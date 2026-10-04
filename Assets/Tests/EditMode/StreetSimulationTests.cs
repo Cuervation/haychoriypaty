@@ -159,6 +159,32 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
+        public void LegacyInflatedSaveResetsStartingTeamAndSpeedButPreservesProgress()
+        {
+            Type gameType = Type.GetType("HayChoriYPaty.StreetGame, Assembly-CSharp", true);
+            Type saveType = gameType.GetNestedType("SaveData", BindingFlags.Public);
+            object legacy = Activator.CreateInstance(saveType);
+            saveType.GetField("version").SetValue(legacy, 1);
+            saveType.GetField("staff").SetValue(legacy, 8);
+            saveType.GetField("speed").SetValue(legacy, 65);
+            saveType.GetField("unlockedLevel").SetValue(legacy, 2);
+            saveType.GetField("coins").SetValue(legacy, 42);
+            saveType.GetField("price").SetValue(legacy, 17f);
+            saveType.GetField("prices").SetValue(legacy, new[] { 5f, 17f, 18f, 19f, 5f, 8f, 9f });
+
+            object migrated = gameType.GetMethod("MigrateSaveData", BindingFlags.NonPublic | BindingFlags.Static)
+                .Invoke(null, new[] { legacy });
+            Assert.AreEqual(2, saveType.GetField("version").GetValue(migrated));
+            Assert.AreEqual(1, saveType.GetField("staff").GetValue(migrated));
+            Assert.AreEqual(0, saveType.GetField("speed").GetValue(migrated));
+            Assert.AreEqual(2, saveType.GetField("unlockedLevel").GetValue(migrated));
+            Assert.AreEqual(42, saveType.GetField("coins").GetValue(migrated));
+            Assert.AreEqual(17f, saveType.GetField("price").GetValue(migrated));
+            Assert.AreEqual(17f, ((float[])saveType.GetField("prices").GetValue(migrated))[1]);
+        }
+
+
+        [Test]
         public void ProductCatalogRemainsSevenAndPriceUsesConfigurableRange()
         {
             object balance = NewBalance(); Tune(balance, "levelProductCounts", new[] { 1, 1, 5, 6, 7 });

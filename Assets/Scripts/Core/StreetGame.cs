@@ -17,7 +17,7 @@ namespace HayChoriYPaty
         [System.Serializable]
         public sealed class SaveData
         {
-            public int version = 1;
+            public int version = 2;
             public int unlockedLevel;
             public float price = 5f;
             public float[] prices;
@@ -91,14 +91,32 @@ namespace HayChoriYPaty
             try
             {
                 SaveData data = JsonUtility.FromJson<SaveData>(PlayerPrefs.GetString(SaveKey));
-                if (data == null || data.version != 1) return DefaultSave();
+                data = MigrateSaveData(data);
+                if (data == null || data.version != 2) return DefaultSave();
                 data.unlockedLevel = Mathf.Clamp(data.unlockedLevel, 0, 4);
                 data.price = Mathf.Clamp(data.price, balance.minPrice, balance.maxPrice);
-                data.coins = Mathf.Max(0, data.coins); data.staff = Mathf.Clamp(data.staff, 1, balance.maxStaff); data.speed = Mathf.Max(0, data.speed);
+                data.coins = Mathf.Max(0, data.coins);
+                data.staff = Mathf.Clamp(data.staff, 1, balance.maxStaff);
+                data.speed = Mathf.Max(0, data.speed);
                 return data;
             }
             catch { return DefaultSave(); }
         }
+
+        private static SaveData MigrateSaveData(SaveData data)
+        {
+            if (data == null) return null;
+            if (data.version == 1)
+            {
+                // Development started from an inflated save; reset only opening staff and speed.
+                // Preserve unlocked locations, coins, prices, and the rest of player progress.
+                data.staff = 1;
+                data.speed = 0;
+                data.version = 2;
+            }
+            return data;
+        }
+
 
         private SaveData DefaultSave() { return new SaveData { price = balance.initialPrice }; }
 

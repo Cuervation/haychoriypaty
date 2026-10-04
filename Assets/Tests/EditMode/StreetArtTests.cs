@@ -57,6 +57,72 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
+        public void FirstLevelFansLoadAllFifteenWardrobeSpritesAndVaryByCustomer()
+        {
+            string[] names = (string[])View.GetField("FanWardrobeResourceNames", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+            Assert.AreEqual(15, names.Length);
+            Assert.AreEqual(15, names.Distinct().Count());
+
+            foreach (string name in names)
+            {
+                string path = "Assets/Art/Street/Resources/FanWardrobe/" + name + ".png";
+                Texture2D texture = Resources.Load<Texture2D>("FanWardrobe/" + name);
+                Assert.NotNull(texture, "Missing Resources sprite " + name);
+                TextureImporter importer = (TextureImporter)AssetImporter.GetAtPath(path);
+                Assert.NotNull(importer, "Missing importer for " + path);
+                Assert.IsTrue(importer.DoesSourceTextureHaveAlpha());
+                Assert.IsTrue(importer.alphaIsTransparency);
+                Assert.IsFalse(importer.mipmapEnabled);
+                Assert.AreEqual(TextureImporterNPOTScale.None, importer.npotScale);
+                Assert.AreEqual(TextureImporterCompression.Uncompressed, importer.textureCompression);
+                var android = importer.GetPlatformTextureSettings("Android");
+                Assert.IsTrue(android.overridden);
+                Assert.AreEqual(TextureImporterFormat.RGBA32, android.format);
+            }
+
+            MethodInfo select = View.GetMethod("GetFanWardrobeIndex", BindingFlags.Static | BindingFlags.NonPublic);
+            int[] firstCycle = Enumerable.Range(0, names.Length)
+                .Select(id => (int)select.Invoke(null, new object[] { id }))
+                .ToArray();
+            Assert.AreEqual(names.Length, firstCycle.Distinct().Count(), "Every fan gets a different garment before the cycle repeats");
+            Assert.AreEqual(firstCycle[0], (int)select.Invoke(null, new object[] { names.Length }));
+        }
+
+        [Test]
+        public void StartupCoverAndTitleLogoAreReadyForAndroidSplash()
+        {
+            Texture2D cover = Resources.Load<Texture2D>("street-cover");
+            Texture2D logo = Resources.Load<Texture2D>("street-logo");
+            Assert.NotNull(cover);
+            Assert.NotNull(logo);
+            Assert.AreEqual(1024, cover.width);
+            Assert.AreEqual(1536, cover.height);
+            Assert.AreEqual(1274, logo.width);
+            Assert.AreEqual(1235, logo.height);
+
+            foreach (var pair in new[] {
+                new { Path = "Assets/Art/Street/Resources/street-cover.png", Texture = cover, Alpha = false },
+                new { Path = "Assets/Art/Street/Resources/street-logo.png", Texture = logo, Alpha = true }
+            })
+            {
+                TextureImporter importer = (TextureImporter)AssetImporter.GetAtPath(pair.Path);
+                Assert.NotNull(importer);
+                Assert.IsFalse(importer.mipmapEnabled);
+                Assert.AreEqual(TextureImporterNPOTScale.None, importer.npotScale);
+                Assert.AreEqual(TextureImporterCompression.Uncompressed, importer.textureCompression);
+                Assert.AreEqual(pair.Alpha, importer.DoesSourceTextureHaveAlpha());
+                if (pair.Alpha) Assert.IsTrue(importer.alphaIsTransparency);
+                var android = importer.GetPlatformTextureSettings("Android");
+                Assert.IsTrue(android.overridden);
+                Assert.AreEqual(TextureImporterFormat.RGBA32, android.format);
+            }
+
+            float duration = (float)View.GetField("IntroDuration", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue();
+            Assert.GreaterOrEqual(duration, 3f);
+            Assert.LessOrEqual(duration, 5f);
+        }
+
+        [Test]
         public void LargeStreetGrillPreservesAlphaAndOriginalResolution()
         {
             const string path = "Assets/Art/Street/Resources/street-parrilla-large.png";

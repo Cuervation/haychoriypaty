@@ -25,8 +25,10 @@ Normalize the observed 1080×1920 composition to a 540×960 logical safe-area ca
 ## Required direction
 
 - 100% 2D mobile cartoon: small expressive supporters with oversized heads, rounded shapes, vivid colors, clean dark contours, consistent proportions and fluid simple animation.
+- On startup, show the supplied Floresta cover art first, then the separate Hay Chori y Paty logo with a brief warm light flash; let this short intro reveal the existing ready screen, and keep the transition in the established 2D presentation.
 - Fixed portrait camera. Keep signs at top, dense standing supporters with product/quantity/patience indicators above a horizontal separating counter, moving workers in the open lower playfield, product stations below and large hire/upgrade controls at bottom; retain automatic side condiments.
-- Floresta public sidewalk, in front of All Boys: neighborhood facades and a generic stadium silhouette. Do not use club logos or imply indoor stadium service.
+- Floresta public sidewalk, across from All Boys: neighborhood facades, stadium silhouette, and the recognizable broad supporter mural on the wall across the street. Interpret the user's mural photograph as original black-and-white cartoon supporter art; do not copy its exact composition, portraits, lettering, crests, or logos, and do not imply indoor stadium service.
+- In level 1, vary supporter outfits with the original logo-free overlays in `Assets/Art/Street/Resources/FanWardrobe`; preserve the existing poses and leave later-level crowds unchanged.
 - Grill must read as an Argentine iron street parrilla with embers, chorizo and bread, not an industrial kitchen. Condiments are an automatic stop; there is no seating.
 
 ## Do not
@@ -57,6 +59,10 @@ Active `Assets/Art/Street/Resources/street-background-v2.png` (940×1672) places
 
 Actual reviewed Game-view evidence: ignored `Logs/Acceptance/street-layout-final.png`. Generated method/prompts: `Assets/Art/Street/GenerationPrompts.md`. Directional frame walking and state-driven pickup/carry/handoff, moving/receiving fans and sale effects are active, but additional frame polish/audio and distinct four later-club illustrations remain pending. Original background v1 and all existing metas are retained.
 
+## Floresta opposite-wall mural — 2026-10-04
+
+User-supplied All Boys mural photo is a location/composition reference, not a source to trace. The versioned active `Assets/Art/Street/Resources/street-background-mural-v3.png` replaces only the previously blank far stadium wall with original monochrome cartoon supporter art, retaining the composed stall, road/sidewalk, foreground play area, controls-safe area, and all other scene elements. Existing `street-background-v2.png` and its `.meta` remain untouched. New import settings match the old background (NPOT resize/mips off; Android texture override retained). See `Assets/Art/Street/GenerationPrompts.md`. Imported and reviewed in Main's Play-mode Game View at the start menu; screenshot: ignored `Logs/Acceptance/Mural/floresta-mural-menu.png`.
+
 ## Parrillero appearance — 2026-10-03
 
 User photo is appearance reference, not graphic style: very overweight adult, dark wavy hair/light stubble, fuller cheeks and double chin, matched face/body skin hue, bare shoulders/arms/back (no shirt), dirty white bib apron with grease/charcoal stains. Visible role is **Parrillero**, not Cocinero. Original cartoon likeness, no copied photo/logo/tattoo. Preserve existing fans, 2D composition and seven products.
@@ -76,3 +82,9 @@ User supplied two real crowded sidewalk-grill photographs as ambience/object-sca
 Integrated original2172x724RGBA Resources/street-parrilla-large.png with NPOT/mipmaps off, uncompressed4096/AndroidRGBA32. Real9art checks passed in41-case targetedEditMode job;11pointer checks passed. Actual1080x1920Game-view captures reviewed for Ready/FlorestaPlaying/seven-products: loaded full-width grill, clear HUD/buttons and drink stations, unchanged worker anchors; exact editor progress restored after stoppingPlay. Evidence ignored under Logs/Acceptance/LargeGrill/. Exact prompt retained in Assets/Art/Street/GenerationPrompts.md.
 
 APK0.2.3/code5 succeeded363.11s,0errors/3warnings; signature/package/ABI verified. Not installed or run natively by explicit user request; physical visual/FPS validation remains pending.
+
+## Selected startup artwork — 2026-10-04
+
+The user selected the supplied portrait cover and transparent title logo, retained unchanged as `Assets/Art/Street/Resources/street-cover.png` and `street-logo.png` with new preserved metas. Follow the explicit requested cover→logo/light-flash sequence; the latest WhatsApp clip itself was not visually inspected, so do not claim frame-matched reproduction. The original reference direction still governs gameplay art.
+
+Real 1080×1920 Game-view captures reviewed: ignored `Logs/Acceptance/Intro/{cover,logo-flash,ready}.png`. The separate representative `wardrobe-floresta.png` confirms fitting of the logo-free clothing over original fan bodies, with gameplay/layout unchanged; all 15 texture loads and deterministic rotation are covered by focused art tests. Native/device appearance remains unverified until requested installation.

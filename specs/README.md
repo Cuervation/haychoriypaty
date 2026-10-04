@@ -12,5 +12,6 @@ Specs are authoritative; implementation and short status belong in code/status, 
 | Code boundaries and Unity folders | [architecture.md](architecture.md) |
 | Brief technical tradeoffs | [decisions.md](decisions.md) |
 | Current implementation and next steps | [status.md](status.md) |
+| Resume in a new chat / latest saved checkpoint | [continuity.md](continuity.md) |
 
 For each feature, consult its spec, keep scope minimal, validate only affected behavior, and update its acceptance/status if behavior or completion changes.

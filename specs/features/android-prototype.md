@@ -1,7 +1,16 @@
 # Android delivery — current Street and historical prototype
 
+## Current Street0.2.4 — selected cover/logo intro (2026-10-04)
 
-## Current Street0.2.2 — Parrillero poses (2026-10-04)
+- Supplied cover/logo assets, 4.1-second unscaled reveal with one warm flash, native/desktop action gating until Ready; includes the earlier mural, 15 fan-clothing overlays and v1→v2 opening staff/speed migration. No new game mechanics, packages or scene changes.
+- Focused art EditMode 11/11 passed; affected real-editor pointer PlayMode 12/12 passed (job `adfc5a956d4f48548c73f34aa2caec0d`). Earlier batch pointer failures are recorded in [status](../status.md), not counted as passing checks. Actual 1080×1920 Game-view intro and representative wardrobe captures reviewed; editor progress restored exactly and Main remains clean/stopped.
+- Existing-editor MCP build `build-1970fbd5d5` succeeded 364.73s (actual BuildReport 364.70s), 0 errors / 3 warnings: diagnostic-symbol recommendation and two Unity-splash PVRTC/fallback notices. Main only; preserved Main/SampleScene Build Settings entries. No simultaneous editor.
+- Rolling local artifact `Builds/Android/HayChoriYPaty-street.apk`: **106,121,029 bytes (101.20 MiB)**, package `com.haychoriypaty.game`, version **0.2.4/code6**, minimum API26 / target36, ARM64 IL2CPP, V2 signature verified. Debug/local build, not Play Store release signing. Historical hashes below do not describe this replaced file.
+- SHA256: `50e7c191f7818bd6dae8c44e20c4007723d48057500a30c45266fb4508ed7d75`.
+- Unity was safely restarted under user authorization; live MCP state/project/scene/hierarchy/console queries now work. Editor left open on clean Main, Play stopped.
+- User-requested physical Motorola Edge60Fusion delivery: serial-targeted `adb install -r` returned **Success**; installed **0.2.4/code6** verified by PackageManager. GameActivity cold launch **Status ok**, 769ms; app process remained alive. No uninstall/data clear, rebuild or emulator. Foreground changed to another app before screen capture, so new native appearance/touch/performance remain unverified.
+
+## Historical Street0.2.2 — Parrillero poses (2026-10-04)
 
 - Original16-pose atlas and selected fuller-face/skin-matched portrait, visible Parrillero name.3/3focused art EditMode checks and1/1hire/speed PlayMode regression passed. No save/gameplay schema change.
 - Real existing-editor MCP build build-69c0e0ea94 succeeded210.41s,0errors/3warnings (diagnostic-symbol recommendation and two Unity-splashPVRTC/fallback notices). APK67,471,601bytes (64.35MiB), package com.haychoriypaty.game0.2.2/code4,min26/target36/ARM64,V2signature verified. SHA256121d1b815a5dbc6976eeeb9256ce9c37f6167a1b2a5f75c766946bb7903fca0b.

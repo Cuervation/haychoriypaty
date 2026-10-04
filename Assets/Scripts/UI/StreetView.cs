@@ -18,7 +18,19 @@ namespace HayChoriYPaty
         private static readonly Rect Next = new Rect(101, 601, 338, 56);
         private StreetGame game;
         private Texture2D backdrop, people, items, parrillero, parrilleroIcon, largeGrill;
+        private Texture2D[] fanWardrobe;
+        private Texture2D coverArt, titleLogo, introGlow;
+        private bool introActive;
+        private float introStarted;
+        private const float IntroDuration = 4.1f;
         private const string ParrilleroLabel = "Parrillero";
+        private static readonly string[] FanWardrobeResourceNames = {
+            "01-home-white-black", "02-alternative-blue", "03-october-rosa-pink",
+            "04-goalkeeper-aqua", "05-alternative-graphite", "06-home-band-2025",
+            "07-goalkeeper-skyblue", "08-goalkeeper-orange", "09-alternative-blue-original",
+            "10-tee-black", "11-polo-white-black", "12-tee-gray",
+            "13-training-thermal-white", "14-training-jacket-black-white", "15-hoodie-cream"
+        };
         private GUIStyle tiny, small, text, title, header, amount, invisible;
         private int pressedAction, lastAction, priceProduct;
         private bool priceDrag;
@@ -58,17 +70,35 @@ namespace HayChoriYPaty
         private void OnEnable()
         {
             game = GetComponent<StreetGame>();
-            backdrop = Resources.Load<Texture2D>("street-background-v2");
+            backdrop = Resources.Load<Texture2D>("street-background-mural-v3");
             people = Resources.Load<Texture2D>("street-characters");
             items = Resources.Load<Texture2D>("street-items");
             parrillero = Resources.Load<Texture2D>("street-parrillero");
             parrilleroIcon = Resources.Load<Texture2D>("street-parrillero-icon");
             largeGrill = Resources.Load<Texture2D>("street-parrilla-large");
+            fanWardrobe = new Texture2D[FanWardrobeResourceNames.Length];
+            for (int i = 0; i < FanWardrobeResourceNames.Length; i++)
+                fanWardrobe[i] = Resources.Load<Texture2D>("FanWardrobe/" + FanWardrobeResourceNames[i]);
+            coverArt = Resources.Load<Texture2D>("street-cover");
+            titleLogo = Resources.Load<Texture2D>("street-logo");
+            introGlow = CreateIntroGlow();
+            introActive = coverArt != null && titleLogo != null;
+            introStarted = Time.unscaledTime;
             tiny = small = text = title = header = amount = invisible = null;
             pressedAction = lastAction = priceProduct = 0; priceDrag = false;
         }
+        private void OnDisable()
+        {
+            if (introGlow != null) Destroy(introGlow);
+            introGlow = null;
+        }
         private void Update()
         {
+            if (introActive)
+            {
+                if (Time.unscaledTime - introStarted < IntroDuration) return;
+                introActive = false;
+            }
 #if !(UNITY_ANDROID && !UNITY_EDITOR) && ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
             var touch = Touchscreen.current; var mouse = Mouse.current;
             if (touch != null && (touch.primaryTouch.press.isPressed || touch.primaryTouch.press.wasReleasedThisFrame))
@@ -116,6 +146,7 @@ namespace HayChoriYPaty
         }
         private void DispatchAction(int a)
         {
+            if (introActive) return; // Also gates Android's native IMGUI action path.
             bool ok = true;
             if (a==1) game.StartRound(); else if (a==2) ok=game.TryHire(); else if (a==3) ok=game.TryUpgradeSpeed();
             else if (a==4) ok=game.Retry(); else if (a==5) ok=game.NextLevel(); else if (a>=10&&a<15) {ok=game.SelectLevel(a-10);priceProduct=0;} else if(a>=20&&a<27)priceProduct=a-20;
@@ -162,20 +193,112 @@ namespace HayChoriYPaty
             if(sim.Phase==RoundPhase.Ready) ReadyPanel();
             else if(sim.Phase==RoundPhase.Won||sim.Phase==RoundPhase.Lost) ResultPanel();
             else Label(new Rect(45,896,450,35),StreetSimulation.LevelNames[sim.LevelIndex],text);
+            if (introActive) DrawIntro(Time.unscaledTime - introStarted);
             GUI.color=old;GUI.matrix=m;
         }
+        private static Texture2D CreateIntroGlow()
+        {
+            const int size = 128;
+            var glow = new Texture2D(size, size, TextureFormat.RGBA32, false, true)
+            {
+                name = "Intro radial light flash",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            var pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float dx = (x + .5f) / size * 2f - 1f;
+                float dy = (y + .5f) / size * 2f - 1f;
+                float alpha = Mathf.Exp(-(dx * dx + dy * dy) * 7f);
+                pixels[y * size + x] = new Color(1f, .91f, .69f, alpha);
+            }
+            glow.SetPixels(pixels);
+            glow.Apply(false, true);
+            return glow;
+        }
+        private void DrawIntro(float elapsed)
+        {
+            float coverFadeIn = IntroEase(elapsed / .28f);
+            float logoFadeIn = IntroEase((elapsed - 1.62f) / .35f);
+            float exitFade = 1f - IntroEase((elapsed - 3.48f) / .58f);
+            float coverAlpha = coverFadeIn * exitFade;
+            GUI.color = new Color(0f, 0f, 0f, exitFade);
+            GUI.DrawTexture(new Rect(0, 0, W, H), Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
+            GUI.color = new Color(1f, 1f, 1f, coverAlpha);
+            GUI.DrawTexture(new Rect(0, 0, W, H), coverArt, ScaleMode.ScaleAndCrop, true);
+
+            float shadeAlpha = .48f * logoFadeIn * exitFade;
+            GUI.color = new Color(.035f, .025f, .045f, shadeAlpha);
+            GUI.DrawTexture(new Rect(0, 0, W, H), Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
+
+            Rect logoRect = new Rect(78f, 292f, 384f, 376f);
+            float logoScale = Mathf.Lerp(.76f, 1f, logoFadeIn);
+            logoRect = new Rect(270f - logoRect.width * logoScale * .5f,
+                                480f - logoRect.height * logoScale * .5f,
+                                logoRect.width * logoScale, logoRect.height * logoScale);
+
+            float flashTime = elapsed - 2.04f;
+            if (flashTime >= 0f && introGlow != null)
+            {
+                float glowProgress = IntroEase(flashTime / .72f);
+                float glowAlpha = .9f * (1f - glowProgress) * logoFadeIn * exitFade;
+                float glowScale = Mathf.Lerp(.7f, 1.9f, glowProgress);
+                Rect glowRect = new Rect(270f - 235f * glowScale, 480f - 230f * glowScale,
+                                         470f * glowScale, 460f * glowScale);
+                GUI.color = new Color(1f, .91f, .72f, glowAlpha);
+                GUI.DrawTexture(glowRect, introGlow, ScaleMode.StretchToFill, true);
+
+                float flashAlpha = .32f * (1f - IntroEase(flashTime / .18f)) * logoFadeIn * exitFade;
+                if (flashAlpha > .001f)
+                {
+                    GUI.color = new Color(1f, 1f, .96f, flashAlpha);
+                    GUI.DrawTexture(new Rect(0, 0, W, H), Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
+                }
+            }
+
+            GUI.color = new Color(1f, 1f, 1f, logoFadeIn * exitFade);
+            GUI.DrawTexture(logoRect, titleLogo, ScaleMode.ScaleToFit, true);
+            GUI.color = Color.white;
+        }
+        private static float IntroEase(float value)
+        {
+            float t = Mathf.Clamp01(value);
+            return t * t * (3f - 2f * t);
+        }
+
         private void DrawCustomer(StreetCustomer c)
         {
             bool walking=c.State==StreetCustomerState.Entering||c.State==StreetCustomerState.Leaving;
             float bob=walking?Mathf.Sin(c.AnimationTime*14)*2:Mathf.Sin(c.AnimationTime*2+c.Id)*0.8f;
             if(c.State==StreetCustomerState.Receiving)bob-=3;
-            Person(new Rect(c.Position.x-39,c.Position.y-76+bob,78,76),8+(c.Id%4)+(walking?4:0),walking&&c.Target.x>c.Position.x);
+            Rect person = new Rect(c.Position.x-39,c.Position.y-76+bob,78,76);
+            Person(person,8+(c.Id%4)+(walking?4:0),walking&&c.Target.x>c.Position.x);
+            if (game.Sim.LevelIndex == 0) DrawFanWardrobe(person, c.Id);
             if(c.State==StreetCustomerState.Entering||c.State==StreetCustomerState.Leaving)return;
             Item(new Rect(c.Position.x-29,c.Position.y-132,58,65),11,true);
             Item(new Rect(c.Position.x-19,c.Position.y-125,38,30),c.Product);
             Label(new Rect(c.Position.x-29,c.Position.y-101,58,24),c.Remaining.ToString(),text);
             // A sprite-backed patience strip; no placeholder shape stands in for game art.
             GUI.color=new Color(.32f,.7f,.32f);Item(new Rect(c.Position.x-22,c.Position.y-64,44*c.PatienceFraction,4),13,true);GUI.color=Color.white;
+        }
+        private void DrawFanWardrobe(Rect person, int customerId)
+        {
+            if (fanWardrobe == null || fanWardrobe.Length == 0) return;
+            Texture2D garment = fanWardrobe[GetFanWardrobeIndex(customerId)];
+            if (garment == null) return;
+
+            // The underlying original fan remains unchanged; this transparent shirt overlay
+            // covers only its existing jersey area and follows the same bob/movement rect.
+            Rect shirt = new Rect(person.center.x - 16, person.yMax - 38, 32, 22);
+            GUI.DrawTexture(shirt, garment, ScaleMode.StretchToFill, true);
+        }
+        private static int GetFanWardrobeIndex(int customerId)
+        {
+            int index = customerId % FanWardrobeResourceNames.Length;
+            return index < 0 ? index + FanWardrobeResourceNames.Length : index;
         }
         private void DrawWorker(StreetWorker w)
         {

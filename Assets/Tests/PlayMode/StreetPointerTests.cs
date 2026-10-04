@@ -17,6 +17,7 @@ namespace HayChoriYPaty.Tests
         private const BindingFlags StaticPrivate = BindingFlags.NonPublic | BindingFlags.Static;
         private GameObject root;
         private Component game;
+        private Component view;
         private Type gameType;
         private Mouse mouse;
         private bool hadSavedProgress;
@@ -41,7 +42,9 @@ namespace HayChoriYPaty.Tests
             root = new GameObject("Street pointer test (temporary)");
             game = root.AddComponent(gameType);
             Type viewType = Type.GetType("HayChoriYPaty.StreetView, Assembly-CSharp", true);
-            root.AddComponent(viewType);
+            view = root.AddComponent(viewType);
+            // Existing pointer checks isolate post-intro controls; the dedicated test below exercises startup.
+            viewType.GetField("introActive", PrivateInstance).SetValue(view, false);
             yield return null;
         }
 
@@ -106,6 +109,27 @@ namespace HayChoriYPaty.Tests
             yield return null; yield return null;
             InputSystem.QueueStateEvent(mouse, new MouseState { position = to });
             yield return null; yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator StartupIntroBlocksActionsAndUsesUnscaledTime()
+        {
+            Type viewType = view.GetType();
+            viewType.GetField("introActive", PrivateInstance).SetValue(view, true);
+            viewType.GetField("introStarted", PrivateInstance).SetValue(view, Time.unscaledTime);
+            viewType.GetMethod("DispatchAction", PrivateInstance).Invoke(view, new object[] { 1 });
+            Assert.AreEqual("Ready", Phase, "Native and bridge actions must not start behind the cover");
+            yield return Click(270, 585);
+            Assert.AreEqual("Ready", Phase);
+
+            Time.timeScale = 0f;
+            float duration = (float)viewType.GetField("IntroDuration", StaticPrivate).GetRawConstantValue();
+            yield return new WaitForSecondsRealtime(duration + .1f);
+            Assert.IsFalse((bool)viewType.GetField("introActive", PrivateInstance).GetValue(view));
+            Assert.AreEqual("Ready", Phase, "Intro ends without starting a timed round");
+            Time.timeScale = 1f;
+            yield return Click(270, 585);
+            Assert.AreEqual("Playing", Phase);
         }
 
         [UnityTest]
@@ -212,7 +236,7 @@ namespace HayChoriYPaty.Tests
         {
             string key = (string)gameType.GetField("ProgressKey", BindingFlags.Public | BindingFlags.Static).GetValue(null);
             ((Behaviour)game).enabled = false;
-            PlayerPrefs.SetString(key, "{\"version\":1,\"unlockedLevel\":1,\"price\":60,\"prices\":[60,17,9,11,3,6,5],\"coins\":123,\"staff\":3,\"speed\":4}");
+            PlayerPrefs.SetString(key, "{\"version\":2,\"unlockedLevel\":1,\"price\":60,\"prices\":[60,17,9,11,3,6,5],\"coins\":123,\"staff\":3,\"speed\":4}");
             ((Behaviour)game).enabled = true; yield return null;
             Assert.AreEqual(5f, Sim.GetType().GetProperty("Price").GetValue(Sim, null));
             Assert.AreEqual(123, Sim.GetType().GetProperty("Coins").GetValue(Sim, null));

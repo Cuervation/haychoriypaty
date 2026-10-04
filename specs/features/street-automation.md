@@ -15,7 +15,7 @@ Playable Floresta first; reuse the same small scene/simulation for Nueva Chicago
 - Hire up to eight independently moving workers by default. Reservations prevent duplicate delivery to the same final unit; clients that leave release reservations, and in-flight workers cancel safely without earning coins or decrementing another order. Delivery refreshes customer patience. Waiting expiry makes the customer leave.
 - Simulation position/state is authoritative: revenue and quantity changes are gated by arrival and handoff, not by an unrelated view timer. View animates entering/waiting/receiving/exiting customers and directional worker walking/pickup/carry/handoff; coin amount/effect, upgrade and hire feedback reflect actual events.
 - Floresta speed costs $5 on every purchase and adds10percentage points of base movement/productivity per upgrade (x1.00→1.10→1.20). Each extra parrillero/ayudante costs $25 without escalation; retain the eight-worker cap. Later-level speed starts$5/+25percentage points and hire starts$15, retaining their existing escalating cost rules; purchases update availability/prices and affect movement/productivity immediately. Reject insufficient-funds purchases without side effects, and dispatch each tap exactly once.
-- Floresta (level1) is a full 180-second turn: reaching24 delivered units early does not end it; workers keep serving and earning until the clock expires. At the deadline, win if delivered units meet the goal, otherwise lose. `florestaFinishAtDeadline` and duration are inspector-configurable for this trial. Other levels retain early victory at their unit goal. Results show outcome and all delivered units; successful completion unlocks the next location. Do not require clearing every customer to win; preserve purchased staff/upgrades/coins and the save schema.
+- Floresta (level1) is a full 180-second turn: reaching24 delivered units early does not end it; workers keep serving and earning until the clock expires. At the deadline, win if delivered units meet the goal, otherwise lose. `florestaFinishAtDeadline` and duration are inspector-configurable for this trial. Other levels retain early victory at their unit goal. Results show outcome and all delivered units; successful completion unlocks the next location. Do not require clearing every customer to win; preserve purchased staff/upgrades/coins during ordinary v2 saves and level changes.
 
 ## Progression defaults
 
@@ -29,7 +29,7 @@ Products unlock in catalog order: chori, paty, bondiola, vacío, Coca cup, Ferne
 | Vélez | 6 | 85 | 270 |
 | Ferro | 7 | 110 | 300 |
 
-Demand, duration, goal, limits, speed, station delays, patience and upgrade costs remain configurable. Persist unlocked level, prices, purchased upgrades/workers and coins in a versioned JSON value under a dedicated PlayerPrefs key; reject/reset malformed or incompatible data safely. This is progression/economy persistence, not a claim of full in-flight round resume. Define reset/replay handling explicitly in code and test it so restored purchases are not charged again.
+Demand, duration, goal, limits, speed, station delays, patience and upgrade costs remain configurable. Persist unlocked level, prices, purchased upgrades/workers and coins in a versioned JSON value under a dedicated PlayerPrefs key; reject/reset malformed or incompatible data safely. On the one-time v1→v2 migration, reset inflated development workers/speed to one worker and base speed while preserving unlocked level, coins and prices; v2 saves persist later purchases normally. This is progression/economy persistence, not a claim of full in-flight round resume. Define reset/replay handling explicitly in code and test it so restored purchases are not charged again.
 
 ## Minimal integration
 
@@ -43,11 +43,13 @@ No new framework, service, generalized content pipeline or package is necessary.
 - [x] Original imported art matches reference functional composition; no placeholder geometric actors, copied assets, 3D/isometric/cenital view or seated diners. All seven product sprites/stations are connected to their unlocked levels.
 - [x] Historical/later-level price panel changes actual demand and revenue; start works with editor mouse and Android touch, with aligned safe-area hit bounds.
 - [x] Dozens of customers enter and group in rows; each shows correct product, remaining quantity and patience with actual enter/wait/receive/exit states.
+- [x] Floresta rotates all 15 logo-free wardrobe overlays over existing fan poses; focused import/rotation checks and representative portrait Game-view placement review passed.
 - [x] A configured 999-unit order decreases by exactly one on each real handoff; cancellations/departures cannot duplicate decrements or earnings.
 - [x] One worker visibly performs station→pickup→carry→handoff repeatedly; hired workers coordinate reservations and increase measured throughput.
 - [x] Coin effects/amounts occur only for real deliveries. Historical/later-level $5 speed and $15 hire initial costs, escalation, affordability and immediate response verified; Floresta now uses the separate rules below.
 - [x] Win/lose/results/replay work end-to-end; five increasing levels unlock exactly the catalog counts above, never an eighth product.
 - [x] Versioned save/load restores supported progression/economy state and handles corrupt data; no claim of full-round resume without a dedicated test.
+- [x] One-time v1→v2 save migration resets development starting staff/speed to 1 worker and ×1.00 while preserving unlocks, coins and prices.
 - [x] Directional walk/carry/pickup/handoff, customer states and management feedback are actual animations, not static claims.
 - [x] Targeted simulation/input tests, Unity Main playthrough, portrait comparisons and Android player verification recorded (16EditMode/9PlayMode; actual native24-unit round).
 - [ ] Physical device/GPU profiling before mobile-performance certification; pure21client/8worker simulation measured, not mobile FPS.
@@ -72,3 +74,12 @@ User approved this duration experiment. Focused simulation acceptance passed22/2
 - Preserve180seconds/goal24 and original art/progress. User explicitly requested noAPK for this change; only focused editor checks.
 
 Current editor verification:32/32simulation+9/9art jobc900430c9df54e1ab041b0a2475b6e54 and11/11pointer job81416a6df3c746eb8fa26d209fbcf885,0failed/skipped. Ready/Playing Game-view confirms no price slider,$5/$25/+10%,1–4 orders and large parrilla. First-level180s deadline regressions passed. The original noAPK instruction applied to that source-change turn; subsequent large-parrilla request explicitly authorizes APK build, not phone install.
+
+## Startup cover/title reveal — 2026-10-04
+
+Use the selected user-supplied cover and separate transparent logo unchanged. The 4.1-second unscaled intro shows the cover first, reveals the logo with a single short warm flash, then fades to the existing Ready screen without starting a round. Gate both native Android IMGUI and desktop bridge actions during the intro; no extra scene, package, video playback or gameplay changes.
+
+- [x] Both resources import at source dimensions with Android RGBA32/no mipmaps; 11/11 focused art tests passed.
+- [x] Intro blocks actions, ends with timeScale0, stays Ready and permits Start afterward; 12/12 editor pointer tests passed (job adfc5a956d4f48548c73f34aa2caec0d).
+- [x] Actual 1080×1920 Game-view cover/logo-flash/Ready captures reviewed in ignored Logs/Acceptance/Intro/.
+- [x] Android0.2.4/code6 APK built; V2 signature/package/ARM64/min26/target36 verified. User subsequently requested phone installation: 0.2.4/code6 install-r Success and cold launch Statusok verified; new native appearance/touch remain unchecked (see Android delivery).
