@@ -1,0 +1,65 @@
+# Android delivery — current Street and historical prototype
+
+
+## Current Street0.2.0 — verified APK/emulator
+
+Current gameplay authority: [street automation](street-automation.md). Same existing toolchain/AVD/input ownership as below; no dependencies or second Unity installed/launched.
+
+- Build MCP final `build-9d977619d5` succeeded105.11s (first build `build-f16e1134d4`433.10s), **0 errors/52 warnings**. Forty-eight repeated SDK remote manifest/source-list connection warnings plus four diagnostic/postprocessing/splashPVRTC notices. Existing localSDK was sufficient; no downloads/install workaround. Actual reflected BuildReport and Unity LogEntries counts agree0errors/52warnings; MCPv10 read_console mislabels warnings as errors with this editor, so use actual counts/report before diagnosis.
+- APK `Builds/Android/HayChoriYPaty-street.apk`: **84,269,076 bytes (80.37MiB)**, version0.2.0/code2, `com.haychoriypaty.game`, min26/target36, ARM64, V2 signature verified; debug/local build, not release signing. SHA256 `c1254fecc2ae01d1d32fbf03811c740547395fab2c52a25f4fc3fc6db78b4725`.
+- Existing emulator-5554 install-r returned Success and GameActivity launch Statusok. Native Android drag reached0 and60, tap restored5, Start initiated the actual new game. Live crowd21 has999-unit orders and shows one-unit decrements; workers carry original chori sprite.
+- Exactly one Speed5 tap and one Cook15 tap gave17sales/$65/team2/rate1.25/nextcosts10 and30:17×5−20=65. Actual round then won **24 units/$100**,24×5−20=100. No duplicate charges.
+- Street editor validation16EditMode/9PlayMode is recorded in [status](../status.md); it is distinct from these real native Android interactions. Evidence stays ignored `Logs/Acceptance/StreetAndroid/`.
+- Native Next unlockedNuevaChicago/3products/goal40. SeparatePaty11/Chori5 saved on pause; forced own-app restart restored100coins/2staff/speed1/unlocked1. Price tabs initially coveredHUD; moved to panel under title and9/9 regression passed; final APK rebuilt/installed; native product selection and visible/unobstructed HUD confirmed.
+- Process log0 FATAL EXCEPTION/NullReference/MissingReference/IndexOutOfRange; optionalAssetPackManager/EGL/URP warnings exist, not a zero-error log.
+- Physical phone absent in current adb inventory; earlier installation below was the old0.1.0 APK, not this update. Physical touch/FPS/thermal/other cutouts still unverified. Later-club scenery, audio and final polish pending.
+
+## Historical0.1.0 scope
+Deliver the existing two-product portrait prototype as a locally installable Android APK and run it in the existing visible emulator. Preserve gameplay, 2D cartoon reference, package dependencies, scene/meta identities and seven-product boundary. No Play Store publication or release signing.
+
+## Implementation
+- Unity 6000.6.3f1, bundled SDK/JDK/NDK, IL2CPP ARM64, minimum API26, application `com.haychoriypaty.game`.
+- Build Main only via existing Unity MCP editor; do not launch a second editor or overwrite the preserved SampleScene build entry.
+- Exactly one action owner per platform: native GameActivity IMGUI on Android player (no PollPointer), Input System bridge in Input-System-only desktop/editor (GUI render-only).
+- Fit the 540×960 view within Screen.safeArea; share that transform with primary-touch hit testing, preserve portrait letterboxing.
+- Reuse Asadito_Pixel_7a_API_36 (Google APIs x86_64 + libndk ARM64 translation), visible SwiftShader. No duplicated AVD, data wipe or install of new SDK components.
+
+## Acceptance
+- [x] Android build succeeds; APK signature, package, ABI and minimum SDK verified.
+- [x] Safe-area geometry tests and affected pointer tests pass.
+- [x] Existing emulator boots visibly; package installs and launches without fatal Unity/runtime errors.
+- [x] Real emulator taps start a turn, buy staff/speed with earned coins, complete a turn and replay.
+- [x] Reviewed emulator screenshots show reference-consistent portrait UI; buttons remain unobstructed.
+- [x] Emulator remains running with game visible; report evidence and limits.
+
+## Limits
+Emulator ARM translation/software rendering is functional QA, not physical-phone touch, thermal/FPS certification or Unity-supported-device certification. Final art/audio/balancing and Play Store delivery remain separate.
+
+## Evidence — 2026-10-03
+- AndroidViewport EditMode **4/4 passed**, job `059678e9abc54279826b75b0d50813c8`; reference portrait, asymmetric cutout/navigation, side insets, invalid/zero dimensions.
+- Affected FlorestaPointer PlayMode **3/3 passed**, job `04791fa77ba84246ba490660a24d7414`; actual queued mouse/touch start/hire/upgrade/replay and outside/drag rejection. These editor checks are not emulator/device inputs.
+
+- First emulator run exposed duplicate speed purchase: served9/coins100 reflected two $24 charges after one upgrade tap plus hire. A bridge-only Android attempt did not start with the same adb tap. Use the already verified native GameActivity IMGUI path as sole Android owner; desktop/editor retains the bridge. Regression and final rebuilt APK validation completed below.
+
+### Final delivery
+- Final build `build-e95274f9a4`: **Succeeded**, 41.97 seconds, 0 errors / 4 warnings. APK **69,595,590 bytes (66.37 MiB)**; BuildReport769.82MiB includes separate debug outputs, not download size.
+- APK V2 signature verified; package `com.haychoriypaty.game`, version0.1.0/code1, minAPI26/targetAPI36, `arm64-v8a`, GameActivity. Debug/local prototype, not Play Store release signing.
+- SHA256: `94ae293c617e4dbcbbd3afef81b05383f3d99e6c111803e1f3cd5be567028fbc`.
+- Final affected pointer suite **4/4 passed**, job `f82f79af68344b51b834d784a8d75c21`, including duplicate-GUI notification regression in editor; earlier geometry **4/4 passed**. Eight distinct targeted editor cases, not Android player tests.
+- Reused visible AVD `Asadito_Pixel_7a_API_36`, adb `emulator-5554`, 1080×2400, API36, `libndk_translation.so`, SwiftShader. Real install-r/am-start succeeded. No new SDK packages/AVD or user-data wipe.
+- Native adb taps started/replayed rounds, hired one seller and bought exactly one speed level. Final purchase screenshot: served4 / coins34 =16+4×18−30−24, two sellers. Final result: **12 delivered,0 departed,178 coins** =16+12×18−30−24. This confirms no duplicate charge.
+- Inspected portrait UI/letterboxing on native1080×2400: top/cutout and bottom controls remain unobstructed. Screenshots/log evidence retained only in ignored `Logs/Acceptance/Android/{ready,purchases,victory}.png` and `runtime-logcat.txt`.
+- Unity remains stopped on clean Main, Android active; preserved Main/SampleScene entries. Emulator left running with the game in the foreground on its Ready screen, without a timer running until the user starts.
+
+### Observed limitations, not hidden passes
+- Final build warnings: diagnostic symbol recommendation, editor uncompiled-postprocessing notice, obsolete PVRTC Unity splash logo and uncompressed splash fallback. The generated player IL2CPP code contains the current native-only Android input path; actual APK interactions verified it. No postprocessor code changed in this task.
+- Final gameplay process log:0 `FATAL EXCEPTION` and0 observed NullReference/MissingReference/IndexOutOfRange exceptions. **Not a zero-error log**: one engine `AssetPackManager` ClassNotFound diagnostic (standalone APK uses bundled resources),4 emulator EGL capability/fallback errors, URP unsupported-cookie/postprocess notices. These did not prevent the recorded rounds. No Play Asset Delivery dependency added merely to suppress an optional-engine diagnostic.
+- Cold boot initially showed a System UI ANR; Wait let startup finish. SwiftShader/ARM translation is slow and simulation can lag wall time; do not infer phone FPS from this AVD. Physical phone touch, other cutouts, pause/resume stress and thermal/FPS remain unverified.
+- Installed Unity reflection marks X86_64 no longer supported; use ARM64 translation, not a forced obsolete ABI ([Unity removal notice](https://discussions.unity.com/t/platform-support-update-upcoming-magic-leap-x86-64-build-target-removal-in-unity-6-5/1706286)). Unity does not certify Android emulators as supported player platforms ([system requirements](https://docs.unity.com/en-us/engine/6000.5/manual/get-started/install-and-upgrade/getting-started-installing-unity/system-requirements)).
+
+### Reproduce historical0.1.0 narrowly
+Use the existing connected MCP editor: `manage_build` build/android, scenes `["Assets/Scenes/Main.unity"]`, development true, output `Builds/Android/HayChoriYPaty-prototype.apk`; poll its job. Do not start another Unity. For the already-installed bundled SDK, run the existing AVD visibly with `-gpu swiftshader_indirect -no-snapshot-load`; prefer a persistent exec/PTY session (a detached nohup launch did not survive this tool session). Then adb install-r and start `com.haychoriypaty.game/com.unity3d.player.UnityPlayerGameActivity`. Reuse an already-online emulator; never wipe it. Full suite is unnecessary for view/config-only changes.
+
+### Physical phone installation — 2026-10-03
+- User requested installation on the connected Motorola Edge60Fusion: adb reported AndroidAPI36 / arm64-v8a; explicit USB-target install-r returned Success and GameActivity launch Statusok (cold647ms). Existing data preserved; no uninstall or device settings changed.
+- Phone disconnected before the subsequent process/foreground/screenshot query, so no physical-screen review, touch round or FPS validation claimed. Emulator evidence above remains distinct.

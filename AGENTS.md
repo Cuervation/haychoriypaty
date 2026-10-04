@@ -1,0 +1,12 @@
+# Hay Chori y Paty — project rules
+
+- Treat `specs/` as the source of truth. Start at [`specs/README.md`](specs/README.md), then read only the feature/architecture file relevant to the change.
+- Workflow: inspect relevant spec → make the smallest change → run proportional checks → update acceptance/status only if behavior or completion changed → log a short decision when needed. Do not regenerate full documentation.
+- Token discipline: search before broad reads; avoid repeated scans, full-suite tests for small edits, long plans/reports, and subagents unless independent work clearly saves more than it costs. Never overlap agent edits to the same files.
+- Use the installed Unity editor version recorded in `ProjectSettings/ProjectVersion.txt`. Preserve every Unity `.meta` file; do not commit `Library`, `Temp`, `Logs`, `Obj`, build output, or user settings.
+- No package/service installs or paid API routing unless the user explicitly requests or approves them. Project agents may only use GPT-6 Luna or GPT-6.1 Sol; use their checked-in TOML roles only when delegation is beneficial. Model/effort cannot be silently changed for the primary chat.
+- Validate only affected systems; state explicitly when the Unity editor/player or a test could not be run. Do not claim unexecuted checks passed.
+- Preserve the seven-product limit and Argentine street-stall setting in `specs/product.md`; do not add products or seated dining without approval.
+- Before designing or changing any screen, character, object, sprite, or animation, consult specs/visual-reference.md. The project-local screenshot is style/layout reference only; never reuse its artwork literally.
+
+- For Unity work, prefer the configured local Unity MCP when connected for editor operations. Read the relevant spec first; specs stay authoritative. Start with read-only queries, make only the scoped change, and run targeted checks from the existing skill; never infer success from a request alone. MCP uses the global Codex endpoint `http://127.0.0.1:8080/mcp`; do not add duplicate config or expose it beyond loopback.

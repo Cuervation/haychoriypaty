@@ -1,0 +1,10 @@
+{
+  "name": "HayChoriYPaty.PlayModeTests",
+  "references": [
+    "Unity.InputSystem"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ],
+  "autoReferenced": false
+}

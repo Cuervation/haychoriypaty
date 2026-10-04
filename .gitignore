@@ -1,0 +1,34 @@
+# Unity generated data (keep *.meta files tracked).
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Ll]ogs/
+[Bb]uild/
+[Bb]uilds/
+[Mm]emoryCaptures/
+[Rr]ecordings/
+[Uu]ser[Ss]ettings/
+.utmp/
+
+# IDE and operating-system files.
+.idea/
+.vscode/
+.vs/
+*.csproj
+*.sln
+*.suo
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.tmp
+*.bak
+.DS_Store
+Thumbs.db
+
+# Keep Unity package manifests, ProjectSettings, source art, and all .meta files.
+
+# Transient Unity performance-test resources (created/cleaned by runner).
+/Assets/Resources/PerformanceTestRunInfo.json*
+/Assets/Resources/PerformanceTestRunSettings.json*
