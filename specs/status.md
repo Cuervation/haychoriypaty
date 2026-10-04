@@ -1,6 +1,6 @@
 # Project status
 
-**Current milestone:** Street automation active on Main in Unity6000.6.3f1. Current trial0.2.1: Floresta runs the full180seconds; below is the historical0.2.0 acceptance plus the new scoped record. Editor gameplay and original art verified; Android0.2.0 APK compiled/installed and native emulator round verified. [Authoritative feature](features/street-automation.md). Earlier two-product Android0.1.0 evidence remains in [Android history](features/android-prototype.md), not acceptance of this new APK.
+**Current milestone:** Street automation active on Main in Unity6000.6.3f1. Current trial0.2.2: new Parrillero sprites/name and Floresta runs the full180seconds; below is the historical0.2.0 acceptance plus the new scoped record. Editor gameplay and original art verified; Android0.2.0 APK compiled/installed and native emulator round verified. [Authoritative feature](features/street-automation.md). Earlier two-product Android0.1.0 evidence remains in [Android history](features/android-prototype.md), not acceptance of this new APK.
 
 ## Implemented and executed
 
@@ -39,3 +39,9 @@ User chose a full180-second first level. `florestaFinishAtDeadline=true` on Main
 - MCP recovered using installed10.0.0 cache and existing bridge API, no install/second editor. Chat client cached startup error; real MCP SDK client can query/call tools. Temporary editor bootstrap restored, metas unchanged.
 
 - Physical Motorola updated0.2.1/code3 and launchedStatusok after user chose phone over emulator; USB subsequently disconnected before screen verification. Old emulator endpoint shows958sales/56s remaining, not a verified deadline result. No emulator now running; preserved data with install-r.
+
+## Parrillero character — 2026-10-03
+
+Generated original16-pose transparent atlas and hire portrait following user photo/required fat shirtless character with dirty white apron. Active view switched to new assets and visible Parrillero label; supporters, gameplay/save and existing metas preserved. Final selected face uses wavy dark hair/light stubble, fuller cheeks/jaw and matched skin; previous giant-eyed alternate discarded.16 named Unity sprites/foot pivots verified.3/3 StreetArtTests passed (job962b86955487489d9818270118bbc5c3),1/1 affected hire/speed pointer test passed (job5e6b90e5136b4cf5bac2115a5e3e1aa7),0compilation errors. First pre-import job found0tests and is not counted. Extra carry/celebrate/tired poses delivered, no new simulation actions. APK0.2.2/code4 succeeded210.41s0errors/3warnings and signature/ABI verified; phone install/native visual check pending because USB/adb inventory empty even after user reconnection and oneADB restart.
+
+Actual editor Main capture reviewed (2026-10-04): new profile walk, matching hire portrait and unclipped Parrillero label in original Floresta layout. Ignored Logs/Acceptance/Parrillero/parrillero-final.png; stopped Play and restored exact prior editor progress. USB/ioreg and adb show no physical phone, so APK0.2.2 not yet installed/launched there. Three build warnings: diagnostic symbols and Unity-splashPVRTC/fallback; no postprocessing warning in this build.

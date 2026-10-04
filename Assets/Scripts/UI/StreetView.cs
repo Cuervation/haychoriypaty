@@ -12,12 +12,13 @@ namespace HayChoriYPaty
         private const float W = 540, H = 960;
         private static readonly Rect Start = new Rect(161, 555, 218, 61);
         private static readonly Rect Speed = new Rect(84, 680, 174, 179);
-        private static readonly Rect Cook = new Rect(282, 680, 174, 179);
+        private static readonly Rect HireParrillero = new Rect(282, 680, 174, 179);
         private static readonly Rect Slider = new Rect(87, 484, 366, 36);
         private static readonly Rect Again = new Rect(101, 536, 338, 56);
         private static readonly Rect Next = new Rect(101, 601, 338, 56);
         private StreetGame game;
-        private Texture2D backdrop, people, items;
+        private Texture2D backdrop, people, items, parrillero, parrilleroIcon;
+        private const string ParrilleroLabel = "Parrillero";
         private GUIStyle tiny, small, text, title, header, amount, invisible;
         private int pressedAction, lastAction, priceProduct;
         private bool priceDrag;
@@ -35,12 +36,33 @@ namespace HayChoriYPaty
             new Rect(49,631,236,306),new Rect(350,627,256,313),new Rect(658,629,252,311),new Rect(955,628,261,308),
             new Rect(79,943,196,304),new Rect(383,942,208,306),new Rect(690,940,200,308),new Rect(982,940,242,308)
         };
+        // Reviewed alpha bounds from the original 1315x1197 atlas; existing fans unchanged.
+        private static readonly Rect[] ParrilleroPoses = {
+            new Rect(30,10,266,303),
+            new Rect(357,16,263,309),
+            new Rect(690,10,246,316),
+            new Rect(1020,10,255,303),
+            new Rect(31,331,264,288),
+            new Rect(367,330,229,291),
+            new Rect(708,330,228,290),
+            new Rect(1018,335,265,285),
+            new Rect(77,622,185,288),
+            new Rect(382,623,233,287),
+            new Rect(702,622,221,287),
+            new Rect(1045,640,242,268),
+            new Rect(45,908,234,278),
+            new Rect(374,908,227,276),
+            new Rect(687,908,249,276),
+            new Rect(1044,909,235,277)
+        };
         private void OnEnable()
         {
             game = GetComponent<StreetGame>();
             backdrop = Resources.Load<Texture2D>("street-background-v2");
             people = Resources.Load<Texture2D>("street-characters");
             items = Resources.Load<Texture2D>("street-items");
+            parrillero = Resources.Load<Texture2D>("street-parrillero");
+            parrilleroIcon = Resources.Load<Texture2D>("street-parrillero-icon");
             tiny = small = text = title = header = amount = invisible = null;
             pressedAction = lastAction = priceProduct = 0; priceDrag = false;
         }
@@ -87,7 +109,7 @@ namespace HayChoriYPaty
                 for (int i=0;i<5;i++) if (LevelButton(i).Contains(p) && i<=game.UnlockedLevel) return 10+i;
                 return 0;
             }
-            if (game.Sim.Phase == RoundPhase.Playing) return Speed.Contains(p) ? 3 : Cook.Contains(p) ? 2 : 0;
+            if (game.Sim.Phase == RoundPhase.Playing) return Speed.Contains(p) ? 3 : HireParrillero.Contains(p) ? 2 : 0;
             return Again.Contains(p) ? 4 : Next.Contains(p) && game.Sim.Phase==RoundPhase.Won && game.SelectedLevel<4 ? 5 : 0;
         }
         private void DispatchAction(int a)
@@ -132,7 +154,7 @@ namespace HayChoriYPaty
             Label(new Rect(168,644,212,27),"Ventas "+sim.Delivered+" / "+sim.Goal,small);
             Label(new Rect(385,644,137,27),Mathf.CeilToInt(sim.TimeRemaining)+" s",small);
             Upgrade(Speed,3,15,"Velocidad",sim.SpeedCost,sim.Coins>=sim.SpeedCost);
-            Upgrade(Cook,2,16,"Cocinero",sim.HireCost,sim.Coins>=sim.HireCost&&sim.StaffCount<game.Balance.maxStaff);
+            Upgrade(HireParrillero,2,16,ParrilleroLabel,sim.HireCost,sim.Coins>=sim.HireCost&&sim.StaffCount<game.Balance.maxStaff);
             Label(new Rect(70,858,400,26),"Equipo "+sim.StaffCount+"  ·  Velocidad ×"+sim.WorkRate.ToString("0.00"),small);
             if(sim.Phase==RoundPhase.Ready) PricePanel();
             else if(sim.Phase==RoundPhase.Won||sim.Phase==RoundPhase.Lost) ResultPanel();
@@ -156,11 +178,15 @@ namespace HayChoriYPaty
         {
             bool moving=w.State==StreetWorkerState.ToStation||w.State==StreetWorkerState.ToCounter;
             bool back=w.Target.y<w.Position.y;int frame=0;
-            if(moving)frame=(back?5:1)+((int)(w.AnimationTime*8)%2);
+            if(moving)
+            {
+                bool sideways=Mathf.Abs(w.Target.x-w.Position.x)>Mathf.Abs(w.Target.y-w.Position.y);
+                frame=(sideways?9:(back?5:1))+((int)(w.AnimationTime*8)%2);
+            }
             if(w.State==StreetWorkerState.Pickup)frame=7;
             if(w.State==StreetWorkerState.Handoff)frame=3;
             float bob=moving?Mathf.Sin(w.AnimationTime*16)*1.5f:0;
-            Person(new Rect(w.Position.x-45,w.Position.y-98+bob,90,98),frame,w.Target.x>w.Position.x&&Mathf.Abs(w.Target.x-w.Position.x)>30);
+            Parrillero(new Rect(w.Position.x-45,w.Position.y-98+bob,90,98),frame,w.Target.x>w.Position.x&&Mathf.Abs(w.Target.x-w.Position.x)>30);
             if(w.State==StreetWorkerState.ToCounter||w.State==StreetWorkerState.Handoff)
                 Item(new Rect(w.Position.x-25,w.Position.y-46+bob,31,29),w.Product);
             if(w.State==StreetWorkerState.Pickup) {GUI.color=new Color(1,1,1,.55f);Item(new Rect(w.Position.x-15,w.Position.y-45,30,36),19);GUI.color=Color.white;}
@@ -234,7 +260,15 @@ namespace HayChoriYPaty
         }
         private static GUIStyle Style(int size){var s=new GUIStyle(GUI.skin.label){fontSize=size,fontStyle=FontStyle.Bold,alignment=TextAnchor.MiddleCenter,wordWrap=true};s.normal.textColor=new Color(.16f,.10f,.08f);return s;}
         private static void Label(Rect r,string value,GUIStyle style){GUI.Label(r,value,style);}
-        private void Item(Rect r,int id,bool stretch=false){if(items!=null&&id>=0&&id<Items.Length)Draw(r,items,Items[id],stretch,false);}
+        private void Item(Rect r,int id,bool stretch=false)
+        {
+            if(id==16 && parrilleroIcon!=null)Draw(r,parrilleroIcon,new Rect(22,6,1269,1188),false,false);
+            else if(items!=null&&id>=0&&id<Items.Length)Draw(r,items,Items[id],stretch,false);
+        }
+        private void Parrillero(Rect r,int id,bool flip)
+        {
+            if(parrillero!=null)Draw(r,parrillero,ParrilleroPoses[id],false,flip);
+        }
         private void Person(Rect r,int id,bool flip){if(people==null)return;Draw(r,people,People[id],false,flip);}
         private static void Draw(Rect dest,Texture2D texture,Rect src,bool stretch,bool flip)
         {

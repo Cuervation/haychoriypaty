@@ -1,9 +1,15 @@
 # Android delivery — current Street and historical prototype
 
 
-## Current Street0.2.1 — three-minute trial
+## Current Street0.2.2 — Parrillero poses (2026-10-04)
 
-`Builds/Android/HayChoriYPaty-street.apk` is a rolling local artifact: current0.2.1/code3 built/installed; native past-goal continuation verified, complete deadline check pending. Historical hashes/results below describe0.2.0, not the current file after replacement. No package/toolchain/input change; install-r preserves the versioned save.
+- Original16-pose atlas and selected fuller-face/skin-matched portrait, visible Parrillero name.3/3focused art EditMode checks and1/1hire/speed PlayMode regression passed. No save/gameplay schema change.
+- Real existing-editor MCP build build-69c0e0ea94 succeeded210.41s,0errors/3warnings (diagnostic-symbol recommendation and two Unity-splashPVRTC/fallback notices). APK67,471,601bytes (64.35MiB), package com.haychoriypaty.game0.2.2/code4,min26/target36/ARM64,V2signature verified. SHA256121d1b815a5dbc6976eeeb9256ce9c37f6167a1b2a5f75c766946bb7903fca0b.
+- Rolling artifact Builds/Android/HayChoriYPaty-street.apk now contains this build; historical hashes below describe earlier files. Phone install/visual verification pending: authorized Motorola briefly reappeared then USB/adb absent; one existingADB restart did not restore it. No new components/data wipe.
+
+## Historical Street0.2.1 — three-minute trial
+
+`Builds/Android/HayChoriYPaty-street.apk` is a rolling local artifact: historical0.2.1/code3 built/installed; native past-goal continuation verified, complete deadline check pending. Historical hashes/results below describe0.2.0, not the current file after replacement. No package/toolchain/input change; install-r preserves the versioned save.
 
 - Build `build-a71ad1b4b7`:Succeeded75.02s,0errors/4warnings (diagnostic symbols, uncompiled postprocessing notice and two splashPVRTC/fallback notices). APK70,044,678bytes (66.80MiB),min26/target36/ARM64,V2 signature verified. SHA256 `2ac35039d858cd4b0aa4b454eaa2737789e2c10840141f54e22c50e6056df477`.
 - Real native install-rSuccess/launchStatusok; Ready preserved672coins/7staff/rate3.25. One Start tap, no purchases:60units/$972 (=672+60×5) with172s remaining and no result panel, proving goal24 no longer finishes Floresta early. Evidence ignored `Logs/Acceptance/ThreeMinuteTrial/`. Full deadline/result/save check pending; emulator is functional QA, not phone performance. Endpoint probe stillPlaying958sales/56s left: slow emulator wall time does not equal simulated time; no native deadline victory claimed.

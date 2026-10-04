@@ -59,3 +59,8 @@ Editor:16/16 Street EditMode,9/9 Street PlayMode, Main actual24-unit victory and
 ## Three-minute Floresta trial
 
 User approved this duration experiment. Focused simulation acceptance passed22/22 (job `e1d05e79e164439f94d13b0e4c107315`): level1 staysPlaying beyond24 and continues earnings until180s; deadline evaluatesWon/Lost and freezesclock; otherlevels still early-win. Existing progression/economy save is unchanged; Android0.2.1 built/installed and native60units with172s left verified; full native deadline check pending. No new waves/products/art/UI changes.
+
+## Parrillero art/name requirement — 2026-10-03
+- Staff are visibly named Parrillero. Use new original16-pose heavy shirtless/dirty-white-apron character and matching hire portrait; keep fans, gameplay, prices and progress unchanged.
+- [x] New RGBA textures/16 named sprites import without resizing or mipmaps; bounds/alpha reviewed, bottom-center pivots verified.
+- [x] Runtime worker/hire visuals and Parrillero label reviewed in real editor Game view;3/3EditMode and1/1PlayMode passed. Native visual/performance review remains pending.
