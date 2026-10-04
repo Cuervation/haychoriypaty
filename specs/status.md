@@ -1,6 +1,6 @@
 # Project status
 
-**Current milestone:** Street automation requested from the video, active on Main in Unity6000.6.3f1. Editor gameplay and original art verified; Android0.2.0 APK compiled/installed and native emulator round verified. [Authoritative feature](features/street-automation.md). Earlier two-product Android0.1.0 evidence remains in [Android history](features/android-prototype.md), not acceptance of this new APK.
+**Current milestone:** Street automation active on Main in Unity6000.6.3f1. Current trial0.2.1: Floresta runs the full180seconds; below is the historical0.2.0 acceptance plus the new scoped record. Editor gameplay and original art verified; Android0.2.0 APK compiled/installed and native emulator round verified. [Authoritative feature](features/street-automation.md). Earlier two-product Android0.1.0 evidence remains in [Android history](features/android-prototype.md), not acceptance of this new APK.
 
 ## Implemented and executed
 
@@ -26,6 +26,16 @@ Final build `build-9d977619d5`:0errors/52warnings, signature/package/ABI verifie
 
 ## Remaining
 
-- Physical-phone installation/validation pending: phone currently absent from adb; new0.2.0 emulator install does not update the old phone APK.
+- Physical phone updated to0.2.1/code3 via USB install-rSuccess/launchStatusok. USB disconnected before screen review; physical touch/FPS validation remains pending.
 - Five gameplay locations share the first Floresta artwork; distinct Chicago/Argentinos/Vélez/Ferro scenery and supporter kits still pending.
 - Audio, final animation/art polish, device FPS/thermal profiling, broader cutouts and pause/resume stress, balancing and release signing/Play Store publication remain unverified or out of scope.
+
+## Floresta three-minute trial — 2026-10-03
+
+User chose a full180-second first level. `florestaFinishAtDeadline=true` on Main means reaching24 units no longer ends Floresta: continue serving/earning until the clock, then evaluateWon/Lost. Clock clamps to the deadline; other levels still win early. No waves, products, art/input, upgrade/reset or save-schema changes.
+
+- Street simulation **22/22 passed**,0failed/skipped, job `e1d05e79e164439f94d13b0e4c107315`: new continuity/extra earnings with8staff+7speed,Playing at179s,Won exactly180/frozen after end, insufficient-goal deadline loss, and four later-level early wins.
+- Main new policy explicitly serialized; editor0 compilation errors after import. Version0.2.1/code3 flushed toPlayerSettings. APK0.2.1/code3 build75.02s/0errors/4warnings,signature/ABI/version verified and installed. Native continued60units/$972 aftergoal24 with172s left (baseline672coins,7staff/rate3.25 preserved); complete deadline check pending. Earlier0.2.0 screenshots/results remain historical.
+- MCP recovered using installed10.0.0 cache and existing bridge API, no install/second editor. Chat client cached startup error; real MCP SDK client can query/call tools. Temporary editor bootstrap restored, metas unchanged.
+
+- Physical Motorola updated0.2.1/code3 and launchedStatusok after user chose phone over emulator; USB subsequently disconnected before screen verification. Old emulator endpoint shows958sales/56s remaining, not a verified deadline result. No emulator now running; preserved data with install-r.

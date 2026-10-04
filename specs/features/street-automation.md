@@ -15,7 +15,7 @@ Playable Floresta first; reuse the same small scene/simulation for Nueva Chicago
 - Hire up to eight independently moving workers by default. Reservations prevent duplicate delivery to the same final unit; clients that leave release reservations, and in-flight workers cancel safely without earning coins or decrementing another order. Delivery refreshes customer patience. Waiting expiry makes the customer leave.
 - Simulation position/state is authoritative: revenue and quantity changes are gated by arrival and handoff, not by an unrelated view timer. View animates entering/waiting/receiving/exiting customers and directional worker walking/pickup/carry/handoff; coin amount/effect, upgrade and hire feedback reflect actual events.
 - Speed initially costs $5; hire initially costs $15. Subsequent costs escalate through inspector balance; purchases update availability/prices and affect movement/productivity immediately. Reject insufficient-funds purchases without side effects, and dispatch each tap exactly once.
-- Win when the configurable delivered-unit goal is reached, even if a 999-unit order remains unfinished. Lose when the level clock expires first. Results show outcome and units delivered; successful completion unlocks the next location. Do not require all orders to reach zero to win.
+- Floresta (level1) is a full 180-second turn: reaching24 delivered units early does not end it; workers keep serving and earning until the clock expires. At the deadline, win if delivered units meet the goal, otherwise lose. `florestaFinishAtDeadline` and duration are inspector-configurable for this trial. Other levels retain early victory at their unit goal. Results show outcome and all delivered units; successful completion unlocks the next location. Never require all999 units to finish; prices/staff/upgrades/save remain unchanged.
 
 ## Progression defaults
 
@@ -55,3 +55,7 @@ No new framework, service, generalized content pipeline or package is necessary.
 ## Validation record
 
 Editor:16/16 Street EditMode,9/9 Street PlayMode, Main actual24-unit victory and persistent reload; original atlas/import/layout reviewed. Isolated five-level wins and real wrapper corrupt/versioned save checks passed. See [status](../status.md) for exact jobs and limitations. Native Android slider0/60,Start,unique hire/speed,24-unit victory,next unlock and restart/save verified; final rebuilt APK installed; native product selection and unobstructed HUD confirmed. Physical performance remains pending; checked simulation/progression criteria do not imply five distinct club backgrounds, audio or physical-device certification.
+
+## Three-minute Floresta trial
+
+User approved this duration experiment. Focused simulation acceptance passed22/22 (job `e1d05e79e164439f94d13b0e4c107315`): level1 staysPlaying beyond24 and continues earnings until180s; deadline evaluatesWon/Lost and freezesclock; otherlevels still early-win. Existing progression/economy save is unchanged; Android0.2.1 built/installed and native60units with172s left verified; full native deadline check pending. No new waves/products/art/UI changes.

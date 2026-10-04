@@ -576,6 +576,7 @@ MonoBehaviour:
     - 240
     - 270
     - 300
+    florestaFinishAtDeadline: 1
   selectedLevel: 0
 --- !u!1660057539 &9223372036854775807
 SceneRoots:

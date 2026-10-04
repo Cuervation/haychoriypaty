@@ -29,6 +29,8 @@ namespace HayChoriYPaty
         public int[] levelProductCounts = { 1, 3, 5, 6, 7 };
         public int[] levelGoals = { 24, 40, 65, 85, 110 };
         public float[] levelDurations = { 180f, 210f, 240f, 270f, 300f };
+        [Tooltip("Floresta keeps serving for the full turn; evaluate its sales goal at the deadline.")]
+        public bool florestaFinishAtDeadline = true;
     }
 
     public enum StreetCustomerState { Entering, Waiting, Receiving, Leaving }
@@ -185,8 +187,9 @@ namespace HayChoriYPaty
 
         private void StepSlice(float dt)
         {
-            Elapsed += dt;
-            if (Elapsed >= LevelValue(balance.levelDurations, LevelIndex, DefaultDurations)) { Phase = Delivered >= Goal ? RoundPhase.Won : RoundPhase.Lost; return; }
+            float duration = LevelValue(balance.levelDurations, LevelIndex, DefaultDurations);
+            Elapsed = Mathf.Min(duration, Elapsed + dt);
+            if (Elapsed >= duration) { Phase = Delivered >= Goal ? RoundPhase.Won : RoundPhase.Lost; return; }
             arrival -= dt;
             if (arrival <= 0f && customers.Count < DemandCapacity())
             {
@@ -206,7 +209,7 @@ namespace HayChoriYPaty
             AdvanceCustomers(dt);
             AdvanceWorkers(dt);
             for (int i = sales.Count - 1; i >= 0; i--) { sales[i].Age += dt; if (sales[i].Age > 3f) sales.RemoveAt(i); }
-            if (Delivered >= Goal) Phase = RoundPhase.Won;
+            if (Delivered >= Goal && !(LevelIndex == 0 && balance.florestaFinishAtDeadline)) Phase = RoundPhase.Won;
         }
 
         private int DemandCapacity()

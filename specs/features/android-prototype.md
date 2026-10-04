@@ -1,7 +1,15 @@
 # Android delivery — current Street and historical prototype
 
 
-## Current Street0.2.0 — verified APK/emulator
+## Current Street0.2.1 — three-minute trial
+
+`Builds/Android/HayChoriYPaty-street.apk` is a rolling local artifact: current0.2.1/code3 built/installed; native past-goal continuation verified, complete deadline check pending. Historical hashes/results below describe0.2.0, not the current file after replacement. No package/toolchain/input change; install-r preserves the versioned save.
+
+- Build `build-a71ad1b4b7`:Succeeded75.02s,0errors/4warnings (diagnostic symbols, uncompiled postprocessing notice and two splashPVRTC/fallback notices). APK70,044,678bytes (66.80MiB),min26/target36/ARM64,V2 signature verified. SHA256 `2ac35039d858cd4b0aa4b454eaa2737789e2c10840141f54e22c50e6056df477`.
+- Real native install-rSuccess/launchStatusok; Ready preserved672coins/7staff/rate3.25. One Start tap, no purchases:60units/$972 (=672+60×5) with172s remaining and no result panel, proving goal24 no longer finishes Floresta early. Evidence ignored `Logs/Acceptance/ThreeMinuteTrial/`. Full deadline/result/save check pending; emulator is functional QA, not phone performance. Endpoint probe stillPlaying958sales/56s left: slow emulator wall time does not equal simulated time; no native deadline victory claimed.
+- User then chose the connected physical Motorola Edge60Fusion. USB-target install-rSuccess and GameActivity launchStatusok/cold819ms; installed0.2.1/code3 verified. USB disconnected before foreground/screenshot query, so physical visual/touch/performance checks remain unverified. No data wipe; emulator no longer running.
+
+## Historical Street0.2.0 — verified APK/emulator
 
 Current gameplay authority: [street automation](street-automation.md). Same existing toolchain/AVD/input ownership as below; no dependencies or second Unity installed/launched.
 

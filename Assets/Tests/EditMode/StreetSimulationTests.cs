@@ -58,14 +58,11 @@ namespace HayChoriYPaty.Tests
         public void MultipleWorkersNeverReserveMoreUnitsThanRemain()
         {
             object balance = NewBalance(); Tune(balance,"levelGoals",new[]{1,1,1,1,1}); Tune(balance, "maxCustomers", 1);
-            object sim = Make(staff: 8, balance: balance); Start(sim); Spawn(sim, 0, 1); Step(sim, 8f);
-            IList customers = Customers(sim);
-            if (customers.Count > 0)
-            {
-                object customer = customers[0];
-                Assert.LessOrEqual((int)Get(customer, "Reserved"), (int)Get(customer, "Remaining"));
-            }
-            Assert.LessOrEqual((int)Get(sim, "Delivered"), 1);
+            object sim = Make(staff: 8, balance: balance); Start(sim); Spawn(sim, 0, 1);
+            object customer = Customers(sim)[0]; Step(sim, 8f);
+            // The full turn may serve later arrivals; verify this original one-unit order.
+            Assert.AreEqual(0, Get(customer, "Remaining"));
+            Assert.AreEqual(0, Get(customer, "Reserved"));
         }
 
         [Test]
@@ -136,11 +133,11 @@ namespace HayChoriYPaty.Tests
         public void WinUnlocksNextLevelAndCreatesReadyNextRound()
         {
             object balance = NewBalance(); Tune(balance, "levelGoals", new[] { 1, 2, 3, 4, 5 });
-            object sim = Make(balance: balance); Start(sim); Spawn(sim, 0, 1);
+            object sim = Make(level: 1, balance: balance); Start(sim); Spawn(sim, 0, 1);
             for (int i = 0; i < 100 && Get(sim, "Phase").ToString() == "Playing"; i++) Step(sim, 0.1f);
             Assert.AreEqual("Won", Get(sim, "Phase").ToString());
             Assert.IsTrue((bool)Call(sim, "NextLevel"));
-            Assert.AreEqual("Ready", Get(sim, "Phase").ToString()); Assert.AreEqual(1, Get(sim, "LevelIndex"));
+            Assert.AreEqual("Ready", Get(sim, "Phase").ToString()); Assert.AreEqual(2, Get(sim, "LevelIndex"));
         }
 
         [Test]
@@ -195,6 +192,52 @@ namespace HayChoriYPaty.Tests
             Assert.Greater(Customers(cheap).Count,Customers(expensive).Count);
             Assert.Greater((int)Get(Customers(cheap)[0],"Remaining"),900);
             if(Customers(expensive).Count>0)Assert.LessOrEqual((int)Get(Customers(expensive)[0],"Remaining"),1);
+        }
+
+        [Test]
+        public void FlorestaServesPastGoalAndWinsOnlyAtThreeMinuteDeadline()
+        {
+            object sim = Make(coins: 1000, staff: 8);
+            for (int i = 0; i < 7; i++) Call(sim, "TryUpgradeSpeed");
+            Start(sim);
+            for (int i = 0; i < 3; i++) Step(sim, 10f);
+            Assert.Greater((int)Get(sim, "Delivered"), (int)Get(sim, "Goal"));
+            Assert.AreEqual("Playing", Get(sim, "Phase").ToString());
+            int coins = (int)Get(sim, "Coins"); Step(sim, 10f);
+            Assert.Greater((int)Get(sim, "Coins"), coins);
+            for (int i = 0; i < 13; i++) Step(sim, 10f);
+            Step(sim, 9f);
+            Assert.AreEqual("Playing", Get(sim, "Phase").ToString());
+            Assert.Greater((float)Get(sim, "TimeRemaining"), 0f);
+            Step(sim, 2f);
+            Assert.AreEqual("Won", Get(sim, "Phase").ToString());
+            Assert.AreEqual(180f, Get(sim, "Elapsed"));
+            Assert.AreEqual(0f, Get(sim, "TimeRemaining"));
+            int earned = (int)Get(sim, "Coins"); Step(sim, 5f);
+            Assert.AreEqual(180f, Get(sim, "Elapsed"));
+            Assert.AreEqual(earned, Get(sim, "Coins"));
+        }
+
+        [Test]
+        public void FlorestaLosesAtDeadlineWhenGoalWasNotMet()
+        {
+            object b = NewBalance(); Tune(b, "levelDurations", new[] { .5f, 210f, 240f, 270f, 300f });
+            object sim = Make(balance: b); Start(sim); Step(sim, 2f);
+            Assert.AreEqual("Lost", Get(sim, "Phase").ToString());
+            Assert.AreEqual(.5f, Get(sim, "Elapsed"));
+            Assert.AreEqual(0f, Get(sim, "TimeRemaining"));
+        }
+
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        [TestCase(4)]
+        public void LaterLevelsStillWinEarly(int level)
+        {
+            object b = NewBalance(); Tune(b, "levelGoals", new[] { 1, 1, 1, 1, 1 });
+            object sim = Make(level: level, balance: b); Start(sim); Spawn(sim, 0, 1); Step(sim, 8f);
+            Assert.AreEqual("Won", Get(sim, "Phase").ToString());
+            Assert.Greater((float)Get(sim, "TimeRemaining"), 0f);
         }
 
         [Test]
