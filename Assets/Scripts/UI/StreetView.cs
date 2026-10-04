@@ -17,7 +17,7 @@ namespace HayChoriYPaty
         private static readonly Rect Again = new Rect(101, 536, 338, 56);
         private static readonly Rect Next = new Rect(101, 601, 338, 56);
         private StreetGame game;
-        private Texture2D backdrop, people, items, parrillero, parrilleroIcon;
+        private Texture2D backdrop, people, items, parrillero, parrilleroIcon, largeGrill;
         private const string ParrilleroLabel = "Parrillero";
         private GUIStyle tiny, small, text, title, header, amount, invisible;
         private int pressedAction, lastAction, priceProduct;
@@ -63,6 +63,7 @@ namespace HayChoriYPaty
             items = Resources.Load<Texture2D>("street-items");
             parrillero = Resources.Load<Texture2D>("street-parrillero");
             parrilleroIcon = Resources.Load<Texture2D>("street-parrillero-icon");
+            largeGrill = Resources.Load<Texture2D>("street-parrilla-large");
             tiny = small = text = title = header = amount = invisible = null;
             pressedAction = lastAction = priceProduct = 0; priceDrag = false;
         }
@@ -90,7 +91,7 @@ namespace HayChoriYPaty
             Rect v = CanvasViewport(new Vector2(Screen.width,Screen.height),Screen.safeArea);
             if (v.width <= 0) return;
             Vector2 p = (new Vector2(pixel.x,Screen.height-pixel.y)-v.position)/(v.width/W);
-            if (down) { priceDrag = game.Sim.Phase == RoundPhase.Ready && Slider.Contains(p); pressedAction = HitAction(p); }
+            if (down) { priceDrag = game.Sim.Phase == RoundPhase.Ready && game.Sim.CanEditPrices && Slider.Contains(p); pressedAction = HitAction(p); }
             if (priceDrag) SetSlider(p.x);
             if (!up) return;
             if (!priceDrag && pressedAction != 0 && pressedAction == HitAction(p)) DispatchAction(pressedAction);
@@ -98,6 +99,7 @@ namespace HayChoriYPaty
         }
         private void SetSlider(float x)
         {
+            if (!game.Sim.CanEditPrices) return;
             game.SetProductPrice(priceProduct,Mathf.Round(Mathf.Lerp(game.Balance.minPrice,game.Balance.maxPrice,Mathf.Clamp01((x-Slider.x)/Slider.width))));
         }
         private int HitAction(Vector2 p)
@@ -142,6 +144,7 @@ namespace HayChoriYPaty
                 var c=sim.Customers[i]; if(Mathf.RoundToInt((310-c.Target.y)/70)!=row)continue;
                 DrawCustomer(c);
             }
+            DrawGrill();
             for(int i=0;i<7;i++) DrawStation(i,i<sim.ProductCount);
             for(int i=0;i<sim.Workers.Count;i++) DrawWorker(sim.Workers[i]);
             for(int i=0;i<sim.Sales.Count;i++)
@@ -156,7 +159,7 @@ namespace HayChoriYPaty
             Upgrade(Speed,3,15,"Velocidad",sim.SpeedCost,sim.Coins>=sim.SpeedCost);
             Upgrade(HireParrillero,2,16,ParrilleroLabel,sim.HireCost,sim.Coins>=sim.HireCost&&sim.StaffCount<game.Balance.maxStaff);
             Label(new Rect(70,858,400,26),"Equipo "+sim.StaffCount+"  ·  Velocidad ×"+sim.WorkRate.ToString("0.00"),small);
-            if(sim.Phase==RoundPhase.Ready) PricePanel();
+            if(sim.Phase==RoundPhase.Ready) ReadyPanel();
             else if(sim.Phase==RoundPhase.Won||sim.Phase==RoundPhase.Lost) ResultPanel();
             else Label(new Rect(45,896,450,35),StreetSimulation.LevelNames[sim.LevelIndex],text);
             GUI.color=old;GUI.matrix=m;
@@ -191,14 +194,28 @@ namespace HayChoriYPaty
                 Item(new Rect(w.Position.x-25,w.Position.y-46+bob,31,29),w.Product);
             if(w.State==StreetWorkerState.Pickup) {GUI.color=new Color(1,1,1,.55f);Item(new Rect(w.Position.x-15,w.Position.y-45,30,36),19);GUI.color=Color.white;}
         }
+        // Shared hot-food surface. Floresta devotes the full row to its only product;
+        // later levels reserve the right side for the unchanged beverage stations.
+        private static Rect GrillRect(int productCount)
+        {
+            return productCount <= 4 ? new Rect(23, 530, 494, 108) : new Rect(23, 548, 280, 90);
+        }
+        private void DrawGrill()
+        {
+            Rect r = GrillRect(game.Sim.ProductCount);
+            if (largeGrill != null) GUI.DrawTexture(r, largeGrill, ScaleMode.StretchToFill);
+            else Item(r, 7); // Existing original parrilla is a safe missing-resource fallback.
+        }
         private void DrawStation(int i,bool unlocked)
         {
+            // A single broad parrilla replaces seven tiny BBQs. Locked products do not
+            // add miniature stations; unlock logic and pickup coordinates remain intact.
+            if (!unlocked) return;
             float x=StreetSimulation.StationPosition(i).x;
-            GUI.color=unlocked?Color.white:new Color(.47f,.47f,.47f,.78f);
-            Item(new Rect(x-33,555,66,72),i<4?7:8);
-            if(unlocked){Item(new Rect(x-20,548,40,29),i);Label(new Rect(x-34,618,68,20),StreetSimulation.ProductNames[i],tiny);}
-            else Item(new Rect(x-12,579,24,30),17);
-            GUI.color=Color.white;
+            if(i>=4) Item(new Rect(x-33,555,66,72),8);
+            float y=i<4 ? GrillRect(game.Sim.ProductCount).y-15 : 548;
+            Item(new Rect(x-20,y,40,29),i);
+            Label(new Rect(x-34,618,68,20),StreetSimulation.ProductNames[i],tiny);
         }
         private void Upgrade(Rect r,int action,int icon,string name,int cost,bool affordable)
         {
@@ -207,27 +224,32 @@ namespace HayChoriYPaty
             Rect drawn=r;if(lastAction==action&&Time.unscaledTime<feedbackUntil){drawn.width*=feedbackScale;drawn.height*=feedbackScale;drawn.center=r.center;}
             Item(drawn,12,true);GUI.color=old;
             Label(new Rect(r.x+5,r.y+12,r.width-10,32),name,title);
+            if(action==3 && !game.Sim.CanEditPrices) Label(new Rect(r.x+5,r.y+43,r.width-10,18),"+10%",tiny);
             Item(new Rect(r.x+45,r.y+57,r.width-90,66),icon);
             Item(new Rect(r.x+37,r.y+139,28,28),10);Label(new Rect(r.x+69,r.y+132,80,37),cost.ToString(),amount);
             bool prev=GUI.enabled;GUI.enabled=available;
             if(GUI.Button(r,"",invisible))NativeAction(action);GUI.enabled=prev;
         }
-        private void PricePanel()
+        private void ReadyPanel()
         {
             Rect panel=new Rect(38,193,464,454);Item(panel,14,true);
-            Label(new Rect(54,207,432,64),"Precio: "+StreetSimulation.ProductNames[priceProduct],header);
+            bool editable=game.Sim.CanEditPrices;
+            Label(new Rect(54,207,432,64),editable?"Precio: "+StreetSimulation.ProductNames[priceProduct]:"Chori · precio fijo",header);
             Item(new Rect(188,306,164,107),priceProduct);
             Label(new Rect(86,421,368,54),"$ "+game.Sim.GetProductPrice(priceProduct).ToString("0"),amount);
-            Item(new Rect(Slider.x,Slider.y+13,Slider.width,10),13,true);
-            float f=Mathf.InverseLerp(game.Balance.minPrice,game.Balance.maxPrice,game.Sim.GetProductPrice(priceProduct));
-            Item(new Rect(Slider.x+f*Slider.width-16,Slider.y+1,32,32),10);
+            if(editable)
+            {
+                Item(new Rect(Slider.x,Slider.y+13,Slider.width,10),13,true);
+                float f=Mathf.InverseLerp(game.Balance.minPrice,game.Balance.maxPrice,game.Sim.GetProductPrice(priceProduct));
+                Item(new Rect(Slider.x+f*Slider.width-16,Slider.y+1,32,32),10);
 #if UNITY_ANDROID && !UNITY_EDITOR || !(ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER)
-            var e=Event.current;
-            if(e.type==EventType.MouseDown&&Slider.Contains(e.mousePosition)){priceDrag=true;SetSlider(e.mousePosition.x);e.Use();}
-            else if(priceDrag&&e.type==EventType.MouseDrag){SetSlider(e.mousePosition.x);e.Use();}
-            else if(priceDrag&&e.type==EventType.MouseUp){SetSlider(e.mousePosition.x);priceDrag=false;e.Use();}
+                var e=Event.current;
+                if(e.type==EventType.MouseDown&&Slider.Contains(e.mousePosition)){priceDrag=true;SetSlider(e.mousePosition.x);e.Use();}
+                else if(priceDrag&&e.type==EventType.MouseDrag){SetSlider(e.mousePosition.x);e.Use();}
+                else if(priceDrag&&e.type==EventType.MouseUp){SetSlider(e.mousePosition.x);priceDrag=false;e.Use();}
 #endif
-            Label(new Rect(60,519,420,30),game.Sim.DemandFraction>.6f?"Precio bajo · mucha demanda":"Precio alto · menor demanda",small);
+            }
+            Label(new Rect(60,519,420,30),editable?(game.Sim.DemandFraction>.6f?"Precio bajo · mucha demanda":"Precio alto · menor demanda"):"Cada hincha pide de 1 a 4 choris",small);
             Button(Start,1,"Empezar");
             if(game.Sim.ProductCount>1)for(int i=0;i<game.Sim.ProductCount;i++){Rect r=ProductButton(i);Item(r,12,true);Item(new Rect(r.x+4,r.y+3,r.width-8,r.height-6),i);if(GUI.Button(r,"",invisible))NativeAction(20+i);}
             Label(new Rect(43,878,454,26),StreetSimulation.LevelNames[game.SelectedLevel],text);
@@ -247,7 +269,7 @@ namespace HayChoriYPaty
             Label(new Rect(54,221,432,75),won?"¡Aguante el puesto!":"Se terminó el tiempo",header);
             Item(new Rect(224,318,92,96),won?18:16);
             Label(new Rect(74,421,392,82),game.Sim.Delivered+" ventas · $"+game.Sim.Coins+"\nEquipo y mejoras guardados",text);
-            Button(Again,4,"Volver a elegir precio");
+            Button(Again,4,game.Sim.CanEditPrices?"Volver a elegir precio":"Jugar de nuevo");
             if(won&&game.SelectedLevel<4)Button(Next,5,"Siguiente cancha");
             else if(won)Label(new Rect(73,601,394,58),"¡Las cinco canchas completas!",text);
         }

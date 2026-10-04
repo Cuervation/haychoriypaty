@@ -63,7 +63,7 @@ namespace HayChoriYPaty.Tests
         {
             Type dataType = gameType.GetNestedType("SaveData", BindingFlags.Public);
             object data = System.Activator.CreateInstance(dataType);
-            dataType.GetField("unlockedLevel").SetValue(data, 0);
+            dataType.GetField("unlockedLevel").SetValue(data, 1);
             dataType.GetField("price").SetValue(data, 5f);
             dataType.GetField("coins").SetValue(data, 40);
             dataType.GetField("staff").SetValue(data, 1);
@@ -111,6 +111,7 @@ namespace HayChoriYPaty.Tests
         [UnityTest]
         public IEnumerator MouseDragSetsPriceAndStartBeginsRound()
         {
+            Invoke(game, "SelectLevel", 1);
             Assert.AreEqual("Ready", Phase);
             yield return DragPrice(89, 451);
             Assert.AreEqual(60f, Get("Sim").GetType().GetProperty("Price", PublicInstance).GetValue(Sim, null));
@@ -148,11 +149,11 @@ namespace HayChoriYPaty.Tests
 
             yield return Click(369, 769);
             Assert.AreEqual(2, Get("Sim").GetType().GetProperty("StaffCount", PublicInstance).GetValue(Sim, null));
-            Assert.AreEqual(25, Get("Sim").GetType().GetProperty("Coins", PublicInstance).GetValue(Sim, null));
+            Assert.AreEqual(15, Get("Sim").GetType().GetProperty("Coins", PublicInstance).GetValue(Sim, null));
 
             yield return Click(171, 769);
             Assert.AreEqual(1, Get("Sim").GetType().GetProperty("SpeedLevel", PublicInstance).GetValue(Sim, null));
-            Assert.AreEqual(20, Get("Sim").GetType().GetProperty("Coins", PublicInstance).GetValue(Sim, null));
+            Assert.AreEqual(10, Get("Sim").GetType().GetProperty("Coins", PublicInstance).GetValue(Sim, null));
         }
 
         private IEnumerator Tap(Touchscreen screen, float x, float y, int id)
@@ -177,13 +178,13 @@ namespace HayChoriYPaty.Tests
                 ((Behaviour)game).enabled = false;
                 yield return Tap(screen, 369, 769, 2);
                 Assert.AreEqual(2, Get("Sim").GetType().GetProperty("StaffCount", PublicInstance).GetValue(Sim, null));
-                Assert.AreEqual(25, Get("Sim").GetType().GetProperty("Coins", PublicInstance).GetValue(Sim, null));
+                Assert.AreEqual(15, Get("Sim").GetType().GetProperty("Coins", PublicInstance).GetValue(Sim, null));
             }
             finally { InputSystem.RemoveDevice(screen); }
         }
 
         [UnityTest]
-        public IEnumerator ReplayReturnsToReadyPricePanelWithoutStartingAutomatically()
+        public IEnumerator ReplayReturnsToReadyWithoutStartingAutomatically()
         {
             Tune("levelDurations", new[] { 0.05f, 210f, 240f, 270f, 300f });
             yield return Click(270, 585);
@@ -192,6 +193,37 @@ namespace HayChoriYPaty.Tests
             yield return Click(270, 564);
             Assert.AreEqual("Ready", Phase);
         }
+
+
+        [UnityTest]
+        public IEnumerator FlorestaIgnoresSliderDragButStartStillWorks()
+        {
+            Assert.IsFalse((bool)Sim.GetType().GetProperty("CanEditPrices").GetValue(Sim, null));
+            yield return DragPrice(89, 451);
+            Assert.AreEqual(5f, Sim.GetType().GetProperty("Price").GetValue(Sim, null));
+            yield return DragPrice(451, 89);
+            Assert.AreEqual(5f, Sim.GetType().GetProperty("Price").GetValue(Sim, null));
+            yield return Click(270, 585);
+            Assert.AreEqual("Playing", Phase);
+        }
+
+        [UnityTest]
+        public IEnumerator FlorestaLoadFixesSavedPriceWithoutResettingOtherProgress()
+        {
+            string key = (string)gameType.GetField("ProgressKey", BindingFlags.Public | BindingFlags.Static).GetValue(null);
+            ((Behaviour)game).enabled = false;
+            PlayerPrefs.SetString(key, "{\"version\":1,\"unlockedLevel\":1,\"price\":60,\"prices\":[60,17,9,11,3,6,5],\"coins\":123,\"staff\":3,\"speed\":4}");
+            ((Behaviour)game).enabled = true; yield return null;
+            Assert.AreEqual(5f, Sim.GetType().GetProperty("Price").GetValue(Sim, null));
+            Assert.AreEqual(123, Sim.GetType().GetProperty("Coins").GetValue(Sim, null));
+            Assert.AreEqual(3, Sim.GetType().GetProperty("StaffCount").GetValue(Sim, null));
+            Assert.AreEqual(4, Sim.GetType().GetProperty("SpeedLevel").GetValue(Sim, null));
+            Assert.That((float)Sim.GetType().GetProperty("WorkRate").GetValue(Sim, null), Is.EqualTo(1.4f).Within(.0001f));
+            Assert.AreEqual(17f, Sim.GetType().GetMethod("GetProductPrice").Invoke(Sim, new object[] { 1 }));
+            Invoke(game, "SelectLevel", 1);
+            Assert.IsTrue((bool)Sim.GetType().GetProperty("CanEditPrices").GetValue(Sim, null));
+        }
+
 
         private Rect Viewport(Vector2 size, Rect safe)
         {

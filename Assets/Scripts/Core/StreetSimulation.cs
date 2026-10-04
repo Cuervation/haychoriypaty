@@ -13,6 +13,9 @@ namespace HayChoriYPaty
         [Min(1)] public int maxStaff = 8;
         [Min(1)] public int baseHireCost = 15;
         [Min(1)] public int baseSpeedCost = 5;
+        [Min(1)] public int florestaHireCost = 25;
+        [Min(1)] public int florestaSpeedCost = 5;
+        [Min(.01f)] public float florestaSpeedIncrease = .10f;
         [Min(0.1f)] public float customerArrivalSeconds = 0.16f;
         [Min(0.1f)] public float workerSpeed = 300f;
         [Min(10f)] public float customerSpeed = 300f;
@@ -79,6 +82,7 @@ namespace HayChoriYPaty
     /// <summary>Deterministic, view-independent street-service simulation.</summary>
     public sealed class StreetSimulation
     {
+        public const float FlorestaChoriPrice = 5f;
         public static readonly string[] ProductNames = { "Chori", "Paty", "Bondiola", "Vacío", "Coca", "Fernet", "Cerveza" };
         public static readonly string[] LevelNames = { "Floresta / All Boys", "Nueva Chicago", "Argentinos Juniors", "Vélez", "Ferro" };
         private static readonly int[] DefaultProductCounts = { 1, 3, 5, 6, 7 };
@@ -103,9 +107,10 @@ namespace HayChoriYPaty
         public float TimeRemaining { get { return Mathf.Max(0f, LevelValue(balance.levelDurations, LevelIndex, DefaultDurations) - Elapsed); } }
         public int StaffCount { get { return workers.Count; } }
         public int SpeedLevel { get; private set; }
-        public int HireCost { get { return balance.baseHireCost * StaffCount; } }
-        public int SpeedCost { get { return balance.baseSpeedCost * (SpeedLevel + 1); } }
-        public float WorkRate { get { return 1f + SpeedLevel * 0.25f; } }
+        public bool CanEditPrices { get { return LevelIndex != 0; } }
+        public int HireCost { get { return CanEditPrices ? balance.baseHireCost * StaffCount : balance.florestaHireCost; } }
+        public int SpeedCost { get { return CanEditPrices ? balance.baseSpeedCost * (SpeedLevel + 1) : balance.florestaSpeedCost; } }
+        public float WorkRate { get { return 1f + SpeedLevel * (CanEditPrices ? .25f : balance.florestaSpeedIncrease); } }
         public IReadOnlyList<StreetCustomer> Customers { get { return customers; } }
         public IReadOnlyList<StreetWorker> Workers { get { return workers; } }
         public IReadOnlyList<StreetSale> Sales { get { return sales; } }
@@ -121,6 +126,7 @@ namespace HayChoriYPaty
             this.price = Mathf.Clamp(price, this.balance.minPrice, this.balance.maxPrice);
             for(int i=0;i<7;i++) productPrices[i]=Mathf.Clamp(this.price*ProductMultiplier(i),this.balance.minPrice,this.balance.maxPrice);
             this.price=productPrices[0];
+            if (!CanEditPrices) SetProductPrice(0, FlorestaChoriPrice);
             Coins = Mathf.Max(0, coins); SpeedLevel = Mathf.Max(0, speed);
             staff = Mathf.Clamp(staff, 1, Mathf.Max(1, this.balance.maxStaff));
             for (int i = 0; i < staff; i++) AddWorker();
@@ -134,7 +140,7 @@ namespace HayChoriYPaty
         }
         public void SetPrice(float value) { SetProductPrice(0,value); }
         public float GetProductPrice(int product) { return productPrices[Mathf.Clamp(product,0,6)]; }
-        public void SetProductPrice(int product,float value) { if(product<0||product>=7)return; productPrices[product]=Mathf.Clamp(value,balance.minPrice,balance.maxPrice); if(product==0)price=productPrices[0]; }
+        public void SetProductPrice(int product,float value) { if(product<0||product>=7)return; productPrices[product]=!CanEditPrices && product==0 ? FlorestaChoriPrice : Mathf.Clamp(value,balance.minPrice,balance.maxPrice); if(product==0)price=productPrices[0]; }
         public bool TryHire()
         {
             if ((Phase != RoundPhase.Ready && Phase != RoundPhase.Playing) || StaffCount >= balance.maxStaff || Coins < HireCost) return false;
@@ -148,7 +154,9 @@ namespace HayChoriYPaty
         public bool SelectLevel(int level)
         {
             if (Phase != RoundPhase.Ready || level < 0 || level >= LevelNames.Length) return false;
-            LevelIndex = level; return true;
+            LevelIndex = level;
+            if (!CanEditPrices) SetProductPrice(0, FlorestaChoriPrice);
+            return true;
         }
         public bool NextLevel()
         {
@@ -177,7 +185,7 @@ namespace HayChoriYPaty
             Vector2 target = new Vector2(58 + 70 * col, 310 - 70 * row);
             bool left = (nextCustomer & 1) == 0;
             customers.Add(new StreetCustomer { Id = nextCustomer++, Product = product,
-                Remaining = Mathf.Clamp(quantity, 1, 999), Position = new Vector2(left ? -40 : 580, target.y),
+                Remaining = Mathf.Clamp(quantity, 1, CanEditPrices ? 999 : 4), Position = new Vector2(left ? -40 : 580, target.y),
                 Target = target, State = StreetCustomerState.Entering, Patience = Mathf.Max(0.1f, balance.customerPatienceSeconds), PatienceFraction = 1f,
                 Slot = slot });
             return true;
@@ -196,12 +204,17 @@ namespace HayChoriYPaty
                 float demandFactor = .55f / Mathf.Pow(Mathf.Max(.08f,DemandFraction),Mathf.Max(.1f,balance.priceSensitivity));
                 float pressure=balance.levelDemandMultipliers!=null&&LevelIndex<balance.levelDemandMultipliers.Length?Mathf.Max(.1f,balance.levelDemandMultipliers[LevelIndex]):1f;
                 int product = ChooseProduct();
-                int minimum = Mathf.Clamp(balance.minOrderQuantity, 1, 999);
-                int maximum = Mathf.Clamp(balance.maxOrderQuantity, minimum, 999);
-                int quantity=random.Next(minimum,maximum+1);
-                float appetite=Mathf.Clamp01((balance.maxPrice-GetProductPrice(product))/Mathf.Max(.01f,balance.maxPrice-balance.minPrice));
-                if(appetite<.8f)quantity=Mathf.Max(1,Mathf.RoundToInt(quantity*Mathf.Pow(appetite,4)));
-                else if(roundFirstOrder==1)quantity=999;
+                int quantity;
+                if (!CanEditPrices) quantity = random.Next(1, 5);
+                else
+                {
+                    int minimum = Mathf.Clamp(balance.minOrderQuantity, 1, 999);
+                    int maximum = Mathf.Clamp(balance.maxOrderQuantity, minimum, 999);
+                    quantity = random.Next(minimum, maximum + 1);
+                    float appetite = Mathf.Clamp01((balance.maxPrice - GetProductPrice(product)) / Mathf.Max(.01f, balance.maxPrice - balance.minPrice));
+                    if (appetite < .8f) quantity = Mathf.Max(1, Mathf.RoundToInt(quantity * Mathf.Pow(appetite, 4)));
+                    else if (roundFirstOrder == 1) quantity = 999;
+                }
                 SpawnCustomer(product, quantity);
                 roundFirstOrder = 0;
                 arrival = Mathf.Max(0.05f, balance.customerArrivalSeconds * demandFactor / pressure);

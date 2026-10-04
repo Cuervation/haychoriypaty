@@ -77,3 +77,12 @@ Use the existing connected MCP editor: `manage_build` build/android, scenes `["A
 ### Physical phone installation — 2026-10-03
 - User requested installation on the connected Motorola Edge60Fusion: adb reported AndroidAPI36 / arm64-v8a; explicit USB-target install-r returned Success and GameActivity launch Statusok (cold647ms). Existing data preserved; no uninstall or device settings changed.
 - Phone disconnected before the subsequent process/foreground/screenshot query, so no physical-screen review, touch round or FPS validation claimed. Emulator evidence above remains distinct.
+
+## Large parrilla and first-level economy — 2026-10-04 (build only)
+
+User explicitly requests APK but no phone connection/install/launch. Main first level now fixed$5/no price slider, speed+10base percentage points for fixed$5, helperfixed$25 and1–4orders with completion/exit/replacement;180s preserved. Original broad shared iron-grill sprite with many chorizos/embers/bread; earlier native screenshots/results remain historical, not validation of this version.
+
+- Real MCP build`build-4df2bd9cd6`:Succeeded363.106656s,0errors/3warnings; actualBuildReport agrees. Warnings only: diagnostics need symbols, obsolete Unity-splashPVRTC and uncompressed splash fallback.
+- Ignored APK`Builds/Android/HayChoriYPaty-street.apk`:0.2.3/code5,57,681,379bytes; signatureV2 verified, packagecom.haychoriypaty.game,ARM64IL2CPP,min26,target36; SHA256`af50ac8961483c875191fa5ad4540484454ddf8037bb3e1e5e3ad2fcd471db90`.
+- Targeted41/41EditMode (32simulation+9art) and11/11PlayMode passed; real1080x1920editor Ready/Playing/seven-product screenshots reviewed. Exact editor progress restored,Play stopped.
+- No adb calls/emulator/phone install/launch performed. New native visual/performance certification not claimed. Existing generated performance-test outputs/folder meta ignored, all authored art/metas retained.

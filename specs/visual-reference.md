@@ -64,3 +64,15 @@ User photo is appearance reference, not graphic style: very overweight adult, da
 New transparent16-pose atlas and hire portrait: Assets/Art/Street/Resources/street-parrillero{,-icon}.png. Reviewed independent bounds in Assets/Art/Street/parrillero-poses.json; exact built-in prompts in ParrilleroGenerationPrompts.md. Real MCP import16namedSprite, original dimensions/alpha/AndroidRGBA32 and foot pivots verified;3/3art and1/1affected pointer checks passed. Actual editor Game-view capture reviewed in Logs/Acceptance/Parrillero/parrillero-final.png: profile walk and matching portrait/Parrillero label. Native visual check pending; no device-performance claim.
 
 Face references: user supplied four photos and explicitly selected the drawn adult-face variant; retain its eyes/nose/toothy smile while making cheeks/jaw fuller and matching face/neck skin palette to body. Do not revert to giant-eyed alternate or photographic head. Selected sheet1315x1197 and portrait1315x1196; previous character files and GUIDs retained.
+
+## Large street parrilla — 2026-10-04
+
+User supplied two real crowded sidewalk-grill photographs as ambience/object-scale references, not graphic style or copied assets. Replace tiny individual BBQ presentation with one original long black-iron parrilla, dense rows of visible chorizos, charcoal/embers and bread. Preserve casual2D cartoon, frontal slightly elevated view, existing supporters/Parrillero/UI/safe-area and seven-product limit. In Floresta the parrilla spans nearly the full station row; when drinks unlock, keep one shared hot-food grill plus the original separate drink stations. Pickup anchors/automatic handoff, recipes, coins and pacing remain unchanged.
+
+- [x] Original transparent large-grill sprite imported with consistent style/alpha.
+- [x] Actual Game-view grill visibly proportionate, no HUD/button/path obstruction; affected art/input and pending first-level rules verified.
+- [x] New APK built/verified only; explicitly no phone connection/install/launch this turn.
+
+Integrated original2172x724RGBA Resources/street-parrilla-large.png with NPOT/mipmaps off, uncompressed4096/AndroidRGBA32. Real9art checks passed in41-case targetedEditMode job;11pointer checks passed. Actual1080x1920Game-view captures reviewed for Ready/FlorestaPlaying/seven-products: loaded full-width grill, clear HUD/buttons and drink stations, unchanged worker anchors; exact editor progress restored after stoppingPlay. Evidence ignored under Logs/Acceptance/LargeGrill/. Exact prompt retained in Assets/Art/Street/GenerationPrompts.md.
+
+APK0.2.3/code5 succeeded363.11s,0errors/3warnings; signature/package/ABI verified. Not installed or run natively by explicit user request; physical visual/FPS validation remains pending.

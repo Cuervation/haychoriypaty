@@ -22,3 +22,7 @@
 | 2026-10-03 | Make per-product prices alter automatic capacity, bulk size, arrival interval and product selection as well as actual unit revenue. | Prevent dominant high-price/unchanged999 demand; default $5 preserves the reference-like crowd. Curves are inspector balance choices, not observed video mechanics. |
 | 2026-10-03 | Put multi-product price selectors below panel title, outside the live HUD. | Actual AndroidChicago screenshot exposed coin/sales overlap at y648; shared hit rectangle moved to y273 with focused pointer regression. |
 | 2026-10-03 | Run Floresta for the full180seconds and evaluate its24-unit target only at the clock; preserve later-level early wins. | User chose a three-minute trial. Clock-only limit was already180, but earlyWin24 shortened the round; keep upgrades/prices/economy and defer waves/rebalancing. |
+
+| 2026-10-04 | Scope fixed$5chori, +10%base/$5speed, $25helper and1–4choris to Floresta; retain later price/demand/cost rules and180s. | User explicitly changed first-level loop and requested noAPK. Fixed per-purchase prices avoid old escalation; completed orders use existing receipt/exit/free-slot replacement, not teleporting clients. |
+
+- 2026-10-04: Replace miniature hot-food BBQs with one broad original iron parrilla (494x108 for1–4 unlocked foods;280x90 when drinks need the right side). Keep simulation pickup anchors and all seven products; only unlocked markers are drawn. Original grill remains missing-resource fallback. Build APK only, no phone/emulator control.
