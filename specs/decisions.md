@@ -30,3 +30,20 @@
 - 2026-10-04: Replace miniature hot-food BBQs with one broad original iron parrilla (494x108 for1–4 unlocked foods;280x90 when drinks need the right side). Keep simulation pickup anchors and all seven products; only unlocked markers are drawn. Original grill remains missing-resource fallback. Build APK only, no phone/emulator control.
 | 2026-10-04 | Apply wardrobe PNGs as deterministic per-customer overlays only in Floresta instead of repainting the shared fan atlas. | Retains every existing fan pose and keeps later levels unchanged while using the new apparel options.
 | 2026-10-04 | Keep the supplied cover/logo intro in StreetView with unscaled timing and a central action guard; no new scene/controller/package. | Reuse the 2D renderer and both existing platform input owners, avoid an Android tap starting the round behind the cover, and preserve gameplay. |
+
+| 2026-10-04 | Replace auto-dismiss intro with≥4s fully visible cover +≥4s fully visible logo, then persistent Jugar/Salir; author glossy blue button texture and bundle Apache 2.0 Luckiest Guy. | User explicitly requested NEXT-blue styling and direct Play/Quit. Keep StreetView/unscaled timing/shared input guards; no new scene, package or game rules. No tests/APK until later combined validation. |
+
+| 2026-10-04 | Floresta speed costs $25 and helper $200; reset first-level staff/speed on simulation construction and every StartRound to one parrillero/x1.00. | Explicit user request overrides first-level purchase persistence. Keep coins/unlocks, +10% increments and later-level behavior; synchronize Main serialized balance with defaults. No tests/APK now. |
+
+| 2026-10-04 | Keep the seven existing columns as FIFO lanes: compact on departure, admit newcomers only at tails, serve only settled front customers. | User forbids newcomers replacing older waiting people at the front. Add Advancing state/reuse walking/bubbles; cancel stale reservations without income and keep bounded population, art/layout and other rules. No tests/APK now. |
+
+| 2026-10-04 | Versioned v4 backdrop crops upper framing to mural, removes stadium/roof/signage/supports, and widens only the crowd street behind the retained counter; remove obsolete top sign-product overlays. | Explicit user request for readable queues/orders. Keep counter/floor/station/HUD/input anchors and previous art/GUIDs; built-in image edit, static review only, no tests/APK. |
+
+| 2026-10-04 | Animate stationary supporters procedurally around their feet, using existing AnimationTime and per-ID rhythms; share transform with clothing and restore it before bubbles. | User wants lively waiting fans. Front atlas entries are different identities, not idle frames; avoid swapping people/new assets or moving logical FIFO anchors. No tests/APK now. |
+
+| 2026-10-04 | Reuse the exact presentation logo for default/Android single-layer icons; compose adaptive foreground with native percentage-inset XML during Gradle generation over a cream background. | User wants the existing logo, not redesigned art. Native composition preserves PNG bytes and keeps lettering inside launcher masks without raster edits/new dependencies; source-only until the next authorized build. |
+
+| 2026-10-04 | Floresta wins on real unit1000with180s deadline preserved; stop workers at threshold. Place thin upper-corner balance/progress panels above rear bubbles and reuse a generated gold-only coin for HUD/income effects. | User explicitly chose1000sales, retained180s and rejected colored coin accents. Synchronize defaults/fallback/Main; preserve FIFO, fixed$5, costs25/200, reset and later rules; no tests/APK now. |
+
+
+- 2026-10-04 combined delivery: latest explicit user request supersedes earlier deferred tests/builds. Validate only affected Street logic/art/input with updated fixtures; retain historical evidence as historical. Version new APK0.2.5/code7 and archive it; use same debug certificate and`install -r` to preserve phone data. No device install/exit success claimed while Motorola is disconnected.

@@ -16,13 +16,23 @@ namespace HayChoriYPaty
         private static readonly Rect Slider = new Rect(87, 484, 366, 36);
         private static readonly Rect Again = new Rect(101, 536, 338, 56);
         private static readonly Rect Next = new Rect(101, 601, 338, 56);
+        private static readonly Rect MenuPlay = new Rect(126, 704, 288, 92);
+        private static readonly Rect MenuQuit = new Rect(126, 816, 288, 92);
+        private const int MenuPlayAction = 6, MenuQuitAction = 7;
         private StreetGame game;
-        private Texture2D backdrop, people, items, parrillero, parrilleroIcon, largeGrill;
+        private Texture2D backdrop, people, items, parrillero, parrilleroIcon, largeGrill, gameCoin;
         private Texture2D[] fanWardrobe;
-        private Texture2D coverArt, titleLogo, introGlow;
+        private Texture2D coverArt, titleLogo, introGlow, menuButton;
+        private Font menuFont;
+        private GUIStyle menuTitle;
         private bool introActive;
         private float introStarted;
-        private const float IntroDuration = 4.1f;
+        private const float CoverFadeDuration = .28f, CoverHoldDuration = 4f;
+        private const float LogoFadeDuration = .35f, LogoHoldDuration = 4f;
+        private const float LogoRevealAt = CoverFadeDuration + CoverHoldDuration;
+        // Each artwork gets four full seconds after its own fade, not including the fade.
+        private const float IntroDuration = LogoRevealAt + LogoFadeDuration + LogoHoldDuration;
+        private bool MenuAvailable { get { return introActive && Time.unscaledTime - introStarted >= IntroDuration; } }
         private const string ParrilleroLabel = "Parrillero";
         private static readonly string[] FanWardrobeResourceNames = {
             "01-home-white-black", "02-alternative-blue", "03-october-rosa-pink",
@@ -31,7 +41,7 @@ namespace HayChoriYPaty
             "10-tee-black", "11-polo-white-black", "12-tee-gray",
             "13-training-thermal-white", "14-training-jacket-black-white", "15-hoodie-cream"
         };
-        private GUIStyle tiny, small, text, title, header, amount, invisible;
+        private GUIStyle tiny, small, text, title, header, amount, invisible, hudNumber;
         private int pressedAction, lastAction, priceProduct;
         private bool priceDrag;
         private float feedbackUntil, feedbackScale;
@@ -70,35 +80,36 @@ namespace HayChoriYPaty
         private void OnEnable()
         {
             game = GetComponent<StreetGame>();
-            backdrop = Resources.Load<Texture2D>("street-background-mural-v3");
+            backdrop = Resources.Load<Texture2D>("street-background-open-street-v4");
             people = Resources.Load<Texture2D>("street-characters");
             items = Resources.Load<Texture2D>("street-items");
             parrillero = Resources.Load<Texture2D>("street-parrillero");
             parrilleroIcon = Resources.Load<Texture2D>("street-parrillero-icon");
             largeGrill = Resources.Load<Texture2D>("street-parrilla-large");
+            gameCoin = Resources.Load<Texture2D>("street-coin-gold-v2");
             fanWardrobe = new Texture2D[FanWardrobeResourceNames.Length];
             for (int i = 0; i < FanWardrobeResourceNames.Length; i++)
                 fanWardrobe[i] = Resources.Load<Texture2D>("FanWardrobe/" + FanWardrobeResourceNames[i]);
             coverArt = Resources.Load<Texture2D>("street-cover");
             titleLogo = Resources.Load<Texture2D>("street-logo");
             introGlow = CreateIntroGlow();
-            introActive = coverArt != null && titleLogo != null;
+            menuButton = CreateMenuButton();
+            menuFont = Resources.Load<Font>("Menu/LuckiestGuy-Regular");
+            introActive = true;
             introStarted = Time.unscaledTime;
-            tiny = small = text = title = header = amount = invisible = null;
+            tiny = small = text = title = header = amount = invisible = menuTitle = null;
             pressedAction = lastAction = priceProduct = 0; priceDrag = false;
         }
         private void OnDisable()
         {
             if (introGlow != null) Destroy(introGlow);
             introGlow = null;
+            if (menuButton != null) Destroy(menuButton);
+            menuButton = null;
         }
         private void Update()
         {
-            if (introActive)
-            {
-                if (Time.unscaledTime - introStarted < IntroDuration) return;
-                introActive = false;
-            }
+            if (introActive && !MenuAvailable) return;
 #if !(UNITY_ANDROID && !UNITY_EDITOR) && ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
             var touch = Touchscreen.current; var mouse = Mouse.current;
             if (touch != null && (touch.primaryTouch.press.isPressed || touch.primaryTouch.press.wasReleasedThisFrame))
@@ -121,7 +132,7 @@ namespace HayChoriYPaty
             Rect v = CanvasViewport(new Vector2(Screen.width,Screen.height),Screen.safeArea);
             if (v.width <= 0) return;
             Vector2 p = (new Vector2(pixel.x,Screen.height-pixel.y)-v.position)/(v.width/W);
-            if (down) { priceDrag = game.Sim.Phase == RoundPhase.Ready && game.Sim.CanEditPrices && Slider.Contains(p); pressedAction = HitAction(p); }
+            if (down) { priceDrag = !introActive && game.Sim.Phase == RoundPhase.Ready && game.Sim.CanEditPrices && Slider.Contains(p); pressedAction = HitAction(p); }
             if (priceDrag) SetSlider(p.x);
             if (!up) return;
             if (!priceDrag && pressedAction != 0 && pressedAction == HitAction(p)) DispatchAction(pressedAction);
@@ -134,10 +145,12 @@ namespace HayChoriYPaty
         }
         private int HitAction(Vector2 p)
         {
+            if (introActive)
+                return !MenuAvailable ? 0 : MenuPlay.Contains(p) ? MenuPlayAction : MenuQuit.Contains(p) ? MenuQuitAction : 0;
             if (game.Sim.Phase == RoundPhase.Ready)
             {
                 if (Start.Contains(p)) return 1;
-                for(int i=0;i<game.Sim.ProductCount;i++)if(ProductButton(i).Contains(p))return 20+i;
+                if(game.Sim.CanEditPrices && game.Sim.ProductCount>1)for(int i=0;i<game.Sim.ProductCount;i++)if(ProductButton(i).Contains(p))return 20+i;
                 for (int i=0;i<5;i++) if (LevelButton(i).Contains(p) && i<=game.UnlockedLevel) return 10+i;
                 return 0;
             }
@@ -146,11 +159,32 @@ namespace HayChoriYPaty
         }
         private void DispatchAction(int a)
         {
-            if (introActive) return; // Also gates Android's native IMGUI action path.
+            if (introActive)
+            {
+                // Native Android and the desktop bridge share the same startup guard.
+                if (!MenuAvailable) return;
+                if (a == MenuPlayAction)
+                {
+                    introActive = false;
+                    pressedAction = 0;
+                    priceDrag = false;
+                    game.StartRound(); // Jugar enters gameplay directly, with no second Start.
+                }
+                else if (a == MenuQuitAction) QuitGame();
+                return;
+            }
             bool ok = true;
             if (a==1) game.StartRound(); else if (a==2) ok=game.TryHire(); else if (a==3) ok=game.TryUpgradeSpeed();
             else if (a==4) ok=game.Retry(); else if (a==5) ok=game.NextLevel(); else if (a>=10&&a<15) {ok=game.SelectLevel(a-10);priceProduct=0;} else if(a>=20&&a<27)priceProduct=a-20;
             lastAction=a; feedbackUntil=Time.unscaledTime+0.22f; feedbackScale=ok?1.04f:0.97f;
+        }
+        private static void QuitGame()
+        {
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying = false;
+#else
+            Application.Quit();
+#endif
         }
         private void NativeAction(int a)
         {
@@ -166,13 +200,18 @@ namespace HayChoriYPaty
             Styles(); Rect v=CanvasViewport(new Vector2(Screen.width,Screen.height),Screen.safeArea); if(v.width<=0)return;
             Matrix4x4 m=GUI.matrix; Color old=GUI.color;
             GUI.matrix=Matrix4x4.TRS(new Vector3(v.x,v.y),Quaternion.identity,new Vector3(v.width/W,v.width/W,1)); GUI.color=Color.white;
+            if (introActive)
+            {
+                DrawIntro(Time.unscaledTime - introStarted);
+                GUI.color = old; GUI.matrix = m;
+                return; // Do not create hidden gameplay GUI controls behind the startup menu.
+            }
             if(backdrop!=null)GUI.DrawTexture(new Rect(0,0,W,H),backdrop,ScaleMode.StretchToFill);
             var sim=game.Sim;
-            // Upper signs contain live product sprites rather than a baked competing menu.
-            Item(new Rect(40,130,47,37),0); Item(new Rect(444,130,47,37),sim.ProductCount-1);
+            // Keep the expanded customer street clear; order icons live on their customers.
             for(int row=4;row>=0;row--)for(int i=0;i<sim.Customers.Count;i++)
             {
-                var c=sim.Customers[i]; if(Mathf.RoundToInt((310-c.Target.y)/70)!=row)continue;
+                var c=sim.Customers[i]; if(Mathf.Clamp(Mathf.RoundToInt((310-c.Position.y)/70),0,4)!=row)continue;
                 DrawCustomer(c);
             }
             DrawGrill();
@@ -184,17 +223,25 @@ namespace HayChoriYPaty
                 Item(new Rect(s.Position.x-27,s.Position.y-86-s.Age*33,23,23),10);
                 Label(new Rect(s.Position.x-3,s.Position.y-86-s.Age*33,48,25),"+"+s.Amount,text);GUI.color=Color.white;
             }
-            Item(new Rect(24,644,26,26),10);Label(new Rect(51,644,119,27),sim.Coins.ToString(),text);
-            Label(new Rect(168,644,212,27),"Ventas "+sim.Delivered+" / "+sim.Goal,small);
-            Label(new Rect(385,644,137,27),Mathf.CeilToInt(sim.TimeRemaining)+" s",small);
+            DrawCounters(sim);
+            Label(new Rect(164,644,212,27),"Tiempo: "+Mathf.CeilToInt(sim.TimeRemaining)+" s",small);
             Upgrade(Speed,3,15,"Velocidad",sim.SpeedCost,sim.Coins>=sim.SpeedCost);
             Upgrade(HireParrillero,2,16,ParrilleroLabel,sim.HireCost,sim.Coins>=sim.HireCost&&sim.StaffCount<game.Balance.maxStaff);
             Label(new Rect(70,858,400,26),"Equipo "+sim.StaffCount+"  ·  Velocidad ×"+sim.WorkRate.ToString("0.00"),small);
             if(sim.Phase==RoundPhase.Ready) ReadyPanel();
             else if(sim.Phase==RoundPhase.Won||sim.Phase==RoundPhase.Lost) ResultPanel();
             else Label(new Rect(45,896,450,35),StreetSimulation.LevelNames[sim.LevelIndex],text);
-            if (introActive) DrawIntro(Time.unscaledTime - introStarted);
             GUI.color=old;GUI.matrix=m;
+        }
+        private void DrawCounters(StreetSimulation sim)
+        {
+            // Stay above the rear-row order bubbles (which begin at logical y38).
+            Item(new Rect(12,4,207,32),12,true);
+            Item(new Rect(17,3,34,34),10);
+            Label(new Rect(53,6,158,28),sim.Coins.ToString(),hudNumber);
+            Item(new Rect(322,4,206,32),12,true);
+            Item(new Rect(330,5,35,28),sim.LevelIndex==0?0:18);
+            Label(new Rect(369,6,150,28),sim.Delivered+"/"+sim.Goal,hudNumber);
         }
         private static Texture2D CreateIntroGlow()
         {
@@ -221,16 +268,14 @@ namespace HayChoriYPaty
         }
         private void DrawIntro(float elapsed)
         {
-            float coverFadeIn = IntroEase(elapsed / .28f);
-            float logoFadeIn = IntroEase((elapsed - 1.62f) / .35f);
-            float exitFade = 1f - IntroEase((elapsed - 3.48f) / .58f);
-            float coverAlpha = coverFadeIn * exitFade;
-            GUI.color = new Color(0f, 0f, 0f, exitFade);
+            float coverFadeIn = IntroEase(elapsed / CoverFadeDuration);
+            float logoFadeIn = IntroEase((elapsed - LogoRevealAt) / LogoFadeDuration);
+            GUI.color = Color.black;
             GUI.DrawTexture(new Rect(0, 0, W, H), Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
-            GUI.color = new Color(1f, 1f, 1f, coverAlpha);
-            GUI.DrawTexture(new Rect(0, 0, W, H), coverArt, ScaleMode.ScaleAndCrop, true);
+            GUI.color = new Color(1f, 1f, 1f, coverFadeIn);
+            if (coverArt != null) GUI.DrawTexture(new Rect(0, 0, W, H), coverArt, ScaleMode.ScaleAndCrop, true);
 
-            float shadeAlpha = .48f * logoFadeIn * exitFade;
+            float shadeAlpha = .48f * logoFadeIn;
             GUI.color = new Color(.035f, .025f, .045f, shadeAlpha);
             GUI.DrawTexture(new Rect(0, 0, W, H), Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
 
@@ -240,18 +285,18 @@ namespace HayChoriYPaty
                                 480f - logoRect.height * logoScale * .5f,
                                 logoRect.width * logoScale, logoRect.height * logoScale);
 
-            float flashTime = elapsed - 2.04f;
+            float flashTime = elapsed - (LogoRevealAt + LogoFadeDuration + .07f);
             if (flashTime >= 0f && introGlow != null)
             {
                 float glowProgress = IntroEase(flashTime / .72f);
-                float glowAlpha = .9f * (1f - glowProgress) * logoFadeIn * exitFade;
+                float glowAlpha = .9f * (1f - glowProgress) * logoFadeIn;
                 float glowScale = Mathf.Lerp(.7f, 1.9f, glowProgress);
                 Rect glowRect = new Rect(270f - 235f * glowScale, 480f - 230f * glowScale,
                                          470f * glowScale, 460f * glowScale);
                 GUI.color = new Color(1f, .91f, .72f, glowAlpha);
                 GUI.DrawTexture(glowRect, introGlow, ScaleMode.StretchToFill, true);
 
-                float flashAlpha = .32f * (1f - IntroEase(flashTime / .18f)) * logoFadeIn * exitFade;
+                float flashAlpha = .32f * (1f - IntroEase(flashTime / .18f)) * logoFadeIn;
                 if (flashAlpha > .001f)
                 {
                     GUI.color = new Color(1f, 1f, .96f, flashAlpha);
@@ -259,9 +304,82 @@ namespace HayChoriYPaty
                 }
             }
 
-            GUI.color = new Color(1f, 1f, 1f, logoFadeIn * exitFade);
-            GUI.DrawTexture(logoRect, titleLogo, ScaleMode.ScaleToFit, true);
+            GUI.color = new Color(1f, 1f, 1f, logoFadeIn);
+            if (titleLogo != null) GUI.DrawTexture(logoRect, titleLogo, ScaleMode.ScaleToFit, true);
             GUI.color = Color.white;
+            if (MenuAvailable)
+            {
+                DrawMenuButton(MenuPlay, MenuPlayAction, "JUGAR");
+                DrawMenuButton(MenuQuit, MenuQuitAction, "SALIR");
+            }
+        }
+        private void DrawMenuButton(Rect bounds, int action, string caption)
+        {
+            bool pressed = pressedAction == action;
+            float scale = pressed ? .97f : 1f;
+            Rect r = new Rect(bounds.center.x - bounds.width * scale * .5f,
+                              bounds.center.y - bounds.height * scale * .5f,
+                              bounds.width * scale, bounds.height * scale);
+            GUI.color = pressed ? new Color(.78f, .88f, 1f) : Color.white;
+            GUI.DrawTexture(r, menuButton, ScaleMode.StretchToFill, true);
+            GUI.color = Color.white;
+            Rect letters = new Rect(r.x, r.y - 2f, r.width, r.height - 8f);
+            menuTitle.normal.textColor = new Color(.035f, .075f, .16f);
+            // Eight-direction outline keeps the chunky white comic letters legible.
+            for (int y = -1; y <= 1; y++)
+            for (int x = -1; x <= 1; x++)
+                if (x != 0 || y != 0)
+                    GUI.Label(new Rect(letters.x + x * 2.2f, letters.y + y * 2.2f, letters.width, letters.height), caption, menuTitle);
+            menuTitle.normal.textColor = Color.white;
+            GUI.Label(letters, caption, menuTitle);
+            if (GUI.Button(bounds, "", invisible)) NativeAction(action);
+        }
+        private static Texture2D CreateMenuButton()
+        {
+            const int width = 512, height = 164;
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+            {
+                name = "Original glossy blue startup button",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            var pixels = new Color[width * height];
+            Rect shadow = new Rect(8, 13, 496, 148), rim = new Rect(6, 3, 500, 149), face = new Rect(11, 7, 490, 137);
+            for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
+            {
+                float px = x + .5f, py = height - y - .5f;
+                float t = Mathf.Clamp01((py - face.y) / face.height);
+                Color color = new Color(.015f, .06f, .18f, .6f * RoundedCoverage(px, py, shadow, 70));
+                color = Over(color, Color.Lerp(new Color(.73f, .96f, 1f), new Color(.025f, .12f, .57f), t), RoundedCoverage(px, py, rim, 72));
+                float faceAlpha = RoundedCoverage(px, py, face, 67);
+                color = Over(color, Color.Lerp(new Color(.2f, .81f, 1f), new Color(.02f, .22f, .98f), t), faceAlpha);
+                float gloss = .48f * (1f - IntroEase((t - .02f) / .48f));
+                color = Over(color, Color.white, faceAlpha * gloss);
+                float dx = (px - 47f) / 13f, dy = (py - 25f) / 5f;
+                color = Over(color, Color.white, .78f * faceAlpha * Mathf.Clamp01(1f - dx * dx - dy * dy));
+                pixels[y * width + x] = color;
+            }
+            texture.SetPixels(pixels);
+            texture.Apply(false, true);
+            return texture;
+        }
+        private static float RoundedCoverage(float x, float y, Rect r, float radius)
+        {
+            float dx = Mathf.Abs(x - r.center.x) - (r.width * .5f - radius);
+            float dy = Mathf.Abs(y - r.center.y) - (r.height * .5f - radius);
+            float distance = new Vector2(Mathf.Max(dx, 0f), Mathf.Max(dy, 0f)).magnitude
+                             + Mathf.Min(Mathf.Max(dx, dy), 0f) - radius;
+            return Mathf.Clamp01(.5f - distance);
+        }
+        private static Color Over(Color below, Color above, float coverage)
+        {
+            float alpha = above.a * coverage, remaining = below.a * (1f - alpha), total = alpha + remaining;
+            if (total <= 0f) return Color.clear;
+            return new Color((above.r * alpha + below.r * remaining) / total,
+                             (above.g * alpha + below.g * remaining) / total,
+                             (above.b * alpha + below.b * remaining) / total, total);
         }
         private static float IntroEase(float value)
         {
@@ -271,18 +389,54 @@ namespace HayChoriYPaty
 
         private void DrawCustomer(StreetCustomer c)
         {
-            bool walking=c.State==StreetCustomerState.Entering||c.State==StreetCustomerState.Leaving;
-            float bob=walking?Mathf.Sin(c.AnimationTime*14)*2:Mathf.Sin(c.AnimationTime*2+c.Id)*0.8f;
-            if(c.State==StreetCustomerState.Receiving)bob-=3;
-            Rect person = new Rect(c.Position.x-39,c.Position.y-76+bob,78,76);
-            Person(person,8+(c.Id%4)+(walking?4:0),walking&&c.Target.x>c.Position.x);
-            if (game.Sim.LevelIndex == 0) DrawFanWardrobe(person, c.Id);
+            bool walking=c.State==StreetCustomerState.Entering||c.State==StreetCustomerState.Leaving||c.State==StreetCustomerState.Advancing;
+            DrawCustomerBody(c, walking);
             if(c.State==StreetCustomerState.Entering||c.State==StreetCustomerState.Leaving)return;
             Item(new Rect(c.Position.x-29,c.Position.y-132,58,65),11,true);
             Item(new Rect(c.Position.x-19,c.Position.y-125,38,30),c.Product);
             Label(new Rect(c.Position.x-29,c.Position.y-101,58,24),c.Remaining.ToString(),text);
             // A sprite-backed patience strip; no placeholder shape stands in for game art.
             GUI.color=new Color(.32f,.7f,.32f);Item(new Rect(c.Position.x-22,c.Position.y-64,44*c.PatienceFraction,4),13,true);GUI.color=Color.white;
+        }
+        private void DrawCustomerBody(StreetCustomer c, bool walking)
+        {
+            float bob = walking ? Mathf.Sin(c.AnimationTime * 14) * 2 : 0f;
+            if (c.State == StreetCustomerState.Receiving) bob -= 3;
+            Rect person = new Rect(c.Position.x - 39, c.Position.y - 76 + bob, 78, 76);
+            Matrix4x4 viewMatrix = GUI.matrix;
+            if (!walking)
+            {
+                // The atlas front poses are different people, not interchangeable idle frames.
+                // Animate their existing silhouettes from simulation time, never OnGUI events.
+                float phase = c.Id * 2.399963f;
+                float sway = Mathf.Sin(c.AnimationTime * (2.2f + (c.Id % 3) * .18f) + phase);
+                float breath = Mathf.Sin(c.AnimationTime * 3.2f + phase);
+                float cheerTime = Mathf.Repeat(c.AnimationTime + c.Id * .83f, 4.8f + (c.Id % 4) * .55f);
+                float hop = 0f;
+                if (cheerTime < 1.2f)
+                {
+                    float pulse = Mathf.Sin(cheerTime * Mathf.PI * 2f / 1.2f);
+                    hop = pulse * pulse; // Two soft hops, with zero velocity at either end.
+                }
+
+                Vector3 feet = new Vector3(person.center.x, person.yMax, 0f);
+                Vector3 offset = new Vector3(sway * 1.2f, -hop * 4f, 0f);
+                Vector3 scale = new Vector3(1f + breath * .012f - hop * .018f,
+                    1f - breath * .016f + hop * .025f, 1f);
+                GUI.matrix = viewMatrix * Matrix4x4.TRS(feet + offset,
+                    Quaternion.Euler(0f, 0f, sway * 2.8f), scale) * Matrix4x4.Translate(-feet);
+            }
+
+            try
+            {
+                Person(person, 8 + (c.Id % 4) + (walking ? 4 : 0), walking && c.Target.x > c.Position.x);
+                if (game.Sim.LevelIndex == 0) DrawFanWardrobe(person, c.Id);
+            }
+            finally
+            {
+                // Only the body/garment move: badges and subsequent UI keep the safe-area matrix.
+                GUI.matrix = viewMatrix;
+            }
         }
         private void DrawFanWardrobe(Rect person, int customerId)
         {
@@ -291,7 +445,7 @@ namespace HayChoriYPaty
             if (garment == null) return;
 
             // The underlying original fan remains unchanged; this transparent shirt overlay
-            // covers only its existing jersey area and follows the same bob/movement rect.
+            // covers only its existing jersey area and shares the body rect and idle transform.
             Rect shirt = new Rect(person.center.x - 16, person.yMax - 38, 32, 22);
             GUI.DrawTexture(shirt, garment, ScaleMode.StretchToFill, true);
         }
@@ -355,6 +509,13 @@ namespace HayChoriYPaty
         }
         private void ReadyPanel()
         {
+            if (!game.Sim.CanEditPrices)
+            {
+                // Floresta has no price popup, including the old read-only summary.
+                DrawMenuButton(Start, 1, "JUGAR");
+                ReadyLevels();
+                return;
+            }
             Rect panel=new Rect(38,193,464,454);Item(panel,14,true);
             bool editable=game.Sim.CanEditPrices;
             Label(new Rect(54,207,432,64),editable?"Precio: "+StreetSimulation.ProductNames[priceProduct]:"Chori · precio fijo",header);
@@ -375,6 +536,10 @@ namespace HayChoriYPaty
             Label(new Rect(60,519,420,30),editable?(game.Sim.DemandFraction>.6f?"Precio bajo · mucha demanda":"Precio alto · menor demanda"):"Cada hincha pide de 1 a 4 choris",small);
             Button(Start,1,"Empezar");
             if(game.Sim.ProductCount>1)for(int i=0;i<game.Sim.ProductCount;i++){Rect r=ProductButton(i);Item(r,12,true);Item(new Rect(r.x+4,r.y+3,r.width-8,r.height-6),i);if(GUI.Button(r,"",invisible))NativeAction(20+i);}
+            ReadyLevels();
+        }
+        private void ReadyLevels()
+        {
             Label(new Rect(43,878,454,26),StreetSimulation.LevelNames[game.SelectedLevel],text);
             for(int i=0;i<5;i++)
             {
@@ -402,12 +567,18 @@ namespace HayChoriYPaty
             if(tiny!=null)return;
             tiny=Style(11);small=Style(14);text=Style(18);title=Style(23);header=Style(25);header.normal.textColor=Color.white;amount=Style(31);
             invisible=new GUIStyle();
+            hudNumber = Style(22);
+            hudNumber.wordWrap = false;
+            menuTitle = Style(38);
+            if (menuFont != null) { menuTitle.font = menuFont; menuTitle.fontStyle = FontStyle.Normal; }
+            menuTitle.wordWrap = false;
         }
         private static GUIStyle Style(int size){var s=new GUIStyle(GUI.skin.label){fontSize=size,fontStyle=FontStyle.Bold,alignment=TextAnchor.MiddleCenter,wordWrap=true};s.normal.textColor=new Color(.16f,.10f,.08f);return s;}
         private static void Label(Rect r,string value,GUIStyle style){GUI.Label(r,value,style);}
         private void Item(Rect r,int id,bool stretch=false)
         {
-            if(id==16 && parrilleroIcon!=null)Draw(r,parrilleroIcon,new Rect(22,6,1269,1188),false,false);
+            if(id==10 && gameCoin!=null)Draw(r,gameCoin,new Rect(0,0,gameCoin.width,gameCoin.height),false,false);
+            else if(id==16 && parrilleroIcon!=null)Draw(r,parrilleroIcon,new Rect(22,6,1269,1188),false,false);
             else if(items!=null&&id>=0&&id<Items.Length)Draw(r,items,Items[id],stretch,false);
         }
         private void Parrillero(Rect r,int id,bool flip)

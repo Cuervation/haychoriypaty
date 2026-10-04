@@ -68,7 +68,7 @@ namespace HayChoriYPaty.Tests
             object data = System.Activator.CreateInstance(dataType);
             dataType.GetField("unlockedLevel").SetValue(data, 1);
             dataType.GetField("price").SetValue(data, 5f);
-            dataType.GetField("coins").SetValue(data, 40);
+            dataType.GetField("coins").SetValue(data, 500);
             dataType.GetField("staff").SetValue(data, 1);
             dataType.GetField("speed").SetValue(data, 0);
             string key = (string)gameType.GetField("ProgressKey", BindingFlags.Public | BindingFlags.Static).GetValue(null);
@@ -119,17 +119,23 @@ namespace HayChoriYPaty.Tests
             viewType.GetField("introStarted", PrivateInstance).SetValue(view, Time.unscaledTime);
             viewType.GetMethod("DispatchAction", PrivateInstance).Invoke(view, new object[] { 1 });
             Assert.AreEqual("Ready", Phase, "Native and bridge actions must not start behind the cover");
-            yield return Click(270, 585);
-            Assert.AreEqual("Ready", Phase);
+            viewType.GetMethod("DispatchAction", PrivateInstance).Invoke(view, new object[] { 6 });
+            yield return Click(270, 750);
+            Assert.AreEqual("Ready", Phase, "Jugar must remain unavailable during the timed presentation");
 
+            Assert.GreaterOrEqual((float)viewType.GetField("CoverHoldDuration", StaticPrivate).GetRawConstantValue(), 4f);
+            Assert.GreaterOrEqual((float)viewType.GetField("LogoHoldDuration", StaticPrivate).GetRawConstantValue(), 4f);
             Time.timeScale = 0f;
             float duration = (float)viewType.GetField("IntroDuration", StaticPrivate).GetRawConstantValue();
             yield return new WaitForSecondsRealtime(duration + .1f);
-            Assert.IsFalse((bool)viewType.GetField("introActive", PrivateInstance).GetValue(view));
-            Assert.AreEqual("Ready", Phase, "Intro ends without starting a timed round");
+            Assert.IsTrue((bool)viewType.GetField("introActive", PrivateInstance).GetValue(view), "The menu stays open until Jugar");
+            Assert.AreEqual("Ready", Phase, "Waiting at the menu must not start a timed round");
+            viewType.GetMethod("DispatchAction", PrivateInstance).Invoke(view, new object[] { 1 });
+            Assert.AreEqual("Ready", Phase, "Hidden gameplay Start stays blocked even when the menu is available");
             Time.timeScale = 1f;
-            yield return Click(270, 585);
-            Assert.AreEqual("Playing", Phase);
+            yield return Click(270, 750);
+            Assert.IsFalse((bool)viewType.GetField("introActive", PrivateInstance).GetValue(view));
+            Assert.AreEqual("Playing", Phase, "Jugar enters gameplay without a second Start");
         }
 
         [UnityTest]
@@ -173,11 +179,11 @@ namespace HayChoriYPaty.Tests
 
             yield return Click(369, 769);
             Assert.AreEqual(2, Get("Sim").GetType().GetProperty("StaffCount", PublicInstance).GetValue(Sim, null));
-            Assert.AreEqual(15, Get("Sim").GetType().GetProperty("Coins", PublicInstance).GetValue(Sim, null));
+            Assert.AreEqual(300, Get("Sim").GetType().GetProperty("Coins", PublicInstance).GetValue(Sim, null));
 
             yield return Click(171, 769);
             Assert.AreEqual(1, Get("Sim").GetType().GetProperty("SpeedLevel", PublicInstance).GetValue(Sim, null));
-            Assert.AreEqual(10, Get("Sim").GetType().GetProperty("Coins", PublicInstance).GetValue(Sim, null));
+            Assert.AreEqual(275, Get("Sim").GetType().GetProperty("Coins", PublicInstance).GetValue(Sim, null));
         }
 
         private IEnumerator Tap(Touchscreen screen, float x, float y, int id)
@@ -202,7 +208,7 @@ namespace HayChoriYPaty.Tests
                 ((Behaviour)game).enabled = false;
                 yield return Tap(screen, 369, 769, 2);
                 Assert.AreEqual(2, Get("Sim").GetType().GetProperty("StaffCount", PublicInstance).GetValue(Sim, null));
-                Assert.AreEqual(15, Get("Sim").GetType().GetProperty("Coins", PublicInstance).GetValue(Sim, null));
+                Assert.AreEqual(300, Get("Sim").GetType().GetProperty("Coins", PublicInstance).GetValue(Sim, null));
             }
             finally { InputSystem.RemoveDevice(screen); }
         }
@@ -232,7 +238,7 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
-        public IEnumerator FlorestaLoadFixesSavedPriceWithoutResettingOtherProgress()
+        public IEnumerator FlorestaLoadFixesSavedPriceAndResetsTeamButPreservesOtherProgress()
         {
             string key = (string)gameType.GetField("ProgressKey", BindingFlags.Public | BindingFlags.Static).GetValue(null);
             ((Behaviour)game).enabled = false;
@@ -240,9 +246,9 @@ namespace HayChoriYPaty.Tests
             ((Behaviour)game).enabled = true; yield return null;
             Assert.AreEqual(5f, Sim.GetType().GetProperty("Price").GetValue(Sim, null));
             Assert.AreEqual(123, Sim.GetType().GetProperty("Coins").GetValue(Sim, null));
-            Assert.AreEqual(3, Sim.GetType().GetProperty("StaffCount").GetValue(Sim, null));
-            Assert.AreEqual(4, Sim.GetType().GetProperty("SpeedLevel").GetValue(Sim, null));
-            Assert.That((float)Sim.GetType().GetProperty("WorkRate").GetValue(Sim, null), Is.EqualTo(1.4f).Within(.0001f));
+            Assert.AreEqual(1, Sim.GetType().GetProperty("StaffCount").GetValue(Sim, null));
+            Assert.AreEqual(0, Sim.GetType().GetProperty("SpeedLevel").GetValue(Sim, null));
+            Assert.That((float)Sim.GetType().GetProperty("WorkRate").GetValue(Sim, null), Is.EqualTo(1f).Within(.0001f));
             Assert.AreEqual(17f, Sim.GetType().GetMethod("GetProductPrice").Invoke(Sim, new object[] { 1 }));
             Invoke(game, "SelectLevel", 1);
             Assert.IsTrue((bool)Sim.GetType().GetProperty("CanEditPrices").GetValue(Sim, null));

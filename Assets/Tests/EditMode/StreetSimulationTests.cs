@@ -58,7 +58,7 @@ namespace HayChoriYPaty.Tests
         public void MultipleWorkersNeverReserveMoreUnitsThanRemain()
         {
             object balance = NewBalance(); Tune(balance,"levelGoals",new[]{1,1,1,1,1}); Tune(balance, "maxCustomers", 1);
-            object sim = Make(staff: 8, balance: balance); Start(sim); Spawn(sim, 0, 1);
+            object sim = Make(staff: 8, level: 1, balance: balance); Start(sim); Spawn(sim, 0, 1);
             object customer = Customers(sim)[0]; Step(sim, 8f);
             // The full turn may serve later arrivals; verify this original one-unit order.
             Assert.AreEqual(0, Get(customer, "Remaining"));
@@ -123,10 +123,10 @@ namespace HayChoriYPaty.Tests
         [Test]
         public void PurchasesCostCoinsAndAreAvailableDuringPlay()
         {
-            object sim = Make(coins: 40); Start(sim);
+            object sim = Make(coins: 500); Start(sim);
             Assert.IsTrue((bool)Call(sim, "TryHire")); Assert.AreEqual(2, Get(sim, "StaffCount"));
             Assert.IsTrue((bool)Call(sim, "TryUpgradeSpeed")); Assert.AreEqual(1, Get(sim, "SpeedLevel"));
-            Assert.AreEqual(10, Get(sim, "Coins"));
+            Assert.AreEqual(275, Get(sim, "Coins"));
         }
 
         [Test]
@@ -222,27 +222,22 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void FlorestaServesPastGoalAndWinsOnlyAtThreeMinuteDeadline()
+        public void FlorestaWinsAtExactlyOneThousandRealSalesBeforeDeadlineAndFreezes()
         {
-            object sim = Make(coins: 1000, staff: 8);
-            for (int i = 0; i < 7; i++) Call(sim, "TryUpgradeSpeed");
-            Start(sim);
-            for (int i = 0; i < 3; i++) Step(sim, 10f);
-            Assert.Greater((int)Get(sim, "Delivered"), (int)Get(sim, "Goal"));
-            Assert.AreEqual("Playing", Get(sim, "Phase").ToString());
-            int coins = (int)Get(sim, "Coins"); Step(sim, 10f);
-            Assert.Greater((int)Get(sim, "Coins"), coins);
-            for (int i = 0; i < 13; i++) Step(sim, 10f);
-            Step(sim, 9f);
-            Assert.AreEqual("Playing", Get(sim, "Phase").ToString());
-            Assert.Greater((float)Get(sim, "TimeRemaining"), 0f);
-            Step(sim, 2f);
-            Assert.AreEqual("Won", Get(sim, "Phase").ToString());
-            Assert.AreEqual(180f, Get(sim, "Elapsed"));
-            Assert.AreEqual(0f, Get(sim, "TimeRemaining"));
-            int earned = (int)Get(sim, "Coins"); Step(sim, 5f);
-            Assert.AreEqual(180f, Get(sim, "Elapsed"));
-            Assert.AreEqual(earned, Get(sim, "Coins"));
+            object b = NewBalance();
+            // Accelerate travel only to exercise the real handoff path, not production pacing.
+            Tune(b, "workerSpeed", 100000f); Tune(b, "customerSpeed", 100000f); Tune(b, "pickupSeconds", .01f);
+            object sim = Make(coins: 3000, balance: b); Start(sim);
+            Assert.AreEqual(1000, Get(sim, "Goal")); Assert.AreEqual(180f, Get(sim, "TimeRemaining"));
+            for (int i = 0; i < 7; i++) Assert.IsTrue((bool)Call(sim, "TryHire"));
+            for (int i = 0; i < 20; i++) Assert.IsTrue((bool)Call(sim, "TryUpgradeSpeed"));
+            int opening = (int)Get(sim, "Coins");
+            for (int i = 0; i < 3600 && Get(sim, "Phase").ToString() == "Playing"; i++) Step(sim, .05f);
+            Assert.AreEqual("Won", Get(sim, "Phase").ToString()); Assert.AreEqual(1000, Get(sim, "Delivered"));
+            Assert.Greater((float)Get(sim, "TimeRemaining"), 0f); Assert.AreEqual(opening + 5000, Get(sim, "Coins"));
+            float elapsed = (float)Get(sim, "Elapsed"); Step(sim, 10f);
+            Assert.AreEqual(elapsed, Get(sim, "Elapsed")); Assert.AreEqual(1000, Get(sim, "Delivered"));
+            Assert.AreEqual(opening + 5000, Get(sim, "Coins"));
         }
 
         [Test]
@@ -276,9 +271,9 @@ namespace HayChoriYPaty.Tests
             Assert.IsFalse((bool)Get(sim, "CanEditPrices"));
             Call(sim, "SetPrice", 0f); Call(sim, "SetProductPrice", 0, 60f);
             Assert.AreEqual(5f, Call(sim, "GetProductPrice", 0));
-            Assert.AreEqual(123, Get(sim, "Coins")); Assert.AreEqual(3, Get(sim, "StaffCount"));
-            Assert.AreEqual(4, Get(sim, "SpeedLevel"));
-            Assert.That((float)Get(sim, "WorkRate"), Is.EqualTo(1.4f).Within(.0001f));
+            Assert.AreEqual(123, Get(sim, "Coins")); Assert.AreEqual(1, Get(sim, "StaffCount"));
+            Assert.AreEqual(0, Get(sim, "SpeedLevel"));
+            Assert.That((float)Get(sim, "WorkRate"), Is.EqualTo(1f).Within(.0001f));
             Call(sim, "SelectLevel", 1); Call(sim, "SetPrice", 17f);
             Assert.IsTrue((bool)Get(sim, "CanEditPrices")); Assert.AreEqual(17f, Get(sim, "Price"));
             Call(sim, "SelectLevel", 0); Assert.AreEqual(5f, Get(sim, "Price"));
@@ -287,24 +282,24 @@ namespace HayChoriYPaty.Tests
         [Test]
         public void FlorestaRepeatPurchasesHaveFixedCostsAndTenPercentBaseSteps()
         {
-            object sim = Make(coins: 100); Start(sim);
+            object sim = Make(coins: 500); Start(sim);
             for (int i = 0; i < 2; i++)
             {
-                Assert.AreEqual(25, Get(sim, "HireCost")); Assert.IsTrue((bool)Call(sim, "TryHire"));
-                Assert.AreEqual(5, Get(sim, "SpeedCost")); Assert.IsTrue((bool)Call(sim, "TryUpgradeSpeed"));
+                Assert.AreEqual(200, Get(sim, "HireCost")); Assert.IsTrue((bool)Call(sim, "TryHire"));
+                Assert.AreEqual(25, Get(sim, "SpeedCost")); Assert.IsTrue((bool)Call(sim, "TryUpgradeSpeed"));
                 Assert.That((float)Get(sim, "WorkRate"), Is.EqualTo(1f + .1f * (i + 1)).Within(.0001f));
             }
-            Assert.AreEqual(40, Get(sim, "Coins")); Assert.AreEqual(3, Get(sim, "StaffCount"));
-            Assert.AreEqual(25, Get(sim, "HireCost")); Assert.AreEqual(5, Get(sim, "SpeedCost"));
+            Assert.AreEqual(50, Get(sim, "Coins")); Assert.AreEqual(3, Get(sim, "StaffCount"));
+            Assert.AreEqual(200, Get(sim, "HireCost")); Assert.AreEqual(25, Get(sim, "SpeedCost"));
         }
 
         [Test]
         public void FlorestaInsufficientFundsDoNotChangePurchases()
         {
-            object speed = Make(coins: 4); Assert.IsFalse((bool)Call(speed, "TryUpgradeSpeed"));
-            Assert.AreEqual(4, Get(speed, "Coins")); Assert.AreEqual(0, Get(speed, "SpeedLevel"));
-            object hire = Make(coins: 24); Assert.IsFalse((bool)Call(hire, "TryHire"));
-            Assert.AreEqual(24, Get(hire, "Coins")); Assert.AreEqual(1, Get(hire, "StaffCount"));
+            object speed = Make(coins: 24); Assert.IsFalse((bool)Call(speed, "TryUpgradeSpeed"));
+            Assert.AreEqual(24, Get(speed, "Coins")); Assert.AreEqual(0, Get(speed, "SpeedLevel"));
+            object hire = Make(coins: 199); Assert.IsFalse((bool)Call(hire, "TryHire"));
+            Assert.AreEqual(199, Get(hire, "Coins")); Assert.AreEqual(1, Get(hire, "StaffCount"));
         }
 
         [Test]
@@ -368,6 +363,108 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual("Playing", Get(sim, "Phase").ToString());
         }
 
+
+        private static readonly BindingFlags Hidden = BindingFlags.Instance | BindingFlags.NonPublic;
+        private static void Set(object obj, string property, object value) { obj.GetType().GetProperty(property, Instance).SetValue(obj, value, null); }
+        private static object Field(object obj, string name) { return obj.GetType().GetField(name, Hidden).GetValue(obj); }
+        private static void SetField(object obj, string name, object value) { obj.GetType().GetField(name, Hidden).SetValue(obj, value); }
+        private static object HiddenCall(object obj, string method, params object[] args) { return obj.GetType().GetMethod(method, Hidden).Invoke(obj, args); }
+        private static void State(object obj, string state) { Set(obj, "State", Enum.Parse(obj.GetType().GetProperty("State").PropertyType, state)); }
+        private object FullSettledQueue(int coins = 0)
+        {
+            object sim = Make(coins: coins); Start(sim);
+            for (int i = 0; i < 21; i++) Assert.IsTrue(Spawn(sim, 0, 4));
+            foreach (object c in Customers(sim)) { Set(c, "Position", Get(c, "Target")); State(c, "Waiting"); }
+            return sim;
+        }
+
+        [Test]
+        public void RestartResetsFirstLevelTeamAndSpeedWithoutRefundingCoins()
+        {
+            object sim = Make(coins: 1000); Start(sim);
+            for (int i = 0; i < 2; i++) { Call(sim, "TryHire"); Call(sim, "TryUpgradeSpeed"); }
+            Assert.AreEqual(3, Get(sim, "StaffCount")); Assert.AreEqual(2, Get(sim, "SpeedLevel"));
+            Start(sim);
+            Assert.AreEqual(1, Get(sim, "StaffCount")); Assert.AreEqual(0, Get(sim, "SpeedLevel"));
+            Assert.AreEqual(1f, Get(sim, "WorkRate")); Assert.AreEqual(550, Get(sim, "Coins"));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void DepartingFrontAdvancesExistingLaneAndAdmitsNewcomerOnlyAtTail(bool expires)
+        {
+            object sim = FullSettledQueue(); IList queue = Customers(sim);
+            object front = queue[0], second = queue[7], third = queue[14];
+            Vector2 secondFrom = (Vector2)Get(second, "Position"), thirdFrom = (Vector2)Get(third, "Position");
+            int secondId = (int)Get(second, "Id"), thirdId = (int)Get(third, "Id");
+            if (expires) { SetField(front, "Patience", 0f); HiddenCall(sim, "AdvanceCustomers", .01f); }
+            else { Set(front, "Remaining", 0); State(front, "Receiving"); SetField(front, "ReceiveRemaining", 0f); HiddenCall(sim, "AdvanceCustomers", .01f); }
+            Assert.AreEqual("Leaving", Get(front, "State").ToString()); Assert.AreEqual(-1, Field(front, "Slot"));
+            Assert.AreEqual(0, Field(second, "Slot")); Assert.AreEqual(7, Field(third, "Slot"));
+            Assert.AreEqual("Advancing", Get(second, "State").ToString()); Assert.AreEqual("Advancing", Get(third, "State").ToString());
+            Assert.AreEqual(secondFrom, Get(second, "Position")); Assert.AreEqual(thirdFrom, Get(third, "Position"));
+            Assert.AreEqual(secondId, Get(second, "Id")); Assert.AreEqual(thirdId, Get(third, "Id"));
+            Assert.AreEqual(4, Get(second, "Remaining")); Assert.AreEqual(4, Get(third, "Remaining"));
+            Assert.IsFalse(Spawn(sim, 0, 1), "Leaver counts toward capacity until offscreen");
+            HiddenCall(sim, "RemoveCustomer", front); Assert.IsTrue(Spawn(sim, 0, 1));
+            object newcomer = queue[queue.Count - 1]; Assert.AreEqual(14, Field(newcomer, "Slot"));
+            Assert.Greater((int)Get(newcomer, "Id"), thirdId);
+            HiddenCall(sim, "AdvanceCustomers", .05f);
+            Assert.Greater(((Vector2)Get(second, "Position")).y, secondFrom.y);
+            Assert.Less(((Vector2)Get(second, "Position")).y, ((Vector2)Get(second, "Target")).y);
+            Assert.AreEqual(0, Get(sim, "Delivered")); Assert.AreEqual(0, Get(sim, "Coins"));
+        }
+
+        [Test]
+        public void WorkersReserveOnlySettledFrontCustomersNeverMovingOrRearFans()
+        {
+            object sim = FullSettledQueue(2000);
+            for (int i = 0; i < 7; i++) Call(sim, "TryHire");
+            object moving = Customers(sim)[0]; State(moving, "Advancing"); Set(moving, "Position", new Vector2(58, 280));
+            foreach (object worker in (IList)Get(sim, "Workers"))
+            {
+                HiddenCall(sim, "Assign", worker); object c = Field(worker, "Customer");
+                Assert.NotNull(c); Assert.That((int)Field(c, "Slot"), Is.InRange(1, 6));
+                Assert.AreEqual(Get(c, "Target"), Get(c, "Position")); Assert.AreEqual("Waiting", Get(c, "State").ToString());
+            }
+            Assert.AreEqual(0, Get(moving, "Reserved"));
+            foreach (object c in Customers(sim)) if ((int)Field(c, "Slot") >= 7) Assert.AreEqual(0, Get(c, "Reserved"));
+        }
+
+        [Test]
+        public void ConcurrentHandoffsStopAtExactThousandthSaleInSameSlice()
+        {
+            object sim = FullSettledQueue(2000);
+            for (int i = 0; i < 7; i++) Call(sim, "TryHire");
+            foreach (object worker in (IList)Get(sim, "Workers"))
+            { HiddenCall(sim, "Assign", worker); State(worker, "Handoff"); SetField(worker, "Delay", 0f); }
+            Set(sim, "Delivered", 999); int coins = (int)Get(sim, "Coins");
+            Step(sim, .05f);
+            Assert.AreEqual(1000, Get(sim, "Delivered")); Assert.AreEqual(coins + 5, Get(sim, "Coins"));
+            Assert.AreEqual("Won", Get(sim, "Phase").ToString());
+            int remaining = 0; foreach (object c in Customers(sim)) remaining += (int)Get(c, "Remaining");
+            Assert.AreEqual(83, remaining, "Exactly one of eight queued handoffs should commit");
+        }
+
+        [Test]
+        public void ConcurrentQueueMaintainsUniqueSlotsAndExactReservationsAndIncome()
+        {
+            object sim = Make(coins: 2000); Start(sim);
+            for (int i = 0; i < 7; i++) Call(sim, "TryHire");
+            int opening = (int)Get(sim, "Coins");
+            for (int i = 0; i < 1800; i++)
+            {
+                Step(sim, .05f); var slots = new System.Collections.Generic.HashSet<int>();
+                foreach (object c in Customers(sim))
+                {
+                    int slot = (int)Field(c, "Slot"); if (slot >= 0) Assert.IsTrue(slots.Add(slot));
+                    Assert.That((int)Get(c, "Reserved"), Is.InRange(0, (int)Get(c, "Remaining")));
+                    if (slot >= 7 || Get(c, "State").ToString() == "Advancing") Assert.AreEqual(0, Get(c, "Reserved"));
+                }
+                Assert.AreEqual(opening + (int)Get(sim, "Delivered") * 5, Get(sim, "Coins"));
+            }
+            Assert.Greater((int)Get(sim, "Delivered"), 0);
+        }
 
         [Test]
         public void OnlyPlayingRoundAdvancesClock()

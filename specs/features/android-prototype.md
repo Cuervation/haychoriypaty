@@ -1,6 +1,25 @@
 # Android delivery — current Street and historical prototype
 
-## Current Street0.2.4 — selected cover/logo intro (2026-10-04)
+## Presentation-logo app icon — source update (2026-10-04)
+
+Use the same selected `Assets/Art/Street/Resources/street-logo.png` as the application icon, without redrawing its text/art or modifying the presentation asset/meta. Assign its texture to the Unity default icon and all Android single-layer legacy/round slots. On future Android generation, the Editor-only StreetAppIcon callback copies the exact source PNG to launcher drawable-nodpi and supplies a cream background plus an XML-inset adaptive foreground (20% horizontal/20.92% vertical), preserving the full badge/aspect for varied launcher masks. No new package or raster derivative; source PNG stays authoritative.
+
+- [x] Default/Android single-layer icon references and adaptive build-source composition implemented.
+- [ ] Next authorized build/install confirms the logo replaces the Unity icon, stays readable/unclipped under launcher masks and keeps presentation unchanged.
+
+**Validation:** Source review only. No tests, Play, APK/export generation or device changes by standing user instruction. Unity MCP state ping did not respond; import/compilation and callback execution remain unverified. Installed0.2.4 retains its previous icon until a future authorized update; historical build results below do not validate this source change.
+
+
+## Current Street0.2.5 — combined tested APK (2026-10-04)
+
+- Latest user authorized tests/build/phone update. Existing Unity6000.6.3f1/Android/Main: relevant EditMode52completed/succeeded/no reported failures; PlayMode12/12passed,0failed/0skipped. Regression scope and jobs are in[street automation](street-automation.md#combined-validation--2026-10-04-current-accumulated-implementation). Actual menu,21-fan crowd, paired idle animation frames and seven-product Ready/Playing captures reviewed in ignored`Logs/Acceptance/Combined`; exact editor progress restored and Play stopped.
+- Build`build-47e1c59fff`: **Succeeded**,277.796s,**0errors/3warnings**. Main-only Android development/IL2CPP ARM64. Warnings: Diagnostics Data recommends fuller debug symbols; obsolete Unity splash PVRTC plus uncompressed-logo fallback. These are recorded, not hidden errors or zero-warning claims. No package/toolchain install or second editor.
+- APK`Builds/Android/HayChoriYPaty-street.apk`, archive`Builds/Android/Archive/HayChoriYPaty-0.2.5-code7.apk`: **114,272,726bytes (108.98MiB)**, package`com.haychoriypaty.game`,0.2.5/code7,minAPI26/targetAPI36,`arm64-v8a`,GameActivity. BuildReport998.76MiB includes separate debug outputs, not download size.
+- SHA256:`99d78efd142a624e612259737664ab013a0667e41d8319a62e6733b3d296403c`. V2signature verified; same local Android Debug certificate as0.2.4 (SHA256`d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`), suitable for non-destructive`install -r`; not Play Store release signing.
+- StreetAppIcon callback executed: generated adaptive icon/foreground/cream background XML are present, manifest application icon references`@mipmap/app_icon`, packaged`res/drawable-nodpi-v4/hay_chori_paty_logo.png` exactly matches original presentation PNG bytes/SHA`bdce6ed77abbcfca57bcb9676e887b70044da4c7d38626d0d726a586733fd247`. Actual phone-launcher mask rendering still pending.
+- Motorola Edge60Fusion`ZY22MBNWRB` was verified connected with0.2.4/code6 at start, then disconnected before installation. Final adb inventory empty; user asked to reconnect/unlock. **0.2.5 not installed or launched on device yet**. No uninstall, clear-data, reset or unrelated-phone operation performed. Reconnect and use`adb -s ZY22MBNWRB install -r` then own GameActivity; verify native intro/Jugar/Salir/purchases/replay, launcher icon and runtime log. Device/FPS/thermal/endurance claims remain unverified.
+
+## Historical Street0.2.4 — selected cover/logo intro (2026-10-04)
 
 - Supplied cover/logo assets, 4.1-second unscaled reveal with one warm flash, native/desktop action gating until Ready; includes the earlier mural, 15 fan-clothing overlays and v1→v2 opening staff/speed migration. No new game mechanics, packages or scene changes.
 - Focused art EditMode 11/11 passed; affected real-editor pointer PlayMode 12/12 passed (job `adfc5a956d4f48548c73f34aa2caec0d`). Earlier batch pointer failures are recorded in [status](../status.md), not counted as passing checks. Actual 1080×1920 Game-view intro and representative wardrobe captures reviewed; editor progress restored exactly and Main remains clean/stopped.

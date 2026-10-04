@@ -27,3 +27,65 @@ Use case: precise-object-edit. Asset type: portrait 2D mobile-game level backgro
 ```
 
 Output: `Resources/street-background-mural-v3.png` (940×1673 RGB). It remains a separate file so the previous backdrop and GUID remain available.
+
+
+## Open street / counter-only stall — 2026-10-04
+
+Mode: built-in ImageGen `imagegen`, precise-object-edit, opaque background. Exact edit target: `Resources/street-background-mural-v3.png` (existing original project art). Generated output is copied unchanged to `Resources/street-background-open-street-v4.png` (940×1673); old v3/GUID retained. No CLI/API fallback, resampling or programmatic image editing.
+
+```text
+Use case: precise-object-edit.
+Asset type: opaque portrait 2D mobile-game background for Hay Chori y Paty, Floresta street level.
+Input image: the referenced file is the exact existing project background to EDIT, not merely a style reference.
+
+Primary request: remove the entire upper stadium/sky portion, remove the stall roof/awning, remove the "HAY CHORI Y PATY" wooden header, remove both hanging black chalkboards and all tall roof-support posts and their feet. The stall must be ONLY the low wood-and-black-iron counter. Enlarge the open STREET BEHIND the counter where the queued customers will stand. The top edge of the image must end at the mural wall itself: NO scenery, sky, stadium facade or floodlights above that mural.
+
+Composition and exact game-layout constraints:
+- Keep the FULL portrait canvas at the input aspect ratio, approximately 940 x 1673 (9:16). Do NOT solve this by cropping or rescaling the entire image.
+- Preserve the existing counter in its SAME horizontal band and scale: wooden countertop begins approximately y548 (32.7% of image height); black iron front ends approximately y655 (39.2%). Keep the counter spanning the width. Do not move it up or down.
+- Recompose ONLY the former upper stadium/canopy/signage area above this fixed counter. Relocate the existing ORIGINAL black-and-white supporter mural wall to the TOP EDGE, occupying roughly the first 12% of image height (y0 to around y200). At the image's upper edge there is mural/plaster, not sky or architecture above it. Keep recognizable original painted supporters/flags/football mural subjects and the same cartoon art language; do not invent lettering, crests or logos.
+- Immediately below the mural wall, a subtle far curb and a broad EMPTY gray-warm street extend all the way to the back of the counter. The expanded customer STREET occupies roughly y200 through y548 (12% to 32.7% of the canvas). This band must be open, unobstructed across its entire width and large enough for three rows of standing customers. It is street roadway/paving, not another counter or a restaurant. No live people: customers will be separate game sprites.
+- Preserve EVERYTHING from the counter downward in the same positions, proportions, palette and appearance: long counter, existing right-side condiment workbench, open warm sidewalk tiles for workers, cream blank lower HUD area, small bottom black-and-white pennants. Exception: remove the old tall canopy supports/pole bases wherever they extend into this area, neatly inpainting their tiny footprints. Do not change the lower floor, do not enlarge the foreground worker sidewalk instead of the CUSTOMER STREET, do not add objects.
+- No awnings, roofs, overhead bunting, title signs, hanging boards, floating icons, stall branding, stadium above the wall, extra structures, seating, people outside the painted mural, food, UI, text, watermark or new logos. Keep only the counter as the stall structure.
+
+Style invariants: match the exact existing polished original casual 2D cartoon, clean dark contours, warm daylight, lightly painted material textures, fixed frontal slightly elevated portrait camera. Not photorealistic, not 3D, not isometric. Preserve existing art; do not redesign the full scene.
+Output: exactly one finished opaque edited portrait background, without framing or an explanatory diagram.
+
+```
+
+Static output review: no upper stadium/sky, canopy/header/chalkboards or supports; original mural at top; wide empty road behind unchanged counter band; existing foreground/HUD bands retained. No live crowd/worker/food sprites baked in. Source selection and sign-overlay removal integrated, but no Unity/Game-view/device validation or APK this turn.
+
+SHA256: `4d468772fc8524a331f7d8ac7e1bfcf2f32ad44bad99f51302c36e3b6e9bd8dd`. New TextureImporter meta copies prior NPOT/mip/Android settings with new GUIDs and full image bounds; import not verified.
+
+
+## Game currency: gold-only choripán/paty coin — 2026-10-04
+
+- Method: built-in ImageGen generate, then scoped color/material edit after user requested100%gold. No API/CLI fallback or Python image edit.
+- Draft: `/Users/celestino/.codex/generated_images/01a107c9-7a49-7782-bfac-9bc8d5a60f16/exec-0e71e8c8-a587-4e09-9b3f-94fd841b1dbb.png` (colored food/Argentina accents, not integrated).
+- Selected edit source/output: `/Users/celestino/.codex/generated_images/01a107c9-7a49-7782-bfac-9bc8d5a60f16/exec-fbcef7af-73af-42b8-928d-6e7266f490ed.png`.
+- Project asset: `Resources/street-coin-gold-v2.png` —1254×1254RGBA, original output bytes/alpha preserved, gold-only relief, statically reviewed; import/Game/device review deferred.
+- SHA256: `2b65f5d3ee2e637c7fa898a57be8ff172b45bca76a2c07c4faa0222c5831b4a4`. Previous sprites/metas retained; new meta GUID and full bounds, mipmaps/NPOT off, uncompressed AndroidRGBA32.
+
+### Initial generation prompt
+
+```text
+Use case: stylized-concept.
+Asset type: single original transparent game currency icon for the upper-left HUD of Hay Chori y Paty, an Argentine street-grill 2D mobile cartoon game.
+Primary request: one beautiful chunky GOLD COIN with clear original embossed symbols referencing BOTH choripán and paty: a grilled chorizo in a split bread roll and a small beef paty sandwich, arranged together as one compact central food emblem. The choripán must be unmistakable (sausage sticking out of bread, a few simple grill marks), the paty recognizable as a burger bun with beef patty. No other foods.
+Style/medium: polished 100% 2D cartoon sprite, rounded cel-shaded shapes, thick clean dark-brown contours, crisp readable silhouette, highlights and raised embossed relief drawn in simple flat cartoon tones; NOT photoreal metal, NOT 3D render. Warm yellow/gold rim with a subtle cream/red center food detail, tiny pale sky-blue/white enamel accent reminiscent of Argentina and the existing title logo palette. Large simple forms, readable at 40 pixels.
+Composition/framing: frontal nearly perfectly round coin, very slight illustrated rim thickness, centered on a square canvas, isolated, occupying about 90% of canvas with generous transparent padding. Entire outline visible, no cropped edges. One coin only, no pile, no mockup, no UI panel.
+Scene/backdrop: genuinely transparent alpha outside the coin; no opaque background, checkerboard, floor, or cast shadow outside its silhouette.
+Text: none. No letters, numbers, dollar signs, watermark, logo copy, club crests or external brand marks.
+Output: transparent square PNG asset. This is new original in-game currency artwork, not the app icon or title logo.
+```
+
+### Final gold-only edit prompt
+
+```text
+Use case: precise-object-edit.
+Asset type: final transparent in-game currency coin sprite for Hay Chori y Paty.
+Primary request: EDIT THE ATTACHED COIN ONLY TO MAKE IT 100% GOLD, with absolutely no colored enamel or colored food. Preserve the same coin outline, circular framing, rim thickness, placement and exact central choripán and paty/burger food shapes, but turn every detail into embossed relief made from the SAME GOLD METAL as the coin.
+Change only material/color treatment. All sausage, bread, grill marks, burger, tomato, patty, garnish and both ribbons must be monochrome gold relief. No red, green, blue, white, silver, brown food, black ink or multicolored accents anywhere on the coin. Use only gold-family tones: warm gold, pale yellow-gold highlights and deeper gold/ochre relief shadows, enough contrast to read the choripán and paty at small HUD size. Make upper/lower ribbons plain gold embossed arcs without a flag. Not painted food, no colored center.
+Preserve polished casual 2D cartoon icon style, not photorealistic and not a 3D-render photograph. Entire coin visible with transparent padding, centered square format.
+Keep true transparent alpha everywhere outside the coin; no opaque background, checkerboard, floor, external cast shadow, UI layout, letters/numbers/dollar signs, watermark, new objects or extra coins. Do not alter or replace the food-emblem design or introduce the app title logo.
+```

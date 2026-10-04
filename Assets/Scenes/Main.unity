@@ -543,8 +543,8 @@ MonoBehaviour:
     maxStaff: 8
     baseHireCost: 15
     baseSpeedCost: 5
-    florestaHireCost: 25
-    florestaSpeedCost: 5
+    florestaHireCost: 200
+    florestaSpeedCost: 25
     florestaSpeedIncrease: 0.1
     customerArrivalSeconds: 0.16
     workerSpeed: 300
@@ -572,14 +572,14 @@ MonoBehaviour:
     initialPrice: 5
     deliveryPatienceRefreshSeconds: 180
     levelProductCounts: 0100000003000000050000000600000007000000i
-    levelGoals: 180000002800000041000000550000006e000000i
+    levelGoals: e80300002800000041000000550000006e000000i
     levelDurations:
     - 180
     - 210
     - 240
     - 270
     - 300
-    florestaFinishAtDeadline: 1
+    florestaFinishAtDeadline: 0
   selectedLevel: 0
 --- !u!1660057539 &9223372036854775807
 SceneRoots:

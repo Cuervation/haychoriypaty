@@ -13,8 +13,8 @@ namespace HayChoriYPaty
         [Min(1)] public int maxStaff = 8;
         [Min(1)] public int baseHireCost = 15;
         [Min(1)] public int baseSpeedCost = 5;
-        [Min(1)] public int florestaHireCost = 25;
-        [Min(1)] public int florestaSpeedCost = 5;
+        [Min(1)] public int florestaHireCost = 200;
+        [Min(1)] public int florestaSpeedCost = 25;
         [Min(.01f)] public float florestaSpeedIncrease = .10f;
         [Min(0.1f)] public float customerArrivalSeconds = 0.16f;
         [Min(0.1f)] public float workerSpeed = 300f;
@@ -30,13 +30,13 @@ namespace HayChoriYPaty
         [Min(0f)] public float initialPrice = 5f;
         [Min(0f)] public float deliveryPatienceRefreshSeconds = 180f;
         public int[] levelProductCounts = { 1, 3, 5, 6, 7 };
-        public int[] levelGoals = { 24, 40, 65, 85, 110 };
+        public int[] levelGoals = { 1000, 40, 65, 85, 110 };
         public float[] levelDurations = { 180f, 210f, 240f, 270f, 300f };
-        [Tooltip("Floresta keeps serving for the full turn; evaluate its sales goal at the deadline.")]
-        public bool florestaFinishAtDeadline = true;
+        [Tooltip("Optional deadline-only Floresta trial. Default false: win immediately at the unit goal.")]
+        public bool florestaFinishAtDeadline = false;
     }
 
-    public enum StreetCustomerState { Entering, Waiting, Receiving, Leaving }
+    public enum StreetCustomerState { Entering, Waiting, Receiving, Leaving, Advancing }
     public enum StreetWorkerState { Idle, ToStation, Pickup, ToCounter, Handoff }
 
     [Serializable]
@@ -83,10 +83,11 @@ namespace HayChoriYPaty
     public sealed class StreetSimulation
     {
         public const float FlorestaChoriPrice = 5f;
+        private const int QueueColumns = 7, QueueSlots = 21;
         public static readonly string[] ProductNames = { "Chori", "Paty", "Bondiola", "Vacío", "Coca", "Fernet", "Cerveza" };
         public static readonly string[] LevelNames = { "Floresta / All Boys", "Nueva Chicago", "Argentinos Juniors", "Vélez", "Ferro" };
         private static readonly int[] DefaultProductCounts = { 1, 3, 5, 6, 7 };
-        private static readonly int[] DefaultGoals = { 24, 40, 65, 85, 110 };
+        private static readonly int[] DefaultGoals = { 1000, 40, 65, 85, 110 };
         private static readonly float[] DefaultDurations = { 180f, 210f, 240f, 270f, 300f };
         private readonly StreetBalance balance;
         private readonly List<StreetCustomer> customers = new List<StreetCustomer>();
@@ -129,12 +130,15 @@ namespace HayChoriYPaty
             if (!CanEditPrices) SetProductPrice(0, FlorestaChoriPrice);
             Coins = Mathf.Max(0, coins); SpeedLevel = Mathf.Max(0, speed);
             staff = Mathf.Clamp(staff, 1, Mathf.Max(1, this.balance.maxStaff));
-            for (int i = 0; i < staff; i++) AddWorker();
+            if (!CanEditPrices) ResetFlorestaTeam();
+            else for (int i = 0; i < staff; i++) AddWorker();
         }
 
         public void StartRound()
         {
             customers.Clear(); sales.Clear();
+            // A fresh/replayed Floresta turn never inherits hired staff or speed upgrades.
+            if (!CanEditPrices) ResetFlorestaTeam();
             foreach (StreetWorker worker in workers) ResetWorker(worker);
             Elapsed = 0f; Delivered = 0; arrival = 0f; assignmentAfterId = 0; roundFirstOrder = 1; Phase = RoundPhase.Playing;
         }
@@ -179,10 +183,9 @@ namespace HayChoriYPaty
         public bool SpawnCustomer(int product, int quantity)
         {
             if (customers.Count >= Mathf.Clamp(balance.maxCustomers, 1, 21) || product < 0 || product >= ProductCount) return false;
-            int slot = FindFreeSlot();
+            int slot = FindQueueTailSlot();
             if (slot < 0) return false;
-            int row = slot / 7, col = slot % 7;
-            Vector2 target = new Vector2(58 + 70 * col, 310 - 70 * row);
+            Vector2 target = QueuePosition(slot);
             bool left = (nextCustomer & 1) == 0;
             customers.Add(new StreetCustomer { Id = nextCustomer++, Product = product,
                 Remaining = Mathf.Clamp(quantity, 1, CanEditPrices ? 999 : 4), Position = new Vector2(left ? -40 : 580, target.y),
@@ -249,11 +252,17 @@ namespace HayChoriYPaty
             for (int i = customers.Count - 1; i >= 0; i--)
             {
                 StreetCustomer c = customers[i]; c.AnimationTime += dt;
-                if (c.State == StreetCustomerState.Entering) { c.Position = Move(c.Position, c.Target, balance.customerSpeed, dt); if (c.Position == c.Target) c.State = StreetCustomerState.Waiting; }
-                if (c.State == StreetCustomerState.Waiting) { c.Patience -= dt; c.PatienceFraction = Mathf.Clamp01(c.Patience / Mathf.Max(0.1f, balance.customerPatienceSeconds)); }
+                if (c.State == StreetCustomerState.Entering || c.State == StreetCustomerState.Advancing ||
+                    (c.State == StreetCustomerState.Receiving && c.Position != c.Target))
+                {
+                    c.Position = Move(c.Position, c.Target, balance.customerSpeed, dt);
+                    if (c.Position == c.Target && c.State != StreetCustomerState.Receiving) c.State = StreetCustomerState.Waiting;
+                }
+                if (c.State == StreetCustomerState.Waiting || c.State == StreetCustomerState.Advancing)
+                { c.Patience -= dt; c.PatienceFraction = Mathf.Clamp01(c.Patience / Mathf.Max(0.1f, balance.customerPatienceSeconds)); }
                 if (c.Patience <= 0f && c.State != StreetCustomerState.Leaving) SetLeaving(c);
                 if (c.State == StreetCustomerState.Leaving) { c.Position = Move(c.Position, c.Target, 180f, dt); if (c.Position == c.Target) RemoveCustomer(c); }
-                if(c.State==StreetCustomerState.Receiving) { c.ReceiveRemaining-=dt; if(c.ReceiveRemaining<=0f) { if(c.Remaining<=0&&c.Reserved<=0)SetLeaving(c);else if(c.Remaining>0)c.State=StreetCustomerState.Waiting; } }
+                if(c.State==StreetCustomerState.Receiving) { c.ReceiveRemaining-=dt; if(c.ReceiveRemaining<=0f) { if(c.Remaining<=0&&c.Reserved<=0)SetLeaving(c);else if(c.Remaining>0)c.State=c.Position==c.Target?StreetCustomerState.Waiting:StreetCustomerState.Advancing; } }
             }
         }
 
@@ -263,6 +272,7 @@ namespace HayChoriYPaty
             {
                 w.AnimationTime += dt;
                 if (w.State == StreetWorkerState.Idle) { Assign(w); continue; }
+                if (!IsAtCounter(w.Customer) || !customers.Contains(w.Customer)) { CancelAssignment(w); continue; }
                 if (w.State == StreetWorkerState.ToStation)
                 {
                     w.Position = Move(w.Position, w.Target, balance.workerSpeed * WorkRate, dt);
@@ -281,7 +291,16 @@ namespace HayChoriYPaty
                 else if (w.State == StreetWorkerState.Handoff)
                 {
                     w.Delay -= dt;
-                    if (w.Delay <= 0f) Deliver(w);
+                    if (w.Delay <= 0f)
+                    {
+                        Deliver(w);
+                        // Stop at the goal handoff, before another worker can sell in this slice.
+                        if (LevelIndex == 0 && !balance.florestaFinishAtDeadline && Delivered >= Goal)
+                        {
+                            Phase = RoundPhase.Won;
+                            return;
+                        }
+                    }
                 }
             }
         }
@@ -294,7 +313,7 @@ namespace HayChoriYPaty
             {
                 int i = (start + offset) % customers.Count;
                 StreetCustomer c = customers[i];
-                if (c.State != StreetCustomerState.Waiting || c.Remaining - c.Reserved <= 0) continue;
+                if (c.State != StreetCustomerState.Waiting || !IsAtCounter(c) || c.Remaining - c.Reserved <= 0) continue;
                 c.Reserved++; worker.Customer = c; worker.CustomerId = c.Id; worker.Product = c.Product; assignmentAfterId = c.Id;
                 worker.Target = StationPosition(c.Product); worker.State = StreetWorkerState.ToStation; return;
             }
@@ -303,7 +322,7 @@ namespace HayChoriYPaty
         private void Deliver(StreetWorker worker)
         {
             StreetCustomer c = worker.Customer;
-            if (c != null && customers.Contains(c) && c.State != StreetCustomerState.Leaving && c.Reserved > 0 && c.Remaining > 0)
+            if (IsAtCounter(c) && customers.Contains(c) && c.Reserved > 0 && c.Remaining > 0)
             {
                 c.Reserved--; c.Remaining--; c.State = StreetCustomerState.Receiving; c.ReceiveRemaining=.3f;
                 Delivered++; int amount = Mathf.Max(0, Mathf.RoundToInt(GetProductPrice(c.Product)));
@@ -313,14 +332,17 @@ namespace HayChoriYPaty
                 if (sales.Count > 40) sales.RemoveAt(0);
                 // Receiving pose lasts .3 seconds; departure/next assignment is advanced above.
             }
+            else { CancelAssignment(worker); return; }
             ResetWorker(worker);
         }
 
         private void RemoveCustomer(StreetCustomer c)
         {
+            int column = c.Slot >= 0 ? c.Slot % QueueColumns : -1;
             for (int i = 0; i < workers.Count; i++)
-                if (workers[i].Customer == c) { if (c.Reserved > 0) c.Reserved--; ResetWorker(workers[i]); }
+                if (workers[i].Customer == c) CancelAssignment(workers[i]);
             customers.Remove(c);
+            if (column >= 0) CompactQueue(column);
         }
         private float ProductMultiplier(int product)
         {
@@ -329,23 +351,74 @@ namespace HayChoriYPaty
         }
         private void SetLeaving(StreetCustomer c)
         {
+            if (c.State == StreetCustomerState.Leaving) return;
+            int column = c.Slot % QueueColumns;
             c.State = StreetCustomerState.Leaving; c.Target = new Vector2(c.Position.x < 270 ? -50 : 590, c.Position.y);
+            c.Slot = -1; // No longer in the queue, but still counted until the exit walk ends.
             for (int i = 0; i < workers.Count; i++)
-                if (workers[i].Customer == c) { if (c.Reserved > 0) c.Reserved--; ResetWorker(workers[i]); }
+                if (workers[i].Customer == c) CancelAssignment(workers[i]);
+            CompactQueue(column);
         }
-        private int FindFreeSlot()
+        private void CompactQueue(int column)
         {
-            int max = Mathf.Clamp(balance.maxCustomers, 1, 21);
-            for (int slot = 0; slot < max; slot++)
+            int nextSlot = column;
+            // Front-to-back traversal preserves the same-lane order of existing customers.
+            for (int slot = column; slot < QueueSlots; slot += QueueColumns)
+            for (int i = 0; i < customers.Count; i++)
             {
-                bool used = false;
-                for (int i = 0; i < customers.Count; i++) if (customers[i].Slot == slot) { used = true; break; }
-                if (!used) return slot;
+                StreetCustomer c = customers[i];
+                if (c.Slot != slot || c.State == StreetCustomerState.Leaving) continue;
+                if (c.Slot != nextSlot)
+                {
+                    for (int w = 0; w < workers.Count; w++)
+                        if (workers[w].Customer == c) CancelAssignment(workers[w]);
+                    c.Slot = nextSlot;
+                    c.Target = QueuePosition(nextSlot);
+                    if (c.State == StreetCustomerState.Waiting) c.State = StreetCustomerState.Advancing;
+                }
+                nextSlot += QueueColumns;
+                break;
             }
-            return -1;
+        }
+        private int FindQueueTailSlot()
+        {
+            int max = Mathf.Clamp(balance.maxCustomers, 1, QueueSlots), result = -1;
+            for (int column = 0; column < QueueColumns; column++)
+            {
+                int tail = column;
+                for (int i = 0; i < customers.Count; i++)
+                {
+                    int slot = customers[i].Slot;
+                    if (slot >= 0 && slot % QueueColumns == column) tail = Mathf.Max(tail, slot + QueueColumns);
+                }
+                // Only append behind existing people; never reuse a hole in front of them.
+                if (tail < max && (result < 0 || tail < result)) result = tail;
+            }
+            return result;
+        }
+        private static Vector2 QueuePosition(int slot)
+        {
+            return new Vector2(58 + 70 * (slot % QueueColumns), 310 - 70 * (slot / QueueColumns));
+        }
+        private static bool IsAtCounter(StreetCustomer c)
+        {
+            return c != null && c.Slot >= 0 && c.Slot < QueueColumns && c.Position == c.Target &&
+                   (c.State == StreetCustomerState.Waiting || c.State == StreetCustomerState.Receiving);
+        }
+        private static void CancelAssignment(StreetWorker worker)
+        {
+            if (worker.Customer != null && worker.Customer.Reserved > 0) worker.Customer.Reserved--;
+            ResetWorker(worker);
         }
         private static int LevelValue(int[] values, int index, int[] fallback) { return values != null && index < values.Length ? Mathf.Max(1, values[index]) : fallback[index]; }
         private static float LevelValue(float[] values, int index, float[] fallback) { return values != null && index < values.Length ? Mathf.Max(.01f, values[index]) : fallback[index]; }
+        private void ResetFlorestaTeam()
+        {
+            workers.Clear();
+            nextWorker = 1;
+            SpeedLevel = 0; // Zero purchased upgrades means the displayed speed is x1.00.
+            AddWorker();
+        }
         private void AddWorker() { workers.Add(new StreetWorker { Id = nextWorker++, Position = new Vector2(433, 430), Target = new Vector2(433, 430), State = StreetWorkerState.Idle }); }
         private static void ResetWorker(StreetWorker w) { w.Customer = null; w.CustomerId = 0; w.State = StreetWorkerState.Idle; w.Target = new Vector2(433, 430); }
         private static Vector2 Move(Vector2 from, Vector2 to, float speed, float dt) { return Vector2.MoveTowards(from, to, speed * dt); }

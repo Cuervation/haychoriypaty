@@ -118,8 +118,23 @@ namespace HayChoriYPaty.Tests
             }
 
             float duration = (float)View.GetField("IntroDuration", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue();
-            Assert.GreaterOrEqual(duration, 3f);
-            Assert.LessOrEqual(duration, 5f);
+            Assert.GreaterOrEqual(duration, 8f);
+            Assert.LessOrEqual(duration, 9f);
+            Assert.NotNull(Resources.Load<Font>("Menu/LuckiestGuy-Regular"));
+        }
+
+        [TestCase("street-background-open-street-v4", 940, 1673, false)]
+        [TestCase("street-coin-gold-v2", 1254, 1254, true)]
+        public void NewStreetBackgroundAndGoldCoinKeepNativeResolution(string name, int width, int height, bool alpha)
+        {
+            Texture2D texture = Resources.Load<Texture2D>(name); Assert.NotNull(texture);
+            Assert.AreEqual(width, texture.width); Assert.AreEqual(height, texture.height);
+            TextureImporter importer = (TextureImporter)AssetImporter.GetAtPath("Assets/Art/Street/Resources/" + name + ".png");
+            Assert.NotNull(importer); Assert.AreEqual(alpha, importer.DoesSourceTextureHaveAlpha());
+            Assert.IsFalse(importer.mipmapEnabled); Assert.AreEqual(TextureImporterNPOTScale.None, importer.npotScale);
+            var android = importer.GetPlatformTextureSettings("Android");
+            Assert.IsTrue(android.overridden); Assert.AreEqual(TextureImporterFormat.RGBA32, android.format);
+            Assert.GreaterOrEqual(android.maxTextureSize, Math.Max(width, height));
         }
 
         [Test]

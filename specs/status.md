@@ -72,3 +72,67 @@ Actual 1080×1920 cover, logo-flash, Ready and representative Floresta wardrobe 
 ## Startup APK — physical phone delivery (2026-10-04)
 
 User requested installation on the connected Motorola Edge60Fusion. Serial-targeted replacement install returned Success; PackageManager confirms0.2.4/code6. GameActivity cold launch Statusok/769ms and app process alive. No uninstall/data clear, rebuild, new packages or emulator. Foreground changed to another app before screenshot, so no physical-screen/intro/touch/performance verification claimed. Existing editor stays open, Main clean/Play stopped.
+
+
+## Longer startup and Jugar/Salir menu — implemented, checks deferred (2026-10-04)
+
+Source now holds the fully visible cover 4s, reveals the logo, holds it fully visible 4s, then retains both behind original glossy blue JUGAR/SALIR buttons (Luckiest Guy with white/dark-outline text; Apache 2.0 license bundled). Fades are extra: buttons become available at 8.63s unscaled. Jugar starts the saved selected round directly; Salir calls player quit / Editor Play stop. Hidden game controls are not rendered/dispatched while startup/menu owns input; no simulation/economy/progression/product changes. Existing startup regression source adapted to persistent menu, not executed.
+
+**Validation:** Tests, Play-mode/visual/device verification and APK generation explicitly deferred by user; previous 0.2.4 test/build records are historical, not proof of this change. No second editor, package install, phone control, version bump or build. Source diff reviewed; normal asset refresh imported the font with includeFontData enabled and generated new metas; Editor finished reload, remains on stopped Main. Console MCP requests returned session-not-ready/ping timeouts, so clean compilation is not confirmed; no gameplay validation claimed.
+
+**Next:** When user requests combined validation, check the≥4s+≥4s timing, button typography/layout/safe-area, both platform input paths, direct Jugar and native Salir; build/install only if separately requested.
+
+
+## No Floresta price popup — implemented, untested (2026-10-04)
+
+Removed the full first-level price card/summary from StreetView.ReadyPanel, including replay/Ready paths; non-modal blue Jugar and unlocked-level navigation remain. Hidden product hit targets are also gated to editable-price levels. Simulation already enforces chori $5 (including old saves), so economy/progress and later levels remain unchanged. Startup menu changes from the preceding request are preserved.
+
+**Validation:** Source inspection only. Explicitly no tests, Play-mode/device checks, APK, version/settings/scene/meta changes or new Unity session; runtime/import/compilation for this edit not verified. Test files were not changed in this follow-up.
+
+
+## Floresta $25 speed / $200 helper and replay reset — implemented, untested (2026-10-04)
+
+Changed StreetBalance defaults and Main serialized values to $25 per speed upgrade and $200 per extra parrillero; +10% base increments and fixed/no-escalation first-level costs remain. StreetSimulation constructs and starts every first-level turn with one worker and SpeedLevel0 (displayed x1.00), clearing old staff and resetting worker IDs; this also covers wrapper reload/retry and return-to-Floresta start. Coins, unlocks, fixed $5 chori and later-level staff/speed rules remain unchanged. Earlier cover/menu/no-price-popup edits preserved.
+
+**Validation:** Source inspection only; user previously explicitly deferred all tests/APK and that instruction is retained. No Play, tests, APK, device/Editor mutation, package install, save-schema/version change or compilation/import verification. Scene diff is limited to the two balance fields; existing metas preserved. Old hard-coded cost/staff-preservation assertions in StreetSimulationTests/StreetPointerTests must be updated for the new contract before combined testing; no test-file edits in this turn.
+
+
+## FIFO lanes and rear-only replacement — implemented, untested (2026-10-04)
+
+StreetSimulation now releases departing queue slots and advances existing customers in the same column (all levels), retaining ID/order/patience and moving continuously. New arrivals are tail-only; leaving people remain counted until off-screen. Advancing state keeps visible order bubbles and uses existing walking frames; StreetView depth now follows actual positions. Workers reserve/deliver only to settled front customers; stale/moving/departed assignments are canceled without sale/reward or stuck reservations. Earlier first-level costs/reset, no price popup and startup menu preserved.
+
+**Validation:** Source review only. No tests, Play/visual/device checks, APK, compile/import confirmation, package/asset/scene/meta changes, commit or push. Standing no-tests/no-APK instruction retained. Existing tests that assume direct free-slot reuse/rear-row serving need adaptation before later combined checks.
+
+
+## Open street backdrop / counter-only stand — implemented, game review deferred (2026-10-04)
+
+New original versioned940×1673opaque `street-background-open-street-v4.png` removes the upper stadium/sky, roof/awning, branding header, chalkboards and tall supports. Mural ends at the top frame; broad open crowd street fills the space behind the retained counter. Existing worker sidewalk, condiment bench and lower HUD band retain their bands. StreetView loads v4 and removes both upper product-sign icons; queue/counter/worker/station/input anchors and prior gameplay/menu/reset changes preserved. Old v3/metas retained; new meta has fresh GUIDs and inherited import settings/full bounds. Exact prompt/method/SHA retained in GenerationPrompts.md.
+
+**Validation:** Built-in edited image statically reviewed and source diff inspected only. Explicitly no tests, Play, APK, device work or Unity import/compile confirmation. Runtime crowd/overlay/counter alignment with new backdrop is still unverified. No package/settings/scene changes in this turn; no commit/push.
+
+
+## Waiting supporter animations — implemented, untested (2026-10-04)
+
+StreetView now adds per-customer staggered breathing, foot-pivot leaning/weight shifts and occasional two-bounce cheering while stationary. Existing supporter identity and Floresta clothing share the same body transform; GUI matrix is restored before stable order/patience indicators. Walking/Advancing and receipt bob remain; existing AnimationTime drives all idle movement, with no changes to simulation, FIFO, economy, input, sprites/metas or prior work.
+
+**Validation:** Source/diff review only; no tests, Play, APK, device work or Unity compilation/import confirmation. Visual motion, garment attachment and dense-row readability await the later combined check requested by the user. No test files changed for this request.
+
+
+## Presentation-logo app icon — implemented, unbuilt (2026-10-04)
+
+PlayerSettings assigns the existing street-logo texture as default and all12Android single-layer icons. New Editor-only StreetAppIcon Gradle callback copies that same PNG byte-for-byte and composes a cream adaptive icon with percentage padding/aspect preservation, avoiding cropped lettering or generated/redrawn art. No source logo/meta, intro/gameplay, package/version/signing/input or earlier changes modified. New script meta has a fresh GUID.
+
+**Validation:** Source/diff review only; Unity MCP readiness read failed ping. No tests, Play, APK/export, device change or verified Unity compilation/import/callback run. Phone still has prior installed0.2.4/icon; verify branding with the later combined build/install.
+
+
+## First-level1000goal / gold coin / corner HUD — implemented, untested (2026-10-04)
+
+Floresta default/fallback/Main goal changed24→1000, deadline-only flagtrue→false, user-confirmed180seconds unchanged. Early first-level threshold handoff stops remaining workers in that slice, preserving actual unit/price accounting and freezing winning counter at1000/1000. Other goals/rules unaffected.
+
+Built-in ImageGen produced a new original transparent1254×1254coin; after user rejected colored accents, a scoped gold-only edit preserved choripán/paty relief. Final `street-coin-gold-v2.png` copied intact with fresh meta/full bounds, NPOT/mips off and AndroidRGBA32; draft/output retained, exact prompts/hash in GenerationPrompts.md. StreetView loads it for HUD/income effects; moves coin balance top-left and sold/goal top-right in slim panels above rear orders, leaving timer lower and all interaction/queue anchors unchanged. Current gameplay summary updated to authoritative costs/FIFO/goal without changing those earlier systems.
+
+**Validation:** Static image/source/diff review only. No tests, Play, APK/export/device work or verified Unity import/compilation; new goal/balance,1000-unit win/deadline loss, corner readability and gold icon appearance remain pending combined checks. Old24-unit/deadline-only fixtures need adaptation; no test files changed. Earlier app-icon/menu/queue/cost/reset/art/idle work preserved; no package/version/signing change, commit or push.
+
+
+## Combined validation checkpoint — 2026-10-04
+Latest user now authorizes combined tests/APK/phone update. Active checkout remains`/Users/celestino/HayChoriYPaty`, Unity6000.6.3f1/Android/Main. Updated Street fixtures and targeted EditMode52succeeded/no failures + PlayMode12/12passed; relevant evidence in`features/street-automation.md`. Reviewed actual menu/crowd/HUD and paired idle animation captures in ignored`Logs/Acceptance/Combined`; exact editor save restored, Play stopped. Android0.2.5/code7 development Main-only build`build-47e1c59fff` succeeded277.796s/0errors/3warnings. APK114272726bytes/SHA`99d78efd142a624e612259737664ab013a0667e41d8319a62e6733b3d296403c`, V2same debug certificate, min26/target36/ARM64; original adaptive logo bytes verified. RollingAPK plus0.2.5-code7 archive preserved, older0.2.4 archive untouched. Seven-product Ready/Playing layout also reviewed and exact editor save restored. Motorola serial`ZY22MBNWRB` was connected with0.2.4/code6 but then disconnected; finaladb inventory empty. NewAPK is **not yet installed/launched**, nativeSalir/launcher/device behavior still pending. User asked to reconnect/unlock; next action`adb install -r` without data wipe, then native smoke check. Evidence`Logs/Acceptance/Combined/summary.json`, full Android delivery in`features/android-prototype.md`.

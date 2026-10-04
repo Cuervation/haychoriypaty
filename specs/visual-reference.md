@@ -25,9 +25,9 @@ Normalize the observed 1080×1920 composition to a 540×960 logical safe-area ca
 ## Required direction
 
 - 100% 2D mobile cartoon: small expressive supporters with oversized heads, rounded shapes, vivid colors, clean dark contours, consistent proportions and fluid simple animation.
-- On startup, show the supplied Floresta cover art first, then the separate Hay Chori y Paty logo with a brief warm light flash; let this short intro reveal the existing ready screen, and keep the transition in the established 2D presentation.
-- Fixed portrait camera. Keep signs at top, dense standing supporters with product/quantity/patience indicators above a horizontal separating counter, moving workers in the open lower playfield, product stations below and large hire/upgrade controls at bottom; retain automatic side condiments.
-- Floresta public sidewalk, across from All Boys: neighborhood facades, stadium silhouette, and the recognizable broad supporter mural on the wall across the street. Interpret the user's mural photograph as original black-and-white cartoon supporter art; do not copy its exact composition, portraits, lettering, crests, or logos, and do not imply indoor stadium service.
+- On startup, hold the fully visible supplied Floresta cover for at least 4 seconds, then reveal the separate Hay Chori y Paty logo with a brief warm light flash and hold it fully visible for at least 4 more seconds. Only then show glossy blue Jugar/Salir buttons with white dark-outlined comic lettering, inspired by the supplied blue NEXT reference (original geometry, not copied pixels). Keep the cover/logo/menu until a choice; Jugar starts gameplay directly, Salir exits.
+- Fixed portrait camera. No overhead stall signs/roof or upper stadium above the mural; crop the artwork at the mural wall and leave a broad unobstructed customer street behind a counter-only stall. Keep dense standing supporters with product/quantity/patience indicators above a horizontal separating counter, moving workers in the open lower playfield, product stations below and large hire/upgrade controls at bottom; retain automatic side condiments.
+- Floresta public sidewalk, across from All Boys: the recognizable broad supporter mural on the wall across the street, ending at the top image boundary; no stadium facade, sky or floodlights above it. Interpret the user's mural photograph as original black-and-white cartoon supporter art; do not copy its exact composition, portraits, lettering, crests, or logos, and do not imply indoor stadium service.
 - In level 1, vary supporter outfits with the original logo-free overlays in `Assets/Art/Street/Resources/FanWardrobe`; preserve the existing poses and leave later-level crowds unchanged.
 - Grill must read as an Argentine iron street parrilla with embers, chorizo and bread, not an industrial kitchen. Condiments are an automatic stop; there is no seating.
 
@@ -53,15 +53,15 @@ All 1798 frames were decoded without missing indices; source is 60 fps / 29.9667
 
 Private analysis evidence (ignored, not gameplay art or GitHub content): `Logs/ReferenceAnalysis/{status.json,metrics.jsonl,index.json,quantity-analysis.json,contact-00.png,contact-10.png,contact-20.png,transitions.png}`. Decoder used installed browser WebCodecs VP9 and a temporary loopback server; no packages installed or video sent externally.
 
-## Current Street art — imported and reviewed
+## Historical Street art — imported and reviewed before the open-street update
 
-Active `Assets/Art/Street/Resources/street-background-v2.png` (940×1672) places the All Boys perimeter, original stall signage, counter and Argentine sidewalk in the measured functional bands. `street-characters.png` (1254×1254 RGBA) contains16 original worker/fan poses; `street-items.png` (1402×1122 RGBA) contains the seven products, parrilla/cooler/condiments and management/coin/order sprites. StreetView uses individually reviewed16/20 pixel rectangles, not assumed grid cells. NPOT resizing/mipmaps off; uncompressed max2048 and Android RGBA32 overrides.
+Historical `Assets/Art/Street/Resources/street-background-v2.png` (940×1672) places the All Boys perimeter, original stall signage, counter and Argentine sidewalk in the measured functional bands. `street-characters.png` (1254×1254 RGBA) contains16 original worker/fan poses; `street-items.png` (1402×1122 RGBA) contains the seven products, parrilla/cooler/condiments and management/coin/order sprites. StreetView uses individually reviewed16/20 pixel rectangles, not assumed grid cells. NPOT resizing/mipmaps off; uncompressed max2048 and Android RGBA32 overrides.
 
 Actual reviewed Game-view evidence: ignored `Logs/Acceptance/street-layout-final.png`. Generated method/prompts: `Assets/Art/Street/GenerationPrompts.md`. Directional frame walking and state-driven pickup/carry/handoff, moving/receiving fans and sale effects are active, but additional frame polish/audio and distinct four later-club illustrations remain pending. Original background v1 and all existing metas are retained.
 
 ## Floresta opposite-wall mural — 2026-10-04
 
-User-supplied All Boys mural photo is a location/composition reference, not a source to trace. The versioned active `Assets/Art/Street/Resources/street-background-mural-v3.png` replaces only the previously blank far stadium wall with original monochrome cartoon supporter art, retaining the composed stall, road/sidewalk, foreground play area, controls-safe area, and all other scene elements. Existing `street-background-v2.png` and its `.meta` remain untouched. New import settings match the old background (NPOT resize/mips off; Android texture override retained). See `Assets/Art/Street/GenerationPrompts.md`. Imported and reviewed in Main's Play-mode Game View at the start menu; screenshot: ignored `Logs/Acceptance/Mural/floresta-mural-menu.png`.
+User-supplied All Boys mural photo is a location/composition reference, not a source to trace. The historical versioned `Assets/Art/Street/Resources/street-background-mural-v3.png` replaces only the previously blank far stadium wall with original monochrome cartoon supporter art, retaining the composed stall, road/sidewalk, foreground play area, controls-safe area, and all other scene elements. Existing `street-background-v2.png` and its `.meta` remain untouched. New import settings match the old background (NPOT resize/mips off; Android texture override retained). See `Assets/Art/Street/GenerationPrompts.md`. Imported and reviewed in Main's Play-mode Game View at the start menu; screenshot: ignored `Logs/Acceptance/Mural/floresta-mural-menu.png`.
 
 ## Parrillero appearance — 2026-10-03
 
@@ -88,3 +88,44 @@ APK0.2.3/code5 succeeded363.11s,0errors/3warnings; signature/package/ABI verifie
 The user selected the supplied portrait cover and transparent title logo, retained unchanged as `Assets/Art/Street/Resources/street-cover.png` and `street-logo.png` with new preserved metas. Follow the explicit requested cover→logo/light-flash sequence; the latest WhatsApp clip itself was not visually inspected, so do not claim frame-matched reproduction. The original reference direction still governs gameplay art.
 
 Real 1080×1920 Game-view captures reviewed: ignored `Logs/Acceptance/Intro/{cover,logo-flash,ready}.png`. The separate representative `wardrobe-floresta.png` confirms fitting of the logo-free clothing over original fan bodies, with gameplay/layout unchanged; all 15 texture loads and deterministic rotation are covered by focused art tests. Native/device appearance remains unverified until requested installation.
+
+
+### Blue startup menu — source update, validation deferred (2026-10-04)
+
+StreetView authors the cyan→blue capsule/edge/gloss/shadow as one runtime texture, released on disable; cover/logo remain unchanged. Menu uses bundled Luckiest Guy Regular (Astigmatic/Brian J. Bonislawsky), white uppercase JUGAR/SALIR and an eight-direction dark outline. Official source: https://github.com/google/fonts/tree/main/apache/luckiestguy; Apache 2.0 license retained beside Resources/Menu/LuckiestGuy-Regular.ttf. New flow/visuals have not been tested or reviewed in Play/device; no new APK by explicit user instruction.
+
+
+### Floresta price-popup removal — source update (2026-10-04)
+
+Level 1 must never show a price popup, including the old read-only $5 card. Ready keeps only a blue JUGAR action and unlocked-level navigation over the existing scene; startup Jugar still starts directly. Later-level price panels remain unchanged. Visual/runtime checks deferred by user.
+
+
+### Visible FIFO advance — source update (2026-10-04)
+
+When a supporter departs, existing supporters directly behind advance along their same column before a new arrival takes the last place. Reuse original walking poses; preserve clothing/customer identity and visible order/patience bubbles while advancing. Draw depth uses actual feet positions during movement rather than future row targets. Never animate a newcomer jumping ahead or a rear customer receiving service past the front. No new art/layout; Play/device visual review deferred.
+
+
+## Open crowd street and counter-only stall — 2026-10-04
+
+Current source selects `Assets/Art/Street/Resources/street-background-open-street-v4.png` (940×1673, opaque). Built-in ImageGen edited the existing original v3 backdrop: mural reaches the top edge with no upper stadium/sky/floodlights; roof, HAY CHORI Y PATY header, hanging chalkboards and tall support poles removed. The expanded empty street behind the counter now spans roughly image y180–548 for the three customer rows; counter top/front retain approximately y548–655, equivalent to logical y314–376. Foreground worker sidewalk, right automatic-condiment bench and lower blank HUD band remain in their established bands.
+
+StreetView removes the two obsolete upper sign-product overlays; individual order/product bubbles remain. No customer/worker/station/GUI input anchors changed. Previous backdrop files/GUIDs retained. New meta inherits NPOT/mips off, max2048 and AndroidRGBA32 from v3, with fresh asset/Sprite GUIDs and full940×1673 bounds. Exact built-in prompt/provenance retained in `Assets/Art/Street/GenerationPrompts.md`.
+
+New image visually reviewed as a static asset only, not a Game-view capture. No tests, Play, APK, device or Unity import/compilation confirmation by the standing user instruction.
+
+
+## Waiting crowd motion — source update (2026-10-04)
+
+Use the existing four original cheering fan identities, not a cycle through different people. Add small breathing/stretch, foot-pivot sway/weight shift and intermittent double bounces with customer-specific phases/rhythms. Keep amplitudes modest in the dense queue; transform the Floresta garment with the body and restore the view matrix before drawing fixed order/quantity/patience indicators. Existing walk/advance/receive/exit states remain distinct. Animation follows simulation time without changing customer anchors, FIFO or deliveries. No new raster art; actual Game/device readability and motion review deferred (no tests/Play/APK).
+
+
+## Presentation logo as app icon — source update (2026-10-04)
+
+User selected the existing transparent Hay Chori y Paty intro logo as application icon too. Keep its original pixels/lettering and intro unchanged. Unity default/Android legacy-round slots reuse the texture; adaptive Android branding uses a build-only native XML inset over a matching cream background, with no repainting or new raster art. Full-badge fit/readability in actual launcher masks remains pending; no tests/Play/APK or device update.
+
+
+## Gold-only currency and top-corner HUD — source update (2026-10-04)
+
+Original transparent `Resources/street-coin-gold-v2.png` depicts choripán and paty/burger embossed on one coin. Latest user clarification requires100%gold tones only: food/ribbons are gold relief, without red/green/blue/white enamel or flag accents. Colored generation draft was not integrated. Preserve the2D cartoon silhouette, alpha and original assets/metas. Use it for the upper-left coin balance and actual delivery-income effect.
+
+Upper-right shows choripán plus actual sales/1000in Floresta (100/1000example); later levels retain their actual goal/generic progress marker. Slim sprite-backed blue/cream32px panels fit logicaly4–36, above rear-row bubbles beginningy38; coin silhouette fitsy3–37. Existing safe-area transform, crowd/stall and button anchors stay; countdown remains lower. Static art/source review only: actual small-size readability/alignment/import not yet verified; no tests/Play/APK.
