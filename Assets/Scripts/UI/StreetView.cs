@@ -13,6 +13,28 @@ namespace HayChoriYPaty
         private const string AllBoysCrestResource = "street-allboys-crest";
         private const string ChicagoCrestResource = "street-new-chicago-crest-v1";
         private const string ChicagoBackgroundResource = "street-background-chicago-v1";
+        private const string VelezBackgroundResource = "street-background-velez-v1";
+        private const string VelezCrestResource = "street-velez-crest-v1";
+        private const string VelezFrontFansResource = "street-velez-fans-front-v1";
+        private const string VelezWalkingFansResource = "street-velez-fans-walk-v1";
+        private const string VelezRiotFansResource = "street-velez-riot-fans-v1";
+        private const string VelezGrillResource = "street-parrilla-velez-v1";
+        private const string FerroBackgroundResource = "street-background-ferro-v1";
+        private const string FerroFrontFansResource = "street-ferro-fans-front-v1";
+        private const string FerroWalkingFansResource = "street-ferro-fans-walk-v1";
+        private const string FerroRiotFansResource = "street-ferro-riot-fans-v1";
+        private const string IndependienteBackgroundResource = "street-background-independiente-v1";
+        private const string IndependienteFrontFansResource = "street-independiente-fans-front-v1";
+        private const string IndependienteWalkingFansResource = "street-independiente-fans-walk-v1";
+        private const string IndependienteRiotFansResource = "street-independiente-riot-fans-v1";
+        private const string FourZoneGrillResource = "street-grill-four-zones-v1";
+        private const string BeerBarrelResource = "street-beer-barrel-v1";
+        private const string FernetTableResource = "street-fernet-table-v1";
+        private const string ReadySandwichesTableResource = "street-ready-sandwiches-table-v1";
+        private const int VelezFanVariantCount = 9;
+        private const int VelezFanAtlasColumns = 3;
+        private const int TeamFanVariantCount = 9;
+        private const int TeamFanAtlasColumns = 3;
         private const string CocaBottleResource = "street-coca-bottle-v1";
         private const string BeverageBarrelResource = "street-beverage-barrel-v1";
         // Nine monochrome All Boys outfits stay integrated in front, walk, and timeout poses.
@@ -41,25 +63,30 @@ namespace HayChoriYPaty
         private static readonly Rect AllBoysSelectorMuralSource = new Rect(45, 0, 610, 280);
         private static readonly Rect ChicagoSelectorMuralSource = new Rect(0, 0, 610, 280);
         private static readonly int[][] LaterLevelCardProducts = {
-            new[] { 0, 1, 2 }, new[] { 2, 4, 5 }, new[] { 3, 5, 6 }
+            new[] { 0, 1, 2 }, new[] { 0, 1, 2 }, new[] { 3, 5, 6 }
         };
         // Status is screen-edge anchored; interactive controls still use the safe-area canvas.
         private static readonly Rect HudBar = new Rect(0, 0, 540, 68);
         private static readonly Rect HudCoins = new Rect(70, 10, 122, 45);
-        private static readonly Rect HudTime = new Rect(241, 10, 81, 45);
+        private static readonly Rect HudTime = new Rect(228, 8, 96, 50);
         private static readonly Rect HudSales = new Rect(388, 10, 146, 45);
         private static readonly Rect HudChoriSales = new Rect(376, 6, 158, 26);
         private static readonly Rect HudCocaSales = new Rect(376, 34, 158, 26);
-        // The camera only occupies the upper channel; the countdown fits below it.
+        // Keep the centered camera clear above the clock, then use the full lower capsule band for a readable countdown.
         private static readonly Rect CutoutHudGap = new Rect(232, 0, 70, 34);
         private static readonly Rect CutoutHudCoins = new Rect(70, 10, 122, 45);
-        private static readonly Rect CutoutHudTime = new Rect(235, 35, 88, 27);
+        private static readonly Rect CutoutHudTime = new Rect(202, 35, 124, 32);
         private static readonly Rect CutoutHudSales = new Rect(388, 10, 146, 45);
+        private const int HudClockFontSize = 48;
         private const float CustomerHiddenLegHeight = 32f;
         // In Floresta the table is LEFT of the grill, never below it or across its route.
         private static readonly Rect ServingTableRect = new Rect(16, 540, 196, 98);
-        private static readonly Rect ChicagoServingTableRect = new Rect(12, 602, 165, 84);
-        private static readonly Rect ChicagoBarrelRect = new Rect(410, 561, 116, 132);
+        // Permanent Chicago order: Coca barrel, centered grill, finished-chori table.
+        // Uniform 56px visible gaps and a common y=686 ground line; original art proportions retained.
+        private static readonly Rect ChicagoServingTableRect = new Rect(413.2f, 625.52f, 118.8f, 60.48f);
+        private const string ChicagoGrillResource = "street-parrilla-large-v4";
+        private static readonly Rect ChicagoBarrelRect = new Rect(63.44f, 590.96f, 63.36f, 95.04f);
+        private static readonly Rect VelezBarrelRect = new Rect(410, 561, 116, 132);
         private static Rect ServingTableBounds(int productCount) => productCount == 1
             ? ServingTableRect : new Rect(18, 610, 196, 98);
         private static Rect ServingTableBoundsForLevel(int productCount, int levelIndex) =>
@@ -67,11 +94,23 @@ namespace HayChoriYPaty
         private static readonly Rect Start = new Rect(161, 555, 218, 61);
         private static readonly Rect Speed = new Rect(28, 710, 234, 120);
         private static readonly Rect HireParrillero = new Rect(278, 710, 234, 120);
-        private static readonly Rect Slider = new Rect(87, 484, 366, 36);
+        private static readonly Rect HireCocacolero = new Rect(360, 710, 156, 120);
+        private const int HireCocacoleroAction = 16;
+        private static Rect UpgradeTouchBounds(int action, bool specialists, float verticalScale)
+        {
+            Rect rect = UpgradeCardBounds(action, specialists);
+            rect.height /= Mathf.Max(.01f, verticalScale);
+            return rect;
+        }
+        private static Rect UpgradeCardBounds(int action, bool specialists)
+        {
+            if (!specialists) return action == 3 ? Speed : HireParrillero;
+            return action == 3 ? new Rect(24,710,156,120) : action == 2 ? new Rect(192,710,156,120) : HireCocacolero;
+        }
         private static readonly Rect MenuPlay = new Rect(126, 704, 288, 92);
         private static readonly Rect MenuQuit = new Rect(126, 816, 288, 92);
         private const int MenuPlayAction = 6, MenuQuitAction = 7;
-        private const int LevelSelectorBackAction = 8, VictoryExitAction = 9, LevelSelectFirstAction = 30;
+        private const int LevelSelectorBackAction = 8, VictoryExitAction = 9, RiotReturnAction = 15, LevelSelectFirstAction = 30;
         private static readonly Rect LevelSelectTitle = new Rect(28, 61, 484, 64);
         private static readonly Rect LevelSelectHint = new Rect(48, 718, 444, 28);
         private static readonly Rect LevelSelectBack = new Rect(126, 770, 288, 78);
@@ -86,11 +125,15 @@ namespace HayChoriYPaty
         private const float RiotImpactCloudDuration = 1.55f;
         private const float RiotAngerRampSeconds = .55f, RiotBreakStartSeconds = .55f, RiotBreakTransitionSeconds = .9f, RiotFanFramesPerSecond = 6f;
         private const float RiotFanAtlasRowSplitY = 493f;
-        private static readonly Rect RiotReplay = new Rect(88, 858, 364, 66);
+        private static readonly Rect RiotReturnButton = new Rect(88, 858, 364, 66);
         private StreetGame game;
-        private Texture2D backdrop, chicagoBackground, people, items, parrillero, parrilleroDiagonal, parrilleroIcon, upgradeWood, speedArrows, largeGrill, servingTable, gameCoin, muralArt, allBoysCrest, chicagoCrest, cocaBottle, beverageBarrel;
+        private Texture2D backdrop, chicagoBackground, velezBackground, velezCrest, velezGrill, people, items, parrillero, parrilleroDiagonal, cocacolero, parrilleroIcon, upgradeWood, speedArrows, largeGrill, servingTable, gameCoin, muralArt, allBoysCrest, chicagoCrest, cocaBottle, beverageBarrel, chicagoGrill;
         private Texture2D allBoysFrontFans, allBoysWalkingFans, allBoysRiotFans;
         private Texture2D chicagoFrontFans, chicagoWalkingFans, chicagoRiotFans;
+        private Texture2D velezFrontFans, velezWalkingFans, velezRiotFans;
+        private Texture2D ferroBackground, ferroFrontFans, ferroWalkingFans, ferroRiotFans;
+        private Texture2D independienteBackground, independienteFrontFans, independienteWalkingFans, independienteRiotFans;
+        private Texture2D fourZoneGrill, beerBarrel, fernetTable, readySandwichesTable;
         private Texture2D victoryPopup;
         private Texture2D coverArt, titleLogo, introGlow, menuButton, hudBarTexture, cutoutHudBarTexture, riotBackdrop, riotFanAtlas, riotImpactCloud;
         private Font menuFont;
@@ -108,8 +151,7 @@ namespace HayChoriYPaty
         private bool MenuAvailable { get { return introActive && Time.unscaledTime - introStarted >= IntroDuration; } }
         private const string ParrilleroLabel = "Parrillero";
         private GUIStyle tiny, small, text, title, header, amount, invisible, hudNumber, upgradeTitle, upgradePercent, upgradePrice, riotCue;
-        private int pressedAction, lastAction, priceProduct;
-        private bool priceDrag;
+        private int pressedAction, lastAction;
         private float feedbackUntil, feedbackScale;
         private float layoutVerticalScale = 1f;
         private float logicalCanvasHeight = H;
@@ -152,6 +194,21 @@ namespace HayChoriYPaty
             new Rect(16,523,356,475), new Rect(424,523,336,476),
             new Rect(820,523,322,477), new Rect(1181,519,342,481)
         };
+        // Alpha-trimmed cells in the original transparent 1247x1261 Cocacolero 4x4 pose atlas.
+        private static readonly Rect[] CocacoleroPoses = {
+            new Rect(103,946,166,309), new Rect(401,946,150,308), new Rect(703,946,147,308), new Rect(1004,946,155,307),
+            new Rect(99,631,170,315), new Rect(397,631,155,315), new Rect(702,631,146,315), new Rect(983,643,217,303),
+            new Rect(113,315,121,316), new Rect(385,315,192,316), new Rect(690,315,185,316), new Rect(950,315,248,270),
+            new Rect(103,17,156,298), new Rect(395,24,155,291), new Rect(692,21,166,294), new Rect(1012,22,139,293)
+        };
+        // Chicago-only corrected atlas rows, verified against the authored PNG alpha components.
+        // The legacy mapping stays unchanged in other levels; all poses are existing artwork.
+        private static readonly Rect[] ChicagoCocacoleroPoses = {
+            new Rect(103,6,165,291), new Rect(402,7,149,289), new Rect(704,8,146,291), new Rect(1004,8,155,296),
+            new Rect(99,315,170,294), new Rect(397,315,154,292), new Rect(702,315,146,294), new Rect(984,315,215,302),
+            new Rect(114,630,120,294), new Rect(385,630,192,291), new Rect(690,630,185,292), new Rect(950,677,248,213),
+            new Rect(103,946,155,298), new Rect(396,946,154,290), new Rect(692,946,165,293), new Rect(1012,946,139,293)
+        };
         // Threshold-alpha bounds from the transparent upgrade board and three-arrow icon.
         private static readonly Rect UpgradeWoodBounds = new Rect(13,148,1484,715);
         private static readonly Rect SpeedArrowBounds = new Rect(114,224,1174,662);
@@ -163,6 +220,24 @@ namespace HayChoriYPaty
             allBoysCrest = Resources.Load<Texture2D>(AllBoysCrestResource);
             chicagoCrest = Resources.Load<Texture2D>(ChicagoCrestResource);
             chicagoBackground = Resources.Load<Texture2D>(ChicagoBackgroundResource);
+            velezBackground = Resources.Load<Texture2D>(VelezBackgroundResource);
+            velezCrest = Resources.Load<Texture2D>(VelezCrestResource);
+            velezFrontFans = Resources.Load<Texture2D>(VelezFrontFansResource);
+            velezWalkingFans = Resources.Load<Texture2D>(VelezWalkingFansResource);
+            velezRiotFans = Resources.Load<Texture2D>(VelezRiotFansResource);
+            velezGrill = Resources.Load<Texture2D>(VelezGrillResource);
+            ferroBackground = Resources.Load<Texture2D>(FerroBackgroundResource);
+            ferroFrontFans = Resources.Load<Texture2D>(FerroFrontFansResource);
+            ferroWalkingFans = Resources.Load<Texture2D>(FerroWalkingFansResource);
+            ferroRiotFans = Resources.Load<Texture2D>(FerroRiotFansResource);
+            independienteBackground = Resources.Load<Texture2D>(IndependienteBackgroundResource);
+            independienteFrontFans = Resources.Load<Texture2D>(IndependienteFrontFansResource);
+            independienteWalkingFans = Resources.Load<Texture2D>(IndependienteWalkingFansResource);
+            independienteRiotFans = Resources.Load<Texture2D>(IndependienteRiotFansResource);
+            fourZoneGrill = Resources.Load<Texture2D>(FourZoneGrillResource);
+            beerBarrel = Resources.Load<Texture2D>(BeerBarrelResource);
+            fernetTable = Resources.Load<Texture2D>(FernetTableResource);
+            readySandwichesTable = Resources.Load<Texture2D>(ReadySandwichesTableResource);
             cocaBottle = Resources.Load<Texture2D>(CocaBottleResource);
             beverageBarrel = Resources.Load<Texture2D>(BeverageBarrelResource);
             people = Resources.Load<Texture2D>("street-characters");
@@ -175,10 +250,12 @@ namespace HayChoriYPaty
             items = Resources.Load<Texture2D>("street-items");
             parrillero = Resources.Load<Texture2D>("street-parrillero");
             parrilleroDiagonal = Resources.Load<Texture2D>("street-parrillero-diagonal-v1");
+            cocacolero = Resources.Load<Texture2D>("street-cocacolero-v1");
             parrilleroIcon = Resources.Load<Texture2D>("street-parrillero-icon");
             upgradeWood = Resources.Load<Texture2D>("street-upgrade-wood-v1");
             speedArrows = Resources.Load<Texture2D>("street-speed-arrows-v1");
             largeGrill = Resources.Load<Texture2D>("street-parrilla-large-v2");
+            chicagoGrill = Resources.Load<Texture2D>(ChicagoGrillResource);
             servingTable = Resources.Load<Texture2D>("street-serving-table-v1");
             gameCoin = Resources.Load<Texture2D>("street-coin-gold-v2");
             coverArt = Resources.Load<Texture2D>(IntroBackdropResource);
@@ -197,7 +274,7 @@ namespace HayChoriYPaty
             introStarted = Time.unscaledTime;
             tiny = small = text = title = header = amount = invisible = menuTitle = levelTitle = null;
             upgradeTitle = upgradePercent = upgradePrice = riotCue = null;
-            pressedAction = lastAction = priceProduct = 0; priceDrag = false;
+            pressedAction = lastAction = 0;
         }
         private void OnDisable()
         {
@@ -248,16 +325,10 @@ namespace HayChoriYPaty
             logicalCanvasHeight = CanvasLogicalHeight(v);
             layoutVerticalScale = logicalCanvasHeight / H;
             Vector2 p = ScreenToLayoutPoint(pixel, new Vector2(Screen.width, Screen.height), v);
-            if (down) { priceDrag = !introActive && !levelSelectActive && game.Sim.Phase == RoundPhase.Ready && game.Sim.CanEditPrices && Slider.Contains(p); pressedAction = HitAction(p); }
-            if (priceDrag) SetSlider(p.x);
+            if (down) pressedAction = HitAction(p);
             if (!up) return;
-            if (!priceDrag && pressedAction != 0 && pressedAction == HitAction(p)) DispatchAction(pressedAction);
-            priceDrag = false; pressedAction = 0;
-        }
-        private void SetSlider(float x)
-        {
-            if (!game.Sim.CanEditPrices) return;
-            game.SetProductPrice(priceProduct,Mathf.Round(Mathf.Lerp(game.Balance.minPrice,game.Balance.maxPrice,Mathf.Clamp01((x-Slider.x)/Slider.width))));
+            if (pressedAction != 0 && pressedAction == HitAction(p)) DispatchAction(pressedAction);
+            pressedAction = 0;
         }
         private int HitAction(Vector2 p)
         {
@@ -273,12 +344,15 @@ namespace HayChoriYPaty
             if (game.Sim.Phase == RoundPhase.Ready)
             {
                 if (Start.Contains(p)) return 1;
-                if(game.Sim.CanEditPrices && game.Sim.ProductCount>1)for(int i=0;i<game.Sim.ProductCount;i++)if(ProductButton(i).Contains(p))return 20+game.Sim.GetAvailableProduct(i);
                 for (int i=0;i<5;i++) if (LevelButton(i).Contains(p) && i<=game.UnlockedLevel) return 10+i;
                 return 0;
             }
-            if (game.Sim.Phase == RoundPhase.Playing) return Speed.Contains(p) ? 3 : HireParrillero.Contains(p) ? 2 : 0;
-            if (game.Sim.Phase == RoundPhase.Lost) return RiotReplay.Contains(p) ? 4 : 0;
+            if (game.Sim.Phase == RoundPhase.Playing)
+            {
+                bool three = game.Sim.HasCocacolero;
+                return UpgradeTouchBounds(3,three,layoutVerticalScale).Contains(p) ? 3 : UpgradeTouchBounds(2,three,layoutVerticalScale).Contains(p) ? 2 : three && UpgradeTouchBounds(HireCocacoleroAction,true,layoutVerticalScale).Contains(p) ? HireCocacoleroAction : 0;
+            }
+            if (game.Sim.Phase == RoundPhase.Lost) return RiotReturnButton.Contains(p) ? RiotReturnAction : 0;
             return game.Sim.Phase == RoundPhase.Won &&
                 VictoryExitBounds().Contains(new Vector2(p.x, p.y * layoutVerticalScale)) ? VictoryExitAction : 0;
         }
@@ -293,7 +367,6 @@ namespace HayChoriYPaty
                     introActive = false;
                     levelSelectActive = true;
                     pressedAction = 0;
-                    priceDrag = false;
                 }
                 else if (a == MenuQuitAction) QuitGame();
                 return;
@@ -314,9 +387,7 @@ namespace HayChoriYPaty
                     if (selectionSucceeded)
                     {
                         levelSelectActive = false;
-                        priceProduct = 0;
-                        // Floresta starts directly; later locations keep their existing price/setup screen.
-                        if (level == 0) game.StartRound();
+                        game.StartRound();
                     }
                     lastAction = a; feedbackUntil = Time.unscaledTime + 0.22f; feedbackScale = selectionSucceeded ? 1.04f : 0.97f;
                     return;
@@ -324,8 +395,13 @@ namespace HayChoriYPaty
                 return;
             }
             bool ok = true;
-            if (a==1) game.StartRound(); else if (a==2) ok=game.TryHire(); else if (a==3) ok=game.TryUpgradeSpeed();
-            else if (a==4) ok=game.Retry(); else if (a==5) ok=game.NextLevel(); else if (a>=10&&a<15) {ok=game.SelectLevel(a-10);priceProduct=0;} else if(a>=20&&a<27)priceProduct=a-20;
+            if (a==1) game.StartRound(); else if (a==2) ok=game.TryHireParrillero(); else if (a==3) ok=game.TryUpgradeSpeed(); else if (a==HireCocacoleroAction) ok=game.TryHireCocacolero();
+            else if (a==4) ok=game.Retry(); else if (a==5) ok=game.NextLevel(); else if (a>=10&&a<15) {ok=game.SelectLevel(a-10);if(ok)game.StartRound();}
+            else if (a == RiotReturnAction && game.Sim.Phase == RoundPhase.Lost)
+            {
+                ok = game.Retry();
+                if (ok) levelSelectActive = true;
+            }
             else if (a == VictoryExitAction && game.Sim.Phase == RoundPhase.Won)
             {
                 ok = game.Retry();
@@ -394,8 +470,9 @@ namespace HayChoriYPaty
                 Label(new Rect(s.Position.x-3,s.Position.y-86-s.Age*33,48,25),"+"+s.Amount,text);GUI.color=Color.white;
             }
             DrawCounters(sim);
-            Upgrade(Speed,3,15,"Velocidad",sim.SpeedCost,sim.CanUpgradeSpeed);
-            Upgrade(HireParrillero,2,16,ParrilleroLabel,sim.HireCost,sim.CanHire);
+            Upgrade(UpgradeCardBounds(3,sim.HasCocacolero),3,15,"VELOCIDAD",sim.SpeedCost,sim.CanUpgradeSpeed);
+            Upgrade(UpgradeCardBounds(2,sim.HasCocacolero),2,16,"PARRILLERO",sim.ParrilleroHireCost,sim.CanHireParrillero);
+            if (sim.HasCocacolero) Upgrade(HireCocacolero,HireCocacoleroAction,16,"COCACOLERO",sim.CocacoleroHireCost,sim.CanHireCocacolero);
             if(sim.Phase==RoundPhase.Ready) ReadyPanel();
             else if(sim.Phase==RoundPhase.Won||sim.Phase==RoundPhase.Lost) ResultPanel();
             else DrawLevelBadge(sim.LevelIndex, PlayingLevelBadge);
@@ -524,6 +601,9 @@ namespace HayChoriYPaty
             Texture2D activeRiotFans = riotFanAtlas;
             if (levelIndex == 0 && allBoysRiotFans != null) activeRiotFans = allBoysRiotFans;
             else if (levelIndex == 1 && chicagoRiotFans != null) activeRiotFans = chicagoRiotFans;
+            else if (levelIndex == 2 && velezRiotFans != null) activeRiotFans = velezRiotFans;
+            else if (levelIndex == 3 && ferroRiotFans != null) activeRiotFans = ferroRiotFans;
+            else if (levelIndex == 4 && independienteRiotFans != null) activeRiotFans = independienteRiotFans;
             float stagger = (customer.Id % 5) * .055f;
             float fury = IntroEase(Mathf.Clamp01((elapsed - stagger) / RiotAngerRampSeconds));
             float rhythm = elapsed * (10f + (customer.Id % 3) * 1.25f) + customer.Id * 1.71f;
@@ -540,6 +620,9 @@ namespace HayChoriYPaty
                 GUI.color = new Color(1f, 1f, 1f, calmAlpha);
                 if (levelIndex == 0) DrawAllBoysFan(calmPose, customer.Id, false, false);
                 else if (levelIndex == 1) DrawChicagoFan(calmPose, customer.Id, false, false);
+                else if (levelIndex == 2) DrawVelezFan(calmPose, customer.Id, false, false);
+                else if (levelIndex == 3) DrawFerroFan(calmPose, customer.Id, false, false);
+                else if (levelIndex == 4) DrawIndependienteFan(calmPose, customer.Id, false, false);
                 else Person(calmPose, GetLegacyAllBoysFanFrame(customer.Id, false), false);
             }
 
@@ -550,8 +633,12 @@ namespace HayChoriYPaty
                 GUI.color = new Color(1f, 1f, 1f, fury);
                 int pose = RiotFanPoseIndex(elapsed, customer.Id);
                 Rect source;
-                if (levelIndex == 0 && allBoysRiotFans != null)
+                if ((levelIndex == 0 && allBoysRiotFans != null) ||
+                    (levelIndex == 2 && velezRiotFans != null))
                     source = AllBoysRiotFanFrameSource(activeRiotFans, customer.Id, pose);
+                else if ((levelIndex == 3 && ferroRiotFans != null) ||
+                    (levelIndex == 4 && independienteRiotFans != null))
+                    source = TeamRiotFanFrameSource(activeRiotFans, customer.Id, pose);
                 else if (levelIndex == 1 && chicagoRiotFans != null)
                     source = ChicagoRiotFanFrameSource(activeRiotFans, customer.Id, pose);
                 else source = RiotFanFrameSource(activeRiotFans, customer.Id, pose);
@@ -640,10 +727,10 @@ namespace HayChoriYPaty
         private void DrawRiotResult(StreetSimulation sim)
         {
             GUI.color = new Color(.035f, .025f, .02f, .78f);
-            GUI.DrawTexture(LayoutRect(new Rect(18, 48, 504, 104)), Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
+            GUI.DrawTexture(LayoutRect(new Rect(18, 48, 504, 122)), Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
             GUI.color = Color.white;
-            Label(new Rect(27, 53, 486, 46), "¡SE ARMÓ LA TRIFULCA!", header);
-            Label(new Rect(28, 101, 484, 40), "¡HINCHADA FURIOSA! · ¡PUESTO DESTROZADO!", small);
+            Label(new Rect(27, 53, 486, 54), "No llegaste a entregar\ntodos los pedidos.", header);
+            DrawAnimatedGameOver(new Rect(54, 106, 432, 51), Mathf.Max(0f, Time.unscaledTime - riotStartedAt));
 
             GUI.color = new Color(.035f, .025f, .02f, .78f);
             GUI.DrawTexture(LayoutRect(new Rect(42, 778, 456, 154)), Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
@@ -652,7 +739,26 @@ namespace HayChoriYPaty
                 ? "Chori " + Mathf.Min(sim.ChoriDelivered, sim.Goal) + "/" + sim.Goal + " · Coca " + Mathf.Min(sim.CocaDelivered, sim.Goal) + "/" + sim.Goal
                 : "Se terminó el tiempo · " + sim.Delivered + "/" + sim.Goal + " ventas";
             Label(new Rect(54, 786, 432, 46), progress, text);
-            Button(RiotReplay, 4, "JUGAR DE NUEVO");
+            Button(RiotReturnButton, RiotReturnAction, "VOLVER");
+        }
+
+        private void DrawAnimatedGameOver(Rect bounds, float elapsed)
+        {
+            float pulse = 1f + Mathf.Sin(elapsed * 7f) * .055f;
+            float shake = Mathf.Sin(elapsed * 19f) * 1.25f;
+            float bob = Mathf.Sin(elapsed * 4.5f) * 1.5f;
+            Rect animated = new Rect(bounds.center.x + shake - bounds.width * pulse * .5f,
+                bounds.center.y + bob - bounds.height * pulse * .5f,
+                bounds.width * pulse, bounds.height * pulse);
+            float flash = .5f + .5f * Mathf.Sin(elapsed * 5.5f);
+            Color fill = Color.Lerp(new Color(1f, .32f, .07f), new Color(1f, .82f, .16f), flash);
+            int previousSize = menuTitle.fontSize;
+            TextAnchor previousAlignment = menuTitle.alignment;
+            menuTitle.fontSize = FitVictoryFont(menuTitle, "GAME OVER", 36, animated);
+            menuTitle.alignment = TextAnchor.MiddleCenter;
+            OutlineLabel(animated, "GAME OVER", menuTitle, fill, 2f);
+            menuTitle.fontSize = previousSize;
+            menuTitle.alignment = previousAlignment;
         }
 
         private void DrawGameplayScreenFill()
@@ -671,9 +777,15 @@ namespace HayChoriYPaty
             }
             finally { GUI.matrix = previous; GUI.color = color; }
         }
-        private Texture2D CurrentGameplayBackdrop() =>
-            game != null && game.Sim != null && game.Sim.LevelIndex == 1 && chicagoBackground != null
-                ? chicagoBackground : backdrop;
+        private Texture2D CurrentGameplayBackdrop()
+        {
+            if (game == null || game.Sim == null) return backdrop;
+            if (game.Sim.LevelIndex == 1 && chicagoBackground != null) return chicagoBackground;
+            if (game.Sim.LevelIndex == 2 && velezBackground != null) return velezBackground;
+            if (game.Sim.LevelIndex == 3 && ferroBackground != null) return ferroBackground;
+            if (game.Sim.LevelIndex == 4 && independienteBackground != null) return independienteBackground;
+            return backdrop;
+        }
         private void DrawBackdropLayers(float canvasHeight, float verticalScale)
         {
             Texture2D currentBackdrop = CurrentGameplayBackdrop();
@@ -687,7 +799,7 @@ namespace HayChoriYPaty
         private void DrawLevelBadge(int levelIndex, Rect bounds)
         {
             string caption = StreetSimulation.LevelNames[levelIndex].ToUpperInvariant();
-            Texture2D crest = levelIndex == 0 ? allBoysCrest : levelIndex == 1 ? chicagoCrest : null;
+            Texture2D crest = levelIndex == 0 ? allBoysCrest : levelIndex == 1 ? chicagoCrest : levelIndex == 2 ? velezCrest : null;
             bool showCrest = crest != null;
             int originalSize = levelTitle.fontSize;
             float available = bounds.width - (showCrest ? Mathf.Min(32f, bounds.height) + 8f : 0f);
@@ -734,7 +846,7 @@ namespace HayChoriYPaty
                 if (bar != null) GUI.DrawTexture(HudBar, bar, ScaleMode.StretchToFill, true);
                 DrawHudIcon(new Rect(8, 4, 58, 56), 10);
                 DrawHudNumber(cutout ? CutoutHudCoins : HudCoins, sim.Coins.ToString());
-                DrawHudNumber(cutout ? CutoutHudTime : HudTime, FormatRemainingTime(sim.TimeRemaining));
+                DrawHudNumber(cutout ? CutoutHudTime : HudTime, FormatRemainingTime(sim.TimeRemaining), HudClockFontSize);
                 Rect salesBounds = cutout ? CutoutHudSales : HudSales;
                 if (sim.LevelIndex == 1)
                 {
@@ -743,6 +855,24 @@ namespace HayChoriYPaty
                     DrawHudIcon(new Rect(338, 35, 31, 24), 4);
                     DrawHudNumber(HudChoriSales, Mathf.Min(sim.ChoriDelivered, sim.Goal) + "/" + sim.Goal);
                     DrawHudNumber(HudCocaSales, Mathf.Min(sim.CocaDelivered, sim.Goal) + "/" + sim.Goal);
+                }
+                else if (sim.LevelIndex == 2)
+                {
+                    // Keep all three Vélez products recognizable beside the shared delivered-unit goal.
+                    DrawHudIcon(new Rect(338, 1, 30, 20), 0);
+                    DrawHudIcon(new Rect(338, 23, 30, 20), 1);
+                    DrawHudIcon(new Rect(338, 45, 30, 20), 4);
+                    DrawHudNumber(salesBounds, sim.Delivered + "/" + sim.Goal);
+                }
+                else if (sim.LevelIndex >= 3)
+                {
+                    // A compact 3x3 product key fits the expanded Ferro/Rojo catalog without crowding sales.
+                    for (int slot = 0; slot < sim.ProductCount; slot++)
+                    {
+                        Rect icon = new Rect(337 + (slot % 3) * 16, 3 + (slot / 3) * 20, 17, 18);
+                        DrawHudIcon(icon, sim.GetAvailableProduct(slot));
+                    }
+                    DrawHudNumber(salesBounds, sim.Delivered + "/" + sim.Goal);
                 }
                 else
                 {
@@ -771,15 +901,17 @@ namespace HayChoriYPaty
             int seconds = Mathf.Max(0, Mathf.CeilToInt(remaining));
             return (seconds / 60) + ":" + (seconds % 60).ToString("00");
         }
-        private void DrawHudNumber(Rect bounds, string value)
+        private void DrawHudNumber(Rect bounds, string value, int preferredFontSize = 40)
         {
             int originalSize = hudNumber.fontSize;
+            int baseFontSize = Mathf.Max(12, preferredFontSize);
+            hudNumber.fontSize = baseFontSize;
             Vector2 needed = hudNumber.CalcSize(new GUIContent(value));
             float fitWidth = (bounds.width - 4f) / Mathf.Max(1f, needed.x);
             float fitHeight = (bounds.height - 2f) / Mathf.Max(1f, needed.y);
             float fitScale = Mathf.Min(1f, fitWidth, fitHeight);
             if (fitScale < 1f)
-                hudNumber.fontSize = Mathf.Max(12, Mathf.FloorToInt(originalSize * fitScale));
+                hudNumber.fontSize = Mathf.Max(12, Mathf.FloorToInt(baseFontSize * fitScale));
             hudNumber.normal.textColor = new Color(.22f, .10f, .045f);
             for (int y = -1; y <= 1; y++)
             for (int x = -1; x <= 1; x++)
@@ -819,8 +951,8 @@ namespace HayChoriYPaty
                 color = HudCapsule(color, px, py, time, new Color(.26f, .73f, .79f), new Color(.04f, .35f, .46f));
                 color = HudCapsule(color, px, py, sales, new Color(.60f, .86f, .17f), new Color(.20f, .48f, .04f));
                 // Original clock; on cutout phones its entire face sits below/beside the camera.
-                float clockScale = cutout ? 1f : 1.45f;
-                float dx = (px - 220f) / clockScale, dy = (py - (cutout ? 48f : 31f)) / clockScale;
+                float clockScale = cutout ? 1f : 1.2f;
+                float dx = (px - 214f) / clockScale, dy = (py - (cutout ? 48f : 31f)) / clockScale;
                 float radius = new Vector2(dx, dy).magnitude;
                 color = Over(color, new Color(.26f, .13f, .04f), Mathf.Clamp01(10.5f - radius));
                 color = Over(color, new Color(1f, .89f, .55f), Mathf.Clamp01(9.3f - radius));
@@ -1003,6 +1135,25 @@ namespace HayChoriYPaty
                     GUI.DrawTexture(LayoutRect(new Rect(bounds.x + 5, bounds.y + 5, 28, 32)), chicagoCrest, ScaleMode.ScaleToFit, true);
                 return;
             }
+            if (index == 2 && velezBackground != null)
+            {
+                GUI.DrawTexture(LayoutRect(bounds), velezBackground, ScaleMode.ScaleAndCrop, true);
+                if (velezCrest != null)
+                    GUI.DrawTexture(LayoutRect(new Rect(bounds.x + 5, bounds.y + 5, 30, 34)), velezCrest, ScaleMode.ScaleToFit, true);
+                return;
+            }
+            if (index == 3 && ferroBackground != null)
+            {
+                GUI.DrawTexture(LayoutRect(bounds), ferroBackground, ScaleMode.ScaleAndCrop, true);
+                FillRect(new Rect(bounds.x, bounds.y, bounds.width, 5), new Color(.04f, .38f, .19f));
+                return;
+            }
+            if (index == 4 && independienteBackground != null)
+            {
+                GUI.DrawTexture(LayoutRect(bounds), independienteBackground, ScaleMode.ScaleAndCrop, true);
+                FillRect(new Rect(bounds.x, bounds.y, bounds.width, 5), new Color(.79f, .035f, .06f));
+                return;
+            }
 
             // Later locations preview their expanding product lineup on the original game grill art.
             if (largeGrill != null) GUI.DrawTexture(LayoutRect(bounds), largeGrill, ScaleMode.ScaleAndCrop, true);
@@ -1023,9 +1174,9 @@ namespace HayChoriYPaty
         {
             switch (levelIndex)
             {
-                case 2: return new Color(.78f, .12f, .17f); // Argentinos Juniors: red/white
-                case 3: return new Color(.08f, .27f, .59f); // Vélez: blue/white
-                default: return new Color(.08f, .42f, .24f); // Ferro: green/white
+                case 2: return new Color(.08f, .27f, .59f); // Vélez: blue/white
+                case 3: return new Color(.04f, .38f, .19f); // Ferro: green/white
+                default: return new Color(.79f, .035f, .06f); // Independiente: red/white
             }
         }
         private void FillRect(Rect bounds, Color color)
@@ -1170,26 +1321,51 @@ namespace HayChoriYPaty
             bool walking=c.State==StreetCustomerState.Entering||c.State==StreetCustomerState.Leaving||c.State==StreetCustomerState.Advancing;
             DrawCustomerBody(c, walking);
             if(c.State==StreetCustomerState.Entering||c.State==StreetCustomerState.Leaving)return;
-            if (c.SecondaryProduct >= 0)
+            int pendingLines = c.PendingOrderLineCount;
+            if (pendingLines > 0)
             {
-                Rect bubble = new Rect(position.x - 35, position.y - 151, 70, 82);
+                Rect bubble = OrderBubbleBounds(position);
                 Item(bubble, 11, true);
-                DrawOrderLine(position.x, bubble.y + 5, c.Product, c.Remaining);
-                DrawOrderLine(position.x, bubble.y + 42, c.SecondaryProduct, c.SecondaryRemaining);
-            }
-            else
-            {
-                Item(new Rect(position.x-29,position.y-132,58,65),11,true);
-                DrawProductIcon(new Rect(position.x-19,position.y-125,38,30), c.Product);
-                Label(new Rect(position.x-29,position.y-101,58,24),c.Remaining.ToString(),text);
+                int visibleLines = Mathf.Min(StreetCustomer.MaxVisibleOrderProducts, pendingLines);
+                for (int i = 0; i < visibleLines; i++)
+                    DrawOrderLine(OrderLineBounds(bubble, i, visibleLines), c.GetVisibleOrderLine(i));
+                if (c.HiddenOrderLineCount > 0)
+                    Label(OrderMoreBounds(bubble), "+" + c.HiddenOrderLineCount + " más", tiny);
             }
             // A sprite-backed patience strip; no placeholder shape stands in for game art.
             GUI.color=new Color(.32f,.7f,.32f);Item(new Rect(position.x-22,position.y-64,44*c.PatienceFraction,4),13,true);GUI.color=Color.white;
         }
-        private void DrawOrderLine(float centerX, float top, int product, int remaining)
+        private static Rect OrderBubbleBounds(Vector2 customerPosition) =>
+            new Rect(customerPosition.x - 35f, customerPosition.y - 154f, 70f, 86f);
+
+        private static Rect OrderLineBounds(Rect bubble, int row, int visibleRows)
         {
-            DrawProductIcon(new Rect(centerX - 28, top, 26, 31), product);
-            Label(new Rect(centerX + 1, top + 2, 23, 25), remaining.ToString(), small);
+            const float rowHeight = 25f;
+            float top = visibleRows <= 1 ? bubble.y + 26.5f : bubble.y + 8f + row * 25f;
+            return new Rect(bubble.x + 5f, top, bubble.width - 10f, rowHeight);
+        }
+
+        private static Rect OrderMoreBounds(Rect bubble) =>
+            new Rect(bubble.x + 4f, bubble.y + 60f, bubble.width - 8f, 12f);
+
+        private static Rect OrderIconBounds(Rect row) => new Rect(row.x + 2f, row.y + 1f, 26f, row.height - 2f);
+        private static Rect OrderQuantityBounds(Rect row) => new Rect(row.x + 30f, row.y, row.width - 32f, row.height);
+
+        private static int FitOrderQuantityFontSize(GUIStyle style, string value, float maxWidth)
+        {
+            int original = style.fontSize;
+            float measured = style.CalcSize(new GUIContent(value)).x;
+            return measured > maxWidth ? Mathf.Max(11, Mathf.FloorToInt(original * maxWidth / measured)) : original;
+        }
+
+        private void DrawOrderLine(Rect row, StreetOrderLine line)
+        {
+            if (line == null || line.Remaining <= 0) return;
+            DrawProductIcon(OrderIconBounds(row), line.Product);
+            int originalFontSize = text.fontSize;
+            text.fontSize = FitOrderQuantityFontSize(text, line.Remaining.ToString(), OrderQuantityBounds(row).width);
+            Label(OrderQuantityBounds(row), line.Remaining.ToString(), text);
+            text.fontSize = originalFontSize;
         }
         private void DrawCustomerBody(StreetCustomer c, bool walking)
         {
@@ -1228,6 +1404,9 @@ namespace HayChoriYPaty
                 bool allBoysFlip = walking && c.Target.x < c.Position.x; // New All Boys profile poses face right.
                 if (game.Sim.LevelIndex == 0) DrawAllBoysFan(person, c.Id, walking, allBoysFlip);
                 else if (game.Sim.LevelIndex == 1) DrawChicagoFan(person, c.Id, walking, chicagoFlip);
+                else if (game.Sim.LevelIndex == 2) DrawVelezFan(person, c.Id, walking, chicagoFlip);
+                else if (game.Sim.LevelIndex == 3) DrawFerroFan(person, c.Id, walking, chicagoFlip);
+                else if (game.Sim.LevelIndex == 4) DrawIndependienteFan(person, c.Id, walking, chicagoFlip);
                 else Person(person, GetLegacyAllBoysFanFrame(c.Id, walking), chicagoFlip);
             }
             finally
@@ -1293,20 +1472,106 @@ namespace HayChoriYPaty
             return new Rect(column * cellWidth, atlas.height - (rowFromTop + 1) * cellHeight,
                 cellWidth, cellHeight);
         }
+        private void DrawVelezFan(Rect person, int customerId, bool walking, bool flip)
+        {
+            Texture2D atlas = walking ? velezWalkingFans : velezFrontFans;
+            if (atlas == null)
+            {
+                Person(person, GetLegacyAllBoysFanFrame(customerId, walking), walking && !flip);
+                return;
+            }
+            int variant = GetAllBoysFanVariant(customerId);
+            Draw(person, atlas, VelezFanSourceRect(atlas, variant), false, flip);
+        }
+        private static Rect VelezFanSourceRect(Texture2D atlas, int variant)
+        {
+            int index = variant % VelezFanVariantCount;
+            float cellWidth = atlas.width / (float)VelezFanAtlasColumns;
+            float cellHeight = atlas.height / (float)VelezFanAtlasColumns;
+            int column = index % VelezFanAtlasColumns;
+            int rowFromTop = index / VelezFanAtlasColumns;
+            return new Rect(column * cellWidth, atlas.height - (rowFromTop + 1) * cellHeight,
+                cellWidth, cellHeight);
+        }
+        private void DrawFerroFan(Rect person, int customerId, bool walking, bool flip)
+        {
+            DrawTeamFan(person, customerId, walking, flip, ferroFrontFans, ferroWalkingFans);
+        }
+        private void DrawIndependienteFan(Rect person, int customerId, bool walking, bool flip)
+        {
+            DrawTeamFan(person, customerId, walking, flip, independienteFrontFans, independienteWalkingFans);
+        }
+        private void DrawTeamFan(Rect person, int customerId, bool walking, bool flip, Texture2D front, Texture2D walk)
+        {
+            Texture2D atlas = walking ? walk : front;
+            if (atlas == null)
+            {
+                Person(person, GetLegacyAllBoysFanFrame(customerId, walking), walking && !flip);
+                return;
+            }
+            Draw(person, atlas, TeamFanSourceRect(atlas, customerId), false, flip);
+        }
+        private static Rect TeamFanSourceRect(Texture2D atlas, int customerId)
+        {
+            if (atlas == null) return Rect.zero;
+            int variant = customerId % TeamFanVariantCount;
+            if (variant < 0) variant += TeamFanVariantCount;
+            float cellWidth = atlas.width / (float)TeamFanAtlasColumns;
+            float cellHeight = atlas.height / (float)TeamFanAtlasColumns;
+            int column = variant % TeamFanAtlasColumns;
+            int rowFromTop = variant / TeamFanAtlasColumns;
+            return new Rect(column * cellWidth, atlas.height - (rowFromTop + 1) * cellHeight,
+                cellWidth, cellHeight);
+        }
+        private static Rect TeamRiotFanFrameSource(Texture2D atlas, int customerId, int pose)
+        {
+            if (atlas == null) return Rect.zero;
+            int variant = customerId % TeamFanVariantCount;
+            if (variant < 0) variant += TeamFanVariantCount;
+            float cellWidth = atlas.width / 6f;
+            float cellHeight = atlas.height / 3f;
+            int pairedPoseColumn = (variant % TeamFanAtlasColumns) * 2 + (pose & 1);
+            int rowFromTop = variant / TeamFanAtlasColumns;
+            return new Rect(pairedPoseColumn * cellWidth, atlas.height - (rowFromTop + 1) * cellHeight,
+                cellWidth, cellHeight);
+        }
         private void DrawWorker(StreetWorker w)
         {
             bool moving=w.State==StreetWorkerState.ToStation||w.State==StreetWorkerState.ToCounter;
+            bool isCocacolero=StreetSimulation.UsesSpecialistWorkers(game.Sim.LevelIndex) && w.Role==StreetWorkerRole.Cocacolero && cocacolero!=null;
             Vector2 movement=w.Target-w.Position;
             int frame=moving?SelectParrilleroWalkFrame(movement,w.AnimationTime):0;
-            if(w.State==StreetWorkerState.Pickup)frame=7;
+            if(w.State==StreetWorkerState.Pickup)frame=game.Sim.LevelIndex==1 ? 7 : 11;
             if(w.State==StreetWorkerState.Handoff)frame=3;
             float bob=moving?Mathf.Sin(w.AnimationTime*16)*1.5f:0;
             Rect workerRect=new Rect(w.Position.x-45,w.Position.y-98+bob,90,98);
-            if(frame>=16)ParrilleroDiagonal(workerRect,frame-16);
-            else Parrillero(workerRect,frame,moving&&movement.x>30);
-            if(w.State==StreetWorkerState.ToCounter||w.State==StreetWorkerState.Handoff)
+            if(isCocacolero)
+            {
+                if(frame>=16)
+                {
+                    int phase=((int)(w.AnimationTime*8))%2;
+                    float x=Mathf.Abs(movement.x),y=Mathf.Abs(movement.y);
+                    frame=x>y?9+phase:(movement.y>0?1+phase:5+phase);
+                }
+                bool flip=game.Sim.LevelIndex==1
+                    ? ChicagoWorkerFlip(true,frame,movement,w.State==StreetWorkerState.Pickup)
+                    : moving && Mathf.Abs(movement.x)>Mathf.Abs(movement.y) && movement.x<0;
+                Rect[] poses=game.Sim.LevelIndex==1 ? ChicagoCocacoleroPoses : CocacoleroPoses;
+                Draw(workerRect,cocacolero,poses[Mathf.Clamp(frame,0,poses.Length-1)],false,flip);
+            }
+            else if(frame>=16)ParrilleroDiagonal(workerRect,frame-16);
+            else Parrillero(workerRect,frame,game.Sim.LevelIndex==1
+                ? ChicagoWorkerFlip(false,frame,movement,w.State==StreetWorkerState.Pickup)
+                : moving&&movement.x>30);
+            if(w.State==StreetWorkerState.ToCounter || (w.State==StreetWorkerState.Handoff && !isCocacolero))
                 DrawProductIcon(new Rect(w.Position.x-25,w.Position.y-46+bob,31,29),w.Product);
-            if(w.State==StreetWorkerState.Pickup) {GUI.color=new Color(1,1,1,.55f);Item(new Rect(w.Position.x-15,w.Position.y-45,30,36),19);GUI.color=Color.white;}
+            if(w.State==StreetWorkerState.Pickup && !isCocacolero && game.Sim.LevelIndex!=1) {GUI.color=new Color(1,1,1,.55f);Item(new Rect(w.Position.x-15,w.Position.y-45,30,36),19);GUI.color=Color.white;}
+        }
+        private static bool ChicagoWorkerFlip(bool cocacolero, int frame, Vector2 movement, bool pickup)
+        {
+            // Existing pickup/reach poses are mirrored: food reaches right, Coca reaches left.
+            // Cardinal walks retain their facing even during the final few pixels of the trip.
+            return pickup || ((frame == 9 || frame == 10) && (cocacolero ? movement.x < 0 : movement.x > 0));
         }
         private static int SelectParrilleroWalkFrame(Vector2 movement,float animationTime)
         {
@@ -1328,30 +1593,87 @@ namespace HayChoriYPaty
                 : productCount <= 4 ? new Rect(23, 530, 494, 108) : new Rect(23, 548, 280, 90);
         }
         private static Rect GrillRectForLevel(int productCount, int levelIndex) =>
-            levelIndex == 1 ? new Rect(180, 540, 220, 74) : GrillRect(productCount);
+            levelIndex == 1 ? new Rect(182.88f, 627f, 174.24f, 59f)
+                : levelIndex == 2 ? new Rect(22, 535, 382, 118) : GrillRect(productCount);
         private void DrawGrill()
         {
+            if (game.Sim.LevelIndex >= 3 && fourZoneGrill != null)
+            {
+                bool ferro = game.Sim.LevelIndex == 3;
+                // Ferro crops the unavailable fourth bay; Independiente shows all four equal cooking zones.
+                Rect destination = ferro ? new Rect(16, 518, 278, 94) : new Rect(16, 518, 370, 94);
+                Rect source = ferro ? new Rect(0, 0, fourZoneGrill.width * .75f, fourZoneGrill.height)
+                    : new Rect(0, 0, fourZoneGrill.width, fourZoneGrill.height);
+                Draw(destination, fourZoneGrill, source, true, false);
+                return;
+            }
             Rect r = GrillRectForLevel(game.Sim.ProductCount, game.Sim.LevelIndex);
-            if (largeGrill != null) GUI.DrawTexture(LayoutRect(r), largeGrill, ScaleMode.StretchToFill);
+            Texture2D grill = game.Sim.LevelIndex == 1 && chicagoGrill != null ? chicagoGrill : game.Sim.LevelIndex == 1 ? largeGrill
+                : game.Sim.LevelIndex == 2 && velezGrill != null ? velezGrill : largeGrill;
+            if (grill != null) GUI.DrawTexture(LayoutRect(r), grill, ScaleMode.StretchToFill);
             else Item(r, 7); // Existing original parrilla is a safe missing-resource fallback.
         }
         private void DrawServingTable()
         {
-            if (servingTable == null) return;
+            if (game.Sim.LevelIndex >= 3)
+            {
+                if (readySandwichesTable != null)
+                {
+                    Rect table = new Rect(16, 614, 370, 87);
+                    GUI.DrawTexture(LayoutRect(table), readySandwichesTable, ScaleMode.StretchToFill, true);
+                    int foodSlot = 0;
+                    for (int product = 0; product <= 3; product++)
+                    {
+                        if (!game.Sim.IsProductAvailable(product)) continue;
+                        float x = 62 + foodSlot * 92;
+                        DrawProductIcon(new Rect(x - 18, 636, 36, 28), product);
+                        Label(new Rect(x - 32, 665, 64, 14), StreetSimulation.ProductNames[product].ToUpperInvariant(), tiny);
+                        foodSlot++;
+                    }
+                }
+                if (game.Sim.LevelIndex == 4 && fernetTable != null)
+                    Draw(new Rect(446, 622, 94, 66), fernetTable, new Rect(0, 0, fernetTable.width, fernetTable.height), true, false);
+                return;
+            }
+            if (game.Sim.LevelIndex == 2 || servingTable == null) return;
             Draw(ServingTableBoundsForLevel(game.Sim.ProductCount, game.Sim.LevelIndex), servingTable, new Rect(0, 0, servingTable.width, servingTable.height), false, false);
         }
         private void DrawStation(int i,bool unlocked)
         {
             if (!unlocked) return;
             int levelIndex = game.Sim.LevelIndex;
+            if (levelIndex >= 3)
+            {
+                if (i == 4 && beverageBarrel != null)
+                {
+                    Draw(new Rect(391, 522, 58, 92), beverageBarrel, new Rect(0, 0, beverageBarrel.width, beverageBarrel.height), false, false);
+                    Label(new Rect(384, 602, 72, 13), "COCA", tiny);
+                }
+                else if (i == 6 && beerBarrel != null)
+                {
+                    Draw(new Rect(448, 522, 58, 92), beerBarrel, new Rect(0, 0, beerBarrel.width, beerBarrel.height), false, false);
+                    Label(new Rect(442, 602, 72, 13), "CERVEZA", tiny);
+                }
+                else if (i == 5 && levelIndex == 4)
+                    Label(new Rect(466, 685, 72, 13), "FERNET 1 L", tiny);
+                return;
+            }
             bool chicago = levelIndex == 1;
+            bool velez = levelIndex == 2;
             float x=StreetSimulation.StationPositionForLevel(i, levelIndex, game.Sim.ProductCount).x;
-            if (chicago && i == 4 && beverageBarrel != null)
-                Draw(ChicagoBarrelRect, beverageBarrel, new Rect(0, 0, beverageBarrel.width, beverageBarrel.height), false, false);
+            if ((chicago || velez) && i == 4 && beverageBarrel != null)
+                Draw(chicago ? ChicagoBarrelRect : VelezBarrelRect, beverageBarrel, new Rect(0, 0, beverageBarrel.width, beverageBarrel.height), false, false);
             else if(i>=4) Item(new Rect(x-33,555,66,72),8);
+            if (velez)
+            {
+                if (i == 0) Label(new Rect(62, 653, 126, 22), "CHORI", tiny);
+                else if (i == 1) Label(new Rect(244, 653, 126, 22), "PATY", tiny);
+                else if (i == 4) Label(new Rect(407, 535, 126, 20), "COCA 600 ml", tiny);
+                return;
+            }
             float y=chicago ? 535 : i<4 ? GrillRect(game.Sim.ProductCount).y-15 : 548;
             if(ShouldDrawStationProductBadge(i) && !(chicago && i == 4)) DrawProductIcon(new Rect(x-18,y,36,38),i);
-            Rect productName = chicago && i == 4 ? new Rect(416, 688, 106, 18) : new Rect(x-34,618,68,20);
+            Rect productName = chicago && i == 4 ? new Rect(ChicagoBarrelRect.center.x - 54, 688, 108, 18) : new Rect(x-34,618,68,20);
             if (!ServingTableBoundsForLevel(game.Sim.ProductCount, levelIndex).Overlaps(productName)) Label(productName,StreetSimulation.ProductNames[i],tiny);
         }
         private static bool ShouldDrawStationProductBadge(int productIndex)
@@ -1362,38 +1684,53 @@ namespace HayChoriYPaty
         }
         private void Upgrade(Rect r,int action,int icon,string name,int cost,bool affordable)
         {
+            // Anchor the card responsively, but keep its internal typography/icons at one scale.
+            float previousVertical = layoutVerticalScale;
+            r.y *= previousVertical;
+            layoutVerticalScale = 1f;
             bool available=affordable&&game.Sim.Phase==RoundPhase.Playing;
             Color old=GUI.color;GUI.color=available?Color.white:new Color(.57f,.57f,.57f,1);
             Rect drawn=r;if(lastAction==action&&Time.unscaledTime<feedbackUntil){drawn.width*=feedbackScale;drawn.height*=feedbackScale;drawn.center=r.center;}
             if(upgradeWood!=null)Draw(drawn,upgradeWood,UpgradeWoodBounds,true,false);else Item(drawn,12,true);
             GUI.color=old;
+            bool compact = r.width < 200;
+            int titleSize = upgradeTitle.fontSize;
+            if (compact) upgradeTitle.fontSize = 15;
             UpgradeOutline(UpgradeTitleBounds(drawn),name,upgradeTitle,new Color(1f,.9f,.69f));
+            upgradeTitle.fontSize = titleSize;
             string statusText = action == 3
                 ? "×" + game.Sim.WorkRate.ToString("0.00").Replace('.', ',') + "  ·  +10%"
-                : "EQUIPO " + game.Sim.StaffCount;
+                : "EQUIPO " + (action == HireCocacoleroAction ? game.Sim.CocacoleroCount : game.Sim.ParrilleroCount);
+            if (compact && action == 3) statusText = "×" + game.Sim.WorkRate.ToString("0.00").Replace('.', ',') + "\n+10%";
             Rect statusBounds = UpgradeStatusBounds(drawn);
             int originalStatusSize = upgradePercent.fontSize;
+            if (compact) upgradePercent.fontSize = 13;
             upgradePercent.fontSize = FitUpgradeStatusFontSize(upgradePercent, statusText, statusBounds.width);
             UpgradeOutline(statusBounds,statusText,upgradePercent,new Color(1f,.76f,.22f));
             upgradePercent.fontSize = originalStatusSize;
+            Rect portrait = compact ? new Rect(drawn.x+9,drawn.y+39,51,51) : new Rect(drawn.x+24,drawn.y+26,68,68);
             if(action==3)
             {
-                if(speedArrows!=null)Draw(new Rect(drawn.x+20,drawn.y+36,76,48),speedArrows,SpeedArrowBounds,false,false);
+                if(speedArrows!=null)Draw(compact ? new Rect(drawn.x+10,drawn.y+48,48,32) : new Rect(drawn.x+20,drawn.y+36,76,48),speedArrows,SpeedArrowBounds,false,false);
             }
-            else Item(new Rect(drawn.x+24,drawn.y+26,68,68),icon);
+            else if(action==HireCocacoleroAction && cocacolero!=null)
+                Draw(portrait,cocacolero,ChicagoCocacoleroPoses[0],false,false);
+            else Item(portrait,icon);
             string priceText=cost>0?cost.ToString():"MAX";
             if(cost>0)Item(UpgradeCoinBounds(drawn),10);
             int originalPriceSize=upgradePrice.fontSize;
+            if (compact) upgradePrice.fontSize = 24;
             upgradePrice.fontSize=FitUpgradePriceFontSize(upgradePrice,priceText,UpgradePriceTextBounds(drawn).width);
             Label(UpgradePriceTextBounds(drawn),priceText,upgradePrice);
             upgradePrice.fontSize=originalPriceSize;
             bool prev=GUI.enabled;GUI.enabled=available;
             if(GUI.Button(LayoutRect(r),"",invisible))NativeAction(action);GUI.enabled=prev;
+            layoutVerticalScale = previousVertical;
         }
-        private static Rect UpgradeTitleBounds(Rect card){return new Rect(card.x+94,card.y+10,card.width-104,25);}
-        private static Rect UpgradeStatusBounds(Rect card){return new Rect(card.x+94,card.y+35,card.width-104,22);}
-        private static Rect UpgradeCoinBounds(Rect card){return new Rect(card.x+101,card.y+74,21,21);}
-        private static Rect UpgradePriceTextBounds(Rect card){return new Rect(card.x+126,card.y+68,card.width-145,32);}
+        private static Rect UpgradeTitleBounds(Rect card){return card.width < 200 ? new Rect(card.x+6,card.y+9,card.width-12,24) : new Rect(card.x+94,card.y+10,card.width-104,25);}
+        private static Rect UpgradeStatusBounds(Rect card){return card.width < 200 ? new Rect(card.x+62,card.y+38,card.width-70,29) : new Rect(card.x+94,card.y+35,card.width-104,22);}
+        private static Rect UpgradeCoinBounds(Rect card){return card.width < 200 ? new Rect(card.x+63,card.y+77,18,18) : new Rect(card.x+101,card.y+74,21,21);}
+        private static Rect UpgradePriceTextBounds(Rect card){return card.width < 200 ? new Rect(card.x+82,card.y+71,card.width-90,30) : new Rect(card.x+126,card.y+68,card.width-145,32);}
         private static int FitUpgradePriceFontSize(GUIStyle style,string value,float maxWidth)
         {
             int original=style.fontSize;float needed=style.CalcSize(new GUIContent(value)).x;
@@ -1413,38 +1750,8 @@ namespace HayChoriYPaty
         }
         private void ReadyPanel()
         {
-            if (!game.Sim.CanEditPrices)
-            {
-                // Floresta has no price popup, including the old read-only summary.
-                DrawMenuButton(Start, 1, "JUGAR");
-                ReadyLevels();
-                return;
-            }
-            Rect panel=new Rect(38,193,464,454);Item(panel,14,true);
-            bool editable=game.Sim.CanEditPrices;
-            Label(new Rect(54,207,432,64),editable?"Precio: "+StreetSimulation.ProductNames[priceProduct]:"Chori · precio fijo",header);
-            DrawProductIcon(new Rect(188,306,164,107),priceProduct);
-            Label(new Rect(86,421,368,54),"$ "+game.Sim.GetProductPrice(priceProduct).ToString("0"),amount);
-            if(editable)
-            {
-                Item(new Rect(Slider.x,Slider.y+13,Slider.width,10),13,true);
-                float f=Mathf.InverseLerp(game.Balance.minPrice,game.Balance.maxPrice,game.Sim.GetProductPrice(priceProduct));
-                Item(new Rect(Slider.x+f*Slider.width-16,Slider.y+1,32,32),10);
-#if UNITY_ANDROID && !UNITY_EDITOR || !(ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER)
-                var e=Event.current;
-                Vector2 layoutMouse = e.mousePosition;
-                layoutMouse.y /= layoutVerticalScale;
-                if(e.type==EventType.MouseDown&&Slider.Contains(layoutMouse)){priceDrag=true;SetSlider(layoutMouse.x);e.Use();}
-                else if(priceDrag&&e.type==EventType.MouseDrag){SetSlider(layoutMouse.x);e.Use();}
-                else if(priceDrag&&e.type==EventType.MouseUp){SetSlider(layoutMouse.x);priceDrag=false;e.Use();}
-#endif
-            }
-            string orderHint = game.Sim.LevelIndex == 0 ? "Cada hincha pide de 1 a 4 choris"
-                : game.Sim.LevelIndex == 1 ? "Cada hincha pide chori, Coca o ambos (1–4)"
-                : "Pedidos de 1 a 999 unidades";
-            Label(new Rect(60,519,420,30),editable?(game.Sim.DemandFraction>.6f?"Precio bajo · mucha demanda":"Precio alto · menor demanda"):orderHint,small);
-            Button(Start,1,"Empezar");
-            if(game.Sim.ProductCount>1)for(int i=0;i<game.Sim.ProductCount;i++){int product=game.Sim.GetAvailableProduct(i);Rect r=ProductButton(i);Item(r,12,true);DrawProductIcon(new Rect(r.x+4,r.y+3,r.width-8,r.height-6),product);if(GUI.Button(LayoutRect(r),"",invisible))NativeAction(20+product);}
+            // Prices are fixed in every location; Ready has no price-selection panel or hidden controls.
+            DrawMenuButton(Start, 1, "JUGAR");
             ReadyLevels();
         }
         private void ReadyLevels()
@@ -1458,7 +1765,6 @@ namespace HayChoriYPaty
                 bool prev=GUI.enabled;GUI.enabled=unlocked;if(GUI.Button(LayoutRect(r),"",invisible))NativeAction(10+i);GUI.enabled=prev;
             }
         }
-        private static Rect ProductButton(int i){return new Rect(72+i*57,273,50,31);}
         private static Rect LevelButton(int i){return new Rect(108+i*67,912,57,35);}
         private static Rect VictoryPopupBounds(float canvasHeight)
         {

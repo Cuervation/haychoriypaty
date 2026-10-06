@@ -571,7 +571,13 @@ MonoBehaviour:
     maxOrderQuantity: 999
     initialPrice: 5
     deliveryPatienceRefreshSeconds: 180
-    levelProductCounts: 0100000002000000050000000600000007000000i
+    levelProductCounts: 0100000002000000030000000500000007000000i
+    levelProductIds:
+    - 0
+    - 0,4
+    - 0,1,4
+    - 0,1,2,4,6
+    - 0,1,2,3,4,6,5
     levelGoals: c8000000c800000041000000550000006e000000i
     levelDurations:
     - 120

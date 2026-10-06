@@ -1,3 +1,21 @@
+# Current Android delivery — 2026-10-06 (0.2.15/code17, Chicago grill)
+
+Unity 6000.6.3f1 Main-only Development Android IL2CPP/ARM64 build `build-b25ab47045`: **Succeeded in 264.65s**, 0 errors / 1 warning. APK package `com.haychoriypaty.game`, version0.2.15/code17, min API26 / target36, `arm64-v8a`.
+
+Versioned APK `Builds/Android/Archive/HayChoriYPaty-0.2.15-code17-chicago-grill.apk`: **243,108,702 bytes**. SHA-256 `8ff5f1d1aeabab3a222e4e7d078ce94eb93f10121b1604d06f6a793a2c31d3c3`. `aapt` confirms package/version; `apksigner` verifies APK Signature Scheme v2. Rolling APK `Builds/Android/HayChoriYPaty-street.apk` matches byte-for-byte.
+
+**Installed:** `adb install -r` returned **Success** on Motorola Edge 60 Fusion (`ZY22MBNWRB`); PackageManager confirms versionCode17/versionName0.2.15 and firstInstallTime 2026-10-03. No uninstall or data clear. The targeted Chicago grill EditMode checks had already passed **2/2** with a reviewed Game View capture before this packaging request; tests were not rerun for the build. No native on-device visual review was done.
+
+---
+
+## Previous Android delivery — 2026-10-06 (0.2.14/code16, Levels 4–5)
+
+Unity 6000.6.3f1 Main-only Development Android IL2CPP/ARM64 build `build-714fa2d0bb`: **Succeeded in 284.30s**, 0 errors / 1 warning. The APK contains `com.haychoriypaty.game`, version0.2.14/code16, min API26 / target36, `arm64-v8a`.
+
+Versioned APK `Builds/Android/Archive/HayChoriYPaty-0.2.14-code16-levels4-5.apk`: **297,881,149 bytes**. SHA-256 `de81a45d374f8db6545bca6e52ddc9f4fa1947615288e4e1777d0a578eaace1d`. `aapt` confirms package/version; `apksigner` verifies APK Signature Scheme v2 with the existing Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`. Rolling APK `Builds/Android/HayChoriYPaty-street.apk` matches byte-for-byte. The focused Levels 4–5 EditMode suite previously passed **8/8**, zero failures/skips; it was not rerun during this APK-only request. No phone installation was requested or performed.
+
+---
+
 # Current Android delivery — 2026-10-06 (0.2.13/code15, victory popup)
 
 Unity6000.6.3f1 Main-only Development Android IL2CPP/ARM64 build `build-f93d61fec0`: **Succeeded in 263.61s**, 0 errors / 1 warning (Diagnostics Data recommends enabling debug symbols for detailed crash reports). The complete Street test assemblies passed: **139/139 EditMode + 23/23 PlayMode**, 0 failures/skips. Two test/source compilation issues found in the first validation attempt were fixed before these passing runs.

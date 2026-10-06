@@ -24,6 +24,9 @@ namespace HayChoriYPaty
             public int coins;
             public int staff = 1;
             public int speed;
+            public int workerLevel = -1;
+            public int parrilleros = -1;
+            public int cocacoleros;
         }
 
         public StreetSimulation Sim { get { return sim; } }
@@ -37,6 +40,7 @@ namespace HayChoriYPaty
             save = Load();
             selectedLevel = Mathf.Clamp(selectedLevel, 0, save.unlockedLevel);
             sim = new StreetSimulation(balance, selectedLevel, save.price, save.coins, save.staff, save.speed);
+            if (selectedLevel > 0 && save.workerLevel == selectedLevel && save.parrilleros >= 1) sim.RestoreWorkerCounts(save.parrilleros, save.cocacoleros);
             if(save.prices!=null && save.prices.Length==7)for(int i=0;i<7;i++)sim.SetProductPrice(i,save.prices[i]);
         }
 
@@ -65,7 +69,10 @@ namespace HayChoriYPaty
         }
         public void SetProductPrice(int product,float value) { if(sim!=null && sim.Phase==RoundPhase.Ready)sim.SetProductPrice(product,value); }
         public void StartRound() { if (sim == null || sim.Phase != RoundPhase.Ready) return; resultSaved = false; sim.StartRound(); Save(); }
-        public bool TryHire() { if (sim == null || !sim.TryHire()) return false; Save(); return true; }
+        public bool TryHire() { return TryHireParrillero(); }
+        public bool TryHireParrillero() { return HireRole(StreetWorkerRole.Parrillero); }
+        public bool TryHireCocacolero() { return HireRole(StreetWorkerRole.Cocacolero); }
+        private bool HireRole(StreetWorkerRole role) { if (sim == null || !sim.TryHire(role)) return false; Save(); return true; }
         public bool TryUpgradeSpeed() { if (sim == null || !sim.TryUpgradeSpeed()) return false; Save(); return true; }
         public bool NextLevel()
         {
@@ -82,6 +89,7 @@ namespace HayChoriYPaty
         private StreetSimulation NewReadySimulation(int level)
         {
             var next = new StreetSimulation(balance, level, sim.Price, 0, sim.StaffCount, sim.SpeedLevel);
+            if (level > 0) next.RestoreWorkerCounts(sim.ParrilleroCount, sim.CocacoleroCount);
             for(int i=0;i<7;i++)next.SetProductPrice(i,sim.GetProductPrice(i));return next;
         }
 
@@ -126,6 +134,7 @@ namespace HayChoriYPaty
             if(save.prices==null || save.prices.Length!=7)save.prices=new float[7];
             for(int i=0;i<7;i++)save.prices[i]=sim.GetProductPrice(i);
             save.price = sim.Price; save.coins = sim.Coins; save.staff = sim.StaffCount; save.speed = sim.SpeedLevel;
+            save.workerLevel = sim.LevelIndex; save.parrilleros = sim.ParrilleroCount; save.cocacoleros = sim.CocacoleroCount;
             save.unlockedLevel = Mathf.Max(save.unlockedLevel, sim.LevelIndex);
             if (sim.Phase == RoundPhase.Won) save.unlockedLevel = Mathf.Max(save.unlockedLevel, Mathf.Min(4, sim.LevelIndex + 1));
             PlayerPrefs.SetString(SaveKey, JsonUtility.ToJson(save)); PlayerPrefs.Save();

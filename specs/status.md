@@ -1,5 +1,10 @@
 # Project status
 
+## Chicago grill APK 0.2.15 installed (2026-10-06)
+
+Main-only Android Development IL2CPP/ARM64 build `build-b25ab47045` succeeded in 264.65s with 0 errors / 1 warning. Generated `Builds/Android/Archive/HayChoriYPaty-0.2.15-code17-chicago-grill.apk` (243,108,702 bytes; SHA-256 `8ff5f1d1aeabab3a222e4e7d078ce94eb93f10121b1604d06f6a793a2c31d3c3`); `aapt` metadata and v2 signature verified, rolling APK matches. Installed via `adb install -r` on Motorola Edge 60 Fusion `ZY22MBNWRB`; PackageManager confirms versionCode17/versionName0.2.15. No uninstall/data clear; firstInstallTime remains 2026-10-03. The focused grill EditMode checks had passed 2/2 with a reviewed Game View screenshot in the immediately preceding grill task; tests were not repeated for this build. Native-device visual review was not done.
+
+
 ## Selected victory popup tested and Android 0.2.13 installed (2026-10-06)
 
 The wood/iron/parchment result screen, gross CoinsEarned summary, responsive Salir-to-selector navigation, and existing Chicago dual-goal presentation are integrated. Unity 6000.6.3f1 full Street suites passed **139/139 EditMode + 23/23 PlayMode**, 0 failures/skips. Validation found and fixed a selector local-name compile conflict and an iterator/reflection issue in its regression fixture. Main-only Android Development IL2CPP/ARM64 build `build-f93d61fec0` succeeded in 263.61s (0 errors, 1 Diagnostics Data warning). APK 0.2.13/code15 (190,308,172 bytes; SHA-256 `f0b963338611ad7cd12fadc1a282dee81bac59294ed2d70520541893e4aa9680`) was v2-signature/package verified and installed by `adb install -r` on Motorola Edge 60 Fusion `ZY22MBNWRB`; PackageManager confirms versionCode15/versionName0.2.13. No uninstall/data clear. Actual popup visual review in Game view/on device was not done.
@@ -404,3 +409,89 @@ Added a large transparent comic dust-cloud sprite that quickly expands over the 
 Built Main-only Development Android IL2CPP/ARM64 APK 0.2.12/code14 with the newly added timeout smoke transition. Unity build `build-059ad48e84` succeeded in 273.46s (0 errors, 2 warnings). V2 signature verified; archive SHA-256 `524b63abbfb4ea413ab597282b798f743221329c2f2667c224884662de5da926`. The archive and rolling APK match.
 
 Installed on Motorola Edge 60 Fusion `ZY22MBNWRB` using `adb install -r`; PackageManager confirms 0.2.12/code14. No uninstall/data clear, test suite, app launch or gameplay visual review.
+
+
+## Global multi-product order window — 2026-10-06
+
+The current live order model previously stored only `Product/Remaining` and one `SecondaryProduct/SecondaryRemaining`; the view switched between one and two independent bubble layouts. It now retains up to five ordered, distinct product lines with a reservation count per line while preserving the legacy one-/two-product API. Workers still reserve and finish every unit of an earlier line before starting the next. StreetView uses one shared, fixed-size two-line window: zero-quantity lines disappear immediately, following lines reveal in original order, and “+N más” counts hidden product types. Existing automatic generation and level balancing are unchanged. Focused model/layout and legacy-delivery tests were added. Unity6000.6.3f1 compilation and the complete EditMode suite passed 154/154; the complete PlayMode suite passed 23/23. These cover 1–5-line windows/reveals/count/order, bubble bounds, FIFO rows, reservations, worker delivery, coins and legacy Chicago combined orders. No actual Game-view or device screenshot was captured, and no APK was requested.
+
+## Chicago role-specific customer ownership — implementation checkpoint (2026-10-06)
+
+Removed the rotating global assignment cursor. New assignments now scan customer IDs oldest-first and require a settled front-row Waiting customer. Chicago workers have explicit Parrillero/Cocacolero roles, chosen to balance the current team without changing initial staffing, the five-worker cap, existing hire prices, speed, timer, goals or revenue. The first purchase after the initial Parrillero is a Cocacolero. Each `StreetOrderLine` has one `OwnerWorkerId`; a worker keeps that customer and product line through every reserved station/pickup/handoff trip, releasing the owner only when its complete specialty part is delivered. Chori and Coca lines on the same mixed Chicago order are independently owned and may progress concurrently. Other levels retain Parrillero handling and keep ordered multi-line tickets with their assigned worker.
+
+The same `StreetView` worker flow loads original 4×4 Cocacolero art: red-apron idle, alternating walking, low bottle pickup and handoff poses. Nueva Chicago's existing blue barrel/product route is reused. Owner checks gate the paid handoff; timeout/departure cancels the reservation and owner before any income. Queue layout/compaction/tail admission/settling, station positions and entry/exit are unchanged.
+
+**Focused validation:** Unity6000.6.3f1 EditMode `StreetSimulationTests` + one `StreetArtTests` case: **13/13 passed, zero failures or skips** (job `76d6ce108ef349fe90da4683f8ffcefb`). Covered Parrillero 4+2+1 order priority, Cocacolero 4+2 order priority, same-role non-sharing, mixed same-customer parallel assignment and final departure, unchanged hire table/cap, rear-row/role-ineligible idling, timeout reservation/owner release with no delivery or coins, general ordered-ticket ownership, existing Chicago counter boundary, overserve protection and the 16-frame atlas/import configuration. No full test suite, PlayMode tests, APK/build, phone/device operation, or in-game portrait screenshot was run. The generated atlas itself was inspected; integrated Game-view appearance remains unverified.
+
+## Vélez / Liniers Level 3 — implementation checkpoint (2026-10-06)
+
+Level 3 is configured as **Liniers - Velez Sarsfield** with stable catalog IDs Chori 0, Paty 1 and Coca 4. Its custom public-street background combines the three user-supplied mural cues; nine original full-body fan looks include prominent blue V/chevron shirts and matched walking/timeout outfits. One transparent two-zone grill shows chorizos and patties; the separate Coca barrel and existing red-apron Cocacolero are reused. The Paty sandwich icon is reused rather than adding a catalog item.
+
+The Parrillero owns one customer's complete Chori+Paty portion (Chori before Paty); a Cocacolero independently owns Coca. Orders are generated from all seven non-empty product subsets, with independent quantities 1–4. FIFO/front-row assignment, parallel distinct roles, delayed final departure, and timeout reservation cleanup have focused regression source.
+
+**Validation checkpoint:** git diff --check passes; a static check confirmed all seven referenced resource files/metas exist, Android RGBA32 is configured, and the new resource GUIDs are unique. Unity 6000.6.3f1 is registered, but the editor does not answer its state/console ping; the filtered EditMode request timed out before returning a test job. Therefore **no Level 3/Chicago/Floresta tests, script compilation, Unity asset import, or Game-view screenshot are claimed as executed**. Visual source assets were inspected directly, not in-game. No APK was built and no device was touched. Rerun focused Unity tests and Game-view review once the editor responds.
+
+## Successful level transition resets upgrades — source update (2026-10-06)
+
+Advancing after a win now resets the next level's team to one Parrillero and speed to x1.00 before `StreetGame` rebuilds/saves the ready simulation. The first hire/speed prices therefore come from the newly selected level's initial price rows. Coins continue to reset; unlocked progress and product prices remain. No other retry, economy or level behavior changed.
+
+**Validation:** Static source/spec inspection only. No tests or Unity editor run, APK, or device operation, consistent with the user's instruction not to test until asked.
+
+
+## Fixed $5 prices across all levels — source update (2026-10-06)
+
+Removed the per-level product-price setup UI and all product tabs/slider/drag targets. Unlocked selector choices and Ready-state level navigation now start gameplay immediately. The simulation normalizes every catalog price to $5, ignores edits through legacy setter/save fields, and retains those serialized fields for compatibility; Floresta-only hire/speed discounts and its reset behavior remain keyed to level 0 rather than price editability. Updated focused regression sources and current gameplay/architecture/automation specs.
+
+**Validation:** Static source/spec review and `git diff --check` only. No Unity tests, editor import, Game-view, APK or device validation was run, respecting the user's standing instruction not to test until asked.
+
+
+## Enlarged digital clock in top HUD — source update (2026-10-06)
+
+Expanded the timer label to use more of the center capsule, increased its timer-specific preferred font size, and shifted/shrank the analog face slightly left. The camera-safe field gains height while remaining below the centered cutout and within the bar. Time format, HUD artwork/height, coins, sales and game timing are unchanged. Added focused source assertions for timer bounds and camera clearance.
+
+**Validation:** Static source review and `git diff --check` only. No tests, Unity import/Game-view, APK or device validation, per the standing no-test instruction.
+
+## Cutout-phone countdown readability — source correction (2026-10-06)
+
+The countdown field on tall cutout layouts now uses the full lower blue capsule (124×32 logical pixels at x202/y35), rather than the previous narrow 94×29 slot. It remains completely below the centered camera-clearance channel and inside the existing 68-pixel HUD; the non-cutout layout, clock face, time format and gameplay timing are unchanged. Added a focused geometry assertion and clarified the HUD spec.
+
+**Validation:** `git diff --check` only. Tests, Unity import/compilation, Game-view/device review, APK build and phone install were not run, following the standing no-test preference.
+
+
+## Defeat result copy and return navigation — 2026-10-06
+
+The active riot result now states that the player did not complete the orders, animates a pulsing GAME OVER label underneath, and replaces Jugar de nuevo with Volver to the unlocked level selector. The focused PlayMode regression source was updated; tests and visual Unity/device review were not run.
+
+## Levels 4–5 implementation checkpoint — 2026-10-06
+
+Added cumulative Ferro and Independiente product maps, original club backgrounds and team outfit atlases, four-zone grill art, finished-sandwich table, beer barrel, Fernet preparation table, and specialist station/delivery routing. New EditMode regression sources cover product unlock/order, locked items, five-type tickets, automatic 1–4 quantities, FIFO/specialty exclusivity, mixed food/drink completion and station anchors; an art-resource test covers both backgrounds, matching fan poses and station assets. Level goals/timers and $5 economy are unchanged.
+
+**Checks run:** `git diff --check` passed. A standard-library PNG/GUID/importer/source-map audit passed for 12 level art resource pairs; the new backgrounds, fan atlases, grill and drink stations were visually inspected as source images. After the user reloaded `Main.unity`, Unity 6000.6.3f1 refreshed/recompiled successfully; the console returned no errors or warnings. Focused EditMode coverage for Levels 4–5 passed **8/8, 0 failures/skips** (job `2b8c8abc78de4b8b988f4089ef3c1698`): product unlocks/order, locked items, five-type mixed tickets, FIFO/specialty ownership, random quantities/catalog, kitchen anchors, and art-resource integration. The Unity GameView was OS-focused before capturing and reviewing both live Play-mode screenshots: `Logs/Acceptance/Levels4-5-20261006/ferro-screen-capture.png` and `Logs/Acceptance/Levels4-5-20261006/independiente-screen-capture.png` (1080×1920 each). The blank camera-only captures were discarded; the reviewed ScreenCapture files show the integrated levels. Mobile visual validation remains unverified. Android APK 0.2.14/code16 was built successfully as `Builds/Android/Archive/HayChoriYPaty-0.2.14-code16-levels4-5.apk` (297,881,149 bytes; SHA-256 `de81a45d374f8db6545bca6e52ddc9f4fa1947615288e4e1777d0a578eaace1d`), signature verified, and copied to the rolling APK path; no phone install was requested. No commit or push was made. The diff also contains accumulated edits from earlier requested features, so it has not been staged or pushed under the task's clean/exclusive-diff condition.
+
+
+## HUD countdown validation — 2026-10-06
+
+The user explicitly requested tests and a screenshot. Unity 6000.6.3f1 refreshed/recompiled successfully. Focused EditMode jobs `cde423f6903b486c9dd075fedb37ccd0` (5 cases) and `50ae63c849f7408786dcd8b2e4fb7901` (8 cases) passed **13/13**, zero failures/skips: bar/camera-gap geometry, icon fit, time rounding/boundaries, and cached HUD texture creation/disposal. Ten runtime font-metric checks fit five timer strings in both layouts (normal fitted font 39px, cutout 24px).
+
+Reviewed real Level 1 Game View capture `Logs/Acceptance/Clock-20261006/clock-level1-playing-1080x1920.png` at 1080×1920 and 0:40: enlarged digits stay inside the blue capsule, clear of the clock icon and other counters. This is the normal layout; no cutout-phone screenshot is claimed. QA stepped the live simulation to 80 seconds, froze it for capture and restored the original editor save and time scale afterward. No production code or balance changes were necessary after validation. `git diff --check` passed. No APK/device operation or full-suite testing was requested or run.
+
+
+## Definitive Chicago layout and pickup routes — 2026-10-06
+
+Implemented Coca barrel left, grill centered, finished-chori table right, with a common y686 ground line, 56px visible gaps and uniformly proportional 72% art scaling. Food Pickup/approach moves to (395,665)/(395,510); Coca to (155,648)/(155,510). Return trips use the same safe approaches. Reuse the Parrillero's side reach, fix Chicago cardinal flip at short distances and preserve its diagonal strides. Actual Game View revealed an existing Coca atlas row mismatch (walking selected idle poses); added a Chicago-only source crop table from the existing PNG's alpha components, excluding neighboring hair fragments. The original mappings and old right barrel layout remain unchanged outside Chicago. No new art assets or meta changes.
+
+**Validation:** Unity 6000.6.3f1 refreshed/recompiled; final focused EditMode job `240c347e2ffd4dddb4b300259ce85fa6` passed **16/16**, zero failures/skips. Initial visually detected shoe/grill overlap was corrected and the clearance regression strengthened to account for the rendered workers, then tests/review repeated. 2,828 sampled routes across all seven columns and both products had zero crossings. An isolated 4+4 ticket produced 8 deliveries/$40, both workers Idle with assignments released. Reviewed four actual 1080×1920 live Game View snapshots with the ordinary 21-customer queue in `Logs/Acceptance/ChicagoLayout-20261006/`: `chicago-playing-final.png`, `chicago-coca-pickup-final.png`, `chicago-walking-right-final-1.png`, `chicago-handoff-final.png`. QA stepped/froze the live simulation and restored the original editor save/time scale; Play Mode is stopped. Gameplay outside station targets/routes is unchanged. `git diff --check` passed. No full suite, APK, device install or native screenshot was requested or run.
+
+**Post-review tool limit:** after Play Mode stopped and the original save was restored (both confirmed), the final console-read ping did not answer on two attempts. Earlier compilation, the final 16/16 test job and all listed Game View captures completed successfully; no claim of an additional post-stop console inspection is made.
+
+## Independent hiring HUD — completed 2026-10-06
+- Speed / Parrillero / Cocacolero separate cards on Chicago and later drink-specialist levels; Floresta stays two cards. Each hire explicitly buys its role with independent count, price tier and cap. Configured tables retained; role caps inherit5 unless overridden. Composition saved/retried without role alternation; advancement baseline unchanged.
+- Focused Unity validation:25 distinct EditMode and8 distinct PlayMode cases passed, including requested10 checks, touch/mouse edges, prices/caps, save/retry and retained service/routes. Jobs:92dae766f6ec4da7b4d25926fae8c105(17/17),124f0fe4e6314a0c9dd83739702f1f2f(6/6,4 repeated+2 tall checks),92be90b702cd47b1b3f4bb0808f8e90f(4/4),52862071d29f47d28bd052116aff7cae(4/4),00fe1803b95c44b6ab9c6ebeed4e8062(5 passed/1 old auto-hire fixture failed),2ac7bc2ae2654021bc8cc00b6e6230a2(corrected fixture1/1). No unresolved failure.
+- Reviewed real Game View screenshots1080×1920 and1220×2712. Final images:Logs/Acceptance/IndependentHUD-20261006/chicago-mobile-playing-final.png, chicago-mobile-four-digits-max-final.png, floresta-mobile-two-cards-final.png. Temporarily isolated Game View from Device Simulator's mismatched screen metrics; editor windows restored. Original progress restored and Play stopped. No new art/metas, no APK/device install, no commit/push this task. Accumulated unrelated changes preserved.
+
+
+## Nueva Chicago parrilla — four rows and scaled bread — 2026-10-06
+
+Replaced the earlier Chicago-specific grill art with `street-parrilla-large-v4.png`: exactly four visible horizontal chorizo rows, one extra over the prior three-row sprite, and three short rolls scaled to about one chorizo each (the bread is not oversized). The grill keeps its centered, modestly wider footprint (174.24×59 logical px, x=182.88, bottom y=686) and the established station layout. The same lateral +8/−8 side-station and approach offsets keep 56.08px gaps and pickups adjacent to the ready table/barrel; the simulation ordering/rules are unchanged. New art is 2170×725 true-alpha RGBA, importer uncompressed/no mipmaps/no NPOT resize/Android RGBA32; SHA-256 `72b48c30a83665081f1a1cfe6241ba5c6f2e5e7f2b3d806966f84df08cd2b363`. The superseded v3 file and `.meta` remain intact.
+
+**Focused validation:** Unity 6000.6.3f1 imported the v4 sprite (alpha and Android RGBA32 confirmed). `ChicagoLocationLoadsItsMuralCrestBottleAndBlueBarrelWithSidePickupLayout` and `ChicagoBothSpecialistsReachNewSidePickupsAndReturnWithoutCrossingProps` passed **2/2** in EditMode, job `7921da557e0c4075a742b33227e546ef`. Reviewed the actual 1080×1920 Play-mode capture at `Logs/Acceptance/ChicagoGrill-20261006/chicago-four-row-grill-review.png`: four rows and proportional rolls are visible; route regression checks both specialists' pickup/carry/handoff without crossing the expanded grill. Full suite, APK and device installation were not run/requested. Original player-save JSON and `Time.timeScale=1` were restored after capture.

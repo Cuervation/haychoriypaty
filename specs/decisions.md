@@ -2,6 +2,7 @@
 
 | Date | Decision | Reason |
 |---|---|---|
+| 2026-10-06 | Fix all seven catalog products at $5 for every level; remove all price pop-ups and price controls, while retaining legacy save fields/setter APIs as normalized compatibility shims. | The user made product price fixed across all levels and requested removal of every price popup; $5 is the existing default and confirmed Chicago chori/Coca price. |
 | 2026-10-03 | Target Unity 6000.6.3f1 already installed; avoid nonessential package additions. | Match environment; keep initialization light. |
 | 2026-10-03 | Preserve the existing URP template, sample content, and cached packages; add the prototype as a separate main scene. | Avoid disturbing the user's existing Unity setup/scene while keeping the first level isolated. |
 | 2026-10-03 | Use project-scoped `.codex/agents/*.toml` with native custom agents and `.agents/skills/*/SKILL.md`. | Current local Codex CLI 0.159.2 supports project custom agents and repo skills; no global config edits. |
@@ -97,3 +98,34 @@ Set Level 2 to 180 seconds at the user's request. Keep Floresta at 120 seconds a
 ## Mask the timeout-to-riot cut with a short comic impact cloud — 2026-10-05
 
 Keep the existing live `StreetView` riot sequence, but reveal it through one large transparent smoke-and-impact overlay. Animate its fast expansion and fade on unscaled time over the actual frozen queue; do not add combat logic, a new scene, packages or a persistent obstruction of HUD/results.
+
+## 2026-10-06 — Preserve the existing Chicago team/economy while adding a Coca specialty
+
+Keep the existing single free starting worker, five-worker cap and every current hire/upgrade price unchanged. In Nueva Chicago the first Parrillero remains the baseline; choose the next hired role from the least-represented specialty, making the first hire Cocacolero and keeping later hires balanced. This avoids adding a free worker or changing the established economy just to make the new role available.
+
+## Level 3 Vélez integration — 2026-10-06
+
+Use selector slot 3 for `Liniers - Velez Sarsfield`, preserving the slot's existing 65-unit goal, 240-second timer and demand setting. Keep catalog IDs fixed and offer products 0/1/4 (Chori/Paty/Coca); do not add new products or price rules. Reuse specialist roles: Parrillero owns the full Chori+Paty portion of one customer in ticket order, Cocacolero owns Coca, and the two may work in parallel. Use the existing queue, two-line bubble window, barrel, Cocacolero atlas and price systems. The level gets one exterior mural background, matching complete front/walk/riot fan outfits, a two-zone single grill and a team badge.
+
+## Level-transition purchase baseline — 2026-10-06
+
+Reset the next level to one Parrillero and speed x1.00 on successful advancement; let the active level's first upgrade rows determine the displayed hire and speed prices. Keep unlocks/product prices and within-level retry behavior unchanged.
+
+
+## 2026-10-06 — Make the timeout result clear and return to level selection
+
+Use the direct failure copy “No llegaste a entregar todos los pedidos.”, a pulsing/outlined GAME OVER below it, and a single Volver action. Volver resets the failed attempt and opens the unlocked level selector instead of restarting gameplay immediately. Preserve the existing riot, sales counters, outfit mapping and progression.
+## 2026-10-06 — Integrate Ferro and Independiente as cumulative locations
+
+Keep product IDs stable; Level 4 uses catalog order `0,1,2,4,6`, Level 5 uses `0,1,2,3,4,6,5`. Retain the shared specialist worker, FIFO, station-routing and multi-product order architecture, with a per-ticket cap of five types. Their new art remains replaceable resources and must keep the same customer outfit across front, walk and timeout/riot poses.
+
+
+## 2026-10-06 — Permanent Nueva Chicago kitchen order
+
+User explicitly fixes Chicago to barrel-left / centered-grill / ready-chori-table-right, superseding the old table-left/barrel-right composition. Keep the three assets proportional at 72% scale, y686 ground line and equal 56px visible gaps so each specialist can stand beside its station without putting a shoe on the grill. Food uses (395,510) → (395,665); Coca uses (155,510) → (155,648), returning through the same approach. Correct Chicago-only pose selection from existing art; no new animation assets. Preserve the old barrel rectangle and Coca crop table for Vélez/later levels. No changes to role ownership, FIFO, clients, requests, economy, upgrades, timers, goals or HUD.
+
+- 2026-10-06: Replace alternating single hiring card/shared total-tier cap with independent role commands/cards. Reuse existing price values and maxStaff default per specialty; optional separate role caps. Zero Coca uses first cost row (same as count one) to preserve configured five-role cap without inventing an extra price. Persist composition on retry/load; keep advancement reset and all service/routes unchanged.
+
+## 2026-10-06 — Expand Chicago parrilla capacity modestly
+
+Keep the barrel-left / grill-center / ready-chori-table-right layout. Use a separate original grill sprite with exactly four visible chorizo rows (one added), compact bread rolls approximately chorizo-sized, and only a modest 10% horizontal increase; retain the common ground line and side clearances. Preserve station pickup routes and all gameplay values.

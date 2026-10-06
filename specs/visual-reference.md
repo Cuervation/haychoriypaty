@@ -157,7 +157,7 @@ Implementation reviewed in actual1080×1920and1200×2670Game-view menus: full-sc
 
 User's attached compact glossy cartoon HUD is style/layout inspiration only; do not copy its art. Current HUD uses an original amber/brown rounded continuous frame with recessed capsules: gold-only game coin/balance left, clock/countdown center, choripán and actual Delivered/Goal in green right (generic progress marker in later levels). Use bundled Luckiest Guy white numbers with dark outline, no wrapping, and fit each value to both its slot width and height. Time is simulation-derived remaining time rounded up as m:ss, clamped at zero; remove the old lower Tiempo label.
 
-The decorative bar runs edge-to-edge across the physical screen width; its outer rim has no horizontal inset. On cutout phones, live counters avoid the centered camera channel while the bar background remains continuous behind it. Give the right sales capsule extra room; the paired product icons identify Level-2 counters. Keep interactive anchors and the street layout unchanged. Runtime texture is generated once per enable and released on disable; no copied/reference artwork, new asset imports or packages. First-level goal remains200/120seconds.
+The decorative bar runs edge-to-edge across the physical screen width; its outer rim has no horizontal inset. On tall cutout phones, keep the centered camera channel clear, then use the entire lower blue clock capsule for the m:ss countdown (logical x202–326, y35–67) instead of a narrow right-hand text slot. Other live counters avoid the camera channel while the bar background remains continuous behind it. Give the right sales capsule extra room; the paired product icons identify Level-2 counters. Keep interactive anchors and the street layout unchanged. Runtime texture is generated once per enable and released on disable; no copied/reference artwork, new asset imports or packages. First-level goal remains200/120seconds.
 
 - [x] Source renders all three live indicators in the new top bar and removes lower timer.
 - [ ] Unity compilation and Game-view/device review confirm readability, alignment and no rear-order/cutout overlap.
@@ -262,7 +262,7 @@ No tests/APK/device review run.
 
 ## Active-game deadline riot and stall destruction — 2026-10-04
 
-When the actual StreetSimulation enters `RoundPhase.Lost` at time expiry below goal, switch the active Main/StreetView to `street-riot-defeat-v1`: full-screen Floresta scene with an unmistakably furious shouting crowd, raised wooden sticks and a visibly splintered/damaged stand. Preserve non-graphic comedic mobile-game treatment and All Boys setting. It is not enough to show a generic timeout/results card or calm cheering fans. Keep live final counters and an easy replay control legible. Animate the stopped scene with unscaled-time screen rumble and flying splinters; do not alter gameplay or progression.
+When the actual StreetSimulation enters `RoundPhase.Lost` at time expiry below goal, switch the active Main/StreetView to `street-riot-defeat-v1`: full-screen Floresta scene with an unmistakably furious shouting crowd, raised wooden sticks and a visibly splintered/damaged stand. Preserve non-graphic comedic mobile-game treatment and All Boys setting. It is not enough to show a generic timeout/results card or calm cheering fans. Keep final counters legible and provide a clear result action. Animate the stopped scene with unscaled-time screen rumble and flying splinters; do not alter gameplay or progression.
 
 - [x] Imported a dedicated versioned riot scene and connected it to active StreetView's Lost branch; scene illustrates rage, sticks and broken counter.
 - [x] Added unscaled visual rumble/debris motion and retained result stats/retry behavior.
@@ -277,7 +277,7 @@ Validation: the focused PlayMode test verifies timeout→Lost, new resource load
 
 ## Live timeout riot sequence — 2026-10-05
 
-The previous full-screen `street-riot-defeat-v1` plate alone did not meet the user's clarified request. On timeout below goal, first keep the real frozen waiting queue over the intact active street background; stagger their reaction from nervous shaking/anger cues into visibly furious versions of those supporters. Floresta uses the transparent 6-column × 3-row `street-allboys-riot-fans-v1` atlas, pairing each of the same nine integrated outfits from the ordinary crowd with raised-stick and non-contact swing frames. Level 2 keeps its own full-body Chicago riot atlas. Both alternate two frames per person at 6 fps using `Time.unscaledTime`; no garment overlay is used.
+The previous full-screen `street-riot-defeat-v1` plate alone did not meet the user's clarified request. On timeout below goal, first keep the real frozen waiting queue over the intact active street background; stagger their reaction from nervous shaking/anger cues into visibly furious versions of those supporters. Floresta uses the transparent 6-column × 3-row `street-allboys-riot-fans-v1` atlas, pairing each of the same nine integrated outfits from the ordinary crowd with raised-stick and non-contact swing frames. Level 2 keeps its own full-body Chicago riot atlas. Both alternate two frames per person at 6 fps using `Time.unscaledTime`; no garment overlay is used. The result overlay says “No llegaste a entregar todos los pedidos.”, places pulsing **GAME OVER** directly below, retains the final sales counters, and offers one **VOLVER** action to the unlocked level selector.
 
 - [x] Frozen waiting customers transition into animated furious/stick-swing poses; source is keyed to unscaled Lost-state time.
 - [x] A separate people-free wrecked-stall plate makes the breaking phase visible while actual waiting fans continue animating in front.
@@ -290,7 +290,13 @@ The previous full-screen `street-riot-defeat-v1` plate alone did not meet the us
 
 Level 2 uses the full-portrait original cartoon scene `street-background-chicago-v1.png` (940×1673 RGB) based on the supplied Mataderos mural/corner references. The wall has a Chicago black/green/cream treatment with stars, an arch labelled MATADEROS and a C.A.N.CH. shield; the same street/counter/lower blank control band is kept in its established full-screen layout. The separately generated transparent `street-new-chicago-crest-v1.png` is shown beside the Nueva Chicago footer label, while All Boys art remains selected only for Floresta.
 
-The 600 ml Coca bottle (`street-coca-bottle-v1.png`) replaces the old cup artwork at catalog/save ID4. One blue ice barrel containing bottles (`street-beverage-barrel-v1.png`) sits to the right of the smaller L2 grill. The used sandwich table stays left. Level-2 order bubbles support up to two products; the bottle uses its full-height sprite rather than the former cup icon. User visual review on an actual Game View/phone is still pending; focused resource import and station-geometry checks passed, but they are not screenshot evidence.
+The 600 ml Coca bottle (`street-coca-bottle-v1.png`) replaces the old cup artwork at catalog/save ID4. One blue ice barrel containing bottles (`street-beverage-barrel-v1.png`) sits to the left of the centered L2 grill. Chicago now permanently places the barrel left, parrilla centered and finished-chori table right, at a common y=686 baseline with 56-pixel visible gaps; original sprite proportions are retained. Level-2 automatic demand remains chori-only, bottled-Coca-only, or both, and the bottle uses its full-height sprite rather than the former cup icon. The shared order model and two-line bubble window described below serve every level; normal order generation is unchanged. User visual review on an actual Game View/phone remains separate from resource/import and layout tests.
+
+### Definitive Chicago kitchen arrangement — 2026-10-06
+
+The fixed order is **Coca barrel → centered grill → finished-chori table**, with the same ground baseline (y686), equal visible 56px gaps, and original art proportions uniformly scaled to 72% to make room for side access. Coca is picked up beside the barrel's right edge at (155,648); food beside the table's left edge at (395,665). The empty upper lane approaches (155,510)/(395,510), used in both directions, keep workers clear of the props. Reuse authored walking/reach poses, mirror the food pickup toward the right and Coca pickup toward the left. The view has a Chicago-specific corrected Coke atlas crop table; the previous shared crop and right-hand barrel rectangle remain intact for other locations.
+
+Reviewed live 1080×1920 Game View screenshots in `Logs/Acceptance/ChicagoLayout-20261006/`: `chicago-playing-final.png` shows table Pickup and bottled-Coca carry; `chicago-coca-pickup-final.png` shows left-barrel reach and food return; `chicago-walking-right-final-1.png` shows direction-correct travel to the table; `chicago-handoff-final.png` shows actual Handoff. Initial tests only checked foot anchors and missed a shoe overlapping the grill; the final layout/clearance regression also checks rendered worker dimensions. Final focused tests passed 16/16 and 2,828 column/product route samples were clear. Native phone appearance remains unverified.
 
 ## Nueva Chicago counter clearance and outfit fit — 2026-10-05
 
@@ -309,3 +315,42 @@ Double the physical-top HUD from 34 to 68 logical pixels high, still edge-to-edg
 ## Selected wood-and-iron victory popup — 2026-10-05
 
 The user selected the football-medallion, black/white flags, warm wooden planks/riveted dark iron, worn cream parchment and glossy green Salir composition. Use original transparent Resources/street-victory-popup-wood-v1.png with blank header/three value rows/button; draw Luckiest Guy comic lettering live: gold outlined ¡TURNO COMPLETADO!, dark-brown captions, gold variable values and cream SALIR. Keep all decoration contained, dim the underlying full-screen game, preserve uniform aspect on tall phones, and match button hit geometry to the visible green control. Sales, gross round coins earned and padded remaining mm:ss are real data, not the reference's example 200/200,745,00:21. Chicago shows both product goals. Actual Unity/phone appearance is pending; user deferred tests/APK.
+
+
+## Global customer-order speech card — source update (2026-10-06)
+
+Replace the separate one-product/two-product bubble layouts with a single bounded speech-card window at each waiting/advancing supporter. Retain the game's light bubble, dark outline and lower tail; use a fixed 70×86 logical frame, compact icon-left / quantity-right rows, at most two pending product types, and a small “+N más” footer above the tail. Center a single row in the card body. Keep all icon/count/footer rectangles inside the same frame; never draw a zero quantity. The source order may retain five lines, but crowd spacing and automatic demand are unchanged.
+
+## Level 3: Vélez / Liniers
+
+The third selector card and gameplay backdrop use the user's three attached exterior wall/mural references: the street-facing V/S shield on a roller door, blue neighborhood wall/signage, white-blue-green-red mural stripes, “Bienvenidos a mi barrio,” wave marks and 1940 reference. Keep the stand outside on the public sidewalk, with crowd/bubbles readable in front and an unobstructed street below. The authored portrait backdrop is original 2D art composed from those cues rather than a flat photo or inside-stadium scene.
+
+Supporter clothing uses varied original integrated full-body poses in Vélez colors, with prominent blue V/chevron shirts as the main recognizer, alongside blue/white alternate tops, jackets, training looks, scarves and caps. Customer ID selects matching front, walking/leaving and paired riot poses so clothing never changes between states. The timeout crowd uses the matching Vélez wardrobe, not a generic or layered shirt overlay.
+
+The food station is a single transparent wide parrilla, with chorizos on one side and patties on the other, separated clearly. Coca stays at the existing separate blue barrel; its worker keeps the red apron and the Parrillero remains visually distinct.
+
+### Official Vélez apparel research (2026-10-06)
+
+The supporter kit is an original cartoon interpretation, not a traced retail replica. Its key visual cue is the white shirt with blue chest chevron/V from Vélez's 2026 home presentation; the official 2026 away range adds navy and royal-blue details, while the official store's broader assortment informs the casual training/jacket variation. Sources: [Vélez official 2026 Home/Away presentation](https://velez.com.ar/futbol/notas/2026/01/21/185133_velez-y-macron-temporada-2026), [official 2026 third-kit story](https://velez.com.ar/club/notas/2026/03/13/200455_historia-e-identidad-asi-es-la-nueva-camiseta), [Tienda Vélez official apparel catalogue](https://tiendavelez.com.ar/indumentaria-velez/).
+
+
+## Clock digits fill the blue HUD capsule — source update (2026-10-06)
+
+The user found the remaining-time label too small. Give its digital text nearly the full available width and height of the center capsule, use a larger timer-specific preferred type size, and shift/shrink the analog clock face slightly left to clear the text. On centered-camera devices, use the full lower 124×32 timer band at logical x202–326/y35–67, below the camera gap and inside the top bar. Keep the displayed m:ss, capsule art, HUD height, simulation timer and all other counter values unchanged.
+
+- [x] Source expands the standard/cutout timer text bounds and sizes the digital clock independently from coin/sales labels.
+- [x] Cutout timer uses the full lower 124×32 capsule band at x202/y35 beneath the reserved camera channel.
+- [x] Unity 6000.6.3f1 compiled; 13/13 focused EditMode HUD/clock cases passed. A real 1080×1920 Game View capture at 0:40 was reviewed: `Logs/Acceptance/Clock-20261006/clock-level1-playing-1080x1920.png`. The live simulation was stepped to 80 seconds for the capture; the editor save was restored afterward.
+- [x] Ten runtime font-metric checks fit 2:00, 1:59, 0:40, 0:00 and 3:00 inside both timer rectangles.
+- [ ] Native cutout-phone visual review remains unverified; the screenshot shows the standard layout, not the cutout variant.
+
+## Ferro and Independiente original art — 2026-10-06
+
+Use original green/white Ferro and red/white Independiente cartoon identities with nine full-body outfits per club. The same deterministic customer variant is used in front, walking and angry/swinging poses, never as a clothing overlay. Differentiate their backgrounds: Ferro’s Caballito/Ricardo Etcheverri perimeter; Independiente’s red stadium perimeter in Avellaneda. The aligned four-bay grill, ready sandwich table, beer-can barrel and 1-liter Fernet prep trestle follow the established Argentine street-stall cartoon treatment. No source photo or exact kit/mural artwork is embedded.
+
+## Independent specialty upgrade row — 2026-10-06
+Reuse original wood/iron card, chevrons, Parrillero portrait and red-apron Cocacolero atlas. Specialist levels with drinks render three156×120cards at x24/192/360, y710 with12pixel gaps; Floresta keeps original two234×120cards. Titles span the compact card top, portrait/chevrons sit left, role count or multiplier/+10% above the brass price plaque on the right. Internal offsets retain uniform scale while each card anchors responsively; touch bounds match artwork height after inverse Y transform. No new assets. Live1220×2712 captures reviewed in ignored Logs/Acceptance/IndependentHUD-20261006; 2800 and MAX fit independently. This is editor evidence, not a physical-phone run.
+
+## Nueva Chicago parrilla capacity refresh — 2026-10-06
+
+Use `street-parrilla-large-v4.png` for Chicago: one original, transparent iron parrilla, a little longer horizontally (+10% at its current centered station footprint), exactly four distinct rows of chorizos, and three small individual bread rolls approximately the length/thickness of one chorizo. Keep the established barrel-left / grill-center / finished-chori-table-right row, its common bottom line and side clearances. Do not make the rolls oversized baguettes or enlarge the grill out of proportion. The four-row sprite is 2170×725 RGBA with actual alpha; uncompressed, mipmaps/NPOT resize off and Android RGBA32.
