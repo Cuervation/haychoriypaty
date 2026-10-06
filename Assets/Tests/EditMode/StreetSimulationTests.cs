@@ -172,6 +172,22 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
+        public void EarnedCoinsCountActualIncomeNotRemainingBalanceAndResetOnNewAttempt()
+        {
+            object balance = NewBalance(); Tune(balance, "maxCustomers", 1);
+            Tune(balance, "workerSpeed", 100000f); Tune(balance, "customerSpeed", 100000f);
+            Tune(balance, "pickupSeconds", .01f);
+            object sim = Make(balance: balance); Start(sim); Assert.IsTrue(Spawn(sim, 0, 4));
+            for (int i = 0; i < 300 && (int)Get(sim, "Delivered") < 4; i++) Step(sim, .05f);
+            Assert.AreEqual(4, Get(sim, "Delivered"));
+            Assert.AreEqual(20, Get(sim, "CoinsEarned")); Assert.AreEqual(20, Get(sim, "Coins"));
+            Assert.IsTrue((bool)Call(sim, "TryHire")); Assert.IsTrue((bool)Call(sim, "TryUpgradeSpeed"));
+            Assert.AreEqual(0, Get(sim, "Coins")); Assert.AreEqual(20, Get(sim, "CoinsEarned"));
+            Start(sim);
+            Assert.AreEqual(0, Get(sim, "CoinsEarned")); Assert.AreEqual(0, Get(sim, "Coins"));
+        }
+
+        [Test]
         public void WinUnlocksNextLevelAndCreatesReadyNextRound()
         {
             object balance = NewBalance(); Tune(balance, "levelGoals", new[] { 1, 1, 3, 4, 5 });
@@ -259,7 +275,7 @@ namespace HayChoriYPaty.Tests
             object balance=NewBalance();Tune(balance,"maxCustomers",1);Tune(balance,"levelGoals",new[]{1,1,1,1,1});
             object sim=Make(level:2,balance:balance);Call(sim,"SetProductPrice",1,17f);
             Start(sim);Spawn(sim,1,1);Step(sim,8f);
-            Assert.AreEqual(17,Get(sim,"Coins"));Assert.AreEqual(17f,Call(sim,"GetProductPrice",1));
+            Assert.AreEqual(17,Get(sim,"Coins"));Assert.AreEqual(17,Get(sim,"CoinsEarned"));Assert.AreEqual(17f,Call(sim,"GetProductPrice",1));
         }
         [Test]
         public void OwnedRandomIgnoresUnityGlobalRandomAndCatalogConfigIsClamped()
@@ -341,7 +357,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(5, Get(sim, "Delivered"));
             Assert.AreEqual(2, Get(sim, "ChoriDelivered")); Assert.AreEqual(3, Get(sim, "CocaDelivered"));
             Assert.AreEqual(0, Get(order, "Remaining")); Assert.AreEqual(0, Get(order, "SecondaryRemaining"));
-            Assert.AreEqual(31, Get(sim, "Coins")); Assert.AreEqual(0, Get(order, "Reserved"));
+            Assert.AreEqual(31, Get(sim, "Coins")); Assert.AreEqual(31, Get(sim, "CoinsEarned")); Assert.AreEqual(0, Get(order, "Reserved"));
         }
 
         [Test]

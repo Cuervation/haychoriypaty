@@ -117,6 +117,7 @@ namespace HayChoriYPaty
         public int LevelIndex { get; private set; }
         public float Price { get { return price; } }
         public int Coins { get; private set; }
+        public int CoinsEarned { get; private set; }
         public int Delivered { get; private set; }
         public int ChoriDelivered { get; private set; }
         public int CocaDelivered { get; private set; }
@@ -206,7 +207,7 @@ namespace HayChoriYPaty
         public void StartRound()
         {
             customers.Clear(); sales.Clear();
-            Coins = 0; // Income belongs only to this attempt, never to the previous level/round.
+            Coins = 0; CoinsEarned = 0; // Both totals belong only to this attempt.
             // A fresh/replayed Floresta turn never inherits hired staff or speed upgrades.
             if (!CanEditPrices) ResetFlorestaTeam();
             foreach (StreetWorker worker in workers) ResetWorker(worker);
@@ -230,7 +231,7 @@ namespace HayChoriYPaty
         {
             if (Phase != RoundPhase.Ready || level < 0 || level >= LevelNames.Length) return false;
             LevelIndex = level;
-            Coins = 0;
+            Coins = 0; CoinsEarned = 0;
             if (!CanEditPrices) SetProductPrice(0, FlorestaChoriPrice);
             return true;
         }
@@ -238,7 +239,7 @@ namespace HayChoriYPaty
         {
             if (Phase != RoundPhase.Won || LevelIndex + 1 >= LevelNames.Length) return false;
             LevelIndex++;
-            Coins = 0;
+            Coins = 0; CoinsEarned = 0;
             Phase = RoundPhase.Ready; return true;
         }
 
@@ -503,7 +504,7 @@ namespace HayChoriYPaty
                 if (worker.Product == 0) ChoriDelivered++;
                 if (LevelIndex == 1 && worker.Product == 4) CocaDelivered++;
                 int amount = Mathf.Max(0, Mathf.RoundToInt(GetProductPrice(worker.Product)));
-                Coins += amount; sales.Add(new StreetSale { Id = nextSale++, Amount = amount, Position = new Vector2(c.Target.x, 400) });
+                Coins += amount; CoinsEarned += amount; sales.Add(new StreetSale { Id = nextSale++, Amount = amount, Position = new Vector2(c.Target.x, 400) });
                 c.Patience = Mathf.Max(0.1f, balance.deliveryPatienceRefreshSeconds);
                 c.PatienceFraction = Mathf.Clamp01(c.Patience / Mathf.Max(0.1f, balance.customerPatienceSeconds));
                 if (sales.Count > 40) sales.RemoveAt(0);

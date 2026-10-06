@@ -75,7 +75,10 @@ namespace HayChoriYPaty
         private static readonly Rect LevelSelectTitle = new Rect(28, 61, 484, 64);
         private static readonly Rect LevelSelectHint = new Rect(48, 718, 444, 28);
         private static readonly Rect LevelSelectBack = new Rect(126, 770, 288, 78);
-        private static readonly Rect VictoryExit = new Rect(126, 567, 288, 76);
+        private const string VictoryPopupResource = "street-victory-popup-wood-v1";
+        private static readonly Vector2 VictoryPopupArtSize = new Vector2(1122, 1402);
+        // Normalized slots in the transparent artwork; text and pointer bounds use the same frame.
+        private static readonly Rect VictoryExit = new Rect(.195f, .839f, .62f, .151f);
         private const string IntroBackdropResource = "street-cover-user-v5";
         private const string RiotBackdropResource = "street-riot-environment-v1";
         private const string RiotFanAtlasResource = "street-riot-fans-v1";
@@ -88,6 +91,7 @@ namespace HayChoriYPaty
         private Texture2D backdrop, chicagoBackground, people, items, parrillero, parrilleroDiagonal, parrilleroIcon, upgradeWood, speedArrows, largeGrill, servingTable, gameCoin, muralArt, allBoysCrest, chicagoCrest, cocaBottle, beverageBarrel;
         private Texture2D allBoysFrontFans, allBoysWalkingFans, allBoysRiotFans;
         private Texture2D chicagoFrontFans, chicagoWalkingFans, chicagoRiotFans;
+        private Texture2D victoryPopup;
         private Texture2D coverArt, titleLogo, introGlow, menuButton, hudBarTexture, cutoutHudBarTexture, riotBackdrop, riotFanAtlas, riotImpactCloud;
         private Font menuFont;
         private GUIStyle menuTitle, levelTitle;
@@ -178,6 +182,7 @@ namespace HayChoriYPaty
             servingTable = Resources.Load<Texture2D>("street-serving-table-v1");
             gameCoin = Resources.Load<Texture2D>("street-coin-gold-v2");
             coverArt = Resources.Load<Texture2D>(IntroBackdropResource);
+            victoryPopup = Resources.Load<Texture2D>(VictoryPopupResource);
             riotBackdrop = Resources.Load<Texture2D>(RiotBackdropResource);
             riotFanAtlas = Resources.Load<Texture2D>(RiotFanAtlasResource);
             riotImpactCloud = Resources.Load<Texture2D>(RiotImpactCloudResource);
@@ -274,7 +279,8 @@ namespace HayChoriYPaty
             }
             if (game.Sim.Phase == RoundPhase.Playing) return Speed.Contains(p) ? 3 : HireParrillero.Contains(p) ? 2 : 0;
             if (game.Sim.Phase == RoundPhase.Lost) return RiotReplay.Contains(p) ? 4 : 0;
-            return game.Sim.Phase == RoundPhase.Won && VictoryExit.Contains(p) ? VictoryExitAction : 0;
+            return game.Sim.Phase == RoundPhase.Won &&
+                VictoryExitBounds().Contains(new Vector2(p.x, p.y * layoutVerticalScale)) ? VictoryExitAction : 0;
         }
         private void DispatchAction(int a)
         {
@@ -1454,18 +1460,86 @@ namespace HayChoriYPaty
         }
         private static Rect ProductButton(int i){return new Rect(72+i*57,273,50,31);}
         private static Rect LevelButton(int i){return new Rect(108+i*67,912,57,35);}
+        private static Rect VictoryPopupBounds(float canvasHeight)
+        {
+            float scale = Mathf.Min((W - 24f) / VictoryPopupArtSize.x,
+                Mathf.Max(1f, canvasHeight - 32f) / VictoryPopupArtSize.y);
+            Vector2 size = VictoryPopupArtSize * scale;
+            return new Rect((W - size.x) * .5f, (canvasHeight - size.y) * .5f, size.x, size.y);
+        }
+        private static Rect VictorySlot(Rect frame, Rect normalized) => new Rect(
+            frame.x + normalized.x * frame.width, frame.y + normalized.y * frame.height,
+            normalized.width * frame.width, normalized.height * frame.height);
+        private Rect VictoryExitBounds() => VictorySlot(VictoryPopupBounds(logicalCanvasHeight), VictoryExit);
+        private static string FormatVictoryTime(float remaining)
+        {
+            int seconds = Mathf.Max(0, Mathf.CeilToInt(remaining));
+            return (seconds / 60).ToString("00") + ":" + (seconds % 60).ToString("00");
+        }
+        private static int FitVictoryFont(GUIStyle style, string value, int preferred, Rect bounds)
+        {
+            int original = style.fontSize;
+            style.fontSize = preferred;
+            Vector2 needed = style.CalcSize(new GUIContent(value));
+            style.fontSize = original;
+            float scale = Mathf.Min(1f, Mathf.Max(1f, bounds.width - 8f) / Mathf.Max(1f, needed.x),
+                Mathf.Max(1f, bounds.height - 6f) / Mathf.Max(1f, needed.y));
+            return Mathf.Max(10, Mathf.FloorToInt(preferred * scale));
+        }
+        private void VictoryText(Rect bounds, string value, int preferred, Color fill, TextAnchor alignment)
+        {
+            int originalSize = menuTitle.fontSize;
+            TextAnchor originalAlignment = menuTitle.alignment;
+            menuTitle.fontSize = FitVictoryFont(menuTitle, value, preferred, bounds);
+            menuTitle.alignment = alignment;
+            OutlineLabel(bounds, value, menuTitle, fill, preferred >= 32 ? 2f : .65f);
+            menuTitle.fontSize = originalSize;
+            menuTitle.alignment = originalAlignment;
+        }
         private void ResultPanel()
         {
-            Item(new Rect(38,206,464,486),14,true);
-            Label(new Rect(54,221,432,66),"¡NIVEL COMPLETADO!",header);
-            string sales = game.Sim.LevelIndex == 1
-                ? "CHORI " + Mathf.Min(game.Sim.ChoriDelivered, game.Sim.Goal) + "/" + game.Sim.Goal + "  ·  COCA " + Mathf.Min(game.Sim.CocaDelivered, game.Sim.Goal) + "/" + game.Sim.Goal
-                : "VENTAS " + Mathf.Min(game.Sim.Delivered, game.Sim.Goal) + "/" + game.Sim.Goal;
-            Label(new Rect(63,322,414,52),sales,text);
-            Item(new Rect(121,390,38,38),10);
-            Label(new Rect(164,388,280,42),"SALDO FINAL  $" + game.Sim.Coins,text);
-            Label(new Rect(66,447,408,44),"TIEMPO SOBRANTE  " + FormatRemainingTime(game.Sim.TimeRemaining),text);
-            DrawMenuButton(VictoryExit, VictoryExitAction, "SALIR");
+            // Physical-screen dimmer covers the HUD and safe-area insets too.
+            DrawIntroScreen(Texture2D.whiteTexture, new Color(0f, 0f, 0f, .63f), ScaleMode.StretchToFill);
+            Rect frame = VictoryPopupBounds(logicalCanvasHeight);
+            float previousVertical = layoutVerticalScale;
+            try
+            {
+                // Uniform popup coordinates: never stretch its artwork, type or hit area vertically.
+                layoutVerticalScale = 1f;
+                if (victoryPopup != null) GUI.DrawTexture(frame, victoryPopup, ScaleMode.StretchToFill, true);
+                else
+                {
+                    FillRect(frame, new Color(.19f, .07f, .025f));
+                    FillRect(VictorySlot(frame, new Rect(.07f, .35f, .86f, .47f)), new Color(1f, .91f, .71f));
+                    FillRect(VictorySlot(frame, VictoryExit), new Color(.18f, .71f, .035f));
+                }
+                float fontScale = frame.width / 516f;
+                Color gold = new Color(1f, .82f, .22f), brown = new Color(.18f, .055f, .018f);
+                VictoryText(VictorySlot(frame, new Rect(.095f, .149f, .81f, .189f)),
+                    "¡TURNO\nCOMPLETADO!", Mathf.RoundToInt(50f * fontScale), gold, TextAnchor.MiddleCenter);
+
+                VictoryText(VictorySlot(frame, new Rect(.333f, .390f, .20f, .092f)),
+                    "VENTAS", Mathf.RoundToInt(24f * fontScale), brown, TextAnchor.MiddleLeft);
+                string sales = game.Sim.LevelIndex == 1
+                    ? "CHORI " + Mathf.Min(game.Sim.ChoriDelivered, game.Sim.Goal) + "/" + game.Sim.Goal
+                        + "\nCOCA " + Mathf.Min(game.Sim.CocaDelivered, game.Sim.Goal) + "/" + game.Sim.Goal
+                    : Mathf.Min(game.Sim.Delivered, game.Sim.Goal) + "/" + game.Sim.Goal;
+                VictoryText(VictorySlot(frame, new Rect(.554f, .382f, .371f, .105f)), sales,
+                    Mathf.RoundToInt((game.Sim.LevelIndex == 1 ? 27f : 40f) * fontScale), gold, TextAnchor.MiddleCenter);
+                VictoryText(VictorySlot(frame, new Rect(.333f, .534f, .245f, .104f)),
+                    "MONEDAS\nGANADAS", Mathf.RoundToInt(25f * fontScale), brown, TextAnchor.MiddleLeft);
+                VictoryText(VictorySlot(frame, new Rect(.600f, .532f, .325f, .104f)),
+                    game.Sim.CoinsEarned.ToString(), Mathf.RoundToInt(42f * fontScale), gold, TextAnchor.MiddleCenter);
+                VictoryText(VictorySlot(frame, new Rect(.333f, .686f, .245f, .104f)),
+                    "TIEMPO\nSOBRANTE", Mathf.RoundToInt(25f * fontScale), brown, TextAnchor.MiddleLeft);
+                VictoryText(VictorySlot(frame, new Rect(.588f, .685f, .337f, .104f)),
+                    FormatVictoryTime(game.Sim.TimeRemaining), Mathf.RoundToInt(42f * fontScale), gold, TextAnchor.MiddleCenter);
+                int exitFont = Mathf.RoundToInt((pressedAction == VictoryExitAction ? 42f : 44f) * fontScale);
+                VictoryText(VictorySlot(frame, new Rect(.242f, .86f, .52f, .102f)),
+                    "SALIR", exitFont, new Color(1f, .96f, .83f), TextAnchor.MiddleCenter);
+                if (GUI.Button(VictorySlot(frame, VictoryExit), "", invisible)) NativeAction(VictoryExitAction);
+            }
+            finally { layoutVerticalScale = previousVertical; }
         }
         private void Button(Rect r,int action,string label){Item(r,13,true);Label(r,label,title);if(GUI.Button(LayoutRect(r),"",invisible))NativeAction(action);}
         private void Styles()

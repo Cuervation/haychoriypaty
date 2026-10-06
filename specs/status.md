@@ -1,5 +1,9 @@
 # Project status
 
+## Selected victory popup integrated — source update (2026-10-05)
+
+Replaced the old blue result panel with the selected wood/iron/parchment football popup, original transparent blank artwork and green Salir button. Live outlined comic heading/labels/values, full-screen dimmer, aspect-correct frame and shared responsive mouse/native exit bounds; Salir still returns to the level selector. Chicago lists both sales goals. Added round-local CoinsEarned to report actual gross sales income rather than post-upgrade remaining balance; no spendable-money/unlock rules changed. Imported native 1122×1402 RGBA/meta, recorded generation prompt, and updated targeted art/economy/pointer test source. Generated asset/static diff reviewed; no tests, Unity/Game view, APK or device action per standing instruction.
+
 ## Crowd counter occlusion and double-height HUD — source update (2026-10-05)
 
 All locations use a view-only queue offset matched to their active background counter edge, with crowd clipping that hides front-row legs behind the stand. Order/patience badges move with the bodies; simulation/FIFO/worker routes and economy are unchanged. The initial anger transition preserves queue placement, then exposes riot poses after counter destruction. Top HUD is now 68 logical pixels high (was 34), still full physical width, with larger fitted comic text/icons, countdown below the top camera channel and two separate Chicago goal rows. Updated focused art/layout regression source and visual/feature acceptance. Only static review and git diff --check; no Unity tests, Game view, APK or device action per standing instruction.

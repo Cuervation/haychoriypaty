@@ -276,6 +276,7 @@ namespace HayChoriYPaty.Tests
         }
 
         [TestCase("street-background-open-street-v4", 940, 1673, false)]
+        [TestCase("street-victory-popup-wood-v1", 1122, 1402, true)]
         [TestCase("street-mural-real-v5", 940, 1673, false)]
         [TestCase("street-coin-gold-v2", 1254, 1254, true)]
         [TestCase("street-allboys-crest", 320, 320, true)]
@@ -655,6 +656,48 @@ namespace HayChoriYPaty.Tests
                 Assert.IsFalse(texture.isReadable); Assert.IsFalse(cutout.isReadable);
             }
             finally { UnityEngine.Object.DestroyImmediate(texture); UnityEngine.Object.DestroyImmediate(cutout); }
+        }
+
+        [TestCase(700f)]
+        [TestCase(960f)]
+        [TestCase(1200f)]
+        public void VictoryPopupAndExitUseOneUniformPortraitFrame(float canvasHeight)
+        {
+            Rect frame = (Rect)View.GetMethod("VictoryPopupBounds", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { canvasHeight });
+            Rect exitSlot = (Rect)View.GetField("VictoryExit", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+            Rect exit = (Rect)View.GetMethod("VictorySlot", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { frame, exitSlot });
+            Assert.GreaterOrEqual(frame.xMin, 0f); Assert.LessOrEqual(frame.xMax, 540f);
+            Assert.GreaterOrEqual(frame.yMin, 16f); Assert.LessOrEqual(frame.yMax, canvasHeight - 16f);
+            Assert.AreEqual(1122f / 1402f, frame.width / frame.height, .001f);
+            Assert.IsTrue(frame.Contains(exit.min)); Assert.IsTrue(frame.Contains(exit.max));
+            Assert.Greater(exit.yMin, frame.center.y, "Only the green bottom button is interactive");
+        }
+
+        [TestCase("200/200", 40)]
+        [TestCase("2147483647", 42)]
+        [TestCase("CHORI 200/200\nCOCA 200/200", 27)]
+        public void VictoryLiveValuesFitTheirSlotsWithoutBakingNumbers(string value, int preferred)
+        {
+            var style = new GUIStyle { font = Resources.Load<Font>("Menu/LuckiestGuy-Regular"), fontSize = 38, wordWrap = false };
+            Rect bounds = new Rect(0, 0, 190, 68);
+            int size = (int)View.GetMethod("FitVictoryFont", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { style, value, preferred, bounds });
+            Assert.AreEqual(38, style.fontSize, "Fitting must not mutate the shared style");
+            style.fontSize = size;
+            Assert.LessOrEqual(style.CalcSize(new GUIContent(value)).x, bounds.width - 4f);
+            Assert.LessOrEqual(style.CalcSize(new GUIContent(value)).y, bounds.height - 2f);
+        }
+
+        [TestCase(21f, "00:21")]
+        [TestCase(120f, "02:00")]
+        [TestCase(0f, "00:00")]
+        [TestCase(-1f, "00:00")]
+        public void VictoryRemainingTimeUsesTwoDigitMinutes(float seconds, string expected)
+        {
+            Assert.AreEqual(expected, View.GetMethod("FormatVictoryTime", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { seconds }));
         }
 
         [Test]

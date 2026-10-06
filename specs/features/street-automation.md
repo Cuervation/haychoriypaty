@@ -423,7 +423,7 @@ The Main scene uses `StreetView`, not the retired `PrototypeView`. On the existi
 
 ## Presentation-to-level selector and victory return — 2026-10-05
 
-The presentation's **JUGAR** now opens a dedicated level selector rather than starting the saved location automatically. Keep the current five canonical locations; only indices `0..UnlockedLevel` are tappable, and saved progression unlocks the next index after the preceding level is won. Floresta starts directly from its unlocked card (fixed $5, no price panel); later unlocked locations continue to their existing product-price setup before starting. Existing presentation **SALIR** still exits the app. The level-1 card uses the original All Boys mural and shield; level 2 uses its Nueva Chicago mural and shield; locked later cards preview the game grill/product set with club-color accents instead of invented club crests. The win result removes price replay/next-cancha actions, summarizes sales, final balance and remaining time, and has a single **SALIR** that returns to the selector without quitting or starting another round. Loss/riot retry behavior remains unchanged.
+The presentation's **JUGAR** now opens a dedicated level selector rather than starting the saved location automatically. Keep the current five canonical locations; only indices `0..UnlockedLevel` are tappable, and saved progression unlocks the next index after the preceding level is won. Floresta starts directly from its unlocked card (fixed $5, no price panel); later unlocked locations continue to their existing product-price setup before starting. Existing presentation **SALIR** still exits the app. The level-1 card uses the original All Boys mural and shield; level 2 uses its Nueva Chicago mural and shield; locked later cards preview the game grill/product set with club-color accents instead of invented club crests. The win result removes price replay/next-cancha actions, summarizes sales, round coins earned and remaining time, and has a single **SALIR** that returns to the selector without quitting or starting another round. Loss/riot retry behavior remains unchanged.
 
 - [x] Source opens selector from presentation Jugar and gates card selection by persisted unlock level.
 - [x] Source uses the existing All Boys/Chicago mural resources for the first two card illustrations; later locked cards use original game product art and accent colors.
@@ -493,3 +493,16 @@ The top amber HUD remains full-screen-width and physical-top anchored, but grows
 - [ ] Focused Unity art/layout checks and actual portrait Game-view/device review remain pending; user has not authorized tests for this change.
 
 **Validation:** Static source/spec review and git diff --check only. No Unity/editor/player tests, APK or device actions.
+
+## Selected victory popup — source update (2026-10-05)
+
+Use the user's selected football/wood/forged-iron/parchment composition: gold outlined **¡TURNO COMPLETADO!**, decorative football/laurels/black-white flags, three rows for **VENTAS**, **MONEDAS GANADAS**, **TIEMPO SOBRANTE**, and one large green **SALIR**. Use the versioned transparent blank panel artwork; no title/label/live number is baked in. Dim the whole physical scene behind it, including the top bar. Fit the popup uniformly into the safe portrait canvas; the same normalized frame/exit slot drives draw and mouse/native touch geometry. Salir returns to the level selector, never grants another reward or starts a round; loss/riot UI is unchanged. Chicago's sales row shows separate chori/Coca goals.
+
+MONEDAS GANADAS is gross actual handoff income for this attempt, not the spendable balance after purchases. The round-local CoinsEarned tally is incremented only where a handoff already credits Coins and is not reduced by upgrade/hiring costs. Reset it on new attempt/level and do not persist or carry it; no economy changes or duplicate reward. Remaining time uses mm:ss with two-digit minutes; values/font sizes fit variable counts.
+
+- [x] Source loads the original blank RGBA artwork and overlays the requested heading, live summary and green-button caption.
+- [x] Source retains selector navigation and uses shared aspect-correct draw/touch bounds.
+- [x] Gross earnings source records exact product income independently of spending/reset rules; focused regression source added.
+- [ ] Unity import/compilation, affected art/economy/pointer tests and actual portrait/Game-view/device appearance remain pending; the user has not requested testing.
+
+**Validation:** Generated artwork inspected, native PNG/meta/source/spec reviewed, git diff --check only. No Unity/player tests, Game view, APK or device actions.

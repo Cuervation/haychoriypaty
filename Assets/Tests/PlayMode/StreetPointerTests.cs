@@ -197,6 +197,30 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
+        public IEnumerator VictoryPopupTouchBoundsReturnToSelectorAndBlockBackgroundUpgrades()
+        {
+            Type viewType = view.GetType();
+            viewType.GetField("introActive", PrivateInstance).SetValue(view, false);
+            viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, false);
+            Invoke(game, "StartRound");
+            SetSim("Phase", Enum.Parse(Sim.GetType().GetProperty("Phase", PublicInstance).PropertyType, "Won"));
+            yield return null;
+            Rect viewport = (Rect)viewType.GetMethod("CanvasViewport", StaticPrivate)
+                .Invoke(null, new object[] { new Vector2(Screen.width, Screen.height), Screen.safeArea });
+            float canvasHeight = (float)viewType.GetMethod("CanvasLogicalHeight", StaticPrivate).Invoke(null, new object[] { viewport });
+            float verticalScale = canvasHeight / 960f;
+            viewType.GetField("logicalCanvasHeight", PrivateInstance).SetValue(view, canvasHeight);
+            viewType.GetField("layoutVerticalScale", PrivateInstance).SetValue(view, verticalScale);
+            Rect exit = (Rect)viewType.GetMethod("VictoryExitBounds", PrivateInstance).Invoke(view, null);
+            MethodInfo hit = viewType.GetMethod("HitAction", PrivateInstance);
+            Assert.AreEqual(0, hit.Invoke(view, new object[] { new Vector2(35, 715) }), "The modal blocks the upgrade behind it");
+            Assert.AreEqual(9, hit.Invoke(view, new object[] { new Vector2(exit.center.x, exit.center.y / verticalScale) }));
+            yield return Click(exit.center.x, exit.center.y / verticalScale);
+            Assert.AreEqual("Ready", Phase);
+            Assert.IsTrue((bool)viewType.GetField("levelSelectActive", PrivateInstance).GetValue(view));
+        }
+
+        [UnityTest]
         public IEnumerator MouseDragSetsPriceAndStartBeginsRound()
         {
             Invoke(game, "SelectLevel", 1);
