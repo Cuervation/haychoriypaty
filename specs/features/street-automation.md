@@ -152,11 +152,11 @@ Current editor verification:32/32simulation+9/9art jobc900430c9df54e1ab041b0a247
 
 Keep the transparent logo/menu unchanged. The latest full-screen Parrillero refinement below replaces the cover composition only. Using unscaled time, hold the fully visible cover for at least 4 seconds, reveal the logo with the existing brief warm flash, and hold the fully visible logo for at least 4 more seconds before showing **Jugar** and **Salir**. Keep cover/logo/menu visible until an explicit choice, rather than automatically fading into Ready. Buttons use original glossy cyan→blue rounded geometry and white, dark-outlined Luckiest Guy lettering inspired by the supplied blue NEXT reference; do not reuse its pixels. Ship the Apache 2.0 font license.
 
-Jugar starts the selected saved level directly through StreetGame.StartRound, without another Empezar step. Salir calls Application.Quit in the player (stops Play mode in the Editor). Block hidden gameplay controls throughout the presentation/menu and all menu actions before the minimum durations. Keep the shared safe-area transform and existing native Android/desktop input ownership; no extra scene/package, unlock reset or new products; the round-local coin reset applies; the newer first-level cost/staff/speed reset rules below apply.
+Jugar opens the level selector after the existing 4+4-second presentation; it does not start a round. Only levels at or below persisted `UnlockedLevel` are active. Selecting Floresta starts its fixed-price round directly; selecting later levels opens their existing price/setup screen before Start. The victory result has one action, **Salir**, which resets the finished attempt and returns to the level selector (the next location is unlocked only after a win). Presentation-menu Salir still calls `Application.Quit` in the player (stops Play mode in the Editor). Block hidden gameplay/selector actions during intro and locked-card actions at all times. Keep the shared safe-area transform and existing native Android/desktop input ownership; no extra scene/package, unlock reset or new products; the round-local coin reset and first-level cost/staff/speed reset rules below apply.
 
 - [x] Cover is fully visible for ≥4s before logo begins; logo is fully visible for ≥4s before buttons appear, including at timeScale 0.
 - [x] Persistent menu shows readable blue Jugar/Salir; no hidden level/price/upgrade/start input leaks through.
-- [ ] Mouse/native Android touch: Jugar enters Playing directly; Salir exits the player.
+- [ ] Mouse/native Android touch: Jugar opens the level selector; an unlocked tile enters its level path; only the preceding victory unlocks the next tile; victory-popup Salir returns to selector; presentation Salir exits the player.
 
 **Implementation/validation:** Source updated (0.28s cover fade + 4s cover hold + 0.35s logo reveal + 4s logo hold = 8.63s before buttons). Existing startup regression source adapted, **not run**. User explicitly deferred tests, Play/device review and APK generation until later combined validation. Prior 0.2.4 evidence below does not validate this changed flow.
 
@@ -419,6 +419,18 @@ The Main scene uses `StreetView`, not the retired `PrototypeView`. On the existi
 **Validation:** Source/art integration is new; earlier `PrototypeView` riot code is only legacy evidence, not Main verification. User authorized one relevant test after completion. No APK/device install requested.
 
 **Validation (2026-10-04):** Unity6000.6.3f1 filtered PlayMode test `HayChoriYPaty.Tests.StreetPointerTests.ReplayReturnsToReadyWithoutStartingAutomaticallyAndDiscardsCoins` passed1/1,0failed/0skipped. It triggers a 0.05-second level deadline, confirms `Lost`, active Main riot texture/state and changed debris trajectory, then taps replay and confirms Ready with coins reset. Batch compilation/import succeeded in this final run. Actual Game-view/device appearance was not checked; no APK. First attempts surfaced stale win-panel compiler references and OnGUI-only state initialization under `-nographics`; both were corrected before the passing run.
+
+
+## Presentation-to-level selector and victory return — 2026-10-05
+
+The presentation's **JUGAR** now opens a dedicated level selector rather than starting the saved location automatically. Keep the current five canonical locations; only indices `0..UnlockedLevel` are tappable, and saved progression unlocks the next index after the preceding level is won. Floresta starts directly from its unlocked card (fixed $5, no price panel); later unlocked locations continue to their existing product-price setup before starting. Existing presentation **SALIR** still exits the app. The level-1 card uses the original All Boys mural and shield; level 2 uses its Nueva Chicago mural and shield; locked later cards preview the game grill/product set with club-color accents instead of invented club crests. The win result removes price replay/next-cancha actions, summarizes sales, final balance and remaining time, and has a single **SALIR** that returns to the selector without quitting or starting another round. Loss/riot retry behavior remains unchanged.
+
+- [x] Source opens selector from presentation Jugar and gates card selection by persisted unlock level.
+- [x] Source uses the existing All Boys/Chicago mural resources for the first two card illustrations; later locked cards use original game product art and accent colors.
+- [x] Win-result source has relevant round summary, only Salir, and returns to selector after recording the unlock.
+- [ ] Focused pointer/progression tests, Unity import and actual portrait Game-view review remain pending; user asked not to run tests until requested.
+
+**Validation:** Source/spec review only. No Unity editor/player, tests, APK or device actions were run.
 
 
 ## Live timeout rage and stall-break sequence — 2026-10-05

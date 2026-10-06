@@ -38,6 +38,11 @@ namespace HayChoriYPaty
         // Draw one complete mural/wall/coping crop; cover the old v4 mural band so it cannot peek through below.
         private static readonly Rect MuralSource = new Rect(0, 0, 940, 280);
         private static readonly Rect MuralBounds = new Rect(0, 0, W, 118);
+        private static readonly Rect AllBoysSelectorMuralSource = new Rect(45, 0, 610, 280);
+        private static readonly Rect ChicagoSelectorMuralSource = new Rect(0, 0, 610, 280);
+        private static readonly int[][] LaterLevelCardProducts = {
+            new[] { 0, 1, 2 }, new[] { 2, 4, 5 }, new[] { 3, 5, 6 }
+        };
         // Status is screen-edge anchored; interactive controls still use the safe-area canvas.
         private static readonly Rect HudBar = new Rect(0, 0, 540, 34);
         private static readonly Rect HudCoins = new Rect(46, 3, 145, 26);
@@ -60,11 +65,14 @@ namespace HayChoriYPaty
         private static readonly Rect Speed = new Rect(28, 710, 234, 120);
         private static readonly Rect HireParrillero = new Rect(278, 710, 234, 120);
         private static readonly Rect Slider = new Rect(87, 484, 366, 36);
-        private static readonly Rect Again = new Rect(101, 536, 338, 56);
-        private static readonly Rect Next = new Rect(101, 601, 338, 56);
         private static readonly Rect MenuPlay = new Rect(126, 704, 288, 92);
         private static readonly Rect MenuQuit = new Rect(126, 816, 288, 92);
         private const int MenuPlayAction = 6, MenuQuitAction = 7;
+        private const int LevelSelectorBackAction = 8, VictoryExitAction = 9, LevelSelectFirstAction = 30;
+        private static readonly Rect LevelSelectTitle = new Rect(28, 61, 484, 64);
+        private static readonly Rect LevelSelectHint = new Rect(48, 718, 444, 28);
+        private static readonly Rect LevelSelectBack = new Rect(126, 770, 288, 78);
+        private static readonly Rect VictoryExit = new Rect(126, 567, 288, 76);
         private const string IntroBackdropResource = "street-cover-user-v5";
         private const string RiotBackdropResource = "street-riot-environment-v1";
         private const string RiotFanAtlasResource = "street-riot-fans-v1";
@@ -81,6 +89,7 @@ namespace HayChoriYPaty
         private Font menuFont;
         private GUIStyle menuTitle, levelTitle;
         private bool introActive;
+        private bool levelSelectActive;
         private float introStarted;
         private bool riotScreenActive;
         private float riotStartedAt;
@@ -176,6 +185,7 @@ namespace HayChoriYPaty
             cutoutHudBarTexture = CreateHudBarTexture(true);
             menuFont = Resources.Load<Font>("Menu/LuckiestGuy-Regular");
             introActive = true;
+            levelSelectActive = false;
             introStarted = Time.unscaledTime;
             tiny = small = text = title = header = amount = invisible = menuTitle = levelTitle = null;
             upgradeTitle = upgradePercent = upgradePrice = riotCue = null;
@@ -230,7 +240,7 @@ namespace HayChoriYPaty
             logicalCanvasHeight = CanvasLogicalHeight(v);
             layoutVerticalScale = logicalCanvasHeight / H;
             Vector2 p = ScreenToLayoutPoint(pixel, new Vector2(Screen.width, Screen.height), v);
-            if (down) { priceDrag = !introActive && game.Sim.Phase == RoundPhase.Ready && game.Sim.CanEditPrices && Slider.Contains(p); pressedAction = HitAction(p); }
+            if (down) { priceDrag = !introActive && !levelSelectActive && game.Sim.Phase == RoundPhase.Ready && game.Sim.CanEditPrices && Slider.Contains(p); pressedAction = HitAction(p); }
             if (priceDrag) SetSlider(p.x);
             if (!up) return;
             if (!priceDrag && pressedAction != 0 && pressedAction == HitAction(p)) DispatchAction(pressedAction);
@@ -245,6 +255,13 @@ namespace HayChoriYPaty
         {
             if (introActive)
                 return !MenuAvailable ? 0 : MenuPlay.Contains(p) ? MenuPlayAction : MenuQuit.Contains(p) ? MenuQuitAction : 0;
+            if (levelSelectActive)
+            {
+                if (LevelSelectBack.Contains(p)) return LevelSelectorBackAction;
+                for (int i = 0; i < StreetSimulation.LevelNames.Length; i++)
+                    if (i <= game.UnlockedLevel && LevelSelectCardBounds(i).Contains(p)) return LevelSelectFirstAction + i;
+                return 0;
+            }
             if (game.Sim.Phase == RoundPhase.Ready)
             {
                 if (Start.Contains(p)) return 1;
@@ -254,7 +271,7 @@ namespace HayChoriYPaty
             }
             if (game.Sim.Phase == RoundPhase.Playing) return Speed.Contains(p) ? 3 : HireParrillero.Contains(p) ? 2 : 0;
             if (game.Sim.Phase == RoundPhase.Lost) return RiotReplay.Contains(p) ? 4 : 0;
-            return Again.Contains(p) ? 4 : Next.Contains(p) && game.Sim.Phase==RoundPhase.Won && game.SelectedLevel<4 ? 5 : 0;
+            return game.Sim.Phase == RoundPhase.Won && VictoryExit.Contains(p) ? VictoryExitAction : 0;
         }
         private void DispatchAction(int a)
         {
@@ -265,16 +282,46 @@ namespace HayChoriYPaty
                 if (a == MenuPlayAction)
                 {
                     introActive = false;
+                    levelSelectActive = true;
                     pressedAction = 0;
                     priceDrag = false;
-                    game.StartRound(); // Jugar enters gameplay directly, with no second Start.
                 }
                 else if (a == MenuQuitAction) QuitGame();
+                return;
+            }
+            if (levelSelectActive)
+            {
+                if (a == LevelSelectorBackAction)
+                {
+                    levelSelectActive = false;
+                    introActive = true;
+                    introStarted = Time.unscaledTime - IntroDuration;
+                    return;
+                }
+                if (a >= LevelSelectFirstAction && a < LevelSelectFirstAction + StreetSimulation.LevelNames.Length)
+                {
+                    int level = a - LevelSelectFirstAction;
+                    bool ok = level <= game.UnlockedLevel && game.SelectLevel(level);
+                    if (ok)
+                    {
+                        levelSelectActive = false;
+                        priceProduct = 0;
+                        // Floresta starts directly; later locations keep their existing price/setup screen.
+                        if (level == 0) game.StartRound();
+                    }
+                    lastAction = a; feedbackUntil = Time.unscaledTime + 0.22f; feedbackScale = ok ? 1.04f : 0.97f;
+                    return;
+                }
                 return;
             }
             bool ok = true;
             if (a==1) game.StartRound(); else if (a==2) ok=game.TryHire(); else if (a==3) ok=game.TryUpgradeSpeed();
             else if (a==4) ok=game.Retry(); else if (a==5) ok=game.NextLevel(); else if (a>=10&&a<15) {ok=game.SelectLevel(a-10);priceProduct=0;} else if(a>=20&&a<27)priceProduct=a-20;
+            else if (a == VictoryExitAction && game.Sim.Phase == RoundPhase.Won)
+            {
+                ok = game.Retry();
+                if (ok) levelSelectActive = true;
+            }
             lastAction=a; feedbackUntil=Time.unscaledTime+0.22f; feedbackScale=ok?1.04f:0.97f;
         }
         private static void QuitGame()
@@ -308,6 +355,12 @@ namespace HayChoriYPaty
                 DrawIntro(Time.unscaledTime - introStarted);
                 GUI.color = old; GUI.matrix = m;
                 return; // Do not create hidden gameplay GUI controls behind the startup menu.
+            }
+            if (levelSelectActive)
+            {
+                DrawLevelSelector();
+                GUI.color=old; GUI.matrix=m;
+                return; // Keep the locked/unlocked selector as the only interactive layer.
             }
             if (sim.Phase == RoundPhase.Lost)
             {
@@ -846,6 +899,125 @@ namespace HayChoriYPaty
                 DrawMenuButton(MenuQuit, MenuQuitAction, "SALIR");
             }
         }
+        private void DrawLevelSelector()
+        {
+            FillRect(new Rect(0, 0, W, logicalCanvasHeight), new Color(.035f, .025f, .025f, .58f));
+            OutlineLabel(LevelSelectTitle, "ELEGÍ TU CANCHA", menuTitle, new Color(1f, .91f, .72f), 2f);
+            for (int i = 0; i < StreetSimulation.LevelNames.Length; i++) DrawLevelSelectCard(i);
+            Label(LevelSelectHint, "Superá cada cancha para desbloquear la siguiente", small);
+            DrawMenuButton(LevelSelectBack, LevelSelectorBackAction, "VOLVER");
+        }
+        private static Rect LevelSelectCardBounds(int index)
+        {
+            const float width = 236f, height = 150f;
+            int row = index / 2, column = index % 2;
+            float x = index == 4 ? (W - width) * .5f : 24f + column * 256f;
+            return new Rect(x, 154f + row * 174f, width, height);
+        }
+        private void DrawLevelSelectCard(int index)
+        {
+            Rect bounds = LevelSelectCardBounds(index);
+            bool unlocked = index <= game.UnlockedLevel;
+            Color frame = unlocked ? new Color(.94f, .62f, .18f) : new Color(.24f, .20f, .18f);
+            FillRect(new Rect(bounds.x - 2, bounds.y - 2, bounds.width + 4, bounds.height + 4), frame);
+            FillRect(bounds, new Color(.10f, .07f, .045f));
+            Rect artwork = new Rect(bounds.x + 3, bounds.y + 3, bounds.width - 6, 106);
+            DrawLevelSelectArtwork(index, artwork);
+
+            Rect caption = new Rect(bounds.x + 3, bounds.y + 109, bounds.width - 6, 38);
+            FillRect(caption, new Color(.10f, .055f, .028f, .93f));
+            string number = "NIVEL " + (index + 1);
+            int oldSize = menuTitle.fontSize;
+            menuTitle.fontSize = 19;
+            OutlineLabel(new Rect(caption.x + 2, caption.y - 1, caption.width - 4, 20), number, menuTitle,
+                unlocked ? Color.white : new Color(.76f, .72f, .67f), 1.3f);
+            menuTitle.fontSize = oldSize;
+
+            string name = StreetSimulation.LevelNames[index].ToUpperInvariant();
+            int oldLevelSize = levelTitle.fontSize;
+            levelTitle.fontSize = 15;
+            float measured = levelTitle.CalcSize(new GUIContent(name)).x;
+            if (measured > caption.width - 10)
+                levelTitle.fontSize = Mathf.Max(10, Mathf.FloorToInt(levelTitle.fontSize * (caption.width - 10) / measured));
+            OutlineLabel(new Rect(caption.x + 4, caption.y + 17, caption.width - 8, 20), name, levelTitle,
+                unlocked ? new Color(1f, .89f, .62f) : new Color(.72f, .69f, .65f), 1.1f);
+            levelTitle.fontSize = oldLevelSize;
+
+            if (!unlocked)
+            {
+                FillRect(artwork, new Color(.015f, .012f, .012f, .60f));
+                Item(new Rect(artwork.center.x - 14, artwork.center.y - 16, 28, 34), 17);
+            }
+            else
+            {
+                Rect tag = new Rect(artwork.xMax - 83, artwork.y + 6, 77, 19);
+                FillRect(tag, new Color(.20f, .52f, .09f, .94f));
+                Label(tag, "DISPONIBLE", tiny);
+            }
+
+            if (unlocked && GUI.Button(LayoutRect(bounds), "", invisible))
+                NativeAction(LevelSelectFirstAction + index);
+        }
+        private void DrawLevelSelectArtwork(int index, Rect bounds)
+        {
+            if (index == 0 && muralArt != null)
+            {
+                DrawRaw(LayoutRect(bounds), muralArt, AllBoysSelectorMuralSource, true, false);
+                if (allBoysCrest != null)
+                    GUI.DrawTexture(LayoutRect(new Rect(bounds.x + 5, bounds.y + 5, 28, 32)), allBoysCrest, ScaleMode.ScaleToFit, true);
+                return;
+            }
+            if (index == 1 && chicagoBackground != null)
+            {
+                DrawRaw(LayoutRect(bounds), chicagoBackground, ChicagoSelectorMuralSource, true, false);
+                if (chicagoCrest != null)
+                    GUI.DrawTexture(LayoutRect(new Rect(bounds.x + 5, bounds.y + 5, 28, 32)), chicagoCrest, ScaleMode.ScaleToFit, true);
+                return;
+            }
+
+            // Later locations preview their expanding product lineup on the original game grill art.
+            if (largeGrill != null) GUI.DrawTexture(LayoutRect(bounds), largeGrill, ScaleMode.ScaleAndCrop, true);
+            Color accent = LevelSelectAccent(index);
+            FillRect(new Rect(bounds.x, bounds.y, bounds.width, 6), accent);
+            FillRect(new Rect(bounds.x, bounds.y + 6, bounds.width, 2), new Color(1f, 1f, 1f, .8f));
+            int[] featured = LaterLevelCardProducts[Mathf.Clamp(index - 2, 0, LaterLevelCardProducts.Length - 1)];
+            float iconWidth = 43f, gap = 12f;
+            float start = bounds.center.x - (iconWidth * featured.Length + gap * (featured.Length - 1)) * .5f;
+            for (int i = 0; i < featured.Length; i++)
+            {
+                Rect icon = new Rect(start + i * (iconWidth + gap), bounds.y + 38, iconWidth, 43);
+                FillRect(icon, new Color(.08f, .045f, .025f, .8f));
+                DrawProductIcon(new Rect(icon.x + 3, icon.y + 3, icon.width - 6, icon.height - 6), featured[i]);
+            }
+        }
+        private static Color LevelSelectAccent(int levelIndex)
+        {
+            switch (levelIndex)
+            {
+                case 2: return new Color(.78f, .12f, .17f); // Argentinos Juniors: red/white
+                case 3: return new Color(.08f, .27f, .59f); // Vélez: blue/white
+                default: return new Color(.08f, .42f, .24f); // Ferro: green/white
+            }
+        }
+        private void FillRect(Rect bounds, Color color)
+        {
+            Color previous = GUI.color;
+            GUI.color = color;
+            GUI.DrawTexture(LayoutRect(bounds), Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
+            GUI.color = previous;
+        }
+        private void OutlineLabel(Rect bounds, string value, GUIStyle style, Color fill, float offset)
+        {
+            Color previous = style.normal.textColor;
+            style.normal.textColor = new Color(.08f, .035f, .018f, .98f);
+            for (int y = -1; y <= 1; y++)
+            for (int x = -1; x <= 1; x++)
+                if (x != 0 || y != 0)
+                    Label(new Rect(bounds.x + x * offset, bounds.y + y * offset, bounds.width, bounds.height), value, style);
+            style.normal.textColor = fill;
+            Label(bounds, value, style);
+            style.normal.textColor = previous;
+        }
         private void DrawMenuButton(Rect bounds, int action, string caption)
         {
             bool pressed = pressedAction == action;
@@ -1218,15 +1390,15 @@ namespace HayChoriYPaty
         private void ResultPanel()
         {
             Item(new Rect(38,206,464,486),14,true);
-            Label(new Rect(54,221,432,75),"¡Aguante el puesto!",header);
-            Item(new Rect(224,318,92,96),18);
+            Label(new Rect(54,221,432,66),"¡NIVEL COMPLETADO!",header);
             string sales = game.Sim.LevelIndex == 1
-                ? "Chori " + Mathf.Min(game.Sim.ChoriDelivered, game.Sim.Goal) + "/" + game.Sim.Goal + " · Coca " + Mathf.Min(game.Sim.CocaDelivered, game.Sim.Goal) + "/" + game.Sim.Goal
-                : game.Sim.Delivered + " ventas";
-            Label(new Rect(74,421,392,82),sales+" · $"+game.Sim.Coins+"\nEquipo y mejoras guardados",text);
-            Button(Again,4,"Volver a elegir precio");
-            if(game.SelectedLevel<4)Button(Next,5,"Siguiente cancha");
-            else Label(new Rect(73,601,394,58),"¡Las cinco canchas completas!",text);
+                ? "CHORI " + Mathf.Min(game.Sim.ChoriDelivered, game.Sim.Goal) + "/" + game.Sim.Goal + "  ·  COCA " + Mathf.Min(game.Sim.CocaDelivered, game.Sim.Goal) + "/" + game.Sim.Goal
+                : "VENTAS " + Mathf.Min(game.Sim.Delivered, game.Sim.Goal) + "/" + game.Sim.Goal;
+            Label(new Rect(63,322,414,52),sales,text);
+            Item(new Rect(121,390,38,38),10);
+            Label(new Rect(164,388,280,42),"SALDO FINAL  $" + game.Sim.Coins,text);
+            Label(new Rect(66,447,408,44),"TIEMPO SOBRANTE  " + FormatRemainingTime(game.Sim.TimeRemaining),text);
+            DrawMenuButton(VictoryExit, VictoryExitAction, "SALIR");
         }
         private void Button(Rect r,int action,string label){Item(r,13,true);Label(r,label,title);if(GUI.Button(LayoutRect(r),"",invisible))NativeAction(action);}
         private void Styles()

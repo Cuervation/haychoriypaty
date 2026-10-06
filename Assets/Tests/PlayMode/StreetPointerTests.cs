@@ -159,7 +159,41 @@ namespace HayChoriYPaty.Tests
             Time.timeScale = 1f;
             yield return Click(270, 750);
             Assert.IsFalse((bool)viewType.GetField("introActive", PrivateInstance).GetValue(view));
-            Assert.AreEqual("Playing", Phase, "Jugar enters gameplay without a second Start");
+            Assert.IsTrue((bool)viewType.GetField("levelSelectActive", PrivateInstance).GetValue(view), "Jugar opens the location selector");
+            Assert.AreEqual("Ready", Phase, "Opening the selector must not start the round");
+            yield return Click(142, 229);
+            Assert.IsFalse((bool)viewType.GetField("levelSelectActive", PrivateInstance).GetValue(view));
+            Assert.AreEqual("Playing", Phase, "Selecting the unlocked first location starts Floresta");
+        }
+
+        [UnityTest]
+        public IEnumerator LockedLevelNeedsPreviousWinAndVictorySalirReturnsToSelector()
+        {
+            Type viewType = view.GetType();
+            object save = gameType.GetField("save", PrivateInstance).GetValue(game);
+            save.GetType().GetField("unlockedLevel", PublicInstance).SetValue(save, 0);
+            viewType.GetField("introActive", PrivateInstance).SetValue(view, false);
+            viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, true);
+            MethodInfo dispatch = viewType.GetMethod("DispatchAction", PrivateInstance);
+
+            dispatch.Invoke(view, new object[] { 31 }); // Level 2 remains locked before a Level-1 win.
+            Assert.IsTrue((bool)viewType.GetField("levelSelectActive", PrivateInstance).GetValue(view));
+            Assert.AreEqual(0, Get("SelectedLevel"));
+            dispatch.Invoke(view, new object[] { 30 });
+            Assert.AreEqual("Playing", Phase);
+
+            SetSim("Phase", Enum.Parse(Sim.GetType().GetProperty("Phase", PublicInstance).PropertyType, "Won"));
+            Invoke(game, "Save");
+            dispatch.Invoke(view, new object[] { 9 }); // The victory popup's only Salir action.
+            Assert.AreEqual("Ready", Phase);
+            Assert.IsTrue((bool)viewType.GetField("levelSelectActive", PrivateInstance).GetValue(view));
+            Assert.AreEqual(1, Get("UnlockedLevel"), "Winning Floresta unlocks only Nueva Chicago");
+
+            dispatch.Invoke(view, new object[] { 31 });
+            Assert.IsFalse((bool)viewType.GetField("levelSelectActive", PrivateInstance).GetValue(view));
+            Assert.AreEqual("Ready", Phase, "Later locations retain their product-price setup screen");
+            Assert.AreEqual(1, Get("SelectedLevel"));
+            Assert.IsTrue((bool)Sim.GetType().GetProperty("CanEditPrices", PublicInstance).GetValue(Sim, null));
         }
 
         [UnityTest]

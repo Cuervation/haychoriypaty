@@ -1,5 +1,9 @@
 # Project status
 
+## Level selector and victory-popup route — source update (2026-10-05)
+
+Presentation **JUGAR** opens a five-location selector. All Boys/Floresta and Nueva Chicago cards use their own existing mural and shield; locked later cards show the grill/product progression with restrained club-color accents. A card is enabled only up to persisted `UnlockedLevel`; Floresta starts directly, later levels retain their existing price/setup screen. The won-level popup now contains only **SALIR** after sales/final balance/remaining-time summary, and this action resets to Ready then returns to the selector. Main presentation **SALIR** remains app exit. Added pointer/progression and card-art layout regression source but did not execute it, preserving the user's standing no-test instruction. No Unity/Game-view, APK or device work was done.
+
 ## Top HUD extended to physical screen edges — source update (2026-10-05)
 
 The amber top bar now draws its outer frame edge-to-edge, including its decorative fill behind the reserved camera/notch channel. Expanded the sales capsule/text slot; HUD labels use a larger preferred font and fit to both width and height, with compact paired Level-2 counters identified by their icons. No change to HUD height, safe-area interaction geometry, game rules or timer. Updated the focused test source and HUD specifications. No tests, Unity/Game view, APK or phone update per standing no-test instruction.

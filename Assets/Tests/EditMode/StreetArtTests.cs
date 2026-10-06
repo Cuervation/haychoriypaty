@@ -316,6 +316,27 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
+        public void LevelSelectorCardsFitPortraitCanvasAndUseTeamMuralResources()
+        {
+            MethodInfo cardBounds = View.GetMethod("LevelSelectCardBounds", BindingFlags.Static | BindingFlags.NonPublic);
+            Rect[] cards = new Rect[5];
+            for (int i = 0; i < cards.Length; i++)
+            {
+                cards[i] = (Rect)cardBounds.Invoke(null, new object[] { i });
+                Assert.GreaterOrEqual(cards[i].xMin, 0f); Assert.LessOrEqual(cards[i].xMax, 540f);
+                Assert.GreaterOrEqual(cards[i].yMin, 0f); Assert.LessOrEqual(cards[i].yMax, 960f);
+                for (int j = 0; j < i; j++) Assert.IsFalse(cards[i].Overlaps(cards[j]), "Level cards must have separate touch targets");
+            }
+
+            Assert.AreEqual("street-mural-real-v5", View.GetField("MuralResource", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue());
+            Assert.AreEqual("street-background-chicago-v1", View.GetField("ChicagoBackgroundResource", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue());
+            Assert.NotNull(Resources.Load<Texture2D>("street-mural-real-v5"), "Floresta card uses the All Boys mural");
+            Assert.NotNull(Resources.Load<Texture2D>("street-allboys-crest"));
+            Assert.NotNull(Resources.Load<Texture2D>("street-background-chicago-v1"), "Nueva Chicago card uses its own mural scene");
+            Assert.NotNull(Resources.Load<Texture2D>("street-new-chicago-crest-v1"));
+        }
+
+        [Test]
         public void FlorestaBadgeHasOriginalCrestAndBundledComicFont()
         {
             Assert.AreEqual("street-allboys-crest", View.GetField("AllBoysCrestResource", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue());
