@@ -1,5 +1,9 @@
 # Project status
 
+## Crowd counter occlusion and double-height HUD — source update (2026-10-05)
+
+All locations use a view-only queue offset matched to their active background counter edge, with crowd clipping that hides front-row legs behind the stand. Order/patience badges move with the bodies; simulation/FIFO/worker routes and economy are unchanged. The initial anger transition preserves queue placement, then exposes riot poses after counter destruction. Top HUD is now 68 logical pixels high (was 34), still full physical width, with larger fitted comic text/icons, countdown below the top camera channel and two separate Chicago goal rows. Updated focused art/layout regression source and visual/feature acceptance. Only static review and git diff --check; no Unity tests, Game view, APK or device action per standing instruction.
+
 ## Level selector and victory-popup route — source update (2026-10-05)
 
 Presentation **JUGAR** opens a five-location selector. All Boys/Floresta and Nueva Chicago cards use their own existing mural and shield; locked later cards show the grill/product progression with restrained club-color accents. A card is enabled only up to persisted `UnlockedLevel`; Floresta starts directly, later levels retain their existing price/setup screen. The won-level popup now contains only **SALIR** after sales/final balance/remaining-time summary, and this action resets to Ready then returns to the selector. Main presentation **SALIR** remains app exit. Added pointer/progression and card-art layout regression source but did not execute it, preserving the user's standing no-test instruction. No Unity/Game-view, APK or device work was done.

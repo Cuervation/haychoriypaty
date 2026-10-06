@@ -494,7 +494,7 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void CustomerRowsExposeMoreMuralAndFrontFeetAreCloserToCounter()
+        public void SimulationQueueAnchorsRemainUnchangedByCounterOcclusion()
         {
             Type sim = Type.GetType("HayChoriYPaty.StreetSimulation, Assembly-CSharp", true);
             var queue = sim.GetMethod("QueuePosition", BindingFlags.Static | BindingFlags.NonPublic);
@@ -503,6 +503,30 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(new Vector2(58, 324), front);
             Assert.AreEqual(new Vector2(58, 212), back);
             Assert.GreaterOrEqual(back.y - 132, 80, "Rear bubbles leave most of the 90-high wall visible");
+        }
+
+        [TestCase(0, 960f)]
+        [TestCase(1, 960f)]
+        [TestCase(2, 960f)]
+        [TestCase(3, 960f)]
+        [TestCase(4, 960f)]
+        [TestCase(0, 1200f)]
+        [TestCase(1, 1200f)]
+        public void CrowdViewHidesFrontLegsAtEachBackdropCounterWithoutChangingQueue(int level, float canvasHeight)
+        {
+            float verticalScale = canvasHeight / 960f;
+            float counterTop = (float)View.GetMethod("CounterSurfaceY", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { canvasHeight, new Vector2(940, 1673), level });
+            float offset = (float)View.GetMethod("CustomerViewOffsetY", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { counterTop, verticalScale });
+            float hiddenLegs = (float)View.GetField("CustomerHiddenLegHeight", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue();
+            float bodyTop = (324f + offset - 76f) * verticalScale;
+            float feet = bodyTop + 76f;
+            Assert.AreEqual(counterTop + hiddenLegs, feet, .01f);
+            Assert.Less(bodyTop, counterTop, "Face and upper body remain above the counter clipping edge");
+            Assert.GreaterOrEqual(hiddenLegs, 28f, "Legs remain occluded even during small waiting hops");
+            float rearBubbleTop = (212f + offset - (level == 1 ? 151f : 132f)) * verticalScale;
+            Assert.Greater(rearBubbleTop, 68f, "The enlarged physical-edge HUD stays clear of rear orders");
         }
 
         [TestCase("street-upgrade-wood-v1", 1510, 1041)]
@@ -569,7 +593,7 @@ namespace HayChoriYPaty.Tests
         {
             Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
             Assert.GreaterOrEqual(bar.xMin, 0); Assert.LessOrEqual(bar.xMax, 540);
-            Assert.GreaterOrEqual(bar.yMin, 0); Assert.Less(bar.yMax, 38);
+            Assert.AreEqual(0f, bar.yMin); Assert.AreEqual(68f, bar.height, "Double the former 34-pixel HUD height");
             Rect[] counters = new[] { "HudCoins", "HudTime", "HudSales" }
                 .Select(name => (Rect)View.GetField(name, BindingFlags.Static | BindingFlags.NonPublic).GetValue(null)).ToArray();
             for (int i = 0; i < counters.Length; i++)
@@ -578,6 +602,27 @@ namespace HayChoriYPaty.Tests
                 Assert.IsTrue(bar.Contains(counters[i].max));
                 for (int j = i + 1; j < counters.Length; j++) Assert.IsFalse(counters[i].Overlaps(counters[j]));
             }
+            Rect chori = (Rect)View.GetField("HudChoriSales", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+            Rect coca = (Rect)View.GetField("HudCocaSales", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+            Assert.IsFalse(chori.Overlaps(coca), "Chicago goals have independent readable rows");
+            foreach (Rect count in new[] { chori, coca })
+            {
+                Assert.IsTrue(bar.Contains(count.min)); Assert.IsTrue(bar.Contains(count.max));
+                Assert.IsFalse(count.Overlaps(counters[0])); Assert.IsFalse(count.Overlaps(counters[1]));
+            }
+        }
+
+        [TestCase(900f, 500f)]
+        [TestCase(512f, 512f)]
+        [TestCase(100f, 600f)]
+        public void LargerHudIconsFitTheirSlotWithoutStretchingAndRemainCentered(float width, float height)
+        {
+            Rect slot = new Rect(338, 10, 43, 45);
+            Rect fitted = (Rect)View.GetMethod("HudIconBounds", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { slot, new Vector2(width, height) });
+            Assert.AreEqual(slot.center.x, fitted.center.x, .01f); Assert.AreEqual(slot.center.y, fitted.center.y, .01f);
+            Assert.LessOrEqual(fitted.width, slot.width); Assert.LessOrEqual(fitted.height, slot.height);
+            Assert.AreEqual(width / height, fitted.width / fitted.height, .001f);
         }
 
         [TestCase(180f, "3:00")]
@@ -602,14 +647,12 @@ namespace HayChoriYPaty.Tests
                 .Invoke(null, new object[] { true });
             try
             {
-                Assert.AreEqual(1080, texture.width); Assert.AreEqual(68, texture.height);
+                Assert.AreEqual(1080, texture.width); Assert.AreEqual(136, texture.height);
                 Assert.AreEqual(TextureWrapMode.Clamp, texture.wrapMode);
                 Assert.IsTrue(texture.name.Contains("clock"));
                 Assert.AreEqual(HideFlags.HideAndDontSave, texture.hideFlags);
-                Assert.Greater(texture.GetPixel(1, 34).a, 0f, "Standard HUD artwork must reach the physical left edge");
-                Assert.Greater(texture.GetPixel(texture.width - 2, 34).a, 0f, "Standard HUD artwork must reach the physical right edge");
-                Assert.Greater(cutout.GetPixel(cutout.width / 2, cutout.height / 2).a, 0f,
-                    "Camera-safe counters may leave a content gap, but the decorative frame remains continuous");
+                // Runtime textures deliberately discard their CPU copy after upload.
+                Assert.IsFalse(texture.isReadable); Assert.IsFalse(cutout.isReadable);
             }
             finally { UnityEngine.Object.DestroyImmediate(texture); UnityEngine.Object.DestroyImmediate(cutout); }
         }

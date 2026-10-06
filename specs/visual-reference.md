@@ -299,3 +299,9 @@ Chicago workers now idle and hand off at logical y=485, on the player-side floor
 ## Nueva Chicago integrated supporter outfits — 2026-10-05
 
 Level 2 now uses eight complete, original green/black/off-white fan sprites for the front-facing queue and matching side-walking poses. Outfit selection remains deterministic by customer ID. Timeout rioters have their own Chicago-colored full-body stick-raised/swing poses, so no clothing overlay appears in the angry animation either. The older transparent garment sheet remains preserved as historical source material but is no longer loaded at runtime. Reviewed the 1080×1920 live Game-view capture at `Logs/Acceptance/ChicagoOutfits-20261005/chicago-eight-outfits-playing.png`; the queue shows complete integrated kits and a side-walking outfit. Focused Unity EditMode atlas/import/selection validation passed 1/1.
+
+## Counter-occluded queue and taller status bar — 2026-10-05
+
+The latest request supersedes the visible full-body front-row presentation: in every location, the supporters must look immediately behind the counter, with their legs concealed by it. Keep the integrated team apparel and waiting/advancing animation, shift the full queue/badges consistently in the view, and clip at the active backdrop's top counter edge rather than placing feet on the wood. Match background crop geometry for All Boys/generic and Chicago; do not move simulation paths or change throughput. Keep initial riot supporters in those same positions until the counter breaks.
+
+Double the physical-top HUD from 34 to 68 logical pixels high, still edge-to-edge. Use larger proportionate icons and fitted comic numbers. The centered camera channel only reserves the upper half: show time below it on cutout phones. Place Chicago's two product goals on separate readable rows within the same green capsule. No new raster art is needed. Unity and actual device readability/occlusion are unverified; tests deferred by the user.

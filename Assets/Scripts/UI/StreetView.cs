@@ -44,15 +44,18 @@ namespace HayChoriYPaty
             new[] { 0, 1, 2 }, new[] { 2, 4, 5 }, new[] { 3, 5, 6 }
         };
         // Status is screen-edge anchored; interactive controls still use the safe-area canvas.
-        private static readonly Rect HudBar = new Rect(0, 0, 540, 34);
-        private static readonly Rect HudCoins = new Rect(46, 3, 145, 26);
-        private static readonly Rect HudTime = new Rect(233, 3, 88, 26);
-        private static readonly Rect HudSales = new Rect(368, 3, 166, 26);
-        // Reserve the centered camera channel for counters; the decorative frame stays full-width.
+        private static readonly Rect HudBar = new Rect(0, 0, 540, 68);
+        private static readonly Rect HudCoins = new Rect(70, 10, 122, 45);
+        private static readonly Rect HudTime = new Rect(241, 10, 81, 45);
+        private static readonly Rect HudSales = new Rect(388, 10, 146, 45);
+        private static readonly Rect HudChoriSales = new Rect(376, 6, 158, 26);
+        private static readonly Rect HudCocaSales = new Rect(376, 34, 158, 26);
+        // The camera only occupies the upper channel; the countdown fits below it.
         private static readonly Rect CutoutHudGap = new Rect(232, 0, 70, 34);
-        private static readonly Rect CutoutHudCoins = new Rect(40, 3, 108, 26);
-        private static readonly Rect CutoutHudTime = new Rect(184, 3, 39, 26);
-        private static readonly Rect CutoutHudSales = new Rect(343, 3, 191, 26);
+        private static readonly Rect CutoutHudCoins = new Rect(70, 10, 122, 45);
+        private static readonly Rect CutoutHudTime = new Rect(235, 35, 88, 27);
+        private static readonly Rect CutoutHudSales = new Rect(388, 10, 146, 45);
+        private const float CustomerHiddenLegHeight = 32f;
         // In Floresta the table is LEFT of the grill, never below it or across its route.
         private static readonly Rect ServingTableRect = new Rect(16, 540, 196, 98);
         private static readonly Rect ChicagoServingTableRect = new Rect(12, 602, 165, 84);
@@ -373,11 +376,7 @@ namespace HayChoriYPaty
             riotScreenActive = false;
             DrawBackdropLayers(logicalCanvasHeight, layoutVerticalScale);
             // Keep the expanded customer street clear; order icons live on their customers.
-            for(int row=4;row>=0;row--)for(int i=0;i<sim.Customers.Count;i++)
-            {
-                var c=sim.Customers[i]; if(Mathf.Clamp(Mathf.RoundToInt((StreetSimulation.FrontQueueY-c.Position.y)/StreetSimulation.QueueRowSpacing),0,4)!=row)continue;
-                DrawCustomer(c);
-            }
+            DrawWaitingCrowd(sim);
             DrawGrill();
             DrawServingTable();
             for(int i=0;i<7;i++) DrawStation(i,sim.IsProductAvailable(i));
@@ -407,8 +406,9 @@ namespace HayChoriYPaty
             }
 
             float elapsed = Mathf.Max(0f, Time.unscaledTime - riotStartedAt);
-            // Freeze the level, but keep its actual waiting customers visible as the riot begins.
+            // Keep the same safe-canvas counter/queue alignment during the initial anger reaction.
             DrawGameplayScreenFill();
+            DrawBackdropLayers(logicalCanvasHeight, layoutVerticalScale);
 
             float destruction = IntroEase(Mathf.Clamp01((elapsed - RiotBreakStartSeconds) / RiotBreakTransitionSeconds));
             if (riotBackdrop != null && destruction > 0f)
@@ -448,7 +448,10 @@ namespace HayChoriYPaty
             float width = Mathf.Lerp(96f, 520f, grow) * pulse;
             float height = width * .5f;
             float x = (W - width) * .5f + Mathf.Sin(elapsed * 9f) * 2.5f;
-            float y = 196f - height * .5f + Mathf.Sin(elapsed * 7f) * 2.8f;
+            Vector2 queueCenter = CustomerViewPosition(new Vector2(W * .5f,
+                StreetSimulation.FrontQueueY - StreetSimulation.QueueRowSpacing));
+            float y = queueCenter.y - 58f - height / (2f * layoutVerticalScale)
+                + Mathf.Sin(elapsed * 7f) * 2.8f;
             Color previous = GUI.color;
             try
             {
@@ -486,6 +489,10 @@ namespace HayChoriYPaty
         {
             if (sim == null || sim.Customers == null) return;
             Color previousColor = GUI.color;
+            // Legs remain behind the intact stand; reveal the full riot poses only once it breaks.
+            float clipHeight = elapsed < RiotBreakStartSeconds + RiotBreakTransitionSeconds
+                ? CustomerCounterTopY() : logicalCanvasHeight;
+            GUI.BeginGroup(new Rect(0, 0, W, clipHeight));
             try
             {
                 // Use the frozen queue itself rather than introducing a new, unrelated crowd.
@@ -502,11 +509,12 @@ namespace HayChoriYPaty
                     DrawRiotCustomer(customer, sim.LevelIndex, elapsed);
                 }
             }
-            finally { GUI.color = previousColor; }
+            finally { GUI.color = previousColor; GUI.EndGroup(); }
         }
 
         private void DrawRiotCustomer(StreetCustomer customer, int levelIndex, float elapsed)
         {
+            Vector2 position = CustomerViewPosition(customer.Position);
             Texture2D activeRiotFans = riotFanAtlas;
             if (levelIndex == 0 && allBoysRiotFans != null) activeRiotFans = allBoysRiotFans;
             else if (levelIndex == 1 && chicagoRiotFans != null) activeRiotFans = chicagoRiotFans;
@@ -518,8 +526,8 @@ namespace HayChoriYPaty
             float hop = Mathf.Abs(Mathf.Sin(rhythm * 1.16f)) * (1.2f + attack * 7f);
             float surge = attack * 13f;
 
-            Rect calmPose = new Rect(customer.Position.x - 39f + sway,
-                customer.Position.y - 76f - hop + surge, 78f, 76f);
+            Rect calmPose = new Rect(position.x - 39f + sway,
+                position.y - 76f - hop + surge, 78f, 76f);
             if (fury < 1f || activeRiotFans == null)
             {
                 float calmAlpha = activeRiotFans == null ? 1f : 1f - fury;
@@ -529,8 +537,8 @@ namespace HayChoriYPaty
                 else Person(calmPose, GetLegacyAllBoysFanFrame(customer.Id, false), false);
             }
 
-            Rect angryPose = new Rect(customer.Position.x - 44f + sway,
-                customer.Position.y - 88f - hop + surge, 88f, 88f);
+            Rect angryPose = new Rect(position.x - 44f + sway,
+                position.y - 88f - hop + surge, 88f, 88f);
             if (fury > 0f && activeRiotFans != null)
             {
                 GUI.color = new Color(1f, 1f, 1f, fury);
@@ -548,7 +556,7 @@ namespace HayChoriYPaty
             if (riotCue != null && cueAlpha > 0f)
             {
                 GUI.color = new Color(1f, 1f, 1f, cueAlpha);
-                Label(new Rect(customer.Position.x - 17f + sway, customer.Position.y - 112f - hop + surge,
+                Label(new Rect(position.x - 17f + sway, position.y - 112f - hop + surge,
                     34f, 32f), "¡!", riotCue);
             }
             GUI.color = Color.white;
@@ -657,10 +665,12 @@ namespace HayChoriYPaty
             }
             finally { GUI.matrix = previous; GUI.color = color; }
         }
+        private Texture2D CurrentGameplayBackdrop() =>
+            game != null && game.Sim != null && game.Sim.LevelIndex == 1 && chicagoBackground != null
+                ? chicagoBackground : backdrop;
         private void DrawBackdropLayers(float canvasHeight, float verticalScale)
         {
-            Texture2D currentBackdrop = game != null && game.Sim != null && game.Sim.LevelIndex == 1 && chicagoBackground != null
-                ? chicagoBackground : backdrop;
+            Texture2D currentBackdrop = CurrentGameplayBackdrop();
             if (currentBackdrop != null)
                 GUI.DrawTexture(new Rect(0, 0, W, canvasHeight), currentBackdrop, ScaleMode.ScaleAndCrop, true);
             if (muralArt != null && currentBackdrop == backdrop)
@@ -716,27 +726,39 @@ namespace HayChoriYPaty
                 GUI.color = Color.white;
                 Texture2D bar = cutout ? cutoutHudBarTexture : hudBarTexture;
                 if (bar != null) GUI.DrawTexture(HudBar, bar, ScaleMode.StretchToFill, true);
-                Item(cutout ? new Rect(8, 2, 29, 30) : new Rect(12, 2, 31, 30), 10);
+                DrawHudIcon(new Rect(8, 4, 58, 56), 10);
                 DrawHudNumber(cutout ? CutoutHudCoins : HudCoins, sim.Coins.ToString());
                 DrawHudNumber(cutout ? CutoutHudTime : HudTime, FormatRemainingTime(sim.TimeRemaining));
                 Rect salesBounds = cutout ? CutoutHudSales : HudSales;
                 if (sim.LevelIndex == 1)
                 {
-                    float iconsX = salesBounds.x - 36;
-                    DrawProductIcon(new Rect(iconsX, 4, 17, 24), 0);
-                    DrawProductIcon(new Rect(iconsX + 18, 4, 17, 24), 4);
-                    string chori = Mathf.Min(sim.ChoriDelivered, sim.Goal) + "/" + sim.Goal;
-                    string coca = Mathf.Min(sim.CocaDelivered, sim.Goal) + "/" + sim.Goal;
-                    // The product icons immediately before this text identify each counter.
-                    DrawHudNumber(salesBounds, chori + "  " + coca);
+                    // Two larger, independently fitted rows keep both Chicago goals readable.
+                    DrawHudIcon(new Rect(338, 7, 31, 24), 0);
+                    DrawHudIcon(new Rect(338, 35, 31, 24), 4);
+                    DrawHudNumber(HudChoriSales, Mathf.Min(sim.ChoriDelivered, sim.Goal) + "/" + sim.Goal);
+                    DrawHudNumber(HudCocaSales, Mathf.Min(sim.CocaDelivered, sim.Goal) + "/" + sim.Goal);
                 }
                 else
                 {
-                    Item(cutout ? new Rect(310, 4, 31, 24) : new Rect(333, 4, 32, 24), sim.LevelIndex == 0 ? 0 : 18);
+                    DrawHudIcon(new Rect(338, 10, 43, 45), sim.LevelIndex == 0 ? 0 : 18);
                     DrawHudNumber(salesBounds, sim.Delivered + "/" + sim.Goal);
                 }
             }
             finally { GUI.matrix = previous; GUI.color = color; layoutVerticalScale = previousVertical; }
+        }
+        private void DrawHudIcon(Rect slot, int itemId)
+        {
+            Texture2D texture = itemId == 10 && gameCoin != null ? gameCoin
+                : itemId == 4 && cocaBottle != null ? cocaBottle : items;
+            if (texture == null) return;
+            Rect source = texture == items ? Items[itemId] : new Rect(0, 0, texture.width, texture.height);
+            Draw(HudIconBounds(slot, source.size), texture, source, true, false);
+        }
+        private static Rect HudIconBounds(Rect slot, Vector2 sourceSize)
+        {
+            float scale = Mathf.Min(slot.width / sourceSize.x, slot.height / sourceSize.y);
+            Vector2 size = sourceSize * scale;
+            return new Rect(slot.center - size * .5f, size);
         }
         private static string FormatRemainingTime(float remaining)
         {
@@ -765,7 +787,7 @@ namespace HayChoriYPaty
         private static Texture2D CreateHudBarTexture(bool cutout)
         {
             // Original code-authored artwork: no reference pixels or baked-in live numbers.
-            const int width = 1080, height = 68;
+            const int width = 1080, height = 136;
             var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
             {
                 name = "Original amber status bar with clock and green sales capsule",
@@ -774,24 +796,25 @@ namespace HayChoriYPaty
                 hideFlags = HideFlags.HideAndDontSave
             };
             var pixels = new Color[width * height];
-            var shadow = new Rect(0, 3, 540, 31);
-            var rim = new Rect(0, 0, 540, 31);
-            var face = new Rect(2, 1, 536, 28);
-            var coins = cutout ? new Rect(4, 2, 148, 27) : new Rect(10, 2, 186, 27);
-            var time = cutout ? new Rect(158, 2, 68, 27) : new Rect(202, 2, 124, 27);
-            var sales = cutout ? new Rect(306, 2, 234, 27) : new Rect(332, 2, 208, 27);
+            var shadow = new Rect(0, 6, 540, 62);
+            var rim = new Rect(0, 0, 540, 62);
+            var face = new Rect(2, 2, 536, 56);
+            var coins = new Rect(10, 4, 186, 54);
+            var time = new Rect(202, 4, 124, 54);
+            var sales = new Rect(332, 4, 208, 54);
             for (int y = 0; y < height; y++)
             for (int x = 0; x < width; x++)
             {
                 float px = (x + .5f) / 2f, py = (height - y - .5f) / 2f;
-                Color color = new Color(.20f, .08f, .015f, .45f * RoundedCoverage(px, py, shadow, 14));
-                color = Over(color, new Color(.29f, .12f, .045f), RoundedCoverage(px, py, rim, 14));
-                color = Over(color, Color.Lerp(new Color(1f, .84f, .39f), new Color(.83f, .38f, .08f), py / 30f), RoundedCoverage(px, py, face, 13));
+                Color color = new Color(.20f, .08f, .015f, .45f * RoundedCoverage(px, py, shadow, 22));
+                color = Over(color, new Color(.29f, .12f, .045f), RoundedCoverage(px, py, rim, 22));
+                color = Over(color, Color.Lerp(new Color(1f, .84f, .39f), new Color(.83f, .38f, .08f), py / 60f), RoundedCoverage(px, py, face, 20));
                 color = HudCapsule(color, px, py, coins, new Color(.96f, .66f, .20f), new Color(.62f, .27f, .07f));
                 color = HudCapsule(color, px, py, time, new Color(.26f, .73f, .79f), new Color(.04f, .35f, .46f));
                 color = HudCapsule(color, px, py, sales, new Color(.60f, .86f, .17f), new Color(.20f, .48f, .04f));
-                // Tiny original clock icon; no new Resources dependency.
-                float dx = px - (cutout ? 172f : 220f), dy = py - 15.5f;
+                // Original clock; on cutout phones its entire face sits below/beside the camera.
+                float clockScale = cutout ? 1f : 1.45f;
+                float dx = (px - 220f) / clockScale, dy = (py - (cutout ? 48f : 31f)) / clockScale;
                 float radius = new Vector2(dx, dy).magnitude;
                 color = Over(color, new Color(.26f, .13f, .04f), Mathf.Clamp01(10.5f - radius));
                 color = Over(color, new Color(1f, .89f, .55f), Mathf.Clamp01(9.3f - radius));
@@ -807,9 +830,9 @@ namespace HayChoriYPaty
         }
         private static Color HudCapsule(Color below, float x, float y, Rect bounds, Color top, Color bottom)
         {
-            Color color = Over(below, new Color(.35f, .17f, .05f), RoundedCoverage(x, y, bounds, 13));
+            Color color = Over(below, new Color(.35f, .17f, .05f), RoundedCoverage(x, y, bounds, 23));
             var inside = new Rect(bounds.x + 1.5f, bounds.y + 1.5f, bounds.width - 3, bounds.height - 3);
-            float coverage = RoundedCoverage(x, y, inside, 11.5f);
+            float coverage = RoundedCoverage(x, y, inside, 21.5f);
             float t = Mathf.Clamp01((y - inside.y) / inside.height);
             color = Over(color, Color.Lerp(top, bottom, t), coverage);
             return Over(color, Color.white, coverage * .28f * (1f - IntroEase(t / .5f)));
@@ -1093,26 +1116,69 @@ namespace HayChoriYPaty
             return t * t * (3f - 2f * t);
         }
 
+        private void DrawWaitingCrowd(StreetSimulation sim)
+        {
+            // The counter is already in the backdrop: clip only the crowd behind its top edge.
+            // Workers, products and sale effects stay on the player side and outside this group.
+            GUI.BeginGroup(new Rect(0, 0, W, CustomerCounterTopY()));
+            try
+            {
+                for (int row = 4; row >= 0; row--)
+                for (int i = 0; i < sim.Customers.Count; i++)
+                {
+                    StreetCustomer customer = sim.Customers[i];
+                    if (Mathf.Clamp(Mathf.RoundToInt((StreetSimulation.FrontQueueY - customer.Position.y)
+                        / StreetSimulation.QueueRowSpacing), 0, 4) != row) continue;
+                    DrawCustomer(customer);
+                }
+            }
+            finally { GUI.EndGroup(); }
+        }
+        private float CustomerCounterTopY()
+        {
+            Texture2D background = CurrentGameplayBackdrop();
+            Vector2 size = background != null ? new Vector2(background.width, background.height) : new Vector2(940, 1673);
+            int level = background == chicagoBackground && chicagoBackground != null ? 1 : 0;
+            return CounterSurfaceY(logicalCanvasHeight, size, level);
+        }
+        private static float CounterSurfaceY(float canvasHeight, Vector2 backdropSize, int levelIndex)
+        {
+            // Match ScaleAndCrop exactly, including the centered vertical crop on shorter displays.
+            float scale = Mathf.Max(W / backdropSize.x, canvasHeight / backdropSize.y);
+            float sourceY = levelIndex == 1 ? 642f : 548f;
+            return (canvasHeight - backdropSize.y * scale) * .5f + sourceY * scale;
+        }
+        private static float CustomerViewOffsetY(float counterTop, float verticalScale)
+        {
+            float originalFrontFeet = (StreetSimulation.FrontQueueY - 76f) * verticalScale + 76f;
+            return (counterTop + CustomerHiddenLegHeight - originalFrontFeet) / verticalScale;
+        }
+        private Vector2 CustomerViewPosition(Vector2 position)
+        {
+            position.y += CustomerViewOffsetY(CustomerCounterTopY(), layoutVerticalScale);
+            return position;
+        }
         private void DrawCustomer(StreetCustomer c)
         {
+            Vector2 position = CustomerViewPosition(c.Position);
             bool walking=c.State==StreetCustomerState.Entering||c.State==StreetCustomerState.Leaving||c.State==StreetCustomerState.Advancing;
             DrawCustomerBody(c, walking);
             if(c.State==StreetCustomerState.Entering||c.State==StreetCustomerState.Leaving)return;
             if (c.SecondaryProduct >= 0)
             {
-                Rect bubble = new Rect(c.Position.x - 35, c.Position.y - 151, 70, 82);
+                Rect bubble = new Rect(position.x - 35, position.y - 151, 70, 82);
                 Item(bubble, 11, true);
-                DrawOrderLine(c.Position.x, bubble.y + 5, c.Product, c.Remaining);
-                DrawOrderLine(c.Position.x, bubble.y + 42, c.SecondaryProduct, c.SecondaryRemaining);
+                DrawOrderLine(position.x, bubble.y + 5, c.Product, c.Remaining);
+                DrawOrderLine(position.x, bubble.y + 42, c.SecondaryProduct, c.SecondaryRemaining);
             }
             else
             {
-                Item(new Rect(c.Position.x-29,c.Position.y-132,58,65),11,true);
-                DrawProductIcon(new Rect(c.Position.x-19,c.Position.y-125,38,30), c.Product);
-                Label(new Rect(c.Position.x-29,c.Position.y-101,58,24),c.Remaining.ToString(),text);
+                Item(new Rect(position.x-29,position.y-132,58,65),11,true);
+                DrawProductIcon(new Rect(position.x-19,position.y-125,38,30), c.Product);
+                Label(new Rect(position.x-29,position.y-101,58,24),c.Remaining.ToString(),text);
             }
             // A sprite-backed patience strip; no placeholder shape stands in for game art.
-            GUI.color=new Color(.32f,.7f,.32f);Item(new Rect(c.Position.x-22,c.Position.y-64,44*c.PatienceFraction,4),13,true);GUI.color=Color.white;
+            GUI.color=new Color(.32f,.7f,.32f);Item(new Rect(position.x-22,position.y-64,44*c.PatienceFraction,4),13,true);GUI.color=Color.white;
         }
         private void DrawOrderLine(float centerX, float top, int product, int remaining)
         {
@@ -1121,9 +1187,10 @@ namespace HayChoriYPaty
         }
         private void DrawCustomerBody(StreetCustomer c, bool walking)
         {
+            Vector2 position = CustomerViewPosition(c.Position);
             float bob = walking ? Mathf.Sin(c.AnimationTime * 14) * 2 : 0f;
             if (c.State == StreetCustomerState.Receiving) bob -= 3;
-            Rect person = new Rect(c.Position.x - 39, c.Position.y - 76 + bob, 78, 76);
+            Rect person = new Rect(position.x - 39, position.y - 76 + bob, 78, 76);
             Matrix4x4 viewMatrix = GUI.matrix;
             if (!walking)
             {
@@ -1415,7 +1482,7 @@ namespace HayChoriYPaty
             upgradePrice.normal.textColor=new Color(.25f,.09f,.025f);
             riotCue = Style(28); riotCue.normal.textColor = new Color(.96f, .08f, .04f);
             riotCue.wordWrap = false;
-            hudNumber = Style(22);
+            hudNumber = Style(40);
             if (menuFont != null) { hudNumber.font = menuFont; hudNumber.fontStyle = FontStyle.Normal; }
             hudNumber.padding = new RectOffset(0, 0, 0, 0);
             hudNumber.wordWrap = false;

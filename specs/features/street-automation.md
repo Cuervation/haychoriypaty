@@ -481,3 +481,15 @@ This entry records the first overlay-based implementation, superseded by the int
 **All Boys wardrobe refresh (2026-10-05):** Added separate matching 3×3 full-body atlases for nine neutral monochrome outfits in front and walking poses. No clothing overlay is used; old sprites are fallback only. Chicago's separate clothing implementation was unchanged at that checkpoint and was refreshed below. See `specs/status.md` for Unity test results and the visually reviewed Game-view screenshot. No APK/device changes were part of the request.
 
 **Nueva Chicago outfit refresh (2026-10-05):** Replaced level-2 garment overlays with eight complete front and profile-walking sprite variants, plus matching fully integrated green/black timeout-riot poses. Selection remains deterministic by customer ID and apparel is appearance-only. Focused atlas/import/selection EditMode test passed 1/1. Reviewed the 1080×1920 Game-view capture at `Logs/Acceptance/ChicagoOutfits-20261005/chicago-eight-outfits-playing.png`; the clothing reads as part of each full character, including the walking pose. No APK/device changes were part of the request.
+
+## Crowd behind the counter and double-height HUD — source update (2026-10-05)
+
+Across all five locations, shift the rendered queue toward the actual counter edge and clip waiting/advancing supporters behind its top surface so the front row's legs cannot appear on or in front of the stand. Derive the edge from the active backdrop's ScaleAndCrop geometry (open-street y548, Chicago y642); keep simulation queue anchors, FIFO, worker paths, sales, costs and balance unchanged. Bodies and order/patience indicators share the same view-only offset. The initial timeout reaction keeps these positions/occlusion; full riot poses can emerge once the stand has broken, with the impact cloud following the queue.
+
+The top amber HUD remains full-screen-width and physical-top anchored, but grows from 34 to 68 logical pixels high. Increase coin/product/clock artwork and preferred number lettering, then fit each live value to its own slot. On camera-cutout phones, put the countdown below the upper camera channel instead of squeezing it into the former narrow slot. Nueva Chicago's chori/Coca counters use two separate, icon-labelled rows inside the green capsule.
+
+- [x] Source shares counter-aware crowd position/clipping across all levels and the initial timeout transition without changing simulation geometry.
+- [x] Source doubles HUD height and updates cached texture, live text/icon slots, cutout countdown and paired Chicago counters.
+- [ ] Focused Unity art/layout checks and actual portrait Game-view/device review remain pending; user has not authorized tests for this change.
+
+**Validation:** Static source/spec review and git diff --check only. No Unity/editor/player tests, APK or device actions.
