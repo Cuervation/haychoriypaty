@@ -29,6 +29,9 @@
 
 - 2026-10-04: Replace miniature hot-food BBQs with one broad original iron parrilla (494x108 for1–4 unlocked foods;280x90 when drinks need the right side). Keep simulation pickup anchors and all seven products; only unlocked markers are drawn. Original grill remains missing-resource fallback. Build APK only, no phone/emulator control.
 | 2026-10-04 | Apply wardrobe PNGs as deterministic per-customer overlays only in Floresta instead of repainting the shared fan atlas. | Retains every existing fan pose and keeps later levels unchanged while using the new apparel options.
+| 2026-10-05 | Restrict active All Boys fanwear to nine white/black/neutral wardrobe variants; exclude blue, pink and bright goalkeeper outfits from the crowd rotation. | The previous mix looked unlike the club's supporters; retain the original poses, art assets and later-level appearance while reinforcing All Boys' monochrome identity.
+| 2026-10-05 | Render Floresta supporters with their original pose-matched black/white All Boys fan sprites; archive universal standalone shirt overlays until they can fit each pose. | A single fixed torso sticker visibly conflicted with sleeves/arms and side-walking poses; the source atlas already has consistent complete team clothing for every active pose. |
+| 2026-10-05 | Keep Level-1 All Boys uniforms integrated into the complete supporter sprites; never layer standalone garment stickers at runtime. | The screenshot showed the added casual garments did not read as naturally worn club apparel; the existing full-body fan poses already contain coherent black-and-white team clothing. |
 | 2026-10-04 | Keep the supplied cover/logo intro in StreetView with unscaled timing and a central action guard; no new scene/controller/package. | Reuse the 2D renderer and both existing platform input owners, avoid an Android tap starting the round behind the cover, and preserve gameplay. |
 
 | 2026-10-04 | Replace auto-dismiss intro with≥4s fully visible cover +≥4s fully visible logo, then persistent Jugar/Salir; author glossy blue button texture and bundle Apache 2.0 Luckiest Guy. | User explicitly requested NEXT-blue styling and direct Play/Quit. Keep StreetView/unscaled timing/shared input guards; no new scene, package or game rules. No tests/APK until later combined validation. |
@@ -47,3 +50,50 @@
 
 
 - 2026-10-04 combined delivery: latest explicit user request supersedes earlier deferred tests/builds. Validate only affected Street logic/art/input with updated fixtures; retain historical evidence as historical. Version new APK0.2.5/code7 and archive it; use same debug certificate and`install -r` to preserve phone data. No device install/exit success claimed while Motorola is disconnected.
+
+- 2026-10-04 full-screen intro: decouple edge-to-edge decorative backdrop from the540×960 safe-area interactive canvas; exact existing Parrillero portrait is a foreground layer, avoiding AI likeness drift. Replace only the backdrop with a versioned no-hero scene; gameplay transform/input/timing/logo unchanged.
+
+
+## 2026-10-04 — Exact progressive purchase tables
+Use explicit serialized cost arrays shared across locations, not fixed prices or a growth formula. Array rows bound purchasable speed/staff tiers; capped cards display MAX, never a free extra purchase. Update Main and defaults/fallbacks together, clamp old purchases in the simulation constructor without changing save version2, and retain attempt-local coins and first-level baseline reset.
+
+
+- 2026-10-04 unified HUD: original cached procedural amber frame/colored capsules plus existing coin/product art and bundled Luckiest Guy, rather than a generated bitmap with baked values. Keep all three statuses in logicaly2–36 above rear bubbles, derive m:ss solely from simulation and release runtime texture on disable; lower timer removed. Gameplay/input and pending upgrade-card selection unchanged.
+
+
+- 2026-10-04 real mural: latest user explicitly requests recognizable real street/corner motifs rather than the earlier generic fan reinterpretation. Preserve photos as appearance references (no watermark/photo paste). Because two generated full plates shifted lower gameplay bands, consume only new wall crop as a separate native layer over exact v4 base; retain all lower geometry and existing assets.
+
+
+- 2026-10-04 location badge: reuse licensed bundled Luckiest Guy instead of installing a font, and retain original club-hosted crest PNG byte-for-byte instead of AI logo recreation. Center icon+caption as decorative footer only for Floresta; auto-fit other location names without All Boys mark. Record third-party source, no licensing/endorsement assumption.
+
+
+## 2026-10-04 — Isolate batch pointer focus in test fixture
+When no editor/MCP is running, use installed6000.6.3f1 sequential batch checks. Queued pointer fixture temporarily setsIgnoreFocus andAllDeviceInputAlwaysGoesToGameView, preserving/restoring enum values on existingInputSettings. Do not clone/replace transient settings: InputManager destroys the previousHideAndDontSaveobject. Runtime native/editor ownership unchanged; final15/15PlayModepassed.
+
+
+## 2026-10-04 — Fill gameplay portrait by extending logical height
+User superseded gameplay letterboxing with full-height screen fill. Preserve uniform screen scale (avoid oval buttons/portraits) and all touch areas: make logical portrait height aspect-responsive, remap only vertical anchors for drawing and invert the same mapping for pointer input, with ScaleAndCrop on scenery rather than UI. No scene/simulation/input ownership or asset change.
+
+
+## 2026-10-04 — Route choripán pickups to loaded trestle table
+Place a slightly used, fully loaded wooden caballete table in the lower-left foreground beside the shared grill. Route product-zero workers to its right edge, but retain pickup anchors for other products; draw the table behind live station labels/workers and avoid a duplicate floating chori badge. This adds a visible supply surface without changing recipes, unit delivery, or income.
+| 2026-10-04 | Discount only Floresta's upgrade costs to make the 200-sale first level playable; retain later-level prices and +10% speed tiers. | The current progression spent income on speed but reached only 82/200; the tuned earned-income playthrough reached 200/200 in 98.9 seconds. |
+
+- 2026-10-04: Gameplay gray strip was safe-area-only rendering, not disabled Android fullscreen (settings already enable immersive/outside-safe-area). Bleed scenery across physical display and anchor read-only HUD separately, keeping safe control transforms. Floresta table-left/grill-right uses one explicit clear waypoint in both directions, preserving physical pickup/handoff gating instead of masking actors or minting sales on a timer. Later product stations/economy unchanged; no tests/APK requested.
+
+## Render the timeout riot as an unscaled queue animation — 2026-10-05
+
+Keep the loss sequence in existing `StreetView`/IMGUI rather than adding an Animator, scene or package. Reuse the frozen simulation queue/slots, transition each fan into a two-pose angry atlas, and fade a people-free broken-stall environment behind them. This preserves the exact affected customers and keeps replay/results independent of the stopped simulation.
+## 2026-10-05 — Reduce the Floresta timer to two minutes
+
+Set Level 1 to 120 seconds at the user's request. Keep the 200-handoff early win, deadline-loss behavior and all later-level durations unchanged.
+## 2026-10-05 — Set the Nueva Chicago timer to three minutes
+
+Set Level 2 to 180 seconds at the user's request. Keep Floresta at 120 seconds and Levels 3–5 at their existing durations.
+
+| 2026-10-05 | Keep each club’s supporter outfit consistent across normal and failure states by using the same deterministic customer-ID variant in complete-body crowd and riot atlases; apply to every future team. | Fans should remain recognizably dressed as their team when play transitions into a trifulca; separate riot art must not silently change their wardrobe. |
+
+
+## Mask the timeout-to-riot cut with a short comic impact cloud — 2026-10-05
+
+Keep the existing live `StreetView` riot sequence, but reveal it through one large transparent smoke-and-impact overlay. Animate its fast expansion and fade on unscaled time over the actual frozen queue; do not add combat logic, a new scene, packages or a persistent obstruction of HUD/results.

@@ -540,12 +540,12 @@ MonoBehaviour:
     maxCustomers: 21
     randomSeed: 1337
     priceSensitivity: 2.5
-    maxStaff: 8
-    baseHireCost: 15
-    baseSpeedCost: 5
-    florestaHireCost: 200
-    florestaSpeedCost: 25
-    florestaSpeedIncrease: 0.1
+    maxStaff: 5
+    hireCosts: c8000000f4010000b0040000f00a0000i
+    speedUpgradeCosts: 19000000280000004100000064000000a0000000fa0000009001000080020000e8030000i
+    florestaHireCosts: 0f0000001e0000003c00000064000000i
+    florestaSpeedUpgradeCosts: 050000000a0000000f000000140000001e0000002d000000410000005a0000007d000000i
+    speedIncrease: 0.1
     customerArrivalSeconds: 0.16
     workerSpeed: 300
     customerSpeed: 300
@@ -571,11 +571,11 @@ MonoBehaviour:
     maxOrderQuantity: 999
     initialPrice: 5
     deliveryPatienceRefreshSeconds: 180
-    levelProductCounts: 0100000003000000050000000600000007000000i
-    levelGoals: e80300002800000041000000550000006e000000i
+    levelProductCounts: 0100000002000000050000000600000007000000i
+    levelGoals: c8000000c800000041000000550000006e000000i
     levelDurations:
+    - 120
     - 180
-    - 210
     - 240
     - 270
     - 300

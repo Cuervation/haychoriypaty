@@ -24,12 +24,20 @@ namespace HayChoriYPaty.Tests
         private string previousSavedProgress;
         private float previousTimeScale;
         private bool previousBackground;
+        private InputSettings.BackgroundBehavior previousInputBackground;
+        private InputSettings.EditorInputBehaviorInPlayMode previousEditorInput;
 
         [UnitySetUp]
         public IEnumerator SetUp()
         {
             previousTimeScale = Time.timeScale;
             previousBackground = Application.runInBackground;
+            // Synthetic events must not depend on editor/Game-view focus.
+            // Do not replace InputSettings: InputManager destroys temporary defaults.
+            previousInputBackground = InputSystem.settings.backgroundBehavior;
+            previousEditorInput = InputSystem.settings.editorInputBehaviorInPlayMode;
+            InputSystem.settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
+            InputSystem.settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
             Time.timeScale = 1f;
             Application.runInBackground = true;
             gameType = Type.GetType("HayChoriYPaty.StreetGame, Assembly-CSharp", true);
@@ -53,6 +61,8 @@ namespace HayChoriYPaty.Tests
         {
             if (root != null) UnityEngine.Object.Destroy(root);
             if (mouse != null && mouse.added) InputSystem.RemoveDevice(mouse);
+            InputSystem.settings.backgroundBehavior = previousInputBackground;
+            InputSystem.settings.editorInputBehaviorInPlayMode = previousEditorInput;
             string key = (string)gameType.GetField("ProgressKey", BindingFlags.Public | BindingFlags.Static).GetValue(null);
             if (hadSavedProgress) PlayerPrefs.SetString(key, previousSavedProgress);
             else PlayerPrefs.DeleteKey(key);
@@ -79,6 +89,7 @@ namespace HayChoriYPaty.Tests
         private object Get(string name) { return gameType.GetProperty(name, PublicInstance).GetValue(game, null); }
         private string Phase { get { return Get("Sim").GetType().GetProperty("Phase", PublicInstance).GetValue(Get("Sim"), null).ToString(); } }
         private object Sim { get { return Get("Sim"); } }
+        private void SetSim(string property, object value) { Sim.GetType().GetProperty(property, PublicInstance).SetValue(Sim, value, null); }
         private void Invoke(object target, string method, params object[] args) { target.GetType().GetMethod(method, PublicInstance).Invoke(target, args); }
         private void Tune(string field, object value) { Get("Balance").GetType().GetField(field, PublicInstance).SetValue(Get("Balance"), value); }
 
@@ -88,7 +99,9 @@ namespace HayChoriYPaty.Tests
             Rect viewport = (Rect)viewType.GetMethod("CanvasViewport", StaticPrivate)
                 .Invoke(null, new object[] { new Vector2(Screen.width, Screen.height), Screen.safeArea });
             float scale = viewport.width / 540f;
-            return new Vector2(viewport.x + x * scale, Screen.height - (viewport.y + y * scale));
+            float logicalHeight = (float)viewType.GetMethod("CanvasLogicalHeight", StaticPrivate).Invoke(null, new object[] { viewport });
+            float verticalScale = logicalHeight / 960f;
+            return new Vector2(viewport.x + x * scale, Screen.height - (viewport.y + y * verticalScale * scale));
         }
 
         private IEnumerator Click(float x, float y)
@@ -109,6 +122,17 @@ namespace HayChoriYPaty.Tests
             yield return null; yield return null;
             InputSystem.QueueStateEvent(mouse, new MouseState { position = to });
             yield return null; yield return null;
+        }
+
+        [Test]
+        public void IntroUsesSelectedIntegratedCoverWithoutDuplicateParrillero()
+        {
+            Type type = view.GetType();
+            Assert.AreSame(Resources.Load<Texture2D>("street-parrillero-icon"), type.GetField("parrilleroIcon", PrivateInstance).GetValue(view),
+                "The original game/hire portrait remains unchanged");
+            Assert.AreSame(Resources.Load<Texture2D>("street-cover-user-v5"), type.GetField("coverArt", PrivateInstance).GetValue(view));
+            Assert.AreSame(Resources.Load<Texture2D>("street-logo"), type.GetField("titleLogo", PrivateInstance).GetValue(view));
+            Assert.IsNull(type.GetField("coverParrillero", PrivateInstance), "The integrated scene must not add the old cutout");
         }
 
         [UnityTest]
@@ -163,7 +187,7 @@ namespace HayChoriYPaty.Tests
             yield return Click(154, 288);
             yield return DragPrice(89, 451);
             MethodInfo price = Sim.GetType().GetMethod("GetProductPrice", PublicInstance);
-            Assert.AreEqual(60f, price.Invoke(Sim, new object[] { 1 }));
+            Assert.AreEqual(60f, price.Invoke(Sim, new object[] { 4 }), "The second Chicago tab prices the bottled Coca in catalog slot 5");
             Assert.AreEqual(5f, price.Invoke(Sim, new object[] { 0 }));
             Type viewType = Type.GetType("HayChoriYPaty.StreetView, Assembly-CSharp", true);
             Rect tab = (Rect)viewType.GetMethod("ProductButton", StaticPrivate).Invoke(null, new object[] { 1 });
@@ -176,14 +200,16 @@ namespace HayChoriYPaty.Tests
             yield return Click(270, 585);
             Assert.AreEqual("Playing", Phase);
             ((Behaviour)game).enabled = false; // The view still receives input; the round clock stays fixed.
+            Assert.AreEqual(0, Sim.GetType().GetProperty("Coins").GetValue(Sim, null));
+            SetSim("Coins", 500); // Simulated income for the purchase-only fixture, not a starting balance.
 
-            yield return Click(369, 769);
+            yield return Click(395, 770);
             Assert.AreEqual(2, Get("Sim").GetType().GetProperty("StaffCount", PublicInstance).GetValue(Sim, null));
-            Assert.AreEqual(300, Get("Sim").GetType().GetProperty("Coins", PublicInstance).GetValue(Sim, null));
+            Assert.AreEqual(485, Get("Sim").GetType().GetProperty("Coins", PublicInstance).GetValue(Sim, null));
 
-            yield return Click(171, 769);
+            yield return Click(145, 770);
             Assert.AreEqual(1, Get("Sim").GetType().GetProperty("SpeedLevel", PublicInstance).GetValue(Sim, null));
-            Assert.AreEqual(275, Get("Sim").GetType().GetProperty("Coins", PublicInstance).GetValue(Sim, null));
+            Assert.AreEqual(480, Get("Sim").GetType().GetProperty("Coins", PublicInstance).GetValue(Sim, null));
         }
 
         private IEnumerator Tap(Touchscreen screen, float x, float y, int id)
@@ -206,22 +232,74 @@ namespace HayChoriYPaty.Tests
                 yield return Tap(screen, 270, 585, 1);
                 Assert.AreEqual("Playing", Phase);
                 ((Behaviour)game).enabled = false;
-                yield return Tap(screen, 369, 769, 2);
+                Assert.AreEqual(0, Sim.GetType().GetProperty("Coins").GetValue(Sim, null));
+                SetSim("Coins", 500);
+                yield return Tap(screen, 395, 770, 2);
                 Assert.AreEqual(2, Get("Sim").GetType().GetProperty("StaffCount", PublicInstance).GetValue(Sim, null));
-                Assert.AreEqual(300, Get("Sim").GetType().GetProperty("Coins", PublicInstance).GetValue(Sim, null));
+                Assert.AreEqual(485, Get("Sim").GetType().GetProperty("Coins", PublicInstance).GetValue(Sim, null));
             }
             finally { InputSystem.RemoveDevice(screen); }
         }
 
         [UnityTest]
-        public IEnumerator ReplayReturnsToReadyWithoutStartingAutomatically()
+        public IEnumerator UpgradeCardsUpdateNextCostsAndStopAtMaximum()
+        {
+            yield return Click(270, 585);
+            ((Behaviour)game).enabled = false; SetSim("Coins", 10000);
+            int[] hires = { 15, 30, 60, 100 };
+            int[] speeds = { 5, 10, 15, 20, 30, 45, 65, 90, 125 };
+            int remaining = 10000;
+            for (int i = 0; i < hires.Length; i++)
+            {
+                Assert.AreEqual(hires[i], Sim.GetType().GetProperty("HireCost").GetValue(Sim, null));
+                yield return Click(395, 770); remaining -= hires[i];
+                Assert.AreEqual(i + 2, Sim.GetType().GetProperty("StaffCount").GetValue(Sim, null));
+                Assert.AreEqual(remaining, Sim.GetType().GetProperty("Coins").GetValue(Sim, null));
+            }
+            for (int i = 0; i < speeds.Length; i++)
+            {
+                Assert.AreEqual(speeds[i], Sim.GetType().GetProperty("SpeedCost").GetValue(Sim, null));
+                yield return Click(145, 770); remaining -= speeds[i];
+                Assert.AreEqual(i + 1, Sim.GetType().GetProperty("SpeedLevel").GetValue(Sim, null));
+                Assert.AreEqual(remaining, Sim.GetType().GetProperty("Coins").GetValue(Sim, null));
+            }
+            Assert.AreEqual(0, Sim.GetType().GetProperty("HireCost").GetValue(Sim, null));
+            Assert.AreEqual(0, Sim.GetType().GetProperty("SpeedCost").GetValue(Sim, null));
+            yield return Click(395, 770); yield return Click(145, 770);
+            Assert.AreEqual(5, Sim.GetType().GetProperty("StaffCount").GetValue(Sim, null));
+            Assert.AreEqual(9, Sim.GetType().GetProperty("SpeedLevel").GetValue(Sim, null));
+            Assert.AreEqual(9390, Sim.GetType().GetProperty("Coins").GetValue(Sim, null));
+        }
+
+        [UnityTest]
+        public IEnumerator ReplayReturnsToReadyWithoutStartingAutomaticallyAndDiscardsCoins()
         {
             Tune("levelDurations", new[] { 0.05f, 210f, 240f, 270f, 300f });
             yield return Click(270, 585);
             yield return new WaitForSeconds(0.12f);
             Assert.AreEqual("Lost", Phase);
-            yield return Click(270, 564);
+            Type viewType = view.GetType();
+            Texture2D riot = Resources.Load<Texture2D>("street-riot-environment-v1");
+            Assert.NotNull(riot, "The staged timeout sequence requires a broken-stall environment plate");
+            Assert.AreSame(riot, viewType.GetField("riotBackdrop", PrivateInstance).GetValue(view));
+            Texture2D riotFans = Resources.Load<Texture2D>("street-riot-fans-v1");
+            Assert.NotNull(riotFans, "The timeout sequence requires live angry-fan animation frames");
+            Assert.AreEqual(1774, riotFans.width); Assert.AreEqual(887, riotFans.height);
+            Assert.AreSame(riotFans, viewType.GetField("riotFanAtlas", PrivateInstance).GetValue(view));
+            MethodInfo poseIndex = viewType.GetMethod("RiotFanPoseIndex", StaticPrivate);
+            int raisedPose = (int)poseIndex.Invoke(null, new object[] { .02f, 0 });
+            int swingingPose = (int)poseIndex.Invoke(null, new object[] { .19f, 0 });
+            Assert.AreNotEqual(raisedPose, swingingPose, "Waiting fans must alternate real raised-stick and swing poses");
+            Assert.IsTrue((bool)viewType.GetField("riotScreenActive", PrivateInstance).GetValue(view),
+                "The riot scene must be active in the actual StreetView loss screen");
+            MethodInfo debris = viewType.GetMethod("RiotDebrisPosition", StaticPrivate);
+            Vector2 first = (Vector2)debris.Invoke(null, new object[] { .22f, 3 });
+            Vector2 second = (Vector2)debris.Invoke(null, new object[] { .37f, 3 });
+            Assert.Greater(Vector2.Distance(first, second), 1f, "Unscaled riot debris should move while the round is Lost");
+            SetSim("Coins", 321);
+            yield return Click(270, 891);
             Assert.AreEqual("Ready", Phase);
+            Assert.AreEqual(0, Sim.GetType().GetProperty("Coins").GetValue(Sim, null));
         }
 
 
@@ -245,7 +323,7 @@ namespace HayChoriYPaty.Tests
             PlayerPrefs.SetString(key, "{\"version\":2,\"unlockedLevel\":1,\"price\":60,\"prices\":[60,17,9,11,3,6,5],\"coins\":123,\"staff\":3,\"speed\":4}");
             ((Behaviour)game).enabled = true; yield return null;
             Assert.AreEqual(5f, Sim.GetType().GetProperty("Price").GetValue(Sim, null));
-            Assert.AreEqual(123, Sim.GetType().GetProperty("Coins").GetValue(Sim, null));
+            Assert.AreEqual(0, Sim.GetType().GetProperty("Coins").GetValue(Sim, null));
             Assert.AreEqual(1, Sim.GetType().GetProperty("StaffCount").GetValue(Sim, null));
             Assert.AreEqual(0, Sim.GetType().GetProperty("SpeedLevel").GetValue(Sim, null));
             Assert.That((float)Sim.GetType().GetProperty("WorkRate").GetValue(Sim, null), Is.EqualTo(1f).Within(.0001f));
@@ -254,6 +332,43 @@ namespace HayChoriYPaty.Tests
             Assert.IsTrue((bool)Sim.GetType().GetProperty("CanEditPrices").GetValue(Sim, null));
         }
 
+
+        [UnityTest]
+        public IEnumerator LaterLevelTransitionsAndReloadDiscardCoinsButPreserveProgress()
+        {
+            ((Behaviour)game).enabled = false; // Keep lifecycle commands deterministic without automatic steps.
+            Invoke(game, "SelectLevel", 1);
+            Invoke(game, "SetProductPrice", 1, 17f);
+            Invoke(game, "StartRound");
+            Assert.AreEqual(0, Sim.GetType().GetProperty("Coins").GetValue(Sim, null));
+            SetSim("Coins", 500);
+            Invoke(game, "StartRound"); // Duplicate Start during play must not erase current income.
+            Assert.AreEqual(500, Sim.GetType().GetProperty("Coins").GetValue(Sim, null));
+            Invoke(game, "TryHire"); Invoke(game, "TryUpgradeSpeed");
+            Assert.Greater((int)Sim.GetType().GetProperty("Coins").GetValue(Sim, null), 0);
+
+            SetSim("Phase", Enum.Parse(Sim.GetType().GetProperty("Phase").PropertyType, "Won"));
+            Invoke(game, "NextLevel");
+            Assert.AreEqual("Ready", Phase);
+            Assert.AreEqual(2, Get("SelectedLevel")); Assert.AreEqual(2, Get("UnlockedLevel"));
+            Assert.AreEqual(0, Sim.GetType().GetProperty("Coins").GetValue(Sim, null));
+
+            Invoke(game, "StartRound"); SetSim("Coins", 234);
+            SetSim("Phase", Enum.Parse(Sim.GetType().GetProperty("Phase").PropertyType, "Lost"));
+            Invoke(game, "Retry");
+            Assert.AreEqual("Ready", Phase);
+            Assert.AreEqual(0, Sim.GetType().GetProperty("Coins").GetValue(Sim, null));
+
+            // An older/nonzero serialized round balance must not return on application reload.
+            SetSim("Coins", 789);
+            gameType.GetMethod("Save", PrivateInstance).Invoke(game, null);
+            ((Behaviour)game).enabled = true; yield return null;
+            Assert.AreEqual(0, Sim.GetType().GetProperty("Coins").GetValue(Sim, null));
+            Assert.AreEqual(2, Get("UnlockedLevel"));
+            Assert.AreEqual(2, Sim.GetType().GetProperty("StaffCount").GetValue(Sim, null));
+            Assert.AreEqual(1, Sim.GetType().GetProperty("SpeedLevel").GetValue(Sim, null));
+            Assert.AreEqual(17f, Sim.GetType().GetMethod("GetProductPrice").Invoke(Sim, new object[] { 1 }));
+        }
 
         private Rect Viewport(Vector2 size, Rect safe)
         {
@@ -270,12 +385,39 @@ namespace HayChoriYPaty.Tests
         [TestCase(1080, 1920, 0, 0, 1080, 1920)]
         [TestCase(1080, 2400, 0, 80, 1080, 2220)]
         [TestCase(2400, 1080, 80, 0, 2240, 1080)]
-        public void SafeViewportKeepsPortraitDesignInsideSafeArea(float width, float height, float x, float y, float safeWidth, float safeHeight)
+        public void SafeViewportFillsAvailableDisplayWithoutLetterbox(float width, float height, float x, float y, float safeWidth, float safeHeight)
         {
             Rect viewport = Viewport(new Vector2(width, height), new Rect(x, y, safeWidth, safeHeight));
-            Assert.That(viewport.width / viewport.height, Is.EqualTo(540f / 960f).Within(0.0001f));
-            Assert.That(viewport.xMin, Is.GreaterThanOrEqualTo(x));
-            Assert.That(viewport.xMax, Is.LessThanOrEqualTo(x + safeWidth));
+            Assert.AreEqual(new Rect(x, height - y - safeHeight, safeWidth, safeHeight), viewport);
+        }
+
+        [Test]
+        public void TallPortraitAddsVisibleVerticalPlayAreaWithoutChangingUniformSpriteScale()
+        {
+            Rect viewport = Viewport(new Vector2(1220, 2712), new Rect(0, 0, 1220, 2712));
+            Type viewType = Type.GetType("HayChoriYPaty.StreetView, Assembly-CSharp", true);
+            float logicalHeight = (float)viewType.GetMethod("CanvasLogicalHeight", StaticPrivate).Invoke(null, new object[] { viewport });
+            Assert.That(logicalHeight, Is.EqualTo(1200.3934f).Within(0.1f));
+            Assert.That(logicalHeight, Is.GreaterThan(960f));
+            Assert.That(viewport.width / 540f, Is.EqualTo(viewport.height / logicalHeight).Within(0.0001f));
+        }
+
+        [Test]
+        public void FullScreenPointerTransformStillHitsResponsiveUpgradeButton()
+        {
+            Vector2 screenSize = new Vector2(1220, 2712);
+            Rect safe = new Rect(0, 0, screenSize.x, screenSize.y);
+            Rect viewport = Viewport(screenSize, safe);
+            Type viewType = Type.GetType("HayChoriYPaty.StreetView, Assembly-CSharp", true);
+            const float designX = 145f, designY = 770f; // Center of the Parrilla Criolla speed card.
+            float logicalHeight = (float)viewType.GetMethod("CanvasLogicalHeight", StaticPrivate).Invoke(null, new object[] { viewport });
+            float scale = viewport.width / 540f;
+            Vector2 pixel = new Vector2(viewport.x + designX * scale,
+                screenSize.y - (viewport.y + designY * logicalHeight / 960f * scale));
+            Vector2 layout = (Vector2)viewType.GetMethod("ScreenToLayoutPoint", StaticPrivate)
+                .Invoke(null, new object[] { pixel, screenSize, viewport });
+            Assert.That(layout.x, Is.EqualTo(designX).Within(.001f));
+            Assert.That(layout.y, Is.EqualTo(designY).Within(.001f));
         }
     }
 }

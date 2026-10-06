@@ -81,7 +81,7 @@ namespace HayChoriYPaty
 
         private StreetSimulation NewReadySimulation(int level)
         {
-            var next = new StreetSimulation(balance, level, sim.Price, sim.Coins, sim.StaffCount, sim.SpeedLevel);
+            var next = new StreetSimulation(balance, level, sim.Price, 0, sim.StaffCount, sim.SpeedLevel);
             for(int i=0;i<7;i++)next.SetProductPrice(i,sim.GetProductPrice(i));return next;
         }
 
@@ -95,7 +95,7 @@ namespace HayChoriYPaty
                 if (data == null || data.version != 2) return DefaultSave();
                 data.unlockedLevel = Mathf.Clamp(data.unlockedLevel, 0, 4);
                 data.price = Mathf.Clamp(data.price, balance.minPrice, balance.maxPrice);
-                data.coins = Mathf.Max(0, data.coins);
+                data.coins = 0; // Legacy balances are not transferable to a newly loaded attempt.
                 data.staff = Mathf.Clamp(data.staff, 1, balance.maxStaff);
                 data.speed = Mathf.Max(0, data.speed);
                 return data;

@@ -17,12 +17,19 @@ namespace HayChoriYPaty.Tests
         private Mouse mouse;
         private float previousTimeScale;
         private bool previousBackground;
+        private InputSettings.BackgroundBehavior previousInputBackground;
+        private InputSettings.EditorInputBehaviorInPlayMode previousEditorInput;
 
         [UnitySetUp]
         public IEnumerator SetUp()
         {
             previousTimeScale = Time.timeScale;
             previousBackground = Application.runInBackground;
+            previousInputBackground = InputSystem.settings.backgroundBehavior;
+            previousEditorInput = InputSystem.settings.editorInputBehaviorInPlayMode;
+            InputSystem.settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
+            InputSystem.settings.editorInputBehaviorInPlayMode =
+                InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
             Time.timeScale = 1f; Application.runInBackground = true;
             mouse = InputSystem.AddDevice<Mouse>();
             root = new GameObject("Floresta pointer test (temporary)");
@@ -40,6 +47,8 @@ namespace HayChoriYPaty.Tests
             UnityEngine.Object.Destroy(root);
             InputSystem.RemoveDevice(mouse);
             Time.timeScale = previousTimeScale; Application.runInBackground = previousBackground;
+            InputSystem.settings.backgroundBehavior = previousInputBackground;
+            InputSystem.settings.editorInputBehaviorInPlayMode = previousEditorInput;
             yield return null;
         }
 

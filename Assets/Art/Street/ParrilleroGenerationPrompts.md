@@ -39,3 +39,79 @@ Use case: precise-object-edit / identity-preserve. This EXACT attached illustrat
 
 ### selected_final_poses
 Use case: identity-preserve / precise-object-edit. Asset: original16-pose transparent sprite atlas for Hay Chori y Paty. Image1 is FINAL user-selected parrillero face/design: reproduce this same recognizable illustrated man across every front/profile character. Image2 is existing4x4 game sheet: preserve its exact16poses/order, very fat shirtless body, dirty WHITE apron, trousers/shoes, original grill tattoo,2D bold dark contours and full-body cartoon proportions. Change ALL heads/face identity to image1: thick wavy/tousled dark hair instead of buzzcut, lightly stubbled face not full beard, notably fat rounded cheeks/jaw and doublechin, slightly narrow expressive brown eyes with same distinctive eyebrows/prominent rounded nose and broad toothy grin. Do NOT revert to huge round baby eyes or generic bearded cook. Use image1's drawn CARTOON/cel shaded face, NEVER a photographic or realistic face. SAME warm peach-orange skin base/cel-shading palette on face/ears/neck/arms/chest/back, no different color for face. Rear heads must show matching wavy dark hair and thick neck, profiles show full cheek/doublechin/same nose. Keep silhouette big head, short legs, heavy belly. EXACTLY16 individual full bodies in4columns x4rows separated by GENEROUS TRANSPARENT gutters/no touching figures/unclipped extremities; each figure <=80percent cell width/height, consistent foot baseline and scale. Row1 front idle, frontwalkA, frontwalkB OPPOSED STRIDE, front handoff hands forward; Row2 back idle, backwalkA, backwalkB OPPOSED STRIDE, left-profile pickup reach; Row3 left-profile idle, leftprofilewalkA, leftprofilewalkB OPPOSED STRIDE, leftprofile low pickup; Row4 front carry empty hands supporting item, back carry, front celebrate arms up, front tired. Hands EMPTY; food rendered separately. No labels, grid lines, floor/scene, food/tool, hats/bandana/shirt/redapron, extra characters, photorealism/3D. Preserve genuine transparent alpha.
+
+## diagonal_walk_cycle — 2026-10-04
+
+**Asset:** `Assets/Art/Street/Resources/street-parrillero-diagonal-v1.png`, original transparent RGBA 1536×1024 4×2 sheet; SHA-256 `40c0ff3710b78653bc13d5ea224ae53e3d34881ef116fce6b6c5b20e71b28a52`. Generated with built-in image_gen, using `street-parrillero.png` as the exact character/style reference. New `.meta` GUID; source and previous 16-pose atlas remain unchanged. Each two-frame direction pair is individually alpha-bounded in `StreetView.ParrilleroDiagonalPoses`.
+
+### Exact generation prompt
+
+Use case: stylized-concept
+Asset type: original transparent 2D Unity game sprite sheet, diagonal walking cycle for the exact Parrillero character in the reference image
+Input images: Image 1 is the exact character/style reference; preserve his identity, face, curly dark hair, heavy build, bare torso, white stained apron, arm tattoo, dark pants, shoes, outline and palette.
+Primary request: create an accurately aligned, clean 4 columns × 2 rows sprite atlas containing eight distinct full-body diagonal-walking sprites. Every cell shows the same Parrillero taking a readable diagonal step, with visible alternating legs/feet; pair A/B must be opposite gait phases, not duplicate poses.
+Composition/framing: transparent background, orthographic 2D game-art sprite sheet; exact evenly divided 4×2 grid with clean transparent gutters, one character centered in each cell, consistent body size, foot baseline and lighting. No borders or grid lines.
+Cell order left-to-right, top row then bottom row:
+1. 3/4 front view walking diagonally toward screen-left/down (stride A, left leg forward);
+2. same direction (stride B, opposite legs);
+3. 3/4 front view walking diagonally toward screen-right/down (stride A);
+4. same direction (stride B, opposite legs);
+5. 3/4 rear view walking diagonally toward screen-left/up (stride A);
+6. same direction (stride B, opposite legs);
+7. 3/4 rear view walking diagonally toward screen-right/up (stride A);
+8. same direction (stride B, opposite legs).
+Style: match the reference's polished colorful hand-drawn 2D game sprite, bold clean outlines and expressive consistent face; preserve character anatomy and outfit, not a new interpretation.
+Constraints: entire shoes/feet and body visible in each cell; clear separated legs and readable different foot positions between paired frames; no props, food, apron redesign, extra people, shadows on floor, text, labels, logos, background, watermark, perspective camera or checkerboard. True alpha transparency.
+
+
+## Full-body cover Parrillero — 2026-10-04
+
+Generated with the built-in image_gen tool as a transparent, cover-only cutout. Image 1 (Resources/street-parrillero-icon.png) guided the selected face identity; Image 2 (Resources/street-parrillero.png) guided the game body's proportions, palette, tattoo, clothes and style. Original game/hire portrait and full sprite sheet remain unchanged. The face and exposed arm base colors were visually checked and sampled consistently (face median RGB 246/150/83; arm median RGB 246/150/84).
+
+- Resources/street-cover-parrillero-full-v1.png: 1024×1536 RGBA, 1,813,108 bytes, SHA-256 94df514bed9a84971fd147dc3a3639f3f77cb401a1a10f2faff738e923d4ac5e; .meta GUID df55206e3daa4a10be3b7333c4979e7a, no mipmaps, alpha preserved, Android RGBA32. True-alpha corners and head-to-shoes bounds inspected.
+- Used only by the startup cover; the Parrillero hire portrait/gameplay atlases are unchanged. Cover layout reserves a left-side full-body slot beside the title logo.
+
+### Edit prompt
+
+Use case: precise-object-edit. Asset type: transparent, production-ready full-body cover character cutout for the existing 2D mobile game. Image 1 is the generated full-body target. Preserve this exact single Parrillero from top of hair to both shoe soles: same front-facing cheerful pose, framing, identity, face, wavy dark hair, broad cheeks, smile, stubble, very heavy body, bare arms, dirty white apron, black shorts, arm tattoo, dark shoes, outlines and cel-shaded game style. Keep head, hands, legs, and both entire shoes inside the frame, with all other parts unchanged. Image 2 is an in-game identity and palette reference. Make every exposed skin area on the target (face, ears, neck, arms, hands, knees) use one consistent warm medium-tan base hue and undertone matching the actual game character's skin. Specifically correct the face so it is not a lighter/pinker/peachier tint than the arms and knees. Retain natural cartoon highlights and shadows, but keep their skin color family and average tone aligned across face and body. Change only the skin-tone mismatch and cleanly isolate the figure. Preserve true transparent alpha around the entire silhouette; remove any dark vignette, backdrop, glow, or background shadow outside the cutout. No crop, pose redesign, new props, text, lettering, logo, watermark, or additional people.
+
+
+## Selected illustrated grill cover — 2026-10-04
+
+Built-in image_gen edit, not a new gameplay sprite. Target: user attachment `codex-clipboard-003f1c5c-3952-4453-83d3-cd8924fdb105.png`. Identity references: `Resources/street-parrillero-icon.png` and `Resources/street-parrillero.png`. Edited facial features/head-neck transition and kept warm skin color coherent with body; preserved the illustrated grill scene. Output visually inspected for face, neck continuity, skin family, unchanged scene and full-bleed edges. No image resampling/pixel editing outside image_gen.
+
+- Selected output: `$CODEX_HOME/generated_images/01a107c9-7a49-7782-bfac-9bc8d5a60f16/exec-5c03833e-8288-406e-9e6f-1d970de16d7d.png`.
+- Copied byte-identically to `Resources/street-cover-grill-parrillero-v3.png`: 1024×1536 opaque RGB, 2,678,083 bytes; SHA-256 `0a9d88fa2e901cc1964c27fed5333d90b95d6ff3068c342dca5dfaf8e5b4af8d`; fresh .meta GUID `45f7c572e710443db5de4ce0eede0df7`, no mipmaps, no NPOT resize, Android RGBA32.
+- StreetView renders this integrated scene over physical screen pixels with proportional center-crop. Old no-hero backdrop and full-body cutout remain preserved but no longer used by cover rendering; original game portrait/atlases, logo and timing untouched.
+
+### Exact edit prompt
+
+Use case: precise-object-edit / identity-preserve.
+Asset: opaque portrait background for the startup presentation of Hay Chori y Paty, 1024x1536.
+Input 1 is the EDIT TARGET: preserve this exact illustrated night-time Argentine street grill scene, very heavy shirtless cook using tongs to hold a grilled chorizo, stained white apron, huge arms and belly, grill, glowing coals, smoke, cups and can, foreground sandwiches, football crowd, string lights, wooden stall, composition and detailed drawn cartoon rendering.
+Input 2 is the EXACT SELECTED GAME PARRILLERO FACE IDENTITY reference; input 3 is the actual gameplay atlas supporting identity consistency. They are references, not additional people or overlays.
+Change ONLY the target cook's head/face and neck integration. Reproduce the selected reference's recognizable dark wavy/curly hair shape, thick expressive eyebrows, slightly narrow brown almond eyes, distinctive prominent broad rounded nose, fat full cheeks/jaw and soft double chin, very broad cheerful toothy grin and subtle chin stubble. Keep target's forward-facing head pose and sensible head size relative to his very heavy body. It must be recognizably the SAME game Parrillero, not a generic cook or realistic face pasted onto illustration.
+Anatomically integrate head, ears, jaw and thick neck naturally into shoulders and chest: smooth continuous contour and coherent shading, no seam, collage edge, floating head, narrow neck or mismatched perspective.
+CRITICAL COLOR: unify face, ears, neck, chest, both arms and hands to ONE warm medium-tan/peach-orange skin base and undertone matching the body and selected reference. No pale/pink/yellow detached face. Lighting may add natural highlights/shadows but not a different skin family on the face. Preserve existing warm night lighting, detailed illustrated style and all scene objects.
+No logos, words, UI, buttons, watermarks, margins or letterbox bands. Opaque full-bleed scene extends to every edge. Keep head and central grill scene legible for proportional center-cropping on tall portrait phones. Preserve target aspect/composition, do not add another character. One final edited image.
+
+**Import/compile:** Unity6000.6.3f1 batch imported the new texture and compiled successfully (exit0); no tests or Play/device review.
+
+
+## Painterly face/body continuity correction — 2026-10-04
+
+User feedback on v3: the body rendering did not match the face. v3 is preserved. A new built-in image_gen edit uses v3 as the exact target, the user's original image only as a style reference, and the in-game portrait/atlas only for recognizable identity. The revision re-renders face/head/neck with the same detailed textured semi-realistic comic paint, line/edge behavior, dimensional shading and warm grill lighting as the body; avoided a flat-vector/sprite pasted look. Scene is visually inspected; user device acceptance remains pending.
+
+- Selected new output: `$CODEX_HOME/generated_images/01a107c9-7a49-7782-bfac-9bc8d5a60f16/exec-f8461f72-a3e1-4d9e-bd30-1f6421843414.png`.
+- Copied byte-identically to `Resources/street-cover-grill-parrillero-v4.png` (opaque RGB1024×1536); fresh meta GUID and inherited no-mipmap/no-resize/Android RGBA32 settings. v3 is retained unchanged.
+
+### Exact correction prompt
+
+Use case: precise-object-edit. Image 1 is the EDIT TARGET and must remain the same exact full-bleed 1024x1536 illustration. Image 2 is the ORIGINAL BODY/SCENE PAINTING STYLE reference from before the face was replaced. Images 3 and 4 are used ONLY for the Parrillero's recognizable facial identity and features, NOT for their cartoon rendering style.
+User specifically rejected the result because "the body does not match the face." Correct the mismatch decisively.
+Change the head and neck rendering so they look painted by the SAME illustrator, in the SAME medium, at the SAME realism/detail level as the surrounding target body and face-less scene. The target body has richly textured, semi-realistic hand-painted comic illustration: fine skin texture, many nuanced warm light/shadow transitions, subtle organic edges, soft dimensional modeling, detailed ink/paint contours, warm stadium practical light, coherent grain. Match these exact marks/material treatment on the face, ears, hair and neck. The face must no longer look like a flat-vector/chibi/game-sprite head pasted onto a realistic-painterly body. Absolutely avoid clean heavy uniform black cartoon outlines, flat 2D cel blocks, vector-like skin, oversized simplified features, sticker/cutout edges or a different sharpness/shading medium on the head.
+Identity from images 3/4 ONLY: same Parrillero face geometry, dark wavy tousled hair, strong eyebrows, brown slightly narrow eyes, recognizable broad rounded nose, full rounded cheeks/soft double chin, broad happy toothy smile, subtle chin stubble. Reinterpret these same recognizable features with the target body's painterly textured anatomy and light; not the sprite's thick outlines. Preserve believable natural head proportions, target's existing orientation and scale.
+Blend head/jaw/chin/ears into target's broad thick neck and shoulders with anatomically continuous shape, matching perspective and occlusion; no narrow-neck collar, hard seam, pasted boundary or color discontinuity. Match body base skin exactly across face, ears, neck, chest, arms and hands under the same golden grill-light. Do not make face more saturated orange or pink than body. Lighting/highlights/shadows remain coherent across the whole single character.
+Everything except head/face/neck must remain pixel-faithful: especially body pose, huge bare torso/arms, tongs/sausage, stained apron, grill, embers, cups/can, food, crowd, lights, scenery, framing, colors and details. Keep opaque full bleed, no cropping, no text/logo/UI/extra objects/people. Do not generate side-by-side concepts. Return one seamlessly integrated painted illustration.
+
+**Unity import/compile:** Unity6000.6.3f1 batch import and compilation succeeded for v4 (exit0); this was not a test or native visual review. User acceptance pending.

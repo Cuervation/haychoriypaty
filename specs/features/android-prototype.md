@@ -1,4 +1,66 @@
+# Current Android delivery — 2026-10-05 (0.2.12/code14, trifulca smoke)
+
+Unity6000.6.3f1 Main-only Development Android IL2CPP/ARM64 build `build-059ad48e84`: **Succeeded in 273.46s**, 0 errors / 2 warnings. The user requested the APK and phone installation; no tests or in-game gameplay review were requested or run.
+
+Versioned APK `Builds/Android/Archive/HayChoriYPaty-0.2.12-code14-trifulca-smoke.apk`: **186,968,662 bytes**, package `com.haychoriypaty.game`, version0.2.12/code14, min API26 / target36, `arm64-v8a`. SHA-256 `524b63abbfb4ea413ab597282b798f743221329c2f2667c224884662de5da926`. APK v2 signature verified; Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`. The rolling APK `Builds/Android/HayChoriYPaty-street.apk` matches byte-for-byte.
+
+**Installed:** `adb install -r` onto the connected Motorola Edge 60 Fusion (`ZY22MBNWRB`) returned successfully. PackageManager reports versionCode14/versionName0.2.12. Replacement install only; no uninstall or data clear. App was not launched, and no visual/device gameplay check was performed.
+
+---
+
+# Current Android delivery — 2026-10-05 (0.2.11/code13, upgrade status ribbon)
+
+Unity6000.6.3f1 Main-only Development Android IL2CPP/ARM64 build `build-2dccbdc803`: **Succeeded in 19.38s**, 0 errors / 1 warning. Tests were not run per the user's standing instruction.
+
+Versioned APK `Builds/Android/Archive/HayChoriYPaty-0.2.11-code13-upgrade-option1.apk`: **181,258,740 bytes**, package `com.haychoriypaty.game`, version0.2.11/code13, min API26 / target36, `arm64-v8a`. SHA-256 `7ff670d8c5999a4c980fd263433c57289a6468c09aeea1928da9aec5ffe4fbab`. APK V2 signature verified; Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`. No phone installation was requested or performed; the previous rolling APK remains unchanged.
+
+## Previous Android delivery — 2026-10-05 (0.2.10/code12, Floresta mural and apparel)
+
+Current Unity source built as a Main-only Development Android IL2CPP/ARM64 APK with Unity6000.6.3f1. Build report: **Succeeded in 246.68s**; the build log also contains a non-blocking Licensing access-token update diagnostic and the Diagnostics Data debug-symbol recommendation. The requested game tests were not run.
+
+APK `Builds/Android/HayChoriYPaty-street.apk`; versioned archive `Builds/Android/Archive/HayChoriYPaty-0.2.10-code12-mural-wardrobe.apk`; **212,807,089 bytes**, package `com.haychoriypaty.game`, version0.2.10/code12, min API26 / target36, `arm64-v8a`. SHA-256 `639e11908265ff2b228afc2a40621f69a6b2d000f5dd1993f4aa5bb8244eb8a4`. APK V2 signature verified; Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`. `aapt` confirms package/version metadata; archive matches rolling APK byte-for-byte.
+
+**Installed:** after the user reconnected the Motorola Edge 60 Fusion (serial `ZY22MBNWRB`), `adb install -r` returned **Success**. PackageManager confirms versionCode12/versionName0.2.10 on the phone. No tests were run; the app was not launched and data was not cleared or uninstalled.
+
+## Previous Android delivery — 2026-10-05 (0.2.9/code11, Level 2 fix)
+
+The complete Unity Editor test suite for the shipped source passed on Unity6000.6.3f1 immediately before this version-only build: **116/116 EditMode + 21/21 PlayMode**, 0 failures/skips. Development Android IL2CPP/ARM64 build **Succeeded in 240.64s**, 0 errors / 1 warning (Diagnostics Data recommends debug symbols for detailed crash stack traces). Main scene only; min API26 / target36; `arm64-v8a`.
+
+APK **0.2.9/code11**, **171,936,606 bytes (~164 MiB)**, package `com.haychoriypaty.game`. V2 signature verified with the existing local Android Debug certificate (SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`). APK SHA-256 `be171c5d141d7de2fd4af2dab0bd8654d67b5c629c14ae3e299d525a9bdf08fb`.
+
+Versioned archive: `Builds/Android/Archive/HayChoriYPaty-0.2.9-code11-level2.apk`; rolling APK: `Builds/Android/HayChoriYPaty-street.apk`. Installed on the connected Motorola Edge 60 Fusion using `adb install -r`; PackageManager confirms version 0.2.9/code11. PlayerPrefs matched byte-for-byte before/after and firstInstallTime was preserved; no uninstall or data clear. The app was not launched for native gameplay/visual review. Build log, signature/package verification, and preference comparison are in ignored `Logs/Acceptance/Level2Delivery-20261005/`.
+
+## Previous Android delivery — 2026-10-05 (0.2.8/code10, full suite)
+
+The complete Unity Editor test suite passed on Unity6000.6.3f1: **115/115 EditMode + 21/21 PlayMode**, 0 failures/skips. Development Android IL2CPP/ARM64 build **Succeeded**, 0 errors / 1 warning (Diagnostics Data recommends debug symbols for detailed crash stack traces). APK **0.2.8/code10**, **168,244,348 bytes**, package `com.haychoriypaty.game`, min API26 / target36, `arm64-v8a`. V2 signature verified with the existing local Android Debug certificate (SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`). APK SHA-256 `6600a5dc54d5c9f917ce2d33d8f2ee999f613ba87cebcd8ef02f44ea8371b240`.
+
+Versioned archive: `Builds/Android/Archive/HayChoriYPaty-0.2.8-code10-fullsuite.apk`; APK was not installed in that delivery. Evidence is in ignored `Logs/Acceptance/FullSuite-20261005/`.
+
+---
+
+## Previous Android delivery — 2026-10-04 (0.2.7/code9, timeout riot)
+
+Current Main source (including the timeout-riot presentation) built with Unity6000.6.3f1 as Development Android IL2CPP ARM64: **Succeeded**,255.41s,0errors/1 Clang warning (`'-x c++' after last input file has no effect`). APK archive `Builds/Android/Archive/HayChoriYPaty-0.2.7-code9-deadline-riot.apk`,157,471,790bytes; rolling artifact `Builds/Android/HayChoriYPaty-street.apk`; package `com.haychoriypaty.game`, version0.2.7/code9, minAPI26/target36, `arm64-v8a`. V2 signature verified; SHA-256 `0c9708a210939c256414ea3c059e64659f73de767482dcfbbe2101c2ffb25ded`; local Android Debug certificate unchanged (`d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`).
+
+Installed on the authorized Motorola Edge60 Fusion (`ZY22MBNWRB`) using `adb install -r`: **Success**, PackageManager reports0.2.7/code9. PlayerPrefs XML matched byte-for-byte before/after; no uninstall or data clear. GameActivity launch succeeded and the app process remained live; at final inspection Android showed Rappi resumed over the game, so it was not forced back to the foreground. The focused deadline→riot→replay PlayMode test had passed1/1 before this delivery; no tests were rerun during the build/install, and no native gameplay/visual acceptance review was performed. Evidence (build log, APK metadata/signature and preference snapshots) is in ignored `Logs/Acceptance/DeadlineRiot20261004/`.
+
+---
+
 # Android delivery — current Street and historical prototype
+
+
+## Current combined validation and phone delivery — 2026-10-04 (0.2.6/code8)
+
+Latest user authorized tests, APK and phone installation. Installed Unity6000.6.3f1 was closed (no running editor/MCP); used the exact installed editor in sequential batch runs, without new packages or a second editor. Current Street **82/82 EditMode + 15/15 PlayMode passed**,0failed/0skipped. Scope includes200-handoff victory/180s deadline, FIFO/reservations, round-local coins and first-level reset, exact progressive prices/caps/MAX, mouse/touch dispatch/start/replay/load, intro timing/asset/viewport guards, current art/HUD/mural/footer imports and layout. Not an unrelated legacy full-suite run or mobile performance certification.
+
+Initial batch pointer runs failed due to unfocused simulated input; swapping transient InputSettings also destroyed the previous instance. Final fixture only saves/restores backgroundBehavior and editorInputBehaviorInPlayMode enum values on the existing settings (IgnoreFocus/AllDeviceInputAlwaysGoesToGameView during tests). No runtime input code or persistent input settings changed. Failed attempts remain in ignored evidence; final15/15 is the successful rerun.
+
+Main-only development Android IL2CPP/ARM64 build **Succeeded340.915261s,0errors/1warning** (Diagnostics Data debug-symbol recommendation). APK **0.2.6/code8**,150547329bytes,min26/target36,packagecom.haychoriypaty.game; V2signature/same debug certificate and original packaged adaptive-logo PNG bytes verified. SHA256`e2cc6576dfbe07e126c8c4f8493ae79640e33b878fd0c3cbd4cef2a825bbe6d5`. Archive`Builds/Android/Archive/HayChoriYPaty-0.2.6-code8.apk`; rolling`Builds/Android/HayChoriYPaty-street.apk` updated after verification; previous archives preserved. Temporary editor build helper/meta removed after saving ignored evidence.
+
+Authorized Motorola Edge60Fusion (API36/1220×2712) replacement install returned **Success**; PackageManager confirms0.2.6/code8. Dedicated playerprefs XML byte-identical before/after install, firstInstallTime preserved; no uninstall/data clear. Own GameActivity cold launch **Statusok/733ms**. Reviewed two native gameplay captures during user play: unified gold-coin/m:ss/sales HUD goal200, recognizable mural/corner behind crowd, pan francés and no floating grill badge, current Parrillero and comic Floresta caption/original crest. The captures show different worker poses and a subsequent fresh first-level round withteam1/×1.00 and initial25/200costs; these are observations, not controlled native tap/reset/accounting tests. User was actively playing/retrying, so no forced restart/quit for additional review. Native gameplay letterboxing remains intentional; full-screen change applies to presentation only.
+
+Own-PID log snapshot contains no matchedFATAL EXCEPTION/NullReferenceException/MissingReferenceException/IndexOutOfRangeException/AndroidJavaException; this is bounded evidence, not an all-session zero-error guarantee. Native intro timing/Salir/launcher masks, device FPS/thermal and broader cutouts remain unverified. Unselected upgrade-card/speed-icon proposals remain unintegrated (existing shoe/card still visible). Evidence stays ignored in`Logs/Acceptance/Current/`: final editmode.xml/playmode.xml, build.json/log, signature/badging, install/package/launch, preferences snapshots and phone-runtime.txt. Both phone-menu.png and phone-result.png actually contain gameplay, not menu/result acceptance. No Git commit/push in this turn.
+
 
 ## Presentation-logo app icon — source update (2026-10-04)
 
@@ -10,14 +72,14 @@ Use the same selected `Assets/Art/Street/Resources/street-logo.png` as the appli
 **Validation:** Source review only. No tests, Play, APK/export generation or device changes by standing user instruction. Unity MCP state ping did not respond; import/compilation and callback execution remain unverified. Installed0.2.4 retains its previous icon until a future authorized update; historical build results below do not validate this source change.
 
 
-## Current Street0.2.5 — combined tested APK (2026-10-04)
+## Historical Street0.2.5 — combined tested APK (2026-10-04)
 
 - Latest user authorized tests/build/phone update. Existing Unity6000.6.3f1/Android/Main: relevant EditMode52completed/succeeded/no reported failures; PlayMode12/12passed,0failed/0skipped. Regression scope and jobs are in[street automation](street-automation.md#combined-validation--2026-10-04-current-accumulated-implementation). Actual menu,21-fan crowd, paired idle animation frames and seven-product Ready/Playing captures reviewed in ignored`Logs/Acceptance/Combined`; exact editor progress restored and Play stopped.
 - Build`build-47e1c59fff`: **Succeeded**,277.796s,**0errors/3warnings**. Main-only Android development/IL2CPP ARM64. Warnings: Diagnostics Data recommends fuller debug symbols; obsolete Unity splash PVRTC plus uncompressed-logo fallback. These are recorded, not hidden errors or zero-warning claims. No package/toolchain install or second editor.
 - APK`Builds/Android/HayChoriYPaty-street.apk`, archive`Builds/Android/Archive/HayChoriYPaty-0.2.5-code7.apk`: **114,272,726bytes (108.98MiB)**, package`com.haychoriypaty.game`,0.2.5/code7,minAPI26/targetAPI36,`arm64-v8a`,GameActivity. BuildReport998.76MiB includes separate debug outputs, not download size.
 - SHA256:`99d78efd142a624e612259737664ab013a0667e41d8319a62e6733b3d296403c`. V2signature verified; same local Android Debug certificate as0.2.4 (SHA256`d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`), suitable for non-destructive`install -r`; not Play Store release signing.
 - StreetAppIcon callback executed: generated adaptive icon/foreground/cream background XML are present, manifest application icon references`@mipmap/app_icon`, packaged`res/drawable-nodpi-v4/hay_chori_paty_logo.png` exactly matches original presentation PNG bytes/SHA`bdce6ed77abbcfca57bcb9676e887b70044da4c7d38626d0d726a586733fd247`. Actual phone-launcher mask rendering still pending.
-- Motorola Edge60Fusion`ZY22MBNWRB` was verified connected with0.2.4/code6 at start, then disconnected before installation. Final adb inventory empty; user asked to reconnect/unlock. **0.2.5 not installed or launched on device yet**. No uninstall, clear-data, reset or unrelated-phone operation performed. Reconnect and use`adb -s ZY22MBNWRB install -r` then own GameActivity; verify native intro/Jugar/Salir/purchases/replay, launcher icon and runtime log. Device/FPS/thermal/endurance claims remain unverified.
+- User reconnected Motorola Edge60Fusion`ZY22MBNWRB` and requested installation. Serial-targeted`adb install -r` returned **Success**; PackageManager confirms **0.2.5/code7**. Dedicated Unity playerprefs XML byte-identical before/after update, firstInstallTime2026-10-03 18:49:24 retained: no wipe/uninstall. GameActivity cold launch **Statusok**,777ms,PID15213 alive immediately after launch. Evidence in ignored`Logs/Acceptance/Combined/{summary.json,phone-prefs-before-install.xml,phone-prefs-after-install.xml}`. USB disconnected again before post-launch runtime log query; waiting query cancelled, no healthy-log/screenshot/native-touch/Salir/launcher-mask/performance claim. App installation and launch are complete; remaining functional/device review is separate.
 
 ## Historical Street0.2.4 — selected cover/logo intro (2026-10-04)
 
@@ -114,3 +176,8 @@ User explicitly requests APK but no phone connection/install/launch. Main first 
 - Ignored APK`Builds/Android/HayChoriYPaty-street.apk`:0.2.3/code5,57,681,379bytes; signatureV2 verified, packagecom.haychoriypaty.game,ARM64IL2CPP,min26,target36; SHA256`af50ac8961483c875191fa5ad4540484454ddf8037bb3e1e5e3ad2fcd471db90`.
 - Targeted41/41EditMode (32simulation+9art) and11/11PlayMode passed; real1080x1920editor Ready/Playing/seven-product screenshots reviewed. Exact editor progress restored,Play stopped.
 - No adb calls/emulator/phone install/launch performed. New native visual/performance certification not claimed. Existing generated performance-test outputs/folder meta ignored, all authored art/metas retained.
+
+
+## Gameplay viewport follow-up — not yet built/installed (2026-10-04)
+
+Latest source removes solid gameplay fit-letterboxes using a tall aspect-responsive logical canvas; targeted StreetArt33/33 and StreetPointer17/17 passed. Existing Motorola0.2.6/code8 predates this change. No Android export or installation performed for this follow-up; do not equate earlier gameplay screenshot with full-screen acceptance. Native layout/touch review remains pending; an install will interrupt any unsaved active round.
