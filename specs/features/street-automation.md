@@ -503,6 +503,7 @@ MONEDAS GANADAS is gross actual handoff income for this attempt, not the spendab
 - [x] Source loads the original blank RGBA artwork and overlays the requested heading, live summary and green-button caption.
 - [x] Source retains selector navigation and uses shared aspect-correct draw/touch bounds.
 - [x] Gross earnings source records exact product income independently of spending/reset rules; focused regression source added.
-- [ ] Unity import/compilation, affected art/economy/pointer tests and actual portrait/Game-view/device appearance remain pending; the user has not requested testing.
+- [x] Unity6000.6.3f1 import/compilation and full Street test assemblies passed: **139/139 EditMode + 23/23 PlayMode**, 0 failures/skips. This includes popup art/layout/live values/earned-income and pointer-to-selector regressions.
+- [ ] Actual portrait/Game-view/native popup appearance was not manually reviewed.
 
-**Validation:** Generated artwork inspected, native PNG/meta/source/spec reviewed, git diff --check only. No Unity/player tests, Game view, APK or device actions.
+**Validation and delivery:** Main-only Android Development IL2CPP/ARM64 `build-f93d61fec0` succeeded in 263.61s (0 errors, 1 Diagnostics Data debug-symbol warning). APK 0.2.13/code15 v2 signature/package/ABI verified and installed on Motorola Edge 60 Fusion `ZY22MBNWRB`; see [Android delivery](android-prototype.md). No manual native gameplay/popup screenshot or physical performance certification.

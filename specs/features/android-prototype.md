@@ -1,3 +1,13 @@
+# Current Android delivery — 2026-10-06 (0.2.13/code15, victory popup)
+
+Unity6000.6.3f1 Main-only Development Android IL2CPP/ARM64 build `build-f93d61fec0`: **Succeeded in 263.61s**, 0 errors / 1 warning (Diagnostics Data recommends enabling debug symbols for detailed crash reports). The complete Street test assemblies passed: **139/139 EditMode + 23/23 PlayMode**, 0 failures/skips. Two test/source compilation issues found in the first validation attempt were fixed before these passing runs.
+
+Versioned APK `Builds/Android/Archive/HayChoriYPaty-0.2.13-code15-victory-popup.apk`: **190,308,172 bytes**, package `com.haychoriypaty.game`, version0.2.13/code15, min API26 / target36, `arm64-v8a`. SHA-256 `f0b963338611ad7cd12fadc1a282dee81bac59294ed2d70520541893e4aa9680`. APK v2 signature verified; Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`. Rolling APK `Builds/Android/HayChoriYPaty-street.apk` matches byte-for-byte.
+
+**Installed:** `adb install -r` returned **Success** on Motorola Edge 60 Fusion (`ZY22MBNWRB`); PackageManager confirms versionCode15/versionName0.2.13. Replacement install only; no uninstall or data clear. The app was not launched, and the popup was not manually reviewed in a native Game-view/device screenshot.
+
+---
+
 # Current Android delivery — 2026-10-05 (0.2.12/code14, trifulca smoke)
 
 Unity6000.6.3f1 Main-only Development Android IL2CPP/ARM64 build `build-059ad48e84`: **Succeeded in 273.46s**, 0 errors / 2 warnings. The user requested the APK and phone installation; no tests or in-game gameplay review were requested or run.

@@ -183,7 +183,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual("Playing", Phase);
 
             SetSim("Phase", Enum.Parse(Sim.GetType().GetProperty("Phase", PublicInstance).PropertyType, "Won"));
-            Invoke(game, "Save");
+            yield return null; // StreetGame persists the win and unlocks the next level during Update.
             dispatch.Invoke(view, new object[] { 9 }); // The victory popup's only Salir action.
             Assert.AreEqual("Ready", Phase);
             Assert.IsTrue((bool)viewType.GetField("levelSelectActive", PrivateInstance).GetValue(view));

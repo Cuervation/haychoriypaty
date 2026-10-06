@@ -310,15 +310,15 @@ namespace HayChoriYPaty
                 if (a >= LevelSelectFirstAction && a < LevelSelectFirstAction + StreetSimulation.LevelNames.Length)
                 {
                     int level = a - LevelSelectFirstAction;
-                    bool ok = level <= game.UnlockedLevel && game.SelectLevel(level);
-                    if (ok)
+                    bool selectionSucceeded = level <= game.UnlockedLevel && game.SelectLevel(level);
+                    if (selectionSucceeded)
                     {
                         levelSelectActive = false;
                         priceProduct = 0;
                         // Floresta starts directly; later locations keep their existing price/setup screen.
                         if (level == 0) game.StartRound();
                     }
-                    lastAction = a; feedbackUntil = Time.unscaledTime + 0.22f; feedbackScale = ok ? 1.04f : 0.97f;
+                    lastAction = a; feedbackUntil = Time.unscaledTime + 0.22f; feedbackScale = selectionSucceeded ? 1.04f : 0.97f;
                     return;
                 }
                 return;

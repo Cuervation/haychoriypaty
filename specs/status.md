@@ -1,8 +1,8 @@
 # Project status
 
-## Selected victory popup integrated — source update (2026-10-05)
+## Selected victory popup tested and Android 0.2.13 installed (2026-10-06)
 
-Replaced the old blue result panel with the selected wood/iron/parchment football popup, original transparent blank artwork and green Salir button. Live outlined comic heading/labels/values, full-screen dimmer, aspect-correct frame and shared responsive mouse/native exit bounds; Salir still returns to the level selector. Chicago lists both sales goals. Added round-local CoinsEarned to report actual gross sales income rather than post-upgrade remaining balance; no spendable-money/unlock rules changed. Imported native 1122×1402 RGBA/meta, recorded generation prompt, and updated targeted art/economy/pointer test source. Generated asset/static diff reviewed; no tests, Unity/Game view, APK or device action per standing instruction.
+The wood/iron/parchment result screen, gross CoinsEarned summary, responsive Salir-to-selector navigation, and existing Chicago dual-goal presentation are integrated. Unity 6000.6.3f1 full Street suites passed **139/139 EditMode + 23/23 PlayMode**, 0 failures/skips. Validation found and fixed a selector local-name compile conflict and an iterator/reflection issue in its regression fixture. Main-only Android Development IL2CPP/ARM64 build `build-f93d61fec0` succeeded in 263.61s (0 errors, 1 Diagnostics Data warning). APK 0.2.13/code15 (190,308,172 bytes; SHA-256 `f0b963338611ad7cd12fadc1a282dee81bac59294ed2d70520541893e4aa9680`) was v2-signature/package verified and installed by `adb install -r` on Motorola Edge 60 Fusion `ZY22MBNWRB`; PackageManager confirms versionCode15/versionName0.2.13. No uninstall/data clear. Actual popup visual review in Game view/on device was not done.
 
 ## Crowd counter occlusion and double-height HUD — source update (2026-10-05)
 
