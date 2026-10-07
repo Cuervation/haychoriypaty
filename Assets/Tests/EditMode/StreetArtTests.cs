@@ -13,38 +13,210 @@ namespace HayChoriYPaty.Tests
         private const string DiagonalSheetPath = "Assets/Art/Street/Resources/street-parrillero-diagonal-v1.png";
         private static Type View { get { return Type.GetType("HayChoriYPaty.StreetView, Assembly-CSharp", true); } }
 
+        [TestCase(true)]
+        [TestCase(false)]
+        public void StandardButtonLabelStatesDoNotInheritSkinHoverOrMutateSource(bool outline)
+        {
+            var source = new GUIStyle { font = Resources.Load<Font>("Menu/LuckiestGuy-Regular"), fontSize = 38 };
+            source.normal.textColor = Color.red;
+            source.hover.textColor = Color.yellow;
+            Color fill = outline ? new Color(.035f, .075f, .16f) : Color.white;
+            var method = View.GetMethod("CreateStandardButtonLabelStyle", BindingFlags.NonPublic | BindingFlags.Static);
+            var result = (GUIStyle)method.Invoke(null, new object[] { source, 27, fill });
+            Assert.AreSame(source.font, result.font);
+            Assert.AreEqual(27, result.fontSize);
+            Assert.AreEqual(fill, result.normal.textColor);
+            Assert.AreEqual(fill, result.hover.textColor);
+            Assert.AreEqual(fill, result.active.textColor);
+            Assert.AreEqual(fill, result.focused.textColor);
+            Assert.AreEqual(38, source.fontSize);
+            Assert.AreEqual(Color.red, source.normal.textColor);
+            Assert.AreEqual(Color.yellow, source.hover.textColor);
+        }
+
+        [Test]
+        public void StandardButtonReusesExactCoverTextureFactoryAndBundledFont()
+        {
+            Texture2D texture = (Texture2D)View.GetMethod("CreateMenuButton", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, null);
+            try
+            {
+                Assert.AreEqual(512, texture.width); Assert.AreEqual(164, texture.height);
+                Assert.AreEqual("Original glossy blue startup button", texture.name);
+                Assert.AreEqual(HideFlags.HideAndDontSave, texture.hideFlags);
+                Assert.AreEqual("", AssetDatabase.GetAssetPath(texture), "No duplicated button asset is created.");
+                Assert.NotNull(Resources.Load<Font>("Menu/LuckiestGuy-Regular"));
+                Assert.NotNull(View.GetMethod("DrawStandardButton", BindingFlags.NonPublic | BindingFlags.Instance));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(texture); }
+        }
+
+        [Test]
+        public void StandardButtonStatesRetainCoverPaletteAndCoherentDisabledTint()
+        {
+            MethodInfo method = View.GetMethod("StandardButtonTint", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.AreEqual(Color.white, (Color)method.Invoke(null, new object[] { true, false }));
+            Assert.AreEqual(new Color(.78f, .88f, 1f), (Color)method.Invoke(null, new object[] { true, true }));
+            Color disabled = (Color)method.Invoke(null, new object[] { false, false });
+            Assert.AreEqual(disabled, (Color)method.Invoke(null, new object[] { false, true }));
+            Assert.Less(disabled.r, disabled.b, "The disabled button stays in the cover's blue family, not generic Unity gray.");
+        }
+
+        [TestCase(288f, 92f)]
+        [TestCase(364f, 66f)]
+        [TestCase(57f, 35f)]
+        [TestCase(320f, 98f)]
+        public void StandardButtonSlicesKeepRoundEndCapsAndCoverEverySize(float width, float height)
+        {
+            Rect bounds = new Rect(120f, 800f, width, height);
+            MethodInfo method = View.GetMethod("StandardButtonSliceBounds", BindingFlags.Static | BindingFlags.NonPublic);
+            Rect left = (Rect)method.Invoke(null, new object[] { bounds, 0 });
+            Rect middle = (Rect)method.Invoke(null, new object[] { bounds, 1 });
+            Rect right = (Rect)method.Invoke(null, new object[] { bounds, 2 });
+            Assert.AreEqual(height * .5f, left.width); Assert.AreEqual(left.width, right.width);
+            Assert.AreEqual(left.xMax, middle.xMin); Assert.AreEqual(middle.xMax, right.xMin);
+            Assert.AreEqual(bounds.xMin, left.xMin); Assert.AreEqual(bounds.xMax, right.xMax);
+            Assert.AreEqual(bounds.width, left.width + middle.width + right.width, .01f);
+        }
+
+        [TestCase("JUGAR", 288f, 92f)]
+        [TestCase("VOLVER", 364f, 66f)]
+        [TestCase("1", 57f, 35f)]
+        [TestCase("CONTINUAR", 156f, 60f)]
+        public void StandardButtonFontFitsWithoutFallbackOrLeakingStyle(string caption, float width, float height)
+        {
+            Font font = Resources.Load<Font>("Menu/LuckiestGuy-Regular");
+            var style = new GUIStyle { font = font, fontSize = 38, wordWrap = false };
+            Rect bounds = new Rect(0, 0, width, height);
+            int size = (int)View.GetMethod("FitStandardButtonFontSize", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { style, caption, bounds });
+            Assert.AreSame(font, style.font); Assert.AreEqual(38, style.fontSize);
+            Assert.GreaterOrEqual(size, 11);
+            if (caption == "JUGAR") Assert.AreEqual(38, size, "Keep the original cover lettering unchanged.");
+            style.fontSize = size;
+            Assert.LessOrEqual(style.CalcSize(new GUIContent(caption)).x, width - 24f * height / 92f + 1f);
+        }
+
+        [TestCase(1f)]
+        [TestCase(1.25f)]
+        [TestCase(1.42f)]
+        public void StandardButtonPressedKeepsCenterInsideUnchangedHitBounds(float verticalScale)
+        {
+            Rect hit = new Rect(88f, 858f * verticalScale, 364f, 66f);
+            MethodInfo method = View.GetMethod("StandardButtonVisualBounds", BindingFlags.Static | BindingFlags.NonPublic);
+            Rect normal = (Rect)method.Invoke(null, new object[] { hit, false });
+            Rect pressed = (Rect)method.Invoke(null, new object[] { hit, true });
+            Assert.AreEqual(hit, normal); Assert.AreEqual(hit.center, pressed.center);
+            Assert.AreEqual(hit.width * .97f, pressed.width, .01f); Assert.AreEqual(hit.height * .97f, pressed.height, .01f);
+            Assert.GreaterOrEqual(pressed.xMin, hit.xMin); Assert.LessOrEqual(pressed.xMax, hit.xMax);
+            Assert.GreaterOrEqual(pressed.yMin, hit.yMin); Assert.LessOrEqual(pressed.yMax, hit.yMax);
+        }
+
         [Test]
         public void SingleRemainingProductIsCentered()
         {
-            MethodInfo bubbleMethod = View.GetMethod("OrderBubbleBounds", BindingFlags.Static | BindingFlags.NonPublic);
-            MethodInfo rowMethod = View.GetMethod("OrderLineBounds", BindingFlags.Static | BindingFlags.NonPublic);
-            Assert.NotNull(bubbleMethod); Assert.NotNull(rowMethod);
-            Rect bubble = (Rect)bubbleMethod.Invoke(null, new object[] { new Vector2(58f, 324f) });
-            Rect row = (Rect)rowMethod.Invoke(null, new object[] { bubble, 0, 1 });
-            Assert.AreEqual(70f, bubble.width); Assert.AreEqual(86f, bubble.height);
-            Assert.AreEqual(bubble.y + (bubble.height - 8f) * .5f, row.center.y, .01f,
-                "A lone pending item is centered in the speech bubble's body, not at the first-row position.");
+            Rect bubble = Bubble(new Vector2(58f, 324f), 1);
+            Rect row = OrderRect("OrderLineBounds", bubble, 0, 1);
+            Assert.AreEqual(62f, bubble.width); Assert.AreEqual(49f, bubble.height);
+            Assert.AreEqual(bubble.y + (bubble.height - 8f) * .5f, row.center.y, .01f);
+            Assert.AreEqual(58f, bubble.center.x);
+            Assert.AreEqual(256f, bubble.yMax);
             Assert.GreaterOrEqual(row.xMin, bubble.xMin); Assert.LessOrEqual(row.xMax, bubble.xMax);
         }
 
         [Test]
-        public void OrderBubbleTwoRowsAndMoreFooterFitInsideFixedCard()
+        public void OrderBubbleTwoRowsAndMoreFooterFitInsideAdaptiveCard()
         {
-            MethodInfo bubbleMethod = View.GetMethod("OrderBubbleBounds", BindingFlags.Static | BindingFlags.NonPublic);
-            MethodInfo rowMethod = View.GetMethod("OrderLineBounds", BindingFlags.Static | BindingFlags.NonPublic);
-            MethodInfo moreMethod = View.GetMethod("OrderMoreBounds", BindingFlags.Static | BindingFlags.NonPublic);
-            Assert.NotNull(bubbleMethod); Assert.NotNull(rowMethod); Assert.NotNull(moreMethod);
-            Rect bubble = (Rect)bubbleMethod.Invoke(null, new object[] { new Vector2(270f, 324f) });
-            Rect first = (Rect)rowMethod.Invoke(null, new object[] { bubble, 0, 2 });
-            Rect second = (Rect)rowMethod.Invoke(null, new object[] { bubble, 1, 2 });
-            Rect more = (Rect)moreMethod.Invoke(null, new object[] { bubble });
-            Assert.AreEqual(70f, bubble.width); Assert.AreEqual(86f, bubble.height);
+            Rect bubble = Bubble(new Vector2(270f, 324f), 4);
+            Rect first = OrderRect("OrderLineBounds", bubble, 0, 2);
+            Rect second = OrderRect("OrderLineBounds", bubble, 1, 2);
+            Rect more = OrderRect("OrderMoreBounds", bubble);
+            Assert.AreEqual(62f, bubble.width); Assert.AreEqual(88f, bubble.height);
             Assert.LessOrEqual(first.yMax, second.yMin); Assert.LessOrEqual(second.yMax, more.yMin);
             Assert.GreaterOrEqual(first.xMin, bubble.xMin); Assert.LessOrEqual(first.xMax, bubble.xMax);
             Assert.GreaterOrEqual(second.xMin, bubble.xMin); Assert.LessOrEqual(second.xMax, bubble.xMax);
-            Assert.LessOrEqual(more.yMax, bubble.yMax - 8f, "The +N footer stays above the speech tail.");
+            Assert.LessOrEqual(more.yMax, bubble.yMax - 8f);
             Assert.LessOrEqual(more.xMax, bubble.xMax);
         }
+
+        [TestCase(1, 49f)]
+        [TestCase(2, 74f)]
+        [TestCase(3, 88f)]
+        [TestCase(4, 88f)]
+        [TestCase(5, 88f)]
+        public void OrderBubbleAdaptsWithoutScalingIconsOrQuantities(int pendingLines, float height)
+        {
+            Rect bubble = Bubble(new Vector2(270f, 324f), pendingLines);
+            Assert.AreEqual(height, bubble.height);
+            Assert.AreEqual(270f, bubble.center.x); Assert.AreEqual(256f, bubble.yMax);
+            int rows = Mathf.Min(2, pendingLines);
+            for (int i = 0; i < rows; i++)
+            {
+                Rect row = OrderRect("OrderLineBounds", bubble, i, rows);
+                Rect icon = OrderRect("OrderIconBounds", row);
+                Rect quantity = OrderRect("OrderQuantityBounds", row);
+                Assert.AreEqual(new Vector2(26f, 23f), icon.size);
+                Assert.AreEqual(new Vector2(20f, 25f), quantity.size);
+                Assert.GreaterOrEqual(icon.xMin, bubble.xMin); Assert.LessOrEqual(quantity.xMax, bubble.xMax);
+                Assert.GreaterOrEqual(icon.yMin, bubble.yMin); Assert.LessOrEqual(quantity.yMax, bubble.yMax - 8f);
+            }
+        }
+
+        [Test]
+        public void OrderBubbleWidthFollowsContentWithoutMovingAnchor()
+        {
+            Rect compact = Bubble(new Vector2(270f, 324f), 1);
+            Rect wide = (Rect)View.GetMethod("OrderBubbleBounds", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { new Vector2(270f, 324f), 1, 40f });
+            Assert.Greater(wide.width, compact.width);
+            Assert.AreEqual(compact.center.x, wide.center.x); Assert.AreEqual(compact.yMax, wide.yMax);
+            Assert.LessOrEqual(wide.width, 70f, "Keep the existing seven-column envelope for legacy large quantities.");
+        }
+
+        [TestCase(1f)]
+        [TestCase(1.25f)]
+        [TestCase(1.42f)]
+        public void OrderBubbleTallScreenKeepsTailAnchorAndLocalContent(float verticalScale)
+        {
+            for (int pendingLines = 1; pendingLines <= 4; pendingLines++)
+            {
+                Rect logical = Bubble(new Vector2(270f, 324f), pendingLines);
+                Rect drawn = OrderRect("OrderBubbleLayoutBounds", logical, verticalScale);
+                Assert.AreEqual(logical.yMax * verticalScale, drawn.yMax, .01f);
+                Assert.AreEqual(logical.center.x, drawn.center.x);
+                Assert.AreEqual(logical.size, drawn.size);
+                Rect row = OrderRect("OrderLineBounds", drawn, 0, Mathf.Min(2, pendingLines));
+                Assert.AreEqual(8f, row.y - drawn.y, .01f);
+                Assert.LessOrEqual(row.yMax, drawn.yMax - 8f);
+            }
+        }
+
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(4)]
+        public void OrderBubbleNineSlicesKeepCornersFixedAndCoverFrame(int pendingLines)
+        {
+            Rect bubble = Bubble(new Vector2(270f, 324f), pendingLines);
+            float area = 0f;
+            for (int row = 0; row < 3; row++)
+            for (int column = 0; column < 3; column++)
+            {
+                Rect slice = OrderRect("OrderBubbleSlice", bubble, column, row, 20f, 15f);
+                Assert.Greater(slice.width, 0f); Assert.Greater(slice.height, 0f);
+                Assert.GreaterOrEqual(slice.xMin, bubble.xMin); Assert.LessOrEqual(slice.xMax, bubble.xMax);
+                Assert.GreaterOrEqual(slice.yMin, bubble.yMin); Assert.LessOrEqual(slice.yMax, bubble.yMax);
+                if (column != 1) Assert.AreEqual(20f, slice.width);
+                if (row != 1) Assert.AreEqual(15f, slice.height);
+                area += slice.width * slice.height;
+            }
+            Assert.AreEqual(bubble.width * bubble.height, area, .01f);
+        }
+
+        private static Rect Bubble(Vector2 position, int pendingLines) =>
+            (Rect)View.GetMethod("OrderBubbleBounds", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { position, pendingLines, 20f });
+
+        private static Rect OrderRect(string method, params object[] args) =>
+            (Rect)View.GetMethod(method, BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, args);
 
         [Test]
         public void ParrilleroHasSixteenNamedSpritesAndReviewedBounds()
@@ -435,26 +607,16 @@ namespace HayChoriYPaty.Tests
             Rect table = (Rect)View.GetMethod("ServingTableBoundsForLevel", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(int), typeof(int) }, null)
                 .Invoke(null, new object[] { 2, 1 });
             Rect barrelBounds = (Rect)View.GetField("ChicagoBarrelRect", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+            Assert.AreEqual(new Rect(242, 577, 282, 94), grill);
+            Assert.AreEqual(new Rect(16, 540, 196, 98), table);
+            Assert.AreEqual(new Rect(524f - 80f * 2f / 3f, 488, 80f * 2f / 3f, 80), barrelBounds);
             Assert.IsFalse(table.Overlaps(grill)); Assert.IsFalse(barrelBounds.Overlaps(grill));
-            Assert.Less(barrelBounds.xMax, grill.xMin); Assert.Less(grill.xMax, table.xMin);
-            Assert.AreEqual(270f, grill.center.x, .001f);
-            Assert.AreEqual(56.08f, grill.xMin - barrelBounds.xMax, .02f);
-            Assert.AreEqual(56.08f, table.xMin - grill.xMax, .02f);
-            Assert.AreEqual(174.24f, grill.width, .01f, "Chicago grill is 10% longer than its original display width");
-            Assert.AreEqual(59f, grill.height, .01f, "One additional sausage row gets a little more depth");
-            Assert.AreEqual(686f, table.yMax, .001f);
-            Assert.AreEqual(table.yMax, grill.yMax, .001f); Assert.AreEqual(table.yMax, barrelBounds.yMax, .001f);
-            Assert.Less(table.yMax, 710f, "Kitchen props stay above the unchanged upgrade HUD");
+            Assert.Less(grill.yMax, 710f, "Fixed-size stations stay above the unchanged HUD");
             Type simulation = Type.GetType("HayChoriYPaty.StreetSimulation, Assembly-CSharp", true);
-            Vector2 chori = (Vector2)simulation.GetMethod("StationPositionForLevel").Invoke(null, new object[] { 0, 1, 2 });
-            Vector2 coca = (Vector2)simulation.GetMethod("StationPositionForLevel").Invoke(null, new object[] { 4, 1, 2 });
-            Assert.AreEqual(new Vector2(403, 665), chori); Assert.AreEqual(new Vector2(147, 648), coca);
-            Assert.That(table.xMin - chori.x, Is.InRange(1f, 25f), "Parrillero reaches the table from its left edge");
-            Assert.That(coca.x - barrelBounds.xMax, Is.InRange(1f, 36f), "Cocacolero reaches the barrel from its right edge");
-            foreach (Vector2 pickup in new[] { chori, coca })
-                foreach (Rect prop in new[] { table, grill, barrelBounds }) Assert.IsFalse(prop.Contains(pickup));
+            Assert.AreEqual(new Vector2(235, 575), simulation.GetMethod("StationPositionForLevel").Invoke(null, new object[] { 0, 1, 2 }));
+            Assert.AreEqual(new Vector2(435, 565), simulation.GetMethod("StationPositionForLevel").Invoke(null, new object[] { 4, 1, 2 }));
             Rect velezBarrel = (Rect)View.GetField("VelezBarrelRect", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
-            Assert.AreEqual(new Rect(410, 561, 116, 132), velezBarrel, "Velez keeps its existing barrel position");
+            Assert.AreEqual(barrelBounds, velezBarrel, "Barrel proportions no longer change with the club");
         }
 
         [TestCase(false, 9, 100f, false, true)]
@@ -549,18 +711,16 @@ namespace HayChoriYPaty.Tests
                 .Invoke(null, new object[] { products });
             Assert.Greater(r.width, 4 * 66f);
             Assert.GreaterOrEqual(r.xMin, 0); Assert.LessOrEqual(r.xMax, 540);
-            Assert.LessOrEqual(r.yMax, 644, "Grill must stop before money/time HUD");
-            if (products == 1) Assert.AreEqual(282f, r.width);
-            else if (products <= 4) Assert.AreEqual(494f, r.width);
-            else Assert.LessOrEqual(r.xMax, 305, "Leave beverage slots free");
+            Assert.LessOrEqual(r.yMax, 704, "Grill must stop before the upgrade HUD");
+            Assert.AreEqual(new Vector2(282, 94), r.size, "Floresta dimensions remain fixed at every product count");
             Rect speed = (Rect)View.GetField("Speed", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
             Rect hire = (Rect)View.GetField("HireParrillero", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
             Assert.IsFalse(r.Overlaps(speed)); Assert.IsFalse(r.Overlaps(hire));
             Type sim = Type.GetType("HayChoriYPaty.StreetSimulation, Assembly-CSharp", true);
             Vector2 anchor = (Vector2)sim.GetMethod("StationPosition").Invoke(null, new object[] { 0 });
-            Assert.AreEqual(new Vector2(205, 585), anchor, "Choripán pickups now happen beside the grill at the loaded trestle table");
-            Assert.AreEqual(new Vector2(128, 578), (Vector2)sim.GetMethod("StationPosition").Invoke(null, new object[] { 1 }),
-                "Other unlocked food stations keep their original pickup positions");
+            Assert.AreEqual(new Vector2(235, 575), anchor, "Choripán pickups now happen beside the grill at the loaded trestle table");
+            Assert.AreEqual(new Vector2(235, 575), (Vector2)sim.GetMethod("StationPosition").Invoke(null, new object[] { 1 }),
+                "Finished foods are fetched from the standard table, never the hot grate");
         }
 
         [Test]
@@ -576,7 +736,8 @@ namespace HayChoriYPaty.Tests
             Vector2 pickup = (Vector2)sim.GetMethod("StationPosition").Invoke(null, new object[] { 0 });
             Assert.Less(approach.y, grill.yMin);
             Assert.Less(pickup.x, grill.xMin);
-            Assert.IsTrue(table.Contains(pickup));
+            Assert.IsFalse(table.Contains(pickup));
+            Assert.Less(table.xMax, pickup.x);
             // Every possible counter destination and the initial spawn use this lane.
             for (int column = 0; column < 7; column++)
             for (int sample = 0; sample <= 100; sample++)
@@ -586,8 +747,8 @@ namespace HayChoriYPaty.Tests
                 Assert.IsFalse(grill.Contains(Vector2.Lerp(new Vector2(433, 430), approach, t)));
                 Assert.IsFalse(grill.Contains(Vector2.Lerp(approach, pickup, t)));
             }
-            Assert.AreEqual(new Vector2(220, 665), (Vector2)sim.GetMethod("StationPositionForProductCount")
-                .Invoke(null, new object[] { 0, 3 }), "Later multi-product pickup positions remain unchanged");
+            Assert.AreEqual(new Vector2(235, 575), (Vector2)sim.GetMethod("StationPositionForProductCount")
+                .Invoke(null, new object[] { 0, 3 }), "Product counts must not resize/reposition the standard pickup");
         }
 
         [Test]
@@ -928,6 +1089,30 @@ namespace HayChoriYPaty.Tests
                 Assert.AreEqual(angry.y, swing.y);
             }
             Assert.NotNull(Resources.Load<Texture2D>("street-items"), "The existing distinct Paty sandwich icon is reused.");
+        }
+
+        [Test]
+        public void VelezKitchenKeepsStandardStationsAndHidesFoodZoneCaptions()
+        {
+            Type layout = Type.GetType("HayChoriYPaty.StreetWorkstationLayout, Assembly-CSharp", true);
+            Rect table = (Rect)layout.GetProperty("FoodTableBounds", BindingFlags.Static | BindingFlags.Public).GetValue(null, null);
+            Rect grill = (Rect)View.GetMethod("GrillRectForLevel", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { 3, 2 });
+            Rect velezTable = (Rect)View.GetMethod("ServingTableBoundsForLevel", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { 3, 2 });
+            Rect barrel = (Rect)layout.GetProperty("CocaBounds", BindingFlags.Static | BindingFlags.Public).GetValue(null, null);
+
+            Assert.AreEqual(new Vector2(196, 98), table.size);
+            Assert.AreEqual(new Vector2(282, 94), grill.size);
+            Assert.AreEqual(table, velezTable, "Vélez uses the same always-present ready-product table frame as the other levels.");
+            Assert.AreEqual(new Vector2(80f * 2f / 3f, 80), barrel.size);
+            Assert.NotNull(Resources.Load<Texture2D>("street-serving-table-v1"), "The shared tabletop art is available to DrawServingTable.");
+
+            MethodInfo label = View.GetMethod("StationLabelForProduct", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.NotNull(label);
+            for (int food = 0; food < 4; food++)
+                Assert.AreEqual(string.Empty, label.Invoke(null, new object[] { food }), "Food zones must not add CHORI/PATY floor captions.");
+            Assert.AreEqual("COCA 600 ml", label.Invoke(null, new object[] { 4 }), "Keep the existing drink-station label.");
         }
 
         [Test]

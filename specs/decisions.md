@@ -129,3 +129,26 @@ User explicitly fixes Chicago to barrel-left / centered-grill / ready-chori-tabl
 ## 2026-10-06 — Expand Chicago parrilla capacity modestly
 
 Keep the barrel-left / grill-center / ready-chori-table-right layout. Use a separate original grill sprite with exactly four visible chorizo rows (one added), compact bread rolls approximately chorizo-sized, and only a modest 10% horizontal increase; retain the common ground line and side clearances. Preserve station pickup routes and all gameplay values.
+
+
+## 2026-10-06 — Resolve club colors for decorative pennants
+
+Keep the All Boys pennants baked into its existing backdrop so its appearance remains pixel-identical. Because later club backdrops do not share that decoration and Chicago still has a baked monochrome row, render one cached transparent pennant strip from the club theme after the selected backdrop; use the same geometry for levels 2–5 and overlay Chicago's old row. Theme data is keyed to the active StreetSimulation.LevelNames names, not scene-specific colors. This avoids duplicate backdrop art and leaves layout/gameplay unchanged.
+
+
+## 2026-10-06 — Fit order speech backgrounds to visible content
+
+The live UI is IMGUI, not a prefab/uGUI layout. Reuse Items[11] with nine-slice border drawing and measure the current icon/quantity rows before drawing. Preserve the two-visible-line +N window and its gameplay-independent reveal behavior; three/four/five-product tickets share a footer-sized frame rather than adding artificial blank space. Transform the customer-relative tail baseline once on tall portraits, then keep local content sizes/offsets fixed. No additional sprite or UI system.
+
+## 2026-10-06 — Reuse the cover as the only ordinary button style
+
+Inspection found no active UI Button components or prefabs; Main renders IMGUI. Consolidate its existing DrawMenuButton into DrawStandardButton, retaining CreateMenuButton and Luckiest Guy instead of introducing a parallel system or assets. Cover controls retain exact mapping; wider/compact controls resize their middle only and overlap internal edges by less than one physical pixel to avoid fractional-transform seams. Migrate green result actions and Ready numeric navigation. Keep user-selected wood/iron upgrade cards and mural selector tiles as explicit design exceptions; leave inactive PrototypeView scenes untouched.
+
+## 2026-10-06 — Freeze Floresta furniture frames, move secondary workstations
+
+Live MCP inspection confirms stations are IMGUI textures rather than prefab/SpriteRenderer objects or physics colliders. Use one pure StreetWorkstationLayout configuration shared by existing rendering and simulation station APIs; do not add a parallel scene/physics/layout system. Freeze the measured282×94/196×98 main frames, proportionally render existing grill variants, reuse the Level1 table asset, and solve circulation with a staggered arrangement. Coca/beer height80 and source aspect ratios leave access while main furniture stays full-sized. All food pickup routes converge at the standard finished table; later route stages traverse the clear upper lane. Conservative full-sprite and foot AABBs validate other props; only target-station hand reach is permitted. On tall portraits, fade a local presentation correction near pickup instead of changing gameplay positions. Preserve all current art/metas/catalog. The previous Chicago single-row reduced composition is superseded by the user's new all-level size/access priority.
+
+
+## 2026-10-06 — Temporarily share the Floresta upgrade economy across all current levels
+
+For test builds, map every level in the current runtime catalog to one TEST_ECONOMY_PROFILE: Parrillero/Cocacolero hire rows $15/$30/$60/$100 (with the existing free starting Parrillero) and speed rows $5/$10/$15/$20/$30/$45/$65/$90/$125, +10% per purchase, capped at ×1.90. This replaces the prior active distinction between Floresta and later-level curves; fixed product prices, employee caps, speed increment, save/purchase persistence and gameplay remain unchanged. Keep level-index-to-profile mapping data-driven so later club-specific curves need only new profile data and mapping, not code branches. The Cocacolero's independent hire curve uses the same shared hire-cost source.

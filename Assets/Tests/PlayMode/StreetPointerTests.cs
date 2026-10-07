@@ -470,8 +470,8 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(1, Sim.GetType().GetProperty("StaffCount").GetValue(Sim, null));
             Assert.AreEqual(0, Sim.GetType().GetProperty("SpeedLevel").GetValue(Sim, null));
             Assert.AreEqual(1f, Sim.GetType().GetProperty("WorkRate").GetValue(Sim, null));
-            Assert.AreEqual(200, Sim.GetType().GetProperty("HireCost").GetValue(Sim, null));
-            Assert.AreEqual(25, Sim.GetType().GetProperty("SpeedCost").GetValue(Sim, null));
+            Assert.AreEqual(15, Sim.GetType().GetProperty("HireCost").GetValue(Sim, null));
+            Assert.AreEqual(5, Sim.GetType().GetProperty("SpeedCost").GetValue(Sim, null));
 
             Invoke(game, "StartRound"); SetSim("Coins", 234);
             SetSim("Phase", Enum.Parse(Sim.GetType().GetProperty("Phase").PropertyType, "Lost"));
@@ -539,5 +539,29 @@ namespace HayChoriYPaty.Tests
             Assert.That(layout.x, Is.EqualTo(designX).Within(.001f));
             Assert.That(layout.y, Is.EqualTo(designY).Within(.001f));
         }
+        [UnityTest]
+        public IEnumerator StandardReadyButtonsKeepCoverFontPressedStateAndLockedNavigation()
+        {
+            Type viewType = view.GetType();
+            Assert.NotNull(viewType.GetMethod("DrawStandardButton", PrivateInstance));
+            var style = (GUIStyle)viewType.GetField("menuTitle", PrivateInstance).GetValue(view);
+            Assert.NotNull(style);
+            Assert.AreSame(Resources.Load<Font>("Menu/LuckiestGuy-Regular"), style.font);
+            Texture2D shared = (Texture2D)viewType.GetField("menuButton", PrivateInstance).GetValue(view);
+            Assert.NotNull(shared);
+            yield return Click(405f, 930f); // Level 5 is locked in this fixture.
+            Assert.AreEqual("Ready", Phase); Assert.AreEqual(0, Get("SelectedLevel"));
+            Assert.AreSame(shared, viewType.GetField("menuButton", PrivateInstance).GetValue(view));
+            Vector2 start = Pixel(270f, 584f);
+            InputSystem.QueueStateEvent(mouse, new MouseState { position = start }.WithButton(MouseButton.Left));
+            yield return null; yield return null;
+            Assert.AreEqual(1, viewType.GetField("pressedAction", PrivateInstance).GetValue(view));
+            Assert.AreEqual("Ready", Phase, "Press state must not dispatch before release.");
+            InputSystem.QueueStateEvent(mouse, new MouseState { position = start });
+            yield return null; yield return null;
+            Assert.AreEqual("Playing", Phase);
+            Assert.AreEqual(0, viewType.GetField("pressedAction", PrivateInstance).GetValue(view));
+        }
+
     }
 }

@@ -5,6 +5,15 @@ using UnityEngine;
 namespace HayChoriYPaty
 {
     [Serializable]
+    public sealed class StreetUpgradeCostProfile
+    {
+        public string profileId = "TEST_ECONOMY_PROFILE";
+        [Tooltip("Shared by Parrillero and Cocacolero; existing role-count rules keep a worker free where applicable.")]
+        public int[] hireCosts = { 15, 30, 60, 100 };
+        public int[] speedUpgradeCosts = { 5, 10, 15, 20, 30, 45, 65, 90, 125 };
+    }
+
+    [Serializable]
     public sealed class StreetBalance
     {
         [Range(1, 21)] public int maxCustomers = 21;
@@ -14,11 +23,17 @@ namespace HayChoriYPaty
         [Tooltip("Zero inherits maxStaff; each specialty has an independent cap.")]
         [Min(0)] public int maxParrilleros;
         [Min(0)] public int maxCocacoleros;
-        public int[] hireCosts = { 200, 500, 1200, 2800 };
-        public int[] speedUpgradeCosts = { 25, 40, 65, 100, 160, 250, 400, 640, 1000 };
-        [Tooltip("Discounted tutorial-level costs; later locations keep the shared tables above.")]
+        [Tooltip("All current clubs temporarily use the same profile; add profiles and remap levels for future club-specific economy.")]
+        public StreetUpgradeCostProfile[] upgradeCostProfiles = { new StreetUpgradeCostProfile() };
+        [Tooltip("Profile index used per level; all current levels share profile 0.")]
+        public int[] levelUpgradeCostProfileIds = { 0, 0, 0, 0, 0 };
+        [HideInInspector, Tooltip("Legacy serialized fields retained only for scene compatibility; runtime costs come from upgradeCostProfiles.")]
+        public int[] hireCosts = { 15, 30, 60, 100 };
+        [HideInInspector, Tooltip("Legacy serialized fields retained only for scene compatibility; runtime costs come from upgradeCostProfiles.")]
+        public int[] speedUpgradeCosts = { 5, 10, 15, 20, 30, 45, 65, 90, 125 };
+        [HideInInspector, Tooltip("Legacy serialized field retained only for scene compatibility; runtime costs come from upgradeCostProfiles.")]
         public int[] florestaHireCosts = { 15, 30, 60, 100 };
-        [Tooltip("Discounted tutorial-level costs; later locations keep the shared tables above.")]
+        [HideInInspector, Tooltip("Legacy serialized field retained only for scene compatibility; runtime costs come from upgradeCostProfiles.")]
         public int[] florestaSpeedUpgradeCosts = { 5, 10, 15, 20, 30, 45, 65, 90, 125 };
         [Min(.01f)] public float speedIncrease = .10f;
         [Min(0.1f)] public float customerArrivalSeconds = 0.16f;
@@ -41,6 +56,16 @@ namespace HayChoriYPaty
         public float[] levelDurations = { 120f, 180f, 240f, 270f, 300f };
         [Tooltip("Optional deadline-only Floresta trial. Default false: win immediately at the unit goal.")]
         public bool florestaFinishAtDeadline = false;
+        private static readonly StreetUpgradeCostProfile DefaultUpgradeCostProfile = new StreetUpgradeCostProfile();
+
+        public StreetUpgradeCostProfile GetUpgradeCostProfile(int levelIndex)
+        {
+            if (upgradeCostProfiles == null || upgradeCostProfiles.Length == 0) return DefaultUpgradeCostProfile;
+            int profileIndex = levelUpgradeCostProfileIds != null && levelIndex >= 0 && levelIndex < levelUpgradeCostProfileIds.Length
+                ? levelUpgradeCostProfileIds[levelIndex] : 0;
+            if (profileIndex < 0 || profileIndex >= upgradeCostProfiles.Length) profileIndex = 0;
+            return upgradeCostProfiles[profileIndex] ?? DefaultUpgradeCostProfile;
+        }
     }
 
     public enum StreetCustomerState { Entering, Waiting, Receiving, Leaving, Advancing }
@@ -167,10 +192,8 @@ namespace HayChoriYPaty
             new[] { 0, 1, 2, 4, 6 }, new[] { 0, 1, 2, 3, 4, 6, 5 }
         };
         private static readonly int[] DefaultGoals = { 200, 200, 65, 85, 110 };
-        private static readonly int[] DefaultHireCosts = { 200, 500, 1200, 2800 };
-        private static readonly int[] DefaultSpeedCosts = { 25, 40, 65, 100, 160, 250, 400, 640, 1000 };
-        private static readonly int[] DefaultFlorestaHireCosts = { 15, 30, 60, 100 };
-        private static readonly int[] DefaultFlorestaSpeedCosts = { 5, 10, 15, 20, 30, 45, 65, 90, 125 };
+        private static readonly int[] DefaultHireCosts = { 15, 30, 60, 100 };
+        private static readonly int[] DefaultSpeedCosts = { 5, 10, 15, 20, 30, 45, 65, 90, 125 };
         private static readonly float[] DefaultDurations = { 120f, 180f, 240f, 270f, 300f };
         private readonly StreetBalance balance;
         private readonly int[][] availableProductsByLevel;
@@ -231,30 +254,39 @@ namespace HayChoriYPaty
         public int HireCostForRole(StreetWorkerRole role)
         {
             int count = WorkerCount(role);
-            return count < MaxWorkersForRole(role) ? Mathf.Max(1, HireCosts[Mathf.Max(0, count - 1)]) : 0;
+            if (count >= MaxWorkersForRole(role)) return 0;
+            int costIndex = role == StreetWorkerRole.Cocacolero ? count : Mathf.Max(0, count - 1);
+            return costIndex < HireCosts.Length ? Mathf.Max(1, HireCosts[costIndex]) : 0;
         }
-        public bool CanHireRole(StreetWorkerRole role)
+public bool CanHireRole(StreetWorkerRole role)
         {
-            return (Phase == RoundPhase.Ready || Phase == RoundPhase.Playing) && WorkerCount(role) < MaxWorkersForRole(role) && Coins >= HireCostForRole(role);
+            int workerCount = WorkerCount(role);
+            int hireCost = HireCostForRole(role);
+            return (Phase == RoundPhase.Ready || Phase == RoundPhase.Playing) &&
+                   workerCount < MaxWorkersForRole(role) && hireCost > 0 && Coins >= hireCost;
         }
         public int SpeedLevel { get; private set; }
         public bool CanEditPrices { get { return false; } }
+        private StreetUpgradeCostProfile UpgradeCostProfile
+        {
+            get { return balance.GetUpgradeCostProfile(LevelIndex); }
+        }
         private int[] HireCosts
         {
             get
             {
-                if (LevelIndex == 0)
-                    return balance.florestaHireCosts != null && balance.florestaHireCosts.Length > 0 ? balance.florestaHireCosts : DefaultFlorestaHireCosts;
-                return balance.hireCosts != null && balance.hireCosts.Length > 0 ? balance.hireCosts : DefaultHireCosts;
+                StreetUpgradeCostProfile profile = UpgradeCostProfile;
+                return profile != null && profile.hireCosts != null && profile.hireCosts.Length > 0
+                    ? profile.hireCosts : DefaultHireCosts;
             }
         }
         private int[] SpeedCosts
         {
             get
             {
-                if (LevelIndex == 0)
-                    return balance.florestaSpeedUpgradeCosts != null && balance.florestaSpeedUpgradeCosts.Length > 0 ? balance.florestaSpeedUpgradeCosts : DefaultFlorestaSpeedCosts;
-                return balance.speedUpgradeCosts != null && balance.speedUpgradeCosts.Length > 0 ? balance.speedUpgradeCosts : DefaultSpeedCosts;
+                StreetUpgradeCostProfile profile = UpgradeCostProfile;
+                return profile != null && profile.speedUpgradeCosts != null && profile.speedUpgradeCosts.Length > 0
+                    ? profile.speedUpgradeCosts : DefaultSpeedCosts;
             }
         }
         public int MaxStaffCount { get { return Mathf.Clamp(balance.maxStaff, 1, HireCosts.Length + 1); } }
@@ -446,53 +478,11 @@ namespace HayChoriYPaty
             return true;
         }
 
-        public static Vector2 StationPosition(int product)
-        {
-            int index = Mathf.Clamp(product, 0, 6);
-            // Choripán pickups happen at the trestle serving table beside the grill.
-            return index == 0 ? new Vector2(205, 585) : new Vector2(58 + 70 * index, 578);
-        }
-
-        public static Vector2 StationPositionForLevel(int product, int levelIndex, int productCount)
-        {
-            if (levelIndex == 1)
-            {
-                // Stand in the open gaps and reach sideways; never walk through the props.
-                if (product == 0) return new Vector2(403, 665);
-                if (product == 4) return new Vector2(147, 648);
-            }
-            if (levelIndex == 2)
-            {
-                if (product == 0) return new Vector2(80, 640);
-                if (product == 1) return new Vector2(340, 640);
-                if (product == 4) return new Vector2(465, 635);
-            }
-            if (levelIndex >= 3)
-            {
-                if (product >= 0 && product <= 3) return new Vector2(62 + 92 * product, 682);
-                if (product == 4) return new Vector2(420, 680);
-                if (product == 5) return new Vector2(510, 680);
-                if (product == 6) return new Vector2(476, 680);
-            }
-            return StationPositionForProductCount(product, productCount);
-        }
-
-        // Route food pickups through the open player-side lane, never across the counter or hot grill.
-        public static Vector2 StationApproachPoint() => new Vector2(205, 510);
-        public static Vector2 StationApproachPointForLevel(int product, int levelIndex)
-        {
-            if (levelIndex == 1) return product == 4 ? new Vector2(147, 510) : new Vector2(403, 510);
-            if (levelIndex == 2)
-            {
-                if (product == 0) return new Vector2(-10, 510);
-                if (product == 1) return new Vector2(405, 510);
-                if (product == 4) return new Vector2(415, 510);
-            }
-            if (levelIndex >= 3) return new Vector2(535, CounterHandoffYForLevel(levelIndex));
-            return StationApproachPoint();
-        }
-        public static Vector2 StationPositionForProductCount(int product, int productCount) =>
-            product == 0 && productCount > 1 ? new Vector2(220, 665) : StationPosition(product);
+        public static Vector2 StationPosition(int product) => StreetWorkstationLayout.PickupPosition(Mathf.Clamp(product, 0, 6));
+        public static Vector2 StationPositionForLevel(int product, int levelIndex, int productCount) => StationPosition(product);
+        public static Vector2 StationApproachPoint() => StreetWorkstationLayout.ApproachPosition(0);
+        public static Vector2 StationApproachPointForLevel(int product, int levelIndex) => StreetWorkstationLayout.ApproachPosition(product);
+        public static Vector2 StationPositionForProductCount(int product, int productCount) => StationPosition(product);
         public static float CounterHandoffYForLevel(int levelIndex) => levelIndex == 1 ? ChicagoCounterServiceY : 400f;
         private Vector2 WorkerHomePosition => new Vector2(433f, CounterHandoffYForLevel(LevelIndex));
         private Vector2 CounterHandoffPosition(StreetCustomer customer) =>
@@ -799,8 +789,8 @@ namespace HayChoriYPaty
 
         private Vector2 NewLevelStationRoutePoint(StreetWorker worker, int stage)
         {
-            // Enter the kitchen only around the far-right edge, then approach pickups from in front of the stations.
-            return stage == 0 ? new Vector2(535f, CounterHandoffYForLevel(LevelIndex)) : new Vector2(535f, 646f);
+            // Cross the open upper lane before approaching the shared side pickups.
+            return stage == 0 ? StreetWorkstationLayout.KitchenEntry : StreetWorkstationLayout.ApproachPosition(worker.Product);
         }
 
         private static bool HasOutstandingItems(StreetCustomer customer) =>

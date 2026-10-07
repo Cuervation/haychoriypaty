@@ -8,9 +8,9 @@ Playable Floresta first; reuse the same small scene/simulation for Nueva Chicago
 
 ## Rules and state contract
 
-- Every product in every level has a fixed $5 unit price. Never show a price popup, read-only price summary, product tab, slider/drag target, setup screen or price-selection replay text. Selecting any unlocked level from the presentation or Ready level navigation starts its round directly; Ready/retry/load paths show only Jugar and unlocked-level navigation. Normalize old saved prices for every product to $5 without changing the save schema; retain catalog IDs, sales accounting, goals, demand model, upgrade curves and all other gameplay values. Every attempt still resets coins as specified below; Floresta opening staff/speed follow its existing round-reset rule. Charge $5 only after a successful handoff.
+- Every product in every level has a fixed $5 unit price. Never show a price popup, read-only price summary, product tab, slider/drag target, setup screen or price-selection replay text. Selecting any unlocked level from the presentation or Ready level navigation starts its round directly; Ready/retry/load paths show only Jugar and unlocked-level navigation. Normalize old saved prices for every product to $5 without changing the save schema; retain catalog IDs, sales accounting, goals, demand model, the active temporary upgrade-cost profile below, and all other gameplay values. Every attempt still resets coins as specified below; Floresta opening staff/speed follow its existing round-reset rule. Charge $5 only after a successful handoff.
 - Every level attempt begins with zero coins: clear the previous balance on load, level selection, next level, retry and Start. Coins earned during an attempt remain spendable only in that attempt; no carryover or refund. Keep unlocks and fixed $5 product prices. Successful advancement resets the next level to one Parrillero and speed ×1.00, returning hire/speed prices to the first applicable row for that level; retry behavior within the current level is otherwise unchanged. Customers automatically enter, move to reserved standing positions, wait, receive products and exit. Support up to 21 simultaneous customers in seven columns/three rows; arrival rate and capacity are configurable per level.
-- Each Floresta customer requests 1–4 choris (uniform random inclusive, including the first arrival). Complete the requested units and animate receipt/departure; then the existing people behind advance in the same column and only its tail may receive a newcomer. Across all levels, preserve each column as FIFO: workers serve only its settled front customer, never a waiting person behind or a newcomer placed ahead. No forced999 exception in this level. At Nueva Chicago, orders are randomly chori-only, bottled-Coca-only, or both; each quantity is independently 1–4. For mixed requests, the Parrillero completes Chori and the Cocacolero completes Coca in parallel. At Level 3, Liniers - Velez Sarsfield, customers may request any non-empty subset of Chori, Paty and bottled Coca, independently 1–4 each. Their lines stay in catalog order; one Parrillero owns both food lines through Chori then Paty, while a Cocacolero owns Coca and may work in parallel. Ferro and Independiente customers may request any non-empty subset of that location's unlocked catalog, preserving catalog order, up to five distinct product types; each automatic quantity is independently 1–4. Across all levels the complete model rejects tickets with more than five distinct products, and automatic generation never repeats a product type. Across all levels, the order bubble shows the first two pending product types and quantities, skips every zero-quantity type, and adds a small “+N más” footer counting hidden pending types (not units). Each completed line immediately leaves the display window so the next original-order line appears; a lone line is centered, and the fixed bubble stays bounded. The bubble is a presentation window only: it never changes real quantities, reservations, FIFO, or worker delivery. Individual patience remains visible. A handoff decreases the corresponding quantity by exactly one, increments delivered-unit total by one and earns exactly $5. There is no counter jump, reward at pickup, or fake timer-only delivery.
+- Each Floresta customer requests 1–4 choris (uniform random inclusive, including the first arrival). Complete the requested units and animate receipt/departure; then the existing people behind advance in the same column and only its tail may receive a newcomer. Across all levels, preserve each column as FIFO: workers serve only its settled front customer, never a waiting person behind or a newcomer placed ahead. No forced999 exception in this level. At Nueva Chicago, orders are randomly chori-only, bottled-Coca-only, or both; each quantity is independently 1–4. For mixed requests, the Parrillero completes Chori and the Cocacolero completes Coca in parallel. At Level 3, Liniers - Velez Sarsfield, customers may request any non-empty subset of Chori, Paty and bottled Coca, independently 1–4 each. Their lines stay in catalog order; one Parrillero owns both food lines through Chori then Paty, while a Cocacolero owns Coca and may work in parallel. Ferro and Independiente customers may request any non-empty subset of that location's unlocked catalog, preserving catalog order, up to five distinct product types; each automatic quantity is independently 1–4. Across all levels the complete model rejects tickets with more than five distinct products, and automatic generation never repeats a product type. Across all levels, the order bubble shows the first two pending product types and quantities, skips every zero-quantity type, and adds a small “+N más” footer counting hidden pending types (not units). Each completed line immediately leaves the display window so the next original-order line appears; a lone line is centered, and the content-sized bubble stays bounded. The bubble is a presentation window only: it never changes real quantities, reservations, FIFO, or worker delivery. Individual patience remains visible. A handoff decreases the corresponding quantity by exactly one, increments delivered-unit total by one and earns exactly $5. There is no counter jump, reward at pickup, or fake timer-only delivery.
 - Workers automatically reserve an outstanding unit, move to its station, pick up, carry to the customer's handoff position, deliver, then repeat. A configurable short station/condiment delay can remain automatic, but must not interrupt the circuit with manual cooking. Food always includes bread; condiments remain automatic and are never extra products.
 - On Nueva Chicago, keep idle workers and every handoff at logical y=485 on the player-side floor, below the counter front (bottom y=384). Their station route may approach the grill/table/barrel, but must never send the parrillero across or visually through the counter. Vélez uses one wide two-zone Chori/Paty grill plus the separate Coca barrel; food approaches use the clear side lanes around the grill, and the Cocacolero uses the barrel approach. Do not walk a worker through the hot cooking surface. Other levels retain their existing handoff positions.
 - Hire up to five independently moving workers by default. Reservations prevent duplicate delivery to the same final unit; clients that leave release reservations, and in-flight workers cancel safely without earning coins or decrementing another order. Delivery refreshes customer patience. Waiting expiry makes the customer leave and compacts that same FIFO column, without changing the identities/orders/patience of those advancing.
@@ -18,64 +18,26 @@ Playable Floresta first; reuse the same small scene/simulation for Nueva Chicago
 - Speed/hire purchases use the explicit progressive tables below in every level, with a five-worker cap and speed x1.9 maximum. Purchases update the next cost and affect movement/productivity immediately. Reject insufficient-funds or capped purchases without side effects, and dispatch each tap exactly once.
 - Floresta (level1) wins immediately when 200 actual choripán handoffs have been sold; retain the user-confirmed 120-second limit and lose at its deadline if below the goal. Default `florestaFinishAtDeadline` is false (the old deadline-only experiment remains an optional inspector toggle, not the active Main rule). Stop further worker handoffs at the winning unit so the first-level counter freezes at200/200. Nueva Chicago uses its separate two-product goal below; the remaining later levels keep their existing goals/early victory/time limits. Results show outcome and delivered units; successful completion unlocks the next location. Do not require clearing every customer to win; preserve unlocks but reset coins on replay; every new Floresta turn starts with one parrillero and speed x1.00, and every successful level advance also starts the next level with one Parrillero and speed ×1.00; retry behavior within a level otherwise remains unchanged.
 
-## Progressive speed and hiring prices — current contract (2026-10-04)
+## Temporary shared upgrade economy — active test profile (2026-10-06)
 
-Use these exact tables for later locations; Floresta has a separate affordable first-level curve below. Initial speed x1.0 and the first worker are free. Each speed purchase adds0.1of base speed; each hire adds one worker. The next price changes immediately after a successful purchase. Stop at speed x1.9 / five workers: exhausted cards display MAX and reject purchases without debiting coins. Do not extrapolate prices past the listed rows. Preserve zero coins per attempt. Each successful level transition resets to one worker and speed x1.00, so the new level uses the first hire/speed cost rows; retry behavior within a level remains unchanged. Clamp older out-of-range counts to the new caps.
+This is a temporary test configuration, not a permanent balance decision. All five levels in the current runtime catalog use one TEST_ECONOMY_PROFILE; StreetBalance.levelUpgradeCostProfileIds maps each level to a profile, so future club-specific curves require data configuration rather than level-specific code. Main serializes the same profile and mapping as the code defaults.
 
-| Speed tier | Work rate | Cost |
-|---|---:|---:|
-| Initial | 1.0 | Free |
-| 2 | 1.1 | $25 |
-| 3 | 1.2 | $40 |
-| 4 | 1.3 | $65 |
-| 5 | 1.4 | $100 |
-| 6 | 1.5 | $160 |
-| 7 | 1.6 | $250 |
-| 8 | 1.7 | $400 |
-| 9 | 1.8 | $640 |
-| 10 | 1.9 | $1000 |
+The first starting Parrillero remains free. Subsequent Parrillero hires use the shared four-row curve. Cocacolero uses that exact same hire-cost array, indexed from zero Cocacoleros: its first independently hired role costs $15 when that role is available. Existing role behavior, products served, speed, route, caps, saves and progression are unchanged. Exhausted purchase curves display MAX and reject purchases without charge.
 
-| Total workers after hire | Cost |
-|---|---:|
-| 1 (initial) | Free |
-| 2 | $200 |
-| 3 | $500 |
-| 4 | $1200 |
-| 5 | $2800 |
+| Upgrade | Starting value | Successive cost by purchase |
+|---|---:|---|
+| Parrillero hire | One starting worker is free | $15 → $30 → $60 → $100 → MAX |
+| Cocacolero hire | No new starting worker | $15 → $30 → $60 → $100 → MAX |
+| Speed | ×1.00, free | ×1.10 $5 → ×1.20 $10 → ×1.30 $15 → ×1.40 $20 → ×1.50 $30 → ×1.60 $45 → ×1.70 $65 → ×1.80 $90 → ×1.90 $125 → MAX |
 
-### Floresta first-level affordability curve — playability adjustment (2026-10-04)
+Speed keeps the current +10% per purchase and x1.90 cap. The former later-level hire curve ($200/$500/$1200/$2800) and speed curve ($25/$40/$65/$100/$160/$250/$400/$640/$1000), plus the prior Floresta-specific split, are superseded and must not affect current gameplay. Fixed $5 product prices, coins, timers, goals, role caps, per-level staff/speed resets, within-level purchase persistence and legacy-save clamping remain unchanged.
 
-Only the first level uses these lower costs; subsequent locations retain the tables above. Speed remains +0.1 per tier, starting x1.0 free and capped at x1.9; the initial parrillero is free and the team still caps at five. The arrays are independently inspector-configurable.
+- [x] One data-driven profile supplies both hire-role curves and the speed curve; all five current runtime levels map to profile 0 in Assets/Scenes/Main.unity.
+- [x] Legacy serialized cost fields remain hidden for scene/save compatibility but are not read by runtime pricing.
+- [x] Focused EditMode tests cover exact hire/speed values, affordability, deductions, +10%, x1.90/MAX on all five runtime levels, Cocacolero's 15/30/60/100/MAX sequence where available, and per-level profile overrides.
+- [x] Focused PlayMode test covers upgrade-card purchase/debit/next-price/MAX behavior through the live view.
 
-| Speed tier | Work rate | Cost |
-|---|---:|---:|
-| Initial | 1.0 | Free |
-| 2 | 1.1 | $5 |
-| 3 | 1.2 | $10 |
-| 4 | 1.3 | $15 |
-| 5 | 1.4 | $20 |
-| 6 | 1.5 | $30 |
-| 7 | 1.6 | $45 |
-| 8 | 1.7 | $65 |
-| 9 | 1.8 | $90 |
-| 10 | 1.9 | $125 |
-
-| Total workers after hire | Cost |
-|---|---:|
-| 1 (initial) | Free |
-| 2 | $15 |
-| 3 | $30 |
-| 4 | $60 |
-| 5 | $100 |
-
-The deterministic first-level purchase playthrough spent only earned $5-per-choripán income, bought all four helpers and nine speed tiers, and won at 200/200 in 98.9s with $390 remaining. That measured run was under the former 180s limit; 98.9s is 21.1s below the new 120s limit, but the playthrough was not rerun after the timer change. The old curve lost at 82/200 even while buying affordable upgrades. No bonus coins or starting team were injected in the successful run.
-
-- [x] Source uses explicit serialized/default/fallback price tables, updates next-tier costs, clamps old purchases and prevents purchases past the last row.
-- [x] Source/Main first-level goal is200; keep120seconds, $5 per choripán, exact early win and Goal-based HUD.
-- [x] Deterministic purchase-driven first-level simulation reaches 200/200 before the deadline using only earned sales income.
-- [x] Focused Unity regressions cover the win path, displayed tier costs and the upgrade-card purchase input.
-
-**Validation:** Unity6000.6.3f1 batch: `StreetSimulationTests` **50/50 passed**; focused `UpgradeCardsUpdateNextCostsAndStopAtMaximum` PlayMode test **1/1 passed**. The simulation won at200/200 in98.9/180seconds, reaching five workers/x1.9 and ending with$390. `git diff --check` passed. This was a deterministic Unity simulation and focused editor tests, not a manual phone playthrough. No Android build/APK or phone installation was requested or performed.
+**Validation:** Unity 6000.6.3f1 EditMode economy tests passed 12/12; PlayMode UpgradeCardsUpdateNextCostsAndStopAtMaximum passed 1/1. The former full StreetSimulation fixture contains unrelated existing failures and was not used as the result for this focused change. Current active clubs are All Boys, Nueva Chicago, Liniers - Velez Sarsfield, Ferro Carril Oeste and Independiente de Avellaneda; this list is read from runtime configuration, not the stale pasted Argentinos/Vélez ordering. No APK, device install, commit or push was performed.
 
 ## Progression defaults
 
@@ -520,14 +482,14 @@ MONEDAS GANADAS is gross actual handoff income for this attempt, not the spendab
 
 ## Global customer order bubble window — source update (2026-10-06)
 
-Use one reusable order model and display layout in every current/future level. An order retains up to five distinct unlocked product lines in request order. The light, dark-edged speech-card shows only the first two lines with product icon at left and a fitted readable quantity at right; completed lines are skipped immediately, and “+N más” counts pending hidden types only. A lone visible line is centered. The window does not mutate the order or alter level-specific spawn, work, reservations, FIFO, economy, or victory rules. Existing automatic demand remains one item in Floresta, the established chori/Coca variants in Chicago, and one unlocked item on other current levels.
+Use one reusable order model and display layout in every current/future level. An order retains up to five distinct unlocked product lines in request order. The light, dark-edged speech-card shows only the first two lines with product icon at left and a fitted readable quantity at right; completed lines are skipped immediately, and “+N más” counts pending hidden types only. A lone visible line is centered inside a compact content-sized background. Use 49/74/88-unit heights for one row/two rows/two rows plus hidden-type footer, with measured width capped at the existing seven-column envelope. Reuse the speech atlas with fixed-corner nine-slice drawing; keep icon/font sizes and the customer-relative tail anchor unchanged. The window does not mutate the order or alter level-specific spawn, work, reservations, FIFO, economy, or victory rules. Existing automatic demand remains one item in Floresta, the established chori/Coca variants in Chicago, and one unlocked item on other current levels.
 
 - [x] Core stores and serves up to five ordered product/quantity/reservation lines; legacy one-/two-product entry points remain compatible.
 - [x] StreetView draws one shared maximum-two-line order window and hides completed/zero lines.
 - [x] Focused EditMode coverage checks one through five lines, hidden counts/reveal/order, multiple levels, one-row centering, old one-/two-product delivery and layout containment.
 - [x] Unity6000.6.3f1 script compilation and complete EditMode suite passed: **154/154**, including order quantities/counts/reveal/order, single-line geometry, FIFO, reservations, worker routing, deliveries, handoff coins and old combined orders.
 - [x] Complete PlayMode suite passed: **23/23**, including input, pointer, timeout and round lifecycle regressions.
-- [ ] Actual portrait Game-view/device appearance was not captured; bubble geometry/content containment is covered by EditMode layout checks.
+- [x] Adaptive-bubble follow-up (2026-10-06): 14/14 focused EditMode cases passed, including one through five pending types, local content containment, fixed corner geometry and stable anchors at tall-screen scales. Game-view captures reviewed at 1080×1920 and 1220×2712 with real model tickets containing one through four (plus five) product types; normal auto-generated All Boys/Ferro crowds also reviewed. No native-device check. No project warnings/errors during the final runtime console window; exact editor PlayerPrefs restored after review.
 
 ## Chicago specialist workers and sticky customer ownership — 2026-10-06
 
@@ -579,13 +541,13 @@ All seven stable catalog product IDs sell for $5 per unit at every location. Rem
 
 ## Defeat-result copy and return action — 2026-10-06
 
-Keep the animated full-screen trifulca, but replace the celebratory riot slogans with the direct explanation **“No llegaste a entregar todos los pedidos.”** Show a pulsing, outlined **GAME OVER** animation immediately below it. Preserve the final per-level sales/goal counters. The only defeat action is **VOLVER**; it resets the failed attempt to Ready and opens the unlocked level selector without auto-starting a round. It does not alter unlocked progression or gameplay rules.
+Keep the animated full-screen trifulca, but replace the celebratory riot slogans with the direct explanation **“No llegaste a entregar todos los pedidos.”** Show a pulsing, outlined **GAME OVER** animation immediately below it. Keep the gameplay sales counters in the upper HUD. The lower result area contains only **VOLVER**: do not draw a repeated objective summary or its translucent backing panel. The only defeat action is **VOLVER**; it resets the failed attempt to Ready and opens the unlocked level selector without auto-starting a round. It does not alter unlocked progression or gameplay rules.
 
-- [x] Loss copy, unscaled animated Game Over, sales summary and Volver action are wired in the active StreetView.
-- [x] Focused PlayMode regression source now expects Volver to return to the selector while retaining the existing zero-coin retry reset.
-- [ ] Execute the focused timeout/return test and review portrait Game view after the user requests testing.
+- [x] Loss copy, unscaled animated Game Over and Volver action are wired in active StreetView.
+- [x] Lower result summary and its backing panel are removed entirely; no layout container reserves space (result is IMGUI).
+- [x] Focused PlayMode timeout/return test passes; live portrait Game View confirms a clean lower area and working button.
 
-**Validation:** Static source/spec review only. No Unity tests, editor/Game-view review, APK or device install were run, following the user's standing no-test instruction.
+**Validation:** `RiotReturnOpensLevelSelectorWithoutStartingAutomaticallyAndDiscardsCoins` passed 1/1. Inspected actual Game View screenshot `Logs/Acceptance/GameOverBottom-20261006/gameover-clean-bottom-1.png`; no summary/panel appears. Unity console: 0 errors/warnings. PlayerPrefs, time scale, Game View and clean Main scene restored. No APK/device install requested.
 
 ## Levels 4 and 5 — Ferro Carril Oeste and Independiente de Avellaneda
 
@@ -610,3 +572,29 @@ The established station order stays Coca barrel left → centered parrilla → f
 
 - [x] Four-row transparent artwork imported at 2170×725, no baked checkerboard, Android RGBA32.
 - [x] Focused Game-view and pickup-route checks pass; visual screenshot: `Logs/Acceptance/ChicagoGrill-20261006/chicago-four-row-grill-review.png`.
+
+## Shared cover-standard navigation buttons — 2026-10-06
+
+Consolidate the existing IMGUI cover button renderer rather than adding a prefab/uGUI system. Ordinary cover/menu/selector/Ready/result controls use the same generated blue capsule and bundled outlined white Luckiest Guy caption. GAME OVER VOLVER retains its exact return action/position; victory SALIR retains its normalized exit slot/navigation and replaces the earlier green face with the shared style. Ready 1–5 controls retain unlock and input rules. Gameplay, persistence/progression, economics and special upgrade/mural cards are unchanged.
+
+- [x] One shared texture/font/renderer; no duplicate assets or fallback fonts.
+- [x] Normal/pressed/disabled states and unchanged locked navigation validated.
+- [x] Cover reference preserved; focused mouse/touch routing and result exit tests passed.
+- [x] Ordinary controls audited/migrated; special card exceptions documented.
+- [x] Future-button rule stored in AGENTS.md.
+
+## Definitive fixed furniture sizing and accessible work block — 2026-10-06
+
+Latest user request supersedes earlier per-level scaling/positions, including Chicago's reduced single-line arrangement and the larger Ferro/Independiente table. Main furniture sizes are measured directly from live Floresta IMGUI: grill282×94 and serving table196×98. StreetWorkstationLayout owns those fixed frames for all five current levels and future levels, independent of product/employee/upgrade counts. Existing grill art fits proportionally; the same Floresta table sprite is reused in every club. Food glyphs identify other ready products. Ferro retains the complete grill width, reusing Chori artwork in the otherwise unavailable fourth food bay rather than stretching a three-bay crop; no unavailable recipe/order is enabled.
+
+Size and position are separate. Final standard table is (16,540,196,98); grill is (242,577,282,94). Drink props sit in the upper work line: Coca ends at x524, beer ends at x364, both y488 and80high with their own source aspect ratios. Fernet uses its proportional94×66 prep table at(16,434). Minimum station gap6; the clear drink corridor is wider than a90pixel worker. No fixed-size table/grill is reduced to fit another prop.
+
+Every food pickup is beside the finished table at(235,575) through(235,480), not the cooking grate. Coca(435,565) approaches via(435,450); beer(395,565) via(395,450); Fernet(155,500) via(155,415). Later levels reuse(433,485) as their upper entry/exit stage. Final-arrival gates alone trigger Pickup/Handoff. Correct existing side-reach/flip/crop and reuse walks; no new animation assets. A faded near-station presentation correction keeps the same hand depth relative to fixed-height props on taller portraits; it does not change simulation, pickup delays or counter handoffs.
+
+Validate all available product paths from all seven counter columns using full90×98 worker+bob and36×12foot bounds. Arms may overlap only the station being reached; feet never enter any station. Pairwise station bounds, screen limits, HUD separation and tall pickup geometry are checked. The live IMGUI scene has no station colliders or sorting layers to migrate. Keep economics, speed/counts, requests/FIFO, goals/durations, unlocks and backgrounds unchanged. See status for executed validation.
+
+- [x] Live Floresta geometry inspected before edits; fixed furniture dimensions shared across all five levels.
+- [x] Proportional secondary props relocated without shrinking main furniture; full-body/foot station clearance checked.
+- [x] All available products reach Pickup/carry/Handoff from all seven columns; timeout/reservation regressions pass.
+- [x] Actual Game View reviewed for all five levels, plus tall portrait drink/table reach; final console clean.
+- [x] Permanent workstation rule recorded in AGENTS.md; original editor save/state restored.

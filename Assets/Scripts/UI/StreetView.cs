@@ -79,18 +79,14 @@ namespace HayChoriYPaty
         private static readonly Rect CutoutHudSales = new Rect(388, 10, 146, 45);
         private const int HudClockFontSize = 48;
         private const float CustomerHiddenLegHeight = 32f;
-        // In Floresta the table is LEFT of the grill, never below it or across its route.
-        private static readonly Rect ServingTableRect = new Rect(16, 540, 196, 98);
-        // Permanent Chicago order: Coca barrel, centered grill, finished-chori table.
-        // Uniform 56px visible gaps and a common y=686 ground line; original art proportions retained.
-        private static readonly Rect ChicagoServingTableRect = new Rect(413.2f, 625.52f, 118.8f, 60.48f);
+        // Standard station dimensions come from live Floresta, not per-level fitting.
         private const string ChicagoGrillResource = "street-parrilla-large-v4";
-        private static readonly Rect ChicagoBarrelRect = new Rect(63.44f, 590.96f, 63.36f, 95.04f);
-        private static readonly Rect VelezBarrelRect = new Rect(410, 561, 116, 132);
-        private static Rect ServingTableBounds(int productCount) => productCount == 1
-            ? ServingTableRect : new Rect(18, 610, 196, 98);
-        private static Rect ServingTableBoundsForLevel(int productCount, int levelIndex) =>
-            levelIndex == 1 ? ChicagoServingTableRect : ServingTableBounds(productCount);
+        private static readonly Rect ServingTableRect = StreetWorkstationLayout.FoodTableBounds;
+        private static readonly Rect ChicagoServingTableRect = StreetWorkstationLayout.FoodTableBounds;
+        private static readonly Rect ChicagoBarrelRect = StreetWorkstationLayout.CocaBounds;
+        private static readonly Rect VelezBarrelRect = StreetWorkstationLayout.CocaBounds;
+        private static Rect ServingTableBounds(int productCount) => StreetWorkstationLayout.FoodTableBounds;
+        private static Rect ServingTableBoundsForLevel(int productCount, int levelIndex) => StreetWorkstationLayout.FoodTableBounds;
         private static readonly Rect Start = new Rect(161, 555, 218, 61);
         private static readonly Rect Speed = new Rect(28, 710, 234, 120);
         private static readonly Rect HireParrillero = new Rect(278, 710, 234, 120);
@@ -128,6 +124,8 @@ namespace HayChoriYPaty
         private static readonly Rect RiotReturnButton = new Rect(88, 858, 364, 66);
         private StreetGame game;
         private Texture2D backdrop, chicagoBackground, velezBackground, velezCrest, velezGrill, people, items, parrillero, parrilleroDiagonal, cocacolero, parrilleroIcon, upgradeWood, speedArrows, largeGrill, servingTable, gameCoin, muralArt, allBoysCrest, chicagoCrest, cocaBottle, beverageBarrel, chicagoGrill;
+        private Texture2D clubPennantTexture;
+        private string clubPennantThemeName;
         private Texture2D allBoysFrontFans, allBoysWalkingFans, allBoysRiotFans;
         private Texture2D chicagoFrontFans, chicagoWalkingFans, chicagoRiotFans;
         private Texture2D velezFrontFans, velezWalkingFans, velezRiotFans;
@@ -286,6 +284,9 @@ namespace HayChoriYPaty
             hudBarTexture = null;
             if (cutoutHudBarTexture != null) Destroy(cutoutHudBarTexture);
             cutoutHudBarTexture = null;
+            if (clubPennantTexture != null) Destroy(clubPennantTexture);
+            clubPennantTexture = null;
+            clubPennantThemeName = null;
         }
         private void Update()
         {
@@ -732,14 +733,7 @@ namespace HayChoriYPaty
             Label(new Rect(27, 53, 486, 54), "No llegaste a entregar\ntodos los pedidos.", header);
             DrawAnimatedGameOver(new Rect(54, 106, 432, 51), Mathf.Max(0f, Time.unscaledTime - riotStartedAt));
 
-            GUI.color = new Color(.035f, .025f, .02f, .78f);
-            GUI.DrawTexture(LayoutRect(new Rect(42, 778, 456, 154)), Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
-            GUI.color = Color.white;
-            string progress = sim.LevelIndex == 1
-                ? "Chori " + Mathf.Min(sim.ChoriDelivered, sim.Goal) + "/" + sim.Goal + " · Coca " + Mathf.Min(sim.CocaDelivered, sim.Goal) + "/" + sim.Goal
-                : "Se terminó el tiempo · " + sim.Delivered + "/" + sim.Goal + " ventas";
-            Label(new Rect(54, 786, 432, 46), progress, text);
-            Button(RiotReturnButton, RiotReturnAction, "VOLVER");
+            DrawStandardButton(RiotReturnButton, RiotReturnAction, "VOLVER");
         }
 
         private void DrawAnimatedGameOver(Rect bounds, float elapsed)
@@ -794,6 +788,36 @@ namespace HayChoriYPaty
             if (muralArt != null && currentBackdrop == backdrop)
                 DrawRaw(new Rect((W - W * verticalScale) * .5f, 0,
                     W * verticalScale, MuralBounds.height * verticalScale), muralArt, MuralSource, true, false);
+            DrawClubPennants(canvasHeight, verticalScale);
+        }
+
+        private void DrawClubPennants(float canvasHeight, float verticalScale)
+        {
+            int levelIndex = game.Sim.LevelIndex;
+            // The original Floresta row is part of its background art; leave it pixel-identical.
+            if (levelIndex == 0) return;
+
+            ClubVisualTheme theme = ClubVisualTheme.ForLevel(levelIndex);
+            if (clubPennantTexture == null || clubPennantThemeName != theme.ClubName)
+            {
+                if (clubPennantTexture != null) Destroy(clubPennantTexture);
+                clubPennantTexture = ClubPennantRenderer.CreateTexture(theme);
+                clubPennantThemeName = theme.ClubName;
+            }
+
+            float height = ClubPennantRenderer.LogicalHeight * verticalScale;
+            Color previousColor = GUI.color;
+            try
+            {
+                // Keep club colors opaque even when a caller is drawing a faded transition layer.
+                GUI.color = Color.white;
+                GUI.DrawTexture(new Rect(0f, canvasHeight - height, W, height),
+                    clubPennantTexture, ScaleMode.StretchToFill, true);
+            }
+            finally
+            {
+                GUI.color = previousColor;
+            }
         }
 
         private void DrawLevelBadge(int levelIndex, Rect bounds)
@@ -1056,8 +1080,8 @@ namespace HayChoriYPaty
             GUI.color = Color.white;
             if (MenuAvailable)
             {
-                DrawMenuButton(MenuPlay, MenuPlayAction, "JUGAR");
-                DrawMenuButton(MenuQuit, MenuQuitAction, "SALIR");
+                DrawStandardButton(MenuPlay, MenuPlayAction, "JUGAR");
+                DrawStandardButton(MenuQuit, MenuQuitAction, "SALIR");
             }
         }
         private void DrawLevelSelector()
@@ -1066,7 +1090,7 @@ namespace HayChoriYPaty
             OutlineLabel(LevelSelectTitle, "ELEGÍ TU CANCHA", menuTitle, new Color(1f, .91f, .72f), 2f);
             for (int i = 0; i < StreetSimulation.LevelNames.Length; i++) DrawLevelSelectCard(i);
             Label(LevelSelectHint, "Superá cada cancha para desbloquear la siguiente", small);
-            DrawMenuButton(LevelSelectBack, LevelSelectorBackAction, "VOLVER");
+            DrawStandardButton(LevelSelectBack, LevelSelectorBackAction, "VOLVER");
         }
         private static Rect LevelSelectCardBounds(int index)
         {
@@ -1198,28 +1222,110 @@ namespace HayChoriYPaty
             Label(bounds, value, style);
             style.normal.textColor = previous;
         }
-        private void DrawMenuButton(Rect bounds, int action, string caption)
+        // The cover is the sole visual source for ordinary runtime buttons.
+        // Special upgrade cards and image-based level tiles retain their explicitly selected designs.
+        private void DrawStandardButton(Rect bounds, int action, string caption, bool enabled = true)
         {
-            bool pressed = pressedAction == action;
-            float scale = pressed ? .97f : 1f;
-            Rect r = new Rect(bounds.center.x - bounds.width * scale * .5f,
-                              bounds.center.y - bounds.height * scale * .5f,
-                              bounds.width * scale, bounds.height * scale);
-            Rect drawn = LayoutRect(r);
-            GUI.color = pressed ? new Color(.78f, .88f, 1f) : Color.white;
-            GUI.DrawTexture(drawn, menuButton, ScaleMode.StretchToFill, true);
-            GUI.color = Color.white;
-            Rect letters = new Rect(drawn.x, drawn.y - 2f, drawn.width, drawn.height - 8f);
-            menuTitle.normal.textColor = new Color(.035f, .075f, .16f);
-            // Eight-direction outline keeps the chunky white comic letters legible.
-            for (int y = -1; y <= 1; y++)
-            for (int x = -1; x <= 1; x++)
-                if (x != 0 || y != 0)
-                    GUI.Label(new Rect(letters.x + x * 2.2f, letters.y + y * 2.2f, letters.width, letters.height), caption, menuTitle);
-            menuTitle.normal.textColor = Color.white;
-            GUI.Label(letters, caption, menuTitle);
-            if (GUI.Button(LayoutRect(bounds), "", invisible)) NativeAction(action);
+            bool interactive = enabled && GUI.enabled;
+            bool pressed = interactive && pressedAction == action;
+            Rect hitBounds = LayoutRect(bounds);
+            Rect drawn = StandardButtonVisualBounds(hitBounds, pressed);
+            Color previousColor = GUI.color;
+            bool previousEnabled = GUI.enabled;
+            try
+            {
+                GUI.color = StandardButtonTint(interactive, pressed);
+                DrawStandardButtonBackground(drawn);
+                GUI.color = Color.white;
+                int fontSize = FitStandardButtonFontSize(menuTitle, caption, bounds);
+                var captionStyle = CreateStandardButtonLabelStyle(menuTitle, fontSize,
+                    interactive ? Color.white : new Color(.80f, .87f, .94f));
+                var borderStyle = CreateStandardButtonLabelStyle(menuTitle, fontSize, new Color(.035f, .075f, .16f));
+                float textScale = bounds.height / 92f;
+                Rect letters = new Rect(drawn.x, drawn.y - 2f * textScale,
+                    drawn.width, drawn.height - 8f * textScale);
+                float outline = 2.2f * captionStyle.fontSize / 38f;
+                for (int y = -1; y <= 1; y++)
+                for (int x = -1; x <= 1; x++)
+                    if (x != 0 || y != 0)
+                        GUI.Label(new Rect(letters.x + x * outline, letters.y + y * outline,
+                            letters.width, letters.height), caption, borderStyle);
+                GUI.Label(letters, caption, captionStyle);
+                GUI.enabled = interactive;
+                if (GUI.Button(hitBounds, "", invisible)) NativeAction(action);
+            }
+            finally
+            {
+                GUI.color = previousColor;
+                GUI.enabled = previousEnabled;
+            }
         }
+
+        private static Rect StandardButtonVisualBounds(Rect bounds, bool pressed)
+        {
+            float scale = pressed ? .97f : 1f;
+            return new Rect(bounds.center.x - bounds.width * scale * .5f,
+                bounds.center.y - bounds.height * scale * .5f, bounds.width * scale, bounds.height * scale);
+        }
+
+        private static Color StandardButtonTint(bool enabled, bool pressed) =>
+            !enabled ? new Color(.50f, .62f, .75f) : pressed ? new Color(.78f, .88f, 1f) : Color.white;
+
+        private static GUIStyle CreateStandardButtonLabelStyle(GUIStyle source, int fontSize, Color color)
+        {
+            var style = new GUIStyle(source) { fontSize = fontSize };
+            // GUI.Label also inherits skin hover colors; they must not erase our custom outline.
+            style.normal.textColor = style.hover.textColor = style.active.textColor = style.focused.textColor = color;
+            return style;
+        }
+
+        private static int FitStandardButtonFontSize(GUIStyle style, string caption, Rect bounds)
+        {
+            int original = style.fontSize;
+            int preferred = Mathf.Max(11, Mathf.RoundToInt(38f * bounds.height / 92f));
+            try
+            {
+                style.fontSize = preferred;
+                float width = Mathf.Max(1f, bounds.width - 24f * bounds.height / 92f);
+                float measured = style.CalcSize(new GUIContent(caption)).x;
+                return measured > width ? Mathf.Max(11, Mathf.FloorToInt(preferred * width / measured)) : preferred;
+            }
+            finally { style.fontSize = original; }
+        }
+
+        private static Rect StandardButtonSliceBounds(Rect bounds, int slice)
+        {
+            float cap = Mathf.Min(bounds.height * .5f, bounds.width * .5f);
+            return slice == 0 ? new Rect(bounds.x, bounds.y, cap, bounds.height)
+                : slice == 1 ? new Rect(bounds.x + cap, bounds.y, bounds.width - cap * 2f, bounds.height)
+                : new Rect(bounds.xMax - cap, bounds.y, cap, bounds.height);
+        }
+
+        private void DrawStandardButtonBackground(Rect bounds)
+        {
+            if (menuButton == null) return;
+            // The original cover aspect uses its original exact texture mapping.
+            if (Mathf.Abs(bounds.width / bounds.height - menuButton.width / (float)menuButton.height) < .03f)
+            {
+                GUI.DrawTexture(bounds, menuButton, ScaleMode.StretchToFill, true);
+                return;
+            }
+            // Resize only the straight middle; end caps, gloss, rim and shadow retain their proportions.
+            for (int slice = 0; slice < 3; slice++)
+            {
+                Rect dest = StandardButtonSliceBounds(bounds, slice);
+                Rect source = StandardButtonSliceBounds(new Rect(0, 0, menuButton.width, menuButton.height), slice);
+                if (dest.width <= 0f) continue;
+                // Fractional portrait transforms can round adjacent IMGUI rectangles apart.
+                // Overlap their internal edges by less than one physical pixel, extending matching UVs.
+                float seam = .75f / Mathf.Max(.01f, Mathf.Abs(GUI.matrix.m00));
+                float sourceSeam = seam * source.width / dest.width;
+                if (slice > 0) { dest.xMin -= seam; source.xMin -= sourceSeam; }
+                if (slice < 2) { dest.xMax += seam; source.xMax += sourceSeam; }
+                DrawRaw(dest, menuButton, source, true, false);
+            }
+        }
+
         private static Texture2D CreateMenuButton()
         {
             const int width = 512, height = 164;
@@ -1324,29 +1430,65 @@ namespace HayChoriYPaty
             int pendingLines = c.PendingOrderLineCount;
             if (pendingLines > 0)
             {
-                Rect bubble = OrderBubbleBounds(position);
-                Item(bubble, 11, true);
                 int visibleLines = Mathf.Min(StreetCustomer.MaxVisibleOrderProducts, pendingLines);
+                float quantityWidth = 20f;
+                for (int i = 0; i < visibleLines; i++)
+                    quantityWidth = Mathf.Max(quantityWidth, text.CalcSize(new GUIContent(c.GetVisibleOrderLine(i).Remaining.ToString())).x);
+                // Transform the anchor once; local content offsets must not grow on tall screens.
+                Rect bubble = OrderBubbleLayoutBounds(OrderBubbleBounds(position, pendingLines, quantityWidth), layoutVerticalScale);
+                DrawOrderBubble(bubble);
                 for (int i = 0; i < visibleLines; i++)
                     DrawOrderLine(OrderLineBounds(bubble, i, visibleLines), c.GetVisibleOrderLine(i));
                 if (c.HiddenOrderLineCount > 0)
-                    Label(OrderMoreBounds(bubble), "+" + c.HiddenOrderLineCount + " más", tiny);
+                    GUI.Label(OrderMoreBounds(bubble), "+" + c.HiddenOrderLineCount + " más", tiny);
             }
             // A sprite-backed patience strip; no placeholder shape stands in for game art.
             GUI.color=new Color(.32f,.7f,.32f);Item(new Rect(position.x-22,position.y-64,44*c.PatienceFraction,4),13,true);GUI.color=Color.white;
         }
-        private static Rect OrderBubbleBounds(Vector2 customerPosition) =>
-            new Rect(customerPosition.x - 35f, customerPosition.y - 154f, 70f, 86f);
+        private const float OrderRowHeight = 25f;
+        private const float OrderPaddingY = 8f;
+        private const float OrderTailHeight = 8f;
+        private const float OrderFooterHeight = 14f;
 
-        private static Rect OrderLineBounds(Rect bubble, int row, int visibleRows)
+        private static Rect OrderBubbleBounds(Vector2 customerPosition, int pendingLines, float quantityWidth = 28f)
         {
-            const float rowHeight = 25f;
-            float top = visibleRows <= 1 ? bubble.y + 26.5f : bubble.y + 8f + row * 25f;
-            return new Rect(bubble.x + 5f, top, bubble.width - 10f, rowHeight);
+            int rows = Mathf.Clamp(pendingLines, 1, StreetCustomer.MaxVisibleOrderProducts);
+            float width = Mathf.Clamp(42f + quantityWidth, 62f, 70f);
+            float height = OrderPaddingY * 2f + rows * OrderRowHeight + OrderTailHeight
+                + (pendingLines > rows ? OrderFooterHeight : 0f);
+            // Keep the same customer-relative tail baseline and horizontal center as before.
+            return new Rect(customerPosition.x - width * .5f, customerPosition.y - 68f - height, width, height);
         }
 
+        private static Rect OrderBubbleLayoutBounds(Rect bubble, float verticalScale)
+        {
+            bubble.y = bubble.yMax * verticalScale - bubble.height;
+            return bubble;
+        }
+
+        private static Rect OrderLineBounds(Rect bubble, int row, int visibleRows) =>
+            new Rect(bubble.x + 5f, bubble.y + OrderPaddingY + row * OrderRowHeight, bubble.width - 10f, OrderRowHeight);
+
         private static Rect OrderMoreBounds(Rect bubble) =>
-            new Rect(bubble.x + 4f, bubble.y + 60f, bubble.width - 8f, 12f);
+            new Rect(bubble.x + 4f, bubble.yMax - OrderTailHeight - OrderPaddingY - 12f, bubble.width - 8f, 12f);
+
+        private static Rect OrderBubbleSlice(Rect bounds, int column, int row, float borderX, float borderY)
+        {
+            float x = column == 0 ? bounds.x : column == 1 ? bounds.x + borderX : bounds.xMax - borderX;
+            float y = row == 0 ? bounds.y : row == 1 ? bounds.y + borderY : bounds.yMax - borderY;
+            return new Rect(x, y, column == 1 ? bounds.width - borderX * 2f : borderX,
+                row == 1 ? bounds.height - borderY * 2f : borderY);
+        }
+
+        private void DrawOrderBubble(Rect bounds)
+        {
+            if (items == null) return;
+            // Reuse the authored speech shape: only its center/edge runs stretch, not the rounded corners.
+            for (int row = 0; row < 3; row++)
+            for (int column = 0; column < 3; column++)
+                DrawRaw(OrderBubbleSlice(bounds, column, row, 20f, 15f), items,
+                    OrderBubbleSlice(Items[11], column, row, 84f, 65f), true, false);
+        }
 
         private static Rect OrderIconBounds(Rect row) => new Rect(row.x + 2f, row.y + 1f, 26f, row.height - 2f);
         private static Rect OrderQuantityBounds(Rect row) => new Rect(row.x + 30f, row.y, row.width - 32f, row.height);
@@ -1361,10 +1503,10 @@ namespace HayChoriYPaty
         private void DrawOrderLine(Rect row, StreetOrderLine line)
         {
             if (line == null || line.Remaining <= 0) return;
-            DrawProductIcon(OrderIconBounds(row), line.Product);
+            DrawProductIcon(OrderIconBounds(row), line.Product, false);
             int originalFontSize = text.fontSize;
             text.fontSize = FitOrderQuantityFontSize(text, line.Remaining.ToString(), OrderQuantityBounds(row).width);
-            Label(OrderQuantityBounds(row), line.Remaining.ToString(), text);
+            GUI.Label(OrderQuantityBounds(row), line.Remaining.ToString(), text);
             text.fontSize = originalFontSize;
         }
         private void DrawCustomerBody(StreetCustomer c, bool walking)
@@ -1541,9 +1683,12 @@ namespace HayChoriYPaty
             bool isCocacolero=StreetSimulation.UsesSpecialistWorkers(game.Sim.LevelIndex) && w.Role==StreetWorkerRole.Cocacolero && cocacolero!=null;
             Vector2 movement=w.Target-w.Position;
             int frame=moving?SelectParrilleroWalkFrame(movement,w.AnimationTime):0;
-            if(w.State==StreetWorkerState.Pickup)frame=game.Sim.LevelIndex==1 ? 7 : 11;
+            if(w.State==StreetWorkerState.Pickup)frame=7;
             if(w.State==StreetWorkerState.Handoff)frame=3;
             float bob=moving?Mathf.Sin(w.AnimationTime*16)*1.5f:0;
+            float stationOffset = StreetWorkstationLayout.WorkerPresentationOffset(w.Position, w.Product, layoutVerticalScale)
+                / Mathf.Max(.01f, layoutVerticalScale);
+            bob += stationOffset;
             Rect workerRect=new Rect(w.Position.x-45,w.Position.y-98+bob,90,98);
             if(isCocacolero)
             {
@@ -1554,18 +1699,21 @@ namespace HayChoriYPaty
                     frame=x>y?9+phase:(movement.y>0?1+phase:5+phase);
                 }
                 bool flip=game.Sim.LevelIndex==1
-                    ? ChicagoWorkerFlip(true,frame,movement,w.State==StreetWorkerState.Pickup)
-                    : moving && Mathf.Abs(movement.x)>Mathf.Abs(movement.y) && movement.x<0;
-                Rect[] poses=game.Sim.LevelIndex==1 ? ChicagoCocacoleroPoses : CocacoleroPoses;
+                    ? (w.State == StreetWorkerState.Pickup ? !StreetWorkstationLayout.PickupReachesRight(w.Product)
+                        : ChicagoWorkerFlip(true,frame,movement,false))
+                    : w.State == StreetWorkerState.Pickup ? !StreetWorkstationLayout.PickupReachesRight(w.Product)
+                        : moving && Mathf.Abs(movement.x)>Mathf.Abs(movement.y) && movement.x<0;
+                Rect[] poses=ChicagoCocacoleroPoses;
                 Draw(workerRect,cocacolero,poses[Mathf.Clamp(frame,0,poses.Length-1)],false,flip);
             }
             else if(frame>=16)ParrilleroDiagonal(workerRect,frame-16);
-            else Parrillero(workerRect,frame,game.Sim.LevelIndex==1
-                ? ChicagoWorkerFlip(false,frame,movement,w.State==StreetWorkerState.Pickup)
-                : moving&&movement.x>30);
+            else Parrillero(workerRect,frame,w.State == StreetWorkerState.Pickup
+                ? StreetWorkstationLayout.PickupReachesRight(w.Product)
+                : game.Sim.LevelIndex == 1 ? ChicagoWorkerFlip(false,frame,movement,false)
+                : moving && Mathf.Abs(movement.x) > Mathf.Abs(movement.y) && movement.x > 0);
             if(w.State==StreetWorkerState.ToCounter || (w.State==StreetWorkerState.Handoff && !isCocacolero))
                 DrawProductIcon(new Rect(w.Position.x-25,w.Position.y-46+bob,31,29),w.Product);
-            if(w.State==StreetWorkerState.Pickup && !isCocacolero && game.Sim.LevelIndex!=1) {GUI.color=new Color(1,1,1,.55f);Item(new Rect(w.Position.x-15,w.Position.y-45,30,36),19);GUI.color=Color.white;}
+            if(w.State==StreetWorkerState.Pickup && !isCocacolero && game.Sim.LevelIndex!=1) {GUI.color=new Color(1,1,1,.55f);Item(new Rect(w.Position.x-15,w.Position.y-45+stationOffset,30,36),19);GUI.color=Color.white;}
         }
         private static bool ChicagoWorkerFlip(bool cocacolero, int frame, Vector2 movement, bool pickup)
         {
@@ -1585,96 +1733,58 @@ namespace HayChoriYPaty
             if(x>y)return 9+phase;
             return movement.y<0?5+phase:1+phase;
         }
-        // Floresta keeps the grill to the RIGHT of the table and the walk lane.
-        // Later multi-product layouts keep their existing station spacing.
-        private static Rect GrillRect(int productCount)
-        {
-            return productCount == 1 ? new Rect(242, 550, 282, 94)
-                : productCount <= 4 ? new Rect(23, 530, 494, 108) : new Rect(23, 548, 280, 90);
-        }
-        private static Rect GrillRectForLevel(int productCount, int levelIndex) =>
-            levelIndex == 1 ? new Rect(182.88f, 627f, 174.24f, 59f)
-                : levelIndex == 2 ? new Rect(22, 535, 382, 118) : GrillRect(productCount);
+        private static Rect GrillRect(int productCount) => StreetWorkstationLayout.GrillBounds;
+        private static Rect GrillRectForLevel(int productCount, int levelIndex) => StreetWorkstationLayout.GrillBounds;
         private void DrawGrill()
         {
-            if (game.Sim.LevelIndex >= 3 && fourZoneGrill != null)
+            int level = game.Sim.LevelIndex;
+            Texture2D grill = level >= 3 && fourZoneGrill != null ? fourZoneGrill
+                : level == 1 && chicagoGrill != null ? chicagoGrill
+                : level == 2 && velezGrill != null ? velezGrill : largeGrill;
+            Rect bounds = StreetWorkstationLayout.GrillBounds;
+            if (grill == null) { Item(bounds, 7); return; }
+            Rect drawn = StreetWorkstationLayout.FitArtwork(LayoutRect(bounds), new Vector2(grill.width, grill.height));
+            GUI.DrawTexture(drawn, grill, ScaleMode.StretchToFill, true);
+            if (level == 3 && grill == fourZoneGrill)
             {
-                bool ferro = game.Sim.LevelIndex == 3;
-                // Ferro crops the unavailable fourth bay; Independiente shows all four equal cooking zones.
-                Rect destination = ferro ? new Rect(16, 518, 278, 94) : new Rect(16, 518, 370, 94);
-                Rect source = ferro ? new Rect(0, 0, fourZoneGrill.width * .75f, fourZoneGrill.height)
-                    : new Rect(0, 0, fourZoneGrill.width, fourZoneGrill.height);
-                Draw(destination, fourZoneGrill, source, true, false);
-                return;
+                // Keep the complete, proportional grill frame: Ferro's unavailable Vacío bay uses Chori instead.
+                // Reuse the existing first quarter, without stretching the three-bay crop into another-sized grill.
+                DrawRaw(new Rect(drawn.x + drawn.width * .75f, drawn.y, drawn.width * .25f, drawn.height),
+                    grill, new Rect(0, 0, grill.width * .25f, grill.height), true, true);
             }
-            Rect r = GrillRectForLevel(game.Sim.ProductCount, game.Sim.LevelIndex);
-            Texture2D grill = game.Sim.LevelIndex == 1 && chicagoGrill != null ? chicagoGrill : game.Sim.LevelIndex == 1 ? largeGrill
-                : game.Sim.LevelIndex == 2 && velezGrill != null ? velezGrill : largeGrill;
-            if (grill != null) GUI.DrawTexture(LayoutRect(r), grill, ScaleMode.StretchToFill);
-            else Item(r, 7); // Existing original parrilla is a safe missing-resource fallback.
         }
         private void DrawServingTable()
         {
-            if (game.Sim.LevelIndex >= 3)
-            {
-                if (readySandwichesTable != null)
-                {
-                    Rect table = new Rect(16, 614, 370, 87);
-                    GUI.DrawTexture(LayoutRect(table), readySandwichesTable, ScaleMode.StretchToFill, true);
-                    int foodSlot = 0;
-                    for (int product = 0; product <= 3; product++)
-                    {
-                        if (!game.Sim.IsProductAvailable(product)) continue;
-                        float x = 62 + foodSlot * 92;
-                        DrawProductIcon(new Rect(x - 18, 636, 36, 28), product);
-                        Label(new Rect(x - 32, 665, 64, 14), StreetSimulation.ProductNames[product].ToUpperInvariant(), tiny);
-                        foodSlot++;
-                    }
-                }
-                if (game.Sim.LevelIndex == 4 && fernetTable != null)
-                    Draw(new Rect(446, 622, 94, 66), fernetTable, new Rect(0, 0, fernetTable.width, fernetTable.height), true, false);
-                return;
-            }
-            if (game.Sim.LevelIndex == 2 || servingTable == null) return;
-            Draw(ServingTableBoundsForLevel(game.Sim.ProductCount, game.Sim.LevelIndex), servingTable, new Rect(0, 0, servingTable.width, servingTable.height), false, false);
+            // Reuse Floresta's actual table art, so its aspect, silhouette and legs stay identical in every club.
+            if (servingTable != null)
+                Draw(StreetWorkstationLayout.FoodTableBounds, servingTable,
+                    new Rect(0, 0, servingTable.width, servingTable.height), false, false);
         }
-        private void DrawStation(int i,bool unlocked)
+        private static string StationLabelForProduct(int product)
+        {
+            if (product == 4) return "COCA 600 ml";
+            if (product == 6) return "CERVEZA";
+            if (product == 5) return "FERNET 1 L";
+            return string.Empty;
+        }
+
+        private void DrawStation(int i, bool unlocked)
         {
             if (!unlocked) return;
-            int levelIndex = game.Sim.LevelIndex;
-            if (levelIndex >= 3)
+            Rect station = StreetWorkstationLayout.BoundsForProduct(i);
+            if (i >= 4)
             {
-                if (i == 4 && beverageBarrel != null)
-                {
-                    Draw(new Rect(391, 522, 58, 92), beverageBarrel, new Rect(0, 0, beverageBarrel.width, beverageBarrel.height), false, false);
-                    Label(new Rect(384, 602, 72, 13), "COCA", tiny);
-                }
-                else if (i == 6 && beerBarrel != null)
-                {
-                    Draw(new Rect(448, 522, 58, 92), beerBarrel, new Rect(0, 0, beerBarrel.width, beerBarrel.height), false, false);
-                    Label(new Rect(442, 602, 72, 13), "CERVEZA", tiny);
-                }
-                else if (i == 5 && levelIndex == 4)
-                    Label(new Rect(466, 685, 72, 13), "FERNET 1 L", tiny);
-                return;
+                Texture2D art = i == 4 ? beverageBarrel : i == 6 ? beerBarrel : fernetTable;
+                if (art != null) Draw(station, art, new Rect(0, 0, art.width, art.height), false, false);
             }
-            bool chicago = levelIndex == 1;
-            bool velez = levelIndex == 2;
-            float x=StreetSimulation.StationPositionForLevel(i, levelIndex, game.Sim.ProductCount).x;
-            if ((chicago || velez) && i == 4 && beverageBarrel != null)
-                Draw(chicago ? ChicagoBarrelRect : VelezBarrelRect, beverageBarrel, new Rect(0, 0, beverageBarrel.width, beverageBarrel.height), false, false);
-            else if(i>=4) Item(new Rect(x-33,555,66,72),8);
-            if (velez)
-            {
-                if (i == 0) Label(new Rect(62, 653, 126, 22), "CHORI", tiny);
-                else if (i == 1) Label(new Rect(244, 653, 126, 22), "PATY", tiny);
-                else if (i == 4) Label(new Rect(407, 535, 126, 20), "COCA 600 ml", tiny);
-                return;
-            }
-            float y=chicago ? 535 : i<4 ? GrillRect(game.Sim.ProductCount).y-15 : 548;
-            if(ShouldDrawStationProductBadge(i) && !(chicago && i == 4)) DrawProductIcon(new Rect(x-18,y,36,38),i);
-            Rect productName = chicago && i == 4 ? new Rect(ChicagoBarrelRect.center.x - 54, 688, 108, 18) : new Rect(x-34,618,68,20);
-            if (!ServingTableBoundsForLevel(game.Sim.ProductCount, levelIndex).Overlaps(productName)) Label(productName,StreetSimulation.ProductNames[i],tiny);
+            string stationLabel = StationLabelForProduct(i);
+            if (!string.IsNullOrEmpty(stationLabel))
+                Label(new Rect(Mathf.Clamp(station.center.x - 48, 0, W - 96), station.y - 17, 96, 16), stationLabel, tiny);
+            if (i >= 4) return;
+            if (game.Sim.LevelIndex == 0) return;
+            // Labels/icons identify finished products on the one standard table, never on the cooking grate.
+            float x = station.x + 25 + i * 46;
+            DrawProductIcon(new Rect(x - 17, station.y + 3, 34, 25), i);
         }
         private static bool ShouldDrawStationProductBadge(int productIndex)
         {
@@ -1751,7 +1861,7 @@ namespace HayChoriYPaty
         private void ReadyPanel()
         {
             // Prices are fixed in every location; Ready has no price-selection panel or hidden controls.
-            DrawMenuButton(Start, 1, "JUGAR");
+            DrawStandardButton(Start, 1, "JUGAR");
             ReadyLevels();
         }
         private void ReadyLevels()
@@ -1759,10 +1869,10 @@ namespace HayChoriYPaty
             DrawLevelBadge(game.SelectedLevel, ReadyLevelBadge);
             for(int i=0;i<5;i++)
             {
-                Rect r=LevelButton(i);bool unlocked=i<=game.UnlockedLevel;GUI.color=unlocked?Color.white:new Color(.6f,.6f,.6f);
-                Item(r,12,true);GUI.color=Color.white;
-                if(unlocked)Label(r,(i+1).ToString(),text);else Item(new Rect(r.center.x-9,r.y+5,18,23),17);
-                bool prev=GUI.enabled;GUI.enabled=unlocked;if(GUI.Button(LayoutRect(r),"",invisible))NativeAction(10+i);GUI.enabled=prev;
+                Rect r = LevelButton(i);
+                bool unlocked = i <= game.UnlockedLevel;
+                DrawStandardButton(r, 10 + i, unlocked ? (i + 1).ToString() : "", unlocked);
+                if (!unlocked) Item(new Rect(r.center.x - 9, r.y + 5, 18, 23), 17);
             }
         }
         private static Rect LevelButton(int i){return new Rect(108+i*67,912,57,35);}
@@ -1794,13 +1904,17 @@ namespace HayChoriYPaty
         }
         private void VictoryText(Rect bounds, string value, int preferred, Color fill, TextAnchor alignment)
         {
-            int originalSize = menuTitle.fontSize;
-            TextAnchor originalAlignment = menuTitle.alignment;
-            menuTitle.fontSize = FitVictoryFont(menuTitle, value, preferred, bounds);
-            menuTitle.alignment = alignment;
-            OutlineLabel(bounds, value, menuTitle, fill, preferred >= 32 ? 2f : .65f);
-            menuTitle.fontSize = originalSize;
-            menuTitle.alignment = originalAlignment;
+            // Keep popup/cover styles isolated and avoid inherited white hover on static summary labels.
+            int fontSize = FitVictoryFont(menuTitle, value, preferred, bounds);
+            var captionStyle = CreateStandardButtonLabelStyle(menuTitle, fontSize, fill);
+            captionStyle.alignment = alignment;
+            var borderStyle = CreateStandardButtonLabelStyle(captionStyle, fontSize, new Color(.08f, .035f, .018f, .98f));
+            float offset = preferred >= 32 ? 2f : .65f;
+            for (int y = -1; y <= 1; y++)
+            for (int x = -1; x <= 1; x++)
+                if (x != 0 || y != 0)
+                    Label(new Rect(bounds.x + x * offset, bounds.y + y * offset, bounds.width, bounds.height), value, borderStyle);
+            Label(bounds, value, captionStyle);
         }
         private void ResultPanel()
         {
@@ -1817,7 +1931,7 @@ namespace HayChoriYPaty
                 {
                     FillRect(frame, new Color(.19f, .07f, .025f));
                     FillRect(VictorySlot(frame, new Rect(.07f, .35f, .86f, .47f)), new Color(1f, .91f, .71f));
-                    FillRect(VictorySlot(frame, VictoryExit), new Color(.18f, .71f, .035f));
+                    FillRect(VictorySlot(frame, VictoryExit), new Color(.015f, .06f, .18f));
                 }
                 float fontScale = frame.width / 516f;
                 Color gold = new Color(1f, .82f, .22f), brown = new Color(.18f, .055f, .018f);
@@ -1840,14 +1954,10 @@ namespace HayChoriYPaty
                     "TIEMPO\nSOBRANTE", Mathf.RoundToInt(25f * fontScale), brown, TextAnchor.MiddleLeft);
                 VictoryText(VictorySlot(frame, new Rect(.588f, .685f, .337f, .104f)),
                     FormatVictoryTime(game.Sim.TimeRemaining), Mathf.RoundToInt(42f * fontScale), gold, TextAnchor.MiddleCenter);
-                int exitFont = Mathf.RoundToInt((pressedAction == VictoryExitAction ? 42f : 44f) * fontScale);
-                VictoryText(VictorySlot(frame, new Rect(.242f, .86f, .52f, .102f)),
-                    "SALIR", exitFont, new Color(1f, .96f, .83f), TextAnchor.MiddleCenter);
-                if (GUI.Button(VictorySlot(frame, VictoryExit), "", invisible)) NativeAction(VictoryExitAction);
+                DrawStandardButton(VictorySlot(frame, VictoryExit), VictoryExitAction, "SALIR");
             }
             finally { layoutVerticalScale = previousVertical; }
         }
-        private void Button(Rect r,int action,string label){Item(r,13,true);Label(r,label,title);if(GUI.Button(LayoutRect(r),"",invisible))NativeAction(action);}
         private void Styles()
         {
             if(tiny!=null)return;
@@ -1882,11 +1992,13 @@ namespace HayChoriYPaty
             else if(id==16 && parrilleroIcon!=null)Draw(r,parrilleroIcon,new Rect(22,6,1269,1188),false,false);
             else if(items!=null&&id>=0&&id<Items.Length)Draw(r,items,Items[id],stretch,false);
         }
-        private void DrawProductIcon(Rect r, int product)
+        private void DrawProductIcon(Rect r, int product, bool applyLayout = true)
         {
+            if (applyLayout) r = LayoutRect(r);
             if (product == 4 && cocaBottle != null)
-                Draw(r, cocaBottle, new Rect(0, 0, cocaBottle.width, cocaBottle.height), false, false);
-            else Item(r, product);
+                DrawRaw(r, cocaBottle, new Rect(0, 0, cocaBottle.width, cocaBottle.height), false, false);
+            else if (items != null && product >= 0 && product < Items.Length)
+                DrawRaw(r, items, Items[product], false, false);
         }
         private void Parrillero(Rect r,int id,bool flip)
         {
