@@ -1,5 +1,10 @@
 # Project status
 
+## Android APK — four-specialty build (2026-10-07)
+
+Packaged the pushed `cc456c8` source with Unity6000.6.3f1 for Main-only Android Development/IL2CPP/ARM64. APK version0.2.16/code18 built successfully (BuildReport0 errors/1 warning), integrity/package metadata and v2 debug signature verified. Archive, rolling and versioned aliases match, size439,337,048 bytes; SHA-256 `df2944e2975c5c96e03e0c133df78550028f686991c675910aac0c22fe46ed1c`. Console notes one URP asset-inclusion warning and a non-blocking Diagnostics Data symbols advisory. No device install/launch. Detailed Android receipt in `features/android-prototype.md`.
+
+
 ## Four exclusive worker specialties — 2026-10-07 (implemented and validated)
 
 StreetSpecialties is the product→role/station authority: normal Chori/Paty; Premium Bondiola/Vacío on a separate equal-size grill; Cocacolero Coca/Cerveza; Fernetero Fernet only. Role/cards/station availability follows actual catalogs, including synthetic index0/10 tests. All11 live catalogs, IDs, prices, goals, durations, demand, club themes and original Main serialization are unchanged. One TEST_ECONOMY_PROFILE supplies $15/$30/$60/$100/MAX to independent paid tiers; initial normal is free and first paid normal hire is $15. Optional role-profile overrides inherit the existing level profile by default. Save v3 migrates v1/v2 safely, preserves unlocks, and never restores hires/speed/coins into a fresh attempt.

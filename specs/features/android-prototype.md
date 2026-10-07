@@ -1,4 +1,14 @@
-# Current Android delivery — 2026-10-06 (0.2.15/code17, Chicago grill)
+# Current Android delivery — 2026-10-07 (0.2.16/code18, four specialties)
+
+Unity6000.6.3f1 Main-only Development Android IL2CPP ARM64 build `build-c291df4c16`: **Succeeded in424.81s; BuildReport0 errors/1 warning**. The sole build warning is URP reporting1 asset included. Console additionally logs a Diagnostics Data debug-symbol configuration advisory at Error log level; it did not produce a build error. Package `com.haychoriypaty.game`, version0.2.16/code18, min API26/target36, `arm64-v8a`.
+
+Fresh archive `Builds/Android/Archive/HayChoriYPaty-0.2.16-code18-four-specialties.apk`: **439,337,048 bytes**. SHA-256 `df2944e2975c5c96e03e0c133df78550028f686991c675910aac0c22fe46ed1c`. `aapt dump badging` verifies package/version/min/target; `unzip -t` reports no archive errors; Unity-bundled OpenJDK + `apksigner` confirms APK Signature Scheme v2 and the established Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`. Root alias `Builds/Android/HayChoriYPaty-0.2.16.apk` and rolling `Builds/Android/HayChoriYPaty-street.apk` match the archive byte-for-byte. Earlier archive deliveries were preserved.
+
+Built from the already-pushed four-specialty commit `cc456c87c04e5dc29749bf2537dcbf5f71767f11`; final full EditMode310/310 and PlayMode35/35 and Game View QA were run immediately before packaging, no project code changed during this build. The project version remains0.2.16/code18; no installer/device operation was requested or performed. This is local Development/debug signing, not a Play Store production-signed release.
+
+---
+
+## Previous Android delivery — 2026-10-06 (0.2.15/code17, Chicago grill)
 
 Unity 6000.6.3f1 Main-only Development Android IL2CPP/ARM64 build `build-b25ab47045`: **Succeeded in 264.65s**, 0 errors / 1 warning. APK package `com.haychoriypaty.game`, version0.2.15/code17, min API26 / target36, `arm64-v8a`.
 
