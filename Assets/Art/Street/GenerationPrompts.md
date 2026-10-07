@@ -352,3 +352,9 @@ Use case: stylized-concept. Transparent game sprite sheet for Hay Chori y Paty, 
 
 - Corrections: make the long-sleeve jersey/jackets/buzos cover forearms to wrists; retain EQT circular center badge and polo contrasting shoulder/collar/cuff blocks. Preserve all24cells, pose pairs and character identities. Final background extraction removes colored/translucent haze without altering clothing/poses; requires transparent gutters and opaque sprite interiors.
 - Riot prompt: same12character/outfit identities and6×4layout, paired angry-raised-fists / existing cartoon wooden-stick swing poses, preserve garment colors/cuts including long sleeves. Reuse existing riot timing/movement and customerId variant assignment; no new mechanics or injury imagery.
+
+
+## Premium grill — 2026-10-07
+
+Asset: Resources/street-grill-premium-v1.png. Built-in imagegen edit of existing street-grill-four-zones-v1.png; retain rectangular Argentine iron grill, elevated frontal cartoon perspective, embers, full handles/feet,3:1 shape. Replace all chorizo/paty/bread with only pork shoulder steaks on left and beef flank strips on right. Second edit removes all floor shadows/gray smears and requests clean transparent gutters. Original assets retained. Preview reviewed; import/Game View validation recorded in specs/status.md.
+SHA256: dfc0585e6270b07867b18fa95bf9fc8ee75ecc042f9dc9bc8ed6c5c4cb3456d0

@@ -90,8 +90,14 @@ namespace HayChoriYPaty.Tests
         private string Phase { get { return Get("Sim").GetType().GetProperty("Phase", PublicInstance).GetValue(Get("Sim"), null).ToString(); } }
         private object Sim { get { return Get("Sim"); } }
         private void SetSim(string property, object value) { Sim.GetType().GetProperty(property, PublicInstance).SetValue(Sim, value, null); }
-        private void Invoke(object target, string method, params object[] args) { target.GetType().GetMethod(method, PublicInstance).Invoke(target, args); }
-        private object CallGame(string method, params object[] args) { return gameType.GetMethod(method, PublicInstance).Invoke(game, args); }
+        private static MethodInfo Command(Type type, string method, int arity)
+        {
+            foreach (MethodInfo candidate in type.GetMethods(PublicInstance))
+                if (candidate.Name == method && candidate.GetParameters().Length == arity) return candidate;
+            throw new MissingMethodException(type.Name,method);
+        }
+        private void Invoke(object target, string method, params object[] args) { Command(target.GetType(),method,args.Length).Invoke(target,args); }
+        private object CallGame(string method, params object[] args) { return Command(gameType,method,args.Length).Invoke(game,args); }
         private void AssertFreshAttempt(string context)
         {
             Assert.AreEqual(1, Sim.GetType().GetProperty("ParrilleroCount", PublicInstance).GetValue(Sim, null), context);
@@ -764,6 +770,28 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual("Playing", Phase);
             Assert.AreEqual(0, viewType.GetField("pressedAction", PrivateInstance).GetValue(view));
         }
+
+        [UnityTest]
+        public IEnumerator PremiumAndFernetCardsDispatchIndependentMouseAndTouchPurchases()
+        {
+            gameType.GetField("save",PrivateInstance).GetValue(game).GetType().GetField("unlockedLevel").SetValue(gameType.GetField("save",PrivateInstance).GetValue(game),10);
+            Assert.IsTrue((bool)CallGame("SelectLevel",4));CallGame("StartRound");SetSim("Coins",10000);
+            Tune("workerSpeed",.1f);Tune("customerArrivalSeconds",10000f);
+            Rect premium=CatalogCard(20),fernet=CatalogCard(21);
+            yield return Click(premium.center.x,premium.center.y);
+            Assert.AreEqual(1,Sim.GetType().GetProperty("ParrilleroPremiumCount").GetValue(Sim));
+            Assert.AreEqual(0,Sim.GetType().GetProperty("FerneteroCount").GetValue(Sim));
+            Touchscreen touch=InputSystem.AddDevice<Touchscreen>();
+            try { yield return Tap(touch,fernet.center.x,fernet.center.y,201); }
+            finally { InputSystem.RemoveDevice(touch); }
+            Assert.AreEqual(1,Sim.GetType().GetProperty("FerneteroCount").GetValue(Sim));
+            Assert.AreEqual(1,Sim.GetType().GetProperty("ParrilleroCount").GetValue(Sim));
+            Assert.AreEqual(0,Sim.GetType().GetProperty("CocacoleroCount").GetValue(Sim));
+            Assert.AreEqual(9970,Sim.GetType().GetProperty("Coins").GetValue(Sim));
+            Assert.AreEqual(30,Sim.GetType().GetProperty("ParrilleroPremiumHireCost").GetValue(Sim));
+            Assert.AreEqual(30,Sim.GetType().GetProperty("FerneteroHireCost").GetValue(Sim));
+        }
+        private Rect CatalogCard(int action) => (Rect)view.GetType().GetMethod("CatalogUpgradeCardBounds",StaticPrivate).Invoke(null,new object[]{Sim,action});
 
     }
 }

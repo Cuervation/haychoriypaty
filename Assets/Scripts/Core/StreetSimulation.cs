@@ -8,7 +8,7 @@ namespace HayChoriYPaty
     public sealed class StreetUpgradeCostProfile
     {
         public string profileId = "TEST_ECONOMY_PROFILE";
-        [Tooltip("Shared by Parrillero and Cocacolero; existing role-count rules keep a worker free where applicable.")]
+        [Tooltip("Shared hire curve used by every role unless its optional role profile override selects another profile.")]
         public int[] hireCosts = { 15, 30, 60, 100 };
         public int[] speedUpgradeCosts = { 5, 10, 15, 20, 30, 45, 65, 90, 125 };
     }
@@ -23,10 +23,14 @@ namespace HayChoriYPaty
         [Tooltip("Zero inherits maxStaff; each specialty has an independent cap.")]
         [Min(0)] public int maxParrilleros;
         [Min(0)] public int maxCocacoleros;
+        [Min(0)] public int maxPremiumParrilleros;
+        [Min(0)] public int maxFerneteros;
         [Tooltip("All current clubs temporarily use the same profile; add profiles and remap levels for future club-specific economy.")]
         public StreetUpgradeCostProfile[] upgradeCostProfiles = { new StreetUpgradeCostProfile() };
         [Tooltip("Profile index used per level; all current levels share profile 0.")]
         public int[] levelUpgradeCostProfileIds = { 0, 0, 0, 0, 0 };
+        [Tooltip("Optional hire-profile override by role enum value; -1 inherits that level's shared profile.")]
+        public int[] roleHireCostProfileIds = { -1, -1, -1, -1 };
         [HideInInspector, Tooltip("Legacy serialized fields retained only for scene compatibility; runtime costs come from upgradeCostProfiles.")]
         public int[] hireCosts = { 15, 30, 60, 100 };
         [HideInInspector, Tooltip("Legacy serialized fields retained only for scene compatibility; runtime costs come from upgradeCostProfiles.")]
@@ -60,9 +64,23 @@ namespace HayChoriYPaty
 
         public StreetUpgradeCostProfile GetUpgradeCostProfile(int levelIndex)
         {
+            return GetProfile(levelUpgradeCostProfileIds != null && levelIndex >= 0 && levelIndex < levelUpgradeCostProfileIds.Length
+                ? levelUpgradeCostProfileIds[levelIndex] : 0);
+        }
+
+        public StreetUpgradeCostProfile GetHireCostProfile(int levelIndex, StreetWorkerRole role)
+        {
+            int roleIndex = (int)role;
+            int profileIndex = roleHireCostProfileIds != null && roleIndex >= 0 && roleIndex < roleHireCostProfileIds.Length
+                ? roleHireCostProfileIds[roleIndex] : -1;
+            return GetProfile(profileIndex >= 0 ? profileIndex :
+                levelUpgradeCostProfileIds != null && levelIndex >= 0 && levelIndex < levelUpgradeCostProfileIds.Length
+                    ? levelUpgradeCostProfileIds[levelIndex] : 0);
+        }
+
+        private StreetUpgradeCostProfile GetProfile(int profileIndex)
+        {
             if (upgradeCostProfiles == null || upgradeCostProfiles.Length == 0) return DefaultUpgradeCostProfile;
-            int profileIndex = levelUpgradeCostProfileIds != null && levelIndex >= 0 && levelIndex < levelUpgradeCostProfileIds.Length
-                ? levelUpgradeCostProfileIds[levelIndex] : 0;
             if (profileIndex < 0 || profileIndex >= upgradeCostProfiles.Length) profileIndex = 0;
             return upgradeCostProfiles[profileIndex] ?? DefaultUpgradeCostProfile;
         }
@@ -70,7 +88,7 @@ namespace HayChoriYPaty
 
     public enum StreetCustomerState { Entering, Waiting, Receiving, Leaving, Advancing }
     public enum StreetWorkerState { Idle, ToStation, Pickup, ToCounter, Handoff }
-    public enum StreetWorkerRole { Parrillero, Cocacolero }
+    public enum StreetWorkerRole { Parrillero = 0, Cocacolero = 1, ParrilleroPremium = 2, Fernetero = 3 }
 
     [Serializable]
     public sealed class StreetOrderLine
@@ -233,35 +251,53 @@ namespace HayChoriYPaty
         {
             get
             {
-                if (!UsesSpecialistWorkers(LevelIndex)) return StreetWorkerRole.Parrillero;
-                int parrilleros = 0, cocacoleros = 0;
-                foreach (StreetWorker worker in workers)
-                    if (worker.Role == StreetWorkerRole.Cocacolero) cocacoleros++; else parrilleros++;
-                return parrilleros <= cocacoleros ? StreetWorkerRole.Parrillero : StreetWorkerRole.Cocacolero;
+                StreetWorkerRole[] roles = { StreetWorkerRole.Parrillero, StreetWorkerRole.Cocacolero,
+                    StreetWorkerRole.ParrilleroPremium, StreetWorkerRole.Fernetero };
+                StreetWorkerRole best = StreetWorkerRole.Parrillero;
+                int lowestCount = int.MaxValue;
+                foreach (StreetWorkerRole role in roles)
+                {
+                    if (!HasRole(role)) continue;
+                    int count = WorkerCount(role);
+                    if (count < lowestCount) { lowestCount = count; best = role; }
+                }
+                return best;
             }
         }
         public int ParrilleroCount { get { return WorkerCount(StreetWorkerRole.Parrillero); } }
         public int CocacoleroCount { get { return WorkerCount(StreetWorkerRole.Cocacolero); } }
-        public bool HasCocacolero { get { for (int i = 0; i < ProductCount; i++) if (IsDrinkProduct(GetAvailableProduct(i))) return UsesSpecialistWorkers(LevelIndex); return false; } }
+        public int ParrilleroPremiumCount { get { return WorkerCount(StreetWorkerRole.ParrilleroPremium); } }
+        public int FerneteroCount { get { return WorkerCount(StreetWorkerRole.Fernetero); } }
+        public bool HasCocacolero { get { return HasRole(StreetWorkerRole.Cocacolero); } }
+        public bool HasParrilleroPremium { get { return HasRole(StreetWorkerRole.ParrilleroPremium); } }
+        public bool HasFernetero { get { return HasRole(StreetWorkerRole.Fernetero); } }
         public int ParrilleroHireCost { get { return HireCostForRole(StreetWorkerRole.Parrillero); } }
         public int CocacoleroHireCost { get { return HireCostForRole(StreetWorkerRole.Cocacolero); } }
+        public int ParrilleroPremiumHireCost { get { return HireCostForRole(StreetWorkerRole.ParrilleroPremium); } }
+        public int FerneteroHireCost { get { return HireCostForRole(StreetWorkerRole.Fernetero); } }
         public bool CanHireParrillero { get { return CanHireRole(StreetWorkerRole.Parrillero); } }
         public bool CanHireCocacolero { get { return CanHireRole(StreetWorkerRole.Cocacolero); } }
+        public bool CanHireParrilleroPremium { get { return CanHireRole(StreetWorkerRole.ParrilleroPremium); } }
+        public bool CanHireFernetero { get { return CanHireRole(StreetWorkerRole.Fernetero); } }
+        public bool HasRole(StreetWorkerRole role) { return StreetSpecialties.CatalogHasRole(availableProductsByLevel[LevelIndex], role); }
         public int WorkerCount(StreetWorkerRole role) { int count = 0; foreach (var worker in workers) if (worker.Role == role) count++; return count; }
         public int MaxWorkersForRole(StreetWorkerRole role)
         {
-            if (role == StreetWorkerRole.Cocacolero && !HasCocacolero) return 0;
-            int configured = role == StreetWorkerRole.Parrillero ? balance.maxParrilleros : balance.maxCocacoleros;
-            return Mathf.Clamp(configured > 0 ? configured : balance.maxStaff, 1, HireCosts.Length + 1);
+            if (!HasRole(role)) return 0;
+            int configured = role == StreetWorkerRole.Parrillero ? balance.maxParrilleros :
+                role == StreetWorkerRole.Cocacolero ? balance.maxCocacoleros :
+                role == StreetWorkerRole.ParrilleroPremium ? balance.maxPremiumParrilleros : balance.maxFerneteros;
+            return Mathf.Clamp(configured > 0 ? configured : balance.maxStaff, 1, GetHireCosts(role).Length + 1);
         }
         public int HireCostForRole(StreetWorkerRole role)
         {
             int count = WorkerCount(role);
             if (count >= MaxWorkersForRole(role)) return 0;
-            int costIndex = role == StreetWorkerRole.Cocacolero ? count : Mathf.Max(0, count - 1);
-            return costIndex < HireCosts.Length ? Mathf.Max(1, HireCosts[costIndex]) : 0;
+            int costIndex = role == StreetWorkerRole.Parrillero ? Mathf.Max(0, count - 1) : count;
+            int[] costs = GetHireCosts(role);
+            return costIndex < costs.Length ? Mathf.Max(1, costs[costIndex]) : 0;
         }
-public bool CanHireRole(StreetWorkerRole role)
+        public bool CanHireRole(StreetWorkerRole role)
         {
             int workerCount = WorkerCount(role);
             int hireCost = HireCostForRole(role);
@@ -278,10 +314,14 @@ public bool CanHireRole(StreetWorkerRole role)
         {
             get
             {
-                StreetUpgradeCostProfile profile = UpgradeCostProfile;
-                return profile != null && profile.hireCosts != null && profile.hireCosts.Length > 0
-                    ? profile.hireCosts : DefaultHireCosts;
+                return GetHireCosts(StreetWorkerRole.Parrillero);
             }
+        }
+        private int[] GetHireCosts(StreetWorkerRole role)
+        {
+            StreetUpgradeCostProfile profile = balance.GetHireCostProfile(LevelIndex, role);
+            return profile != null && profile.hireCosts != null && profile.hireCosts.Length > 0
+                ? profile.hireCosts : DefaultHireCosts;
         }
         private int[] SpeedCosts
         {
@@ -319,9 +359,7 @@ public bool CanHireRole(StreetWorkerRole role)
             return slot >= 0 && slot < ProductCount ? availableProductsByLevel[LevelIndex][slot] : -1;
         }
 
-        public static bool UsesSpecialistWorkers(int levelIndex) => levelIndex >= 1;
-        public static bool IsFoodProduct(int product) => product >= 0 && product <= 3;
-        public static bool IsDrinkProduct(int product) => product >= 4 && product <= 6;
+        public bool HasSpecialtyWorkers { get { return StreetSpecialties.CatalogHasNonDefaultRole(availableProductsByLevel[LevelIndex]); } }
 
         private static int[][] BuildAvailableProducts(StreetBalance value)
         {
@@ -380,7 +418,6 @@ public bool CanHireRole(StreetWorkerRole role)
             Coins = 0; CoinsEarned = 0; // Both totals belong only to this attempt.
             // Every round entry is a fresh attempt, regardless of selected club.
             ResetTeamAndSpeed();
-            if (!UsesSpecialistWorkers(LevelIndex)) SetWorkerRolesForCurrentLevel();
             foreach (StreetWorker worker in workers) ResetWorker(worker);
             Elapsed = 0f; Delivered = 0; ChoriDelivered = 0; CocaDelivered = 0;
             arrival = 0f; roundFirstOrder = 1; Phase = RoundPhase.Playing;
@@ -421,7 +458,6 @@ public bool CanHireRole(StreetWorkerRole role)
             if (Phase != RoundPhase.Ready || level < 0 || level >= LevelNames.Length) return false;
             LevelIndex = level;
             ResetTeamAndSpeed();
-            if (!UsesSpecialistWorkers(LevelIndex)) SetWorkerRolesForCurrentLevel();
             Coins = 0; CoinsEarned = 0;
             return true;
         }
@@ -430,7 +466,6 @@ public bool CanHireRole(StreetWorkerRole role)
             if (Phase != RoundPhase.Won || LevelIndex + 1 >= LevelNames.Length) return false;
             LevelIndex++;
             ResetTeamAndSpeed();
-            if (!UsesSpecialistWorkers(LevelIndex)) SetWorkerRolesForCurrentLevel();
             Coins = 0; CoinsEarned = 0;
             Phase = RoundPhase.Ready; return true;
         }
@@ -496,8 +531,10 @@ public bool CanHireRole(StreetWorkerRole role)
             (LevelIndex == 1 && (worker.Product == 0 || worker.Product == 4)) ||
             (LevelIndex == 2 && (worker.Product == 0 || worker.Product == 1 || worker.Product == 4)) ||
             LevelIndex >= 3;
-        private Vector2 StationPositionForWorker(StreetWorker worker) =>
-            StationPositionForLevel(worker.Product, LevelIndex, ProductCount);
+        private bool UsesExpandedStationRoutes { get { return HasParrilleroPremium; } }
+        private Vector2 StationPositionForWorker(StreetWorker worker) => UsesExpandedStationRoutes
+            ? StreetWorkstationLayout.PickupPosition(worker.Product, true)
+            : StationPositionForLevel(worker.Product, LevelIndex, ProductCount);
         private Vector2 StationApproachForWorker(StreetWorker worker) =>
             StationApproachPointForLevel(worker.Product, LevelIndex);
 
@@ -620,7 +657,17 @@ public bool CanHireRole(StreetWorkerRole role)
                     w.Position = Move(w.Position, w.Target, balance.workerSpeed * WorkRate, dt);
                     if (w.Position == w.Target)
                     {
-                        if (LevelIndex >= 3)
+                        if (UsesExpandedStationRoutes)
+                        {
+                            Vector2[] route = StreetWorkstationLayout.ApproachRoute(w.Product, true);
+                            if (w.StationRouteStage < route.Length - 1)
+                            {
+                                w.StationRouteStage++;
+                                w.Target = route[w.StationRouteStage];
+                            }
+                            else { w.State = StreetWorkerState.Pickup; w.Delay = balance.pickupSeconds / WorkRate; }
+                        }
+                        else if (LevelIndex >= 3)
                         {
                             if (w.StationRouteStage == 0)
                             {
@@ -648,7 +695,13 @@ public bool CanHireRole(StreetWorkerRole role)
                     if (w.Delay <= 0f)
                     {
                         w.State = StreetWorkerState.ToCounter;
-                        if (LevelIndex >= 3)
+                        if (UsesExpandedStationRoutes)
+                        {
+                            Vector2[] route = StreetWorkstationLayout.ApproachRoute(w.Product, true);
+                            w.StationRouteStage = route.Length - 2;
+                            w.Target = w.StationRouteStage >= 0 ? route[w.StationRouteStage] : CounterHandoffPosition(w.Customer);
+                        }
+                        else if (LevelIndex >= 3)
                         {
                             w.StationRouteStage = 1;
                             w.UsingStationApproach = false;
@@ -666,7 +719,17 @@ public bool CanHireRole(StreetWorkerRole role)
                     w.Position = Move(w.Position, w.Target, balance.workerSpeed * WorkRate, dt);
                     if (w.Position == w.Target)
                     {
-                        if (LevelIndex >= 3 && w.StationRouteStage == 1)
+                        if (UsesExpandedStationRoutes && w.StationRouteStage >= 0)
+                        {
+                            Vector2[] route = StreetWorkstationLayout.ApproachRoute(w.Product, true);
+                            w.StationRouteStage--;
+                            w.Target = w.StationRouteStage >= 0 ? route[w.StationRouteStage] : CounterHandoffPosition(w.Customer);
+                        }
+                        else if (UsesExpandedStationRoutes)
+                        {
+                            w.State = StreetWorkerState.Handoff; w.Delay = balance.pickupSeconds / WorkRate;
+                        }
+                        else if (LevelIndex >= 3 && w.StationRouteStage == 1)
                         {
                             w.StationRouteStage = 0;
                             w.Target = NewLevelStationRoutePoint(w, 0);
@@ -722,7 +785,7 @@ public bool CanHireRole(StreetWorkerRole role)
 
         private StreetOrderLine NextOrderLineToServe(StreetCustomer customer, StreetWorker worker)
         {
-            if (UsesSpecialistWorkers(LevelIndex))
+            if (HasSpecialtyWorkers)
             {
                 for (int i = 0; i < customer.OrderLineCount; i++)
                 {
@@ -752,14 +815,13 @@ public bool CanHireRole(StreetWorkerRole role)
 
         private bool IsWorkerResponsibleFor(StreetWorker worker, int product)
         {
-            if (worker.Role == StreetWorkerRole.Cocacolero) return IsDrinkProduct(product);
-            return LevelIndex == 1 ? product == 0 : IsFoodProduct(product);
+            return StreetSpecialties.IsResponsible(worker.Role, product);
         }
 
         private void ClaimAndDispatch(StreetWorker worker, StreetCustomer customer, StreetOrderLine line)
         {
             line.OwnerWorkerId = worker.Id;
-            if (UsesSpecialistWorkers(LevelIndex))
+            if (HasSpecialtyWorkers)
             {
                 // The owner reserves their complete food/drink share while moving one unit at a time.
                 for (int i = 0; i < customer.OrderLineCount; i++)
@@ -777,7 +839,14 @@ public bool CanHireRole(StreetWorkerRole role)
 
         private void DispatchToStation(StreetWorker worker)
         {
-            if (LevelIndex >= 3)
+            if (UsesExpandedStationRoutes)
+            {
+                Vector2[] route = StreetWorkstationLayout.ApproachRoute(worker.Product, true);
+                worker.StationRouteStage = 0;
+                worker.UsingStationApproach = false;
+                worker.Target = route[0];
+            }
+            else if (LevelIndex >= 3)
             {
                 worker.StationRouteStage = 0;
                 worker.UsingStationApproach = false;
@@ -804,7 +873,7 @@ public bool CanHireRole(StreetWorkerRole role)
         {
             StreetCustomer customer = worker.Customer;
             StreetOrderLine line = customer != null ? customer.FindOrderLine(worker.Product) : null;
-            bool correctSpecialty = !UsesSpecialistWorkers(LevelIndex) || IsWorkerResponsibleFor(worker, worker.Product);
+            bool correctSpecialty = IsWorkerResponsibleFor(worker, worker.Product);
             if (IsAtCounter(customer) && customers.Contains(customer) && correctSpecialty && line != null &&
                 line.OwnerWorkerId == worker.Id && line.Reserved > 0 && line.Remaining > 0)
             {
@@ -828,7 +897,7 @@ public bool CanHireRole(StreetWorkerRole role)
                     return;
                 }
 
-                if (UsesSpecialistWorkers(LevelIndex))
+                if (HasSpecialtyWorkers)
                 {
                     // Keep the assigned client until every line for this worker's whole specialty is complete.
                     StreetOrderLine nextPart = NextOrderLineToServe(customer, worker);
@@ -952,21 +1021,11 @@ public bool CanHireRole(StreetWorkerRole role)
             SpeedLevel = 0; // Zero purchased upgrades means the displayed speed is x1.00.
             AddWorker();
         }
-        private void AddWorker() { AddWorker(NextHireRole); }
+        private void AddWorker() { AddWorker(StreetWorkerRole.Parrillero); }
         private void AddWorker(StreetWorkerRole role)
         {
             workers.Add(new StreetWorker { Id = nextWorker++, Role = role, Product = -1,
                 Position = WorkerHomePosition, Target = WorkerHomePosition, State = StreetWorkerState.Idle });
-        }
-        private void SetWorkerRolesForCurrentLevel()
-        {
-            int parrilleros = 0, cocacoleros = 0;
-            foreach (StreetWorker worker in workers)
-            {
-                worker.Role = UsesSpecialistWorkers(LevelIndex) && parrilleros > cocacoleros
-                    ? StreetWorkerRole.Cocacolero : StreetWorkerRole.Parrillero;
-                if (worker.Role == StreetWorkerRole.Cocacolero) cocacoleros++; else parrilleros++;
-            }
         }
         private void ResetWorker(StreetWorker w) { w.Customer = null; w.CustomerId = 0; w.Product = -1; w.State = StreetWorkerState.Idle; w.UsingStationApproach = false; w.StationRouteStage = 0; w.Target = WorkerHomePosition; }
         private static Vector2 Move(Vector2 from, Vector2 to, float speed, float dt) { return Vector2.MoveTowards(from, to, speed * dt); }

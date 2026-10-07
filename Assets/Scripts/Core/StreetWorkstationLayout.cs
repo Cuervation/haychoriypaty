@@ -26,16 +26,66 @@ namespace HayChoriYPaty
         public static Vector2 ApproachPosition(int product) =>
             product < 4 ? new Vector2(235, 480) : product == 5 ? new Vector2(155, 415)
             : new Vector2(product == 4 ? 435 : 395, 450);
+        // Expanded kitchen is selected by the catalog, never by the level number.
+        public static Rect PremiumGrillBounds => new Rect(16, 434, ReferenceGrillSize.x, ReferenceGrillSize.y);
+        public static Rect TableBounds(bool premium) => premium ? new Rect(0, 540, ReferenceTableSize.x, ReferenceTableSize.y) : FoodTableBounds;
+        public static Rect BoundsForProduct(int product, bool premium)
+        {
+            if (!premium) return BoundsForProduct(product);
+            switch (StreetSpecialties.GetStation(product))
+            {
+                case StreetSpecialties.Station.PremiumGrill: return PremiumGrillBounds;
+                case StreetSpecialties.Station.NormalGrill: return TableBounds(true);
+                case StreetSpecialties.Station.CocaBarrel: return CocaBounds;
+                case StreetSpecialties.Station.BeerBarrel: return new Rect(364, 434, BeerBounds.width, BeerBounds.height);
+                case StreetSpecialties.Station.FernetTable: return new Rect(16, 646, 94, 66);
+                default: return default;
+            }
+        }
+        public static Vector2 PickupPosition(int product, bool premium)
+        {
+            if (!premium) return PickupPosition(product);
+            switch (StreetSpecialties.GetStation(product))
+            {
+                case StreetSpecialties.Station.NormalGrill: return new Vector2(219, 575);
+                case StreetSpecialties.Station.PremiumGrill: return new Vector2(343, 510);
+                case StreetSpecialties.Station.CocaBarrel: return new Vector2(450, 565);
+                case StreetSpecialties.Station.BeerBarrel: return new Vector2(450, 514);
+                case StreetSpecialties.Station.FernetTable: return new Vector2(155, 712);
+                default: return KitchenEntry;
+            }
+        }
+        public static Vector2[] ApproachRoute(int product, bool premium)
+        {
+            Vector2 pickup = PickupPosition(product, premium);
+            if (!premium) return new[] { KitchenEntry, ApproachPosition(product), pickup };
+            switch (StreetSpecialties.GetStation(product))
+            {
+                case StreetSpecialties.Station.NormalGrill:
+                    return new[] { new Vector2(343, 415), new Vector2(343, 540), new Vector2(219, 540), pickup };
+                case StreetSpecialties.Station.PremiumGrill:
+                    return new[] { new Vector2(343, 415), pickup };
+                case StreetSpecialties.Station.FernetTable:
+                    return new[] { new Vector2(343, 415), new Vector2(343, 540), new Vector2(219, 540), new Vector2(219, 726), pickup };
+                default: return new[] { new Vector2(450, 415), pickup };
+            }
+        }
+        public static Vector2 ApproachPosition(int product, bool premium)
+        {
+            Vector2[] route = ApproachRoute(product, premium);
+            return route[route.Length - 2];
+        }
+        public static bool PickupReachesRight(int product, bool premium) => BoundsForProduct(product, premium).center.x > PickupPosition(product, premium).x;
         public static bool PickupReachesRight(int product) => BoundsForProduct(product).center.x > PickupPosition(product).x;
         public static Rect WorkerFootBounds(Vector2 feet) => new Rect(feet.x - FootHalfWidth, feet.y - 12, FootHalfWidth * 2, 12);
         // Keep the same local hand-to-prop height when portrait anchors spread apart.
         // Fade only the near-station visual correction; counter/handoff and simulation routes remain unchanged.
-        public static float WorkerPresentationOffset(Vector2 feet, int product, float verticalScale)
+        public static float WorkerPresentationOffset(Vector2 feet, int product, float verticalScale, bool premium = false)
         {
             if (product < 0) return 0f;
-            Vector2 pickup = PickupPosition(product), approach = ApproachPosition(product);
+            Vector2 pickup = PickupPosition(product, premium), approach = ApproachPosition(product, premium);
             float weight = Mathf.Clamp01(1f - Vector2.Distance(feet, pickup) / Mathf.Max(1f, Vector2.Distance(approach, pickup)));
-            return (pickup.y - BoundsForProduct(product).y - WorkerHeight) * (1f - verticalScale) * weight;
+            return (pickup.y - BoundsForProduct(product, premium).y - WorkerHeight) * (1f - verticalScale) * weight;
         }
         public static Rect WorkerVisualBounds(Vector2 feet) => new Rect(feet.x - WorkerHalfWidth, feet.y - WorkerHeight, WorkerHalfWidth * 2, WorkerHeight + 1.5f);
 

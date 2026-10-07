@@ -156,3 +156,10 @@ Live MCP inspection confirms stations are IMGUI textures rather than prefab/Spri
 ## 2026-10-06 — Temporarily share the Floresta upgrade economy across all current levels
 
 For test builds, map every level in the current runtime catalog to one TEST_ECONOMY_PROFILE: Parrillero/Cocacolero hire rows $15/$30/$60/$100 (with the existing free starting Parrillero) and speed rows $5/$10/$15/$20/$30/$45/$65/$90/$125, +10% per purchase, capped at ×1.90. This replaces the prior active distinction between Floresta and later-level curves; fixed product prices, employee caps, speed increment, save/purchase persistence and gameplay remain unchanged. Keep level-index-to-profile mapping data-driven so later club-specific curves need only new profile data and mapping, not code branches. The Cocacolero's independent hire curve uses the same shared hire-cost source.
+
+
+## 2026-10-07 — Catalog-derived worker/station authority
+
+Keep stable product and original role IDs; append Premium/Fernetero. One StreetSpecialties mapping drives responsibility, stations, availability and cards. Share the current cost profile but count each paid tier independently. Extend saves to v3 without restoring legacy attempt purchases or resetting unlocks. Preserve normal furniture scale; add an equal-size independent Premium grill, catalog-selected kitchen graph and two-row4/5-card HUD. Reuse exact worker pose atlases via blue/black apron palettes rather than regenerate mismatched animations. Historical shared-grill/two-role evidence is superseded by this contract, not deleted.
+
+Expanded route occupancy uses full36×12 feet, not projected90×98 body AABBs: frontal-elevated2D depth legitimately overlaps bodies and props. Requiring90px corridors for both282px grills and196px table in540px would force prohibited shrinking. Preserve original strict body-clearance tests for the no-Premium layout and pair expanded foot-route sampling with real portrait Game View inspection. Preserve/integrate the pre-existing removal of drink-station labels in the changed station renderer; do not reintroduce labels during this feature.

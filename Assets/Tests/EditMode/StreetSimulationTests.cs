@@ -66,19 +66,24 @@ namespace HayChoriYPaty.Tests
         private static float WorkerServiceY => (float)Type.GetType("HayChoriYPaty.StreetSceneLayout, Assembly-CSharp", true)
             .GetField("WorkerServiceY", BindingFlags.Public | BindingFlags.Static).GetValue(null);
         private static Rect WorkBounds(string name) => (Rect)Workstations.GetProperty(name).GetValue(null, null);
-        private static Rect ProductBounds(int product) => (Rect)Workstations.GetMethod("BoundsForProduct").Invoke(null, new object[] { product });
-        private static Rect WorkerBounds(string method, Vector2 position) => (Rect)Workstations.GetMethod(method).Invoke(null, new object[] { position });
+        private static Rect ProductBounds(int product, bool premium = false) => (Rect)(premium
+            ? Workstations.GetMethod("BoundsForProduct", new[] { typeof(int), typeof(bool) }).Invoke(null, new object[] { product, true })
+            : Workstations.GetMethod("BoundsForProduct", new[] { typeof(int) }).Invoke(null, new object[] { product }));
+        private static Vector2 PickupPosition(int product, bool premium = false) => (Vector2)(premium
+            ? Workstations.GetMethod("PickupPosition", new[] { typeof(int), typeof(bool) }).Invoke(null, new object[] { product, true })
+            : Workstations.GetMethod("PickupPosition", new[] { typeof(int) }).Invoke(null, new object[] { product }));
+        private static Rect WorkerBounds(string method, Vector2 position) => (Rect)Workstations.GetMethod(method, new[] { typeof(Vector2) }).Invoke(null, new object[] { position });
 
         [TestCase(0)] [TestCase(4)] [TestCase(5)] [TestCase(6)]
         public void StandardWorkstationPickupPresentationKeepsLocalReachDepthOnTallPortrait(int product)
         {
             const float scale = 1.25f;
             Rect prop = ProductBounds(product);
-            Vector2 feet = (Vector2)Workstations.GetMethod("PickupPosition").Invoke(null, new object[] { product });
-            float offset = (float)Workstations.GetMethod("WorkerPresentationOffset").Invoke(null, new object[] { feet, product, scale });
+            Vector2 feet = (Vector2)Workstations.GetMethod("PickupPosition", new[] { typeof(int) }).Invoke(null, new object[] { product });
+            float offset = (float)Workstations.GetMethod("WorkerPresentationOffset").Invoke(null, new object[] { feet, product, scale, false });
             float drawnFeet = (feet.y - 98f) * scale + 98f + offset;
             Assert.AreEqual(feet.y - prop.y, drawnFeet - prop.y * scale, .001f, "Reach height relative to station top remains fixed");
-            Assert.AreEqual(0f, Workstations.GetMethod("WorkerPresentationOffset").Invoke(null, new object[] { feet, product, 1f }));
+            Assert.AreEqual(0f, Workstations.GetMethod("WorkerPresentationOffset").Invoke(null, new object[] { feet, product, 1f, false }));
             Rect body = new Rect(feet.x - 45, drawnFeet - 98, 90, 99.5f);
             foreach (string name in new[] { "GrillBounds", "FoodTableBounds", "CocaBounds", "BeerBounds", "FernetBounds" })
             {
@@ -106,7 +111,7 @@ namespace HayChoriYPaty.Tests
             for (int i = 0; i < (int)Get(sim, "ProductCount"); i++)
             {
                 int p = (int)Call(sim, "GetAvailableProduct", i);
-                Vector2 pickup = (Vector2)Workstations.GetMethod("PickupPosition").Invoke(null, new object[] { p });
+                Vector2 pickup = (Vector2)Workstations.GetMethod("PickupPosition", new[] { typeof(int) }).Invoke(null, new object[] { p });
                 foreach (Rect prop in props) Assert.IsFalse(WorkerBounds("WorkerFootBounds", pickup).Overlaps(prop));
             }
             Rect fitted = (Rect)Workstations.GetMethod("FitArtwork").Invoke(null, new object[] { WorkBounds("GrillBounds"), new Vector2(2170, 725) });
@@ -124,12 +129,26 @@ namespace HayChoriYPaty.Tests
             for (int column = 0; column < 7; column++)
             {
                 object sim = Make(staff: level == 0 ? 1 : 2, level: level, balance: balance); Start(sim);
+                object requiredRole = Type.GetType("HayChoriYPaty.StreetSpecialties, Assembly-CSharp", true)
+                    .GetMethod("GetRequiredWorkerRole", BindingFlags.Public | BindingFlags.Static).Invoke(null, new object[] { product });
+                if ((int)Call(sim, "WorkerCount", requiredRole) == 0)
+                {
+                    Set(sim, "Coins", 10000);
+                    Assert.IsTrue((bool)Call(sim, "TryHire", requiredRole), "Hire the catalog-required worker for product " + product);
+                    Set(sim, "Coins", 0);
+                }
+                bool premiumLayout = (bool)Get(sim, "HasParrilleroPremium");
                 Assert.IsTrue(Spawn(sim, product, 2)); object client = Customers(sim)[0];
                 Vector2 target = (Vector2)Get(client, "Target"); target.x = 58 + column * 70;
                 Set(client, "Target", target); SetWaiting(client);
                 client.GetType().GetField("Slot", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(client, column);
-                var props = new System.Collections.Generic.List<Rect> { WorkBounds("GrillBounds"), WorkBounds("FoodTableBounds") };
-                foreach (int drink in new[] { 4, 5, 6 }) if ((bool)Call(sim, "IsProductAvailable", drink)) props.Add(ProductBounds(drink));
+                var props = new System.Collections.Generic.List<Rect>
+                {
+                    WorkBounds("GrillBounds"),
+                    (Rect)Workstations.GetMethod("TableBounds", new[] { typeof(bool) }).Invoke(null, new object[] { premiumLayout })
+                };
+                if (premiumLayout) props.Add(WorkBounds("PremiumGrillBounds"));
+                foreach (int drink in new[] { 4, 5, 6 }) if ((bool)Call(sim, "IsProductAvailable", drink)) props.Add(ProductBounds(drink, premiumLayout));
                 bool picked = false, carried = false, handed = false;
                 for (int frame = 0; frame < 3000 && (int)Get(sim, "Delivered") < 2; frame++)
                 {
@@ -140,10 +159,15 @@ namespace HayChoriYPaty.Tests
                         Vector2 feet = (Vector2)Get(worker, "Position"); string state = Get(worker, "State").ToString();
                         foreach (Rect prop in props)
                         {
-                            Assert.IsFalse(WorkerBounds("WorkerFootBounds", feet).Overlaps(prop), "Feet crossed prop in " + state);
-                            if (prop != ProductBounds(p)) Assert.IsFalse(WorkerBounds("WorkerVisualBounds", feet).Overlaps(prop), "Full body/bob crossed another prop in " + state);
+                            Assert.IsFalse(WorkerBounds("WorkerFootBounds", feet).Overlaps(prop),
+                                "Worker product " + p + " feet at " + feet + " crossed prop " + prop + " in " + state);
+                            // In the expanded frontal 2D kitchen, full-body AABBs may overlap props in depth;
+                            // preserve the stricter check for the original one-grill layout only.
+                            if (!premiumLayout && prop != ProductBounds(p, false))
+                                Assert.IsFalse(WorkerBounds("WorkerVisualBounds", feet).Overlaps(prop),
+                                    "Worker product " + p + " body at " + feet + " crossed prop " + prop + " in " + state);
                         }
-                        if (state == "Pickup") { picked = true; Assert.AreEqual(Workstations.GetMethod("PickupPosition").Invoke(null, new object[] { product }), feet); }
+                        if (state == "Pickup") { picked = true; Assert.AreEqual(PickupPosition(product, premiumLayout), feet); }
                         if (state == "ToCounter") carried = true;
                         if (state == "Handoff") handed = true;
                     }
@@ -769,7 +793,7 @@ public void ParrilleroAndCocacoleroMaxAreIndependent()
 
             object migrated = gameType.GetMethod("MigrateSaveData", BindingFlags.NonPublic | BindingFlags.Static)
                 .Invoke(null, new[] { legacy });
-            Assert.AreEqual(2, saveType.GetField("version").GetValue(migrated));
+            Assert.AreEqual(3, saveType.GetField("version").GetValue(migrated));
             Assert.AreEqual(1, saveType.GetField("staff").GetValue(migrated));
             Assert.AreEqual(0, saveType.GetField("speed").GetValue(migrated));
             Assert.AreEqual(2, saveType.GetField("unlockedLevel").GetValue(migrated));
@@ -1290,18 +1314,17 @@ public void LaterLevelPurchasesResumeAtTheNextTableTier()
             object balance = NewBalance();
             Tune(balance, "maxCustomers", 1); Tune(balance, "workerSpeed", 100000f);
             Tune(balance, "customerSpeed", 100000f); Tune(balance, "pickupSeconds", .01f);
-            object sim = Make(staff: 5, level: 4, balance: balance); Start(sim);
+            object sim = Make(staff: 3, level: 4, balance: balance); Start(sim);
             Assert.IsTrue((bool)Call(sim, "SpawnCustomerWithProducts", new[] { 0, 1, 2, 3, 4 }, new[] { 1, 1, 1, 1, 1 }));
             object customer = Customers(sim)[0];
             for (int i = 0; i < 1500 && (int)Get(sim, "Delivered") < 5; i++)
             {
                 Step(sim, .05f);
-                // The Parrillero keeps food lines in catalog order; the Cocacolero may fulfill Coca concurrently.
-                for (int line = 0; line < 4; line++)
-                    if ((int)Get(Call(customer, "GetOrderLine", line), "Remaining") > 0)
-                        for (int later = line + 1; later < 4; later++)
-                            Assert.AreEqual(1, Get(Call(customer, "GetOrderLine", later), "Remaining"),
-                                "The Parrillero must not skip an earlier food line; Coca can run in parallel.");
+                // Each griller retains catalog order within its own part; Coca progresses independently.
+                foreach (int[] orderedLines in new[] { new[] { 0, 1 }, new[] { 2, 3 } })
+                    if ((int)Get(Call(customer, "GetOrderLine", orderedLines[0]), "Remaining") > 0)
+                        Assert.AreEqual(1, Get(Call(customer, "GetOrderLine", orderedLines[1]), "Remaining"),
+                            "A worker must complete its first assigned food line before the next one; other roles run in parallel.");
             }
             Assert.AreEqual(5, Get(sim, "Delivered"));
             Assert.AreEqual(25, Get(sim, "Coins"), "Each of the five actual handoffs earns its unchanged $5 price.");
@@ -1444,28 +1467,42 @@ public void LaterLevelPurchasesResumeAtTheNextTableTier()
         }
 
         [Test]
-        public void FerroAndIndependienteCompleteFiveProductMixedTicketsWithOneFoodAndOneDrinkWorker()
+        public void FerroAndIndependienteMixedTicketsUseEveryRequiredSpecialtyAndComplete()
         {
             foreach (int level in new[] { 3, 4 })
             {
                 object balance = NewBalance();
                 Tune(balance, "maxCustomers", 1); Tune(balance, "workerSpeed", 100000f);
                 Tune(balance, "customerSpeed", 100000f); Tune(balance, "pickupSeconds", .01f);
-                object sim = Make(staff: 2, level: level, balance: balance); Start(sim);
                 int[] products = level == 3 ? new[] { 0, 1, 2, 4, 6 } : new[] { 0, 2, 3, 6, 5 };
                 int[] quantities = { 1, 2, 1, 2, 1 };
+                int expectedTotal = 7;
+                int staff = level == 3 ? 3 : 4;
+                object sim = Make(staff: staff, level: level, balance: balance); Start(sim);
                 object customer = SpawnOrder(sim, products, quantities); SetWaiting(customer);
                 IList workers = (IList)Get(sim, "Workers");
-                object parrillero = workers[0], cocacolero = workers[1];
-                Assert.AreEqual("Parrillero", Get(parrillero, "Role").ToString());
-                Assert.AreEqual("Cocacolero", Get(cocacolero, "Role").ToString());
-                HiddenCall(sim, "Assign", parrillero); HiddenCall(sim, "Assign", cocacolero);
-                Assert.AreEqual(Get(customer, "Id"), Get(parrillero, "CustomerId"));
-                Assert.AreEqual(Get(customer, "Id"), Get(cocacolero, "CustomerId"));
-                Assert.AreNotEqual(Get(parrillero, "Product"), Get(cocacolero, "Product"));
-                for (int frame = 0; frame < 1800 && (int)Get(sim, "Delivered") < 7; frame++) Step(sim, .02f);
-                Assert.AreEqual(7, Get(sim, "Delivered"), "All seven units in a full five-product mixed ticket should hand off.");
-                Assert.AreEqual(35, Get(sim, "Coins")); Assert.AreEqual(35, Get(sim, "CoinsEarned"));
+                var byRole = new Dictionary<string, object>();
+                foreach (object worker in workers) byRole[Get(worker, "Role").ToString()] = worker;
+                string[] neededRoles = level == 3
+                    ? new[] { "Parrillero", "ParrilleroPremium", "Cocacolero" }
+                    : new[] { "Parrillero", "ParrilleroPremium", "Cocacolero", "Fernetero" };
+                foreach (string role in neededRoles)
+                {
+                    Assert.IsTrue(byRole.ContainsKey(role), role + " is available from this level's product catalog.");
+                    HiddenCall(sim, "Assign", byRole[role]);
+                    Assert.AreEqual(Get(customer, "Id"), Get(byRole[role], "CustomerId"), role + " claims its portion of the mixed ticket.");
+                }
+                for (int lineIndex = 0; lineIndex < products.Length; lineIndex++)
+                {
+                    string role = products[lineIndex] <= 1 ? "Parrillero" :
+                        products[lineIndex] <= 3 ? "ParrilleroPremium" :
+                        products[lineIndex] == 5 ? "Fernetero" : "Cocacolero";
+                    Assert.AreEqual(Get(byRole[role], "Id"), Get(Call(customer, "GetOrderLine", lineIndex), "OwnerWorkerId"),
+                        "Product " + products[lineIndex] + " must be owned by its only responsible role.");
+                }
+                for (int frame = 0; frame < 1800 && (int)Get(sim, "Delivered") < expectedTotal; frame++) Step(sim, .02f);
+                Assert.AreEqual(expectedTotal, Get(sim, "Delivered"));
+                Assert.AreEqual(expectedTotal * 5, Get(sim, "Coins"));
                 Assert.AreEqual(0, Get(customer, "PendingOrderLineCount")); Assert.AreEqual(0, Get(customer, "Reserved"));
                 for (int i = 0; i < products.Length; i++)
                 {
@@ -1474,7 +1511,7 @@ public void LaterLevelPurchasesResumeAtTheNextTableTier()
                     Assert.AreEqual(0, Get(line, "Reserved")); Assert.AreEqual(0, Get(line, "OwnerWorkerId"));
                 }
                 Step(sim, .35f);
-                Assert.AreEqual("Leaving", Get(customer, "State").ToString(), "The mixed-ticket customer leaves only after every food and drink is complete.");
+                Assert.AreEqual("Leaving", Get(customer, "State").ToString(), "The customer leaves after every role's order lines finish.");
             }
         }
 
@@ -1484,20 +1521,27 @@ public void LaterLevelPurchasesResumeAtTheNextTableTier()
             foreach (int level in new[] { 3, 4 })
             {
                 object balance = NewBalance(); Tune(balance, "maxCustomers", 2);
-                object sim = Make(staff: 4, level: level, balance: balance); Start(sim);
+                object sim = Make(staff: 5, level: level, balance: balance); Start(sim);
                 object first = SpawnOrder(sim, new[] { 0, 4 }, new[] { 2, 1 });
-                object second;
-                Assert.IsTrue((bool)Call(sim, "SpawnCustomerWithProducts", new[] { 2, 6 }, new[] { 1, 1 }));
-                second = Customers(sim)[1]; SetWaiting(first); SetWaiting(second);
+                int[] secondProducts = level == 3 ? new[] { 2, 6 } : new[] { 2, 5, 6 };
+                var secondQuantities = new int[secondProducts.Length];
+                for (int quantityIndex = 0; quantityIndex < secondQuantities.Length; quantityIndex++) secondQuantities[quantityIndex] = 1;
+                Assert.IsTrue((bool)Call(sim, "SpawnCustomerWithProducts", secondProducts, secondQuantities));
+                object second = Customers(sim)[1]; SetWaiting(first); SetWaiting(second);
                 IList workers = (IList)Get(sim, "Workers");
-                HiddenCall(sim, "Assign", workers[0]); HiddenCall(sim, "Assign", workers[1]);
-                HiddenCall(sim, "Assign", workers[2]); HiddenCall(sim, "Assign", workers[3]);
+                StreetWorkerRoleForTest(workers[0], "Parrillero");
+                StreetWorkerRoleForTest(workers[1], "Cocacolero");
+                StreetWorkerRoleForTest(workers[2], "Cocacolero");
+                StreetWorkerRoleForTest(workers[3], "ParrilleroPremium");
+                StreetWorkerRoleForTest(workers[4], level == 3 ? "Parrillero" : "Fernetero");
+                for (int i = 0; i < workers.Count; i++) HiddenCall(sim, "Assign", workers[i]);
                 Assert.AreEqual(Get(first, "Id"), Get(workers[0], "CustomerId"));
-                Assert.AreEqual(Get(first, "Id"), Get(workers[1], "CustomerId"), "One worker of each specialty may serve the same ticket.");
-                Assert.AreEqual(Get(second, "Id"), Get(workers[2], "CustomerId"));
+                Assert.AreEqual(Get(first, "Id"), Get(workers[1], "CustomerId"), "The first Cocacolero owns the oldest Coca line.");
+                Assert.AreEqual(Get(second, "Id"), Get(workers[2], "CustomerId"), "A second Cocacolero skips the owned first ticket and handles the next Coca line.");
                 Assert.AreEqual(Get(second, "Id"), Get(workers[3], "CustomerId"));
-                Assert.AreNotEqual(Get(workers[0], "CustomerId"), Get(workers[2], "CustomerId"));
-                Assert.AreNotEqual(Get(workers[1], "CustomerId"), Get(workers[3], "CustomerId"));
+                if (level == 3) Assert.AreEqual("Idle", Get(workers[4], "State").ToString());
+                else Assert.AreEqual(Get(second, "Id"), Get(workers[4], "CustomerId"));
+                Assert.AreNotEqual(Get(workers[1], "CustomerId"), Get(workers[2], "CustomerId"));
             }
         }
 
@@ -1742,8 +1786,11 @@ public void LaterLevelPurchasesResumeAtTheNextTableTier()
                 while (changed && safety++ < 20)
                 {
                     changed = false;
-                    if ((bool)Get(sim, "CanHire")) { Call(sim, "TryHire"); changed = true; }
-                    if ((bool)Call(sim, "CanHireRole", Role("Cocacolero"))) { Call(sim, "TryHire", Role("Cocacolero")); changed = true; }
+                    foreach (string roleName in new[] { "Parrillero", "ParrilleroPremium", "Cocacolero", "Fernetero" })
+                    {
+                        object role = Role(roleName);
+                        if ((bool)Call(sim, "CanHireRole", role)) { Call(sim, "TryHire", role); changed = true; }
+                    }
                     if ((bool)Get(sim, "CanUpgradeSpeed")) { Call(sim, "TryUpgradeSpeed"); changed = true; }
                 }
             }

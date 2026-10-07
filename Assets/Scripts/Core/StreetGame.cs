@@ -17,7 +17,7 @@ namespace HayChoriYPaty
         [System.Serializable]
         public sealed class SaveData
         {
-            public int version = 2;
+            public int version = 3;
             public int unlockedLevel;
             public float price = 5f;
             public float[] prices;
@@ -27,6 +27,8 @@ namespace HayChoriYPaty
             public int workerLevel = -1;
             public int parrilleros = -1;
             public int cocacoleros;
+            public int premiumParrilleros;
+            public int ferneteros;
         }
 
         public StreetSimulation Sim { get { return sim; } }
@@ -71,6 +73,9 @@ namespace HayChoriYPaty
         public bool TryHire() { return TryHireParrillero(); }
         public bool TryHireParrillero() { return HireRole(StreetWorkerRole.Parrillero); }
         public bool TryHireCocacolero() { return HireRole(StreetWorkerRole.Cocacolero); }
+        public bool TryHireParrilleroPremium() { return HireRole(StreetWorkerRole.ParrilleroPremium); }
+        public bool TryHireFernetero() { return HireRole(StreetWorkerRole.Fernetero); }
+        public bool TryHire(StreetWorkerRole role) { return HireRole(role); }
         private bool HireRole(StreetWorkerRole role) { if (sim == null || !sim.TryHire(role)) return false; Save(); return true; }
         public bool TryUpgradeSpeed() { if (sim == null || !sim.TryUpgradeSpeed()) return false; Save(); return true; }
         public bool NextLevel()
@@ -98,7 +103,7 @@ namespace HayChoriYPaty
             {
                 SaveData data = JsonUtility.FromJson<SaveData>(PlayerPrefs.GetString(SaveKey));
                 data = MigrateSaveData(data);
-                if (data == null || data.version != 2) return DefaultSave();
+                if (data == null || data.version != 3) return DefaultSave();
                 data.unlockedLevel = Mathf.Clamp(data.unlockedLevel, 0, StreetSimulation.LevelNames.Length - 1);
                 data.price = Mathf.Clamp(data.price, balance.minPrice, balance.maxPrice);
                 data.coins = 0; // Legacy balances are not transferable to a newly loaded attempt.
@@ -114,11 +119,18 @@ namespace HayChoriYPaty
             if (data == null) return null;
             if (data.version == 1)
             {
-                // Development started from an inflated save; reset only opening staff and speed.
-                // Preserve unlocked locations, coins, prices, and the rest of player progress.
+                // Development started from an inflated save; retain its established migration.
                 data.staff = 1;
                 data.speed = 0;
                 data.version = 2;
+            }
+            if (data.version == 2)
+            {
+                // Old saves only recorded the first two roles. Composition is never restored,
+                // but retain their progress fields and initialize new role counters safely.
+                data.premiumParrilleros = 0;
+                data.ferneteros = 0;
+                data.version = 3;
             }
             return data;
         }
@@ -133,6 +145,7 @@ namespace HayChoriYPaty
             for(int i=0;i<7;i++)save.prices[i]=sim.GetProductPrice(i);
             save.price = sim.Price; save.coins = sim.Coins; save.staff = sim.StaffCount; save.speed = sim.SpeedLevel;
             save.workerLevel = sim.LevelIndex; save.parrilleros = sim.ParrilleroCount; save.cocacoleros = sim.CocacoleroCount;
+            save.premiumParrilleros = sim.ParrilleroPremiumCount; save.ferneteros = sim.FerneteroCount;
             save.unlockedLevel = Mathf.Max(save.unlockedLevel, sim.LevelIndex);
             if (sim.Phase == RoundPhase.Won) save.unlockedLevel = Mathf.Max(save.unlockedLevel, Mathf.Min(StreetSimulation.LevelNames.Length - 1, sim.LevelIndex + 1));
             PlayerPrefs.SetString(SaveKey, JsonUtility.ToJson(save)); PlayerPrefs.Save();

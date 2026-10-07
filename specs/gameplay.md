@@ -7,3 +7,8 @@ All products cost $5 per unit in every level; there is no price-selection popup,
 Each customer has independent patience, refreshed by deliveries; expiry triggers departure and reservation cancellation. Floresta has a120-second limit and wins immediately on the200thactual choripán handoff; below200at the deadline it loses. The upper-left gold game-coin icon shows current balance; upper-right progress shows sold/200, for example100/200. Later locations still win early on their delivered-unit target or lose at the clock. Never require completion of every mass order. Progress unlocks products/locations and saves prices/purchases/progression; every new level attempt starts with zero coins, without carryover. There is no seating or football-result simulation.
 
 Defaults, exact state contracts, persistence and acceptance are authoritative in [features/street-automation.md](features/street-automation.md). The former chori/Coca, shared crowd-patience prototype rules and test record remain historical in [features/floresta-prototype.md](features/floresta-prototype.md), not requirements for the new runtime.
+
+
+## Exclusive worker specialties (2026-10-07)
+
+Product catalog determines specialties/stations, not level number: Normal Chori/Paty; Premium Bondiola/Vacío on a separate grill; Cocacolero Coca/Cerveza; Fernetero exclusively Fernet. Mixed lines run in parallel with specialty-local ownership/FIFO; customers leave only after all lines complete. Four roles share $15/$30/$60/$100/MAX hiring costs but independent paid tiers, with one free starting normal worker. See the authoritative street-automation contract for future-level acceptance.
