@@ -39,7 +39,7 @@ namespace HayChoriYPaty
         [Min(0.1f)] public float customerArrivalSeconds = 0.16f;
         [Min(0.1f)] public float workerSpeed = 300f;
         [Min(10f)] public float customerSpeed = 300f;
-        public float[] levelDemandMultipliers = { 1f, 1.1f, 1.2f, 1.35f, 1.5f };
+        public float[] levelDemandMultipliers = { 1f, 1.1f, 1.2f, 1.35f, 1.5f, 1.65f, 1.815f, 1.9965f, 2.19615f, 2.415765f, 2.6573415f };
         [Min(0.01f)] public float pickupSeconds = 0.28f;
         [Min(0.1f)] public float customerPatienceSeconds = 180f;
         [Min(0f)] public float minPrice = 0f;
@@ -49,11 +49,11 @@ namespace HayChoriYPaty
         [Min(1)] public int maxOrderQuantity = 999;
         [Min(0f)] public float initialPrice = 5f;
         [Min(0f)] public float deliveryPatienceRefreshSeconds = 180f;
-        public int[] levelProductCounts = { 1, 2, 3, 5, 7 };
+        public int[] levelProductCounts = { 1, 2, 3, 5, 7, 7, 7, 7, 7, 7, 7 };
         [Tooltip("Comma-separated stable product IDs, in each level's display/order priority.")]
-        public string[] levelProductIds = { "0", "0,4", "0,1,4", "0,1,2,4,6", "0,1,2,3,4,6,5" };
-        public int[] levelGoals = { 200, 200, 65, 85, 110 };
-        public float[] levelDurations = { 120f, 180f, 240f, 270f, 300f };
+        public string[] levelProductIds = { "0", "0,4", "0,1,4", "0,1,2,4,6", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5" };
+        public int[] levelGoals = { 200, 200, 65, 85, 110, 121, 133, 146, 161, 177, 195 };
+        public float[] levelDurations = { 120f, 180f, 240f, 270f, 300f, 300f, 300f, 300f, 300f, 300f, 300f };
         [Tooltip("Optional deadline-only Floresta trial. Default false: win immediately at the unit goal.")]
         public bool florestaFinishAtDeadline = false;
         private static readonly StreetUpgradeCostProfile DefaultUpgradeCostProfile = new StreetUpgradeCostProfile();
@@ -181,20 +181,23 @@ namespace HayChoriYPaty
         public const float FixedProductPrice = 5f;
         public const float FlorestaChoriPrice = FixedProductPrice; // Legacy name retained for compatibility.
         public const float FrontQueueY = 324f, QueueRowSpacing = 56f;
-        // Keep the full Parrillero sprite below the Nueva Chicago counter fascia (bottom ≈ y384).
-        public const float ChicagoCounterServiceY = 485f;
+        // Legacy public name retained for callers; all levels use the shared scene service line.
+        public const float ChicagoCounterServiceY = StreetSceneLayout.WorkerServiceY;
         private const int QueueColumns = 7, QueueSlots = 21;
         public static readonly string[] ProductNames = { "Chori", "Paty", "Bondiola", "Vacío", "Coca 600 ml", "Fernet con Coca 1 L", "Cerveza en lata" };
-        public static readonly string[] LevelNames = { "Floresta / All Boys", "Nueva Chicago", "Liniers - Velez Sarsfield", "Ferro Carril Oeste", "Independiente de Avellaneda" };
-        private static readonly int[] DefaultProductCounts = { 1, 2, 3, 5, 7 };
+        public static readonly string[] LevelNames = { "Floresta / All Boys", "Nueva Chicago", "Liniers - Velez Sarsfield", "Ferro Carril Oeste", "Independiente de Avellaneda", "Racing Club / Avellaneda", "San Lorenzo / Boedo", "River Plate / Núñez", "Boca Juniors / La Boca", "Sindicato de Camioneros / Plaza de Mayo", "Los Redondos / Tandil" };
+        private static readonly int[] DefaultProductCounts = { 1, 2, 3, 5, 7, 7, 7, 7, 7, 7, 7 };
         private static readonly int[][] DefaultLevelProducts = {
             new[] { 0 }, new[] { 0, 4 }, new[] { 0, 1, 4 },
-            new[] { 0, 1, 2, 4, 6 }, new[] { 0, 1, 2, 3, 4, 6, 5 }
+            new[] { 0, 1, 2, 4, 6 }, new[] { 0, 1, 2, 3, 4, 6, 5 },
+            new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 },
+            new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 }
         };
-        private static readonly int[] DefaultGoals = { 200, 200, 65, 85, 110 };
+        private static readonly int[] DefaultGoals = { 200, 200, 65, 85, 110, 121, 133, 146, 161, 177, 195 };
+        private static readonly float[] DefaultDemandMultipliers = { 1f, 1.1f, 1.2f, 1.35f, 1.5f, 1.65f, 1.815f, 1.9965f, 2.19615f, 2.415765f, 2.6573415f };
         private static readonly int[] DefaultHireCosts = { 15, 30, 60, 100 };
         private static readonly int[] DefaultSpeedCosts = { 5, 10, 15, 20, 30, 45, 65, 90, 125 };
-        private static readonly float[] DefaultDurations = { 120f, 180f, 240f, 270f, 300f };
+        private static readonly float[] DefaultDurations = { 120f, 180f, 240f, 270f, 300f, 300f, 300f, 300f, 300f, 300f, 300f };
         private readonly StreetBalance balance;
         private readonly int[][] availableProductsByLevel;
         private readonly List<StreetCustomer> customers = new List<StreetCustomer>();
@@ -365,18 +368,18 @@ public bool CanHireRole(StreetWorkerRole role)
             // Normalize current and legacy save values: every product is sold at the same fixed price.
             this.price = FixedProductPrice;
             for (int i = 0; i < productPrices.Length; i++) productPrices[i] = FixedProductPrice;
-            Coins = Mathf.Max(0, coins); SpeedLevel = Mathf.Clamp(speed, 0, MaxSpeedLevel);
-            staff = Mathf.Clamp(staff, 1, MaxStaffCount);
-            if (LevelIndex == 0) ResetTeamAndSpeed();
-            else for (int i = 0; i < staff; i++) AddWorker();
+            // Constructor arguments remain for compatibility with saved callers, but every
+            // construction creates a new attempt baseline; purchases are never resumed.
+            Coins = Mathf.Max(0, coins); // Preserve the existing injected-balance API; actual attempt entry clears coins.
+            ResetTeamAndSpeed();
         }
 
         public void StartRound()
         {
             customers.Clear(); sales.Clear();
             Coins = 0; CoinsEarned = 0; // Both totals belong only to this attempt.
-            // A fresh/replayed Floresta turn never inherits hired staff or speed upgrades.
-            if (LevelIndex == 0) ResetTeamAndSpeed();
+            // Every round entry is a fresh attempt, regardless of selected club.
+            ResetTeamAndSpeed();
             if (!UsesSpecialistWorkers(LevelIndex)) SetWorkerRolesForCurrentLevel();
             foreach (StreetWorker worker in workers) ResetWorker(worker);
             Elapsed = 0f; Delivered = 0; ChoriDelivered = 0; CocaDelivered = 0;
@@ -402,7 +405,7 @@ public bool CanHireRole(StreetWorkerRole role)
         }
         public void RestoreWorkerCounts(int parrilleros, int cocacoleros)
         {
-            // Composition only: no coins, speed changes or in-flight round resume.
+            // Legacy explicit Ready-state composition helper; StreetGame never applies save purchases through it.
             if (Phase != RoundPhase.Ready) return;
             workers.Clear(); nextWorker = 1;
             for (int i = 0; i < Mathf.Clamp(parrilleros, 1, MaxWorkersForRole(StreetWorkerRole.Parrillero)); i++) AddWorker(StreetWorkerRole.Parrillero);
@@ -417,6 +420,7 @@ public bool CanHireRole(StreetWorkerRole role)
         {
             if (Phase != RoundPhase.Ready || level < 0 || level >= LevelNames.Length) return false;
             LevelIndex = level;
+            ResetTeamAndSpeed();
             if (!UsesSpecialistWorkers(LevelIndex)) SetWorkerRolesForCurrentLevel();
             Coins = 0; CoinsEarned = 0;
             return true;
@@ -483,10 +487,10 @@ public bool CanHireRole(StreetWorkerRole role)
         public static Vector2 StationApproachPoint() => StreetWorkstationLayout.ApproachPosition(0);
         public static Vector2 StationApproachPointForLevel(int product, int levelIndex) => StreetWorkstationLayout.ApproachPosition(product);
         public static Vector2 StationPositionForProductCount(int product, int productCount) => StationPosition(product);
-        public static float CounterHandoffYForLevel(int levelIndex) => levelIndex == 1 ? ChicagoCounterServiceY : 400f;
-        private Vector2 WorkerHomePosition => new Vector2(433f, CounterHandoffYForLevel(LevelIndex));
+        public static float CounterHandoffYForLevel(int levelIndex) => StreetSceneLayout.WorkerServiceY;
+        private Vector2 WorkerHomePosition => new Vector2(433f, StreetSceneLayout.WorkerServiceY);
         private Vector2 CounterHandoffPosition(StreetCustomer customer) =>
-            new Vector2(customer.Target.x, CounterHandoffYForLevel(LevelIndex));
+            new Vector2(customer.Target.x, StreetSceneLayout.WorkerServiceY);
         private bool UsesSideTableRoute(StreetWorker worker) =>
             (LevelIndex == 0 && worker.Product == 0) ||
             (LevelIndex == 1 && (worker.Product == 0 || worker.Product == 4)) ||
@@ -506,7 +510,7 @@ public bool CanHireRole(StreetWorkerRole role)
             if (arrival <= 0f && customers.Count < DemandCapacity())
             {
                 float demandFactor = .55f / Mathf.Pow(Mathf.Max(.08f,DemandFraction),Mathf.Max(.1f,balance.priceSensitivity));
-                float pressure=balance.levelDemandMultipliers!=null&&LevelIndex<balance.levelDemandMultipliers.Length?Mathf.Max(.1f,balance.levelDemandMultipliers[LevelIndex]):1f;
+                float pressure=balance.levelDemandMultipliers!=null&&LevelIndex<balance.levelDemandMultipliers.Length?Mathf.Max(.1f,balance.levelDemandMultipliers[LevelIndex]):DefaultDemandMultipliers[LevelIndex];
                 if (LevelIndex >= 2)
                 {
                     // Mixed requests sample unlocked stable product IDs, retain catalog priority, and cap at five types.

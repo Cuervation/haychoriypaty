@@ -1,5 +1,9 @@
 # Technical decision log
 
+## 2026-10-07 — All Boys master geometry, club scenery and fresh attempts
+
+Use StreetSceneLayout for root art/counter/crowd/service geometry and the existing StreetWorkstationLayout for furniture/pickup routes. ClubVisualTheme supplies mural art/crops and scenery-only light temperature, never gameplay positions. Render the root plate in every current level; uniform-fit specific mural panels below the fixed HUD. Remove per-background counter heights, Chicago-only service/approach heights and the duplicate counter vertical transform. Every fresh load/start/select/advance/retry resets to one Parrillero, no free Cocacolero and speed ×1.00; existing purchases apply only within the active attempt. Preserve original art, apparel, progression, prices and save-schema compatibility. Uneven matched Cocacolero atlas rows use measured crops scaled to imported dimensions, not an assumed 4×4 grid.
+
 | Date | Decision | Reason |
 |---|---|---|
 | 2026-10-06 | Fix all seven catalog products at $5 for every level; remove all price pop-ups and price controls, while retaining legacy save fields/setter APIs as normalized compatibility shims. | The user made product price fixed across all levels and requested removal of every price popup; $5 is the existing default and confirmed Chicago chori/Coca price. |

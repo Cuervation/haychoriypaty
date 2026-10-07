@@ -9,7 +9,7 @@ namespace HayChoriYPaty
         public const string ProgressKey = "HayChoriYPaty.StreetGame.v1";
         private const string SaveKey = ProgressKey;
         [SerializeField] private StreetBalance balance = new StreetBalance();
-        [SerializeField, Range(0, 4)] private int selectedLevel;
+        [SerializeField, Range(0, 10)] private int selectedLevel;
         private StreetSimulation sim;
         private SaveData save;
         private bool resultSaved;
@@ -39,8 +39,7 @@ namespace HayChoriYPaty
             if (balance == null) balance = new StreetBalance();
             save = Load();
             selectedLevel = Mathf.Clamp(selectedLevel, 0, save.unlockedLevel);
-            sim = new StreetSimulation(balance, selectedLevel, save.price, save.coins, save.staff, save.speed);
-            if (selectedLevel > 0 && save.workerLevel == selectedLevel && save.parrilleros >= 1) sim.RestoreWorkerCounts(save.parrilleros, save.cocacoleros);
+            sim = new StreetSimulation(balance, selectedLevel, save.price);
             if(save.prices!=null && save.prices.Length==7)for(int i=0;i<7;i++)sim.SetProductPrice(i,save.prices[i]);
         }
 
@@ -88,8 +87,7 @@ namespace HayChoriYPaty
 
         private StreetSimulation NewReadySimulation(int level)
         {
-            var next = new StreetSimulation(balance, level, sim.Price, 0, sim.StaffCount, sim.SpeedLevel);
-            if (level > 0) next.RestoreWorkerCounts(sim.ParrilleroCount, sim.CocacoleroCount);
+            var next = new StreetSimulation(balance, level, sim.Price);
             for(int i=0;i<7;i++)next.SetProductPrice(i,sim.GetProductPrice(i));return next;
         }
 
@@ -101,7 +99,7 @@ namespace HayChoriYPaty
                 SaveData data = JsonUtility.FromJson<SaveData>(PlayerPrefs.GetString(SaveKey));
                 data = MigrateSaveData(data);
                 if (data == null || data.version != 2) return DefaultSave();
-                data.unlockedLevel = Mathf.Clamp(data.unlockedLevel, 0, 4);
+                data.unlockedLevel = Mathf.Clamp(data.unlockedLevel, 0, StreetSimulation.LevelNames.Length - 1);
                 data.price = Mathf.Clamp(data.price, balance.minPrice, balance.maxPrice);
                 data.coins = 0; // Legacy balances are not transferable to a newly loaded attempt.
                 data.staff = Mathf.Clamp(data.staff, 1, balance.maxStaff);
@@ -136,7 +134,7 @@ namespace HayChoriYPaty
             save.price = sim.Price; save.coins = sim.Coins; save.staff = sim.StaffCount; save.speed = sim.SpeedLevel;
             save.workerLevel = sim.LevelIndex; save.parrilleros = sim.ParrilleroCount; save.cocacoleros = sim.CocacoleroCount;
             save.unlockedLevel = Mathf.Max(save.unlockedLevel, sim.LevelIndex);
-            if (sim.Phase == RoundPhase.Won) save.unlockedLevel = Mathf.Max(save.unlockedLevel, Mathf.Min(4, sim.LevelIndex + 1));
+            if (sim.Phase == RoundPhase.Won) save.unlockedLevel = Mathf.Max(save.unlockedLevel, Mathf.Min(StreetSimulation.LevelNames.Length - 1, sim.LevelIndex + 1));
             PlayerPrefs.SetString(SaveKey, JsonUtility.ToJson(save)); PlayerPrefs.Save();
         }
     }

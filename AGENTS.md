@@ -6,6 +6,7 @@
 - Use the installed Unity editor version recorded in `ProjectSettings/ProjectVersion.txt`. Preserve every Unity `.meta` file; do not commit `Library`, `Temp`, `Logs`, `Obj`, build output, or user settings.
 - No package/service installs or paid API routing unless the user explicitly requests or approves them. Project agents may only use GPT-6 Luna or GPT-6.1 Sol; use their checked-in TOML roles only when delegation is beneficial. Model/effort cannot be silently changed for the primary chat.
 - Validate only affected systems; state explicitly when the Unity editor/player or a test could not be run. Do not claim unexecuted checks passed.
+- A level is not complete without scenery, matched Front/Walking/Riot customerId variants, two actual stick poses per Riot variant, registry integration, structural tests and visual defeat validation. Generic Riot is emergency fallback only, never a published club's final art. Preserve body scale and foot anchors independently of transparent atlas padding; see specs/features/street-automation.md.
 - Preserve the seven-product limit and Argentine street-stall setting in `specs/product.md`; do not add products or seated dining without approval.
 - Before designing or changing any screen, character, object, sprite, or animation, consult specs/visual-reference.md. The project-local screenshot is style/layout reference only; never reuse its artwork literally.
 

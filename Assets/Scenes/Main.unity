@@ -562,6 +562,12 @@ MonoBehaviour:
     - 1.2
     - 1.35
     - 1.5
+    - 1.65
+    - 1.815
+    - 1.9965
+    - 2.19615
+    - 2.415765
+    - 2.6573415
     pickupSeconds: 0.28
     customerPatienceSeconds: 180
     minPrice: 0
@@ -578,19 +584,52 @@ MonoBehaviour:
     maxOrderQuantity: 999
     initialPrice: 5
     deliveryPatienceRefreshSeconds: 180
-    levelProductCounts: 0100000002000000030000000500000007000000i
+    levelProductCounts:
+    - 1
+    - 2
+    - 3
+    - 5
+    - 7
+    - 7
+    - 7
+    - 7
+    - 7
+    - 7
+    - 7
     levelProductIds:
     - 0
     - 0,4
     - 0,1,4
     - 0,1,2,4,6
     - 0,1,2,3,4,6,5
-    levelGoals: c8000000c800000041000000550000006e000000i
+    - 0,1,2,3,4,6,5
+    - 0,1,2,3,4,6,5
+    - 0,1,2,3,4,6,5
+    - 0,1,2,3,4,6,5
+    - 0,1,2,3,4,6,5
+    levelGoals:
+    - 200
+    - 200
+    - 65
+    - 85
+    - 110
+    - 121
+    - 133
+    - 146
+    - 161
+    - 177
+    - 195
     levelDurations:
     - 120
     - 180
     - 240
     - 270
+    - 300
+    - 300
+    - 300
+    - 300
+    - 300
+    - 300
     - 300
     florestaFinishAtDeadline: 0
   selectedLevel: 0

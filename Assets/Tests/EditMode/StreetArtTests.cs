@@ -9,9 +9,104 @@ namespace HayChoriYPaty.Tests
 {
     public sealed class StreetArtTests
     {
+        [Test]
+        public void RiverVisualThemeOwnsIndexSevenInTheOfficialCatalog()
+        {
+            Type themes = Type.GetType("HayChoriYPaty.ClubVisualTheme, Assembly-CSharp", true);
+            object theme = themes.GetMethod("ForLevel").Invoke(null, new object[] { 7 });
+            Assert.AreEqual("River Plate / Núñez", themes.GetProperty("ClubName").GetValue(theme));
+            Assert.AreEqual("street-mural-river-master-v1", themes.GetProperty("MuralResource").GetValue(theme));
+            Assert.NotNull(Resources.Load<Texture2D>("street-mural-river-master-v1"));
+            string[] names = (string[])Type.GetType("HayChoriYPaty.StreetSimulation, Assembly-CSharp", true)
+                .GetField("LevelNames").GetValue(null);
+            Assert.AreEqual(11, names.Length);
+            Assert.AreEqual("River Plate / Núñez", names[7]);
+            Assert.AreEqual("Boca Juniors / La Boca", themes.GetProperty("ClubName").GetValue(
+                themes.GetMethod("ForLevel").Invoke(null, new object[] { 8 })));
+        }
+
+        [TestCase(false)] [TestCase(true)]
+        public void RiverAtlasesKeepTwelveOutfitsAcrossAllPosePairs(bool riot)
+        {
+            string resource = riot ? "street-river-riot-fans-v1" : "street-river-fans-paired-v1";
+            Texture2D atlas = Resources.Load<Texture2D>(resource);
+            Assert.NotNull(atlas);
+            Assert.AreEqual(1536, atlas.width); Assert.AreEqual(1024, atlas.height);
+            var importer = (TextureImporter)AssetImporter.GetAtPath("Assets/Art/Street/Resources/" + resource + ".png");
+            Assert.IsTrue(importer.DoesSourceTextureHaveAlpha());
+            Assert.IsFalse(importer.mipmapEnabled); Assert.AreEqual(TextureImporterNPOTScale.None, importer.npotScale);
+            Assert.AreEqual(TextureImporterCompression.Uncompressed, importer.textureCompression);
+            var decoded = new Texture2D(2, 2);
+            try
+            {
+                decoded.LoadImage(System.IO.File.ReadAllBytes(Application.dataPath + "/Art/Street/Resources/" + resource + ".png"));
+                Color32[] pixels = decoded.GetPixels32();
+                Assert.Greater(pixels.Count(p => p.a < 10) / (float)pixels.Length, .40f,
+                    "Transparent gutters must not contain the image generator's translucent background haze");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(decoded); }
+            MethodInfo map = View.GetMethod("RiverAtlasVariant", BindingFlags.Static | BindingFlags.NonPublic);
+            MethodInfo source = View.GetMethod("RacingFanSourceRect", BindingFlags.Static | BindingFlags.NonPublic);
+            var seen = new System.Collections.Generic.HashSet<Rect>();
+            for (int variant = 0; variant < 12; variant++)
+            {
+                int mapped = (int)map.Invoke(null, new object[] { variant });
+                for (int pose = 0; pose < 2; pose++)
+                {
+                    Rect cell = (Rect)source.Invoke(null, new object[] { atlas, mapped, pose == 1 });
+                    Assert.AreEqual((variant % 3 * 2 + pose) * 256f, cell.x);
+                    Assert.AreEqual(variant / 3 * 256f, cell.y, "Retail provenance rows read from top to bottom");
+                    Assert.AreEqual(new Vector2(256, 256), cell.size);
+                    Assert.IsTrue(seen.Add(cell), "Each paired pose has its own complete-body cell");
+                }
+                Assert.AreEqual(mapped, map.Invoke(null, new object[] { variant + 12 }));
+            }
+            Assert.AreEqual(map.Invoke(null, new object[] { 11 }), map.Invoke(null, new object[] { -1 }));
+        }
+
         private const string SheetPath = "Assets/Art/Street/Resources/street-parrillero.png";
         private const string DiagonalSheetPath = "Assets/Art/Street/Resources/street-parrillero-diagonal-v1.png";
         private static Type View { get { return Type.GetType("HayChoriYPaty.StreetView, Assembly-CSharp", true); } }
+
+        [TestCase(960f)]
+        [TestCase(1200f)]
+        public void MasterSceneCounterAndCrowdMatchRootPlateForEveryClub(float canvasHeight)
+        {
+            Type layout = Type.GetType("HayChoriYPaty.StreetSceneLayout, Assembly-CSharp", true);
+            Rect plate = (Rect)layout.GetMethod("BackgroundBounds").Invoke(null, new object[] { canvasHeight });
+            Rect counter = (Rect)layout.GetMethod("CounterBounds").Invoke(null, new object[] { canvasHeight });
+            Rect source = (Rect)layout.GetField("CounterSource").GetValue(null);
+            Vector2 size = (Vector2)layout.GetField("ReferenceBackdropSize").GetValue(null);
+            Assert.AreEqual(plate.y + source.y / size.y * plate.height, counter.y, .001f);
+            Assert.AreEqual(plate.y + source.yMax / size.y * plate.height, counter.yMax, .001f);
+            Assert.AreEqual(plate.width, counter.width, .001f);
+            MethodInfo edge = View.GetMethod("CounterSurfaceY", BindingFlags.Static | BindingFlags.NonPublic);
+            for (int level = 0; level < 11; level++)
+            foreach (Vector2 replacementSize in new[] { new Vector2(940, 1673), new Vector2(1536, 2730), new Vector2(887, 1772) })
+                Assert.AreEqual(counter.y, (float)edge.Invoke(null, new object[] { canvasHeight, replacementSize, level }), .001f,
+                    "Club art dimensions must never move the counter or crowd");
+            Assert.Less(counter.yMax, 400f * canvasHeight / 960f, "Workers' feet stay on the operator side");
+        }
+
+        [TestCase(1)] [TestCase(2)] [TestCase(3)] [TestCase(4)]
+        [TestCase(5)] [TestCase(6)] [TestCase(7)] [TestCase(8)] [TestCase(9)] [TestCase(10)]
+        public void ClubMuralAndAtmosphereConfigureArtWithoutDefiningPerspective(int level)
+        {
+            Type themes = Type.GetType("HayChoriYPaty.ClubVisualTheme, Assembly-CSharp", true);
+            object theme = themes.GetMethod("ForLevel").Invoke(null, new object[] { level });
+            string resource = (string)themes.GetProperty("MuralResource").GetValue(theme);
+            Assert.IsNotEmpty(resource);
+            Texture2D art = Resources.Load<Texture2D>(resource);
+            Assert.IsNotNull(art, resource);
+            Rect crop = (Rect)themes.GetProperty("MuralSource").GetValue(theme);
+            Assert.Greater(crop.width, 0f); Assert.Greater(crop.height, 0f);
+            Assert.GreaterOrEqual(crop.xMin, 0f); Assert.GreaterOrEqual(crop.yMin, 0f);
+            Assert.LessOrEqual(crop.xMax, 1f); Assert.LessOrEqual(crop.yMax, 1f);
+            Color tint = (Color)themes.GetProperty("SceneryTint").GetValue(theme);
+            Assert.GreaterOrEqual(Mathf.Min(tint.r, Mathf.Min(tint.g, tint.b)), .88f,
+                "Atmosphere cannot make the playing scenery dark");
+            Assert.AreEqual(1f, tint.a);
+        }
 
         [TestCase(true)]
         [TestCase(false)]
@@ -525,13 +620,14 @@ namespace HayChoriYPaty.Tests
         public void LevelSelectorCardsFitPortraitCanvasAndUseTeamMuralResources()
         {
             MethodInfo cardBounds = View.GetMethod("LevelSelectCardBounds", BindingFlags.Static | BindingFlags.NonPublic);
-            Rect[] cards = new Rect[5];
+            Rect[] cards = new Rect[11];
             for (int i = 0; i < cards.Length; i++)
             {
                 cards[i] = (Rect)cardBounds.Invoke(null, new object[] { i });
                 Assert.GreaterOrEqual(cards[i].xMin, 0f); Assert.LessOrEqual(cards[i].xMax, 540f);
                 Assert.GreaterOrEqual(cards[i].yMin, 0f); Assert.LessOrEqual(cards[i].yMax, 960f);
-                for (int j = 0; j < i; j++) Assert.IsFalse(cards[i].Overlaps(cards[j]), "Level cards must have separate touch targets");
+                Assert.LessOrEqual(cards[i].yMax, 652f, "Cards must leave room for pagination/back");
+                for (int j = i / 6 * 6; j < i; j++) Assert.IsFalse(cards[i].Overlaps(cards[j]), "Same-page cards must have separate touch targets");
             }
 
             Assert.AreEqual("street-mural-real-v5", View.GetField("MuralResource", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue());
@@ -548,6 +644,29 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual("street-allboys-crest", View.GetField("AllBoysCrestResource", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue());
             Assert.NotNull(Resources.Load<Texture2D>("street-allboys-crest"));
             Assert.NotNull(Resources.Load<Font>("Menu/LuckiestGuy-Regular"));
+        }
+
+        [Test]
+        public void MatchedCocacoleroPosesContainOnlyTheirAuthoredRows()
+        {
+            Texture2D atlas = Resources.Load<Texture2D>("street-cocacolero-levels3-5-v1");
+            Assert.NotNull(atlas);
+            Rect[] poses = (Rect[])View.GetField("MatchedCocacoleroPoses", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+            Assert.AreEqual(16, poses.Length);
+            int[] rows = { 0, 350, 670, 963, 1261 };
+            for (int i = 0; i < poses.Length; i++)
+            {
+                Assert.GreaterOrEqual(poses[i].yMin, rows[i / 4]);
+                Assert.LessOrEqual(poses[i].yMax, rows[i / 4 + 1], "Never include neighboring feet or clip this pose's feet");
+                Assert.Greater(poses[i].height, 240f);
+                Assert.GreaterOrEqual(poses[i].xMin, 0f);
+                Assert.LessOrEqual(poses[i].xMax, 1247f);
+                Rect imported = (Rect)View.GetMethod("MatchedCocacoleroPose", BindingFlags.Static | BindingFlags.NonPublic)
+                    .Invoke(null, new object[] { i, new Vector2(atlas.width, atlas.height) });
+                Assert.LessOrEqual(imported.xMax, atlas.width);
+                Assert.AreEqual(poses[i].yMin / 1261f, imported.yMin / atlas.height, .0001f,
+                    "Importer downscaling must not change the source UV row");
+            }
         }
 
         [Test]
@@ -752,20 +871,20 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void EdgeHudFillsPhysicalScreenAndKeepsNumbersOutsideCenteredCameraGap()
+        public void NormalHudFillsScreenEdgeAndDoesNotUseCutoutLayouts()
         {
             Rect physical = (Rect)View.GetMethod("ScreenBounds", BindingFlags.Static | BindingFlags.NonPublic)
                 .Invoke(null, new object[] { new Vector2(1220, 2712) });
             Assert.AreEqual(new Rect(0, 0, 1220, 2712), physical);
             Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
             Assert.AreEqual(0f, bar.yMin);
-            Rect gap = (Rect)View.GetField("CutoutHudGap", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
-            foreach (string name in new[] { "CutoutHudCoins", "CutoutHudTime", "CutoutHudSales" })
+            foreach (string name in new[] { "HudCoins", "HudTime", "HudSales" })
             {
                 Rect field = (Rect)View.GetField(name, BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
-                Assert.IsFalse(field.Overlaps(gap));
                 Assert.IsTrue(bar.Contains(field.min)); Assert.IsTrue(bar.Contains(field.max));
             }
+            foreach (string name in new[] { "CutoutHudCoins", "CutoutHudTime", "CutoutHudSales" })
+                Assert.IsNull(View.GetField(name, BindingFlags.Static | BindingFlags.NonPublic), name + " must not draw an alternate HUD");
         }
 
         [Test]
@@ -921,14 +1040,10 @@ namespace HayChoriYPaty.Tests
                 for (int j = i + 1; j < counters.Length; j++) Assert.IsFalse(counters[i].Overlaps(counters[j]));
             }
             Assert.AreEqual(new Vector2(96, 50), counters[1].size, "The digital clock uses nearly the full blue capsule");
-            Rect cutoutGap = (Rect)View.GetField("CutoutHudGap", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
-            Rect cutoutTime = (Rect)View.GetField("CutoutHudTime", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
-            Assert.AreEqual(new Vector2(124f, 32f), cutoutTime.size,
-                "Use the entire lower capsule band so the countdown is not constrained to the old narrow slot");
-            Assert.AreEqual(202f, cutoutTime.xMin);
-            Assert.AreEqual(35f, cutoutTime.yMin, "The timer begins below the reserved camera channel");
-            Assert.IsFalse(cutoutTime.Overlaps(cutoutGap));
-            Assert.IsTrue(bar.Contains(cutoutTime.min)); Assert.IsTrue(bar.Contains(cutoutTime.max));
+            Assert.That(Mathf.Abs(counters[1].center.y - bar.center.y), Is.LessThanOrEqualTo(1f),
+                "The clock stays vertically centered in the normal blue capsule");
+            foreach (string name in new[] { "CutoutHudCoins", "CutoutHudTime", "CutoutHudSales" })
+                Assert.IsNull(View.GetField(name, BindingFlags.Static | BindingFlags.NonPublic), name + " is not a supported HUD layout");
             Assert.AreEqual(48, (int)View.GetField("HudClockFontSize", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue());
             Rect chori = (Rect)View.GetField("HudChoriSales", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
             Rect coca = (Rect)View.GetField("HudCocaSales", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);

@@ -9,7 +9,7 @@ namespace HayChoriYPaty
     [DisallowMultipleComponent, RequireComponent(typeof(StreetGame))]
     public sealed class StreetView : MonoBehaviour
     {
-        private const float W = 540, H = 960;
+        private const float W = StreetSceneLayout.Width, H = StreetSceneLayout.Height;
         private const string AllBoysCrestResource = "street-allboys-crest";
         private const string ChicagoCrestResource = "street-new-chicago-crest-v1";
         private const string ChicagoBackgroundResource = "street-background-chicago-v1";
@@ -19,14 +19,31 @@ namespace HayChoriYPaty
         private const string VelezWalkingFansResource = "street-velez-fans-walk-v1";
         private const string VelezRiotFansResource = "street-velez-riot-fans-v1";
         private const string VelezGrillResource = "street-parrilla-velez-v1";
-        private const string FerroBackgroundResource = "street-background-ferro-v1";
-        private const string FerroFrontFansResource = "street-ferro-fans-front-v1";
-        private const string FerroWalkingFansResource = "street-ferro-fans-walk-v1";
-        private const string FerroRiotFansResource = "street-ferro-riot-fans-v1";
-        private const string IndependienteBackgroundResource = "street-background-independiente-v1";
-        private const string IndependienteFrontFansResource = "street-independiente-fans-front-v1";
-        private const string IndependienteWalkingFansResource = "street-independiente-fans-walk-v1";
-        private const string IndependienteRiotFansResource = "street-independiente-riot-fans-v1";
+        private const string FerroBackgroundResource = "street-background-ferro-v2";
+        private const string FerroFrontFansResource = "street-ferro-fans-front-v2";
+        private const string FerroWalkingFansResource = "street-ferro-fans-walk-v2";
+        private const string FerroRiotFansResource = "street-ferro-riot-fans-v2";
+        private const string IndependienteBackgroundResource = "street-background-independiente-v2";
+        private const string IndependienteFrontFansResource = "street-independiente-fans-front-v2";
+        private const string IndependienteWalkingFansResource = "street-independiente-fans-walk-v2";
+        private const string IndependienteRiotFansResource = "street-independiente-riot-fans-v3";
+        private const string RacingBackgroundResource = "street-background-racing-v1";
+        private const string RacingFansResource = "street-racing-fans-paired-v1";
+        private const string RacingRiotFansResource = "street-racing-riot-fans-v2";
+        private const string SanLorenzoBackgroundResource = "street-background-sanlorenzo-v1";
+        private const string SanLorenzoFansResource = "street-sanlorenzo-fans-paired-v1";
+        private const string SanLorenzoRiotFansResource = "street-sanlorenzo-riot-fans-v2";
+        private const string BocaBackgroundResource = "street-background-boca-v1";
+        private const int RiverVisualLevelIndex = 7;
+        private const string RiverMuralResource = "street-mural-river-master-v1";
+        private const string RiverFansResource = "street-river-fans-paired-v1";
+        private const string RiverRiotFansResource = "street-river-riot-fans-v2";
+        private const string BocaFansResource = "street-boca-fans-paired-v1";
+        private const string BocaRiotFansResource = "street-boca-riot-fans-v2";
+        private const string CamionerosBackgroundResource = "street-background-camioneros-v1";
+        private const string LosRedondosBackgroundResource = "street-background-losredondos-v1";
+        private const string LosRedondosFrontFansResource = "street-losredondos-fans-front-v1";
+        private const string LosRedondosWalkingFansResource = "street-losredondos-fans-walk-v1";
         private const string FourZoneGrillResource = "street-grill-four-zones-v1";
         private const string BeerBarrelResource = "street-beer-barrel-v1";
         private const string FernetTableResource = "street-fernet-table-v1";
@@ -34,9 +51,15 @@ namespace HayChoriYPaty
         private const int VelezFanVariantCount = 9;
         private const int VelezFanAtlasColumns = 3;
         private const int TeamFanVariantCount = 9;
+        private const int IndependienteFanVariantCount = 12;
+        private const int FerroFanVariantCount = 12;
+        private const int RacingFanVariantCount = 12;
+        private const int LosRedondosFanVariantCount = 12;
+        private const int LosRedondosFanAtlasColumns = 3;
         private const int TeamFanAtlasColumns = 3;
         private const string CocaBottleResource = "street-coca-bottle-v1";
         private const string BeverageBarrelResource = "street-beverage-barrel-v1";
+        private const string LaterCocacoleroResource = "street-cocacolero-levels3-5-v1";
         // Nine monochrome All Boys outfits stay integrated in front, walk, and timeout poses.
         // All three atlases use the same customer-ID variant so apparel persists across contexts.
         // The old four uniformed silhouettes remain a safe fallback if an atlas is missing.
@@ -59,7 +82,7 @@ namespace HayChoriYPaty
         private const string MuralResource = "street-mural-real-v5";
         // Draw one complete mural/wall/coping crop; cover the old v4 mural band so it cannot peek through below.
         private static readonly Rect MuralSource = new Rect(0, 0, 940, 280);
-        private static readonly Rect MuralBounds = new Rect(0, 0, W, 118);
+        private static readonly Rect MuralBounds = StreetSceneLayout.MuralBounds;
         private static readonly Rect AllBoysSelectorMuralSource = new Rect(45, 0, 610, 280);
         private static readonly Rect ChicagoSelectorMuralSource = new Rect(0, 0, 610, 280);
         private static readonly int[][] LaterLevelCardProducts = {
@@ -72,13 +95,9 @@ namespace HayChoriYPaty
         private static readonly Rect HudSales = new Rect(388, 10, 146, 45);
         private static readonly Rect HudChoriSales = new Rect(376, 6, 158, 26);
         private static readonly Rect HudCocaSales = new Rect(376, 34, 158, 26);
-        // Keep the centered camera clear above the clock, then use the full lower capsule band for a readable countdown.
         private static readonly Rect CutoutHudGap = new Rect(232, 0, 70, 34);
-        private static readonly Rect CutoutHudCoins = new Rect(70, 10, 122, 45);
-        private static readonly Rect CutoutHudTime = new Rect(202, 35, 124, 32);
-        private static readonly Rect CutoutHudSales = new Rect(388, 10, 146, 45);
         private const int HudClockFontSize = 48;
-        private const float CustomerHiddenLegHeight = 32f;
+        private const float CustomerHiddenLegHeight = StreetSceneLayout.CustomerHiddenLegHeight;
         // Standard station dimensions come from live Floresta, not per-level fitting.
         private const string ChicagoGrillResource = "street-parrilla-large-v4";
         private static readonly Rect ServingTableRect = StreetWorkstationLayout.FoodTableBounds;
@@ -107,6 +126,12 @@ namespace HayChoriYPaty
         private static readonly Rect MenuQuit = new Rect(126, 816, 288, 92);
         private const int MenuPlayAction = 6, MenuQuitAction = 7;
         private const int LevelSelectorBackAction = 8, VictoryExitAction = 9, RiotReturnAction = 15, LevelSelectFirstAction = 30;
+        private const int LevelSelectorPreviousAction = 17, LevelSelectorNextAction = 18, LevelSelectorPageSize = 6;
+        private const int ReadyLevelSelectorAction = 19;
+        private static readonly Rect ReadyLevelSelector = new Rect(161, 912, 218, 35);
+        private static readonly Rect LevelSelectPrevious = new Rect(28, 666, 112, 48);
+        private static readonly Rect LevelSelectNext = new Rect(400, 666, 112, 48);
+        private int levelSelectPage;
         private static readonly Rect LevelSelectTitle = new Rect(28, 61, 484, 64);
         private static readonly Rect LevelSelectHint = new Rect(48, 718, 444, 28);
         private static readonly Rect LevelSelectBack = new Rect(126, 770, 288, 78);
@@ -123,14 +148,23 @@ namespace HayChoriYPaty
         private const float RiotFanAtlasRowSplitY = 493f;
         private static readonly Rect RiotReturnButton = new Rect(88, 858, 364, 66);
         private StreetGame game;
-        private Texture2D backdrop, chicagoBackground, velezBackground, velezCrest, velezGrill, people, items, parrillero, parrilleroDiagonal, cocacolero, parrilleroIcon, upgradeWood, speedArrows, largeGrill, servingTable, gameCoin, muralArt, allBoysCrest, chicagoCrest, cocaBottle, beverageBarrel, chicagoGrill;
+        private int VisualLevelIndex => game != null && game.Sim != null ? game.Sim.LevelIndex : 0;
+        private Texture2D backdrop, chicagoBackground, velezBackground, velezCrest, velezGrill, people, items, parrillero, parrilleroDiagonal, cocacolero, laterCocacolero, parrilleroIcon, upgradeWood, speedArrows, largeGrill, servingTable, gameCoin, muralArt, allBoysCrest, chicagoCrest, cocaBottle, beverageBarrel, chicagoGrill;
         private Texture2D clubPennantTexture;
         private string clubPennantThemeName;
+        private Texture2D clubMuralTexture;
+        private string clubMuralResource;
         private Texture2D allBoysFrontFans, allBoysWalkingFans, allBoysRiotFans;
         private Texture2D chicagoFrontFans, chicagoWalkingFans, chicagoRiotFans;
         private Texture2D velezFrontFans, velezWalkingFans, velezRiotFans;
         private Texture2D ferroBackground, ferroFrontFans, ferroWalkingFans, ferroRiotFans;
         private Texture2D independienteBackground, independienteFrontFans, independienteWalkingFans, independienteRiotFans;
+        private Texture2D racingBackground, racingFans, racingRiotFans;
+        private Texture2D sanLorenzoBackground, sanLorenzoFans, sanLorenzoRiotFans;
+        private Texture2D bocaBackground, bocaFans, bocaRiotFans;
+        private Texture2D riverMural, riverFans, riverRiotFans;
+        private Texture2D camionerosBackground;
+        private Texture2D losRedondosBackground, losRedondosFrontFans, losRedondosWalkingFans;
         private Texture2D fourZoneGrill, beerBarrel, fernetTable, readySandwichesTable;
         private Texture2D victoryPopup;
         private Texture2D coverArt, titleLogo, introGlow, menuButton, hudBarTexture, cutoutHudBarTexture, riotBackdrop, riotFanAtlas, riotImpactCloud;
@@ -207,6 +241,13 @@ namespace HayChoriYPaty
             new Rect(114,630,120,294), new Rect(385,630,192,291), new Rect(690,630,185,292), new Rect(950,677,248,213),
             new Rect(103,946,155,298), new Rect(396,946,154,290), new Rect(692,946,165,293), new Rect(1012,946,139,293)
         };
+        // The matched sheet has uneven row heights, not a uniform 4x4 grid.
+        private static readonly Rect[] MatchedCocacoleroPoses = {
+            new Rect(45,15,235,328), new Rect(356,19,234,327), new Rect(672,18,229,329), new Rect(994,13,229,334),
+            new Rect(52,354,224,308), new Rect(357,360,217,305), new Rect(668,361,212,304), new Rect(964,364,253,299),
+            new Rect(77,671,163,288), new Rect(371,674,208,284), new Rect(679,675,201,284), new Rect(943,720,276,243),
+            new Rect(60,964,208,281), new Rect(370,965,211,280), new Rect(673,968,220,282), new Rect(1004,963,188,282)
+        };
         // Threshold-alpha bounds from the transparent upgrade board and three-arrow icon.
         private static readonly Rect UpgradeWoodBounds = new Rect(13,148,1484,715);
         private static readonly Rect SpeedArrowBounds = new Rect(114,224,1174,662);
@@ -220,18 +261,15 @@ namespace HayChoriYPaty
             chicagoBackground = Resources.Load<Texture2D>(ChicagoBackgroundResource);
             velezBackground = Resources.Load<Texture2D>(VelezBackgroundResource);
             velezCrest = Resources.Load<Texture2D>(VelezCrestResource);
-            velezFrontFans = Resources.Load<Texture2D>(VelezFrontFansResource);
-            velezWalkingFans = Resources.Load<Texture2D>(VelezWalkingFansResource);
-            velezRiotFans = Resources.Load<Texture2D>(VelezRiotFansResource);
             velezGrill = Resources.Load<Texture2D>(VelezGrillResource);
             ferroBackground = Resources.Load<Texture2D>(FerroBackgroundResource);
-            ferroFrontFans = Resources.Load<Texture2D>(FerroFrontFansResource);
-            ferroWalkingFans = Resources.Load<Texture2D>(FerroWalkingFansResource);
-            ferroRiotFans = Resources.Load<Texture2D>(FerroRiotFansResource);
             independienteBackground = Resources.Load<Texture2D>(IndependienteBackgroundResource);
-            independienteFrontFans = Resources.Load<Texture2D>(IndependienteFrontFansResource);
-            independienteWalkingFans = Resources.Load<Texture2D>(IndependienteWalkingFansResource);
-            independienteRiotFans = Resources.Load<Texture2D>(IndependienteRiotFansResource);
+            racingBackground = Resources.Load<Texture2D>(RacingBackgroundResource);
+            sanLorenzoBackground = Resources.Load<Texture2D>(SanLorenzoBackgroundResource);
+            bocaBackground = Resources.Load<Texture2D>(BocaBackgroundResource);
+            riverMural = Resources.Load<Texture2D>(RiverMuralResource);
+            camionerosBackground = Resources.Load<Texture2D>(CamionerosBackgroundResource);
+            losRedondosBackground = Resources.Load<Texture2D>(LosRedondosBackgroundResource);
             fourZoneGrill = Resources.Load<Texture2D>(FourZoneGrillResource);
             beerBarrel = Resources.Load<Texture2D>(BeerBarrelResource);
             fernetTable = Resources.Load<Texture2D>(FernetTableResource);
@@ -239,16 +277,11 @@ namespace HayChoriYPaty
             cocaBottle = Resources.Load<Texture2D>(CocaBottleResource);
             beverageBarrel = Resources.Load<Texture2D>(BeverageBarrelResource);
             people = Resources.Load<Texture2D>("street-characters");
-            allBoysFrontFans = Resources.Load<Texture2D>(AllBoysFrontFansResource);
-            allBoysWalkingFans = Resources.Load<Texture2D>(AllBoysWalkingFansResource);
-            allBoysRiotFans = Resources.Load<Texture2D>(AllBoysRiotFansResource);
-            chicagoFrontFans = Resources.Load<Texture2D>(ChicagoFrontFansResource);
-            chicagoWalkingFans = Resources.Load<Texture2D>(ChicagoWalkingFansResource);
-            chicagoRiotFans = Resources.Load<Texture2D>(ChicagoRiotFansResource);
             items = Resources.Load<Texture2D>("street-items");
             parrillero = Resources.Load<Texture2D>("street-parrillero");
             parrilleroDiagonal = Resources.Load<Texture2D>("street-parrillero-diagonal-v1");
             cocacolero = Resources.Load<Texture2D>("street-cocacolero-v1");
+            laterCocacolero = Resources.Load<Texture2D>(LaterCocacoleroResource);
             parrilleroIcon = Resources.Load<Texture2D>("street-parrillero-icon");
             upgradeWood = Resources.Load<Texture2D>("street-upgrade-wood-v1");
             speedArrows = Resources.Load<Texture2D>("street-speed-arrows-v1");
@@ -338,14 +371,16 @@ namespace HayChoriYPaty
             if (levelSelectActive)
             {
                 if (LevelSelectBack.Contains(p)) return LevelSelectorBackAction;
-                for (int i = 0; i < StreetSimulation.LevelNames.Length; i++)
+                if (levelSelectPage > 0 && LevelSelectPrevious.Contains(p)) return LevelSelectorPreviousAction;
+                if ((levelSelectPage + 1) * LevelSelectorPageSize < StreetSimulation.LevelNames.Length && LevelSelectNext.Contains(p)) return LevelSelectorNextAction;
+                for (int i = levelSelectPage * LevelSelectorPageSize; i < Mathf.Min((levelSelectPage + 1) * LevelSelectorPageSize, StreetSimulation.LevelNames.Length); i++)
                     if (i <= game.UnlockedLevel && LevelSelectCardBounds(i).Contains(p)) return LevelSelectFirstAction + i;
                 return 0;
             }
             if (game.Sim.Phase == RoundPhase.Ready)
             {
                 if (Start.Contains(p)) return 1;
-                for (int i=0;i<5;i++) if (LevelButton(i).Contains(p) && i<=game.UnlockedLevel) return 10+i;
+                if (ReadyLevelSelector.Contains(p)) return ReadyLevelSelectorAction;
                 return 0;
             }
             if (game.Sim.Phase == RoundPhase.Playing)
@@ -367,6 +402,7 @@ namespace HayChoriYPaty
                 {
                     introActive = false;
                     levelSelectActive = true;
+                    levelSelectPage = game.Sim.LevelIndex / LevelSelectorPageSize;
                     pressedAction = 0;
                 }
                 else if (a == MenuQuitAction) QuitGame();
@@ -374,6 +410,13 @@ namespace HayChoriYPaty
             }
             if (levelSelectActive)
             {
+                if (a == LevelSelectorPreviousAction || a == LevelSelectorNextAction)
+                {
+                    levelSelectPage = Mathf.Clamp(levelSelectPage + (a == LevelSelectorNextAction ? 1 : -1),
+                        0, (StreetSimulation.LevelNames.Length - 1) / LevelSelectorPageSize);
+                    pressedAction = 0;
+                    return;
+                }
                 if (a == LevelSelectorBackAction)
                 {
                     levelSelectActive = false;
@@ -396,17 +439,23 @@ namespace HayChoriYPaty
                 return;
             }
             bool ok = true;
+            if (a == ReadyLevelSelectorAction && game.Sim.Phase == RoundPhase.Ready)
+            {
+                levelSelectActive = true;
+                levelSelectPage = game.Sim.LevelIndex / LevelSelectorPageSize;
+                return;
+            }
             if (a==1) game.StartRound(); else if (a==2) ok=game.TryHireParrillero(); else if (a==3) ok=game.TryUpgradeSpeed(); else if (a==HireCocacoleroAction) ok=game.TryHireCocacolero();
             else if (a==4) ok=game.Retry(); else if (a==5) ok=game.NextLevel(); else if (a>=10&&a<15) {ok=game.SelectLevel(a-10);if(ok)game.StartRound();}
             else if (a == RiotReturnAction && game.Sim.Phase == RoundPhase.Lost)
             {
                 ok = game.Retry();
-                if (ok) levelSelectActive = true;
+                if (ok) { levelSelectActive = true; levelSelectPage = game.Sim.LevelIndex / LevelSelectorPageSize; }
             }
             else if (a == VictoryExitAction && game.Sim.Phase == RoundPhase.Won)
             {
                 ok = game.Retry();
-                if (ok) levelSelectActive = true;
+                if (ok) { levelSelectActive = true; levelSelectPage = game.Sim.LevelIndex / LevelSelectorPageSize; }
             }
             lastAction=a; feedbackUntil=Time.unscaledTime+0.22f; feedbackScale=ok?1.04f:0.97f;
         }
@@ -460,6 +509,7 @@ namespace HayChoriYPaty
             DrawBackdropLayers(logicalCanvasHeight, layoutVerticalScale);
             // Keep the expanded customer street clear; order icons live on their customers.
             DrawWaitingCrowd(sim);
+            DrawClubCounter();
             DrawGrill();
             DrawServingTable();
             for(int i=0;i<7;i++) DrawStation(i,sim.IsProductAvailable(i));
@@ -515,6 +565,7 @@ namespace HayChoriYPaty
             }
 
             DrawRiotWaitingCrowd(game != null ? game.Sim : null, elapsed);
+            DrawClubCounter(1f - destruction);
             DrawRiotImpactCloud(elapsed);
             DrawRiotDebris(elapsed);
         }
@@ -598,13 +649,11 @@ namespace HayChoriYPaty
 
         private void DrawRiotCustomer(StreetCustomer customer, int levelIndex, float elapsed)
         {
+            levelIndex = VisualLevelIndex;
             Vector2 position = CustomerViewPosition(customer.Position);
-            Texture2D activeRiotFans = riotFanAtlas;
-            if (levelIndex == 0 && allBoysRiotFans != null) activeRiotFans = allBoysRiotFans;
-            else if (levelIndex == 1 && chicagoRiotFans != null) activeRiotFans = chicagoRiotFans;
-            else if (levelIndex == 2 && velezRiotFans != null) activeRiotFans = velezRiotFans;
-            else if (levelIndex == 3 && ferroRiotFans != null) activeRiotFans = ferroRiotFans;
-            else if (levelIndex == 4 && independienteRiotFans != null) activeRiotFans = independienteRiotFans;
+            ClubFanDefinition fans = ClubVisualTheme.ForLevel(levelIndex).Fans;
+            Texture2D activeRiotFans = fans != null ? fans.LoadRiotFans() : null;
+            if (activeRiotFans == null) activeRiotFans = riotFanAtlas; // Emergency fallback only; registered clubs have explicit assets.
             float stagger = (customer.Id % 5) * .055f;
             float fury = IntroEase(Mathf.Clamp01((elapsed - stagger) / RiotAngerRampSeconds));
             float rhythm = elapsed * (10f + (customer.Id % 3) * 1.25f) + customer.Id * 1.71f;
@@ -619,12 +668,7 @@ namespace HayChoriYPaty
             {
                 float calmAlpha = activeRiotFans == null ? 1f : 1f - fury;
                 GUI.color = new Color(1f, 1f, 1f, calmAlpha);
-                if (levelIndex == 0) DrawAllBoysFan(calmPose, customer.Id, false, false);
-                else if (levelIndex == 1) DrawChicagoFan(calmPose, customer.Id, false, false);
-                else if (levelIndex == 2) DrawVelezFan(calmPose, customer.Id, false, false);
-                else if (levelIndex == 3) DrawFerroFan(calmPose, customer.Id, false, false);
-                else if (levelIndex == 4) DrawIndependienteFan(calmPose, customer.Id, false, false);
-                else Person(calmPose, GetLegacyAllBoysFanFrame(customer.Id, false), false);
+                DrawFan(calmPose, customer.Id, false, false, fans);
             }
 
             Rect angryPose = new Rect(position.x - 44f + sway,
@@ -633,17 +677,14 @@ namespace HayChoriYPaty
             {
                 GUI.color = new Color(1f, 1f, 1f, fury);
                 int pose = RiotFanPoseIndex(elapsed, customer.Id);
+                if (fans != null && activeRiotFans != riotFanAtlas)
+                    angryPose = fans.RiotDrawBounds(angryPose, customer.Id, pose);
                 Rect source;
-                if ((levelIndex == 0 && allBoysRiotFans != null) ||
-                    (levelIndex == 2 && velezRiotFans != null))
-                    source = AllBoysRiotFanFrameSource(activeRiotFans, customer.Id, pose);
-                else if ((levelIndex == 3 && ferroRiotFans != null) ||
-                    (levelIndex == 4 && independienteRiotFans != null))
-                    source = TeamRiotFanFrameSource(activeRiotFans, customer.Id, pose);
-                else if (levelIndex == 1 && chicagoRiotFans != null)
-                    source = ChicagoRiotFanFrameSource(activeRiotFans, customer.Id, pose);
-                else source = RiotFanFrameSource(activeRiotFans, customer.Id, pose);
-                Draw(angryPose, activeRiotFans, source, true, false);
+                source = fans != null && activeRiotFans != riotFanAtlas
+                    ? fans.RiotSourceRect(activeRiotFans.width, activeRiotFans.height, customer.Id, pose)
+                    : RiotFanFrameSource(activeRiotFans, customer.Id, pose);
+                // Preserve each atlas cell's authored aspect ratio; Velez's 6x3 source cells are not square.
+                Draw(angryPose, activeRiotFans, source, false, false);
             }
 
             float cueAlpha = Mathf.Clamp01((elapsed - .08f) / .2f) * Mathf.Clamp01((1.1f - elapsed) / .3f);
@@ -774,26 +815,66 @@ namespace HayChoriYPaty
         private Texture2D CurrentGameplayBackdrop()
         {
             if (game == null || game.Sim == null) return backdrop;
+            if (VisualLevelIndex == RiverVisualLevelIndex && riverMural != null) return riverMural;
             if (game.Sim.LevelIndex == 1 && chicagoBackground != null) return chicagoBackground;
             if (game.Sim.LevelIndex == 2 && velezBackground != null) return velezBackground;
             if (game.Sim.LevelIndex == 3 && ferroBackground != null) return ferroBackground;
             if (game.Sim.LevelIndex == 4 && independienteBackground != null) return independienteBackground;
+            if (game.Sim.LevelIndex == 5 && racingBackground != null) return racingBackground;
+            if (game.Sim.LevelIndex == 6 && sanLorenzoBackground != null) return sanLorenzoBackground;
+            if (game.Sim.LevelIndex == 8 && bocaBackground != null) return bocaBackground;
+            if (game.Sim.LevelIndex == 9 && camionerosBackground != null) return camionerosBackground;
+            if (game.Sim.LevelIndex == 10 && losRedondosBackground != null) return losRedondosBackground;
             return backdrop;
         }
         private void DrawBackdropLayers(float canvasHeight, float verticalScale)
         {
-            Texture2D currentBackdrop = CurrentGameplayBackdrop();
-            if (currentBackdrop != null)
-                GUI.DrawTexture(new Rect(0, 0, W, canvasHeight), currentBackdrop, ScaleMode.ScaleAndCrop, true);
-            if (muralArt != null && currentBackdrop == backdrop)
+            ClubVisualTheme theme = ClubVisualTheme.ForLevel(VisualLevelIndex);
+            // The root public ground/counter/operator floor is invariant; only scenery is themed.
+            Color previous = GUI.color;
+            GUI.color = theme.SceneryTint;
+            if (backdrop != null)
+                GUI.DrawTexture(StreetSceneLayout.BackgroundBounds(canvasHeight), backdrop, ScaleMode.StretchToFill, true);
+            GUI.color = previous;
+            if (!string.IsNullOrEmpty(theme.MuralResource))
+                DrawThemedMural(theme, verticalScale);
+            else if (muralArt != null)
                 DrawRaw(new Rect((W - W * verticalScale) * .5f, 0,
                     W * verticalScale, MuralBounds.height * verticalScale), muralArt, MuralSource, true, false);
             DrawClubPennants(canvasHeight, verticalScale);
         }
 
+        private void DrawThemedMural(ClubVisualTheme theme, float verticalScale)
+        {
+            if (clubMuralResource != theme.MuralResource)
+            {
+                clubMuralResource = theme.MuralResource;
+                clubMuralTexture = Resources.Load<Texture2D>(clubMuralResource);
+            }
+            if (clubMuralTexture == null) return;
+            // Fit the complete mural below the fixed HUD, never hide portraits behind it.
+            Rect band = new Rect(0, HudBar.yMax, W, MuralBounds.height * verticalScale);
+            Rect normalized = theme.MuralSource;
+            Rect source = new Rect(normalized.x * clubMuralTexture.width, normalized.y * clubMuralTexture.height,
+                normalized.width * clubMuralTexture.width, normalized.height * clubMuralTexture.height);
+            if (VisualLevelIndex >= 5)
+                // Prepared club compositions need a taller wall, not squeezed portraits or side blanks.
+                // Only scenery expands; the master counter and all actor coordinates stay unchanged.
+                band.height = Mathf.Min(W * source.height / source.width,
+                    Mathf.Max(0f, StreetSceneLayout.CounterTop(H * verticalScale) - band.y));
+            // Frontal wall panels may have different aspect ratios, never stretched portrait figures.
+            Color previous = GUI.color;
+            GUI.color = VisualLevelIndex == 9 ? new Color(.43f, .73f, .92f)
+                : Color.Lerp(theme.PrimaryColor, new Color(.36f, .32f, .27f), .22f);
+            GUI.DrawTexture(new Rect(0, 0, W, band.yMax), Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            DrawRaw(band, clubMuralTexture, source, false, false);
+            GUI.color = previous;
+        }
+
         private void DrawClubPennants(float canvasHeight, float verticalScale)
         {
-            int levelIndex = game.Sim.LevelIndex;
+            int levelIndex = VisualLevelIndex;
             // The original Floresta row is part of its background art; leave it pixel-identical.
             if (levelIndex == 0) return;
 
@@ -822,7 +903,9 @@ namespace HayChoriYPaty
 
         private void DrawLevelBadge(int levelIndex, Rect bounds)
         {
-            string caption = StreetSimulation.LevelNames[levelIndex].ToUpperInvariant();
+            if (VisualLevelIndex == RiverVisualLevelIndex) levelIndex = RiverVisualLevelIndex;
+            string caption = (levelIndex == RiverVisualLevelIndex ? "River Plate / Núñez"
+                : StreetSimulation.LevelNames[levelIndex]).ToUpperInvariant();
             Texture2D crest = levelIndex == 0 ? allBoysCrest : levelIndex == 1 ? chicagoCrest : levelIndex == 2 ? velezCrest : null;
             bool showCrest = crest != null;
             int originalSize = levelTitle.fontSize;
@@ -854,24 +937,20 @@ namespace HayChoriYPaty
         }
         private void DrawCounters(StreetSimulation sim)
         {
-            // Read-only status can use the physical top edge without moving any tap target.
+            // The status bar always uses the same edge-to-edge layout on every device.
             Matrix4x4 previous = GUI.matrix;
             Color color = GUI.color;
             float previousVertical = layoutVerticalScale;
             Rect screen = ScreenBounds(new Vector2(Screen.width, Screen.height));
-            bool cutout = Screen.height >= Screen.width &&
-                CanvasViewport(new Vector2(Screen.width, Screen.height), Screen.safeArea).y > 1f;
             try
             {
                 GUI.matrix = Matrix4x4.Scale(new Vector3(screen.width / W, screen.width / W, 1));
                 layoutVerticalScale = 1f;
                 GUI.color = Color.white;
-                Texture2D bar = cutout ? cutoutHudBarTexture : hudBarTexture;
-                if (bar != null) GUI.DrawTexture(HudBar, bar, ScaleMode.StretchToFill, true);
+                if (hudBarTexture != null) GUI.DrawTexture(HudBar, hudBarTexture, ScaleMode.StretchToFill, true);
                 DrawHudIcon(new Rect(8, 4, 58, 56), 10);
-                DrawHudNumber(cutout ? CutoutHudCoins : HudCoins, sim.Coins.ToString());
-                DrawHudNumber(cutout ? CutoutHudTime : HudTime, FormatRemainingTime(sim.TimeRemaining), HudClockFontSize);
-                Rect salesBounds = cutout ? CutoutHudSales : HudSales;
+                DrawHudNumber(HudCoins, sim.Coins.ToString());
+                DrawHudNumber(HudTime, FormatRemainingTime(sim.TimeRemaining), HudClockFontSize);
                 if (sim.LevelIndex == 1)
                 {
                     // Two larger, independently fitted rows keep both Chicago goals readable.
@@ -886,7 +965,7 @@ namespace HayChoriYPaty
                     DrawHudIcon(new Rect(338, 1, 30, 20), 0);
                     DrawHudIcon(new Rect(338, 23, 30, 20), 1);
                     DrawHudIcon(new Rect(338, 45, 30, 20), 4);
-                    DrawHudNumber(salesBounds, sim.Delivered + "/" + sim.Goal);
+                    DrawHudNumber(HudSales, sim.Delivered + "/" + sim.Goal);
                 }
                 else if (sim.LevelIndex >= 3)
                 {
@@ -896,12 +975,12 @@ namespace HayChoriYPaty
                         Rect icon = new Rect(337 + (slot % 3) * 16, 3 + (slot / 3) * 20, 17, 18);
                         DrawHudIcon(icon, sim.GetAvailableProduct(slot));
                     }
-                    DrawHudNumber(salesBounds, sim.Delivered + "/" + sim.Goal);
+                    DrawHudNumber(HudSales, sim.Delivered + "/" + sim.Goal);
                 }
                 else
                 {
                     DrawHudIcon(new Rect(338, 10, 43, 45), sim.LevelIndex == 0 ? 0 : 18);
-                    DrawHudNumber(salesBounds, sim.Delivered + "/" + sim.Goal);
+                    DrawHudNumber(HudSales, sim.Delivered + "/" + sim.Goal);
                 }
             }
             finally { GUI.matrix = previous; GUI.color = color; layoutVerticalScale = previousVertical; }
@@ -1088,15 +1167,19 @@ namespace HayChoriYPaty
         {
             FillRect(new Rect(0, 0, W, logicalCanvasHeight), new Color(.035f, .025f, .025f, .58f));
             OutlineLabel(LevelSelectTitle, "ELEGÍ TU CANCHA", menuTitle, new Color(1f, .91f, .72f), 2f);
-            for (int i = 0; i < StreetSimulation.LevelNames.Length; i++) DrawLevelSelectCard(i);
+            for (int i = levelSelectPage * LevelSelectorPageSize; i < Mathf.Min((levelSelectPage + 1) * LevelSelectorPageSize, StreetSimulation.LevelNames.Length); i++) DrawLevelSelectCard(i);
+            DrawStandardButton(LevelSelectPrevious, LevelSelectorPreviousAction, "ATRÁS", levelSelectPage > 0);
+            DrawStandardButton(LevelSelectNext, LevelSelectorNextAction, "MÁS", (levelSelectPage + 1) * LevelSelectorPageSize < StreetSimulation.LevelNames.Length);
+            Label(new Rect(148, 675, 244, 30), "CANCHAS " + (levelSelectPage + 1) + " / " + ((StreetSimulation.LevelNames.Length + LevelSelectorPageSize - 1) / LevelSelectorPageSize), small);
             Label(LevelSelectHint, "Superá cada cancha para desbloquear la siguiente", small);
             DrawStandardButton(LevelSelectBack, LevelSelectorBackAction, "VOLVER");
         }
         private static Rect LevelSelectCardBounds(int index)
         {
             const float width = 236f, height = 150f;
-            int row = index / 2, column = index % 2;
-            float x = index == 4 ? (W - width) * .5f : 24f + column * 256f;
+            int slot = index % LevelSelectorPageSize;
+            int row = slot / 2, column = slot % 2;
+            float x = index == StreetSimulation.LevelNames.Length - 1 && column == 0 ? (W - width) * .5f : 24f + column * 256f;
             return new Rect(x, 154f + row * 174f, width, height);
         }
         private void DrawLevelSelectCard(int index)
@@ -1159,24 +1242,20 @@ namespace HayChoriYPaty
                     GUI.DrawTexture(LayoutRect(new Rect(bounds.x + 5, bounds.y + 5, 28, 32)), chicagoCrest, ScaleMode.ScaleToFit, true);
                 return;
             }
-            if (index == 2 && velezBackground != null)
+            ClubVisualTheme theme = ClubVisualTheme.ForLevel(index);
+            if (index >= 2 && !string.IsNullOrEmpty(theme.MuralResource))
             {
-                GUI.DrawTexture(LayoutRect(bounds), velezBackground, ScaleMode.ScaleAndCrop, true);
-                if (velezCrest != null)
-                    GUI.DrawTexture(LayoutRect(new Rect(bounds.x + 5, bounds.y + 5, 30, 34)), velezCrest, ScaleMode.ScaleToFit, true);
-                return;
-            }
-            if (index == 3 && ferroBackground != null)
-            {
-                GUI.DrawTexture(LayoutRect(bounds), ferroBackground, ScaleMode.ScaleAndCrop, true);
-                FillRect(new Rect(bounds.x, bounds.y, bounds.width, 5), new Color(.04f, .38f, .19f));
-                return;
-            }
-            if (index == 4 && independienteBackground != null)
-            {
-                GUI.DrawTexture(LayoutRect(bounds), independienteBackground, ScaleMode.ScaleAndCrop, true);
-                FillRect(new Rect(bounds.x, bounds.y, bounds.width, 5), new Color(.79f, .035f, .06f));
-                return;
+                Texture2D art = Resources.Load<Texture2D>(theme.MuralResource);
+                if (art != null)
+                {
+                    Rect source = theme.MuralSource;
+                    DrawRaw(LayoutRect(bounds), art, new Rect(source.x * art.width, source.y * art.height,
+                        source.width * art.width, source.height * art.height), false, false);
+                    FillRect(new Rect(bounds.x, bounds.y, bounds.width, 5), theme.PrimaryColor);
+                    if (index == 2 && velezCrest != null)
+                        GUI.DrawTexture(LayoutRect(new Rect(bounds.x + 5, bounds.y + 5, 30, 34)), velezCrest, ScaleMode.ScaleToFit, true);
+                    return;
+                }
             }
 
             // Later locations preview their expanding product lineup on the original game grill art.
@@ -1381,7 +1460,7 @@ namespace HayChoriYPaty
 
         private void DrawWaitingCrowd(StreetSimulation sim)
         {
-            // The counter is already in the backdrop: clip only the crowd behind its top edge.
+            // Clip the crowd at the shared counter edge; custom later-level backdrops draw the counter after it.
             // Workers, products and sale effects stay on the player side and outside this group.
             GUI.BeginGroup(new Rect(0, 0, W, CustomerCounterTopY()));
             try
@@ -1397,24 +1476,33 @@ namespace HayChoriYPaty
             }
             finally { GUI.EndGroup(); }
         }
+        private void DrawClubCounter(float opacity = 1f)
+        {
+            if (backdrop == null || opacity <= 0f) return;
+            // Already canvas-space geometry: applying LayoutRect again would move the counter on tall screens.
+            Rect destination = StreetSceneLayout.CounterBounds(logicalCanvasHeight);
+            Color previous = GUI.color;
+            try
+            {
+                Color tint = ClubVisualTheme.ForLevel(game.Sim.LevelIndex).SceneryTint;
+                tint.a = Mathf.Clamp01(opacity);
+                GUI.color = tint;
+                DrawRaw(destination, backdrop, StreetSceneLayout.CounterSource, true, false);
+            }
+            finally { GUI.color = previous; }
+        }
         private float CustomerCounterTopY()
         {
-            Texture2D background = CurrentGameplayBackdrop();
-            Vector2 size = background != null ? new Vector2(background.width, background.height) : new Vector2(940, 1673);
-            int level = background == chicagoBackground && chicagoBackground != null ? 1 : 0;
-            return CounterSurfaceY(logicalCanvasHeight, size, level);
+            return StreetSceneLayout.CounterTop(logicalCanvasHeight);
         }
         private static float CounterSurfaceY(float canvasHeight, Vector2 backdropSize, int levelIndex)
         {
-            // Match ScaleAndCrop exactly, including the centered vertical crop on shorter displays.
-            float scale = Mathf.Max(W / backdropSize.x, canvasHeight / backdropSize.y);
-            float sourceY = levelIndex == 1 ? 642f : 548f;
-            return (canvasHeight - backdropSize.y * scale) * .5f + sourceY * scale;
+            // Legacy private test wrapper; neither club nor replacement texture dimensions control perspective.
+            return StreetSceneLayout.CounterTop(canvasHeight);
         }
         private static float CustomerViewOffsetY(float counterTop, float verticalScale)
         {
-            float originalFrontFeet = (StreetSimulation.FrontQueueY - 76f) * verticalScale + 76f;
-            return (counterTop + CustomerHiddenLegHeight - originalFrontFeet) / verticalScale;
+            return StreetSceneLayout.CustomerOffset(counterTop, verticalScale);
         }
         private Vector2 CustomerViewPosition(Vector2 position)
         {
@@ -1542,20 +1630,32 @@ namespace HayChoriYPaty
 
             try
             {
-                bool chicagoFlip = walking && c.Target.x < c.Position.x; // New Chicago profile poses face right.
-                bool allBoysFlip = walking && c.Target.x < c.Position.x; // New All Boys profile poses face right.
-                if (game.Sim.LevelIndex == 0) DrawAllBoysFan(person, c.Id, walking, allBoysFlip);
-                else if (game.Sim.LevelIndex == 1) DrawChicagoFan(person, c.Id, walking, chicagoFlip);
-                else if (game.Sim.LevelIndex == 2) DrawVelezFan(person, c.Id, walking, chicagoFlip);
-                else if (game.Sim.LevelIndex == 3) DrawFerroFan(person, c.Id, walking, chicagoFlip);
-                else if (game.Sim.LevelIndex == 4) DrawIndependienteFan(person, c.Id, walking, chicagoFlip);
-                else Person(person, GetLegacyAllBoysFanFrame(c.Id, walking), chicagoFlip);
+                bool flip = walking && c.Target.x < c.Position.x;
+                DrawFan(person, c.Id, walking, flip, ClubVisualTheme.ForLevel(VisualLevelIndex).Fans);
             }
             finally
             {
                 // Only the body/garment move: badges and subsequent UI keep the safe-area matrix.
                 GUI.matrix = viewMatrix;
             }
+        }
+        private void DrawFan(Rect person, int customerId, bool walking, bool flip, ClubFanDefinition fans)
+        {
+            if (fans == null)
+            {
+                Person(person, GetLegacyAllBoysFanFrame(customerId, walking), walking && !flip);
+                return;
+            }
+            Texture2D atlas = walking ? fans.LoadWalkingFans() : fans.LoadFrontFans();
+            if (atlas == null)
+            {
+                Person(person, GetLegacyAllBoysFanFrame(customerId, walking), walking && !flip);
+                return;
+            }
+            Rect source = walking
+                ? fans.WalkingSourceRect(atlas.width, atlas.height, customerId)
+                : fans.FrontSourceRect(atlas.width, atlas.height, customerId);
+            Draw(person, atlas, source, false, flip);
         }
         private static int GetAllBoysFanVariant(int customerId)
         {
@@ -1637,11 +1737,65 @@ namespace HayChoriYPaty
         }
         private void DrawFerroFan(Rect person, int customerId, bool walking, bool flip)
         {
-            DrawTeamFan(person, customerId, walking, flip, ferroFrontFans, ferroWalkingFans);
+            Texture2D atlas = walking ? ferroWalkingFans : ferroFrontFans;
+            if (atlas == null)
+            {
+                Person(person, GetLegacyAllBoysFanFrame(customerId, walking), walking && !flip);
+                return;
+            }
+            int variant = customerId % FerroFanVariantCount;
+            if (variant < 0) variant += FerroFanVariantCount;
+            Draw(person, atlas, FerroFanSourceRect(atlas, variant), false, flip);
+        }
+        private static Rect FerroFanSourceRect(Texture2D atlas, int variant)
+        {
+            if (atlas == null) return Rect.zero;
+            float cellWidth = atlas.width / (float)TeamFanAtlasColumns;
+            float cellHeight = atlas.height / 4f;
+            int column = variant % TeamFanAtlasColumns;
+            int rowFromTop = variant / TeamFanAtlasColumns;
+            return new Rect(column * cellWidth, atlas.height - (rowFromTop + 1) * cellHeight,
+                cellWidth, cellHeight);
+        }
+        private void DrawLosRedondosFan(Rect person, int customerId, bool walking, bool flip)
+        {
+            Texture2D atlas = walking ? losRedondosWalkingFans : losRedondosFrontFans;
+            if (atlas == null)
+            {
+                Person(person, GetLegacyAllBoysFanFrame(customerId, walking), walking && !flip);
+                return;
+            }
+            Draw(person, atlas, LosRedondosFanSourceRect(atlas, customerId), false, flip);
+        }
+        private static Rect LosRedondosFanSourceRect(Texture2D atlas, int customerId)
+        {
+            if (atlas == null) return Rect.zero;
+            int variant = customerId % LosRedondosFanVariantCount;
+            if (variant < 0) variant += LosRedondosFanVariantCount;
+            float cellWidth = atlas.width / (float)LosRedondosFanAtlasColumns;
+            float cellHeight = atlas.height / 4f;
+            int column = variant % LosRedondosFanAtlasColumns;
+            int rowFromTop = variant / LosRedondosFanAtlasColumns;
+            return new Rect(column * cellWidth, atlas.height - (rowFromTop + 1) * cellHeight,
+                cellWidth, cellHeight);
         }
         private void DrawIndependienteFan(Rect person, int customerId, bool walking, bool flip)
         {
-            DrawTeamFan(person, customerId, walking, flip, independienteFrontFans, independienteWalkingFans);
+            Texture2D atlas = walking ? independienteWalkingFans : independienteFrontFans;
+            if (atlas == null)
+            {
+                Person(person, GetLegacyAllBoysFanFrame(customerId, walking), walking && !flip);
+                return;
+            }
+            int variant = customerId % IndependienteFanVariantCount;
+            if (variant < 0) variant += IndependienteFanVariantCount;
+            float cellWidth = atlas.width / (float)TeamFanAtlasColumns;
+            float cellHeight = atlas.height / 4f;
+            int column = variant % TeamFanAtlasColumns;
+            int rowFromTop = variant / TeamFanAtlasColumns;
+            Rect source = new Rect(column * cellWidth, atlas.height - (rowFromTop + 1) * cellHeight,
+                cellWidth, cellHeight);
+            Draw(person, atlas, source, false, flip);
         }
         private void DrawTeamFan(Rect person, int customerId, bool walking, bool flip, Texture2D front, Texture2D walk)
         {
@@ -1665,6 +1819,19 @@ namespace HayChoriYPaty
             return new Rect(column * cellWidth, atlas.height - (rowFromTop + 1) * cellHeight,
                 cellWidth, cellHeight);
         }
+        private static Rect FerroRiotFanFrameSource(Texture2D atlas, int customerId, int pose)
+        {
+            if (atlas == null) return Rect.zero;
+            int variant = customerId % FerroFanVariantCount;
+            if (variant < 0) variant += FerroFanVariantCount;
+            float cellWidth = atlas.width / 6f;
+            float cellHeight = atlas.height / 4f;
+            int outfitColumn = (variant % TeamFanAtlasColumns) * 2;
+            int pairedPoseColumn = outfitColumn + (pose & 1);
+            int rowFromTop = variant / TeamFanAtlasColumns;
+            return new Rect(pairedPoseColumn * cellWidth, atlas.height - (rowFromTop + 1) * cellHeight,
+                cellWidth, cellHeight);
+        }
         private static Rect TeamRiotFanFrameSource(Texture2D atlas, int customerId, int pose)
         {
             if (atlas == null) return Rect.zero;
@@ -1677,10 +1844,111 @@ namespace HayChoriYPaty
             return new Rect(pairedPoseColumn * cellWidth, atlas.height - (rowFromTop + 1) * cellHeight,
                 cellWidth, cellHeight);
         }
+        private static Rect IndependienteRiotFanFrameSource(Texture2D atlas, int customerId, int pose)
+        {
+            if (atlas == null) return Rect.zero;
+            int variant = customerId % IndependienteFanVariantCount;
+            if (variant < 0) variant += IndependienteFanVariantCount;
+            float cellWidth = atlas.width / 6f;
+            float cellHeight = atlas.height / 4f;
+            int pairedPoseColumn = (variant % TeamFanAtlasColumns) * 2 + (pose & 1);
+            int rowFromTop = variant / TeamFanAtlasColumns;
+            return new Rect(pairedPoseColumn * cellWidth, atlas.height - (rowFromTop + 1) * cellHeight,
+                cellWidth, cellHeight);
+        }
+        private void DrawRacingFan(Rect person, int customerId, bool walking, bool flip)
+        {
+            if (racingFans == null)
+            {
+                Person(person, GetLegacyAllBoysFanFrame(customerId, walking), walking && !flip);
+                return;
+            }
+            Draw(person, racingFans, RacingFanSourceRect(racingFans, customerId, walking), false, flip);
+        }
+        private void DrawSanLorenzoFan(Rect person, int customerId, bool walking, bool flip)
+        {
+            if (sanLorenzoFans == null)
+            {
+                Person(person, GetLegacyAllBoysFanFrame(customerId, walking), walking && !flip);
+                return;
+            }
+            // This paired 6x4 atlas shares the established twelve-variant outfit/pose grid.
+            Draw(person, sanLorenzoFans, RacingFanSourceRect(sanLorenzoFans, customerId, walking), false, flip);
+        }
+        private void DrawBocaFan(Rect person, int customerId, bool walking, bool flip)
+        {
+            if (bocaFans == null)
+            {
+                Person(person, GetLegacyAllBoysFanFrame(customerId, walking), walking && !flip);
+                return;
+            }
+            // The Boca atlas shares the established paired 6x4 grid with twelve outfit variants.
+            Draw(person, bocaFans, RacingFanSourceRect(bocaFans, customerId, walking), false, flip);
+        }
+        private void DrawRiverFan(Rect person, int customerId, bool walking, bool flip)
+        {
+            if (riverFans == null) return;
+            Draw(person, riverFans, RacingFanSourceRect(riverFans, RiverAtlasVariant(customerId), walking), false, flip);
+        }
+        private static int RiverAtlasVariant(int customerId)
+        {
+            int variant = ((customerId % RacingFanVariantCount) + RacingFanVariantCount) % RacingFanVariantCount;
+            // River provenance uses top-to-bottom rows; reuse the existing bottom-origin atlas helper.
+            return (3 - variant / 3) * 3 + variant % 3;
+        }
+        private static Rect RacingFanSourceRect(Texture2D atlas, int customerId, bool walking)
+        {
+            if (atlas == null) return Rect.zero;
+            int variant = customerId % RacingFanVariantCount;
+            if (variant < 0) variant += RacingFanVariantCount;
+            float cellWidth = atlas.width / 6f;
+            float cellHeight = atlas.height / 4f;
+            int pairedPoseColumn = (variant % 3) * 2 + (walking ? 1 : 0);
+            int rowFromTop = variant / 3;
+            return new Rect(pairedPoseColumn * cellWidth, atlas.height - (rowFromTop + 1) * cellHeight,
+                cellWidth, cellHeight);
+        }
+        private static Rect RacingRiotFanFrameSource(Texture2D atlas, int customerId, int pose)
+        {
+            if (atlas == null) return Rect.zero;
+            int variant = customerId % RacingFanVariantCount;
+            if (variant < 0) variant += RacingFanVariantCount;
+            float cellWidth = atlas.width / 6f;
+            float cellHeight = atlas.height / 4f;
+            int pairedPoseColumn = (variant % 3) * 2 + (pose & 1);
+            int rowFromTop = variant / 3;
+            return new Rect(pairedPoseColumn * cellWidth, atlas.height - (rowFromTop + 1) * cellHeight,
+                cellWidth, cellHeight);
+        }
+        private static bool UsesMatchedCocacoleroArt(int levelIndex)
+        {
+            // Chicago and later specialist levels share the same worker style and proportions.
+            return levelIndex >= 1 && levelIndex < StreetSimulation.LevelNames.Length;
+        }
+        private Texture2D CocacoleroArtForLevel(int levelIndex)
+        {
+            return UsesMatchedCocacoleroArt(levelIndex) && laterCocacolero != null ? laterCocacolero : cocacolero;
+        }
+        private Rect CocacoleroPoseForLevel(int levelIndex, int frame)
+        {
+            if (UsesMatchedCocacoleroArt(levelIndex) && laterCocacolero != null)
+            {
+                return MatchedCocacoleroPose(frame, new Vector2(laterCocacolero.width, laterCocacolero.height));
+            }
+            return ChicagoCocacoleroPoses[Mathf.Clamp(frame, 0, ChicagoCocacoleroPoses.Length - 1)];
+        }
+        private static Rect MatchedCocacoleroPose(int frame, Vector2 importedSize)
+        {
+            Rect pose = MatchedCocacoleroPoses[Mathf.Clamp(frame, 0, MatchedCocacoleroPoses.Length - 1)];
+            Vector2 scale = new Vector2(importedSize.x / 1247f, importedSize.y / 1261f);
+            return new Rect(pose.x * scale.x, pose.y * scale.y, pose.width * scale.x, pose.height * scale.y);
+        }
         private void DrawWorker(StreetWorker w)
         {
             bool moving=w.State==StreetWorkerState.ToStation||w.State==StreetWorkerState.ToCounter;
-            bool isCocacolero=StreetSimulation.UsesSpecialistWorkers(game.Sim.LevelIndex) && w.Role==StreetWorkerRole.Cocacolero && cocacolero!=null;
+            int levelIndex = game.Sim.LevelIndex;
+            Texture2D cocacoleroArt = CocacoleroArtForLevel(levelIndex);
+            bool isCocacolero=StreetSimulation.UsesSpecialistWorkers(levelIndex) && w.Role==StreetWorkerRole.Cocacolero && cocacoleroArt!=null;
             Vector2 movement=w.Target-w.Position;
             int frame=moving?SelectParrilleroWalkFrame(movement,w.AnimationTime):0;
             if(w.State==StreetWorkerState.Pickup)frame=7;
@@ -1703,8 +1971,9 @@ namespace HayChoriYPaty
                         : ChicagoWorkerFlip(true,frame,movement,false))
                     : w.State == StreetWorkerState.Pickup ? !StreetWorkstationLayout.PickupReachesRight(w.Product)
                         : moving && Mathf.Abs(movement.x)>Mathf.Abs(movement.y) && movement.x<0;
-                Rect[] poses=ChicagoCocacoleroPoses;
-                Draw(workerRect,cocacolero,poses[Mathf.Clamp(frame,0,poses.Length-1)],false,flip);
+                bool laterStyle = UsesMatchedCocacoleroArt(levelIndex) && laterCocacolero != null;
+                Rect pose = CocacoleroPoseForLevel(levelIndex, frame);
+                Draw(workerRect,cocacoleroArt,pose,laterStyle,flip);
             }
             else if(frame>=16)ParrilleroDiagonal(workerRect,frame-16);
             else Parrillero(workerRect,frame,w.State == StreetWorkerState.Pickup
@@ -1823,8 +2092,13 @@ namespace HayChoriYPaty
             {
                 if(speedArrows!=null)Draw(compact ? new Rect(drawn.x+10,drawn.y+48,48,32) : new Rect(drawn.x+20,drawn.y+36,76,48),speedArrows,SpeedArrowBounds,false,false);
             }
-            else if(action==HireCocacoleroAction && cocacolero!=null)
-                Draw(portrait,cocacolero,ChicagoCocacoleroPoses[0],false,false);
+            else if(action==HireCocacoleroAction && CocacoleroArtForLevel(game.Sim.LevelIndex)!=null)
+            {
+                int levelIndex = game.Sim.LevelIndex;
+                Texture2D art = CocacoleroArtForLevel(levelIndex);
+                bool laterStyle = UsesMatchedCocacoleroArt(levelIndex) && laterCocacolero != null;
+                Draw(portrait,art,CocacoleroPoseForLevel(levelIndex,0),laterStyle,false);
+            }
             else Item(portrait,icon);
             string priceText=cost>0?cost.ToString():"MAX";
             if(cost>0)Item(UpgradeCoinBounds(drawn),10);
@@ -1867,13 +2141,7 @@ namespace HayChoriYPaty
         private void ReadyLevels()
         {
             DrawLevelBadge(game.SelectedLevel, ReadyLevelBadge);
-            for(int i=0;i<5;i++)
-            {
-                Rect r = LevelButton(i);
-                bool unlocked = i <= game.UnlockedLevel;
-                DrawStandardButton(r, 10 + i, unlocked ? (i + 1).ToString() : "", unlocked);
-                if (!unlocked) Item(new Rect(r.center.x - 9, r.y + 5, 18, 23), 17);
-            }
+            DrawStandardButton(ReadyLevelSelector, ReadyLevelSelectorAction, "CANCHAS");
         }
         private static Rect LevelButton(int i){return new Rect(108+i*67,912,57,35);}
         private static Rect VictoryPopupBounds(float canvasHeight)
