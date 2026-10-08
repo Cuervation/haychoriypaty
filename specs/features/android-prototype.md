@@ -1,4 +1,14 @@
-# Current Android delivery — 2026-10-07 (0.2.16/code18, four specialties)
+# Current Android delivery — 2026-10-08 (0.2.17/code19, modular kitchen)
+
+Unity6000.6.3f1 Main-only Development Android IL2CPP/ARM64 build `build-4e7ebab905`: **Succeeded in300.80s; BuildReport0 errors/1 warning** (`1 URP assets included in build`). Package `com.haychoriypaty.game`, version0.2.17/code19, min API26/target36, `arm64-v8a`.
+
+APK `/tmp/HayChoriYPaty-0.2.17-code19.apk`: **493,101,478 bytes**. SHA-256 `39aa6aa0036973d7d8136b7f24ab59a829de4456eb13e232b464404b356f4ef8`. `aapt dump badging` verifies package/version/min/target; `unzip -t` reports no archive errors; Unity-bundled OpenJDK + `apksigner` confirms APK Signature Scheme v2 and established Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`.
+
+Built from pushed modular-kitchen commit `d2741dbedf35161a0498eca7c09110dbd372269c`; version/code advanced in `ProjectSettings/ProjectSettings.asset` for replacement installation. The previously documented kitchen EditMode/PlayMode validations remain the source validation; no tests were rerun for this version-only package. Motorola Edge60 Fusion `ZY22MBNWRB` appeared briefly over USB, then disconnected before installation; `adb install -r` returned `device not found`. **Phone installation remains pending reconnection**; no uninstall or data clear occurred. This is local Development/debug signing, not a Play Store production-signed release.
+
+---
+
+## Previous Android delivery — 2026-10-07 (0.2.16/code18, four specialties)
 
 Unity6000.6.3f1 Main-only Development Android IL2CPP ARM64 build `build-c291df4c16`: **Succeeded in424.81s; BuildReport0 errors/1 warning**. The sole build warning is URP reporting1 asset included. Console additionally logs a Diagnostics Data debug-symbol configuration advisory at Error log level; it did not produce a build error. Package `com.haychoriypaty.game`, version0.2.16/code18, min API26/target36, `arm64-v8a`.
 
