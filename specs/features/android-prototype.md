@@ -1,3 +1,13 @@
+# Current Android delivery — 2026-10-08 (0.2.19/code21, perspective grill fit)
+
+Unity6000.6.3f1 Main-only Development Android IL2CPP/ARM64 build `build-4524fd8d93`: **Succeeded in409.62s; BuildReport0 errors/1 warning**. Package `com.haychoriypaty.game`, version0.2.19/code21, min API26/target36, `arm64-v8a`.
+
+APK `Builds/Android/Archive/HayChoriYPaty-0.2.19-code21-grill-fit.apk`: **492,872,066 bytes**. SHA-256 `078b09aa340f8ca7bcd36f4c21c185a2bdcdacd6f095d58b265d346b2b39e9fe`. `aapt dump badging` confirms package/version/API/architecture; `unzip -t` reports no archive errors; Unity-bundled OpenJDK + `apksigner` verifies Signature Scheme v2 and established Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`. Versioned alias and rolling APK match the archive; previous archives preserved. BuildReport's total-size figure includes other build outputs and is not the APK file size.
+
+Includes pushed perspective-grill correction commit `9648dfbafba65ee536f5b105cca2fe3e442f291e`; PlayerSettings records0.2.19/code21. Prior focused tests/Game Views for these corrections are documented in `modular-kitchen.md`; no tests were rerun for this packaging-only request. No device installation, launch or on-device validation was requested or performed. Main was clean and Play stopped before building; post-build editor-state read timed out, so no later editor-state confirmation is claimed. This is Development/debug signing, not a Play Store production release.
+
+---
+
 # Current Android delivery — 2026-10-08 (0.2.18/code20, station layout)
 
 Unity6000.6.3f1 Main-only Development Android IL2CPP/ARM64 build `build-ff697f0c18`: **Succeeded in28.71s; BuildReport0 errors/1 warning** (`1 URP assets included in build`). Package `com.haychoriypaty.game`, version0.2.18/code20, min API26/target36, `arm64-v8a`.
