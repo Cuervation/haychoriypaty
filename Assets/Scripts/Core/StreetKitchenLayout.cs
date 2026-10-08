@@ -8,16 +8,16 @@ namespace HayChoriYPaty
     {
         public const float SourceWidth = 760f;
         public const float Scale = StreetSceneLayout.Width / SourceWidth;
-        public const float TableY = 520f;
-        public const float BarrelY = 520f;
+        public const float TableY = 466f;
+        public const float BarrelY = 466f;
         public const float WorkerLaneY = 450f;
-        public const float TablePickupY = 556f;
-        public const float GrillPickupY = 608f;
-        public const float BarrelPickupY = 508f;
+        public const float TablePickupY = 502f;
+        public const float GrillPickupY = 554f;
+        public const float BarrelPickupY = 454f;
         public const float TableWidth = 196f * Scale, TableHeight = 98f * Scale;
         public const float BarrelWidth = 60f * Scale, BarrelHeight = 117.6f * Scale;
         public const float StandardGrillWidth = 352f * Scale, StandardGrillHeight = 117.3333f * Scale;
-        private const float GrillBottomLimit = 714f;
+        public const float GrillBottomLimit = 660f;
 
         private readonly bool hasNormal, hasPremium, hasFernet, hasCoca, hasBeer;
         private readonly Rect normalTable, premiumTable, fernetTable, cocaBarrel, beerBarrel;
@@ -83,14 +83,6 @@ namespace HayChoriYPaty
 
         private void PackGrills(out Rect normal, out Rect premium)
         {
-            float grillY = 620f;
-            float nativeWidth = 352f;
-            if (hasNormal && hasPremium)
-            {
-                normal = new Rect(14f * Scale, grillY, StandardGrillWidth, StandardGrillHeight);
-                premium = new Rect(394f * Scale, grillY, StandardGrillWidth, StandardGrillHeight);
-                return;
-            }
             bool active = hasNormal || hasPremium;
             if (!active) { normal = premium = Rect.zero; return; }
 
@@ -100,7 +92,15 @@ namespace HayChoriYPaty
             if (hasFernet) upperBottom = Mathf.Max(upperBottom, fernetTable.yMax);
             if (hasCoca) upperBottom = Mathf.Max(upperBottom, cocaBarrel.yMax);
             if (hasBeer) upperBottom = Mathf.Max(upperBottom, beerBarrel.yMax);
-            grillY = Mathf.Max(600f, upperBottom + 12f);
+            // Keep both standard grills below the active prep row and entirely above the lower UI field.
+            float grillY = upperBottom + 12f;
+            float nativeWidth = 352f;
+            if (hasNormal && hasPremium)
+            {
+                normal = new Rect(14f * Scale, grillY, StandardGrillWidth, StandardGrillHeight);
+                premium = new Rect(394f * Scale, grillY, StandardGrillWidth, StandardGrillHeight);
+                return;
+            }
             float availableHeight = Mathf.Max(0f, GrillBottomLimit - grillY);
             nativeWidth = Mathf.Min(SourceWidth - 28f, availableHeight / Scale * 3f);
             float width = nativeWidth * Scale;

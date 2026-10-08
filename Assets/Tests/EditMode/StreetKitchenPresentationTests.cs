@@ -117,6 +117,7 @@ namespace HayChoriYPaty.Tests
                 Assert.AreEqual(gap, top[0].xMin, .02f, "First active prep station should use the responsive row margin.");
                 for (int i = 0; i < top.Count; i++)
                 {
+                    Assert.AreEqual(LayoutConstant("TableY"), top[i].y, .02f, "All active prep stations share the raised upper row.");
                     Assert.Greater(top[i].width, 0f);
                     if (i > 0) Assert.AreEqual(gap, top[i].xMin - top[i - 1].xMax, .02f, "Hidden stations must not leave row holes.");
                     if (top[i].width > 100f)
@@ -151,7 +152,9 @@ namespace HayChoriYPaty.Tests
                     Assert.LessOrEqual(grills[0].xMin, 10f);
                     Assert.GreaterOrEqual(grills[1].xMax, width - 10f);
                 }
-                Assert.Less(grills[0].yMax, 716f, "Grills must remain above the upgrade/status band.");
+                foreach (Rect grill in grills)
+                    Assert.LessOrEqual(grill.yMax, LayoutConstant("GrillBottomLimit") + .02f,
+                        "Every grill must remain completely on the tiled playfield above the lower UI field.");
                 foreach (Rect item in top) foreach (Rect grill in grills) Assert.IsFalse(item.Overlaps(grill));
             }
             Assert.AreEqual(196f * (width / (float)LayoutConstant("SourceWidth")), tableSize.Value.width, .02f);

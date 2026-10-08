@@ -91,3 +91,8 @@ Texture sources use NPOTScale.None to preserve original dimensions, mipmaps and 
 -2000-step178-unit isolated editor probe587→117ms after full-table fast path; not Android/device/FPS evidence.
 - Initial MCP jobs that timed out before execution are excluded. New `.cs` must be imported with all/assets refresh; test discovery was explicitly confirmed before the final new-group run.
 - Exact prior PlayerPrefs, GameView19, timeScale1 and background=false restored; Play stopped, Main clean. No package/service installed, no gameplay prices/goals/speed tables/save policy changed. No new APK built/device tested; prior0.2.16 APK does not contain this feature.
+
+
+### 2026-10-08 floor-safe station correction
+
+The live Vélez Game View exposed that grill artwork extended into the pale lower UI field even though the previous geometry test only checked a looser upgrade-band bound. Raise the complete preparation row to logical y=466, derive both grill rows from the active row's lower bound plus 12 units, and cap grill bounds at y=660 (with the observed field transition near y=665). Keep standard grill dimensions, table/barrel dimensions, catalog, worker roles, economy and cooking unchanged; move table/barrel pickup targets upward by the same 54 units so routes still approach their stations. Focused EditMode layout/route checks passed3/3 and cover all11 catalog profiles; actual portrait Game Views for Vélez(Level3) and Independiente(Level5) were visually checked. Both grills now remain fully on the tiled playfield above the pale lower field, and the paired grills share one baseline.
