@@ -1,10 +1,10 @@
-# Current Android delivery — 2026-10-08 (0.2.17/code19, modular kitchen)
+# Current Android delivery — 2026-10-08 (0.2.18/code20, station layout)
 
-Unity6000.6.3f1 Main-only Development Android IL2CPP/ARM64 build `build-4e7ebab905`: **Succeeded in300.80s; BuildReport0 errors/1 warning** (`1 URP assets included in build`). Package `com.haychoriypaty.game`, version0.2.17/code19, min API26/target36, `arm64-v8a`.
+Unity6000.6.3f1 Main-only Development Android IL2CPP/ARM64 build `build-ff697f0c18`: **Succeeded in28.71s; BuildReport0 errors/1 warning** (`1 URP assets included in build`). Package `com.haychoriypaty.game`, version0.2.18/code20, min API26/target36, `arm64-v8a`.
 
-APK `/tmp/HayChoriYPaty-0.2.17-code19.apk`: **493,101,478 bytes**. SHA-256 `39aa6aa0036973d7d8136b7f24ab59a829de4456eb13e232b464404b356f4ef8`. `aapt dump badging` verifies package/version/min/target; `unzip -t` reports no archive errors; Unity-bundled OpenJDK + `apksigner` confirms APK Signature Scheme v2 and established Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`.
+APK `/tmp/HayChoriYPaty-0.2.18-code20.apk`: **492,866,782 bytes**. SHA-256 `00835bd2f3c050cc3b168650a6d9b5c6440bb30d497fa210c7f1d9b2682f5ed4`. `aapt dump badging` confirms package/version/min/target; `unzip -t` reports no archive errors; Unity-bundled OpenJDK + `apksigner` confirms APK Signature Scheme v2 and established Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`.
 
-Built from pushed modular-kitchen commit `d2741dbedf35161a0498eca7c09110dbd372269c`; version/code advanced in `ProjectSettings/ProjectSettings.asset` for replacement installation. The previously documented kitchen EditMode/PlayMode validations remain the source validation; no tests were rerun for this version-only package. Motorola Edge60 Fusion `ZY22MBNWRB` appeared briefly over USB, then disconnected before installation; `adb install -r` returned `device not found`. **Phone installation remains pending reconnection**; no uninstall or data clear occurred. This is local Development/debug signing, not a Play Store production-signed release.
+Built from station-layout commit `1718aedb619b95bb1151feb4cb880aed6c170b95`; `ProjectSettings/ProjectSettings.asset` now records 0.2.18/code20. Previously documented Unity visual and EditMode validations remain the source validation; no tests were rerun for this packaging-only request. Motorola Edge60 Fusion `ZY22MBNWRB` briefly appeared over USB during the session, then ADB returned an empty device list after the final build. **Phone installation is pending reconnection**; no uninstall or data clear occurred. This is a local Development/debug-signed APK, not a Play Store production-signed release.
 
 ---
 
