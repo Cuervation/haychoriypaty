@@ -169,3 +169,7 @@ Expanded route occupancy uses full36×12 feet, not projected90×98 body AABBs: f
 User explicitly approved extending the single StreetSimulation with real food/stock/cooking and fitting the authored760-wide kitchen uniformly into540 canvas. See features/modular-kitchen.md for capacities/timings/initialpreparedstock, which did not exist previously. Render independent SpriteRenderer prefabs through transparent live targets composed with existing IMGUI scenery/HUD; this is not a staticbackground and does not change the counter/club/progression/economy. Preserve worker90×98 proportions and blue Premium/blackFernet palettes. Physical base footprints, not tabletop projection, constrain36×12workerfeet.
 
 Keep original PNGs unchanged and create alpha-trimmed standalone Sprite.asset resources with Sprite.Create/CopySerialized. Unity6 spritesheet API is obsolete and Sprite Editor data provider assemblies are not enabled in this checkout; no new package is installed. Existing GUIDs survive repeated generation. No secondUnityeditor, service, parallelcookingengine or new manual gameplaycontrol.
+
+## 2026-10-08 — Show beverage stock as a loose barrel pile
+
+Widen both barrels20% horizontally while retaining their height, and scatter each barrel's existing12 real drinks into stable staggered positions/angles. Do not raise inventory capacity merely to create a fuller-looking barrel; keep the current service count and return each drink upright when carried.

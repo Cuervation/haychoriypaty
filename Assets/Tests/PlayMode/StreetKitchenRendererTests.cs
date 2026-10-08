@@ -65,5 +65,43 @@ namespace HayChoriYPaty.Tests
             finally { UnityEngine.Object.Destroy(root); }
             yield return null;
         }
+
+        [UnityTest]
+        public IEnumerator FullCatalogBarrelDrinksRenderAsTossedIndividualObjects()
+        {
+            var root = new GameObject("Barrel drink projection test");
+            try
+            {
+                object balance = Activator.CreateInstance(GameType("StreetBalance"));
+                object sim = Activator.CreateInstance(GameType("StreetSimulation"), new object[] { balance, 4, 5f, 0, 1, 0 });
+                Component renderer = root.AddComponent(GameType("StreetKitchenRenderer"));
+                Call(renderer, "Prepare", sim, 1f, 960f);
+                Assert.IsTrue((bool)Get(renderer, "IsReady"));
+                var objects = (IDictionary)renderer.GetType().GetField("foodObjects", Instance).GetValue(renderer);
+                object kitchen = Get(sim, "Kitchen");
+                object layout = Get(sim, "KitchenLayout");
+                int coca = 0, beer = 0;
+                foreach (object unit in (IEnumerable)Get(kitchen, "Units"))
+                {
+                    int product = (int)Get(unit, "Product");
+                    if ((product != 4 && product != 6) || Get(unit, "Location").ToString() != "Table") continue;
+                    if (product == 4) coca++; else beer++;
+                    int slot = (int)Get(unit, "Slot"), id = (int)Get(unit, "Id");
+                    GameObject view = (GameObject)objects[id];
+                    Vector2 point = (Vector2)Call(layout, "BarrelSlotPosition", product, slot);
+                    Rect bounds = (Rect)Call(layout, "BoundsForProduct", product);
+                    Assert.AreEqual((point.x - 270f) * .01f, view.transform.localPosition.x, .0001f);
+                    Assert.AreEqual((480f - point.y) * .01f, view.transform.localPosition.y, .0001f);
+                    float angle = (float)Call(layout, "BarrelSlotRotation", slot);
+                    Assert.That(Mathf.Abs(Mathf.DeltaAngle(angle, view.transform.localEulerAngles.z)), Is.LessThan(.01f));
+                    Assert.GreaterOrEqual(point.x, bounds.xMin);
+                    Assert.LessOrEqual(point.x, bounds.xMax);
+                }
+                Assert.AreEqual(12, coca);
+                Assert.AreEqual(12, beer);
+            }
+            finally { UnityEngine.Object.Destroy(root); }
+            yield return null;
+        }
     }
 }

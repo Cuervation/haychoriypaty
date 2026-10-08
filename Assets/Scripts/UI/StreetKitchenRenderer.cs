@@ -208,7 +208,7 @@ namespace HayChoriYPaty
                     GameObject existing = propsRoot.transform.GetChild(i).gameObject;
                     existing.SetActive(visible);
                     SetStationTransform(existing.transform, bounds);
-                    FitFirstSprite(existing, bounds.width, bounds.height);
+                    FitFirstSprite(existing, bounds.width, bounds.height, !IsBarrelStation(prefabName));
                     return;
                 }
             GameObject source = Prefab(prefabName);
@@ -217,7 +217,7 @@ namespace HayChoriYPaty
             instance.name = key;
             SetLayerRecursively(instance, PropLayer);
             SetStationTransform(instance.transform, bounds);
-            FitFirstSprite(instance, bounds.width, bounds.height);
+            FitFirstSprite(instance, bounds.width, bounds.height, !IsBarrelStation(prefabName));
             SetSorting(instance, 0);
             instance.SetActive(visible);
         }
@@ -275,6 +275,7 @@ namespace HayChoriYPaty
         private void UpdateFoodObject(StreetFoodUnit unit, GameObject go, bool carried)
         {
             bool isGrill = unit.Location == StreetFoodLocation.Grill;
+            bool isBarrelDrink = unit.Product == 4 || unit.Product == 6;
             string key = isGrill ? MeatArt(unit.Product) : unit.Product <= 3 ? SandwichArt(unit.Product) : DrinkArt(unit.Product);
             SpriteRenderer renderer;
             if (foodRenderers.TryGetValue(unit.Id, out renderer) && renderer != null)
@@ -287,7 +288,9 @@ namespace HayChoriYPaty
                         ? new Color(.94f, .78f, .60f, 1f) : Color.white;
                 }
                 else { renderer.sprite = FirstSprite(key); renderer.color = Color.white; }
-                SetDesiredSize(go.transform, renderer, isGrill ? MeatSize(unit.Product) : ServingSize(unit.Product, carried));
+                Vector2 size = isGrill ? MeatSize(unit.Product)
+                    : isBarrelDrink && !carried ? new Vector2(8f, 15f) : ServingSize(unit.Product, carried);
+                SetDesiredSize(go.transform, renderer, size);
             }
             Vector2 position;
             if (isGrill) position = simulation.KitchenLayout.GrillSlotPosition(unit.Product, unit.Slot, Available(unit.Product == 0 ? 1 : unit.Product == 1 ? 0 : unit.Product == 2 ? 3 : 2), simulation.Kitchen.GrillCapacity(unit.Product));
@@ -296,6 +299,8 @@ namespace HayChoriYPaty
             SetItemTransform(go.transform, position, isGrill
                 ? simulation.KitchenLayout.GrillBoundsForProduct(unit.Product)
                 : simulation.KitchenLayout.BoundsForProduct(unit.Product));
+            float rotation = isBarrelDrink && !carried ? simulation.KitchenLayout.BarrelSlotRotation(unit.Slot) : 0f;
+            go.transform.localRotation = Quaternion.Euler(0f, 0f, rotation);
             SetSorting(go, 10 + unit.Slot);
         }
 
@@ -525,14 +530,18 @@ namespace HayChoriYPaty
                 (canvasHeight * .5f - canvasPosition.y * yScale) * .01f, 0f);
         }
 
-        private static void FitFirstSprite(GameObject instance, float width, float height)
+        private static bool IsBarrelStation(string prefabName) => prefabName == "Station_BeerBarrel" || prefabName == "Station_CocaBarrel";
+
+        private static void FitFirstSprite(GameObject instance, float width, float height, bool preserveAspect)
         {
             SpriteRenderer sr = instance.GetComponentInChildren<SpriteRenderer>(true);
             if (sr == null || sr.sprite == null) return;
             Vector2 source = sr.sprite.bounds.size;
             if (source.x <= 0 || source.y <= 0) return;
-            float scale = Mathf.Min(width * .01f / source.x, height * .01f / source.y);
-            instance.transform.localScale = new Vector3(scale, scale, 1f);
+            float scaleX = width * .01f / source.x;
+            float scaleY = height * .01f / source.y;
+            if (preserveAspect) scaleX = scaleY = Mathf.Min(scaleX, scaleY);
+            instance.transform.localScale = new Vector3(scaleX, scaleY, 1f);
         }
 
         private static void SetDesiredSize(Transform root, SpriteRenderer sr, Vector2 size)

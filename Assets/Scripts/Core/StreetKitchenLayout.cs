@@ -15,13 +15,22 @@ namespace HayChoriYPaty
         public const float GrillPickupY = 554f;
         public const float BarrelPickupY = 454f;
         public const float TableWidth = 196f * Scale, TableHeight = 98f * Scale;
-        public const float BarrelWidth = 60f * Scale, BarrelHeight = 117.6f * Scale;
+        public const float BarrelAuthoredWidth = 72f, BarrelAuthoredHeight = 117.6f;
+        public const float BarrelWidth = BarrelAuthoredWidth * Scale, BarrelHeight = BarrelAuthoredHeight * Scale;
         public const float StandardGrillWidth = 352f * Scale, StandardGrillHeight = 117.3333f * Scale;
         public const float GrillBottomLimit = 660f;
 
         private readonly bool hasNormal, hasPremium, hasFernet, hasCoca, hasBeer;
         private readonly Rect normalTable, premiumTable, fernetTable, cocaBarrel, beerBarrel;
         private readonly Rect normalGrill, premiumGrill;
+        private static readonly Vector2[] BarrelDrinkScatter =
+        {
+            new Vector2(.18f, .055f), new Vector2(.31f, .085f), new Vector2(.44f, .05f),
+            new Vector2(.57f, .095f), new Vector2(.70f, .06f), new Vector2(.82f, .085f),
+            new Vector2(.22f, .15f), new Vector2(.35f, .18f), new Vector2(.48f, .145f),
+            new Vector2(.61f, .18f), new Vector2(.74f, .15f), new Vector2(.84f, .17f)
+        };
+        private static readonly float[] BarrelDrinkRotations = { -18f, 64f, 6f, -72f, 28f, 95f, -38f, 12f, 72f, -5f, 106f, 43f };
 
         public bool HasNormalGrill { get { return hasNormal; } }
         public bool HasPremiumGrill { get { return hasPremium; } }
@@ -62,14 +71,14 @@ namespace HayChoriYPaty
         {
             int count = (hasNormal ? 1 : 0) + (hasPremium ? 1 : 0) + (hasFernet ? 1 : 0) + (hasCoca ? 1 : 0) + (hasBeer ? 1 : 0);
             float totalWidth = ((hasNormal ? 196f : 0f) + (hasPremium ? 196f : 0f) + (hasFernet ? 196f : 0f)
-                + (hasCoca ? 60f : 0f) + (hasBeer ? 60f : 0f));
+                + (hasCoca ? BarrelAuthoredWidth : 0f) + (hasBeer ? BarrelAuthoredWidth : 0f));
             float gap = count > 0 ? (SourceWidth - totalWidth) / (count + 1) : 0f;
             float x = gap;
             normal = PlaceUpper(ref x, gap, hasNormal, 196f);
             premium = PlaceUpper(ref x, gap, hasPremium, 196f);
             fernet = PlaceUpper(ref x, gap, hasFernet, 196f);
-            coca = PlaceUpper(ref x, gap, hasCoca, 60f);
-            beer = PlaceUpper(ref x, gap, hasBeer, 60f);
+            coca = PlaceUpper(ref x, gap, hasCoca, BarrelAuthoredWidth);
+            beer = PlaceUpper(ref x, gap, hasBeer, BarrelAuthoredWidth);
         }
 
         private static Rect PlaceUpper(ref float x, float gap, bool active, float nativeWidth)
@@ -238,8 +247,11 @@ namespace HayChoriYPaty
         public Vector2 BarrelSlotPosition(int product, int slot)
         {
             Rect r = BoundsForProduct(product);
-            int col = Mathf.Max(0, slot) % 3, row = Mathf.Max(0, slot) / 3;
-            return new Vector2(r.x + r.width * (.22f + .28f * col), r.y + r.height * .16f + row * 2.1f);
+            Vector2 normalized = BarrelDrinkScatter[Mathf.Max(0, slot) % BarrelDrinkScatter.Length];
+            return new Vector2(r.x + r.width * normalized.x, r.y + r.height * normalized.y);
         }
+
+        /// <summary>Stable loose-pile orientation for each real beverage slot; never changes inventory.</summary>
+        public float BarrelSlotRotation(int slot) => BarrelDrinkRotations[Mathf.Max(0, slot) % BarrelDrinkRotations.Length];
     }
 }

@@ -159,8 +159,31 @@ namespace HayChoriYPaty.Tests
             }
             Assert.AreEqual(196f * (width / (float)LayoutConstant("SourceWidth")), tableSize.Value.width, .02f);
             Assert.AreEqual(98f * (width / (float)LayoutConstant("SourceWidth")), tableSize.Value.height, .02f);
-            Assert.AreEqual(60f * (width / (float)LayoutConstant("SourceWidth")), barrelSize.Value.width, .02f);
+            Assert.AreEqual(72f * (width / (float)LayoutConstant("SourceWidth")), barrelSize.Value.width, .02f);
             Assert.AreEqual(117.6f * (width / (float)LayoutConstant("SourceWidth")), barrelSize.Value.height, .02f);
+        }
+
+        [Test]
+        public void BarrelDrinkSlotsScatterAcrossTheOpeningWithMixedStableAngles()
+        {
+            object layout = Layout(Simulation(4));
+            Rect bounds = RectProperty(layout, "CocaBarrelBounds");
+            var positions = new HashSet<Vector2>();
+            var angles = new HashSet<float>();
+            for (int slot = 0; slot < 12; slot++)
+            {
+                Vector2 position = (Vector2)Call(layout, "BarrelSlotPosition", 4, slot);
+                float normalizedY = (position.y - bounds.y) / bounds.height;
+                float normalizedX = (position.x - bounds.x) / bounds.width;
+                Assert.That(normalizedX, Is.InRange(.15f, .86f));
+                Assert.That(normalizedY, Is.InRange(.04f, .19f));
+                positions.Add(position);
+                angles.Add((float)Call(layout, "BarrelSlotRotation", slot));
+            }
+            Assert.AreEqual(12, positions.Count, "All twelve real inventory slots need their own visual position.");
+            Assert.AreEqual(12, angles.Count, "Each drink receives a deterministic but distinct tossed angle.");
+            Assert.IsTrue(angles.Contains(106f), "Some drinks should lie diagonally/sideways rather than all standing upright.");
+            Assert.IsTrue(angles.Contains(-72f));
         }
 
         [Test]
