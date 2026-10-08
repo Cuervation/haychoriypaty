@@ -19,6 +19,9 @@ namespace HayChoriYPaty
         public const float BarrelWidth = BarrelAuthoredWidth * Scale, BarrelHeight = BarrelAuthoredHeight * Scale;
         public const float StandardGrillWidth = 352f * Scale, StandardGrillHeight = 117.3333f * Scale;
         public const float GrillBottomLimit = 660f;
+        private const float GrillSurfaceTop = .115f, GrillSurfaceBottom = .46f;
+        private const float GrillBackLeft = .145f, GrillBackRight = .855f;
+        private const float GrillFrontLeft = .035f, GrillFrontRight = .965f;
 
         private readonly bool hasNormal, hasPremium, hasFernet, hasCoca, hasBeer;
         private readonly Rect normalTable, premiumTable, fernetTable, cocaBarrel, beerBarrel;
@@ -206,43 +209,91 @@ namespace HayChoriYPaty
 
         public Vector2 GrillSlotPosition(int product, int slot) => GrillSlotPosition(product, slot, true, product < 2 ? 12 : 4);
 
+        /// <summary>Visual meat footprint adapted to the actual surface of the scaled grill.</summary>
+        public Vector2 GrillMeatSize(int product, bool companionAvailable)
+        {
+            Rect grill = GrillBoundsForProduct(product);
+            if (product == 0 && !companionAvailable)
+            {
+                float width = Mathf.Min(62f, Mathf.Max(36.4f, grill.width * .12f));
+                return new Vector2(width, width * 14f / 36.4f);
+            }
+            if (product == 2)
+            {
+                float height = Mathf.Min(38f, grill.height * (GrillSurfaceBottom - GrillSurfaceTop));
+                return new Vector2(34f * height / 38f, height);
+            }
+            if (product == 3 && companionAvailable)
+            {
+                float width = Mathf.Min(90f, grill.width * .27f);
+                return new Vector2(width, 14f * width / 90f);
+            }
+            return product == 0 ? new Vector2(36.4f, 14f)
+                : product == 1 ? new Vector2(34f, 20f)
+                : product == 2 ? new Vector2(34f, 38f)
+                : new Vector2(90f, 14f);
+        }
+
         public Vector2 GrillSlotPosition(int product, int slot, bool companionAvailable, int capacity)
         {
             Rect r = GrillBoundsForProduct(product);
             int index = Mathf.Max(0, slot);
-            float margin = 8f * Scale;
-            float usableWidth = r.width - 2f * margin;
-            float grateTop = r.y + r.height * .08f;
-            float grateHeight = r.height * .46f;
+            Vector2 meatSize = GrillMeatSize(product, companionAvailable);
             int columns, rows, col, row;
-            float left = r.x + margin, width = usableWidth;
             if (companionAvailable && product < 2)
             {
-                width = usableWidth * .5f;
-                if (product == 1) left += width;
                 columns = 3;
                 rows = product == 0 ? 4 : 2;
                 col = index % columns; row = (index / columns) % rows;
-                return new Vector2(left + width * (col + .5f) / columns, grateTop + grateHeight * (row + .5f) / rows);
             }
-            if (companionAvailable)
+            else if (companionAvailable && product >= 2)
             {
                 if (product == 2)
                 {
-                    width = usableWidth * .60f; columns = 4;
-                    col = index % columns;
-                    return new Vector2(left + width * (col + .5f) / columns, grateTop + grateHeight * .48f);
+                    columns = 4; rows = 1;
                 }
-                left += usableWidth * .60f; width = usableWidth * .40f; columns = 1; rows = 3;
-                row = index % rows;
-                return new Vector2(left + width * .5f, grateTop + grateHeight * (row + .5f) / rows);
+                else { columns = 1; rows = Mathf.Max(1, capacity); }
+                col = index % columns; row = index / columns;
+            }
+            else
+            {
+                columns = product == 3 ? Mathf.Min(2, Mathf.Max(1, capacity))
+                    : product == 2 ? Mathf.Max(1, capacity) : 6;
+                rows = Mathf.Max(1, Mathf.CeilToInt(Mathf.Max(1, capacity) / (float)columns));
+                col = index % columns; row = index / columns;
             }
 
-            if (product == 3) { columns = 3; rows = Mathf.Max(1, Mathf.CeilToInt(Mathf.Max(1, capacity) / (float)columns)); }
-            else { columns = product < 2 ? 6 : 7; rows = Mathf.Max(1, Mathf.CeilToInt(Mathf.Max(1, capacity) / (float)columns)); }
-            col = index % columns; row = index / columns;
-            return new Vector2(left + width * (col + .5f) / columns, grateTop + grateHeight * (row + .5f) / rows);
+            float surfaceTop = r.y + r.height * GrillSurfaceTop;
+            float surfaceBottom = r.y + r.height * GrillSurfaceBottom;
+            float firstY = surfaceTop + meatSize.y * .5f;
+            float lastY = surfaceBottom - meatSize.y * .5f;
+            float y = rows <= 1 || lastY <= firstY ? (firstY + lastY) * .5f
+                : Mathf.Lerp(firstY, lastY, row / (float)(rows - 1));
+
+            // The rendered grill is perspective-trapezoidal: narrow at the rear and wider at the front.
+            // Use the narrower edge across the meat's full depth so no slot can hang over the grate sides.
+            float topT = Mathf.Clamp01((y - meatSize.y * .5f - surfaceTop) / (surfaceBottom - surfaceTop));
+            float bottomT = Mathf.Clamp01((y + meatSize.y * .5f - surfaceTop) / (surfaceBottom - surfaceTop));
+            float leftEdge = r.x + r.width * Mathf.Max(LeftEdgeAt(topT), LeftEdgeAt(bottomT));
+            float rightEdge = r.x + r.width * Mathf.Min(RightEdgeAt(topT), RightEdgeAt(bottomT));
+            float zoneStart = companionAvailable
+                ? product == 1 ? .5f : product == 3 ? .6f : 0f
+                : 0f;
+            float zoneEnd = companionAvailable
+                ? product == 0 ? .5f : product == 2 ? .6f : 1f
+                : 1f;
+            float zonePadding = companionAvailable && (product == 0 || product == 1 || product == 2 || product == 3) ? 1f : 0f;
+            float zoneLeft = Mathf.Lerp(leftEdge, rightEdge, zoneStart) + meatSize.x * .5f
+                + (companionAvailable && (product == 1 || product == 3) ? zonePadding : 0f);
+            float zoneRight = Mathf.Lerp(leftEdge, rightEdge, zoneEnd) - meatSize.x * .5f
+                - (companionAvailable && (product == 0 || product == 2) ? zonePadding : 0f);
+            float x = columns <= 1 || zoneRight <= zoneLeft ? (zoneLeft + zoneRight) * .5f
+                : Mathf.Lerp(zoneLeft, zoneRight, col / (float)(columns - 1));
+            return new Vector2(x, y);
         }
+
+        private static float LeftEdgeAt(float depth) => Mathf.Lerp(GrillBackLeft, GrillFrontLeft, depth);
+        private static float RightEdgeAt(float depth) => Mathf.Lerp(GrillBackRight, GrillFrontRight, depth);
 
         public Vector2 BarrelSlotPosition(int product, int slot)
         {

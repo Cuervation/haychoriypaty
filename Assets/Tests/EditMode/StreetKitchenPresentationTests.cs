@@ -164,6 +164,44 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
+        public void GrillMeatVisualBoundsStayInsideTheGrillForEveryLevel()
+        {
+            for (int level = 0; level < 11; level++)
+            {
+                object sim = Simulation(level), layout = Layout(sim), kitchen = Get(sim, "Kitchen");
+                for (int product = 0; product < 4; product++)
+                {
+                    int capacity = (int)Call(kitchen, "GrillCapacity", product);
+                    if (capacity <= 0) continue;
+                    int companion = product % 2 == 0 ? product + 1 : product - 1;
+                    bool companionAvailable = (bool)Call(sim, "IsProductAvailable", companion);
+                    Rect grill = RectProperty(layout, product < 2 ? "NormalGrillBounds" : "PremiumGrillBounds");
+                    Vector2 size = (Vector2)Call(layout, "GrillMeatSize", product, companionAvailable);
+                    for (int slot = 0; slot < capacity; slot++)
+                    {
+                        Vector2 position = (Vector2)Call(layout, "GrillSlotPosition", product, slot, companionAvailable, capacity);
+                        Rect meat = new Rect(position - size * .5f, size);
+                        string context = "Level " + level + ", product " + product + ", slot " + slot;
+                        float grateTop = grill.y + grill.height * .115f;
+                        float grateBottom = grill.y + grill.height * .46f;
+                        Assert.GreaterOrEqual(meat.yMin, grateTop - .02f, context + " behind the grate");
+                        Assert.LessOrEqual(meat.yMax, grateBottom + .02f, context + " past the front grate edge");
+                        float topDepth = Mathf.Clamp01((meat.yMin - grateTop) / (grateBottom - grateTop));
+                        float bottomDepth = Mathf.Clamp01((meat.yMax - grateTop) / (grateBottom - grateTop));
+                        float leftAtTop = Mathf.Lerp(.145f, .035f, topDepth);
+                        float leftAtBottom = Mathf.Lerp(.145f, .035f, bottomDepth);
+                        float rightAtTop = Mathf.Lerp(.855f, .965f, topDepth);
+                        float rightAtBottom = Mathf.Lerp(.855f, .965f, bottomDepth);
+                        float grateLeft = grill.x + grill.width * Mathf.Max(leftAtTop, leftAtBottom);
+                        float grateRight = grill.x + grill.width * Mathf.Min(rightAtTop, rightAtBottom);
+                        Assert.GreaterOrEqual(meat.xMin, grateLeft - .02f, context + " outside the tapered left grate edge");
+                        Assert.LessOrEqual(meat.xMax, grateRight + .02f, context + " outside the tapered right grate edge");
+                    }
+                }
+            }
+        }
+
+        [Test]
         public void BarrelDrinkSlotsScatterAcrossTheOpeningWithMixedStableAngles()
         {
             object layout = Layout(Simulation(4));
@@ -252,7 +290,7 @@ namespace HayChoriYPaty.Tests
             object layout = FullLayout();
             AssertSlotsSeparated(layout, 0, 1, 24, new Vector2(20f, 14f), new Vector2(20f, 14f));
             AssertSlotsSeparated(layout, 2, 3, 18, new Vector2(20f, 14f), new Vector2(20f, 14f));
-            AssertSlotsSeparated(layout, 0, 1, 18, new Vector2(28f, 14f), new Vector2(34f, 20f), true);
+            AssertSlotsSeparated(layout, 0, 1, 18, new Vector2(36.4f, 14f), new Vector2(34f, 20f), true);
             AssertSlotsSeparated(layout, 2, 3, 7, new Vector2(34f, 38f), new Vector2(90f, 14f), true);
         }
 
@@ -266,12 +304,18 @@ namespace HayChoriYPaty.Tests
                     : (Vector2)Call(layout, "TableSlotPosition", first, i, true, count);
                 Vector2 b = grill ? (Vector2)Call(layout, "GrillSlotPosition", second, i, true, second < 2 ? 6 : 3)
                     : (Vector2)Call(layout, "TableSlotPosition", second, i, true, count);
+                if (grill)
+                {
+                    firstSize = (Vector2)Call(layout, "GrillMeatSize", first, true);
+                    secondSize = (Vector2)Call(layout, "GrillMeatSize", second, true);
+                }
                 int firstLimit = grill ? (first == 0 ? 12 : first == 1 ? 6 : first == 2 ? 4 : 3) : count;
                 int secondLimit = grill ? (second == 0 ? 12 : second == 1 ? 6 : second == 2 ? 4 : 3) : count;
                 if (i < firstLimit) firstRects.Add(new Rect(a - firstSize * .5f, firstSize));
                 if (i < secondLimit) secondRects.Add(new Rect(b - secondSize * .5f, secondSize));
             }
-            foreach (Rect a in firstRects) foreach (Rect b in secondRects) Assert.IsFalse(a.Overlaps(b), "Cross-family slots overlap.");
+            foreach (Rect a in firstRects) foreach (Rect b in secondRects)
+                Assert.IsFalse(a.Overlaps(b), "Cross-family grill/table slots overlap for products " + first + "/" + second + ": " + a + " vs " + b);
         }
 
         [Test]

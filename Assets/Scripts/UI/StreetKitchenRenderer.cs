@@ -276,6 +276,7 @@ namespace HayChoriYPaty
         {
             bool isGrill = unit.Location == StreetFoodLocation.Grill;
             bool isBarrelDrink = unit.Product == 4 || unit.Product == 6;
+            bool grillCompanionAvailable = isGrill && Available(unit.Product == 0 ? 1 : unit.Product == 1 ? 0 : unit.Product == 2 ? 3 : 2);
             string key = isGrill ? MeatArt(unit.Product) : unit.Product <= 3 ? SandwichArt(unit.Product) : DrinkArt(unit.Product);
             SpriteRenderer renderer;
             if (foodRenderers.TryGetValue(unit.Id, out renderer) && renderer != null)
@@ -288,12 +289,12 @@ namespace HayChoriYPaty
                         ? new Color(.94f, .78f, .60f, 1f) : Color.white;
                 }
                 else { renderer.sprite = FirstSprite(key); renderer.color = Color.white; }
-                Vector2 size = isGrill ? MeatSize(unit.Product)
+                Vector2 size = isGrill ? simulation.KitchenLayout.GrillMeatSize(unit.Product, grillCompanionAvailable)
                     : isBarrelDrink && !carried ? new Vector2(8f, 15f) : ServingSize(unit.Product, carried);
                 SetDesiredSize(go.transform, renderer, size);
             }
             Vector2 position;
-            if (isGrill) position = simulation.KitchenLayout.GrillSlotPosition(unit.Product, unit.Slot, Available(unit.Product == 0 ? 1 : unit.Product == 1 ? 0 : unit.Product == 2 ? 3 : 2), simulation.Kitchen.GrillCapacity(unit.Product));
+            if (isGrill) position = simulation.KitchenLayout.GrillSlotPosition(unit.Product, unit.Slot, grillCompanionAvailable, simulation.Kitchen.GrillCapacity(unit.Product));
             else if (unit.Product == 4 || unit.Product == 6) position = simulation.KitchenLayout.BarrelSlotPosition(unit.Product, unit.Slot);
             else position = simulation.KitchenLayout.TableSlotPosition(unit.Product, unit.Slot, Available(unit.Product == 0 ? 1 : unit.Product == 1 ? 0 : unit.Product == 2 ? 3 : unit.Product == 3 ? 2 : -1), simulation.Kitchen.TableCapacity(unit.Product));
             SetItemTransform(go.transform, position, isGrill
@@ -507,8 +508,7 @@ namespace HayChoriYPaty
         private static string SandwichArt(int product) => product == 0 ? "sandwich-chori" : product == 1 ? "sandwich-paty" : product == 2 ? "sandwich-bondiola" : "sandwich-vacio";
         private static string DrinkArt(int product) => product == 4 ? "coca" : product == 5 ? "fernet" : "beer";
 
-        private static Vector2 MeatSize(int product) => product == 0 ? new Vector2(28, 14) : product == 1 ? new Vector2(34, 20) : product == 2 ? new Vector2(34, 38) : new Vector2(90, 14);
-        private static Vector2 ServingSize(int product, bool carried) => product < 4 ? (carried ? new Vector2(24, 18) : new Vector2(20, 14)) : product == 5 ? new Vector2(18, 32) : new Vector2(9, 20);
+        private static Vector2 ServingSize(int product, bool carried) => product == 0 ? (carried ? new Vector2(31.2f, 18f) : new Vector2(26f, 14f)) : product < 4 ? (carried ? new Vector2(24, 18) : new Vector2(20, 14)) : product == 5 ? new Vector2(18, 32) : new Vector2(9, 20);
 
         private void SetStationTransform(Transform target, Rect bounds)
         {
