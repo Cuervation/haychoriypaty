@@ -1,4 +1,14 @@
-# Current Android delivery — 2026-10-08 (0.2.19/code21, perspective grill fit)
+# Current Android delivery — 2026-10-08 (0.2.20/code22, larger sandwiches)
+
+Unity6000.6.3f1 Main-only Android Development IL2CPP/ARM64 build `build-f0bd2b66cd`: **Succeeded in73s; BuildReport0 errors/1 warning**. Package `com.haychoriypaty.game`, version0.2.20/code22, min API26/target36, `arm64-v8a`.
+
+APK `Builds/Android/Archive/HayChoriYPaty-0.2.20-code22-sandwich-scale.apk`: **618,489,985 bytes**. SHA-256 `3f948c1f1235023b3c4d9a2264fe23d63680f4a879b6eb5fe87d518bde956024`. `aapt dump badging` confirms package/version/API/architecture; `unzip -t` reports no archive errors; Unity-bundled OpenJDK + `apksigner` verifies Signature Scheme v2 and established Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`. Versioned alias and rolling APK match the archive byte-for-byte.
+
+Includes the renderer-only increase of four sandwich families to1.5× on tables /1.25× carried, with artwork aspect preserved and drinks unchanged. Focused `StreetKitchenRendererTests` PlayMode class passed12/12 before build. **Not installed:** Motorola Edge60 Fusion `ZY22MBNWRB` was not present in `adb devices`; replacement installation remains pending reconnection. No uninstall/data clear/launch occurred. This is Development/debug signing, not a Play Store production release.
+
+---
+
+## Previous Android delivery — 2026-10-08 (0.2.19/code21, perspective grill fit)
 
 Unity6000.6.3f1 Main-only Development Android IL2CPP/ARM64 build `build-4524fd8d93`: **Succeeded in409.62s; BuildReport0 errors/1 warning**. Package `com.haychoriypaty.game`, version0.2.19/code21, min API26/target36, `arm64-v8a`.
 

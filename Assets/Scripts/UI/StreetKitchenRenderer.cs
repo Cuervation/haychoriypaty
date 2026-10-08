@@ -11,6 +11,7 @@ namespace HayChoriYPaty
     {
         private const int PropLayer = 30, CarryLayer = 31;
         private const int RenderScale = 2;
+        private const float TableSandwichScale = 1.5f, CarriedSandwichScale = 1.25f;
         private const string PrefabRoot = "ModularKitchen/Prefabs/";
         private const string SpriteRoot = "ModularKitchen/Sprites/";
         private readonly Dictionary<int, GameObject> foodObjects = new Dictionary<int, GameObject>();
@@ -508,7 +509,18 @@ namespace HayChoriYPaty
         private static string SandwichArt(int product) => product == 0 ? "sandwich-chori" : product == 1 ? "sandwich-paty" : product == 2 ? "sandwich-bondiola" : "sandwich-vacio";
         private static string DrinkArt(int product) => product == 4 ? "coca" : product == 5 ? "fernet" : "beer";
 
-        private static Vector2 ServingSize(int product, bool carried) => product == 0 ? (carried ? new Vector2(31.2f, 18f) : new Vector2(26f, 14f)) : product < 4 ? (carried ? new Vector2(24, 18) : new Vector2(20, 14)) : product == 5 ? new Vector2(18, 32) : new Vector2(9, 20);
+        private static Vector2 ServingSize(int product, bool carried)
+        {
+            if (product <= 3)
+            {
+                Vector2 baseSize = product == 0
+                    ? (carried ? new Vector2(31.2f, 18f) : new Vector2(26f, 14f))
+                    : (carried ? new Vector2(24f, 18f) : new Vector2(20f, 14f));
+                return baseSize * (carried ? CarriedSandwichScale : TableSandwichScale);
+            }
+
+            return product == 5 ? new Vector2(18f, 32f) : new Vector2(9f, 20f);
+        }
 
         private void SetStationTransform(Transform target, Rect bounds)
         {

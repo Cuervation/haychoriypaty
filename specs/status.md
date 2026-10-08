@@ -1,5 +1,9 @@
 # Project status
 
+## Sandwich presentation scale — 2026-10-08
+
+Renderer-only display targets now scale all four sandwiches 1.5× on their tables and 1.25× when carried, preserving art aspect ratio; drinks and gameplay dimensions/economy are unchanged. Focused `StreetKitchenRendererTests` passed 12/12. Main-only Android 0.2.20/code22 IL2CPP/ARM64 build `build-f0bd2b66cd` succeeded in73s,0errors/1warning; APK618,489,985bytes, SHA-256 `3f948c1f1235023b3c4d9a2264fe23d63680f4a879b6eb5fe87d518bde956024`, integrity/package/v2 signature verified and aliases match. Motorola `ZY22MBNWRB` was disconnected, so installation is pending. Full receipt: `features/android-prototype.md`; implementation: `features/modular-kitchen.md`.
+
 ## Modular kitchen — implementation2026-10-07
 
 User approved real production/stock and responsive kitchen fitting. Main now contains StreetKitchenRenderer; the single StreetSimulation owns physical item IDs, cooking/burning, real stock, individual take/carry/consume/cancel and role-gated refill.17original transparent PNGs produce29Sprite assets and21reusable prefabs (empty furniture, separate food/drinks/ice/effects). Paired grills and Beer→Coca→Normal→Premium→Fernet preparation row reuse one760→540layout across actual catalogs, with clear worker foot routes, unchanged HUD/worker proportions and club scenery. Original sourcePNG dimensions are preserved with NPOTScale.None; mipmaps/Trilinear avoid minification sparkle. Native Sprite.Create assets require no extra package and preserve GUIDs on rebuild.
