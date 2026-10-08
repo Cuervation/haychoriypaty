@@ -3,67 +3,140 @@ using UnityEngine;
 
 namespace HayChoriYPaty
 {
-    /// <summary>Responsive native-kitchen geometry in StreetView logical canvas units.
-    /// The 760-unit source row is fitted uniformly into the existing 540-wide world;
-    /// y anchors remain canvas anchors and only their vertical presentation transform changes.</summary>
-    public static class StreetKitchenLayout
+    /// <summary>Catalog-derived kitchen geometry shared by rendering, pickup points, and worker routes.</summary>
+    public sealed class StreetKitchenLayout
     {
         public const float SourceWidth = 760f;
         public const float Scale = StreetSceneLayout.Width / SourceWidth;
         public const float TableY = 520f;
-        public const float GrillY = 620f;
         public const float BarrelY = 520f;
         public const float WorkerLaneY = 450f;
         public const float TablePickupY = 556f;
         public const float GrillPickupY = 608f;
         public const float BarrelPickupY = 508f;
         public const float TableWidth = 196f * Scale, TableHeight = 98f * Scale;
-        public const float GrillWidth = 352f * Scale, GrillHeight = 117.3333f * Scale;
-        public const float BarrelWidth = 50f * Scale, BarrelHeight = 98f * Scale;
+        public const float BarrelWidth = 60f * Scale, BarrelHeight = 117.6f * Scale;
+        public const float StandardGrillWidth = 352f * Scale, StandardGrillHeight = 117.3333f * Scale;
+        private const float GrillBottomLimit = 714f;
 
-        // Upper row order is Normal, Premium, Fernet, Coca, Beer. Equal 12-unit native
-        // margins/gaps use the available width while preserving the current station sizes.
-        private static readonly Rect NormalTable = new Rect(12f * Scale, TableY, TableWidth, TableHeight);
-        private static readonly Rect PremiumTable = new Rect(220f * Scale, TableY, TableWidth, TableHeight);
-        private static readonly Rect FernetTable = new Rect(428f * Scale, TableY, TableWidth, TableHeight);
-        private static readonly Rect Coca = new Rect(636f * Scale, BarrelY, BarrelWidth, BarrelHeight);
-        private static readonly Rect Beer = new Rect(698f * Scale, BarrelY, BarrelWidth, BarrelHeight);
-        private static readonly Rect NormalGrill = new Rect(14f * Scale, GrillY, GrillWidth, GrillHeight);
-        private static readonly Rect PremiumGrill = new Rect(394f * Scale, GrillY, GrillWidth, GrillHeight);
+        private readonly bool hasNormal, hasPremium, hasFernet, hasCoca, hasBeer;
+        private readonly Rect normalTable, premiumTable, fernetTable, cocaBarrel, beerBarrel;
+        private readonly Rect normalGrill, premiumGrill;
 
-        public static Rect BoundsForProduct(int product)
+        public bool HasNormalGrill { get { return hasNormal; } }
+        public bool HasPremiumGrill { get { return hasPremium; } }
+        public bool HasNormalTable { get { return hasNormal; } }
+        public bool HasPremiumTable { get { return hasPremium; } }
+        public bool HasFernetTable { get { return hasFernet; } }
+        public bool HasCocaBarrel { get { return hasCoca; } }
+        public bool HasBeerBarrel { get { return hasBeer; } }
+        public Rect NormalGrillBounds { get { return normalGrill; } }
+        public Rect PremiumGrillBounds { get { return premiumGrill; } }
+        public Rect NormalTableBounds { get { return normalTable; } }
+        public Rect PremiumTableBounds { get { return premiumTable; } }
+        public Rect FernetTableBounds { get { return fernetTable; } }
+        public Rect BeerBarrelBounds { get { return beerBarrel; } }
+        public Rect CocaBarrelBounds { get { return cocaBarrel; } }
+
+        public StreetKitchenLayout(int[] availableProducts)
+        {
+            bool[] available = new bool[7];
+            if (availableProducts != null)
+                for (int i = 0; i < availableProducts.Length; i++)
+                    if (availableProducts[i] >= 0 && availableProducts[i] < available.Length) available[availableProducts[i]] = true;
+
+            hasNormal = available[0] || available[1];
+            hasPremium = available[2] || available[3];
+            hasCoca = available[4];
+            hasFernet = available[5];
+            hasBeer = available[6];
+            Rect normal, premium, fernet, coca, beer;
+            PackUpperRow(out normal, out premium, out fernet, out coca, out beer);
+            normalTable = normal; premiumTable = premium; fernetTable = fernet; cocaBarrel = coca; beerBarrel = beer;
+            Rect normalG, premiumG;
+            PackGrills(out normalG, out premiumG);
+            normalGrill = normalG; premiumGrill = premiumG;
+        }
+
+        private void PackUpperRow(out Rect normal, out Rect premium, out Rect fernet, out Rect coca, out Rect beer)
+        {
+            int count = (hasNormal ? 1 : 0) + (hasPremium ? 1 : 0) + (hasFernet ? 1 : 0) + (hasCoca ? 1 : 0) + (hasBeer ? 1 : 0);
+            float totalWidth = ((hasNormal ? 196f : 0f) + (hasPremium ? 196f : 0f) + (hasFernet ? 196f : 0f)
+                + (hasCoca ? 60f : 0f) + (hasBeer ? 60f : 0f));
+            float gap = count > 0 ? (SourceWidth - totalWidth) / (count + 1) : 0f;
+            float x = gap;
+            normal = PlaceUpper(ref x, gap, hasNormal, 196f);
+            premium = PlaceUpper(ref x, gap, hasPremium, 196f);
+            fernet = PlaceUpper(ref x, gap, hasFernet, 196f);
+            coca = PlaceUpper(ref x, gap, hasCoca, 60f);
+            beer = PlaceUpper(ref x, gap, hasBeer, 60f);
+        }
+
+        private static Rect PlaceUpper(ref float x, float gap, bool active, float nativeWidth)
+        {
+            if (!active) return Rect.zero;
+            float scaledWidth = nativeWidth * Scale;
+            Rect result = new Rect(x * Scale, nativeWidth == 196f ? TableY : BarrelY, scaledWidth, nativeWidth == 196f ? TableHeight : BarrelHeight);
+            x += nativeWidth + gap;
+            return result;
+        }
+
+        private void PackGrills(out Rect normal, out Rect premium)
+        {
+            float grillY = 620f;
+            float nativeWidth = 352f;
+            if (hasNormal && hasPremium)
+            {
+                normal = new Rect(14f * Scale, grillY, StandardGrillWidth, StandardGrillHeight);
+                premium = new Rect(394f * Scale, grillY, StandardGrillWidth, StandardGrillHeight);
+                return;
+            }
+            bool active = hasNormal || hasPremium;
+            if (!active) { normal = premium = Rect.zero; return; }
+
+            float upperBottom = TableY;
+            if (hasNormal) upperBottom = Mathf.Max(upperBottom, normalTable.yMax);
+            if (hasPremium) upperBottom = Mathf.Max(upperBottom, premiumTable.yMax);
+            if (hasFernet) upperBottom = Mathf.Max(upperBottom, fernetTable.yMax);
+            if (hasCoca) upperBottom = Mathf.Max(upperBottom, cocaBarrel.yMax);
+            if (hasBeer) upperBottom = Mathf.Max(upperBottom, beerBarrel.yMax);
+            grillY = Mathf.Max(600f, upperBottom + 12f);
+            float availableHeight = Mathf.Max(0f, GrillBottomLimit - grillY);
+            nativeWidth = Mathf.Min(SourceWidth - 28f, availableHeight / Scale * 3f);
+            float width = nativeWidth * Scale;
+            float height = width / 3f;
+            float x = (StreetSceneLayout.Width - width) * .5f;
+            Rect only = new Rect(x, grillY, width, height);
+            if (hasNormal) { normal = only; premium = Rect.zero; }
+            else { normal = Rect.zero; premium = only; }
+        }
+
+        public Rect BoundsForProduct(int product)
         {
             switch (product)
             {
-                case 0: case 1: return NormalTable;
-                case 2: case 3: return PremiumTable;
-                case 4: return Coca;
-                case 5: return FernetTable;
-                case 6: return Beer;
+                case 0: case 1: return normalTable;
+                case 2: case 3: return premiumTable;
+                case 4: return cocaBarrel;
+                case 5: return fernetTable;
+                case 6: return beerBarrel;
                 default: return Rect.zero;
             }
         }
 
-        public static Rect GrillBoundsForProduct(int product) => product < 2 ? NormalGrill
-            : product < 4 ? PremiumGrill : Rect.zero;
-        public static Rect NormalGrillBounds => NormalGrill;
-        public static Rect PremiumGrillBounds => PremiumGrill;
-        public static Rect NormalTableBounds => NormalTable;
-        public static Rect PremiumTableBounds => PremiumTable;
-        public static Rect FernetTableBounds => FernetTable;
-        public static Rect BeerBarrelBounds => Beer;
-        public static Rect CocaBarrelBounds => Coca;
+        public Rect GrillBoundsForProduct(int product) => product < 2 ? normalGrill : product < 4 ? premiumGrill : Rect.zero;
 
         /// <summary>Solid base/front collision only. The tabletop/food overhang remains reachable.</summary>
-        public static Rect FootprintForProduct(int product)
+        public Rect FootprintForProduct(int product)
         {
             Rect station = BoundsForProduct(product);
+            if (station.width <= 0f) return Rect.zero;
             if (product == 0 || product == 1 || product == 2 || product == 3 || product == 5)
                 return new Rect(station.x, station.yMax - 20f * Scale, station.width, 20f * Scale);
             return station;
         }
 
-        public static Vector2 PickupPosition(int product)
+        public Vector2 PickupPosition(int product)
         {
             Rect r = BoundsForProduct(product);
             float y = product < 4 || product == 5 ? TablePickupY : BarrelPickupY;
@@ -72,30 +145,27 @@ namespace HayChoriYPaty
         }
 
         /// <summary>Walk via the clear upper lane, then approach the service edge without crossing a station base.</summary>
-        public static Vector2[] ApproachRoute(int product)
+        public Vector2[] ApproachRoute(int product)
         {
             Vector2 pickup = PickupPosition(product);
             float approachY = product < 4 || product == 5 ? TablePickupY : BarrelPickupY;
             Vector2 lane = new Vector2(pickup.x, WorkerLaneY);
             Vector2 approach = new Vector2(pickup.x, approachY);
-            // Keep paths out of the narrow inter-station gaps: travel in the common upper lane,
-            // then descend at the station center to the pickup edge.
             var result = new List<Vector2> { new Vector2(StreetSceneLayout.Width * .5f, WorkerLaneY) };
             if (Mathf.Abs(result[0].x - lane.x) > 1f) result.Add(lane);
             if (Mathf.Abs(lane.y - approach.y) > 1f) result.Add(approach);
             return result.ToArray();
         }
 
-        public static Vector2 TableSlotPosition(int product, int slot) => TableSlotPosition(product, slot, true, product == 5 ? 45 : 24);
+        public Vector2 TableSlotPosition(int product, int slot) => TableSlotPosition(product, slot, true, product == 5 ? 45 : 24);
 
-        public static Vector2 TableSlotPosition(int product, int slot, bool companionAvailable, int capacity)
+        public Vector2 TableSlotPosition(int product, int slot, bool companionAvailable, int capacity)
         {
             Rect r = BoundsForProduct(product);
             int index = Mathf.Max(0, slot);
             float woodTopDepth = r.height * .35f;
             if (product == 5)
             {
-                // 15 large glasses, repeated in three subtle product layers.
                 int item = index % 15, layer = index / 15;
                 int col = item % 5, row = item / 5;
                 float x = r.x + r.width * (.10f + .20f * col);
@@ -125,9 +195,9 @@ namespace HayChoriYPaty
             return new Vector2(xPosition + layerX, r.y + rowBase - 7f + layerY);
         }
 
-        public static Vector2 GrillSlotPosition(int product, int slot) => GrillSlotPosition(product, slot, true, product < 2 ? 12 : 4);
+        public Vector2 GrillSlotPosition(int product, int slot) => GrillSlotPosition(product, slot, true, product < 2 ? 12 : 4);
 
-        public static Vector2 GrillSlotPosition(int product, int slot, bool companionAvailable, int capacity)
+        public Vector2 GrillSlotPosition(int product, int slot, bool companionAvailable, int capacity)
         {
             Rect r = GrillBoundsForProduct(product);
             int index = Mathf.Max(0, slot);
@@ -150,7 +220,7 @@ namespace HayChoriYPaty
             {
                 if (product == 2)
                 {
-                    width = usableWidth * .60f; columns = 4; rows = 1;
+                    width = usableWidth * .60f; columns = 4;
                     col = index % columns;
                     return new Vector2(left + width * (col + .5f) / columns, grateTop + grateHeight * .48f);
                 }
@@ -165,7 +235,7 @@ namespace HayChoriYPaty
             return new Vector2(left + width * (col + .5f) / columns, grateTop + grateHeight * (row + .5f) / rows);
         }
 
-        public static Vector2 BarrelSlotPosition(int product, int slot)
+        public Vector2 BarrelSlotPosition(int product, int slot)
         {
             Rect r = BoundsForProduct(product);
             int col = Mathf.Max(0, slot) % 3, row = Mathf.Max(0, slot) / 3;

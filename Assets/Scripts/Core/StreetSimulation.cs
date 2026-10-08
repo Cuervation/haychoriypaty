@@ -345,6 +345,7 @@ namespace HayChoriYPaty
         public IReadOnlyList<StreetWorker> Workers { get { return workers; } }
         public IReadOnlyList<StreetSale> Sales { get { return sales; } }
         public StreetKitchenProduction Kitchen { get; private set; }
+        public StreetKitchenLayout KitchenLayout { get; private set; }
         public float Elapsed { get; private set; }
         public float DemandFraction
         {
@@ -405,6 +406,7 @@ namespace HayChoriYPaty
             this.balance = balance ?? new StreetBalance();
             LevelIndex = Mathf.Clamp(level, 0, LevelNames.Length - 1);
             availableProductsByLevel = BuildAvailableProducts(this.balance);
+            RefreshKitchenLayout();
             random = new System.Random(this.balance.randomSeed + LevelIndex * 97);
             // Normalize current and legacy save values: every product is sold at the same fixed price.
             this.price = FixedProductPrice;
@@ -413,6 +415,11 @@ namespace HayChoriYPaty
             // construction creates a new attempt baseline; purchases are never resumed.
             Coins = Mathf.Max(0, coins); // Preserve the existing injected-balance API; actual attempt entry clears coins.
             ResetTeamAndSpeed();
+        }
+
+        private void RefreshKitchenLayout()
+        {
+            KitchenLayout = new StreetKitchenLayout(availableProductsByLevel[LevelIndex]);
         }
 
         public void StartRound()
@@ -460,6 +467,7 @@ namespace HayChoriYPaty
         {
             if (Phase != RoundPhase.Ready || level < 0 || level >= LevelNames.Length) return false;
             LevelIndex = level;
+            RefreshKitchenLayout();
             ResetTeamAndSpeed();
             Coins = 0; CoinsEarned = 0;
             return true;
@@ -468,6 +476,7 @@ namespace HayChoriYPaty
         {
             if (Phase != RoundPhase.Won || LevelIndex + 1 >= LevelNames.Length) return false;
             LevelIndex++;
+            RefreshKitchenLayout();
             ResetTeamAndSpeed();
             Coins = 0; CoinsEarned = 0;
             Phase = RoundPhase.Ready; return true;
@@ -534,9 +543,9 @@ namespace HayChoriYPaty
             (LevelIndex == 1 && (worker.Product == 0 || worker.Product == 4)) ||
             (LevelIndex == 2 && (worker.Product == 0 || worker.Product == 1 || worker.Product == 4)) ||
             LevelIndex >= 3;
-        // All catalogs now use the responsive modular route supplied by StreetKitchenLayout.
+        // All catalogs now use the responsive modular route supplied by KitchenLayout.
         private bool UsesExpandedStationRoutes { get { return true; } }
-        private Vector2 StationPositionForWorker(StreetWorker worker) => StreetKitchenLayout.PickupPosition(worker.Product);
+        private Vector2 StationPositionForWorker(StreetWorker worker) => KitchenLayout.PickupPosition(worker.Product);
         private Vector2 StationApproachForWorker(StreetWorker worker) =>
             StationApproachPointForLevel(worker.Product, LevelIndex);
 
@@ -663,7 +672,7 @@ namespace HayChoriYPaty
                     {
                         if (UsesExpandedStationRoutes)
                         {
-                            Vector2[] route = StreetKitchenLayout.ApproachRoute(w.Product);
+                            Vector2[] route = KitchenLayout.ApproachRoute(w.Product);
                             if (w.StationRouteStage < route.Length - 1)
                             {
                                 w.StationRouteStage++;
@@ -704,7 +713,7 @@ namespace HayChoriYPaty
                         w.State = StreetWorkerState.ToCounter;
                         if (UsesExpandedStationRoutes)
                         {
-                            Vector2[] route = StreetKitchenLayout.ApproachRoute(w.Product);
+                            Vector2[] route = KitchenLayout.ApproachRoute(w.Product);
                             w.StationRouteStage = route.Length - 2;
                             w.Target = w.StationRouteStage >= 0 ? route[w.StationRouteStage] : CounterHandoffPosition(w.Customer);
                         }
@@ -728,7 +737,7 @@ namespace HayChoriYPaty
                     {
                         if (UsesExpandedStationRoutes && w.StationRouteStage >= 0)
                         {
-                            Vector2[] route = StreetKitchenLayout.ApproachRoute(w.Product);
+                            Vector2[] route = KitchenLayout.ApproachRoute(w.Product);
                             w.StationRouteStage--;
                             w.Target = w.StationRouteStage >= 0 ? route[w.StationRouteStage] : CounterHandoffPosition(w.Customer);
                         }
@@ -849,7 +858,7 @@ namespace HayChoriYPaty
         {
             if (UsesExpandedStationRoutes)
             {
-                Vector2[] route = StreetKitchenLayout.ApproachRoute(worker.Product);
+                Vector2[] route = KitchenLayout.ApproachRoute(worker.Product);
                 worker.StationRouteStage = 0;
                 worker.UsingStationApproach = false;
                 worker.Target = route[0];

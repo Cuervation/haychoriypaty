@@ -19,6 +19,12 @@ namespace HayChoriYPaty
         private readonly Dictionary<int, SpriteRenderer> foodRenderers = new Dictionary<int, SpriteRenderer>();
         private readonly Dictionary<int, GameObject> cookingEffects = new Dictionary<int, GameObject>();
         private readonly Dictionary<int, GameObject> heatEffects = new Dictionary<int, GameObject>();
+        private sealed class AmbientGrillEffects
+        {
+            public GameObject Heat, SmokeA, SmokeB;
+            public SpriteRenderer HeatRenderer, SmokeARenderer, SmokeBRenderer;
+        }
+        private readonly AmbientGrillEffects[] ambientGrills = new AmbientGrillEffects[2];
         private readonly List<int> staleIds = new List<int>();
         private GameObject propsRoot, carryRoot;
         private Camera propsCamera, carryCamera;
@@ -52,6 +58,7 @@ namespace HayChoriYPaty
             if (!IsReady || simulation == null) return;
             // Transforms and sprites are updated here, before the native cameras render for this frame.
             SyncFood();
+            UpdateAmbientEffects();
             PositionCamera(propsCamera);
             PositionCamera(carryCamera);
             if (renderedFrame != Time.frameCount)
@@ -178,15 +185,16 @@ namespace HayChoriYPaty
 
         private void SyncStations()
         {
-            // Show all empty furniture shells in a stable layout; simulation availability still
-            // gates every product, item, worker, and stock flow independently.
-            EnsureStation("Station_NormalGrill", StreetKitchenLayout.NormalGrillBounds, true);
-            EnsureStation("Station_PremiumGrill", StreetKitchenLayout.PremiumGrillBounds, true);
-            EnsureStation("Station_NormalTable", StreetKitchenLayout.NormalTableBounds, true);
-            EnsureStation("Station_PremiumTable", StreetKitchenLayout.PremiumTableBounds, true);
-            EnsureStation("Station_FernetTable", StreetKitchenLayout.FernetTableBounds, true);
-            EnsureStation("Station_BeerBarrel", StreetKitchenLayout.BeerBarrelBounds, true);
-            EnsureStation("Station_CocaBarrel", StreetKitchenLayout.CocaBarrelBounds, true);
+            StreetKitchenLayout layout = simulation.KitchenLayout;
+            EnsureStation("Station_NormalGrill", layout.NormalGrillBounds, layout.HasNormalGrill);
+            EnsureStation("Station_PremiumGrill", layout.PremiumGrillBounds, layout.HasPremiumGrill);
+            EnsureStation("Station_NormalTable", layout.NormalTableBounds, layout.HasNormalTable);
+            EnsureStation("Station_PremiumTable", layout.PremiumTableBounds, layout.HasPremiumTable);
+            EnsureStation("Station_FernetTable", layout.FernetTableBounds, layout.HasFernetTable);
+            EnsureStation("Station_BeerBarrel", layout.BeerBarrelBounds, layout.HasBeerBarrel);
+            EnsureStation("Station_CocaBarrel", layout.CocaBarrelBounds, layout.HasCocaBarrel);
+            UpdateAmbientGrill(0, layout.NormalGrillBounds, layout.HasNormalGrill, 0f);
+            UpdateAmbientGrill(1, layout.PremiumGrillBounds, layout.HasPremiumGrill, 1.7f);
         }
 
         private bool Available(int product) => simulation != null && simulation.IsProductAvailable(product);
@@ -273,19 +281,21 @@ namespace HayChoriYPaty
             {
                 if (isGrill)
                 {
-                    string state = unit.State.ToString();
+                    string state = VisualStateName(unit.State);
                     renderer.sprite = StateSprite(key, state);
+                    renderer.color = unit.State == StreetFoodState.Burned
+                        ? new Color(.94f, .78f, .60f, 1f) : Color.white;
                 }
-                else renderer.sprite = FirstSprite(key);
+                else { renderer.sprite = FirstSprite(key); renderer.color = Color.white; }
                 SetDesiredSize(go.transform, renderer, isGrill ? MeatSize(unit.Product) : ServingSize(unit.Product, carried));
             }
             Vector2 position;
-            if (isGrill) position = StreetKitchenLayout.GrillSlotPosition(unit.Product, unit.Slot, Available(unit.Product == 0 ? 1 : unit.Product == 1 ? 0 : unit.Product == 2 ? 3 : 2), simulation.Kitchen.GrillCapacity(unit.Product));
-            else if (unit.Product == 4 || unit.Product == 6) position = StreetKitchenLayout.BarrelSlotPosition(unit.Product, unit.Slot);
-            else position = StreetKitchenLayout.TableSlotPosition(unit.Product, unit.Slot, Available(unit.Product == 0 ? 1 : unit.Product == 1 ? 0 : unit.Product == 2 ? 3 : unit.Product == 3 ? 2 : -1), simulation.Kitchen.TableCapacity(unit.Product));
+            if (isGrill) position = simulation.KitchenLayout.GrillSlotPosition(unit.Product, unit.Slot, Available(unit.Product == 0 ? 1 : unit.Product == 1 ? 0 : unit.Product == 2 ? 3 : 2), simulation.Kitchen.GrillCapacity(unit.Product));
+            else if (unit.Product == 4 || unit.Product == 6) position = simulation.KitchenLayout.BarrelSlotPosition(unit.Product, unit.Slot);
+            else position = simulation.KitchenLayout.TableSlotPosition(unit.Product, unit.Slot, Available(unit.Product == 0 ? 1 : unit.Product == 1 ? 0 : unit.Product == 2 ? 3 : unit.Product == 3 ? 2 : -1), simulation.Kitchen.TableCapacity(unit.Product));
             SetItemTransform(go.transform, position, isGrill
-                ? StreetKitchenLayout.GrillBoundsForProduct(unit.Product)
-                : StreetKitchenLayout.BoundsForProduct(unit.Product));
+                ? simulation.KitchenLayout.GrillBoundsForProduct(unit.Product)
+                : simulation.KitchenLayout.BoundsForProduct(unit.Product));
             SetSorting(go, 10 + unit.Slot);
         }
 
@@ -312,8 +322,8 @@ namespace HayChoriYPaty
                 SetDesiredSize(effect.transform, smokeRenderer, new Vector2(12f, 26f));
                 cookingEffects[unit.Id] = effect;
             }
-            Vector2 position = StreetKitchenLayout.GrillSlotPosition(unit.Product, unit.Slot, Available(unit.Product == 0 ? 1 : unit.Product == 1 ? 0 : unit.Product == 2 ? 3 : 2), simulation.Kitchen.GrillCapacity(unit.Product));
-            SetItemTransform(effect.transform, new Vector2(position.x, position.y - 5f), StreetKitchenLayout.GrillBoundsForProduct(unit.Product));
+            Vector2 position = simulation.KitchenLayout.GrillSlotPosition(unit.Product, unit.Slot, Available(unit.Product == 0 ? 1 : unit.Product == 1 ? 0 : unit.Product == 2 ? 3 : 2), simulation.Kitchen.GrillCapacity(unit.Product));
+            SetItemTransform(effect.transform, new Vector2(position.x, position.y - 5f), simulation.KitchenLayout.GrillBoundsForProduct(unit.Product));
             effect.SetActive(true);
             GameObject heat;
             if (!heatEffects.TryGetValue(unit.Id, out heat) || heat == null)
@@ -321,7 +331,74 @@ namespace HayChoriYPaty
                 GameObject heatSource = Prefab("Effect_Heat");
                 if (heatSource != null) { heat = Instantiate(heatSource, propsRoot.transform); heat.name = "Cooking_Heat_" + unit.Id; SetLayerRecursively(heat, PropLayer); SetSorting(heat, 5); SpriteRenderer heatRenderer = heat.GetComponentInChildren<SpriteRenderer>(true); SetDesiredSize(heat.transform, heatRenderer, new Vector2(12f, 18f)); heatEffects[unit.Id] = heat; }
             }
-            if (heat != null) { SetItemTransform(heat.transform, position, StreetKitchenLayout.GrillBoundsForProduct(unit.Product)); SpriteRenderer heatRenderer = heat.GetComponentInChildren<SpriteRenderer>(true); if (heatRenderer != null) heatRenderer.color = new Color(1f, 1f, 1f, .24f + .16f * Mathf.Clamp01(unit.Progress)); heat.SetActive(true); }
+            if (heat != null) { SetItemTransform(heat.transform, position, simulation.KitchenLayout.GrillBoundsForProduct(unit.Product)); SpriteRenderer heatRenderer = heat.GetComponentInChildren<SpriteRenderer>(true); if (heatRenderer != null) heatRenderer.color = new Color(1f, 1f, 1f, .24f + .16f * Mathf.Clamp01(unit.Progress)); heat.SetActive(true); }
+        }
+
+        private void UpdateAmbientEffects()
+        {
+            if (simulation == null || propsRoot == null) return;
+            StreetKitchenLayout layout = simulation.KitchenLayout;
+            UpdateAmbientGrill(0, layout.NormalGrillBounds, layout.HasNormalGrill, 0f);
+            UpdateAmbientGrill(1, layout.PremiumGrillBounds, layout.HasPremiumGrill, 1.7f);
+        }
+
+        private void UpdateAmbientGrill(int index, Rect bounds, bool active, float phaseOffset)
+        {
+            AmbientGrillEffects effects = ambientGrills[index];
+            if (!active || bounds.width <= 0f)
+            {
+                if (effects == null) return;
+                SetAmbientActive(effects.Heat, false); SetAmbientActive(effects.SmokeA, false); SetAmbientActive(effects.SmokeB, false);
+                return;
+            }
+            if (effects == null) ambientGrills[index] = effects = new AmbientGrillEffects();
+            string family = index == 0 ? "Normal" : "Premium";
+            if (effects.Heat == null) effects.Heat = CreateAmbientEffect("Ambient_" + family + "_Heat", "Effect_Heat", 2, new Vector2(bounds.width * .48f, 14f), out effects.HeatRenderer);
+            if (effects.SmokeA == null) effects.SmokeA = CreateAmbientEffect("Ambient_" + family + "_Smoke_A", "Effect_Smoke", 6, new Vector2(10f, 24f), out effects.SmokeARenderer);
+            if (effects.SmokeB == null) effects.SmokeB = CreateAmbientEffect("Ambient_" + family + "_Smoke_B", "Effect_Smoke", 6, new Vector2(10f, 24f), out effects.SmokeBRenderer);
+
+            if (effects.Heat != null)
+            {
+                SetDesiredSize(effects.Heat.transform, effects.HeatRenderer, new Vector2(bounds.width * .48f, 14f));
+                float flicker = Mathf.Sin(Time.unscaledTime * 1.8f + phaseOffset);
+                if (effects.HeatRenderer != null) effects.HeatRenderer.color = new Color(1f, .34f, .08f, .10f + .035f * (flicker + 1f));
+                SetItemTransform(effects.Heat.transform, new Vector2(bounds.center.x, bounds.y + bounds.height * .75f), bounds);
+                SetAmbientActive(effects.Heat, true);
+            }
+            UpdateAmbientSmoke(effects.SmokeA, effects.SmokeARenderer, bounds, .17f, 0f, phaseOffset);
+            UpdateAmbientSmoke(effects.SmokeB, effects.SmokeBRenderer, bounds, .83f, .5f, phaseOffset);
+        }
+
+        private void UpdateAmbientSmoke(GameObject smoke, SpriteRenderer renderer, Rect bounds, float xFraction, float stagger, float phaseOffset)
+        {
+            if (smoke == null) return;
+            SetDesiredSize(smoke.transform, renderer, new Vector2(10f, 24f));
+            float phase = Mathf.Repeat(Time.unscaledTime * .28f + stagger + phaseOffset, 1f);
+            float alpha = .15f * Mathf.Sin(phase * Mathf.PI);
+            if (renderer != null) renderer.color = new Color(1f, 1f, 1f, alpha);
+            float rise = bounds.height * .65f + 15f;
+            Vector2 position = new Vector2(bounds.x + bounds.width * xFraction, bounds.y + bounds.height * .78f - phase * rise);
+            SetItemTransform(smoke.transform, position, bounds);
+            SetAmbientActive(smoke, true);
+        }
+
+        private GameObject CreateAmbientEffect(string objectName, string prefabName, int sortingOrder, Vector2 size, out SpriteRenderer renderer)
+        {
+            renderer = null;
+            GameObject source = Prefab(prefabName);
+            if (source == null) return null;
+            GameObject effect = Instantiate(source, propsRoot.transform);
+            effect.name = objectName;
+            SetLayerRecursively(effect, PropLayer);
+            SetSorting(effect, sortingOrder);
+            renderer = effect.GetComponentInChildren<SpriteRenderer>(true);
+            SetDesiredSize(effect.transform, renderer, size);
+            return effect;
+        }
+
+        private static void SetAmbientActive(GameObject effect, bool active)
+        {
+            if (effect != null && effect.activeSelf != active) effect.SetActive(active);
         }
 
         private void SyncCarriedFood()
@@ -399,12 +476,22 @@ namespace HayChoriYPaty
             return items.Length == 0 ? null : items[0];
         }
 
+        private static string VisualStateName(StreetFoodState state)
+        {
+            if (state == StreetFoodState.Raw || state == StreetFoodState.Cooking) return "Raw";
+            return state == StreetFoodState.Cooked ? "Cooked" : "Passed";
+        }
+
+        private static string ArtStateName(string state) => state == "Passed" ? "Cooked" : state;
+
         private Sprite StateSprite(string name, string state)
         {
             Sprite[] items = Sprites(name);
+            // Passed reuses the appetizing cooked frame with a warm tint; the unused black-char frame is never shown.
+            string artState = ArtStateName(state);
             for (int i = 0; i < items.Length; i++)
-                if (items[i] != null && items[i].name.EndsWith("_" + state, StringComparison.OrdinalIgnoreCase)) return items[i];
-            int stateIndex = state == "Raw" ? 0 : state == "Cooking" ? 1 : state == "Cooked" ? 2 : 3;
+                if (items[i] != null && items[i].name.EndsWith("_" + artState, StringComparison.OrdinalIgnoreCase)) return items[i];
+            int stateIndex = artState == "Raw" ? 0 : artState == "Cooking" ? 1 : 2;
             return items.Length > stateIndex ? items[stateIndex] : (items.Length > 0 ? items[0] : null);
         }
 

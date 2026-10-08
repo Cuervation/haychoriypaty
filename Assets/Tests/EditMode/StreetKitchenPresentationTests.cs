@@ -19,23 +19,25 @@ namespace HayChoriYPaty.Tests
             return Activator.CreateInstance(Runtime("StreetSimulation"), new[] { balance, (object)level, 5f, 0, 1, 0 });
         }
 
-        private static object Static(string name, params object[] args)
-        {
-            MethodInfo method = Runtime("StreetKitchenLayout").GetMethod(name, BindingFlags.Public | BindingFlags.Static, null,
-                Array.ConvertAll(args, x => x.GetType()), null);
-            if (method == null) throw new MissingMethodException("StreetKitchenLayout." + name);
-            return method.Invoke(null, args);
-        }
+        private static object Layout(object simulation) => Get(simulation, "KitchenLayout");
+        private static object FullLayout() => Layout(Simulation(4));
 
         private static object Call(object target, string name, params object[] args)
         {
-            MethodInfo method = target.GetType().GetMethod(name, BindingFlags.Public | BindingFlags.Instance);
+            MethodInfo method = null;
+            foreach (MethodInfo candidate in target.GetType().GetMethods(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (candidate.Name != name || candidate.GetParameters().Length != args.Length) continue;
+                if (method != null) throw new AmbiguousMatchException(target.GetType().Name + "." + name);
+                method = candidate;
+            }
             if (method == null) throw new MissingMethodException(target.GetType().Name + "." + name);
             return method.Invoke(target, args);
         }
 
         private static object Get(object target, string name) => target.GetType().GetProperty(name, BindingFlags.Public | BindingFlags.Instance).GetValue(target);
-        private static Rect RectProperty(string name) => (Rect)Runtime("StreetKitchenLayout").GetProperty(name, BindingFlags.Public | BindingFlags.Static).GetValue(null);
+        private static Rect RectProperty(object layout, string name) => (Rect)Runtime("StreetKitchenLayout").GetProperty(name, BindingFlags.Public | BindingFlags.Instance).GetValue(layout);
+        private static float LayoutConstant(string name) => (float)Runtime("StreetKitchenLayout").GetField(name, BindingFlags.Public | BindingFlags.Static).GetRawConstantValue();
         private static float SceneWidth() => (float)Runtime("StreetSceneLayout").GetField("Width", BindingFlags.Public | BindingFlags.Static).GetValue(null);
         private static float WorkerServiceY() => (float)Runtime("StreetSceneLayout").GetField("WorkerServiceY", BindingFlags.Public | BindingFlags.Static).GetValue(null);
 
@@ -83,47 +85,102 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void FiveOrderedStationsAndTwoGrillsRetainTheirAspectAndSafeRows()
+        public void ActiveStationsReflowAcrossTheWidthWithConsistentSizesAndSafeGrillRows()
         {
-            Rect beer = RectProperty("BeerBarrelBounds"), coca = RectProperty("CocaBarrelBounds");
-            Rect normal = RectProperty("NormalTableBounds"), premium = RectProperty("PremiumTableBounds"), fernet = RectProperty("FernetTableBounds");
-            Rect normalGrill = RectProperty("NormalGrillBounds"), premiumGrill = RectProperty("PremiumGrillBounds");
-            Assert.Less(normal.xMax, premium.xMin); Assert.Less(premium.xMax, fernet.xMin);
-            Assert.Less(fernet.xMax, coca.xMin); Assert.Less(coca.xMax, beer.xMin);
-            Assert.AreEqual(normal.size, premium.size); Assert.AreEqual(normal.size, fernet.size);
-            Assert.AreEqual(beer.size, coca.size);
-            Assert.AreEqual(normalGrill.width, premiumGrill.width); Assert.AreEqual(normalGrill.height, premiumGrill.height);
-            Assert.AreEqual(normal.y, premium.y); Assert.AreEqual(normal.y, fernet.y);
-            Assert.AreEqual(normal.y, coca.y); Assert.AreEqual(normal.y, beer.y);
-            Assert.LessOrEqual(normal.xMin, 10f); Assert.GreaterOrEqual(beer.xMax, SceneWidth() - 10f);
-            Assert.AreEqual(520f, normal.y); Assert.AreEqual(620f, normalGrill.y);
-            Assert.AreEqual(normalGrill.y, premiumGrill.y);
-            Assert.LessOrEqual(normalGrill.xMin, 10f); Assert.GreaterOrEqual(premiumGrill.xMax, SceneWidth() - 10f);
-            Assert.AreEqual(30f, normalGrill.y - normal.yMax, .5f);
-            Assert.Less(normalGrill.yMax, 716f, "Kitchen must not cover the upgrade/status band.");
-            Assert.GreaterOrEqual(normal.y - WorkerServiceY(), 120f);
-            Rect[] furniture = { beer, coca, normal, premium, fernet, normalGrill, premiumGrill };
-            for (int i = 0; i < furniture.Length; i++)
-                for (int j = 0; j < i; j++) Assert.IsFalse(furniture[i].Overlaps(furniture[j]), i + " overlaps " + j);
+            float width = SceneWidth();
+            Rect? tableSize = null, barrelSize = null;
+            for (int level = 0; level < 11; level++)
+            {
+                object sim = Simulation(level), layout = Layout(sim);
+                bool normal = (bool)Call(sim, "IsProductAvailable", 0) || (bool)Call(sim, "IsProductAvailable", 1);
+                bool premium = (bool)Call(sim, "IsProductAvailable", 2) || (bool)Call(sim, "IsProductAvailable", 3);
+                bool fernet = (bool)Call(sim, "IsProductAvailable", 5);
+                bool coca = (bool)Call(sim, "IsProductAvailable", 4);
+                bool beer = (bool)Call(sim, "IsProductAvailable", 6);
+                Assert.AreEqual(normal, Get(layout, "HasNormalGrill"));
+                Assert.AreEqual(premium, Get(layout, "HasPremiumGrill"));
+                Assert.AreEqual(normal, Get(layout, "HasNormalTable"));
+                Assert.AreEqual(premium, Get(layout, "HasPremiumTable"));
+                Assert.AreEqual(fernet, Get(layout, "HasFernetTable"));
+                Assert.AreEqual(coca, Get(layout, "HasCocaBarrel"));
+                Assert.AreEqual(beer, Get(layout, "HasBeerBarrel"));
+
+                var top = new List<Rect>();
+                if (normal) top.Add(RectProperty(layout, "NormalTableBounds"));
+                if (premium) top.Add(RectProperty(layout, "PremiumTableBounds"));
+                if (fernet) top.Add(RectProperty(layout, "FernetTableBounds"));
+                if (coca) top.Add(RectProperty(layout, "CocaBarrelBounds"));
+                if (beer) top.Add(RectProperty(layout, "BeerBarrelBounds"));
+                float totalWidth = 0f;
+                foreach (Rect item in top) totalWidth += item.width;
+                float gap = (width - totalWidth) / (top.Count + 1);
+                Assert.AreEqual(gap, top[0].xMin, .02f, "First active prep station should use the responsive row margin.");
+                for (int i = 0; i < top.Count; i++)
+                {
+                    Assert.Greater(top[i].width, 0f);
+                    if (i > 0) Assert.AreEqual(gap, top[i].xMin - top[i - 1].xMax, .02f, "Hidden stations must not leave row holes.");
+                    if (top[i].width > 100f)
+                    {
+                        if (!tableSize.HasValue) tableSize = top[i];
+                        Assert.AreEqual(tableSize.Value.size, top[i].size, "All active tables share one visual size.");
+                    }
+                    else
+                    {
+                        if (!barrelSize.HasValue) barrelSize = top[i];
+                        Assert.AreEqual(barrelSize.Value.size, top[i].size, "All active barrels share one visual size.");
+                    }
+                }
+                Assert.AreEqual(gap, width - top[top.Count - 1].xMax, .02f);
+
+                var grills = new List<Rect>();
+                if (normal) grills.Add(RectProperty(layout, "NormalGrillBounds"));
+                if (premium) grills.Add(RectProperty(layout, "PremiumGrillBounds"));
+                Assert.Greater(grills[0].width, 0f);
+                foreach (Rect grill in grills) Assert.AreEqual(3f, grill.width / grill.height, .02f, "Grill sprites retain their authored aspect ratio.");
+                if (grills.Count == 1)
+                {
+                    Assert.AreEqual(width * .5f, grills[0].center.x, .02f, "One active grill is centered, not stranded in its old left/right slot.");
+                    Assert.Greater(grills[0].width, LayoutConstant("StandardGrillWidth"), "A lone grill grows into available width without covering the bottom UI band.");
+                }
+                else
+                {
+                    Assert.AreEqual(grills[0].width, grills[1].width, .02f);
+                    Assert.AreEqual(grills[0].height, grills[1].height, .02f);
+                    Assert.AreEqual(grills[0].y, grills[1].y, .02f);
+                    Assert.Less(grills[0].xMax, grills[1].xMin);
+                    Assert.LessOrEqual(grills[0].xMin, 10f);
+                    Assert.GreaterOrEqual(grills[1].xMax, width - 10f);
+                }
+                Assert.Less(grills[0].yMax, 716f, "Grills must remain above the upgrade/status band.");
+                foreach (Rect item in top) foreach (Rect grill in grills) Assert.IsFalse(item.Overlaps(grill));
+            }
+            Assert.AreEqual(196f * (width / (float)LayoutConstant("SourceWidth")), tableSize.Value.width, .02f);
+            Assert.AreEqual(98f * (width / (float)LayoutConstant("SourceWidth")), tableSize.Value.height, .02f);
+            Assert.AreEqual(60f * (width / (float)LayoutConstant("SourceWidth")), barrelSize.Value.width, .02f);
+            Assert.AreEqual(117.6f * (width / (float)LayoutConstant("SourceWidth")), barrelSize.Value.height, .02f);
         }
 
         [Test]
-        public void EveryCatalogRouteKeepsTheWholeFootRectangleClearOfVisibleStationBases()
+        public void EveryCatalogRouteUsesItsDynamicStationBoundsAndClearsActiveBases()
         {
-            Rect[] allBases = {
-                (Rect)Static("FootprintForProduct", 0), (Rect)Static("FootprintForProduct", 2),
-                (Rect)Static("FootprintForProduct", 4), (Rect)Static("FootprintForProduct", 5),
-                (Rect)Static("FootprintForProduct", 6), RectProperty("NormalGrillBounds"), RectProperty("PremiumGrillBounds")
-            };
             for (int level = 0; level < 11; level++)
             {
-                object sim = Simulation(level);
+                object sim = Simulation(level), layout = Layout(sim);
+                var allBases = new List<Rect>();
+                if ((bool)Get(layout, "HasNormalTable")) allBases.Add((Rect)Call(layout, "FootprintForProduct", 0));
+                if ((bool)Get(layout, "HasPremiumTable")) allBases.Add((Rect)Call(layout, "FootprintForProduct", 2));
+                if ((bool)Get(layout, "HasCocaBarrel")) allBases.Add((Rect)Call(layout, "FootprintForProduct", 4));
+                if ((bool)Get(layout, "HasFernetTable")) allBases.Add((Rect)Call(layout, "FootprintForProduct", 5));
+                if ((bool)Get(layout, "HasBeerBarrel")) allBases.Add((Rect)Call(layout, "FootprintForProduct", 6));
+                if ((bool)Get(layout, "HasNormalGrill")) allBases.Add(RectProperty(layout, "NormalGrillBounds"));
+                if ((bool)Get(layout, "HasPremiumGrill")) allBases.Add(RectProperty(layout, "PremiumGrillBounds"));
+
                 for (int product = 0; product < 7; product++)
                 {
                     if (!(bool)Call(sim, "IsProductAvailable", product)) continue;
-                    Vector2[] route = (Vector2[])Static("ApproachRoute", product);
+                    Vector2[] route = (Vector2[])Call(layout, "ApproachRoute", product);
                     Assert.GreaterOrEqual(route.Length, 2);
-                    Assert.AreEqual((Vector2)Static("PickupPosition", product), route[route.Length - 1]);
+                    Assert.AreEqual((Vector2)Call(layout, "PickupPosition", product), route[route.Length - 1]);
                     for (int column = 0; column < 7; column++)
                     {
                         Vector2 from = new Vector2(58 + column * 70, WorkerServiceY());
@@ -144,24 +201,45 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void TableAndGrillSlotsDoNotMixTheTwoMeatFamilies()
+        public void SelectingAndAdvancingLevelRefreshesTheCatalogDrivenKitchenLayout()
         {
-            AssertSlotsSeparated(0, 1, 24, new Vector2(20f, 14f), new Vector2(20f, 14f));
-            AssertSlotsSeparated(2, 3, 18, new Vector2(20f, 14f), new Vector2(20f, 14f));
-            AssertSlotsSeparated(0, 1, 18, new Vector2(28f, 14f), new Vector2(34f, 20f), true);
-            AssertSlotsSeparated(2, 3, 7, new Vector2(34f, 38f), new Vector2(90f, 14f), true);
+            object sim = Simulation(0);
+            Assert.IsFalse((bool)Get(Layout(sim), "HasCocaBarrel"));
+            Assert.IsTrue((bool)Call(sim, "SelectLevel", 2));
+            object selectedLayout = Layout(sim);
+            Assert.IsTrue((bool)Get(selectedLayout, "HasCocaBarrel"));
+            Assert.IsFalse((bool)Get(selectedLayout, "HasPremiumGrill"));
+
+            PropertyInfo phase = Runtime("StreetSimulation").GetProperty("Phase", BindingFlags.Public | BindingFlags.Instance);
+            phase.GetSetMethod(true).Invoke(sim, new[] { Enum.Parse(phase.PropertyType, "Won") });
+            Assert.IsTrue((bool)Call(sim, "NextLevel"));
+            Assert.AreEqual(3, Get(sim, "LevelIndex"));
+            object nextLayout = Layout(sim);
+            Assert.IsTrue((bool)Get(nextLayout, "HasPremiumGrill"));
+            Assert.IsTrue((bool)Get(nextLayout, "HasBeerBarrel"));
+            Assert.IsFalse((bool)Get(nextLayout, "HasFernetTable"));
         }
 
-        private static void AssertSlotsSeparated(int first, int second, int count, Vector2 firstSize, Vector2 secondSize, bool grill = false)
+        [Test]
+        public void TableAndGrillSlotsDoNotMixTheTwoMeatFamilies()
+        {
+            object layout = FullLayout();
+            AssertSlotsSeparated(layout, 0, 1, 24, new Vector2(20f, 14f), new Vector2(20f, 14f));
+            AssertSlotsSeparated(layout, 2, 3, 18, new Vector2(20f, 14f), new Vector2(20f, 14f));
+            AssertSlotsSeparated(layout, 0, 1, 18, new Vector2(28f, 14f), new Vector2(34f, 20f), true);
+            AssertSlotsSeparated(layout, 2, 3, 7, new Vector2(34f, 38f), new Vector2(90f, 14f), true);
+        }
+
+        private static void AssertSlotsSeparated(object layout, int first, int second, int count, Vector2 firstSize, Vector2 secondSize, bool grill = false)
         {
             var firstRects = new List<Rect>();
             var secondRects = new List<Rect>();
             for (int i = 0; i < count; i++)
             {
-                Vector2 a = grill ? (Vector2)Static("GrillSlotPosition", first, i, true, first < 2 ? 12 : 4)
-                    : (Vector2)Static("TableSlotPosition", first, i, true, count);
-                Vector2 b = grill ? (Vector2)Static("GrillSlotPosition", second, i, true, second < 2 ? 6 : 3)
-                    : (Vector2)Static("TableSlotPosition", second, i, true, count);
+                Vector2 a = grill ? (Vector2)Call(layout, "GrillSlotPosition", first, i, true, first < 2 ? 12 : 4)
+                    : (Vector2)Call(layout, "TableSlotPosition", first, i, true, count);
+                Vector2 b = grill ? (Vector2)Call(layout, "GrillSlotPosition", second, i, true, second < 2 ? 6 : 3)
+                    : (Vector2)Call(layout, "TableSlotPosition", second, i, true, count);
                 int firstLimit = grill ? (first == 0 ? 12 : first == 1 ? 6 : first == 2 ? 4 : 3) : count;
                 int secondLimit = grill ? (second == 0 ? 12 : second == 1 ? 6 : second == 2 ? 4 : 3) : count;
                 if (i < firstLimit) firstRects.Add(new Rect(a - firstSize * .5f, firstSize));
@@ -171,7 +249,24 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void IndependentResourcesContainFourTrimmedCookingFramesAndSeparateStationPrefabs()
+        public void FourProductionSubstatesProjectToThreeWarmVisualStates()
+        {
+            Type stateType = Runtime("StreetFoodState");
+            MethodInfo visualState = Runtime("StreetKitchenRenderer").GetMethod("VisualStateName", BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.NotNull(visualState);
+            Func<string, string> project = state => (string)visualState.Invoke(null, new[] { Enum.Parse(stateType, state) });
+            Assert.AreEqual("Raw", project("Raw"));
+            Assert.AreEqual("Raw", project("Cooking"), "Cooking remains a timer stage, not a fourth visual state.");
+            Assert.AreEqual("Cooked", project("Cooked"));
+            Assert.AreEqual("Passed", project("Burned"));
+            MethodInfo spriteState = Runtime("StreetKitchenRenderer").GetMethod("ArtStateName", BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.NotNull(spriteState);
+            Assert.AreEqual("Cooked", spriteState.Invoke(null, new object[] { "Passed" }),
+                "Passed must reuse warm cooked art, not the black-char frame.");
+        }
+
+        [Test]
+        public void IndependentResourcesKeepCookingSourceFramesAndSeparateStationPrefabs()
         {
             string[] meat = { "meat-chori", "meat-paty", "meat-bondiola", "meat-vacio" };
             string[] states = { "Raw", "Cooking", "Cooked", "Burned" };
