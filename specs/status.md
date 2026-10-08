@@ -18,7 +18,7 @@ Reordered the upper row to Normal table, Premium table, Fernet table, Coca barre
 
 ## Latest Android APK — station layout 0.2.18/code20 (2026-10-08)
 
-Unity6000.6.3f1 Main-only Android Development/IL2CPP/ARM64 build `build-ff697f0c18` succeeded in28.71s,0errors/1URP warning. APK `/tmp/HayChoriYPaty-0.2.18-code20.apk`,492,866,782bytes, package `com.haychoriypaty.game`, min26/target36, SHA-256 `00835bd2f3c050cc3b168650a6d9b5c6440bb30d497fa210c7f1d9b2682f5ed4`; v2 debug signature/package metadata and archive integrity verified. Build receipts and limitations: `features/android-prototype.md`. ADB saw the Motorola Edge60 Fusion `ZY22MBNWRB` briefly but returned no devices after build; phone installation is pending reconnection, with no uninstall/data clear.
+Unity6000.6.3f1 Main-only Android Development/IL2CPP/ARM64 build `build-ff697f0c18` succeeded in28.71s,0errors/1URP warning. APK `/tmp/HayChoriYPaty-0.2.18-code20.apk`,492,866,782bytes, package `com.haychoriypaty.game`, min26/target36, SHA-256 `00835bd2f3c050cc3b168650a6d9b5c6440bb30d497fa210c7f1d9b2682f5ed4`; v2 debug signature/package metadata and archive integrity verified. Build receipts and limitations: `features/android-prototype.md`. Installed via `adb install -r` on Motorola Edge60 Fusion `ZY22MBNWRB` (Success); PackageManager confirms code20/version0.2.18. No uninstall/data clear. App not launched; no on-device visual check.
 
 ## Previous Android APK — four-specialty 0.2.16/code18 (2026-10-07)
 

@@ -4,7 +4,7 @@ Unity6000.6.3f1 Main-only Development Android IL2CPP/ARM64 build `build-ff697f0c
 
 APK `/tmp/HayChoriYPaty-0.2.18-code20.apk`: **492,866,782 bytes**. SHA-256 `00835bd2f3c050cc3b168650a6d9b5c6440bb30d497fa210c7f1d9b2682f5ed4`. `aapt dump badging` confirms package/version/min/target; `unzip -t` reports no archive errors; Unity-bundled OpenJDK + `apksigner` confirms APK Signature Scheme v2 and established Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`.
 
-Built from station-layout commit `1718aedb619b95bb1151feb4cb880aed6c170b95`; `ProjectSettings/ProjectSettings.asset` now records 0.2.18/code20. Previously documented Unity visual and EditMode validations remain the source validation; no tests were rerun for this packaging-only request. Motorola Edge60 Fusion `ZY22MBNWRB` briefly appeared over USB during the session, then ADB returned an empty device list after the final build. **Phone installation is pending reconnection**; no uninstall or data clear occurred. This is a local Development/debug-signed APK, not a Play Store production-signed release.
+Built from station-layout commit `1718aedb619b95bb1151feb4cb880aed6c170b95`; `ProjectSettings/ProjectSettings.asset` records 0.2.18/code20. Previously documented Unity visual and EditMode validations remain the source validation; no tests were rerun for this packaging-only request. Installed on Motorola Edge 60 Fusion `ZY22MBNWRB` using `adb install -r` (**Success**); PackageManager verified versionCode20/versionName0.2.18. No uninstall or data clear occurred. The app was not launched and no on-device visual check was performed. This is a local Development/debug-signed APK, not a Play Store production-signed release.
 
 ---
 
