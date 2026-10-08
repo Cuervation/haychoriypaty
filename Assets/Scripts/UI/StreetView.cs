@@ -10,6 +10,7 @@ namespace HayChoriYPaty
     public sealed class StreetView : MonoBehaviour
     {
         private const float W = StreetSceneLayout.Width, H = StreetSceneLayout.Height;
+        private StreetKitchenRenderer kitchenRenderer;
         private const string AllBoysCrestResource = "street-allboys-crest";
         private const string ChicagoCrestResource = "street-new-chicago-crest-v1";
         private const string ChicagoBackgroundResource = "street-background-chicago-v1";
@@ -552,10 +553,19 @@ namespace HayChoriYPaty
             // Keep the expanded customer street clear; order icons live on their customers.
             DrawWaitingCrowd(sim);
             DrawClubCounter();
-            DrawGrill();
-            DrawServingTable();
-            for(int i=0;i<7;i++) DrawStation(i,sim.IsProductAvailable(i));
+            if (kitchenRenderer == null)
+                kitchenRenderer = GetComponent<StreetKitchenRenderer>() ?? gameObject.AddComponent<StreetKitchenRenderer>();
+            kitchenRenderer.Prepare(sim, layoutVerticalScale, logicalCanvasHeight);
             for(int i=0;i<sim.Workers.Count;i++) DrawWorker(sim.Workers[i]);
+            // Native independent furniture/food occlude the lower legs of workers reaching
+            // from behind a table; the actual carried item remains above the hand/forearm.
+            Rect kitchenCanvas = new Rect(0, 0, W, logicalCanvasHeight);
+            if (kitchenRenderer.IsReady && kitchenRenderer.BackgroundTexture != null)
+                GUI.DrawTexture(kitchenCanvas, kitchenRenderer.BackgroundTexture, ScaleMode.StretchToFill, true);
+            if (kitchenRenderer.ForegroundTexture != null)
+                GUI.DrawTexture(kitchenCanvas, kitchenRenderer.ForegroundTexture, ScaleMode.StretchToFill, true);
+            if (kitchenRenderer.CarriedTexture != null)
+                GUI.DrawTexture(kitchenCanvas, kitchenRenderer.CarriedTexture, ScaleMode.StretchToFill, true);
             for(int i=0;i<sim.Sales.Count;i++)
             {
                 var s=sim.Sales[i];float a=Mathf.Clamp01(2.2f-s.Age);GUI.color=new Color(1,1,1,a);
@@ -2006,8 +2016,9 @@ namespace HayChoriYPaty
             if(w.State==StreetWorkerState.Pickup)frame=7;
             if(w.State==StreetWorkerState.Handoff)frame=3;
             float bob=moving?Mathf.Sin(w.AnimationTime*16)*1.5f:0;
-            float stationOffset = StreetWorkstationLayout.WorkerPresentationOffset(w.Position, w.Product, layoutVerticalScale, game.Sim.HasParrilleroPremium)
-                / Mathf.Max(.01f, layoutVerticalScale);
+            // Preserve the original90×98worker shape while anchoring its feet to the
+            // same vertically adapted logical position as the native kitchen projection.
+            float stationOffset = 98f * (layoutVerticalScale - 1f) / Mathf.Max(.01f, layoutVerticalScale);
             bob += stationOffset;
             Rect workerRect=new Rect(w.Position.x-45,w.Position.y-98+bob,90,98);
             if(isCocacolero)
@@ -2040,9 +2051,7 @@ namespace HayChoriYPaty
                 ? StreetWorkstationLayout.PickupReachesRight(w.Product, game.Sim.HasParrilleroPremium)
                 : game.Sim.LevelIndex == 1 ? ChicagoWorkerFlip(false,frame,movement,false)
                 : moving && Mathf.Abs(movement.x) > Mathf.Abs(movement.y) && movement.x > 0);
-            if(w.State==StreetWorkerState.ToCounter || (w.State==StreetWorkerState.Handoff && !isCocacolero))
-                DrawProductIcon(new Rect(w.Position.x-25,w.Position.y-46+bob,31,29),w.Product);
-            if(w.State==StreetWorkerState.Pickup && !isCocacolero && game.Sim.LevelIndex!=1) {GUI.color=new Color(1,1,1,.55f);Item(new Rect(w.Position.x-15,w.Position.y-45+stationOffset,30,36),19);GUI.color=Color.white;}
+            // Carried food is a native independent object keyed by CarriedItemId, never a cosmetic icon.
         }
         private static bool ChicagoWorkerFlip(bool cocacolero, int frame, Vector2 movement, bool pickup)
         {

@@ -445,6 +445,7 @@ GameObject:
   - component: {fileID: 990010004}
   - component: {fileID: 990010006}
   - component: {fileID: 990010005}
+  - component: {fileID: 990010007}
   m_Layer: 0
   m_Name: Floresta Round Controller
   m_TagString: Untagged
@@ -543,11 +544,14 @@ MonoBehaviour:
     maxStaff: 5
     maxParrilleros: 0
     maxCocacoleros: 0
+    maxPremiumParrilleros: 0
+    maxFerneteros: 0
     upgradeCostProfiles:
     - profileId: TEST_ECONOMY_PROFILE
       hireCosts: 0f0000001e0000003c00000064000000i
       speedUpgradeCosts: 050000000a0000000f000000140000001e0000002d000000410000005a0000007d000000i
     levelUpgradeCostProfileIds: 0000000000000000000000000000000000000000i
+    roleHireCostProfileIds: ffffffffffffffffffffffffffffffffi
     hireCosts: 0f0000001e0000003c00000064000000i
     speedUpgradeCosts: 050000000a0000000f000000140000001e0000002d000000410000005a0000007d000000i
     florestaHireCosts: 0f0000001e0000003c00000064000000i
@@ -580,22 +584,20 @@ MonoBehaviour:
     - 1
     - 1
     - 1
+    kitchen:
+      normalTableCapacity: 48
+      premiumTableCapacity: 36
+      fernetTableCapacity: 45
+      barrelCapacity: 12
+      cookSeconds: 4
+      burnAfterSeconds: 20
+      discardBurnedAfterSeconds: 1
+      drinkPrepareSeconds: 0.28
     minOrderQuantity: 999
     maxOrderQuantity: 999
     initialPrice: 5
     deliveryPatienceRefreshSeconds: 180
-    levelProductCounts:
-    - 1
-    - 2
-    - 3
-    - 5
-    - 7
-    - 7
-    - 7
-    - 7
-    - 7
-    - 7
-    - 7
+    levelProductCounts: 0100000002000000030000000500000007000000070000000700000007000000070000000700000007000000i
     levelProductIds:
     - 0
     - 0,4
@@ -607,18 +609,7 @@ MonoBehaviour:
     - 0,1,2,3,4,6,5
     - 0,1,2,3,4,6,5
     - 0,1,2,3,4,6,5
-    levelGoals:
-    - 200
-    - 200
-    - 65
-    - 85
-    - 110
-    - 121
-    - 133
-    - 146
-    - 161
-    - 177
-    - 195
+    levelGoals: c8000000c800000041000000550000006e000000790000008500000092000000a1000000b1000000c3000000i
     levelDurations:
     - 120
     - 180
@@ -633,6 +624,18 @@ MonoBehaviour:
     - 300
     florestaFinishAtDeadline: 0
   selectedLevel: 0
+--- !u!114 &990010007
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 990010001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 40bd17e743e54448b4945ed13cc7d367, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::HayChoriYPaty.StreetKitchenRenderer
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

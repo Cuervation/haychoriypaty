@@ -49,6 +49,7 @@ namespace HayChoriYPaty
         [Min(0f)] public float minPrice = 0f;
         [Min(0f)] public float maxPrice = 60f;
         public float[] productPriceMultipliers = { 1f, 1f, 1f, 1f, 1f, 1f, 1f };
+        public StreetKitchenBalance kitchen = new StreetKitchenBalance();
         [Min(1)] public int minOrderQuantity = 999;
         [Min(1)] public int maxOrderQuantity = 999;
         [Min(0f)] public float initialPrice = 5f;
@@ -174,6 +175,7 @@ namespace HayChoriYPaty
         public int Product { get; internal set; }
         public StreetWorkerRole Role { get; internal set; }
         public int CustomerId { get; internal set; }
+        public int CarriedItemId { get; internal set; }
         public Vector2 Position { get; internal set; }
         public Vector2 Target { get; internal set; }
         public StreetWorkerState State { get; internal set; }
@@ -342,6 +344,7 @@ namespace HayChoriYPaty
         public IReadOnlyList<StreetCustomer> Customers { get { return customers; } }
         public IReadOnlyList<StreetWorker> Workers { get { return workers; } }
         public IReadOnlyList<StreetSale> Sales { get { return sales; } }
+        public StreetKitchenProduction Kitchen { get; private set; }
         public float Elapsed { get; private set; }
         public float DemandFraction
         {
@@ -531,15 +534,16 @@ namespace HayChoriYPaty
             (LevelIndex == 1 && (worker.Product == 0 || worker.Product == 4)) ||
             (LevelIndex == 2 && (worker.Product == 0 || worker.Product == 1 || worker.Product == 4)) ||
             LevelIndex >= 3;
-        private bool UsesExpandedStationRoutes { get { return HasParrilleroPremium; } }
-        private Vector2 StationPositionForWorker(StreetWorker worker) => UsesExpandedStationRoutes
-            ? StreetWorkstationLayout.PickupPosition(worker.Product, true)
-            : StationPositionForLevel(worker.Product, LevelIndex, ProductCount);
+        // All catalogs now use the responsive modular route supplied by StreetKitchenLayout.
+        private bool UsesExpandedStationRoutes { get { return true; } }
+        private Vector2 StationPositionForWorker(StreetWorker worker) => StreetKitchenLayout.PickupPosition(worker.Product);
         private Vector2 StationApproachForWorker(StreetWorker worker) =>
             StationApproachPointForLevel(worker.Product, LevelIndex);
 
         private void StepSlice(float dt)
         {
+            Kitchen.Advance(dt, WorkRate, ParrilleroCount > 0, ParrilleroPremiumCount > 0,
+                CocacoleroCount > 0, FerneteroCount > 0);
             float duration = LevelValue(balance.levelDurations, LevelIndex, DefaultDurations);
             Elapsed = Mathf.Min(duration, Elapsed + dt);
             if (Elapsed >= duration) { Phase = GoalReached ? RoundPhase.Won : RoundPhase.Lost; return; }
@@ -659,7 +663,7 @@ namespace HayChoriYPaty
                     {
                         if (UsesExpandedStationRoutes)
                         {
-                            Vector2[] route = StreetWorkstationLayout.ApproachRoute(w.Product, true);
+                            Vector2[] route = StreetKitchenLayout.ApproachRoute(w.Product);
                             if (w.StationRouteStage < route.Length - 1)
                             {
                                 w.StationRouteStage++;
@@ -694,10 +698,13 @@ namespace HayChoriYPaty
                     w.Delay -= dt;
                     if (w.Delay <= 0f)
                     {
+                        StreetFoodUnit item = Kitchen.TryTake(w.Product, w.Role, w.Id);
+                        if (item == null) { w.Delay = balance.pickupSeconds / WorkRate; continue; }
+                        w.CarriedItemId = item.Id;
                         w.State = StreetWorkerState.ToCounter;
                         if (UsesExpandedStationRoutes)
                         {
-                            Vector2[] route = StreetWorkstationLayout.ApproachRoute(w.Product, true);
+                            Vector2[] route = StreetKitchenLayout.ApproachRoute(w.Product);
                             w.StationRouteStage = route.Length - 2;
                             w.Target = w.StationRouteStage >= 0 ? route[w.StationRouteStage] : CounterHandoffPosition(w.Customer);
                         }
@@ -721,7 +728,7 @@ namespace HayChoriYPaty
                     {
                         if (UsesExpandedStationRoutes && w.StationRouteStage >= 0)
                         {
-                            Vector2[] route = StreetWorkstationLayout.ApproachRoute(w.Product, true);
+                            Vector2[] route = StreetKitchenLayout.ApproachRoute(w.Product);
                             w.StationRouteStage--;
                             w.Target = w.StationRouteStage >= 0 ? route[w.StationRouteStage] : CounterHandoffPosition(w.Customer);
                         }
@@ -832,6 +839,7 @@ namespace HayChoriYPaty
             }
             line.Reserved++;
             worker.Product = line.Product;
+            worker.CarriedItemId = 0;
             worker.Customer = customer;
             worker.CustomerId = customer.Id;
             DispatchToStation(worker);
@@ -841,7 +849,7 @@ namespace HayChoriYPaty
         {
             if (UsesExpandedStationRoutes)
             {
-                Vector2[] route = StreetWorkstationLayout.ApproachRoute(worker.Product, true);
+                Vector2[] route = StreetKitchenLayout.ApproachRoute(worker.Product);
                 worker.StationRouteStage = 0;
                 worker.UsingStationApproach = false;
                 worker.Target = route[0];
@@ -875,8 +883,10 @@ namespace HayChoriYPaty
             StreetOrderLine line = customer != null ? customer.FindOrderLine(worker.Product) : null;
             bool correctSpecialty = IsWorkerResponsibleFor(worker, worker.Product);
             if (IsAtCounter(customer) && customers.Contains(customer) && correctSpecialty && line != null &&
-                line.OwnerWorkerId == worker.Id && line.Reserved > 0 && line.Remaining > 0)
+                line.OwnerWorkerId == worker.Id && line.Reserved > 0 && line.Remaining > 0 &&
+                worker.CarriedItemId > 0 && Kitchen.Consume(worker.CarriedItemId, worker.Product, worker.Id))
             {
+                worker.CarriedItemId = 0;
                 line.Reserved--;
                 line.Remaining--;
                 customer.State = StreetCustomerState.Receiving; customer.ReceiveRemaining = .3f;
@@ -999,6 +1009,7 @@ namespace HayChoriYPaty
 
         private void CancelAssignment(StreetWorker worker)
         {
+            if (worker.CarriedItemId > 0) Kitchen.ReturnCarried(worker.CarriedItemId, worker.Id);
             if (worker.Customer != null)
             {
                 for (int i = 0; i < worker.Customer.OrderLineCount; i++)
@@ -1016,6 +1027,7 @@ namespace HayChoriYPaty
         private static float LevelValue(float[] values, int index, float[] fallback) { return values != null && index < values.Length ? Mathf.Max(.01f, values[index]) : fallback[index]; }
         private void ResetTeamAndSpeed()
         {
+            Kitchen = new StreetKitchenProduction(balance.kitchen, availableProductsByLevel[LevelIndex]);
             workers.Clear();
             nextWorker = 1;
             SpeedLevel = 0; // Zero purchased upgrades means the displayed speed is x1.00.
@@ -1027,7 +1039,7 @@ namespace HayChoriYPaty
             workers.Add(new StreetWorker { Id = nextWorker++, Role = role, Product = -1,
                 Position = WorkerHomePosition, Target = WorkerHomePosition, State = StreetWorkerState.Idle });
         }
-        private void ResetWorker(StreetWorker w) { w.Customer = null; w.CustomerId = 0; w.Product = -1; w.State = StreetWorkerState.Idle; w.UsingStationApproach = false; w.StationRouteStage = 0; w.Target = WorkerHomePosition; }
+        private void ResetWorker(StreetWorker w) { w.Customer = null; w.CustomerId = 0; w.Product = -1; w.CarriedItemId = 0; w.State = StreetWorkerState.Idle; w.UsingStationApproach = false; w.StationRouteStage = 0; w.Target = WorkerHomePosition; }
         private static Vector2 Move(Vector2 from, Vector2 to, float speed, float dt) { return Vector2.MoveTowards(from, to, speed * dt); }
     }
 }
