@@ -36,6 +36,7 @@ namespace HayChoriYPaty.Tests
 
         private static object Get(object target, string name) => target.GetType().GetProperty(name, BindingFlags.Public | BindingFlags.Instance).GetValue(target);
         private static Rect RectProperty(string name) => (Rect)Runtime("StreetKitchenLayout").GetProperty(name, BindingFlags.Public | BindingFlags.Static).GetValue(null);
+        private static float SceneWidth() => (float)Runtime("StreetSceneLayout").GetField("Width", BindingFlags.Public | BindingFlags.Static).GetValue(null);
         private static float WorkerServiceY() => (float)Runtime("StreetSceneLayout").GetField("WorkerServiceY", BindingFlags.Public | BindingFlags.Static).GetValue(null);
 
         [Test]
@@ -87,11 +88,17 @@ namespace HayChoriYPaty.Tests
             Rect beer = RectProperty("BeerBarrelBounds"), coca = RectProperty("CocaBarrelBounds");
             Rect normal = RectProperty("NormalTableBounds"), premium = RectProperty("PremiumTableBounds"), fernet = RectProperty("FernetTableBounds");
             Rect normalGrill = RectProperty("NormalGrillBounds"), premiumGrill = RectProperty("PremiumGrillBounds");
-            Assert.Less(beer.xMax, coca.xMin); Assert.Less(coca.xMax, normal.xMin);
             Assert.Less(normal.xMax, premium.xMin); Assert.Less(premium.xMax, fernet.xMin);
+            Assert.Less(fernet.xMax, coca.xMin); Assert.Less(coca.xMax, beer.xMin);
             Assert.AreEqual(normal.size, premium.size); Assert.AreEqual(normal.size, fernet.size);
+            Assert.AreEqual(beer.size, coca.size);
             Assert.AreEqual(normalGrill.width, premiumGrill.width); Assert.AreEqual(normalGrill.height, premiumGrill.height);
+            Assert.AreEqual(normal.y, premium.y); Assert.AreEqual(normal.y, fernet.y);
+            Assert.AreEqual(normal.y, coca.y); Assert.AreEqual(normal.y, beer.y);
+            Assert.LessOrEqual(normal.xMin, 10f); Assert.GreaterOrEqual(beer.xMax, SceneWidth() - 10f);
             Assert.AreEqual(520f, normal.y); Assert.AreEqual(620f, normalGrill.y);
+            Assert.AreEqual(normalGrill.y, premiumGrill.y);
+            Assert.LessOrEqual(normalGrill.xMin, 10f); Assert.GreaterOrEqual(premiumGrill.xMax, SceneWidth() - 10f);
             Assert.AreEqual(30f, normalGrill.y - normal.yMax, .5f);
             Assert.Less(normalGrill.yMax, 716f, "Kitchen must not cover the upgrade/status band.");
             Assert.GreaterOrEqual(normal.y - WorkerServiceY(), 120f);

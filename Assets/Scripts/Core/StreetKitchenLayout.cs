@@ -21,12 +21,13 @@ namespace HayChoriYPaty
         public const float GrillWidth = 352f * Scale, GrillHeight = 117.3333f * Scale;
         public const float BarrelWidth = 50f * Scale, BarrelHeight = 98f * Scale;
 
-        // Preserve five-slot ordering even when a product is not unlocked. Locked stations remain empty.
-        private static readonly Rect Beer = new Rect(14f * Scale, BarrelY, BarrelWidth, BarrelHeight);
-        private static readonly Rect Coca = new Rect(76f * Scale, BarrelY, BarrelWidth, BarrelHeight);
-        private static readonly Rect NormalTable = new Rect(138f * Scale, TableY, TableWidth, TableHeight);
-        private static readonly Rect PremiumTable = new Rect(346f * Scale, TableY, TableWidth, TableHeight);
-        private static readonly Rect FernetTable = new Rect(554f * Scale, TableY, TableWidth, TableHeight);
+        // Upper row order is Normal, Premium, Fernet, Coca, Beer. Equal 12-unit native
+        // margins/gaps use the available width while preserving the current station sizes.
+        private static readonly Rect NormalTable = new Rect(12f * Scale, TableY, TableWidth, TableHeight);
+        private static readonly Rect PremiumTable = new Rect(220f * Scale, TableY, TableWidth, TableHeight);
+        private static readonly Rect FernetTable = new Rect(428f * Scale, TableY, TableWidth, TableHeight);
+        private static readonly Rect Coca = new Rect(636f * Scale, BarrelY, BarrelWidth, BarrelHeight);
+        private static readonly Rect Beer = new Rect(698f * Scale, BarrelY, BarrelWidth, BarrelHeight);
         private static readonly Rect NormalGrill = new Rect(14f * Scale, GrillY, GrillWidth, GrillHeight);
         private static readonly Rect PremiumGrill = new Rect(394f * Scale, GrillY, GrillWidth, GrillHeight);
 

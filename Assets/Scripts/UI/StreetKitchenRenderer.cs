@@ -178,13 +178,15 @@ namespace HayChoriYPaty
 
         private void SyncStations()
         {
-            EnsureStation("Station_NormalGrill", StreetKitchenLayout.NormalGrillBounds, Available(0) || Available(1));
-            EnsureStation("Station_PremiumGrill", StreetKitchenLayout.PremiumGrillBounds, Available(2) || Available(3));
-            EnsureStation("Station_NormalTable", StreetKitchenLayout.NormalTableBounds, Available(0) || Available(1));
-            EnsureStation("Station_PremiumTable", StreetKitchenLayout.PremiumTableBounds, Available(2) || Available(3));
-            EnsureStation("Station_FernetTable", StreetKitchenLayout.FernetTableBounds, Available(5));
-            EnsureStation("Station_BeerBarrel", StreetKitchenLayout.BeerBarrelBounds, Available(6));
-            EnsureStation("Station_CocaBarrel", StreetKitchenLayout.CocaBarrelBounds, Available(4));
+            // Show all empty furniture shells in a stable layout; simulation availability still
+            // gates every product, item, worker, and stock flow independently.
+            EnsureStation("Station_NormalGrill", StreetKitchenLayout.NormalGrillBounds, true);
+            EnsureStation("Station_PremiumGrill", StreetKitchenLayout.PremiumGrillBounds, true);
+            EnsureStation("Station_NormalTable", StreetKitchenLayout.NormalTableBounds, true);
+            EnsureStation("Station_PremiumTable", StreetKitchenLayout.PremiumTableBounds, true);
+            EnsureStation("Station_FernetTable", StreetKitchenLayout.FernetTableBounds, true);
+            EnsureStation("Station_BeerBarrel", StreetKitchenLayout.BeerBarrelBounds, true);
+            EnsureStation("Station_CocaBarrel", StreetKitchenLayout.CocaBarrelBounds, true);
         }
 
         private bool Available(int product) => simulation != null && simulation.IsProductAvailable(product);
