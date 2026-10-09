@@ -185,8 +185,8 @@ namespace HayChoriYPaty
         public float StepDistance { get; internal set; }
         public Vector2 FacingVector { get; internal set; }
         internal float Delay;
-        internal bool UsingStationApproach;
-        internal int StationRouteStage;
+        internal Vector2[] Route;
+        internal int RouteIndex;
         internal StreetCustomer Customer;
     }
 
@@ -542,17 +542,6 @@ namespace HayChoriYPaty
         private Vector2 WorkerHomePosition => new Vector2(433f, StreetSceneLayout.WorkerServiceY);
         private Vector2 CounterHandoffPosition(StreetCustomer customer) =>
             new Vector2(customer.Target.x, StreetSceneLayout.WorkerServiceY);
-        private bool UsesSideTableRoute(StreetWorker worker) =>
-            (LevelIndex == 0 && worker.Product == 0) ||
-            (LevelIndex == 1 && (worker.Product == 0 || worker.Product == 4)) ||
-            (LevelIndex == 2 && (worker.Product == 0 || worker.Product == 1 || worker.Product == 4)) ||
-            LevelIndex >= 3;
-        // All catalogs now use the responsive modular route supplied by KitchenLayout.
-        private bool UsesExpandedStationRoutes { get { return true; } }
-        private Vector2 StationPositionForWorker(StreetWorker worker) => KitchenLayout.PickupPosition(worker.Product);
-        private Vector2 StationApproachForWorker(StreetWorker worker) =>
-            StationApproachPointForLevel(worker.Product, LevelIndex);
-
         private void StepSlice(float dt)
         {
             Kitchen.Advance(dt, WorkRate, ParrilleroCount > 0, ParrilleroPremiumCount > 0,
@@ -683,39 +672,8 @@ namespace HayChoriYPaty
                 if (w.State == StreetWorkerState.ToStation)
                 {
                     MoveWorker(w, dt);
-                    if (w.Position == w.Target)
-                    {
-                        if (UsesExpandedStationRoutes)
-                        {
-                            Vector2[] route = KitchenLayout.ApproachRoute(w.Product);
-                            if (w.StationRouteStage < route.Length - 1)
-                            {
-                                w.StationRouteStage++;
-                                w.Target = route[w.StationRouteStage];
-                            }
-                            else { w.State = StreetWorkerState.Pickup; w.Delay = balance.pickupSeconds / WorkRate; }
-                        }
-                        else if (LevelIndex >= 3)
-                        {
-                            if (w.StationRouteStage == 0)
-                            {
-                                w.StationRouteStage = 1;
-                                w.Target = NewLevelStationRoutePoint(w, 1);
-                            }
-                            else if (w.StationRouteStage == 1)
-                            {
-                                w.StationRouteStage = 2;
-                                w.Target = StationPositionForWorker(w);
-                            }
-                            else { w.State = StreetWorkerState.Pickup; w.Delay = balance.pickupSeconds / WorkRate; }
-                        }
-                        else if (w.UsingStationApproach)
-                        {
-                            w.UsingStationApproach = false;
-                            w.Target = StationPositionForWorker(w);
-                        }
-                        else { w.State = StreetWorkerState.Pickup; w.Delay = balance.pickupSeconds / WorkRate; }
-                    }
+                    if (w.Position == w.Target && AdvanceWorkerRoute(w))
+                    { w.State = StreetWorkerState.Pickup; w.Delay = balance.pickupSeconds / WorkRate; }
                 }
                 else if (w.State == StreetWorkerState.Pickup)
                 {
@@ -726,62 +684,14 @@ namespace HayChoriYPaty
                         if (item == null) { w.Delay = balance.pickupSeconds / WorkRate; continue; }
                         w.CarriedItemId = item.Id;
                         w.State = StreetWorkerState.ToCounter;
-                        if (UsesExpandedStationRoutes)
-                        {
-                            Vector2[] route = KitchenLayout.ApproachRoute(w.Product);
-                            w.StationRouteStage = route.Length - 2;
-                            w.Target = w.StationRouteStage >= 0 ? route[w.StationRouteStage] : CounterHandoffPosition(w.Customer);
-                        }
-                        else if (LevelIndex >= 3)
-                        {
-                            w.StationRouteStage = 1;
-                            w.UsingStationApproach = false;
-                            w.Target = NewLevelStationRoutePoint(w, 1);
-                        }
-                        else
-                        {
-                            w.UsingStationApproach = UsesSideTableRoute(w);
-                            w.Target = w.UsingStationApproach ? StationApproachForWorker(w) : CounterHandoffPosition(w.Customer);
-                        }
+                        if (!SetWorkerRoute(w, CounterHandoffPosition(w.Customer))) { CancelAssignment(w); continue; }
                     }
                 }
                 else if (w.State == StreetWorkerState.ToCounter)
                 {
                     MoveWorker(w, dt);
-                    if (w.Position == w.Target)
-                    {
-                        if (UsesExpandedStationRoutes && w.StationRouteStage >= 0)
-                        {
-                            Vector2[] route = KitchenLayout.ApproachRoute(w.Product);
-                            w.StationRouteStage--;
-                            w.Target = w.StationRouteStage >= 0 ? route[w.StationRouteStage] : CounterHandoffPosition(w.Customer);
-                        }
-                        else if (UsesExpandedStationRoutes)
-                        {
-                            w.State = StreetWorkerState.Handoff; w.Delay = balance.pickupSeconds / WorkRate;
-                        }
-                        else if (LevelIndex >= 3 && w.StationRouteStage == 1)
-                        {
-                            w.StationRouteStage = 0;
-                            w.Target = NewLevelStationRoutePoint(w, 0);
-                        }
-                        else if (LevelIndex >= 3 && w.StationRouteStage == 0)
-                        {
-                            // Leave the kitchen lane at the outside corner, then move to this customer's counter slot.
-                            w.StationRouteStage = -1;
-                            w.Target = CounterHandoffPosition(w.Customer);
-                        }
-                        else if (LevelIndex >= 3)
-                        {
-                            w.State = StreetWorkerState.Handoff; w.Delay = balance.pickupSeconds / WorkRate;
-                        }
-                        else if (w.UsingStationApproach)
-                        {
-                            w.UsingStationApproach = false;
-                            w.Target = CounterHandoffPosition(w.Customer);
-                        }
-                        else { w.State = StreetWorkerState.Handoff; w.Delay = balance.pickupSeconds / WorkRate; }
-                    }
+                    if (w.Position == w.Target && AdvanceWorkerRoute(w))
+                    { w.State = StreetWorkerState.Handoff; w.Delay = balance.pickupSeconds / WorkRate; }
                 }
                 else if (w.State == StreetWorkerState.Handoff)
                 {
@@ -871,31 +781,35 @@ namespace HayChoriYPaty
 
         private void DispatchToStation(StreetWorker worker)
         {
-            if (UsesExpandedStationRoutes)
-            {
-                Vector2[] route = KitchenLayout.ApproachRoute(worker.Product);
-                worker.StationRouteStage = 0;
-                worker.UsingStationApproach = false;
-                worker.Target = route[0];
-            }
-            else if (LevelIndex >= 3)
-            {
-                worker.StationRouteStage = 0;
-                worker.UsingStationApproach = false;
-                worker.Target = NewLevelStationRoutePoint(worker, 0);
-            }
-            else
-            {
-                worker.UsingStationApproach = UsesSideTableRoute(worker);
-                worker.Target = worker.UsingStationApproach ? StationApproachForWorker(worker) : StationPositionForWorker(worker);
-            }
+            if (!SetWorkerRoute(worker, KitchenLayout.PickupPosition(worker.Product))) { CancelAssignment(worker); return; }
             worker.State = StreetWorkerState.ToStation;
         }
 
-        private Vector2 NewLevelStationRoutePoint(StreetWorker worker, int stage)
+        private bool SetWorkerRoute(StreetWorker worker, Vector2 destination)
         {
-            // Cross the open upper lane before approaching the shared side pickups.
-            return stage == 0 ? StreetWorkstationLayout.KitchenEntry : StreetWorkstationLayout.ApproachPosition(worker.Product);
+            worker.Route = KitchenLayout.FindShortestSafeRoute(worker.Position, destination);
+            if (worker.Route == null)
+            {
+                worker.RouteIndex = 0;
+                worker.Target = worker.Position;
+                return false;
+            }
+            worker.RouteIndex = 0;
+            worker.Target = worker.Route.Length > 0 ? worker.Route[0] : destination;
+            return true;
+        }
+
+        private static bool AdvanceWorkerRoute(StreetWorker worker)
+        {
+            worker.RouteIndex++;
+            if (worker.Route != null && worker.RouteIndex < worker.Route.Length)
+            {
+                worker.Target = worker.Route[worker.RouteIndex];
+                return false;
+            }
+            worker.Route = null;
+            worker.RouteIndex = 0;
+            return true;
         }
 
         private static bool HasOutstandingItems(StreetCustomer customer) =>
@@ -1063,7 +977,7 @@ namespace HayChoriYPaty
             workers.Add(new StreetWorker { Id = nextWorker++, Role = role, Product = -1,
                 Position = WorkerHomePosition, Target = WorkerHomePosition, State = StreetWorkerState.Idle });
         }
-        private void ResetWorker(StreetWorker w) { w.StepDistance = 0f; w.Customer = null; w.CustomerId = 0; w.Product = -1; w.CarriedItemId = 0; w.State = StreetWorkerState.Idle; w.UsingStationApproach = false; w.StationRouteStage = 0; w.Target = WorkerHomePosition; }
+        private void ResetWorker(StreetWorker w) { w.StepDistance = 0f; w.Customer = null; w.CustomerId = 0; w.Product = -1; w.CarriedItemId = 0; w.State = StreetWorkerState.Idle; w.Route = null; w.RouteIndex = 0; w.Target = w.Position; }
         private static Vector2 Move(Vector2 from, Vector2 to, float speed, float dt) { return Vector2.MoveTowards(from, to, speed * dt); }
     }
 }

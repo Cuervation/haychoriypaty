@@ -1,5 +1,13 @@
 # Technical decision log
 
+## 2026-10-08 — Ten-point clearance for grills
+
+Set the common prep-row-to-grill gap to10 logical units. Preserve table/barrel sprite sizes and prevent barrel/grill overlap by aligning barrel bounds with the table row bottoms; move barrel pickup anchors with that small station shift.
+
+## 2026-10-08 — Shortest safe employee routes
+
+Use catalog-derived visibility routing around active physical station solids expanded by the worker's36×12 feet, preferring a clear direct/diagonal segment. Recalculate outbound, return, and subsequent-unit legs from the employee's actual position; never reverse a fixed route or force a trip home. Do not add worker-vs-worker collision, NavMesh, or packages.
+
 ## 2026-10-08 — Native distance-driven worker cutouts
 
 Reuse original contact/carry poses and 20 missing-direction poses through pooled torso/leg/finger SpriteRenderers in the existing kitchen camera. Compose two contact and two passing samples per direction, advancing by actual traveled distance rather than idle AnimationTime. Worker palm anchors and real carried objects share depth/scale; do not bake product copies or add an animation camera. This preserves worker proportions and gameplay while avoiding per-frame texture work. Release cached sprites before their palette textures on view disable.

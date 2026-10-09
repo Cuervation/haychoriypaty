@@ -9,11 +9,13 @@ namespace HayChoriYPaty
         public const float SourceWidth = 760f;
         public const float Scale = StreetSceneLayout.Width / SourceWidth;
         public const float TableY = 466f;
-        public const float BarrelY = 466f;
+        public const float GrillVerticalGap = 10f;
+        // Align the taller barrels to the table bottoms so the whole prep row shares the requested grill clearance.
+        public const float BarrelY = TableY + TableHeight - BarrelHeight;
         public const float WorkerLaneY = 450f;
         public const float TablePickupY = 502f;
         public const float GrillPickupY = 554f;
-        public const float BarrelPickupY = 454f;
+        public const float BarrelPickupY = BarrelY - 12f;
         public const float TableWidth = 196f * Scale, TableHeight = 98f * Scale;
         public const float BarrelAuthoredWidth = 72f, BarrelAuthoredHeight = 117.6f;
         public const float BarrelWidth = BarrelAuthoredWidth * Scale, BarrelHeight = BarrelAuthoredHeight * Scale;
@@ -26,6 +28,11 @@ namespace HayChoriYPaty
         private readonly bool hasNormal, hasPremium, hasFernet, hasCoca, hasBeer;
         private readonly Rect normalTable, premiumTable, fernetTable, cocaBarrel, beerBarrel;
         private readonly Rect normalGrill, premiumGrill;
+        // Route obstacles describe the actual solid bases expanded by the worker's 36x12 foot collider.
+        private readonly List<Rect> routeObstacles = new List<Rect>();
+        private readonly List<Vector2> routeVertices = new List<Vector2>();
+        private const float RouteClearance = 0f;
+        private const float RouteVertexOffset = .05f;
         private static readonly Vector2[] BarrelDrinkScatter =
         {
             new Vector2(.18f, .055f), new Vector2(.31f, .085f), new Vector2(.44f, .05f),
@@ -68,6 +75,7 @@ namespace HayChoriYPaty
             Rect normalG, premiumG;
             PackGrills(out normalG, out premiumG);
             normalGrill = normalG; premiumGrill = premiumG;
+            BuildRouteGeometry(available);
         }
 
         private void PackUpperRow(out Rect normal, out Rect premium, out Rect fernet, out Rect coca, out Rect beer)
@@ -105,7 +113,7 @@ namespace HayChoriYPaty
             if (hasCoca) upperBottom = Mathf.Max(upperBottom, cocaBarrel.yMax);
             if (hasBeer) upperBottom = Mathf.Max(upperBottom, beerBarrel.yMax);
             // Keep both standard grills below the active prep row and entirely above the lower UI field.
-            float grillY = upperBottom + 12f;
+            float grillY = upperBottom + GrillVerticalGap;
             float nativeWidth = 352f;
             if (hasNormal && hasPremium)
             {
@@ -156,16 +164,171 @@ namespace HayChoriYPaty
             return new Vector2(safeX, y);
         }
 
-        /// <summary>Walk via the clear upper lane, then approach the service edge without crossing a station base.</summary>
+        /// <summary>Shortest safe route from the initial counter position to this product's pickup.</summary>
         public Vector2[] ApproachRoute(int product)
         {
-            Vector2 pickup = PickupPosition(product);
-            float approachY = product < 4 || product == 5 ? TablePickupY : BarrelPickupY;
-            Vector2 lane = new Vector2(pickup.x, WorkerLaneY);
-            Vector2 approach = new Vector2(pickup.x, approachY);
-            var result = new List<Vector2> { new Vector2(StreetSceneLayout.Width * .5f, WorkerLaneY) };
-            if (Mathf.Abs(result[0].x - lane.x) > 1f) result.Add(lane);
-            if (Mathf.Abs(lane.y - approach.y) > 1f) result.Add(approach);
+            return FindShortestSafeRoute(new Vector2(433f, StreetSceneLayout.WorkerServiceY), PickupPosition(product));
+        }
+
+        /// <summary>Returns waypoints excluding start and including destination; return paths are queried independently.</summary>
+        public Vector2[] FindShortestSafeRoute(Vector2 start, Vector2 destination)
+        {
+            if (start == destination) return new Vector2[0];
+            if (IsRouteSegmentClear(start, destination)) return new[] { destination };
+
+            var points = new List<Vector2>(routeVertices.Count + 2) { start };
+            points.AddRange(routeVertices);
+            points.Add(destination);
+            int last = points.Count - 1;
+            var distances = new float[points.Count];
+            var previous = new int[points.Count];
+            var visited = new bool[points.Count];
+            for (int i = 0; i < distances.Length; i++) { distances[i] = float.PositiveInfinity; previous[i] = -1; }
+            distances[0] = 0f;
+
+            for (int iteration = 0; iteration < points.Count; iteration++)
+            {
+                int current = -1;
+                float best = float.PositiveInfinity;
+                for (int i = 0; i < points.Count; i++)
+                    if (!visited[i] && distances[i] < best) { current = i; best = distances[i]; }
+                if (current < 0 || current == last) break;
+                visited[current] = true;
+                for (int next = 1; next < points.Count; next++)
+                {
+                    if (visited[next] || next == current || !IsRouteSegmentClear(points[current], points[next])) continue;
+                    float candidate = best + Vector2.Distance(points[current], points[next]);
+                    if (candidate + .0001f < distances[next]) { distances[next] = candidate; previous[next] = current; }
+                }
+            }
+
+            if (previous[last] < 0) return null;
+            var reversed = new List<Vector2>();
+            for (int at = last; at > 0; at = previous[at])
+            {
+                if (at < 0) return null;
+                reversed.Add(points[at]);
+            }
+            reversed.Reverse();
+            return SimplifyRoute(reversed);
+        }
+
+        /// <summary>Checks the complete swept feet-center segment against all active solid bases.</summary>
+        public bool IsRouteSegmentClear(Vector2 start, Vector2 end)
+        {
+            float halfWidth = StreetWorkstationLayout.FootHalfWidth;
+            if (start.x < halfWidth || start.x > StreetSceneLayout.Width - halfWidth ||
+                end.x < halfWidth || end.x > StreetSceneLayout.Width - halfWidth ||
+                start.y < 12f || start.y > StreetSceneLayout.Height ||
+                end.y < 12f || end.y > StreetSceneLayout.Height) return false;
+            for (int i = 0; i < routeObstacles.Count; i++)
+                if (SegmentEntersOpenRect(start, end, routeObstacles[i])) return false;
+            return true;
+        }
+
+        private void BuildRouteGeometry(bool[] available)
+        {
+            var solidBases = new List<Rect>();
+            for (int product = 0; product < available.Length; product++)
+            {
+                if (!available[product]) continue;
+                Rect footprint = FootprintForProduct(product);
+                if (footprint.width > 0f && !solidBases.Contains(footprint)) solidBases.Add(footprint);
+            }
+            if (hasNormal && normalGrill.width > 0f) solidBases.Add(normalGrill);
+            if (hasPremium && premiumGrill.width > 0f) solidBases.Add(premiumGrill);
+            for (int i = 0; i < solidBases.Count; i++)
+            {
+                Rect solid = solidBases[i];
+                routeObstacles.Add(new Rect(
+                    solid.xMin - StreetWorkstationLayout.FootHalfWidth - RouteClearance,
+                    solid.yMin - RouteClearance,
+                    solid.width + StreetWorkstationLayout.FootHalfWidth * 2f + RouteClearance * 2f,
+                    solid.height + 12f + RouteClearance * 2f));
+            }
+            BuildVisibilityVertices();
+        }
+
+        // A shortest path around axis-aligned solids only turns at exposed convex vertices of their union.
+        private void BuildVisibilityVertices()
+        {
+            var xs = new List<float>();
+            var ys = new List<float>();
+            for (int i = 0; i < routeObstacles.Count; i++)
+            {
+                AddUnique(xs, routeObstacles[i].xMin); AddUnique(xs, routeObstacles[i].xMax);
+                AddUnique(ys, routeObstacles[i].yMin); AddUnique(ys, routeObstacles[i].yMax);
+            }
+            xs.Sort(); ys.Sort();
+            const float sample = .01f;
+            for (int xi = 0; xi < xs.Count; xi++)
+            for (int yi = 0; yi < ys.Count; yi++)
+            {
+                float x = xs[xi], y = ys[yi];
+                int occupied = 0, blockedX = 0, blockedY = 0;
+                for (int sx = -1; sx <= 1; sx += 2)
+                for (int sy = -1; sy <= 1; sy += 2)
+                    if (IsInsideObstacle(new Vector2(x + sx * sample, y + sy * sample)))
+                    { occupied++; blockedX = sx; blockedY = sy; }
+                if (occupied != 1) continue;
+                Vector2 vertex = new Vector2(x - blockedX * RouteVertexOffset, y - blockedY * RouteVertexOffset);
+                if (!IsRoutePointClear(vertex)) continue;
+                bool duplicate = false;
+                for (int i = 0; i < routeVertices.Count; i++)
+                    if ((routeVertices[i] - vertex).sqrMagnitude < .0001f) { duplicate = true; break; }
+                if (!duplicate) routeVertices.Add(vertex);
+            }
+        }
+
+        private static void AddUnique(List<float> values, float value)
+        {
+            for (int i = 0; i < values.Count; i++) if (Mathf.Abs(values[i] - value) < .001f) return;
+            values.Add(value);
+        }
+
+        private bool IsInsideObstacle(Vector2 point)
+        {
+            for (int i = 0; i < routeObstacles.Count; i++)
+                if (point.x > routeObstacles[i].xMin && point.x < routeObstacles[i].xMax &&
+                    point.y > routeObstacles[i].yMin && point.y < routeObstacles[i].yMax) return true;
+            return false;
+        }
+
+        private bool IsRoutePointClear(Vector2 point) =>
+            point.x >= StreetWorkstationLayout.FootHalfWidth && point.x <= StreetSceneLayout.Width - StreetWorkstationLayout.FootHalfWidth &&
+            point.y >= 12f && point.y <= StreetSceneLayout.Height && !IsInsideObstacle(point);
+
+        private static bool SegmentEntersOpenRect(Vector2 start, Vector2 end, Rect rect)
+        {
+            float minT = 0f, maxT = 1f;
+            if (!ClipSegmentAxis(start.x, end.x - start.x, rect.xMin, rect.xMax, ref minT, ref maxT) ||
+                !ClipSegmentAxis(start.y, end.y - start.y, rect.yMin, rect.yMax, ref minT, ref maxT)) return false;
+            return maxT - minT > .000001f && maxT > 0f && minT < 1f;
+        }
+
+        private static bool ClipSegmentAxis(float origin, float delta, float min, float max, ref float minT, ref float maxT)
+        {
+            if (Mathf.Abs(delta) < .000001f) return origin > min && origin < max;
+            float first = (min - origin) / delta, second = (max - origin) / delta;
+            if (first > second) { float swap = first; first = second; second = swap; }
+            minT = Mathf.Max(minT, first); maxT = Mathf.Min(maxT, second);
+            return maxT > minT;
+        }
+
+        private static Vector2[] SimplifyRoute(List<Vector2> route)
+        {
+            if (route.Count < 3) return route.ToArray();
+            var result = new List<Vector2>(route.Count);
+            for (int i = 0; i < route.Count; i++)
+            {
+                while (result.Count >= 2)
+                {
+                    Vector2 a = result[result.Count - 2], b = result[result.Count - 1], c = route[i];
+                    if (Mathf.Abs((b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x)) > .001f) break;
+                    result.RemoveAt(result.Count - 1);
+                }
+                result.Add(route[i]);
+            }
             return result.ToArray();
         }
 

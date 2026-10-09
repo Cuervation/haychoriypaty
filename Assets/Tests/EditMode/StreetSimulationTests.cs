@@ -74,10 +74,11 @@ namespace HayChoriYPaty.Tests
             ? Workstations.GetMethod("PickupPosition", new[] { typeof(int), typeof(bool) }).Invoke(null, new object[] { product, true })
             : Workstations.GetMethod("PickupPosition", new[] { typeof(int) }).Invoke(null, new object[] { product }));
         private static Rect WorkerBounds(string method, Vector2 position) => (Rect)Workstations.GetMethod(method, new[] { typeof(Vector2) }).Invoke(null, new object[] { position });
-        private static Rect KitchenFootprint(int product) => (Rect)KitchenLayout.GetMethod("FootprintForProduct").Invoke(null, new object[] { product });
-        private static Rect KitchenGrillBounds(int product) => (Rect)KitchenLayout.GetMethod("GrillBoundsForProduct").Invoke(null, new object[] { product });
-        private static Vector2 KitchenPickupPosition(int product) => (Vector2)KitchenLayout.GetMethod("PickupPosition").Invoke(null, new object[] { product });
-        private static Vector2[] KitchenApproachRoute(int product) => (Vector2[])KitchenLayout.GetMethod("ApproachRoute").Invoke(null, new object[] { product });
+        private static Rect KitchenFootprint(object layout, int product) => (Rect)KitchenLayout.GetMethod("FootprintForProduct").Invoke(layout, new object[] { product });
+        private static Rect KitchenGrillBounds(object layout, int product) => (Rect)KitchenLayout.GetMethod("GrillBoundsForProduct").Invoke(layout, new object[] { product });
+        private static Vector2 KitchenPickupPosition(object layout, int product) => (Vector2)KitchenLayout.GetMethod("PickupPosition").Invoke(layout, new object[] { product });
+        private static Vector2[] KitchenShortestRoute(object layout, Vector2 start, Vector2 destination) =>
+            (Vector2[])KitchenLayout.GetMethod("FindShortestSafeRoute").Invoke(layout, new object[] { start, destination });
         private static Rect KitchenWorkerFootBounds(Vector2 position) => new Rect(position.x - 18f, position.y - 12f, 36f, 12f);
 
         [TestCase(0)] [TestCase(4)] [TestCase(5)] [TestCase(6)]
@@ -135,6 +136,7 @@ namespace HayChoriYPaty.Tests
             for (int column = 0; column < 7; column++)
             {
                 object sim = Make(staff: level == 0 ? 1 : 2, level: level, balance: balance); Start(sim);
+                object kitchenLayout = Get(sim, "KitchenLayout");
                 object requiredRole = Type.GetType("HayChoriYPaty.StreetSpecialties, Assembly-CSharp", true)
                     .GetMethod("GetRequiredWorkerRole", BindingFlags.Public | BindingFlags.Static).Invoke(null, new object[] { product });
                 if ((int)Call(sim, "WorkerCount", requiredRole) == 0)
@@ -150,35 +152,56 @@ namespace HayChoriYPaty.Tests
                 var props = new System.Collections.Generic.List<Rect>();
                 foreach (int visibleProduct in AvailableProducts(sim))
                 {
-                    Rect footprint = KitchenFootprint(visibleProduct);
+                    Rect footprint = KitchenFootprint(kitchenLayout, visibleProduct);
                     if (!props.Contains(footprint)) props.Add(footprint);
                     if (visibleProduct < 4)
                     {
-                        Rect grill = KitchenGrillBounds(visibleProduct);
+                        Rect grill = KitchenGrillBounds(kitchenLayout, visibleProduct);
                         if (!props.Contains(grill)) props.Add(grill);
                     }
                 }
                 bool picked = false, carried = false, handed = false;
-                Vector2[] expectedRoute = KitchenApproachRoute(product);
+                bool firstDeliveryAtHandoff = false, secondTripStartedFromThatHandoff = false;
+                Vector2 firstDeliveryPosition = Vector2.zero;
+                int assignedWorkerId = 0;
                 for (int frame = 0; frame < 3000 && (int)Get(sim, "Delivered") < 2; frame++)
                 {
                     Step(sim, .01f);
                     foreach (object worker in (IList)Get(sim, "Workers"))
                     {
-                        int p = (int)Get(worker, "Product"); if (p < 0) continue;
+                        int p = (int)Get(worker, "Product");
                         Vector2 feet = (Vector2)Get(worker, "Position"); string state = Get(worker, "State").ToString();
+                        int workerId = (int)Get(worker, "Id");
+                        if (p == product && state != "Idle" && assignedWorkerId == 0) assignedWorkerId = workerId;
+                        if (workerId == assignedWorkerId && assignedWorkerId > 0 && !secondTripStartedFromThatHandoff &&
+                            (int)Get(sim, "Delivered") == 1 && state == "ToStation")
+                        {
+                            firstDeliveryPosition = feet;
+                            firstDeliveryAtHandoff = true;
+                            Assert.AreEqual(new Vector2(target.x, WorkerServiceY), feet, "The next unit starts where the first was handed to this customer.");
+                            Vector2[] nextTrip = KitchenShortestRoute(kitchenLayout, firstDeliveryPosition, KitchenPickupPosition(kitchenLayout, product));
+                            Assert.Greater(nextTrip.Length, 0);
+                            Assert.AreEqual(nextTrip[0], Get(worker, "Target"), "A successive unit starts from the prior handoff position.");
+                            if (column == 0) Assert.Greater(Vector2.Distance(firstDeliveryPosition, new Vector2(433f, WorkerServiceY)), 1f,
+                                "This customer is away from home, so the next route demonstrably starts at the prior handoff.");
+                            secondTripStartedFromThatHandoff = true;
+                        }
+                        if (p < 0) continue;
                         foreach (Rect prop in props)
                         {
                             Assert.IsFalse(KitchenWorkerFootBounds(feet).Overlaps(prop),
                                 "Worker product " + p + " feet at " + feet + " crossed prop " + prop + " in " + state);
                         }
-                        if (state == "Pickup") { picked = true; Assert.AreEqual(KitchenPickupPosition(product), feet); }
+                        if (state == "Pickup") { picked = true; Assert.AreEqual(KitchenPickupPosition(kitchenLayout, product), feet); }
                         if (state == "ToCounter")
                         {
                             carried = true;
-                            int reverseStage = (int)Get(worker, "StationRouteStage");
-                            if (reverseStage >= 0)
-                                Assert.AreEqual(expectedRoute[reverseStage], Get(worker, "Target"), "Return trip follows the outbound route in reverse.");
+                            Vector2[] independentReturn = KitchenShortestRoute(kitchenLayout, KitchenPickupPosition(kitchenLayout, product), new Vector2(target.x, WorkerServiceY));
+                            Assert.Greater(independentReturn.Length, 0);
+                            Vector2[] activeReturn = (Vector2[])Get(worker, "Route");
+                            CollectionAssert.AreEqual(independentReturn, activeReturn, "The return trip is recalculated from pickup to this customer's handoff.");
+                            int activeReturnIndex = (int)Get(worker, "RouteIndex");
+                            Assert.AreEqual(activeReturn[activeReturnIndex], Get(worker, "Target"));
                         }
                         if (state == "Handoff")
                         {
@@ -189,6 +212,7 @@ namespace HayChoriYPaty.Tests
                     }
                 }
                 Assert.IsTrue(picked && carried && handed);
+                Assert.IsTrue(firstDeliveryAtHandoff && secondTripStartedFromThatHandoff, "Two-unit orders reuse the worker from its real current position without a return-home leg.");
                 Assert.AreEqual(2, Get(sim, "Delivered")); Assert.AreEqual(10, Get(sim, "Coins"));
                 Assert.AreEqual(0, Get(client, "Reserved"));
                 foreach (object worker in (IList)Get(sim, "Workers")) Assert.AreEqual("Idle", Get(worker, "State").ToString());
@@ -544,14 +568,15 @@ namespace HayChoriYPaty.Tests
             Tune(balance, "customerArrivalSeconds", 1000f);
             object sim = Make(staff: 2, level: 1, balance: balance); Start(sim);
             Assert.IsTrue((bool)Call(sim, "SpawnCustomer", 0, 2, 4, 2));
+            object kitchenLayout = Get(sim, "KitchenLayout");
             var props = new System.Collections.Generic.List<Rect>();
             foreach (int product in AvailableProducts(sim))
             {
-                Rect footprint = KitchenFootprint(product);
+                Rect footprint = KitchenFootprint(kitchenLayout, product);
                 if (!props.Contains(footprint)) props.Add(footprint);
                 if (product < 4)
                 {
-                    Rect grill = KitchenGrillBounds(product);
+                    Rect grill = KitchenGrillBounds(kitchenLayout, product);
                     if (!props.Contains(grill)) props.Add(grill);
                 }
             }
@@ -571,7 +596,7 @@ namespace HayChoriYPaty.Tests
                     if (state == "Pickup")
                     {
                         picked[role] = true;
-                        Assert.AreEqual(KitchenPickupPosition(role == 0 ? 0 : 4), position);
+                        Assert.AreEqual(KitchenPickupPosition(kitchenLayout, role == 0 ? 0 : 4), position);
                         Assert.AreEqual(role == 0 ? 0 : 4, Get(worker, "Product"));
                     }
                     if (state == "ToCounter") carried[role] = true;

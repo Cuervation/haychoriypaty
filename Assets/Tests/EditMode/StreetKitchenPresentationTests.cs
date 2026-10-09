@@ -117,7 +117,8 @@ namespace HayChoriYPaty.Tests
                 Assert.AreEqual(gap, top[0].xMin, .02f, "First active prep station should use the responsive row margin.");
                 for (int i = 0; i < top.Count; i++)
                 {
-                    Assert.AreEqual(LayoutConstant("TableY"), top[i].y, .02f, "All active prep stations share the raised upper row.");
+                    float expectedY = top[i].width > 100f ? LayoutConstant("TableY") : LayoutConstant("BarrelY");
+                    Assert.AreEqual(expectedY, top[i].y, .02f, "Tables and barrels align by their lower edges while keeping their authored heights.");
                     Assert.Greater(top[i].width, 0f);
                     if (i > 0) Assert.AreEqual(gap, top[i].xMin - top[i - 1].xMax, .02f, "Hidden stations must not leave row holes.");
                     if (top[i].width > 100f)
@@ -153,8 +154,12 @@ namespace HayChoriYPaty.Tests
                     Assert.GreaterOrEqual(grills[1].xMax, width - 10f);
                 }
                 foreach (Rect grill in grills)
+                {
+                    Assert.AreEqual(LayoutConstant("GrillVerticalGap"), grill.yMin - Mathf.Max(top.ConvertAll(item => item.yMax).ToArray()), .02f,
+                        "The complete active prep row must remain ten logical points above the grills.");
                     Assert.LessOrEqual(grill.yMax, LayoutConstant("GrillBottomLimit") + .02f,
                         "Every grill must remain completely on the tiled playfield above the lower UI field.");
+                }
                 foreach (Rect item in top) foreach (Rect grill in grills) Assert.IsFalse(item.Overlaps(grill));
             }
             Assert.AreEqual(196f * (width / (float)LayoutConstant("SourceWidth")), tableSize.Value.width, .02f);
@@ -225,8 +230,11 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void EveryCatalogRouteUsesItsDynamicStationBoundsAndClearsActiveBases()
+        public void EveryCatalogJourneyUsesShortestSafePathsInBothDirectionsAndReportsSavings()
         {
+            Vector2 home = new Vector2(433f, WorkerServiceY());
+            float oldDistanceTotal = 0f, newDistanceTotal = 0f, percentageTotal = 0f, maxPercentage = 0f;
+            int journeys = 0;
             for (int level = 0; level < 11; level++)
             {
                 object sim = Simulation(level), layout = Layout(sim);
@@ -242,26 +250,126 @@ namespace HayChoriYPaty.Tests
                 for (int product = 0; product < 7; product++)
                 {
                     if (!(bool)Call(sim, "IsProductAvailable", product)) continue;
-                    Vector2[] route = (Vector2[])Call(layout, "ApproachRoute", product);
-                    Assert.GreaterOrEqual(route.Length, 2);
-                    Assert.AreEqual((Vector2)Call(layout, "PickupPosition", product), route[route.Length - 1]);
+                    Vector2 pickup = (Vector2)Call(layout, "PickupPosition", product);
+                    Vector2[] legacy = LegacyApproachRoute(product, pickup);
+                    Vector2[] fromHome = (Vector2[])Call(layout, "FindShortestSafeRoute", home, pickup);
+                    Assert.Greater(fromHome.Length, 0, "L" + level + " P" + product + " initial home route exists");
+                    AssertRouteClear(layout, home, fromHome, allBases, "L" + level + " P" + product + " initial home");
+
                     for (int column = 0; column < 7; column++)
                     {
-                        Vector2 from = new Vector2(58 + column * 70, WorkerServiceY());
-                        foreach (Vector2 to in route)
-                        {
-                            for (int step = 0; step <= 100; step++)
-                            {
-                                Vector2 feet = Vector2.Lerp(from, to, step / 100f);
-                                Rect footBounds = new Rect(feet.x - 18f, feet.y - 12f, 36f, 12f);
-                                foreach (Rect baseRect in allBases)
-                                    Assert.IsFalse(footBounds.Overlaps(baseRect), "L" + level + " P" + product + " feet " + footBounds + " base " + baseRect);
-                            }
-                            from = to;
-                        }
+                        Vector2 handoff = new Vector2(58 + column * 70, WorkerServiceY());
+                        Vector2[] outbound = (Vector2[])Call(layout, "FindShortestSafeRoute", handoff, pickup);
+                        Assert.Greater(outbound.Length, 0, "L" + level + " P" + product + " C" + column + " outbound route exists");
+                        Assert.AreEqual(pickup, outbound[outbound.Length - 1]);
+                        AssertRouteClear(layout, handoff, outbound, allBases, "L" + level + " P" + product + " C" + column + " outbound");
+                        float oldOut = PathDistance(handoff, legacy);
+                        float newOut = PathDistance(handoff, outbound);
+                        Assert.LessOrEqual(newOut, oldOut + .01f, "L" + level + " P" + product + " C" + column + " outbound cannot exceed the former center-lane route.");
+                        AccumulateRouteSavings(oldOut, newOut, ref oldDistanceTotal, ref newDistanceTotal, ref percentageTotal, ref maxPercentage, ref journeys);
+
+                        Vector2[] returning = (Vector2[])Call(layout, "FindShortestSafeRoute", pickup, handoff);
+                        Assert.Greater(returning.Length, 0, "L" + level + " P" + product + " C" + column + " return route exists");
+                        Assert.AreEqual(handoff, returning[returning.Length - 1]);
+                        AssertRouteClear(layout, pickup, returning, allBases, "L" + level + " P" + product + " C" + column + " return");
+
+                        var oldReturn = new List<Vector2>();
+                        for (int i = legacy.Length - 2; i >= 0; i--) oldReturn.Add(legacy[i]);
+                        oldReturn.Add(handoff);
+                        float oldBack = PathDistance(pickup, oldReturn.ToArray());
+                        float newBack = PathDistance(pickup, returning);
+                        Assert.LessOrEqual(newBack, oldBack + .01f, "L" + level + " P" + product + " C" + column + " return cannot exceed the former reversed route.");
+                        AccumulateRouteSavings(oldBack, newBack, ref oldDistanceTotal, ref newDistanceTotal, ref percentageTotal, ref maxPercentage, ref journeys);
                     }
                 }
             }
+            Assert.Greater(journeys, 0);
+            TestContext.WriteLine("Shortest-route baseline: " + journeys + " outbound/return journeys; average per-journey distance reduction " + (percentageTotal / journeys).ToString("F1") + "%; max " + maxPercentage.ToString("F1") + "%; aggregate reduction " + ((1f - newDistanceTotal / oldDistanceTotal) * 100f).ToString("F1") + "%.");
+        }
+
+        [Test]
+        public void VisibilityRouteGoesAroundActualWorkerFootObstacleWithoutDetoursOnClearSegments()
+        {
+            object layout = Layout(Simulation(0));
+            Rect baseRect = (Rect)Call(layout, "FootprintForProduct", 0);
+            Vector2 start = new Vector2(baseRect.xMin - 60f, baseRect.center.y);
+            Vector2 destination = new Vector2(baseRect.xMax + 60f, baseRect.center.y);
+            Vector2[] route = (Vector2[])Call(layout, "FindShortestSafeRoute", start, destination);
+            Assert.Greater(route.Length, 1, "The straight segment crosses the real table base, so a safe detour is required.");
+            Assert.IsFalse((bool)Call(layout, "IsRouteSegmentClear", start, destination));
+            var solidBases = new[] { baseRect, RectProperty(layout, "NormalGrillBounds") };
+            Vector2 previous = start;
+            for (int i = 0; i < route.Length; i++)
+            {
+                Assert.IsTrue((bool)Call(layout, "IsRouteSegmentClear", previous, route[i]), "Every complete swept segment clears the feet-expanded solids.");
+                for (int sample = 0; sample <= 100; sample++)
+                {
+                    Vector2 feet = Vector2.Lerp(previous, route[i], sample / 100f);
+                    Rect footBounds = new Rect(feet.x - 18f, feet.y - 12f, 36f, 12f);
+                    foreach (Rect solid in solidBases) Assert.IsFalse(footBounds.Overlaps(solid), "The worker's actual feet rectangle never overlaps a solid.");
+                }
+                previous = route[i];
+            }
+            Assert.AreEqual(destination, route[route.Length - 1]);
+            Rect expandedBase = new Rect(baseRect.xMin - 18f, baseRect.yMin, baseRect.width + 36f, baseRect.height + 12f);
+            Vector2 lowerLeft = new Vector2(expandedBase.xMin, expandedBase.yMin);
+            Vector2 lowerRight = new Vector2(expandedBase.xMax, expandedBase.yMin);
+            float geometricShortest = Vector2.Distance(start, lowerLeft) + expandedBase.width + Vector2.Distance(lowerRight, destination);
+            Assert.That(PathDistance(start, route), Is.InRange(geometricShortest, geometricShortest + .25f),
+                "The obstacle detour matches the geometric shortest path around the exposed lower base corners.");
+            Assert.IsNull(Call(layout, "FindShortestSafeRoute", baseRect.center, destination),
+                "A start inside a solid obstacle is unreachable and must never fall back to a direct through-obstacle line.");
+        }
+
+        private static Vector2[] LegacyApproachRoute(int product, Vector2 pickup)
+        {
+            Vector2 center = new Vector2(SceneWidth() * .5f, LayoutConstant("WorkerLaneY"));
+            Vector2 lane = new Vector2(pickup.x, LayoutConstant("WorkerLaneY"));
+            float approachY = product < 4 || product == 5 ? LayoutConstant("TablePickupY") : LayoutConstant("BarrelPickupY");
+            Vector2 approach = new Vector2(pickup.x, approachY);
+            var result = new List<Vector2> { center };
+            if (Mathf.Abs(center.x - lane.x) > 1f) result.Add(lane);
+            if (Mathf.Abs(lane.y - approach.y) > 1f) result.Add(approach);
+            return result.ToArray();
+        }
+
+        private static void AssertRouteClear(object layout, Vector2 start, Vector2[] route, List<Rect> solidBases, string label)
+        {
+            if (route.Length > 0 && (bool)Call(layout, "IsRouteSegmentClear", start, route[route.Length - 1]))
+                Assert.AreEqual(1, route.Length, label + " uses the direct path without waypoints when unobstructed.");
+            Vector2 from = start;
+            Vector2 beforeFrom = Vector2.zero;
+            for (int i = 0; i < route.Length; i++)
+            {
+                Assert.Greater((route[i] - from).sqrMagnitude, .0001f, label + " has no duplicate consecutive waypoints.");
+                if (i > 0)
+                    Assert.Greater(Mathf.Abs((from.x - beforeFrom.x) * (route[i].y - from.y) - (from.y - beforeFrom.y) * (route[i].x - from.x)), .001f,
+                        label + " has no redundant collinear waypoints.");
+                Assert.IsTrue((bool)Call(layout, "IsRouteSegmentClear", from, route[i]), label + " complete segment is collision-free.");
+                for (int sample = 0; sample <= 100; sample++)
+                {
+                    Vector2 feet = Vector2.Lerp(from, route[i], sample / 100f);
+                    Rect footBounds = new Rect(feet.x - 18f, feet.y - 12f, 36f, 12f);
+                    foreach (Rect solid in solidBases)
+                        Assert.IsFalse(footBounds.Overlaps(solid), label + " feet " + footBounds + " overlap solid base " + solid);
+                }
+                beforeFrom = from; from = route[i];
+            }
+        }
+
+        private static float PathDistance(Vector2 start, Vector2[] route)
+        {
+            float distance = 0f;
+            for (int i = 0; i < route.Length; i++) { distance += Vector2.Distance(start, route[i]); start = route[i]; }
+            return distance;
+        }
+
+        private static void AccumulateRouteSavings(float oldDistance, float newDistance, ref float oldTotal, ref float newTotal, ref float percentageTotal, ref float maxPercentage, ref int journeys)
+        {
+            Assert.Greater(oldDistance, 0f);
+            float reduction = Mathf.Max(0f, (oldDistance - newDistance) / oldDistance * 100f);
+            oldTotal += oldDistance; newTotal += newDistance; percentageTotal += reduction;
+            maxPercentage = Mathf.Max(maxPercentage, reduction); journeys++;
         }
 
         [Test]

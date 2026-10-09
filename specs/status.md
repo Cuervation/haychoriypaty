@@ -1,5 +1,13 @@
 # Project status
 
+## Shortest safe employee routes — 2026-10-08
+
+All worker trips now use a shortest-path visibility graph around active station solids expanded by the 36×12 feet collider; direct diagonal segments are retained when clear. Outbound, return, and next-unit legs start from actual worker positions; no forced home return, worker collision system, or NavMesh. Focused Unity EditMode checks passed 12/12, covering 840 product/column journeys across all 11 catalog profiles: average per-trip distance reduction 34.1%, maximum 90.8%, aggregate 35.6%. Main Game View inspected during real movement at levels 1 and 11; screenshots: `Logs/Acceptance/ShortestRoutes-20261008/`.
+
+## Parrilla/mesa spacing — 2026-10-08
+
+Reduced the clearance from the lowest active prep-station bounds to both parrillas from 12 to 10 logical units (about20 screen pixels at1080×1920). To keep all stations non-overlapping with their original sprite dimensions, taller barrels shift up just enough for their bottoms to align with table bottoms; barrel worker pickup points follow. Focused catalog/route layout checks updated and run before commit. Details: `features/modular-kitchen.md`.
+
 ## Employee animation — 2026-10-08
 
 All four roles use eight-direction, distance-driven four-sample native gait and shared hand grips for real physical product IDs. Existing artwork/proportions/routes/economy are preserved; 20 supplemental poses fill missing directions/empty-handed carries. 19 distinct focused EditMode cases and one 448-sample PlayMode acceptance passed. Actual Main gameplay with 5/17 workers at 1080×1920 and 1220×2712 inspected, including lifecycle re-enable and unchanged delivery/revenue; 0 final runtime errors/warnings. Original save/editor state restored. No new APK or on-device performance claim. Contract and evidence: `features/worker-animation.md`.
