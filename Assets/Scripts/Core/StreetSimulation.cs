@@ -643,8 +643,6 @@ namespace HayChoriYPaty
             for (int slot = 0; slot < ProductCount; slot++)
             {
                 int product = GetAvailableProduct(slot);
-                StreetWorkerRole role = StreetSpecialties.GetRequiredWorkerRole(product);
-                if (WorkerCount(role) <= 0) continue; // Bootstrap economy: never create a ticket no hired role can serve.
                 eligible.Add(product);
                 weights.Add(ProductDemandWeight(product));
             }

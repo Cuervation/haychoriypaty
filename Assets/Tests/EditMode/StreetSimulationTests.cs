@@ -78,6 +78,38 @@ namespace HayChoriYPaty.Tests
         }
         private IList Customers(object sim) { return (IList)Get(sim, "Customers"); }
 
+        private object MakeWithFirstCocaOrder(int level, bool cocaOnly, out object customer)
+        {
+            MethodInfo spawn = simType.GetMethod("SpawnQuotaBalancedOrder", BindingFlags.Instance | BindingFlags.NonPublic);
+            for (int seed = 0; seed < 128; seed++)
+            {
+                object balance = NewBalance();
+                Tune(balance, "randomSeed", seed);
+                Tune(balance, "customerPatienceSeconds", 600f);
+                Tune(balance, "deliveryPatienceRefreshSeconds", 600f);
+                Tune(balance, "customerArrivalSeconds", 10000f);
+                object sim = Make(level: level, balance: balance);
+                Start(sim);
+                Assert.AreEqual(0, Get(sim, "CocacoleroCount"));
+                spawn.Invoke(sim, null);
+                IList customers = Customers(sim);
+                if (customers.Count == 0) continue;
+                object first = customers[0];
+                int lineCount = (int)Get(first, "OrderLineCount");
+                bool requestedCoca = false;
+                for (int line = 0; line < lineCount; line++)
+                    requestedCoca |= (int)Get(Call(first, "GetOrderLine", line), "Product") == 4;
+                if (!requestedCoca || (cocaOnly && (lineCount != 1 ||
+                    (int)Get(Call(first, "GetOrderLine", 0), "Remaining") != 1))) continue;
+                SetField(sim, "arrival", 10000f);
+                customer = first;
+                return sim;
+            }
+            Assert.Fail("Could not find deterministic first-customer Coca seed for level " + level + ".");
+            customer = null;
+            return null;
+        }
+
 
         private static Type Workstations => Type.GetType("HayChoriYPaty.StreetWorkstationLayout, Assembly-CSharp", true);
         private static Type KitchenLayout => Type.GetType("HayChoriYPaty.StreetKitchenLayout, Assembly-CSharp", true);
@@ -1864,31 +1896,81 @@ object sim = Make(level: level);
             Assert.AreEqual(expectedCoins, Get(advancing, "Coins"));
         }
 
-        [Test]
-        public void QuotaBalancedOrdersWaitForSpecialistsAndKeepRealQuantityRange()
+        [TestCase(1)]
+        [TestCase(2)]
+        public void FirstCustomerCanRequestCocaWithoutHiringCocacolero(int level)
         {
-            object sim = Make(level: 1); Start(sim);
+            object customer;
+            object sim = MakeWithFirstCocaOrder(level, false, out customer);
+            Assert.AreEqual(1, Get(sim, "ParrilleroCount"));
+            Assert.AreEqual(0, Get(sim, "CocacoleroCount"));
+            bool hasCoca = false;
+            for (int line = 0; line < (int)Get(customer, "OrderLineCount"); line++)
+                hasCoca |= (int)Get(Call(customer, "GetOrderLine", line), "Product") == 4;
+            Assert.IsTrue(hasCoca);
+        }
+
+        [Test]
+        public void QuotaBalancedOrdersUseLevelCatalogWithoutSpecialistsAndKeepRealQuantityRange()
+        {
             MethodInfo spawn = simType.GetMethod("SpawnQuotaBalancedOrder", BindingFlags.Instance | BindingFlags.NonPublic);
-            for (int i = 0; i < 8; i++) spawn.Invoke(sim, null);
-            foreach (object customer in Customers(sim))
+            for (int level = 0; level < 11; level++)
             {
-                Assert.AreEqual(0, Get(customer, "Product"), "Without a Cocacolero, no Coca order may block the economy.");
-                Assert.That((int)Get(customer, "Remaining"), Is.InRange(1, 4));
-            }
-            Set(sim, "Coins", 10000); Assert.IsTrue((bool)Call(sim, "TryHire", Role("Cocacolero")));
-            bool sawCoca = false;
-            for (int i = 0; i < 80 && !sawCoca; i++)
-            {
-                spawn.Invoke(sim, null);
-                object customer = Customers(sim)[Customers(sim).Count - 1];
-                for (int line = 0; line < (int)Get(customer, "OrderLineCount"); line++)
+                object sim = Make(level: level); Start(sim);
+                Assert.AreEqual(1, Get(sim, "StaffCount"), "Only the starter Parrillero should be present in level " + level);
+                var expected = new HashSet<int>();
+                for (int slot = 0; slot < (int)Get(sim, "ProductCount"); slot++)
+                    expected.Add((int)Call(sim, "GetAvailableProduct", slot));
+                var observed = new HashSet<int>();
+                bool sawMixedOrder = expected.Count <= 1;
+                for (int i = 0; i < 1200 && observed.Count < expected.Count; i++)
                 {
-                    object item = Call(customer, "GetOrderLine", line);
-                    Assert.That((int)Get(item, "Remaining"), Is.InRange(1, 4));
-                    sawCoca |= (int)Get(item, "Product") == 4;
+                    IList customers = Customers(sim);
+                    if (customers.Count >= 21) customers.Clear();
+                    spawn.Invoke(sim, null);
+                    customers = Customers(sim);
+                    object customer = customers[customers.Count - 1];
+                    int lineCount = (int)Get(customer, "OrderLineCount");
+                    Assert.That(lineCount, Is.InRange(1, Math.Min(5, expected.Count)));
+                    sawMixedOrder |= lineCount > 1;
+                    var distinct = new HashSet<int>();
+                    for (int line = 0; line < lineCount; line++)
+                    {
+                        object item = Call(customer, "GetOrderLine", line);
+                        int product = (int)Get(item, "Product");
+                        Assert.IsTrue(expected.Contains(product), "Locked product generated in level " + level);
+                        Assert.IsTrue((bool)Call(sim, "IsProductAvailable", product), "Unavailable product generated in level " + level);
+                        Assert.IsTrue(distinct.Add(product));
+                        Assert.That((int)Get(item, "Remaining"), Is.InRange(1, 4));
+                        observed.Add(product);
+                    }
                 }
+                CollectionAssert.AreEquivalent(expected, observed, "Level " + level);
+                Assert.IsTrue(sawMixedOrder, "Combined orders should remain possible in level " + level);
             }
-            Assert.IsTrue(sawCoca, "Once hired, Coca gains genuine mixed-order opportunities.");
+        }
+
+        [Test]
+        public void GeneratedCocaOrderWaitsWithoutFakeDeliveryAndIsServedAfterHire()
+        {
+            object customer;
+            object sim = MakeWithFirstCocaOrder(1, true, out customer);
+            object cocaLine = Call(customer, "GetOrderLine", 0);
+            SetWaiting(customer);
+            Step(sim, 1f);
+            Assert.AreEqual("Waiting", Get(customer, "State").ToString());
+            Assert.AreEqual(1, Get(cocaLine, "Remaining"));
+            Assert.AreEqual(0, Get(cocaLine, "Reserved"));
+            Assert.AreEqual(0, Get(sim, "CocaDelivered"));
+            Assert.AreEqual(0, Call(sim, "GetProductDelivered", 4));
+            Assert.AreEqual(0, Get(sim, "CoinsEarned"));
+
+            Set(sim, "Coins", 10000);
+            Assert.IsTrue((bool)Call(sim, "TryHire", Role("Cocacolero")));
+            for (int i = 0; i < 18 && (int)Get(sim, "CocaDelivered") == 0; i++) Step(sim, 5f);
+            Assert.AreEqual(1, Get(sim, "CocaDelivered"));
+            Assert.AreEqual(0, Get(cocaLine, "Remaining"));
+            Assert.AreEqual(5, Get(sim, "CoinsEarned"));
         }
 
         [Test]

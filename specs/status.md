@@ -1,5 +1,9 @@
 # Project status
 
+## Orders independent of hired specialists — 2026-10-09
+
+Removed employee-count filtering from quota-balanced order generation; demand now draws only from the active level catalog and existing quota/time weights. Coca and other specialist products may be requested before hiring; lines wait normally and require the correct worker plus a real handoff for delivery and revenue. Unity 6000.6.3f1 focused EditMode validation passed 4/4 cases: first-customer Coca in Chicago/Vélez, all enabled catalogs across 11 levels with zero specialists hired, no locked products, mixed 1–4 quantities, and a pre-existing Coca order remaining pending without fake delivery then served after Cocacolero hire. No APK or broader suite run.
+
 ## Per-product balance for all 11 levels — 2026-10-09
 
 Implemented the per-ID quota/hire/speed table, individual victory predicate, quota-aware demand, compact seven-product HUD and product-aware result summary. Fixed official sale prices and hiring/speed costs remain unchanged. Real `StreetSimulation` runs exposed an economy/deadline conflict: at the requested zero-start-money baseline, the optimized employee-first strategy won only 2/3 River and Boca seeds and 0/3 Camioneros/Los Redondos. An explicit minimal balance adjustment is now in source/spec: River gets 10 additional seconds (4:55); Boca, Camioneros and Los Redondos start with $50/$150/$200, respectively; opening funds are not earned income and never carry over.
