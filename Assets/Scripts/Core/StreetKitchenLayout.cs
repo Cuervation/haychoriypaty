@@ -8,19 +8,21 @@ namespace HayChoriYPaty
     {
         public const float SourceWidth = 760f;
         public const float Scale = StreetSceneLayout.Width / SourceWidth;
-        public const float TableY = 466f;
+        public const float TableY = 506f;
         public const float GrillVerticalGap = 4f;
-        // Align the taller barrels to the table bottoms so the whole prep row shares the requested grill clearance.
+        // Align taller barrels to table bottoms so the complete row shares its grill clearance.
         public const float BarrelY = TableY + TableHeight - BarrelHeight;
         public const float WorkerLaneY = 450f;
-        public const float TablePickupY = 502f;
-        public const float GrillPickupY = 554f;
+        public const float TablePickupY = TableY + 36f;
+        public const float GrillPickupY = TableY + TableHeight + GrillVerticalGap + 14.4f;
         public const float BarrelPickupY = BarrelY - 12f;
         public const float TableWidth = 196f * Scale, TableHeight = 98f * Scale;
         public const float BarrelAuthoredWidth = 72f, BarrelAuthoredHeight = 117.6f;
         public const float BarrelWidth = BarrelAuthoredWidth * Scale, BarrelHeight = BarrelAuthoredHeight * Scale;
         public const float StandardGrillWidth = 352f * Scale, StandardGrillHeight = 117.3333f * Scale;
-        public const float GrillBottomLimit = 660f;
+        public const float TiledPlayfieldBottom = 665f;
+        public const float GrillBottomClearance = 2f;
+        public const float GrillBottomLimit = TiledPlayfieldBottom - GrillBottomClearance;
         private const float GrillSurfaceTop = .115f, GrillSurfaceBottom = .46f;
         private const float GrillBackLeft = .145f, GrillBackRight = .855f;
         private const float GrillFrontLeft = .035f, GrillFrontRight = .965f;
@@ -112,7 +114,7 @@ namespace HayChoriYPaty
             if (hasFernet) upperBottom = Mathf.Max(upperBottom, fernetTable.yMax);
             if (hasCoca) upperBottom = Mathf.Max(upperBottom, cocaBarrel.yMax);
             if (hasBeer) upperBottom = Mathf.Max(upperBottom, beerBarrel.yMax);
-            // Keep both standard grills below the active prep row and entirely above the lower UI field.
+            // Keep the entire station block between the requested four-point upper and two-point lower margins.
             float grillY = upperBottom + GrillVerticalGap;
             float nativeWidth = 352f;
             if (hasNormal && hasPremium)

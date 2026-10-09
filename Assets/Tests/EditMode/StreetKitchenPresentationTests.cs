@@ -88,8 +88,13 @@ namespace HayChoriYPaty.Tests
         public void ActiveStationsReflowAcrossTheWidthWithConsistentSizesAndSafeGrillRows()
         {
             float width = SceneWidth();
+            Assert.AreEqual(506f, LayoutConstant("TableY"), .001f,
+                "The active kitchen block is positioned to preserve both requested vertical clearances.");
             Assert.AreEqual(4f, LayoutConstant("GrillVerticalGap"), .001f,
                 "The grill clearance must remain at the user's requested four logical points.");
+            Assert.AreEqual(2f, LayoutConstant("GrillBottomClearance"), .001f);
+            Assert.AreEqual(2f, LayoutConstant("TiledPlayfieldBottom") - LayoutConstant("GrillBottomLimit"), .001f,
+                "The grill bounds must leave two logical points before the cream lower UI field.");
             Rect? tableSize = null, barrelSize = null;
             for (int level = 0; level < 11; level++)
             {
@@ -144,7 +149,8 @@ namespace HayChoriYPaty.Tests
                 if (grills.Count == 1)
                 {
                     Assert.AreEqual(width * .5f, grills[0].center.x, .02f, "One active grill is centered, not stranded in its old left/right slot.");
-                    Assert.Greater(grills[0].width, LayoutConstant("StandardGrillWidth"), "A lone grill grows into available width without covering the bottom UI band.");
+                    Assert.LessOrEqual(grills[0].width, LayoutConstant("StandardGrillWidth") + .1f,
+                        "A lone grill stays within its standard aspect-preserving frame when both margins are reserved.");
                 }
                 else
                 {
@@ -161,6 +167,8 @@ namespace HayChoriYPaty.Tests
                         "The complete active prep row must retain the configured clearance above the grills.");
                     Assert.LessOrEqual(grill.yMax, LayoutConstant("GrillBottomLimit") + .02f,
                         "Every grill must remain completely on the tiled playfield above the lower UI field.");
+                    Assert.AreEqual(LayoutConstant("GrillBottomLimit"), grill.yMax, .03f,
+                        "Every active grill must end at the two-point lower clearance, not just the solo grill.");
                 }
                 foreach (Rect item in top) foreach (Rect grill in grills) Assert.IsFalse(item.Overlaps(grill));
             }

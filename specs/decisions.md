@@ -8,6 +8,10 @@ Set the common prep-row-to-grill gap to10 logical units. Preserve table/barrel s
 
 Reduce the shared prep-row-to-grill clearance from10 to4 logical units at the user's request. Keep station dimensions and barrel alignment unchanged; retain the active catalog non-overlap and grill safe-bottom checks.
 
+## 2026-10-08 — Two-point lower grill margin
+
+Honor the requested2-point margin from the grills to the lower tiled-field/UI seam while retaining the4-point prep-row clearance. Translate the complete kitchen block down40 logical units to y=506, track its pickup anchors, and keep grill aspect ratios and non-overlap rather than distorting or moving grills independently.
+
 ## 2026-10-08 — Shortest safe employee routes
 
 Use catalog-derived visibility routing around active physical station solids expanded by the worker's36×12 feet, preferring a clear direct/diagonal segment. Recalculate outbound, return, and subsequent-unit legs from the employee's actual position; never reverse a fixed route or force a trip home. Do not add worker-vs-worker collision, NavMesh, or packages.

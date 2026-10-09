@@ -2,11 +2,11 @@
 
 ## Shortest safe employee routes — 2026-10-08
 
-All worker trips now use a shortest-path visibility graph around active station solids expanded by the 36×12 feet collider; direct diagonal segments are retained when clear. Outbound, return, and next-unit legs start from actual worker positions; no forced home return, worker collision system, or NavMesh. Focused Unity EditMode checks passed 12/12, covering 840 product/column journeys across all 11 catalog profiles: average per-trip distance reduction 34.1%, maximum 90.8%, aggregate 35.6%. Main Game View inspected during real movement at levels 1 and 11; screenshots: `Logs/Acceptance/ShortestRoutes-20261008/`.
+All worker trips now use a shortest-path visibility graph around active station solids expanded by the 36×12 feet collider; direct diagonal segments are retained when clear. Outbound, return, and next-unit legs start from actual worker positions; no forced home return, worker collision system, or NavMesh. Focused Unity EditMode checks passed 10/10 after the final kitchen reflow, covering 840 product/column journeys across all 11 catalog profiles: average per-trip distance reduction 33.7%, maximum 82.5%, aggregate 35.1%. Main Game View inspected during real movement at levels 1 and 11; screenshots: `Logs/Acceptance/ShortestRoutes-20261008/`.
 
 ## Parrilla/mesa spacing — 2026-10-08
 
-Reduced the clearance from the lowest active prep-station bounds to both parrillas from 10 to 4 logical units (about8 screen pixels at1080×1920). Table/barrel dimensions, lower-bound alignment and pickup anchors are unchanged; focused layout/route EditMode checks passed3/3 across all11 catalog profiles and continue to enforce non-overlap and the grill safe-bottom limit. Details: `features/modular-kitchen.md`.
+The active prep row now sits at logical y=506, keeping4 points between its lower edge and the grills while each grill ends2 points above the tiled-playfield/lower-UI transition. The block moves down40 points to satisfy both clearances without stretching grill art; table/barrel sizes, lower-bound alignment and pickup anchors remain consistent. Focused Unity EditMode checks passed10/10, including all11 catalog layouts, all840 journey cases, and representative delivery routes. Details: `features/modular-kitchen.md`.
 
 ## Employee animation — 2026-10-08
 
