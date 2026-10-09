@@ -13,6 +13,25 @@ namespace HayChoriYPaty
         public int[] speedUpgradeCosts = { 5, 10, 15, 20, 30, 45, 65, 90, 125 };
     }
 
+
+    [Serializable]
+    public sealed class StreetLevelBalance
+    {
+        [Tooltip("Mandatory targets keyed by stable product ID 0..6; zero only for products not in this level.")]
+        public int[] goalsByProductId = new int[7];
+        [Tooltip("First paid hire price by StreetWorkerRole enum; zero means the role is not available.")]
+        public int[] hireBaseCostsByRole = new int[4];
+        [Min(0.1f)] public float speedCostMultiplier = 1f;
+        [Min(0)] public int startingCoins;
+
+        public StreetLevelBalance() { }
+        public StreetLevelBalance(int[] goals, int[] hireBaseCosts, float speedMultiplier, int startingCoins = 0)
+        {
+            goalsByProductId = goals; hireBaseCostsByRole = hireBaseCosts;
+            speedCostMultiplier = speedMultiplier; this.startingCoins = Mathf.Max(0, startingCoins);
+        }
+    }
+
     [Serializable]
     public sealed class StreetBalance
     {
@@ -57,8 +76,56 @@ namespace HayChoriYPaty
         public int[] levelProductCounts = { 1, 2, 3, 5, 7, 7, 7, 7, 7, 7, 7 };
         [Tooltip("Comma-separated stable product IDs, in each level's display/order priority.")]
         public string[] levelProductIds = { "0", "0,4", "0,1,4", "0,1,2,4,6", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5" };
+        [HideInInspector, Tooltip("Legacy aggregate goals retained for serialized-scene compatibility; individual levelBalances are authoritative.")]
         public int[] levelGoals = { 200, 200, 65, 85, 110, 121, 133, 146, 161, 177, 195 };
-        public float[] levelDurations = { 120f, 180f, 240f, 270f, 300f, 300f, 300f, 300f, 300f, 300f, 300f };
+        public float[] levelDurations = { 120f, 180f, 180f, 210f, 240f, 255f, 270f, 295f, 300f, 300f, 300f };
+        [Tooltip("Official per-level goals, role hire base costs, speed-cost multiplier, and opening attempt balance.")]
+        public StreetLevelBalance[] levelBalances = CreateOfficialLevelBalances();
+
+        private static StreetLevelBalance[] CreateOfficialLevelBalances()
+        {
+            return new[]
+            {
+                new StreetLevelBalance(new[] {200,0,0,0,0,0,0}, new[] {15,0,0,0}, 1f),
+                new StreetLevelBalance(new[] {200,0,0,0,200,0,0}, new[] {20,20,0,0}, 1f),
+                new StreetLevelBalance(new[] {180,120,0,0,150,0,0}, new[] {25,25,0,0}, 1.15f),
+                new StreetLevelBalance(new[] {185,125,60,0,155,0,75}, new[] {30,30,35,0}, 1.30f),
+                new StreetLevelBalance(new[] {190,130,70,65,160,65,80}, new[] {35,35,45,40}, 1.45f),
+                new StreetLevelBalance(new[] {210,145,80,75,175,75,90}, new[] {40,40,50,45}, 1.60f),
+                new StreetLevelBalance(new[] {230,165,100,85,195,80,105}, new[] {45,45,55,50}, 1.75f),
+                new StreetLevelBalance(new[] {250,180,110,95,210,90,115}, new[] {50,50,65,55}, 1.90f),
+                new StreetLevelBalance(new[] {275,195,120,110,225,100,125}, new[] {55,55,70,65}, 2.05f, 50),
+                new StreetLevelBalance(new[] {310,220,135,125,255,110,145}, new[] {60,60,80,70}, 2.20f, 150),
+                new StreetLevelBalance(new[] {345,245,150,140,285,120,165}, new[] {70,70,90,80}, 2.35f, 200)
+            };
+        }
+
+        public StreetLevelBalance GetLevelBalance(int levelIndex)
+        {
+            return levelBalances != null && levelIndex >= 0 && levelIndex < levelBalances.Length && levelBalances[levelIndex] != null
+                ? levelBalances[levelIndex] : CreateOfficialLevelBalances()[Mathf.Clamp(levelIndex, 0, 10)];
+        }
+
+        public int GetProductGoal(int levelIndex, int productId)
+        {
+            if (productId < 0 || productId >= 7) return 0;
+            StreetLevelBalance row = GetLevelBalance(levelIndex);
+            return row.goalsByProductId != null && productId < row.goalsByProductId.Length && row.goalsByProductId[productId] > 0
+                ? row.goalsByProductId[productId] : CreateOfficialLevelBalances()[Mathf.Clamp(levelIndex, 0, 10)].goalsByProductId[productId];
+        }
+
+        public int GetHireBaseCost(int levelIndex, StreetWorkerRole role)
+        {
+            int roleIndex = (int)role;
+            StreetLevelBalance row = GetLevelBalance(levelIndex);
+            return row.hireBaseCostsByRole != null && roleIndex >= 0 && roleIndex < row.hireBaseCostsByRole.Length
+                ? Mathf.Max(0, row.hireBaseCostsByRole[roleIndex])
+                : CreateOfficialLevelBalances()[Mathf.Clamp(levelIndex, 0, 10)].hireBaseCostsByRole[roleIndex];
+        }
+        public int GetStartingCoins(int levelIndex)
+        {
+            return Mathf.Max(0, GetLevelBalance(levelIndex).startingCoins);
+        }
         [Tooltip("Optional deadline-only Floresta trial. Default false: win immediately at the unit goal.")]
         public bool florestaFinishAtDeadline = false;
         private static readonly StreetUpgradeCostProfile DefaultUpgradeCostProfile = new StreetUpgradeCostProfile();
@@ -220,18 +287,18 @@ namespace HayChoriYPaty
             new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 },
             new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 }
         };
-        private static readonly int[] DefaultGoals = { 200, 200, 65, 85, 110, 121, 133, 146, 161, 177, 195 };
         private static readonly float[] DefaultDemandMultipliers = { 1f, 1.1f, 1.2f, 1.35f, 1.5f, 1.65f, 1.815f, 1.9965f, 2.19615f, 2.415765f, 2.6573415f };
-        private static readonly int[] DefaultHireCosts = { 15, 30, 60, 100 };
         private static readonly int[] DefaultSpeedCosts = { 5, 10, 15, 20, 30, 45, 65, 90, 125 };
-        private static readonly float[] DefaultDurations = { 120f, 180f, 240f, 270f, 300f, 300f, 300f, 300f, 300f, 300f, 300f };
+        private static readonly float[] DefaultDurations = { 120f, 180f, 180f, 210f, 240f, 255f, 270f, 295f, 300f, 300f, 300f };
+        private static readonly float[] PaidHireTierMultipliers = { 1f, 2.5f, 5f, 9f };
         private readonly StreetBalance balance;
         private readonly int[][] availableProductsByLevel;
         private readonly List<StreetCustomer> customers = new List<StreetCustomer>();
         private readonly List<StreetWorker> workers = new List<StreetWorker>();
         private readonly List<StreetSale> sales = new List<StreetSale>();
         private float arrival;
-        private int nextCustomer = 1, nextWorker = 1, nextSale = 1, roundFirstOrder = 1;
+        private int nextCustomer = 1, nextWorker = 1, nextSale = 1;
+        private readonly int[] deliveredByProduct = new int[7];
         private float price;
         private System.Random random;
 
@@ -241,18 +308,30 @@ namespace HayChoriYPaty
         public int Coins { get; private set; }
         public int CoinsEarned { get; private set; }
         public int Delivered { get; private set; }
-        public int ChoriDelivered { get; private set; }
-        public int CocaDelivered { get; private set; }
-        public int Goal { get { return LevelValue(balance.levelGoals, LevelIndex, DefaultGoals); } }
+        public int ChoriDelivered { get { return GetProductDelivered(0); } }
+        public int CocaDelivered { get { return GetProductDelivered(4); } }
+        // Aggregate target is retained for summaries only; it is never a victory predicate.
+        public int Goal
+        {
+            get { int total = 0; for (int slot = 0; slot < ProductCount; slot++) total += GetProductGoal(GetAvailableProduct(slot)); return total; }
+        }
         public bool GoalReached
         {
             get
             {
-                return LevelIndex == 1
-                    ? ChoriDelivered >= Goal && CocaDelivered >= Goal
-                    : Delivered >= Goal;
+                if (ProductCount <= 0) return false;
+                for (int slot = 0; slot < ProductCount; slot++)
+                {
+                    int product = GetAvailableProduct(slot);
+                    if (GetProductGoal(product) <= 0 || GetProductDelivered(product) < GetProductGoal(product)) return false;
+                }
+                return true;
             }
         }
+        public int GetProductGoal(int productId) => IsProductAvailable(productId) ? balance.GetProductGoal(LevelIndex, productId) : 0;
+        public int GetProductDelivered(int productId) => productId >= 0 && productId < deliveredByProduct.Length ? deliveredByProduct[productId] : 0;
+        public int GetProductRemaining(int productId) => Mathf.Max(0, GetProductGoal(productId) - GetProductDelivered(productId));
+        public bool IsProductGoalComplete(int productId) => GetProductGoal(productId) > 0 && GetProductRemaining(productId) == 0;
         public float TimeRemaining { get { return Mathf.Max(0f, LevelValue(balance.levelDurations, LevelIndex, DefaultDurations) - Elapsed); } }
         public int StaffCount { get { return workers.Count; } }
         public StreetWorkerRole NextHireRole
@@ -295,15 +374,19 @@ namespace HayChoriYPaty
             int configured = role == StreetWorkerRole.Parrillero ? balance.maxParrilleros :
                 role == StreetWorkerRole.Cocacolero ? balance.maxCocacoleros :
                 role == StreetWorkerRole.ParrilleroPremium ? balance.maxPremiumParrilleros : balance.maxFerneteros;
-            return Mathf.Clamp(configured > 0 ? configured : balance.maxStaff, 1, GetHireCosts(role).Length + 1);
+            int naturalCap = role == StreetWorkerRole.Parrillero ? 5 : 4;
+            int configuredCap = configured > 0 ? configured : Mathf.Min(balance.maxStaff, naturalCap);
+            return Mathf.Clamp(configuredCap, 1, naturalCap);
         }
         public int HireCostForRole(StreetWorkerRole role)
         {
             int count = WorkerCount(role);
             if (count >= MaxWorkersForRole(role)) return 0;
-            int costIndex = role == StreetWorkerRole.Parrillero ? Mathf.Max(0, count - 1) : count;
-            int[] costs = GetHireCosts(role);
-            return costIndex < costs.Length ? Mathf.Max(1, costs[costIndex]) : 0;
+            int paidIndex = role == StreetWorkerRole.Parrillero ? Mathf.Max(0, count - 1) : count;
+            if (paidIndex < 0 || paidIndex >= PaidHireTierMultipliers.Length) return 0;
+            int baseCost = balance.GetHireBaseCost(LevelIndex, role);
+            if (baseCost <= 0) return 0;
+            return Mathf.CeilToInt(baseCost * PaidHireTierMultipliers[paidIndex] / 5f) * 5;
         }
         public bool CanHireRole(StreetWorkerRole role)
         {
@@ -314,36 +397,19 @@ namespace HayChoriYPaty
         }
         public int SpeedLevel { get; private set; }
         public bool CanEditPrices { get { return false; } }
-        private StreetUpgradeCostProfile UpgradeCostProfile
-        {
-            get { return balance.GetUpgradeCostProfile(LevelIndex); }
-        }
-        private int[] HireCosts
-        {
-            get
-            {
-                return GetHireCosts(StreetWorkerRole.Parrillero);
-            }
-        }
-        private int[] GetHireCosts(StreetWorkerRole role)
-        {
-            StreetUpgradeCostProfile profile = balance.GetHireCostProfile(LevelIndex, role);
-            return profile != null && profile.hireCosts != null && profile.hireCosts.Length > 0
-                ? profile.hireCosts : DefaultHireCosts;
-        }
-        private int[] SpeedCosts
-        {
-            get
-            {
-                StreetUpgradeCostProfile profile = UpgradeCostProfile;
-                return profile != null && profile.speedUpgradeCosts != null && profile.speedUpgradeCosts.Length > 0
-                    ? profile.speedUpgradeCosts : DefaultSpeedCosts;
-            }
-        }
-        public int MaxStaffCount { get { return Mathf.Clamp(balance.maxStaff, 1, HireCosts.Length + 1); } }
-        public int MaxSpeedLevel { get { return SpeedCosts.Length; } }
+        public int MaxStaffCount { get { return MaxWorkersForRole(StreetWorkerRole.Parrillero); } }
+        public int MaxSpeedLevel { get { return DefaultSpeedCosts.Length; } }
         public int HireCost { get { return ParrilleroHireCost; } }
-        public int SpeedCost { get { return SpeedLevel < MaxSpeedLevel ? Mathf.Max(1, SpeedCosts[SpeedLevel]) : 0; } }
+        public int SpeedCost
+        {
+            get
+            {
+                if (SpeedLevel >= MaxSpeedLevel) return 0;
+                float multiplier = balance.GetLevelBalance(LevelIndex).speedCostMultiplier;
+                int raw = Mathf.CeilToInt(DefaultSpeedCosts[SpeedLevel] * Mathf.Max(0.1f, multiplier));
+                return Mathf.CeilToInt(raw / 5f) * 5;
+            }
+        }
         public bool CanHire { get { return CanHireParrillero; } }
         public bool CanUpgradeSpeed { get { return (Phase == RoundPhase.Ready || Phase == RoundPhase.Playing) && SpeedLevel < MaxSpeedLevel && Coins >= SpeedCost; } }
         public float WorkRate { get { return 1f + SpeedLevel * balance.speedIncrease; } }
@@ -430,12 +496,12 @@ namespace HayChoriYPaty
         public void StartRound()
         {
             customers.Clear(); sales.Clear();
-            Coins = 0; CoinsEarned = 0; // Both totals belong only to this attempt.
+            Coins = balance.GetStartingCoins(LevelIndex); CoinsEarned = 0; // Opening balance is a configured attempt grant, not earned revenue.
             // Every round entry is a fresh attempt, regardless of selected club.
             ResetTeamAndSpeed();
             foreach (StreetWorker worker in workers) ResetWorker(worker);
-            Elapsed = 0f; Delivered = 0; ChoriDelivered = 0; CocaDelivered = 0;
-            arrival = 0f; roundFirstOrder = 1; Phase = RoundPhase.Playing;
+            Elapsed = 0f; Delivered = 0; Array.Clear(deliveredByProduct, 0, deliveredByProduct.Length);
+            arrival = 0f; Phase = RoundPhase.Playing;
         }
         public void SetPrice(float value) { SetProductPrice(0,value); }
         public float GetProductPrice(int product) { return OfficialProductPrices[Mathf.Clamp(product,0,OfficialProductPrices.Length - 1)]; }
@@ -473,7 +539,7 @@ namespace HayChoriYPaty
             LevelIndex = level;
             RefreshKitchenLayout();
             ResetTeamAndSpeed();
-            Coins = 0; CoinsEarned = 0;
+            Coins = balance.GetStartingCoins(LevelIndex); CoinsEarned = 0;
             return true;
         }
         public bool NextLevel()
@@ -482,7 +548,7 @@ namespace HayChoriYPaty
             LevelIndex++;
             RefreshKitchenLayout();
             ResetTeamAndSpeed();
-            Coins = 0; CoinsEarned = 0;
+            Coins = balance.GetStartingCoins(LevelIndex); CoinsEarned = 0;
             Phase = RoundPhase.Ready; return true;
         }
 
@@ -546,50 +612,23 @@ namespace HayChoriYPaty
         {
             Kitchen.Advance(dt, WorkRate, ParrilleroCount > 0, ParrilleroPremiumCount > 0,
                 CocacoleroCount > 0, FerneteroCount > 0);
-            float duration = LevelValue(balance.levelDurations, LevelIndex, DefaultDurations);
+            float duration = LevelDuration;
             Elapsed = Mathf.Min(duration, Elapsed + dt);
             if (Elapsed >= duration) { Phase = GoalReached ? RoundPhase.Won : RoundPhase.Lost; return; }
             arrival -= dt;
             if (arrival <= 0f && customers.Count < DemandCapacity())
             {
-                float demandFactor = .55f / Mathf.Pow(Mathf.Max(.08f,DemandFraction),Mathf.Max(.1f,balance.priceSensitivity));
-                float pressure=balance.levelDemandMultipliers!=null&&LevelIndex<balance.levelDemandMultipliers.Length?Mathf.Max(.1f,balance.levelDemandMultipliers[LevelIndex]):DefaultDemandMultipliers[LevelIndex];
-                if (LevelIndex >= 2)
-                {
-                    // Mixed requests sample unlocked stable product IDs, retain catalog priority, and cap at five types.
-                    SpawnRandomUnlockedOrder();
-                }
-                else if (LevelIndex == 1)
-                {
-                    int variant = random.Next(0, 3);
-                    int choriQuantity = random.Next(1, 5);
-                    if (variant == 0) SpawnCustomer(0, choriQuantity);
-                    else if (variant == 1) SpawnCustomer(4, random.Next(1, 5));
-                    else SpawnCustomer(0, choriQuantity, 4, random.Next(1, 5));
-                }
-                else
-                {
-                    int product = ChooseProduct();
-                    int quantity;
-                    if (LevelIndex == 0) quantity = random.Next(1, 5);
-                    else
-                    {
-                        int minimum = Mathf.Clamp(balance.minOrderQuantity, 1, 999);
-                        int maximum = Mathf.Clamp(balance.maxOrderQuantity, minimum, 999);
-                        quantity = random.Next(minimum, maximum + 1);
-                        float appetite = Mathf.Clamp01((balance.maxPrice - DemandReferencePrice) / Mathf.Max(.01f, balance.maxPrice - balance.minPrice));
-                        if (appetite < .8f) quantity = Mathf.Max(1, Mathf.RoundToInt(quantity * Mathf.Pow(appetite, 4)));
-                        else if (roundFirstOrder == 1) quantity = 999;
-                    }
-                    SpawnCustomer(product, quantity);
-                }
-                roundFirstOrder = 0;
-                arrival = Mathf.Max(0.05f, balance.customerArrivalSeconds * demandFactor / pressure);
+                float pressure = balance.levelDemandMultipliers != null && LevelIndex < balance.levelDemandMultipliers.Length
+                    ? Mathf.Max(.1f, balance.levelDemandMultipliers[LevelIndex]) : DefaultDemandMultipliers[LevelIndex];
+                // Keep the established arrival curve; the reference price is fixed, so payouts cannot affect demand.
+                float demandFactor = .55f / Mathf.Pow(Mathf.Max(.08f, DemandFraction), Mathf.Max(.1f, balance.priceSensitivity));
+                SpawnQuotaBalancedOrder();
+                arrival = Mathf.Max(.05f, balance.customerArrivalSeconds * demandFactor / pressure);
             }
             AdvanceCustomers(dt);
             AdvanceWorkers(dt);
             for (int i = sales.Count - 1; i >= 0; i--) { sales[i].Age += dt; if (sales[i].Age > 3f) sales.RemoveAt(i); }
-            if (GoalReached && !(LevelIndex == 0 && balance.florestaFinishAtDeadline)) Phase = RoundPhase.Won;
+            if (GoalReached) Phase = RoundPhase.Won;
         }
 
         private int DemandCapacity()
@@ -597,40 +636,76 @@ namespace HayChoriYPaty
             int cap=Mathf.Clamp(balance.maxCustomers,1,21);
             return DemandFraction>=.8f?cap:Mathf.Clamp(Mathf.RoundToInt(Mathf.Lerp(1,cap,DemandFraction*DemandFraction)),1,cap);
         }
-        private int ChooseProduct()
+        private void SpawnQuotaBalancedOrder()
         {
-            float total=0;
-            for(int slot=0;slot<ProductCount;slot++)total+=PriceWeight();
-            float roll=(float)random.NextDouble()*total;
-            for(int slot=0;slot<ProductCount;slot++){int p=GetAvailableProduct(slot);roll-=PriceWeight();if(roll<=0)return p;}
-            return GetAvailableProduct(ProductCount-1);
-        }
-        private float PriceWeight()
-        {
-            float f=Mathf.Clamp01((balance.maxPrice-DemandReferencePrice)/Mathf.Max(.01f,balance.maxPrice-balance.minPrice));
-            return Mathf.Max(.01f,Mathf.Pow(f,Mathf.Max(.1f,balance.priceSensitivity)));
-        }
+            var eligible = new List<int>(ProductCount);
+            var weights = new List<float>(ProductCount);
+            for (int slot = 0; slot < ProductCount; slot++)
+            {
+                int product = GetAvailableProduct(slot);
+                StreetWorkerRole role = StreetSpecialties.GetRequiredWorkerRole(product);
+                if (WorkerCount(role) <= 0) continue; // Bootstrap economy: never create a ticket no hired role can serve.
+                eligible.Add(product);
+                weights.Add(ProductDemandWeight(product));
+            }
+            if (eligible.Count == 0) return;
 
-        private void SpawnRandomUnlockedOrder()
-        {
-            int availableCount = ProductCount;
-            int orderSize = random.Next(1, Mathf.Min(StreetCustomer.MaxOrderProducts, availableCount) + 1);
-            int[] shuffledSlots = new int[availableCount];
-            for (int i = 0; i < availableCount; i++) shuffledSlots[i] = i;
-            for (int i = 0; i < orderSize; i++)
+            int maxOrderSize = Mathf.Min(StreetCustomer.MaxOrderProducts, eligible.Count);
+            int orderWeightTotal = 0;
+            for (int size = 1; size <= maxOrderSize; size++) orderWeightTotal += maxOrderSize + 2 - size;
+            int orderRoll = random.Next(orderWeightTotal), orderSize = 1;
+            for (int size = 1; size <= maxOrderSize; size++)
             {
-                int selected = random.Next(i, availableCount);
-                int swap = shuffledSlots[i]; shuffledSlots[i] = shuffledSlots[selected]; shuffledSlots[selected] = swap;
+                orderRoll -= maxOrderSize + 2 - size;
+                if (orderRoll < 0) { orderSize = size; break; }
             }
-            Array.Sort(shuffledSlots, 0, orderSize);
             int[] products = new int[orderSize], quantities = new int[orderSize];
+            var pool = new List<int>(eligible);
+            var poolWeights = new List<float>(weights);
             for (int i = 0; i < orderSize; i++)
             {
-                products[i] = GetAvailableProduct(shuffledSlots[i]);
-                quantities[i] = random.Next(1, 5);
+                int selected = WeightedProductIndex(poolWeights);
+                products[i] = pool[selected];
+                quantities[i] = random.Next(1, 5); // Preserve the existing 1–4 units per product.
+                pool.RemoveAt(selected); poolWeights.RemoveAt(selected);
             }
+            // Sort each product together with its quantity to preserve stable catalog order.
+            for (int i = 0; i < orderSize; i++)
+            for (int j = i + 1; j < orderSize; j++)
+                if (products[j] < products[i]) { int p = products[i]; products[i] = products[j]; products[j] = p; int q = quantities[i]; quantities[i] = quantities[j]; quantities[j] = q; }
             SpawnCustomerWithProducts(products, quantities);
         }
+
+        private int WeightedProductIndex(List<float> weights)
+        {
+            float total = 0f; for (int i = 0; i < weights.Count; i++) total += Mathf.Max(.01f, weights[i]);
+            float roll = (float)random.NextDouble() * total;
+            for (int i = 0; i < weights.Count; i++) { roll -= Mathf.Max(.01f, weights[i]); if (roll <= 0f) return i; }
+            return weights.Count - 1;
+        }
+
+        private float ProductDemandWeight(int product)
+        {
+            int goal = GetProductGoal(product);
+            if (goal <= 0) return .01f;
+            int remaining = GetProductRemaining(product);
+            if (remaining <= 0) return .10f; // Completed goods stay available for genuine extra sales.
+            int alreadyRequested = 0;
+            for (int i = 0; i < customers.Count; i++)
+            {
+                StreetCustomer customer = customers[i];
+                if (customer.State == StreetCustomerState.Leaving) continue;
+                StreetOrderLine line = customer.FindOrderLine(product);
+                if (line != null) alreadyRequested += line.Remaining;
+            }
+            int unrequested = Mathf.Max(0, remaining - alreadyRequested);
+            float timeFraction = Mathf.Clamp01(TimeRemaining / Mathf.Max(1f, LevelDuration));
+            float relativePace = Mathf.Clamp((remaining / (float)goal) / Mathf.Max(.05f, timeFraction), .25f, 4f);
+            float quotaNeed = Mathf.Pow(unrequested / (float)goal, 1.25f);
+            return .08f + quotaNeed * relativePace;
+        }
+
+        private float LevelDuration => LevelValue(balance.levelDurations, LevelIndex, DefaultDurations);
 
         private void AdvanceCustomers(float dt)
         {
@@ -700,7 +775,7 @@ namespace HayChoriYPaty
                     {
                         Deliver(w);
                         // Stop at the goal handoff, before another worker can sell in this slice.
-                        if (GoalReached && !(LevelIndex == 0 && balance.florestaFinishAtDeadline))
+                        if (GoalReached)
                         {
                             Phase = RoundPhase.Won;
                             return;
@@ -829,8 +904,7 @@ namespace HayChoriYPaty
                 line.Remaining--;
                 customer.State = StreetCustomerState.Receiving; customer.ReceiveRemaining = .3f;
                 Delivered++;
-                if (worker.Product == 0) ChoriDelivered++;
-                if (LevelIndex >= 1 && worker.Product == 4) CocaDelivered++;
+                deliveredByProduct[worker.Product]++;
                 int amount = Mathf.Max(0, Mathf.RoundToInt(GetProductPrice(worker.Product)));
                 Coins += amount; CoinsEarned += amount; sales.Add(new StreetSale { Id = nextSale++, Amount = amount, Position = new Vector2(customer.Target.x, 400) });
                 customer.Patience = Mathf.Max(0.1f, balance.deliveryPatienceRefreshSeconds);

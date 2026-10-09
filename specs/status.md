@@ -1,5 +1,13 @@
 # Project status
 
+## Per-product balance for all 11 levels — 2026-10-09
+
+Implemented the per-ID quota/hire/speed table, individual victory predicate, quota-aware demand, compact seven-product HUD and product-aware result summary. Fixed official sale prices and hiring/speed costs remain unchanged. Real `StreetSimulation` runs exposed an economy/deadline conflict: at the requested zero-start-money baseline, the optimized employee-first strategy won only 2/3 River and Boca seeds and 0/3 Camioneros/Los Redondos. An explicit minimal balance adjustment is now in source/spec: River gets 10 additional seconds (4:55); Boca, Camioneros and Los Redondos start with $50/$150/$200, respectively; opening funds are not earned income and never carry over.
+
+Measured real-simulation outcomes (three seeds: 1337, 407, 2026, full route/production/order/purchase logic) with those adjustments: River 3/3, average win 285.0s; Boca 3/3, 292.0s; Camioneros 3/3, 252.4s; Los Redondos 3/3, 278.0s. At zero opening funds, L6 and L7 were 3/3 (251s / 260s averages); L8–L11 respectively were 2/3, 2/3, 0/3, 0/3. For L10, $100 opening funds yielded 2/3 and $150 3/3; for L11, $100 yielded 0/3, $150 2/3 and $200 3/3.
+
+Unity 6000.6.3f1 compiled the edited scripts; the console query returned 0 errors/warnings. The focused NUnit job started but Unity MCP Test Runner disconnected/timed out before publishing results; `TestResults.xml` remained stale, so no new NUnit pass is claimed. The all-strategy A–D regression and portrait Game View review remain pending due that editor/MCP outage. See [the authoritative balance table](features/street-automation.md#current-per-product-level-balance).
+
 ## Official product sale prices — 2026-10-08
 
 The simulation uses one stable ID-based price table (Chori $5, Paty $5, Bondiola $10, Vacío $12, Coca $5, Fernet $12, Cerveza $7). Only completed real handoffs award the corresponding amount; victory remains based on units delivered. Legacy saved price values cannot override the table, and demand generation retains its previous uniform-$5 reference. Unity 6000.6.3f1 focused validation passed: 5/5 EditMode and 2/2 PlayMode. Checked all 11 levels, real handoff revenue for all seven IDs across two mixed-ticket tests, unchanged delivered counts/demand/orders, and legacy saves reserializing to official prices.

@@ -91,11 +91,11 @@ namespace HayChoriYPaty
         };
         // Status is screen-edge anchored; interactive controls still use the safe-area canvas.
         private static readonly Rect HudBar = new Rect(0, 0, 540, 68);
-        private static readonly Rect HudCoins = new Rect(70, 10, 122, 45);
-        private static readonly Rect HudTime = new Rect(228, 8, 96, 50);
-        private static readonly Rect HudSales = new Rect(388, 10, 146, 45);
-        private static readonly Rect HudChoriSales = new Rect(376, 6, 158, 26);
-        private static readonly Rect HudCocaSales = new Rect(376, 34, 158, 26);
+        private static readonly Rect HudCoins = new Rect(50, 10, 64, 45);
+        private static readonly Rect HudTime = new Rect(118, 9, 82, 48);
+        private static readonly Rect HudQuotaGrid = new Rect(204, 1, 334, 66);
+        // Retained name for layout tests and diagnostics; this now encloses the seven per-SKU chips.
+        private static readonly Rect HudSales = HudQuotaGrid;
         private static readonly Rect CutoutHudGap = new Rect(232, 0, 70, 34);
         private const int HudClockFontSize = 48;
         private const float CustomerHiddenLegHeight = StreetSceneLayout.CustomerHiddenLegHeight;
@@ -833,12 +833,12 @@ namespace HayChoriYPaty
 
         private void DrawRiotResult(StreetSimulation sim)
         {
-            GUI.color = new Color(.035f, .025f, .02f, .78f);
-            GUI.DrawTexture(LayoutRect(new Rect(18, 48, 504, 122)), Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
+            GUI.color = new Color(.035f, .025f, .02f, .82f);
+            GUI.DrawTexture(LayoutRect(new Rect(18, 44, 504, 154)), Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
             GUI.color = Color.white;
-            Label(new Rect(27, 53, 486, 54), "No llegaste a entregar\ntodos los pedidos.", header);
-            DrawAnimatedGameOver(new Rect(54, 106, 432, 51), Mathf.Max(0f, Time.unscaledTime - riotStartedAt));
-
+            Label(new Rect(27, 48, 486, 43), "No completaste\ntodas las metas.", header);
+            Label(new Rect(31, 91, 478, 34), FormatPendingQuotas(sim), tiny);
+            DrawAnimatedGameOver(new Rect(54, 128, 432, 48), Mathf.Max(0f, Time.unscaledTime - riotStartedAt));
             DrawStandardButton(RiotReturnButton, RiotReturnAction, "VOLVER");
         }
 
@@ -1002,7 +1002,7 @@ namespace HayChoriYPaty
         }
         private void DrawCounters(StreetSimulation sim)
         {
-            // The status bar always uses the same edge-to-edge layout on every device.
+            // One compact per-SKU quota grid keeps every target visible without covering the rear queue.
             Matrix4x4 previous = GUI.matrix;
             Color color = GUI.color;
             float previousVertical = layoutVerticalScale;
@@ -1013,42 +1013,42 @@ namespace HayChoriYPaty
                 layoutVerticalScale = 1f;
                 GUI.color = Color.white;
                 if (hudBarTexture != null) GUI.DrawTexture(HudBar, hudBarTexture, ScaleMode.StretchToFill, true);
-                DrawHudIcon(new Rect(8, 4, 58, 56), 10);
-                DrawHudNumber(HudCoins, sim.Coins.ToString());
-                DrawHudNumber(HudTime, FormatRemainingTime(sim.TimeRemaining), HudClockFontSize);
-                if (sim.LevelIndex == 1)
-                {
-                    // Two larger, independently fitted rows keep both Chicago goals readable.
-                    DrawHudIcon(new Rect(338, 7, 31, 24), 0);
-                    DrawHudIcon(new Rect(338, 35, 31, 24), 4);
-                    DrawHudNumber(HudChoriSales, Mathf.Min(sim.ChoriDelivered, sim.Goal) + "/" + sim.Goal);
-                    DrawHudNumber(HudCocaSales, Mathf.Min(sim.CocaDelivered, sim.Goal) + "/" + sim.Goal);
-                }
-                else if (sim.LevelIndex == 2)
-                {
-                    // Keep all three Vélez products recognizable beside the shared delivered-unit goal.
-                    DrawHudIcon(new Rect(338, 1, 30, 20), 0);
-                    DrawHudIcon(new Rect(338, 23, 30, 20), 1);
-                    DrawHudIcon(new Rect(338, 45, 30, 20), 4);
-                    DrawHudNumber(HudSales, sim.Delivered + "/" + sim.Goal);
-                }
-                else if (sim.LevelIndex >= 3)
-                {
-                    // A compact 3x3 product key fits the expanded Ferro/Rojo catalog without crowding sales.
-                    for (int slot = 0; slot < sim.ProductCount; slot++)
-                    {
-                        Rect icon = new Rect(337 + (slot % 3) * 16, 3 + (slot / 3) * 20, 17, 18);
-                        DrawHudIcon(icon, sim.GetAvailableProduct(slot));
-                    }
-                    DrawHudNumber(HudSales, sim.Delivered + "/" + sim.Goal);
-                }
-                else
-                {
-                    DrawHudIcon(new Rect(338, 10, 43, 45), sim.LevelIndex == 0 ? 0 : 18);
-                    DrawHudNumber(HudSales, sim.Delivered + "/" + sim.Goal);
-                }
+                DrawHudIcon(new Rect(5, 5, 40, 56), 10);
+                DrawHudNumber(HudCoins, sim.Coins.ToString(), 34);
+                DrawHudNumber(HudTime, FormatRemainingTime(sim.TimeRemaining), 40);
+                for (int slot = 0; slot < sim.ProductCount; slot++) DrawQuotaChip(sim, slot);
             }
             finally { GUI.matrix = previous; GUI.color = color; layoutVerticalScale = previousVertical; }
+        }
+
+        private static Rect HudQuotaCellBounds(int slot)
+        {
+            float cellWidth = HudQuotaGrid.width / 4f;
+            float cellHeight = HudQuotaGrid.height / 2f;
+            return new Rect(HudQuotaGrid.x + (slot % 4) * cellWidth + 1f,
+                HudQuotaGrid.y + (slot / 4) * cellHeight + 1f, cellWidth - 2f, cellHeight - 2f);
+        }
+
+        private void DrawQuotaChip(StreetSimulation sim, int slot)
+        {
+            int product = sim.GetAvailableProduct(slot);
+            int goal = sim.GetProductGoal(product);
+            int delivered = sim.GetProductDelivered(product);
+            bool complete = sim.IsProductGoalComplete(product);
+            Rect bounds = HudQuotaCellBounds(slot);
+            FillRect(bounds, complete ? new Color(.33f, .54f, .27f, .92f) : new Color(.25f, .15f, .08f, .80f));
+            DrawHudIcon(new Rect(bounds.x + 2f, bounds.y + 5f, 17f, 17f), product);
+            DrawHudNumber(new Rect(bounds.x + 20f, bounds.y + 1f, bounds.width - 21f, bounds.height - 6f),
+                delivered + "/" + goal, 20);
+            Rect track = new Rect(bounds.x + 2f, bounds.yMax - 4f, bounds.width - 4f, 2f);
+            FillRect(track, new Color(.09f, .06f, .035f, .85f));
+            FillRect(new Rect(track.x, track.y, track.width * Mathf.Clamp01(delivered / (float)Mathf.Max(1, goal)), track.height),
+                complete ? new Color(.46f, .95f, .28f) : new Color(1f, .75f, .25f));
+            if (complete)
+            {
+                Color previous = GUI.color; GUI.color = new Color(.82f, 1f, .70f);
+                Label(new Rect(bounds.xMax - 14f, bounds.y + 1f, 13f, 15f), "✓", tiny); GUI.color = previous;
+            }
         }
         private void DrawHudIcon(Rect slot, int itemId)
         {
@@ -2269,6 +2269,33 @@ namespace HayChoriYPaty
                     Label(new Rect(bounds.x + x * offset, bounds.y + y * offset, bounds.width, bounds.height), value, borderStyle);
             Label(bounds, value, captionStyle);
         }
+        private static readonly string[] ProductShortNames = { "CHORI", "PATY", "BOND", "VACÍO", "COCA", "FERNET", "CERVEZA" };
+
+        private static string FormatQuotaSummary(StreetSimulation sim, bool pendingOnly)
+        {
+            var entries = new System.Collections.Generic.List<string>(sim.ProductCount);
+            for (int slot = 0; slot < sim.ProductCount; slot++)
+            {
+                int product = sim.GetAvailableProduct(slot);
+                int remaining = sim.GetProductRemaining(product);
+                if (pendingOnly)
+                {
+                    if (remaining > 0) entries.Add(ProductShortNames[product] + " " + remaining);
+                }
+                else entries.Add(ProductShortNames[product] + " " + sim.GetProductDelivered(product) + "/" + sim.GetProductGoal(product));
+            }
+            if (entries.Count == 0) return pendingOnly ? "Todas las metas completas" : "—";
+            var lines = new System.Collections.Generic.List<string>(2);
+            for (int i = 0; i < entries.Count; i += 4)
+                lines.Add(string.Join("  ·  ", entries.GetRange(i, Mathf.Min(4, entries.Count - i)).ToArray()));
+            return string.Join("\n", lines.ToArray());
+        }
+
+        private static string FormatPendingQuotas(StreetSimulation sim)
+        {
+            return "PENDIENTES: " + FormatQuotaSummary(sim, true);
+        }
+
         private void ResultPanel()
         {
             // Physical-screen dimmer covers the HUD and safe-area insets too.
@@ -2291,22 +2318,20 @@ namespace HayChoriYPaty
                 VictoryText(VictorySlot(frame, new Rect(.095f, .149f, .81f, .189f)),
                     "¡TURNO\nCOMPLETADO!", Mathf.RoundToInt(50f * fontScale), gold, TextAnchor.MiddleCenter);
 
-                VictoryText(VictorySlot(frame, new Rect(.333f, .390f, .20f, .092f)),
-                    "VENTAS", Mathf.RoundToInt(24f * fontScale), brown, TextAnchor.MiddleLeft);
-                string sales = game.Sim.LevelIndex == 1
-                    ? "CHORI " + Mathf.Min(game.Sim.ChoriDelivered, game.Sim.Goal) + "/" + game.Sim.Goal
-                        + "\nCOCA " + Mathf.Min(game.Sim.CocaDelivered, game.Sim.Goal) + "/" + game.Sim.Goal
-                    : Mathf.Min(game.Sim.Delivered, game.Sim.Goal) + "/" + game.Sim.Goal;
-                VictoryText(VictorySlot(frame, new Rect(.554f, .382f, .371f, .105f)), sales,
-                    Mathf.RoundToInt((game.Sim.LevelIndex == 1 ? 27f : 40f) * fontScale), gold, TextAnchor.MiddleCenter);
-                VictoryText(VictorySlot(frame, new Rect(.333f, .534f, .245f, .104f)),
-                    "MONEDAS\nGANADAS", Mathf.RoundToInt(25f * fontScale), brown, TextAnchor.MiddleLeft);
-                VictoryText(VictorySlot(frame, new Rect(.600f, .532f, .325f, .104f)),
-                    game.Sim.CoinsEarned.ToString(), Mathf.RoundToInt(42f * fontScale), gold, TextAnchor.MiddleCenter);
-                VictoryText(VictorySlot(frame, new Rect(.333f, .686f, .245f, .104f)),
-                    "TIEMPO\nSOBRANTE", Mathf.RoundToInt(25f * fontScale), brown, TextAnchor.MiddleLeft);
-                VictoryText(VictorySlot(frame, new Rect(.588f, .685f, .337f, .104f)),
-                    FormatVictoryTime(game.Sim.TimeRemaining), Mathf.RoundToInt(42f * fontScale), gold, TextAnchor.MiddleCenter);
+                bool victory = game.Sim.Phase == RoundPhase.Won;
+                VictoryText(VictorySlot(frame, new Rect(.10f, .345f, .80f, .055f)),
+                    victory ? "VENTAS COMPLETADAS" : "FALTAN", Mathf.RoundToInt(23f * fontScale), brown, TextAnchor.MiddleCenter);
+                string sales = FormatQuotaSummary(game.Sim, !victory);
+                VictoryText(VictorySlot(frame, new Rect(.09f, .398f, .82f, .15f)), sales,
+                    Mathf.RoundToInt(17f * fontScale), gold, TextAnchor.MiddleCenter);
+                VictoryText(VictorySlot(frame, new Rect(.333f, .565f, .245f, .09f)),
+                    "MONEDAS\nGANADAS", Mathf.RoundToInt(23f * fontScale), brown, TextAnchor.MiddleLeft);
+                VictoryText(VictorySlot(frame, new Rect(.600f, .565f, .325f, .09f)),
+                    game.Sim.CoinsEarned.ToString(), Mathf.RoundToInt(39f * fontScale), gold, TextAnchor.MiddleCenter);
+                VictoryText(VictorySlot(frame, new Rect(.333f, .691f, .245f, .09f)),
+                    "TIEMPO\nSOBRANTE", Mathf.RoundToInt(23f * fontScale), brown, TextAnchor.MiddleLeft);
+                VictoryText(VictorySlot(frame, new Rect(.588f, .690f, .337f, .09f)),
+                    FormatVictoryTime(game.Sim.TimeRemaining), Mathf.RoundToInt(39f * fontScale), gold, TextAnchor.MiddleCenter);
                 DrawStandardButton(VictorySlot(frame, VictoryExit), VictoryExitAction, "SALIR");
             }
             finally { layoutVerticalScale = previousVertical; }

@@ -1028,31 +1028,28 @@ namespace HayChoriYPaty.Tests
         [Test]
         public void UnifiedTopHudFitsAboveRearOrdersAndSeparatesCounters()
         {
-            Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
-            Assert.GreaterOrEqual(bar.xMin, 0); Assert.LessOrEqual(bar.xMax, 540);
-            Assert.AreEqual(0f, bar.yMin); Assert.AreEqual(68f, bar.height, "Double the former 34-pixel HUD height");
-            Rect[] counters = new[] { "HudCoins", "HudTime", "HudSales" }
-                .Select(name => (Rect)View.GetField(name, BindingFlags.Static | BindingFlags.NonPublic).GetValue(null)).ToArray();
-            for (int i = 0; i < counters.Length; i++)
+Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+            Rect grid = (Rect)View.GetField("HudQuotaGrid", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+            Rect coins = (Rect)View.GetField("HudCoins", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+            Rect clock = (Rect)View.GetField("HudTime", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+            Assert.AreEqual(0f, bar.yMin); Assert.AreEqual(68f, bar.height);
+            Assert.AreEqual(new Rect(204, 1, 334, 66), grid);
+            Assert.IsTrue(bar.Contains(coins.min)); Assert.IsTrue(bar.Contains(coins.max));
+            Assert.IsTrue(bar.Contains(clock.min)); Assert.IsTrue(bar.Contains(clock.max));
+            Assert.IsFalse(coins.Overlaps(clock)); Assert.IsFalse(coins.Overlaps(grid)); Assert.IsFalse(clock.Overlaps(grid));
+            Assert.AreEqual(new Vector2(82, 48), clock.size);
+            Assert.That(Mathf.Abs(clock.center.y - bar.center.y), Is.LessThanOrEqualTo(1f));
+            MethodInfo cellMethod = View.GetMethod("HudQuotaCellBounds", BindingFlags.Static | BindingFlags.NonPublic);
+            Rect[] cells = new Rect[7];
+            for (int i = 0; i < cells.Length; i++)
             {
-                Assert.IsTrue(bar.Contains(counters[i].min));
-                Assert.IsTrue(bar.Contains(counters[i].max));
-                for (int j = i + 1; j < counters.Length; j++) Assert.IsFalse(counters[i].Overlaps(counters[j]));
+                cells[i] = (Rect)cellMethod.Invoke(null, new object[] { i });
+                Assert.IsTrue(grid.Contains(cells[i].min)); Assert.IsTrue(grid.Contains(cells[i].max));
+                for (int j = 0; j < i; j++) Assert.IsFalse(cells[i].Overlaps(cells[j]));
             }
-            Assert.AreEqual(new Vector2(96, 50), counters[1].size, "The digital clock uses nearly the full blue capsule");
-            Assert.That(Mathf.Abs(counters[1].center.y - bar.center.y), Is.LessThanOrEqualTo(1f),
-                "The clock stays vertically centered in the normal blue capsule");
             foreach (string name in new[] { "CutoutHudCoins", "CutoutHudTime", "CutoutHudSales" })
                 Assert.IsNull(View.GetField(name, BindingFlags.Static | BindingFlags.NonPublic), name + " is not a supported HUD layout");
             Assert.AreEqual(48, (int)View.GetField("HudClockFontSize", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue());
-            Rect chori = (Rect)View.GetField("HudChoriSales", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
-            Rect coca = (Rect)View.GetField("HudCocaSales", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
-            Assert.IsFalse(chori.Overlaps(coca), "Chicago goals have independent readable rows");
-            foreach (Rect count in new[] { chori, coca })
-            {
-                Assert.IsTrue(bar.Contains(count.min)); Assert.IsTrue(bar.Contains(count.max));
-                Assert.IsFalse(count.Overlaps(counters[0])); Assert.IsFalse(count.Overlaps(counters[1]));
-            }
         }
 
         [TestCase(900f, 500f)]
@@ -1130,6 +1127,23 @@ namespace HayChoriYPaty.Tests
             style.fontSize = size;
             Assert.LessOrEqual(style.CalcSize(new GUIContent(value)).x, bounds.width - 4f);
             Assert.LessOrEqual(style.CalcSize(new GUIContent(value)).y, bounds.height - 2f);
+        }
+
+        [Test]
+        public void SevenQuotaResultsFitCompactlyAndDefeatListsOnlyPendingProducts()
+        {
+            Type simType = Type.GetType("HayChoriYPaty.StreetSimulation, Assembly-CSharp", true);
+            Type balanceType = Type.GetType("HayChoriYPaty.StreetBalance, Assembly-CSharp", true);
+            object sim = Activator.CreateInstance(simType, new object[] { Activator.CreateInstance(balanceType), 4, 5f, 0, 1, 0 });
+            MethodInfo summary = View.GetMethod("FormatQuotaSummary", BindingFlags.Static | BindingFlags.NonPublic);
+            string complete = (string)summary.Invoke(null, new object[] { sim, false });
+            string pending = (string)summary.Invoke(null, new object[] { sim, true });
+            Assert.AreEqual(2, complete.Split('\n').Length);
+            foreach (string name in new[] { "CHORI", "PATY", "BOND", "VACÍO", "COCA", "FERNET", "CERVEZA" })
+            {
+                Assert.IsTrue(complete.Contains(name));
+                Assert.IsTrue(pending.Contains(name));
+            }
         }
 
         [TestCase(21f, "00:21")]

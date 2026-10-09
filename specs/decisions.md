@@ -201,3 +201,7 @@ Keep original PNGs unchanged and create alpha-trimmed standalone Sprite.asset re
 ## 2026-10-08 — Show beverage stock as a loose barrel pile
 
 Widen both barrels20% horizontally while retaining their height, and scatter each barrel's existing12 real drinks into stable staggered positions/angles. Do not raise inventory capacity merely to create a fuller-looking barrel; keep the current service count and return each drink upright when carried.
+
+## 2026-10-09 — Stabilize the late per-product quota economy
+
+Keep the requested per-product targets, fixed selling prices, employee hire-cost tables and speed-up costs. Real `StreetSimulation` seeds showed the specified all-zero opening economy could not reliably complete River–Los Redondos; instead of silently lowering quotas or changing prices, set River to 295 seconds and grant $50/$150/$200 at the start of Boca/Camioneros/Los Redondos. These are unearned attempt-local starting balances. Re-evaluate only with full route/production/multi-seed simulation; preserve all remaining specified values unless new evidence requires an explicit adjustment.
