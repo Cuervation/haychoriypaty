@@ -165,7 +165,7 @@ namespace HayChoriYPaty.Tests
 
             for (int i = 0; i < 300 && (int)Get(sim, "Delivered") < 5; i++) Call(sim, "Step", .05f);
             Assert.AreEqual(5, Get(sim, "Delivered"));
-            Assert.AreEqual(25, Get(sim, "CoinsEarned"));
+            Assert.AreEqual(39, Get(sim, "CoinsEarned"), "Actual handoffs for IDs 0, 2, 4, 5 and 6 earn $5+$10+$5+$12+$7.");
             Assert.AreEqual(0, Get(customer, "PendingOrderLineCount"));
         }
 

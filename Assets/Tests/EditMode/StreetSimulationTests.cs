@@ -848,10 +848,11 @@ public void ParrilleroAndCocacoleroMaxAreIndependent()
 
 
         [Test]
-        public void SevenProductCatalogUsesFixedFiveAcrossEveryLevelAndRejectsEdits()
+        public void OfficialProductPricesCoverEveryLevelAndRejectEdits()
         {
-            object balance = NewBalance(); Tune(balance, "levelProductCounts", new[] { 1, 1, 5, 6, 7 });
-            for (int level = 0; level < 5; level++)
+            object balance = NewBalance(); Tune(balance, "levelProductCounts", new[] { 1, 2, 3, 5, 7, 7, 7, 7, 7, 7, 7 });
+            float[] expectedPrices = { 5f, 5f, 10f, 12f, 5f, 12f, 7f };
+            for (int level = 0; level < 11; level++)
             {
                 object sim = Make(level: level, balance: balance);
                 Assert.IsFalse((bool)Get(sim, "CanEditPrices"));
@@ -860,7 +861,7 @@ public void ParrilleroAndCocacoleroMaxAreIndependent()
                 {
                     Call(sim, "SetProductPrice", product, 0f);
                     Call(sim, "SetProductPrice", product, 60f);
-                    Assert.AreEqual(5f, Call(sim, "GetProductPrice", product), "Level " + level + ", product " + product);
+                    Assert.AreEqual(expectedPrices[product], Call(sim, "GetProductPrice", product), "Level " + level + ", product " + product);
                 }
                 Call(sim, "SetPrice", -1f);
                 Assert.AreEqual(5f, Get(sim, "Price"));
@@ -869,7 +870,7 @@ public void ParrilleroAndCocacoleroMaxAreIndependent()
         }
 
         [Test]
-        public void LegacyPerProductPriceEditCannotChangeFixedRevenue()
+        public void LegacyPerProductPriceEditCannotChangeOfficialRevenue()
         {
             object balance=NewBalance();Tune(balance,"maxCustomers",1);Tune(balance,"levelGoals",new[]{1,1,1,1,1});
             object sim=Make(level:2,balance:balance);Call(sim,"SetProductPrice",1,17f);
@@ -1371,7 +1372,8 @@ public void LaterLevelPurchasesResumeAtTheNextTableTier()
                             "A worker must complete its first assigned food line before the next one; other roles run in parallel.");
             }
             Assert.AreEqual(5, Get(sim, "Delivered"));
-            Assert.AreEqual(25, Get(sim, "Coins"), "Each of the five actual handoffs earns its unchanged $5 price.");
+            Assert.AreEqual(37, Get(sim, "Coins"), "Actual handoffs for product IDs 0–4 earn $5+$5+$10+$12+$5.");
+            Assert.AreEqual(37, Get(sim, "CoinsEarned"));
             for (int line = 0; line < 5; line++) Assert.AreEqual(0, Get(Call(customer, "GetOrderLine", line), "Remaining"));
             Assert.AreEqual(0, Get(customer, "Reserved"));
             for (int i = 0; i < 200 && Customers(sim).Contains(customer); i++) Step(sim, .05f);

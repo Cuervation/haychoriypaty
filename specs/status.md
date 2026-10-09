@@ -1,5 +1,9 @@
 # Project status
 
+## Official product sale prices — 2026-10-08
+
+The simulation uses one stable ID-based price table (Chori $5, Paty $5, Bondiola $10, Vacío $12, Coca $5, Fernet $12, Cerveza $7). Only completed real handoffs award the corresponding amount; victory remains based on units delivered. Legacy saved price values cannot override the table, and demand generation retains its previous uniform-$5 reference. Unity 6000.6.3f1 focused validation passed: 5/5 EditMode and 2/2 PlayMode. Checked all 11 levels, real handoff revenue for all seven IDs across two mixed-ticket tests, unchanged delivered counts/demand/orders, and legacy saves reserializing to official prices.
+
 ## Shortest safe employee routes — 2026-10-08
 
 All worker trips now use a shortest-path visibility graph around active station solids expanded by the 36×12 feet collider; direct diagonal segments are retained when clear. Outbound, return, and next-unit legs start from actual worker positions; no forced home return, worker collision system, or NavMesh. Focused Unity EditMode checks passed 10/10 after the final kitchen reflow, covering 840 product/column journeys across all 11 catalog profiles: average per-trip distance reduction 33.7%, maximum 82.5%, aggregate 35.1%. Main Game View inspected during real movement at levels 1 and 11; screenshots: `Logs/Acceptance/ShortestRoutes-20261008/`.

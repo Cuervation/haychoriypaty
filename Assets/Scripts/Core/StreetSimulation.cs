@@ -202,8 +202,11 @@ namespace HayChoriYPaty
     /// <summary>Deterministic, view-independent street-service simulation.</summary>
     public sealed class StreetSimulation
     {
-        public const float FixedProductPrice = 5f;
+        public const float FixedProductPrice = 5f; // Legacy common/chori price retained for compatibility.
         public const float FlorestaChoriPrice = FixedProductPrice; // Legacy name retained for compatibility.
+        private static readonly float[] OfficialProductPrices = { FixedProductPrice, FixedProductPrice, 10f, 12f, FixedProductPrice, 12f, 7f };
+        // Preserve the former uniform-$5 demand model; selling prices must not influence ticket frequency or product selection.
+        private const float DemandReferencePrice = FixedProductPrice;
         public const float FrontQueueY = 324f, QueueRowSpacing = 56f;
         // Legacy public name retained for callers; all levels use the shared scene service line.
         public const float ChicagoCounterServiceY = StreetSceneLayout.WorkerServiceY;
@@ -230,7 +233,6 @@ namespace HayChoriYPaty
         private float arrival;
         private int nextCustomer = 1, nextWorker = 1, nextSale = 1, roundFirstOrder = 1;
         private float price;
-        private readonly float[] productPrices = new float[7];
         private System.Random random;
 
         public RoundPhase Phase { get; private set; } = RoundPhase.Ready;
@@ -356,7 +358,7 @@ namespace HayChoriYPaty
             get
             {
                 float total = 0;
-                for (int slot = 0; slot < ProductCount; slot++) total += productPrices[GetAvailableProduct(slot)];
+                for (int slot = 0; slot < ProductCount; slot++) total += DemandReferencePrice;
                 return Mathf.Clamp01((balance.maxPrice-total/ProductCount)/Mathf.Max(0.01f,balance.maxPrice-balance.minPrice));
             }
         }
@@ -412,9 +414,8 @@ namespace HayChoriYPaty
             availableProductsByLevel = BuildAvailableProducts(this.balance);
             RefreshKitchenLayout();
             random = new System.Random(this.balance.randomSeed + LevelIndex * 97);
-            // Normalize current and legacy save values: every product is sold at the same fixed price.
+            // Keep the legacy aggregate price field for compatibility; the official ID table owns unit prices.
             this.price = FixedProductPrice;
-            for (int i = 0; i < productPrices.Length; i++) productPrices[i] = FixedProductPrice;
             // Constructor arguments remain for compatibility with saved callers, but every
             // construction creates a new attempt baseline; purchases are never resumed.
             Coins = Mathf.Max(0, coins); // Preserve the existing injected-balance API; actual attempt entry clears coins.
@@ -437,13 +438,12 @@ namespace HayChoriYPaty
             arrival = 0f; roundFirstOrder = 1; Phase = RoundPhase.Playing;
         }
         public void SetPrice(float value) { SetProductPrice(0,value); }
-        public float GetProductPrice(int product) { return productPrices[Mathf.Clamp(product,0,6)]; }
+        public float GetProductPrice(int product) { return OfficialProductPrices[Mathf.Clamp(product,0,OfficialProductPrices.Length - 1)]; }
         public void SetProductPrice(int product, float value)
         {
-            // Keep the legacy API safe for old saves/callers, but never permit variable prices.
-            if (product < 0 || product >= productPrices.Length) return;
-            productPrices[product] = FixedProductPrice;
-            price = FixedProductPrice;
+            // Retain the legacy setter for saved callers; official prices are immutable and ID-based.
+            if (product < 0 || product >= OfficialProductPrices.Length) return;
+            price = FixedProductPrice; // Legacy aggregate price represents Chori (ID 0).
         }
         public bool TryHire()
         {
@@ -577,7 +577,7 @@ namespace HayChoriYPaty
                         int minimum = Mathf.Clamp(balance.minOrderQuantity, 1, 999);
                         int maximum = Mathf.Clamp(balance.maxOrderQuantity, minimum, 999);
                         quantity = random.Next(minimum, maximum + 1);
-                        float appetite = Mathf.Clamp01((balance.maxPrice - GetProductPrice(product)) / Mathf.Max(.01f, balance.maxPrice - balance.minPrice));
+                        float appetite = Mathf.Clamp01((balance.maxPrice - DemandReferencePrice) / Mathf.Max(.01f, balance.maxPrice - balance.minPrice));
                         if (appetite < .8f) quantity = Mathf.Max(1, Mathf.RoundToInt(quantity * Mathf.Pow(appetite, 4)));
                         else if (roundFirstOrder == 1) quantity = 999;
                     }
@@ -600,14 +600,14 @@ namespace HayChoriYPaty
         private int ChooseProduct()
         {
             float total=0;
-            for(int slot=0;slot<ProductCount;slot++)total+=PriceWeight(GetAvailableProduct(slot));
+            for(int slot=0;slot<ProductCount;slot++)total+=PriceWeight();
             float roll=(float)random.NextDouble()*total;
-            for(int slot=0;slot<ProductCount;slot++){int p=GetAvailableProduct(slot);roll-=PriceWeight(p);if(roll<=0)return p;}
+            for(int slot=0;slot<ProductCount;slot++){int p=GetAvailableProduct(slot);roll-=PriceWeight();if(roll<=0)return p;}
             return GetAvailableProduct(ProductCount-1);
         }
-        private float PriceWeight(int p)
+        private float PriceWeight()
         {
-            float f=Mathf.Clamp01((balance.maxPrice-GetProductPrice(p))/Mathf.Max(.01f,balance.maxPrice-balance.minPrice));
+            float f=Mathf.Clamp01((balance.maxPrice-DemandReferencePrice)/Mathf.Max(.01f,balance.maxPrice-balance.minPrice));
             return Mathf.Max(.01f,Mathf.Pow(f,Mathf.Max(.1f,balance.priceSensitivity)));
         }
 

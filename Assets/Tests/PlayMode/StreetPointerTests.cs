@@ -427,7 +427,11 @@ namespace HayChoriYPaty.Tests
             Invoke(game, "SelectLevel", 1);
             yield return null;
             MethodInfo price = Sim.GetType().GetMethod("GetProductPrice", PublicInstance);
-            for (int product = 0; product < 7; product++) Assert.AreEqual(5f, price.Invoke(Sim, new object[] { product }));
+            float[] officialPrices = { 5f, 5f, 10f, 12f, 5f, 12f, 7f };
+            for (int product = 0; product < 7; product++) Assert.AreEqual(officialPrices[product], price.Invoke(Sim, new object[] { product }));
+            Type saveType = gameType.GetNestedType("SaveData", BindingFlags.Public);
+            object persisted = JsonUtility.FromJson(PlayerPrefs.GetString(key), saveType);
+            CollectionAssert.AreEqual(officialPrices, (float[])saveType.GetField("prices").GetValue(persisted));
             Assert.IsFalse((bool)Sim.GetType().GetProperty("CanEditPrices", PublicInstance).GetValue(Sim, null));
             Type viewType = view.GetType(); MethodInfo hit = viewType.GetMethod("HitAction", PrivateInstance);
             viewType.GetField("introActive", PrivateInstance).SetValue(view, false);
@@ -650,7 +654,8 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(1, Sim.GetType().GetProperty("StaffCount").GetValue(Sim, null));
             Assert.AreEqual(0, Sim.GetType().GetProperty("SpeedLevel").GetValue(Sim, null));
             Assert.That((float)Sim.GetType().GetProperty("WorkRate").GetValue(Sim, null), Is.EqualTo(1f).Within(.0001f));
-            for (int product = 0; product < 7; product++) Assert.AreEqual(5f, Sim.GetType().GetMethod("GetProductPrice").Invoke(Sim, new object[] { product }));
+            float[] officialPrices = { 5f, 5f, 10f, 12f, 5f, 12f, 7f };
+            for (int product = 0; product < 7; product++) Assert.AreEqual(officialPrices[product], Sim.GetType().GetMethod("GetProductPrice").Invoke(Sim, new object[] { product }));
             Invoke(game, "SelectLevel", 1);
             Assert.IsFalse((bool)Sim.GetType().GetProperty("CanEditPrices").GetValue(Sim, null));
         }

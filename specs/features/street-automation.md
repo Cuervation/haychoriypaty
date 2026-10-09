@@ -610,14 +610,15 @@ After a valid win advances to the next location, start it with exactly one Parri
 **Validation:** Static source/spec review only. No Unity tests/editor run, APK or device action was performed; tests remain pending until requested.
 
 
-## Fixed $5 product prices and removed all price pop-ups — current contract (2026-10-06)
+## Official selling prices by stable product ID — current contract (2026-10-08)
 
-All seven stable catalog product IDs sell for $5 per unit at every location. Remove the old per-level product-price setup popup, product tabs, selected-price display and slider/drag behavior; there must be no hidden price hit targets. The unlocked-level selector (including the Ready-state navigation after reload/retry) starts the chosen level immediately. Keep legacy `price`/`prices` save fields and public setter wrappers only for compatibility: constructors/load normalize all slots to $5, setter calls cannot change a value, and subsequent saves write the fixed values. Do not alter demand formulas, goals, timers, upgrade economics, product catalog, order generation or any other balance as part of this change.
+All locations use the immutable catalog sale-price table: ID 0 Chori $5; ID 1 Paty $5; ID 2 Bondiola $10; ID 3 Vacío $12; ID 4 Coca $5; ID 5 Fernet $12; ID 6 Cerveza $7. Keep IDs and legacy `price`/`prices` fields/setter wrappers for compatibility, but constructors, level changes, and loads must always expose the official values; old saved prices must never override them, and subsequent saves must write the official table. Revenue is credited only on each completed real handoff and equals that product ID’s price; delivered-unit counters and every victory goal remain quantity-based. Keep all price-selection popups, tabs, displays, sliders, and hidden price hit targets absent. Do not let selling prices influence customer demand, order frequency, product probabilities or quantities; do not change goals, timers, hiring/speed economics, catalog, order generation, or any other balance.
 
-- [x] Simulation reports $5 for all seven products in all five levels and rejects legacy price edits.
-- [x] Old saved values normalize to $5 without changing save schema.
-- [x] Every unlocked selector/Ready level action starts gameplay directly; old popup coordinates have no price hit target.
-- [ ] Focused Unity tests/Game-view review pending explicit user authorization; none were executed for this change.
+- [x] Simulation reports the exact seven-ID table in all 11 levels and rejects legacy price edits.
+- [x] Old saved values cannot override the table; saving serializes official values.
+- [x] Completed handoffs credit exact ID-based revenue while unit delivery counters remain unchanged.
+- [x] Every unlocked selector/Ready level action starts gameplay directly; no price hit target exists.
+- [x] Unity 6000.6.3f1 focused regression passed: 5/5 EditMode and 2/2 PlayMode, covering all 11 levels, exact handoff revenue for IDs 0–6, unit counters, legacy-save normalization/reserialization, disabled editing, and unchanged demand/orders.
 
 
 ## Defeat-result copy and return action — 2026-10-06
