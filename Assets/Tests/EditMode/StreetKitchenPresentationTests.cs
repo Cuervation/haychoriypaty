@@ -88,13 +88,15 @@ namespace HayChoriYPaty.Tests
         public void ActiveStationsReflowAcrossTheWidthWithConsistentSizesAndSafeGrillRows()
         {
             float width = SceneWidth();
-            Assert.AreEqual(506f, LayoutConstant("TableY"), .001f,
-                "The active kitchen block is positioned to preserve both requested vertical clearances.");
+            float expectedTableY = LayoutConstant("TiledPlayfieldBottom") - LayoutConstant("GrillBottomClearance")
+                - LayoutConstant("StandardGrillHeight") - LayoutConstant("TableHeight") - LayoutConstant("GrillVerticalGap");
+            Assert.AreEqual(expectedTableY, LayoutConstant("TableY"), .001f,
+                "The prep block is derived from the lower frame so standard grills retain both requested clearances.");
             Assert.AreEqual(4f, LayoutConstant("GrillVerticalGap"), .001f,
                 "The grill clearance must remain at the user's requested four logical points.");
-            Assert.AreEqual(2f, LayoutConstant("GrillBottomClearance"), .001f);
-            Assert.AreEqual(2f, LayoutConstant("TiledPlayfieldBottom") - LayoutConstant("GrillBottomLimit"), .001f,
-                "The grill bounds must leave two logical points before the cream lower UI field.");
+            Assert.AreEqual(5f, LayoutConstant("GrillBottomClearance"), .001f);
+            Assert.AreEqual(5f, LayoutConstant("TiledPlayfieldBottom") - LayoutConstant("GrillBottomLimit"), .001f,
+                "The grill bounds must sit five logical points above the lower tiled-field frame.");
             Rect? tableSize = null, barrelSize = null;
             for (int level = 0; level < 11; level++)
             {

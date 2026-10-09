@@ -6,7 +6,7 @@ All worker trips now use a shortest-path visibility graph around active station 
 
 ## Parrilla/mesa spacing — 2026-10-08
 
-The active prep row now sits at logical y=506, keeping4 points between its lower edge and the grills while each grill ends2 points above the tiled-playfield/lower-UI transition. The block moves down40 points to satisfy both clearances without stretching grill art; table/barrel sizes, lower-bound alignment and pickup anchors remain consistent. Focused Unity EditMode checks passed10/10, including all11 catalog layouts, all840 journey cases, and representative delivery routes. Details: `features/modular-kitchen.md`.
+The prep row is positioned at logical y≈503.03 from the tiled-field lower frame; grills end at y=660, exactly5 points above that frame, while preserving the4-point upper clearance. Both frame and kitchen use the same responsive vertical transform; table/barrel sizes, grill aspect ratio and pickup anchors remain consistent. Focused Unity EditMode checks passed17/17: all11 catalog layouts,840 journey cases, level refresh, and seven standard/specialist route cases. Details: `features/modular-kitchen.md`.
 
 ## Employee animation — 2026-10-08
 

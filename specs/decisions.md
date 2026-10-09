@@ -10,7 +10,11 @@ Reduce the shared prep-row-to-grill clearance from10 to4 logical units at the us
 
 ## 2026-10-08 — Two-point lower grill margin
 
-Honor the requested2-point margin from the grills to the lower tiled-field/UI seam while retaining the4-point prep-row clearance. Translate the complete kitchen block down40 logical units to y=506, track its pickup anchors, and keep grill aspect ratios and non-overlap rather than distorting or moving grills independently.
+Previously honored the requested2-point margin from the grills to the lower tiled-field/UI seam while retaining the4-point prep-row clearance. This was superseded by the responsive five-point frame requirement below.
+
+## 2026-10-08 — Five-point responsive lower grill margin
+
+Place the grill bounds exactly5 logical points above the lower tiled-field frame on the responsive layout, retaining4 points above and preserving standard grill proportions. Derive the prep-row y from both clearances and standard dimensions so the same responsive transform carries the frame and grill margin together.
 
 ## 2026-10-08 — Shortest safe employee routes
 
