@@ -88,6 +88,8 @@ namespace HayChoriYPaty.Tests
         public void ActiveStationsReflowAcrossTheWidthWithConsistentSizesAndSafeGrillRows()
         {
             float width = SceneWidth();
+            Assert.AreEqual(4f, LayoutConstant("GrillVerticalGap"), .001f,
+                "The grill clearance must remain at the user's requested four logical points.");
             Rect? tableSize = null, barrelSize = null;
             for (int level = 0; level < 11; level++)
             {
@@ -156,7 +158,7 @@ namespace HayChoriYPaty.Tests
                 foreach (Rect grill in grills)
                 {
                     Assert.AreEqual(LayoutConstant("GrillVerticalGap"), grill.yMin - Mathf.Max(top.ConvertAll(item => item.yMax).ToArray()), .02f,
-                        "The complete active prep row must remain ten logical points above the grills.");
+                        "The complete active prep row must retain the configured clearance above the grills.");
                     Assert.LessOrEqual(grill.yMax, LayoutConstant("GrillBottomLimit") + .02f,
                         "Every grill must remain completely on the tiled playfield above the lower UI field.");
                 }

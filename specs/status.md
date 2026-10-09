@@ -6,7 +6,7 @@ All worker trips now use a shortest-path visibility graph around active station 
 
 ## Parrilla/mesa spacing — 2026-10-08
 
-Reduced the clearance from the lowest active prep-station bounds to both parrillas from 12 to 10 logical units (about20 screen pixels at1080×1920). To keep all stations non-overlapping with their original sprite dimensions, taller barrels shift up just enough for their bottoms to align with table bottoms; barrel worker pickup points follow. Focused catalog/route layout checks updated and run before commit. Details: `features/modular-kitchen.md`.
+Reduced the clearance from the lowest active prep-station bounds to both parrillas from 10 to 4 logical units (about8 screen pixels at1080×1920). Table/barrel dimensions, lower-bound alignment and pickup anchors are unchanged; focused layout/route EditMode checks passed3/3 across all11 catalog profiles and continue to enforce non-overlap and the grill safe-bottom limit. Details: `features/modular-kitchen.md`.
 
 ## Employee animation — 2026-10-08
 

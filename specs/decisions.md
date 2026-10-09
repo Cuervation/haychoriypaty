@@ -4,6 +4,10 @@
 
 Set the common prep-row-to-grill gap to10 logical units. Preserve table/barrel sprite sizes and prevent barrel/grill overlap by aligning barrel bounds with the table row bottoms; move barrel pickup anchors with that small station shift.
 
+## 2026-10-08 — Four-point clearance for grills
+
+Reduce the shared prep-row-to-grill clearance from10 to4 logical units at the user's request. Keep station dimensions and barrel alignment unchanged; retain the active catalog non-overlap and grill safe-bottom checks.
+
 ## 2026-10-08 — Shortest safe employee routes
 
 Use catalog-derived visibility routing around active physical station solids expanded by the worker's36×12 feet, preferring a clear direct/diagonal segment. Recalculate outbound, return, and subsequent-unit legs from the employee's actual position; never reverse a fixed route or force a trip home. Do not add worker-vs-worker collision, NavMesh, or packages.

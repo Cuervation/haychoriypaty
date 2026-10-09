@@ -9,7 +9,7 @@ namespace HayChoriYPaty
         public const float SourceWidth = 760f;
         public const float Scale = StreetSceneLayout.Width / SourceWidth;
         public const float TableY = 466f;
-        public const float GrillVerticalGap = 10f;
+        public const float GrillVerticalGap = 4f;
         // Align the taller barrels to the table bottoms so the whole prep row shares the requested grill clearance.
         public const float BarrelY = TableY + TableHeight - BarrelHeight;
         public const float WorkerLaneY = 450f;
