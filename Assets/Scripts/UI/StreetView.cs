@@ -348,6 +348,8 @@ namespace HayChoriYPaty
         }
         private void OnDisable()
         {
+            // Release cached sprites before destroying their palette textures.
+            if (kitchenRenderer != null) kitchenRenderer.ReleaseWorkers();
             if (introGlow != null) Destroy(introGlow);
             introGlow = null;
             if (menuButton != null) Destroy(menuButton);
@@ -556,7 +558,11 @@ namespace HayChoriYPaty
             if (kitchenRenderer == null)
                 kitchenRenderer = GetComponent<StreetKitchenRenderer>() ?? gameObject.AddComponent<StreetKitchenRenderer>();
             kitchenRenderer.Prepare(sim, layoutVerticalScale, logicalCanvasHeight);
-            for(int i=0;i<sim.Workers.Count;i++) DrawWorker(sim.Workers[i]);
+            kitchenRenderer.PrepareWorkers(parrillero, parrilleroDiagonal, premiumWorker, premiumDiagonal,
+                CocacoleroArtForLevel(sim.LevelIndex), UsesMatchedCocacoleroArt(sim.LevelIndex) ? fernetWorkerLater : fernetWorker,
+                UsesMatchedCocacoleroArt(sim.LevelIndex));
+            if (!kitchenRenderer.WorkersReady)
+                for(int i=0;i<sim.Workers.Count;i++) DrawWorker(sim.Workers[i]);
             // Native independent furniture/food occlude the lower legs of workers reaching
             // from behind a table; the actual carried item remains above the hand/forearm.
             Rect kitchenCanvas = new Rect(0, 0, W, logicalCanvasHeight);
@@ -2002,6 +2008,10 @@ namespace HayChoriYPaty
             Vector2 scale = new Vector2(importedSize.x / 1247f, importedSize.y / 1261f);
             return new Rect(pose.x * scale.x, pose.y * scale.y, pose.width * scale.x, pose.height * scale.y);
         }
+        internal static Rect[] WorkerFoodPoseBounds => ParrilleroPoses;
+        internal static Rect[] WorkerDiagonalPoseBounds => ParrilleroDiagonalPoses;
+        internal static Rect[] WorkerDrinkPoseBounds(bool matched) => matched ? MatchedCocacoleroPoses : ChicagoCocacoleroPoses;
+
         private void DrawWorker(StreetWorker w)
         {
             bool moving=w.State==StreetWorkerState.ToStation||w.State==StreetWorkerState.ToCounter;

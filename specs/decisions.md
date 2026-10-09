@@ -1,5 +1,9 @@
 # Technical decision log
 
+## 2026-10-08 — Native distance-driven worker cutouts
+
+Reuse original contact/carry poses and 20 missing-direction poses through pooled torso/leg/finger SpriteRenderers in the existing kitchen camera. Compose two contact and two passing samples per direction, advancing by actual traveled distance rather than idle AnimationTime. Worker palm anchors and real carried objects share depth/scale; do not bake product copies or add an animation camera. This preserves worker proportions and gameplay while avoiding per-frame texture work. Release cached sprites before their palette textures on view disable.
+
 ## 2026-10-07 — All Boys master geometry, club scenery and fresh attempts
 
 Use StreetSceneLayout for root art/counter/crowd/service geometry and the existing StreetWorkstationLayout for furniture/pickup routes. ClubVisualTheme supplies mural art/crops and scenery-only light temperature, never gameplay positions. Render the root plate in every current level; uniform-fit specific mural panels below the fixed HUD. Remove per-background counter heights, Chicago-only service/approach heights and the duplicate counter vertical transform. Every fresh load/start/select/advance/retry resets to one Parrillero, no free Cocacolero and speed ×1.00; existing purchases apply only within the active attempt. Preserve original art, apparel, progression, prices and save-schema compatibility. Uneven matched Cocacolero atlas rows use measured crops scaled to imported dimensions, not an assumed 4×4 grid.

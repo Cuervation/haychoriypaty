@@ -1,5 +1,9 @@
 # Project status
 
+## Employee animation — 2026-10-08
+
+All four roles use eight-direction, distance-driven four-sample native gait and shared hand grips for real physical product IDs. Existing artwork/proportions/routes/economy are preserved; 20 supplemental poses fill missing directions/empty-handed carries. 19 distinct focused EditMode cases and one 448-sample PlayMode acceptance passed. Actual Main gameplay with 5/17 workers at 1080×1920 and 1220×2712 inspected, including lifecycle re-enable and unchanged delivery/revenue; 0 final runtime errors/warnings. Original save/editor state restored. No new APK or on-device performance claim. Contract and evidence: `features/worker-animation.md`.
+
 ## Sandwich presentation scale — 2026-10-08
 
 Renderer-only display targets now scale all four sandwiches 1.5× on their tables and 1.25× when carried, preserving art aspect ratio; drinks and gameplay dimensions/economy are unchanged. Focused `StreetKitchenRendererTests` passed 12/12. Main-only Android 0.2.20/code22 IL2CPP/ARM64 build `build-f0bd2b66cd` succeeded in73s,0errors/1warning; APK618,489,985bytes, SHA-256 `3f948c1f1235023b3c4d9a2264fe23d63680f4a879b6eb5fe87d518bde956024`, integrity/package/v2 signature verified and aliases match. Motorola `ZY22MBNWRB` was disconnected, so installation is pending. Full receipt: `features/android-prototype.md`; implementation: `features/modular-kitchen.md`.

@@ -77,6 +77,8 @@ namespace HayChoriYPaty.Tests
             object premium=Enum.Parse(roles,"ParrilleroPremium"),fernet=Enum.Parse(roles,"Fernetero");
             Color white=new Color(.8f,.8f,.8f,1),red=new Color(.8f,.1f,.1f,1);
             Assert.AreNotEqual(white,color.Invoke(null,new object[]{white,premium,.6f}));
+            Color warmApron=new Color(.9f,.84f,.74f,1f);
+            Assert.AreNotEqual(warmApron,color.Invoke(null,new object[]{warmApron,premium,.6f}),"Warm off-white apron must remain visibly Premium blue");
             Assert.AreNotEqual(red,color.Invoke(null,new object[]{red,fernet,.6f}));
             Assert.AreEqual(white,color.Invoke(null,new object[]{white,premium,.15f}));
             Assert.AreEqual(Color.clear,color.Invoke(null,new object[]{Color.clear,premium,.6f}));

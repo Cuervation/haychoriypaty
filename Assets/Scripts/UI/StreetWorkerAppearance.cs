@@ -9,7 +9,8 @@ namespace HayChoriYPaty
         {
             if (color.a <= .01f || bodyY < .36f || bodyY > .88f) return color;
             if (role == StreetWorkerRole.ParrilleroPremium && color.r > .38f &&
-                Mathf.Abs(color.r-color.g) < .10f && Mathf.Abs(color.g-color.b) < .10f)
+                color.g >= color.r*.78f && color.b >= color.g*.78f &&
+                Mathf.Max(color.r,Mathf.Max(color.g,color.b))-Mathf.Min(color.r,Mathf.Min(color.g,color.b)) < .27f)
                 return new Color(color.r*.34f, color.g*.60f, color.b*.95f, color.a);
             if (role == StreetWorkerRole.Fernetero && color.r > .20f && color.g < color.r*.35f && color.b < color.r*.30f)
                 return new Color(color.r*.16f, color.r*.17f, color.r*.18f, color.a);

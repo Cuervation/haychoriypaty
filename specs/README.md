@@ -9,6 +9,7 @@ Specs are authoritative; implementation and short status belong in code/status, 
 | Historical first slice (superseded delivery scope; retain validation) | [features/floresta-prototype.md](features/floresta-prototype.md) |
 | Android build/emulator delivery | [features/android-prototype.md](features/android-prototype.md) |
 | Approved modular kitchen / real cooking, inventory and responsive layout | [features/modular-kitchen.md](features/modular-kitchen.md) |
+| Employee gait and physical carry presentation | [features/worker-animation.md](features/worker-animation.md) |
 | Visual art direction and composition | [visual-reference.md](visual-reference.md) (consult before any screen, character, object, or animation design) |
 | Code boundaries and Unity folders | [architecture.md](architecture.md) |
 | Brief technical tradeoffs | [decisions.md](decisions.md) |

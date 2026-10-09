@@ -180,6 +180,10 @@ namespace HayChoriYPaty
         public Vector2 Target { get; internal set; }
         public StreetWorkerState State { get; internal set; }
         public float AnimationTime { get; internal set; }
+        // Visual telemetry only; movement math and service timing are unchanged.
+        public float TravelDistance { get; internal set; }
+        public float StepDistance { get; internal set; }
+        public Vector2 FacingVector { get; internal set; }
         internal float Delay;
         internal bool UsingStationApproach;
         internal int StationRouteStage;
@@ -658,16 +662,27 @@ namespace HayChoriYPaty
             }
         }
 
+        private void MoveWorker(StreetWorker worker, float dt)
+        {
+            Vector2 previous = worker.Position;
+            worker.Position = Move(previous, worker.Target, balance.workerSpeed * WorkRate, dt);
+            Vector2 delta = worker.Position - previous;
+            worker.StepDistance = delta.magnitude;
+            worker.TravelDistance += worker.StepDistance;
+            if (worker.StepDistance > .0001f) worker.FacingVector = delta;
+        }
+
         private void AdvanceWorkers(float dt)
         {
             foreach (StreetWorker w in workers)
             {
                 w.AnimationTime += dt;
+                w.StepDistance = 0f;
                 if (w.State == StreetWorkerState.Idle) { Assign(w); continue; }
                 if (!IsAtCounter(w.Customer) || !customers.Contains(w.Customer)) { CancelAssignment(w); continue; }
                 if (w.State == StreetWorkerState.ToStation)
                 {
-                    w.Position = Move(w.Position, w.Target, balance.workerSpeed * WorkRate, dt);
+                    MoveWorker(w, dt);
                     if (w.Position == w.Target)
                     {
                         if (UsesExpandedStationRoutes)
@@ -732,7 +747,7 @@ namespace HayChoriYPaty
                 }
                 else if (w.State == StreetWorkerState.ToCounter)
                 {
-                    w.Position = Move(w.Position, w.Target, balance.workerSpeed * WorkRate, dt);
+                    MoveWorker(w, dt);
                     if (w.Position == w.Target)
                     {
                         if (UsesExpandedStationRoutes && w.StationRouteStage >= 0)
@@ -1048,7 +1063,7 @@ namespace HayChoriYPaty
             workers.Add(new StreetWorker { Id = nextWorker++, Role = role, Product = -1,
                 Position = WorkerHomePosition, Target = WorkerHomePosition, State = StreetWorkerState.Idle });
         }
-        private void ResetWorker(StreetWorker w) { w.Customer = null; w.CustomerId = 0; w.Product = -1; w.CarriedItemId = 0; w.State = StreetWorkerState.Idle; w.UsingStationApproach = false; w.StationRouteStage = 0; w.Target = WorkerHomePosition; }
+        private void ResetWorker(StreetWorker w) { w.StepDistance = 0f; w.Customer = null; w.CustomerId = 0; w.Product = -1; w.CarriedItemId = 0; w.State = StreetWorkerState.Idle; w.UsingStationApproach = false; w.StationRouteStage = 0; w.Target = WorkerHomePosition; }
         private static Vector2 Move(Vector2 from, Vector2 to, float speed, float dt) { return Vector2.MoveTowards(from, to, speed * dt); }
     }
 }

@@ -5,7 +5,7 @@ using UnityEngine;
 namespace HayChoriYPaty
 {
     /// <summary>Projects real kitchen props and StreetSimulation food entities through isolated transparent
-    /// orthographic cameras. The existing IMGUI scene, crowd, workers and HUD remain untouched.</summary>
+    /// orthographic cameras. Native workers share the kitchen projection; IMGUI scenery, crowd and HUD are retained.</summary>
     [DisallowMultipleComponent]
     public sealed class StreetKitchenRenderer : MonoBehaviour
     {
@@ -27,10 +27,12 @@ namespace HayChoriYPaty
         }
         private readonly AmbientGrillEffects[] ambientGrills = new AmbientGrillEffects[2];
         private readonly List<int> staleIds = new List<int>();
+        private readonly HashSet<int> liveCarriedIds = new HashSet<int>();
         private GameObject propsRoot, carryRoot;
         private Camera propsCamera, carryCamera;
         private RenderTexture propsTexture, carryTexture;
         private StreetSimulation simulation;
+        private StreetWorkerProjection workerProjection;
         private float verticalScale = 1f, canvasHeight = StreetSceneLayout.Height;
         private int renderedFrame = -1;
         private bool loggedMissingResources;
@@ -38,7 +40,8 @@ namespace HayChoriYPaty
         public bool IsReady { get; private set; }
         public Texture BackgroundTexture => propsTexture;
         public Texture ForegroundTexture => null;
-        public Texture CarriedTexture => carryTexture;
+        public bool WorkersReady => workerProjection != null && workerProjection.Ready;
+        public Texture CarriedTexture => WorkersReady ? null : carryTexture;
 
         /// <summary>Called by StreetView. Native SpriteRenderer objects always reflect live sim IDs and states.</summary>
         public void Prepare(StreetSimulation sim, float layoutVerticalScale, float logicalHeight)
@@ -54,10 +57,33 @@ namespace HayChoriYPaty
             IsReady = true;
         }
 
+        public void PrepareWorkers(Texture2D normal, Texture2D diagonal, Texture2D premium, Texture2D premiumDiagonal,
+            Texture2D drink, Texture2D fernet, bool matched)
+        {
+            if (propsRoot == null || simulation == null) return;
+            if (workerProjection == null)
+            {
+                GameObject source = Prefab("Sandwich_Chori");
+                workerProjection = new StreetWorkerProjection(propsRoot.transform, source.GetComponentInChildren<SpriteRenderer>().sharedMaterial);
+            }
+            workerProjection.SetArt(normal, diagonal, premium, premiumDiagonal, drink, fernet, matched);
+            workerProjection.Sync(simulation, verticalScale, canvasHeight);
+            SyncCarriedFood();
+            if (carryCamera != null) carryCamera.enabled = !WorkersReady;
+        }
+
+        public void ReleaseWorkers()
+        {
+            if (workerProjection != null) workerProjection.Dispose();
+            workerProjection = null;
+            if (carryCamera != null) carryCamera.enabled = true;
+        }
+
         private void LateUpdate()
         {
             if (!IsReady || simulation == null) return;
             // Transforms and sprites are updated here, before the native cameras render for this frame.
+            if (WorkersReady) workerProjection.Sync(simulation, verticalScale, canvasHeight);
             SyncFood();
             UpdateAmbientEffects();
             PositionCamera(propsCamera);
@@ -411,7 +437,7 @@ namespace HayChoriYPaty
         private void SyncCarriedFood()
         {
             if (carryRoot == null) return;
-            var liveCarried = new HashSet<int>();
+            var liveCarried = liveCarriedIds; liveCarried.Clear();
             foreach (StreetFoodUnit unit in simulation.Kitchen.Units)
             {
                 if (unit == null || unit.Location != StreetFoodLocation.Carried) continue;
@@ -436,6 +462,19 @@ namespace HayChoriYPaty
                 float bob = (worker.State == StreetWorkerState.ToStation || worker.State == StreetWorkerState.ToCounter)
                     ? Mathf.Sin(worker.AnimationTime * 16f) * 1.5f : 0f;
                 Vector2 hand = new Vector2(worker.Position.x - 9.5f, worker.Position.y * verticalScale - 31.5f + bob);
+                int order;
+                if (WorkersReady && workerProjection.Grip(worker.Id, out hand, out order))
+                {
+                    if (go.layer != PropLayer) SetLayerRecursively(go, PropLayer);
+                    SpriteRenderer carriedRenderer;
+                    if (foodRenderers.TryGetValue(unit.Id, out carriedRenderer) && carriedRenderer != null)
+                    {
+                        // The unit sits ON the supporting palm. Its height varies by real product artwork.
+                        hand.y -= carriedRenderer.bounds.size.y * 50f;
+                        carriedRenderer.sortingOrder = order;
+                    }
+                }
+                else if (go.layer != CarryLayer) SetLayerRecursively(go, CarryLayer);
                 SetCanvasTransform(go.transform, hand, 1f);
             }
             staleIds.Clear();
@@ -579,6 +618,7 @@ namespace HayChoriYPaty
 
         private void OnDestroy()
         {
+            if (workerProjection != null) workerProjection.Dispose();
             ReleaseCamera(propsCamera);
             ReleaseCamera(carryCamera);
             ReleaseTexture(ref propsTexture);
