@@ -685,36 +685,76 @@ var sim = Make(level: 1); Start(sim); Set(sim, "Coins", 10000);
             Set(sim, "Coins", 99); Assert.IsFalse((bool)Call(sim, "TryHire", Role("Cocacolero")));
             Assert.AreEqual(99, Get(sim, "Coins")); Assert.AreEqual(2, Get(sim, "CocacoleroCount"));
         }
-public void ParrilleroAndCocacoleroMaxAreIndependent()
+[Test]
+        public void ParrilleroAndCocacoleroEachExceedTheLegacyHireLimits()
         {
-var sim = Make(level: 1); Start(sim); Set(sim, "Coins", 50000);
-            int[] tierCosts = { 20, 50, 100, 180 };
-            for (int i = 0; i < tierCosts.Length; i++)
+            var sim = Make(level: 1); Start(sim); Set(sim, "Coins", 50000);
+            int[] sixthHireCurve = { 20, 50, 100, 180, 280, 400 };
+            for (int i = 0; i < sixthHireCurve.Length; i++)
             {
-                Assert.AreEqual(tierCosts[i], Get(sim, "ParrilleroHireCost"));
+                Assert.AreEqual(sixthHireCurve[i], Get(sim, "ParrilleroHireCost"));
                 Assert.IsTrue((bool)Call(sim, "TryHire", Role("Parrillero")));
             }
-            Assert.AreEqual(0, Get(sim, "ParrilleroHireCost")); Assert.IsFalse((bool)Get(sim, "CanHireParrillero"));
+            Assert.AreEqual(7, Get(sim, "ParrilleroCount"));
+            Assert.AreEqual(280, Get(sim, "CocacoleroHireCost"));
+            Assert.IsTrue((bool)Get(sim, "CanHireParrillero"));
+
+            for (int i = 0; i < 5; i++) Assert.IsTrue((bool)Call(sim, "TryHire", Role("Cocacolero")));
+            Assert.AreEqual(5, Get(sim, "CocacoleroCount"));
+            Assert.AreEqual(400, Get(sim, "CocacoleroHireCost"));
+            Assert.AreEqual(int.MaxValue, Call(sim, "MaxWorkersForRole", Role("Cocacolero")));
             Assert.IsTrue((bool)Get(sim, "CanHireCocacolero"));
-            for (int i = 0; i < tierCosts.Length; i++)
-            {
-                Assert.AreEqual(tierCosts[i], Get(sim, "CocacoleroHireCost"));
-                Assert.IsTrue((bool)Call(sim, "TryHire", Role("Cocacolero")));
-            }
-            Assert.AreEqual(5, Get(sim, "ParrilleroCount")); Assert.AreEqual(4, Get(sim, "CocacoleroCount"));
-            Assert.AreEqual(4, Call(sim, "MaxWorkersForRole", Role("Cocacolero")));
-            Assert.AreEqual(0, Get(sim, "CocacoleroHireCost")); Assert.IsFalse((bool)Get(sim, "CanHireCocacolero"));
         }
         [Test]
-        public void RoleCapsAndPostStartHiringPreserveIndependentComposition()
+        public void LegacyRoleCapsDoNotLimitEnabledHiresButDisabledRolesStayUnavailable()
         {
-            var balance=NewBalance(); Tune(balance,"maxParrilleros",2); Tune(balance,"maxCocacoleros",3);
-            var sim=Make(level:1,balance:balance);
-            Start(sim); Set(sim,"Coins",10000);
-            for (int i=0;i<10;i++) Call(sim,"TryHire",Role(i < 2 ? "Parrillero" : "Cocacolero"));
-            Assert.AreEqual(2,Get(sim,"ParrilleroCount")); Assert.AreEqual(3,Get(sim,"CocacoleroCount"));
-            var floresta=Make(coins:10000); Assert.IsFalse((bool)Call(floresta,"TryHire",Role("Cocacolero")));
+            var balance = NewBalance(); Tune(balance, "maxParrilleros", 2); Tune(balance, "maxCocacoleros", 3);
+            Tune(balance, "maxPremiumParrilleros", 1); Tune(balance, "maxFerneteros", 1);
+            var sim = Make(level: 4, balance: balance); Start(sim); Set(sim, "Coins", 100000);
+            foreach (string role in new[] { "Parrillero", "Cocacolero", "ParrilleroPremium", "Fernetero" })
+                for (int i = 0; i < 5; i++) Assert.IsTrue((bool)Call(sim, "TryHire", Role(role)), role + " beyond legacy cap");
+            Assert.AreEqual(6, Get(sim, "ParrilleroCount"));
+            Assert.AreEqual(5, Get(sim, "CocacoleroCount"));
+            Assert.AreEqual(5, Get(sim, "ParrilleroPremiumCount"));
+            Assert.AreEqual(5, Get(sim, "FerneteroCount"));
+            var floresta = Make(coins: 10000);
+            Assert.IsFalse((bool)Call(floresta, "TryHire", Role("Cocacolero")), "The catalog still controls which roles can be hired.");
         }
+
+        [Test]
+        public void FifteenWorkersServeRealOrdersInParallelWithoutDuplicateHandoffsOrCoins()
+        {
+            var balance = NewBalance(); Tune(balance, "maxCustomers", 21); Tune(balance, "workerSpeed", 100000f);
+            Tune(balance, "customerSpeed", 100000f); Tune(balance, "customerArrivalSeconds", 100000f); Tune(balance, "pickupSeconds", .01f);
+            var sim = Make(level: 0, balance: balance); Start(sim); Set(sim, "Coins", 10000);
+            for (int i = 0; i < 15; i++) Assert.IsTrue((bool)Call(sim, "TryHire", Role("Parrillero")));
+            Assert.AreEqual(16, Get(sim, "StaffCount"));
+            Assert.AreEqual(0, Get(sim, "Coins"), "Hiring the fifteenth paid worker must debit the exact growing cost without underflow.");
+            var workers = (IList)Get(sim, "Workers");
+            var uniqueIds = new HashSet<int>();
+            foreach (object worker in workers) uniqueIds.Add((int)Get(worker, "Id"));
+            Assert.AreEqual(16, uniqueIds.Count, "Every hire gets an independent worker identity.");
+
+            for (int i = 0; i < 15; i++)
+            {
+                Assert.IsTrue(Spawn(sim, 0, 1));
+                SetWaiting(((IList)Get(sim, "Customers"))[i]);
+            }
+            int maxActive = 0;
+            for (int tick = 0; tick < 3000 && (int)Get(sim, "Delivered") < 15; tick++)
+            {
+                Step(sim, .02f);
+                int active = 0;
+                foreach (object worker in workers)
+                    if (Get(worker, "State").ToString() != "Idle") active++;
+                maxActive = Math.Max(maxActive, active);
+            }
+            Assert.GreaterOrEqual(maxActive, 2, "Independent Parrilleros should service different customers in parallel.");
+            Assert.AreEqual(15, Get(sim, "Delivered"));
+            Assert.AreEqual(75, Get(sim, "CoinsEarned"));
+            Assert.AreEqual(75, Get(sim, "Coins"));
+        }
+
 
         [Test]
         public void ChicagoParrilleroCompletesFourChorisBeforeMovingToSecondAndThirdCustomer()
@@ -834,7 +874,7 @@ var sim = Make(level: 1); Start(sim); Set(sim, "Coins", 50000);
             Assert.AreEqual(0, Get(sim, "Coins"));
             Assert.AreEqual(1, Get(sim, "StaffCount")); Assert.AreEqual(0, Get(sim, "SpeedLevel"));
             Assert.AreEqual(1f, Get(sim, "WorkRate"));
-            Assert.AreEqual(25, Get(sim, "HireCost")); Assert.AreEqual(10, Get(sim, "SpeedCost"));
+            Assert.AreEqual(25, Get(sim, "HireCost")); Assert.AreEqual(15, Get(sim, "SpeedCost"));
             IList workers = (IList)Get(sim, "Workers");
             Assert.AreEqual("Parrillero", Get(workers[0], "Role").ToString());
         }
@@ -1117,45 +1157,93 @@ object b = NewBalance(); TuneAllProductGoals(b, level, 1);
         [TestCase(2)]
         [TestCase(3)]
         [TestCase(4)]
-        public void EveryLevelUsesExactUpgradeTablesAndStopsAtLastTier(int level)
+        [TestCase(5)]
+        [TestCase(6)]
+        [TestCase(7)]
+        [TestCase(8)]
+        [TestCase(9)]
+        [TestCase(10)]
+        public void EveryLevelUsesExactSpeedPricesAndStopsAtOnePointNine(int level)
         {
-object sim = Make(level: level); Start(sim); Set(sim, "Coins", 100000);
+            object sim = Make(level: level); Start(sim); Set(sim, "Coins", 1000000);
             int[] speedBase = { 5, 10, 15, 20, 30, 45, 65, 90, 125 };
-            float[] multipliers = { 1f, 1f, 1.15f, 1.30f, 1.45f, 1.60f, 1.75f, 1.90f, 2.05f, 2.20f, 2.35f };
-            int[] hireBase = { 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 70 };
+            double[] multipliers = { 1d, 1.5d, 2.25d, 3.25d, 4.5d, 6d, 8d, 10.5d, 13.5d, 17d, 21d };
             for (int tier = 0; tier < speedBase.Length; tier++)
             {
-                int expected = Mathf.CeilToInt(speedBase[tier] * multipliers[level] / 5f) * 5;
-                Assert.AreEqual(expected, Get(sim, "SpeedCost")); Assert.IsTrue((bool)Call(sim, "TryUpgradeSpeed"));
+                int expected = CeilToFive(speedBase[tier] * multipliers[level]);
+                Assert.AreEqual(expected, Get(sim, "SpeedCost"), "Level " + (level + 1) + " speed buy " + (tier + 1));
+                Assert.IsTrue((bool)Call(sim, "TryUpgradeSpeed"));
             }
-            Assert.AreEqual(9, Get(sim, "SpeedLevel")); Assert.AreEqual(0, Get(sim, "SpeedCost"));
-            for (int tier = 0; tier < 4; tier++)
+            Assert.AreEqual(9, Get(sim, "SpeedLevel"));
+            Assert.That((float)Get(sim, "WorkRate"), Is.EqualTo(1.9f).Within(.0001f));
+            Assert.AreEqual(0, Get(sim, "SpeedCost"));
+            Assert.IsFalse((bool)Get(sim, "CanUpgradeSpeed"));
+            int coinsAtMax = (int)Get(sim, "Coins");
+            Assert.IsFalse((bool)Call(sim, "TryUpgradeSpeed"));
+            Assert.AreEqual(coinsAtMax, Get(sim, "Coins"), "The ×1.90 maximum must not charge a tenth purchase.");
+        }
+
+        private static int CeilToFive(double amount) => (int)(Math.Ceiling(amount / 5d) * 5d);
+        private static int ExpectedHireCost(int baseCost, int paidNumber)
+        {
+            double multiplier = paidNumber == 1 ? 1d : paidNumber == 2 ? 2.5d : paidNumber == 3 ? 5d
+                : paidNumber * (paidNumber + 1) / 2d - 1d;
+            return CeilToFive(baseCost * multiplier);
+        }
+
+        [Test]
+        public void RequiredSpeedPriceSamplesMatchTheOfficialElevenLevelTable()
+        {
+            int[][] samples =
             {
-                float[] factors = { 1f, 2.5f, 5f, 9f };
-                int expected = Mathf.CeilToInt(hireBase[level] * factors[tier] / 5f) * 5;
-                Assert.AreEqual(expected, Get(sim, "HireCost")); Assert.IsTrue((bool)Call(sim, "TryHire"));
+                new[] { 5, 125 }, new[] { 10, 190 }, new[] { 25, 565 },
+                new[] { 55, 1315 }, new[] { 105, 2625 }
+            };
+            int[] levels = { 0, 1, 4, 7, 10 };
+            for (int i = 0; i < levels.Length; i++)
+            {
+                object sim = Make(level: levels[i]); Start(sim); Set(sim, "Coins", 1000000);
+                Assert.AreEqual(samples[i][0], Get(sim, "SpeedCost"));
+                for (int tier = 0; tier < 8; tier++) Assert.IsTrue((bool)Call(sim, "TryUpgradeSpeed"));
+                Assert.AreEqual(samples[i][1], Get(sim, "SpeedCost"));
             }
-            Assert.AreEqual(5, Get(sim, "StaffCount")); Assert.AreEqual(0, Get(sim, "HireCost"));
-            Assert.IsFalse((bool)Get(sim, "CanHire"));
         }
 
         [TestCase(1)]
-        [TestCase(2)]
-        [TestCase(3)]
         [TestCase(4)]
-        public void CocacoleroUsesTheSharedHireCurveFromZeroToMax(int level)
+        [TestCase(10)]
+        public void CocacoleroUsesItsOwnUnboundedFifteenHireCurve(int level)
         {
-object sim = Make(level: level); Start(sim); Set(sim, "Coins", 100000);
-            int[] bases = { 0, 20, 25, 30, 35 }; float[] factors = { 1f, 2.5f, 5f, 9f };
-            for (int tier = 0; tier < 4; tier++)
+            object sim = Make(level: level); Start(sim); Set(sim, "Coins", 1000000);
+            int[] bases = { 20, 35, 70 };
+            int baseCost = level == 1 ? bases[0] : level == 4 ? bases[1] : bases[2];
+            for (int paidNumber = 1; paidNumber <= 15; paidNumber++)
             {
-                int expected = Mathf.CeilToInt(bases[level] * factors[tier] / 5f) * 5;
-                Assert.AreEqual(expected, Get(sim, "CocacoleroHireCost"));
+                Assert.AreEqual(ExpectedHireCost(baseCost, paidNumber), Get(sim, "CocacoleroHireCost"));
                 Assert.IsTrue((bool)Call(sim, "TryHire", Role("Cocacolero")));
             }
-            Assert.AreEqual(4, Get(sim, "CocacoleroCount"));
-            Assert.AreEqual(4, Call(sim, "MaxWorkersForRole", Role("Cocacolero")));
-            Assert.AreEqual(0, Get(sim, "CocacoleroHireCost")); Assert.IsFalse((bool)Get(sim, "CanHireCocacolero"));
+            Assert.AreEqual(15, Get(sim, "CocacoleroCount"));
+            Assert.AreEqual(ExpectedHireCost(baseCost, 16), Get(sim, "CocacoleroHireCost"));
+            Assert.AreEqual(int.MaxValue, Call(sim, "MaxWorkersForRole", Role("Cocacolero")));
+        }
+
+        [Test]
+        public void StartingANewAttemptResetsUnlimitedTeamAndSpeedToTheOneFreeWorker()
+        {
+            object sim = Make(level: 4); Start(sim); Set(sim, "Coins", 1000000);
+            foreach (string role in new[] { "Parrillero", "Cocacolero", "ParrilleroPremium", "Fernetero" })
+                for (int i = 0; i < 5; i++) Assert.IsTrue((bool)Call(sim, "TryHire", Role(role)));
+            for (int i = 0; i < 9; i++) Assert.IsTrue((bool)Call(sim, "TryUpgradeSpeed"));
+            Assert.AreEqual(21, Get(sim, "StaffCount"));
+            Assert.That((float)Get(sim, "WorkRate"), Is.EqualTo(1.9f).Within(.0001f));
+            Call(sim, "StartRound");
+            Assert.AreEqual(1, Get(sim, "ParrilleroCount"));
+            Assert.AreEqual(0, Get(sim, "CocacoleroCount"));
+            Assert.AreEqual(0, Get(sim, "ParrilleroPremiumCount"));
+            Assert.AreEqual(0, Get(sim, "FerneteroCount"));
+            Assert.AreEqual(1, Get(sim, "StaffCount"));
+            Assert.AreEqual(0, Get(sim, "SpeedLevel"));
+            Assert.AreEqual(1f, Get(sim, "WorkRate"));
         }
 
 [Test]
@@ -1172,7 +1260,7 @@ object balance = NewBalance();
             object allBoys = Make(level: 0, balance: balance), chicago = Make(level: 1, balance: balance), velez = Make(level: 2, balance: balance);
             Assert.AreEqual(15, Get(allBoys, "HireCost")); Assert.AreEqual(5, Get(allBoys, "SpeedCost"));
             Assert.AreEqual(20, Get(chicago, "HireCost")); Assert.AreEqual(20, Get(chicago, "CocacoleroHireCost"));
-            Assert.AreEqual(25, Get(velez, "HireCost")); Assert.AreEqual(10, Get(velez, "SpeedCost"));
+            Assert.AreEqual(25, Get(velez, "HireCost")); Assert.AreEqual(15, Get(velez, "SpeedCost"));
         }
 
 
@@ -1213,8 +1301,8 @@ public void LaterLevelPurchasesResumeAtTheNextTableTier()
             Start(sim); Set(sim, "Coins", 100);
             Assert.IsTrue((bool)Call(sim, "TryHire", Role("Cocacolero")));
             Call(sim, "TryUpgradeSpeed"); Call(sim, "TryUpgradeSpeed");
-            Assert.AreEqual(20, Get(sim, "HireCost")); Assert.AreEqual(50, Get(sim, "CocacoleroHireCost")); Assert.AreEqual(15, Get(sim, "SpeedCost"));
-            Assert.AreEqual(65, Get(sim, "Coins")); Assert.That((float)Get(sim, "WorkRate"), Is.EqualTo(1.2f).Within(.0001f));
+            Assert.AreEqual(20, Get(sim, "HireCost")); Assert.AreEqual(50, Get(sim, "CocacoleroHireCost")); Assert.AreEqual(25, Get(sim, "SpeedCost"));
+            Assert.AreEqual(55, Get(sim, "Coins")); Assert.That((float)Get(sim, "WorkRate"), Is.EqualTo(1.2f).Within(.0001f));
         }
 
         [Test]

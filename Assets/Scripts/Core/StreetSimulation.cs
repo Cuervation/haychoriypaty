@@ -38,12 +38,13 @@ namespace HayChoriYPaty
         [Range(1, 21)] public int maxCustomers = 21;
         public int randomSeed = 1337;
         [Range(.1f,4f)] public float priceSensitivity=2.5f;
-        [Min(1)] public int maxStaff = 5;
-        [Tooltip("Zero inherits maxStaff; each specialty has an independent cap.")]
-        [Min(0)] public int maxParrilleros;
-        [Min(0)] public int maxCocacoleros;
-        [Min(0)] public int maxPremiumParrilleros;
-        [Min(0)] public int maxFerneteros;
+        [HideInInspector, Tooltip("Legacy serialized limit retained for save/scene compatibility; worker hiring is unlimited when the role is enabled.")]
+        public int maxStaff = 5;
+        [HideInInspector, Tooltip("Legacy serialized role caps retained for scene compatibility; ignored by runtime hiring.")]
+        public int maxParrilleros;
+        [HideInInspector] public int maxCocacoleros;
+        [HideInInspector] public int maxPremiumParrilleros;
+        [HideInInspector] public int maxFerneteros;
         [Tooltip("All current clubs temporarily use the same profile; add profiles and remap levels for future club-specific economy.")]
         public StreetUpgradeCostProfile[] upgradeCostProfiles = { new StreetUpgradeCostProfile() };
         [Tooltip("Profile index used per level; all current levels share profile 0.")]
@@ -87,16 +88,16 @@ namespace HayChoriYPaty
             return new[]
             {
                 new StreetLevelBalance(new[] {200,0,0,0,0,0,0}, new[] {15,0,0,0}, 1f),
-                new StreetLevelBalance(new[] {200,0,0,0,200,0,0}, new[] {20,20,0,0}, 1f),
-                new StreetLevelBalance(new[] {180,120,0,0,150,0,0}, new[] {25,25,0,0}, 1.15f),
-                new StreetLevelBalance(new[] {185,125,60,0,155,0,75}, new[] {30,30,35,0}, 1.30f),
-                new StreetLevelBalance(new[] {190,130,70,65,160,65,80}, new[] {35,35,45,40}, 1.45f),
-                new StreetLevelBalance(new[] {210,145,80,75,175,75,90}, new[] {40,40,50,45}, 1.60f),
-                new StreetLevelBalance(new[] {230,165,100,85,195,80,105}, new[] {45,45,55,50}, 1.75f),
-                new StreetLevelBalance(new[] {250,180,110,95,210,90,115}, new[] {50,50,65,55}, 1.90f),
-                new StreetLevelBalance(new[] {275,195,120,110,225,100,125}, new[] {55,55,70,65}, 2.05f, 50),
-                new StreetLevelBalance(new[] {310,220,135,125,255,110,145}, new[] {60,60,80,70}, 2.20f, 150),
-                new StreetLevelBalance(new[] {345,245,150,140,285,120,165}, new[] {70,70,90,80}, 2.35f, 200)
+                new StreetLevelBalance(new[] {200,0,0,0,200,0,0}, new[] {20,20,0,0}, 1.5f),
+                new StreetLevelBalance(new[] {180,120,0,0,150,0,0}, new[] {25,25,0,0}, 2.25f),
+                new StreetLevelBalance(new[] {185,125,60,0,155,0,75}, new[] {30,30,35,0}, 3.25f),
+                new StreetLevelBalance(new[] {190,130,70,65,160,65,80}, new[] {35,35,45,40}, 4.50f),
+                new StreetLevelBalance(new[] {210,145,80,75,175,75,90}, new[] {40,40,50,45}, 6.00f),
+                new StreetLevelBalance(new[] {230,165,100,85,195,80,105}, new[] {45,45,55,50}, 8.00f),
+                new StreetLevelBalance(new[] {250,180,110,95,210,90,115}, new[] {50,50,65,55}, 10.50f),
+                new StreetLevelBalance(new[] {275,195,120,110,225,100,125}, new[] {55,55,70,65}, 13.50f, 50),
+                new StreetLevelBalance(new[] {310,220,135,125,255,110,145}, new[] {60,60,80,70}, 17.00f, 150),
+                new StreetLevelBalance(new[] {345,245,150,140,285,120,165}, new[] {70,70,90,80}, 21.00f, 200)
             };
         }
 
@@ -290,7 +291,7 @@ namespace HayChoriYPaty
         private static readonly float[] DefaultDemandMultipliers = { 1f, 1.1f, 1.2f, 1.35f, 1.5f, 1.65f, 1.815f, 1.9965f, 2.19615f, 2.415765f, 2.6573415f };
         private static readonly int[] DefaultSpeedCosts = { 5, 10, 15, 20, 30, 45, 65, 90, 125 };
         private static readonly float[] DefaultDurations = { 120f, 180f, 180f, 210f, 240f, 255f, 270f, 295f, 300f, 300f, 300f };
-        private static readonly float[] PaidHireTierMultipliers = { 1f, 2.5f, 5f, 9f };
+        private const int MaxHireCost = int.MaxValue - int.MaxValue % 5;
         private readonly StreetBalance balance;
         private readonly int[][] availableProductsByLevel;
         private readonly List<StreetCustomer> customers = new List<StreetCustomer>();
@@ -370,30 +371,53 @@ namespace HayChoriYPaty
         public int WorkerCount(StreetWorkerRole role) { int count = 0; foreach (var worker in workers) if (worker.Role == role) count++; return count; }
         public int MaxWorkersForRole(StreetWorkerRole role)
         {
-            if (!HasRole(role)) return 0;
-            int configured = role == StreetWorkerRole.Parrillero ? balance.maxParrilleros :
-                role == StreetWorkerRole.Cocacolero ? balance.maxCocacoleros :
-                role == StreetWorkerRole.ParrilleroPremium ? balance.maxPremiumParrilleros : balance.maxFerneteros;
-            int naturalCap = role == StreetWorkerRole.Parrillero ? 5 : 4;
-            int configuredCap = configured > 0 ? configured : Mathf.Min(balance.maxStaff, naturalCap);
-            return Mathf.Clamp(configuredCap, 1, naturalCap);
+            // This legacy query now reports the representable count range, not a gameplay cap.
+            return HasRole(role) ? int.MaxValue : 0;
         }
         public int HireCostForRole(StreetWorkerRole role)
         {
-            int count = WorkerCount(role);
-            if (count >= MaxWorkersForRole(role)) return 0;
-            int paidIndex = role == StreetWorkerRole.Parrillero ? Mathf.Max(0, count - 1) : count;
-            if (paidIndex < 0 || paidIndex >= PaidHireTierMultipliers.Length) return 0;
+            if (!HasRole(role)) return 0;
+            long paidNumber = role == StreetWorkerRole.Parrillero
+                ? Math.Max(1, WorkerCount(role)) // The opening Parrillero is free.
+                : (long)WorkerCount(role) + 1;
             int baseCost = balance.GetHireBaseCost(LevelIndex, role);
             if (baseCost <= 0) return 0;
-            return Mathf.CeilToInt(baseCost * PaidHireTierMultipliers[paidIndex] / 5f) * 5;
+
+            // Preserve x1, x2.5 and x5, then extend the fourth-tier x9 curve with
+            // n(n+1)/2-1. Work with exact integer ratios, and saturate only at the
+            // largest positive $5 multiple representable by Coins (not a hire cap).
+            return ComputeHireCost(baseCost, paidNumber);
+        }
+        private static int ComputeHireCost(int baseCost, long paidNumber)
+        {
+            if (baseCost <= 0 || paidNumber <= 0) return 0;
+            long factorNumerator;
+            long denominator;
+            if (paidNumber == 1) { factorNumerator = 1; denominator = 1; }
+            else if (paidNumber == 2) { factorNumerator = 5; denominator = 2; }
+            else if (paidNumber == 3) { factorNumerator = 5; denominator = 1; }
+            else
+            {
+                if (paidNumber == long.MaxValue) return MaxHireCost;
+                long left = paidNumber, right = paidNumber + 1;
+                if ((left & 1L) == 0) left /= 2; else right /= 2;
+                if (left > long.MaxValue / right) return MaxHireCost;
+                factorNumerator = left * right - 1;
+                denominator = 1;
+            }
+
+            long allowedNumerator = (long)MaxHireCost * denominator;
+            if (factorNumerator > allowedNumerator / baseCost) return MaxHireCost;
+            long numerator = factorNumerator * baseCost;
+            long priceStep = denominator * 5;
+            long rounded = ((numerator + priceStep - 1) / priceStep) * 5;
+            return (int)Math.Min(rounded, MaxHireCost);
         }
         public bool CanHireRole(StreetWorkerRole role)
         {
-            int workerCount = WorkerCount(role);
             int hireCost = HireCostForRole(role);
             return (Phase == RoundPhase.Ready || Phase == RoundPhase.Playing) &&
-                   workerCount < MaxWorkersForRole(role) && hireCost > 0 && Coins >= hireCost;
+                   HasRole(role) && hireCost > 0 && Coins >= hireCost;
         }
         public int SpeedLevel { get; private set; }
         public bool CanEditPrices { get { return false; } }
@@ -525,8 +549,9 @@ namespace HayChoriYPaty
             // Legacy explicit Ready-state composition helper; StreetGame never applies save purchases through it.
             if (Phase != RoundPhase.Ready) return;
             workers.Clear(); nextWorker = 1;
-            for (int i = 0; i < Mathf.Clamp(parrilleros, 1, MaxWorkersForRole(StreetWorkerRole.Parrillero)); i++) AddWorker(StreetWorkerRole.Parrillero);
-            for (int i = 0; i < Mathf.Clamp(cocacoleros, 0, MaxWorkersForRole(StreetWorkerRole.Cocacolero)); i++) AddWorker(StreetWorkerRole.Cocacolero);
+            for (int i = 0; i < Math.Max(1, parrilleros); i++) AddWorker(StreetWorkerRole.Parrillero);
+            if (HasRole(StreetWorkerRole.Cocacolero))
+                for (int i = 0; i < Math.Max(0, cocacoleros); i++) AddWorker(StreetWorkerRole.Cocacolero);
         }
         public bool TryUpgradeSpeed()
         {

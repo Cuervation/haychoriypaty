@@ -63,24 +63,25 @@ A real completed handoff alone increments that product's delivered count and awa
 | Level | First paid Parrillero | Cocacolero | Premium | Fernetero | Speed-cost multiplier | Opening coins |
 |---|---:|---:|---:|---:|---:|---:|
 | 1 | 15 | — | — | — | 1.00 | 0 |
-| 2 | 20 | 20 | — | — | 1.00 | 0 |
-| 3 | 25 | 25 | — | — | 1.15 | 0 |
-| 4 | 30 | 30 | 35 | — | 1.30 | 0 |
-| 5 | 35 | 35 | 45 | 40 | 1.45 | 0 |
-| 6 | 40 | 40 | 50 | 45 | 1.60 | 0 |
-| 7 | 45 | 45 | 55 | 50 | 1.75 | 0 |
-| 8 | 50 | 50 | 65 | 55 | 1.90 | 0 |
-| 9 | 55 | 55 | 70 | 65 | 2.05 | 50 |
-| 10 | 60 | 60 | 80 | 70 | 2.20 | 150 |
-| 11 | 70 | 70 | 90 | 80 | 2.35 | 200 |
+| 2 | 20 | 20 | — | — | 1.50 | 0 |
+| 3 | 25 | 25 | — | — | 2.25 | 0 |
+| 4 | 30 | 30 | 35 | — | 3.25 | 0 |
+| 5 | 35 | 35 | 45 | 40 | 4.50 | 0 |
+| 6 | 40 | 40 | 50 | 45 | 6.00 | 0 |
+| 7 | 45 | 45 | 55 | 50 | 8.00 | 0 |
+| 8 | 50 | 50 | 65 | 55 | 10.50 | 0 |
+| 9 | 55 | 55 | 70 | 65 | 13.50 | 50 |
+| 10 | 60 | 60 | 80 | 70 | 17.00 | 150 |
+| 11 | 70 | 70 | 90 | 80 | 21.00 | 200 |
 
-The first Parrillero is free (max five total); each other role has a max of four. Each role's independent successive paid-hire multipliers are ×1, ×2.5, ×5 and ×9, rounded up to a $5 multiple. Speed remains +10% per upgrade to ×1.90; base costs are $5/$10/$15/$20/$30/$45/$65/$90/$125, multiplied by the level factor above and rounded up to $5. Attempt opening coins are a disclosed balance adjustment: levels 1–8 begin at $0, levels 9–11 at the table values. They are not earned revenue, never carry over and reset on a fresh attempt.
+The first Parrillero is free. All four roles can be hired without a worker-count cap whenever that role is enabled in the level and the next hire is affordable; each role has its own count-based price progression. For paid hire n, preserve multipliers ×1, ×2.5 and ×5 for n=1–3, then use n×(n+1)/2−1 from n=4 onward (×9, ×14, ×20, ×27, ×35, ×44, ×54 at n=4–10), rounded up to a $5 multiple. Saturate only at the largest representable positive $5 price; this is numeric overflow protection, not a gameplay cap. Speed remains +10% per upgrade to ×1.90; its base costs are $5/$10/$15/$20/$30/$45/$65/$90/$125, multiplied by the exact level factor above and rounded up to $5. Attempt opening coins are a disclosed balance adjustment: levels 1–8 begin at $0, levels 9–11 at the table values. They are not earned revenue, never carry over and reset on a fresh attempt.
 
 Quota-aware demand retains random 1–4 quantities and mixed tickets (up to five unlocked products), weighting every product in the level catalog by outstanding goal deficit/time independently of hired staff. A missing specialist does not suppress demand: those order lines wait under normal customer patience and become serviceable if the responsible worker is hired later. Delivery/revenue still requires that responsible worker and a real handoff; no synthetic delivery is allowed. Completed quotas stay visible and may still sell for real revenue. Role responsibilities, stations, routes, stock and handoff accounting remain unchanged. Victory requires every unlocked product quota.
 
 - [x] The code centralizes all 11 per-ID quota, hire, speed-multiplier and opening-balance rows; the real simulation identified the Level-8 deadline and Level-9–11 opening-balance adjustments recorded above.
 - [x] Order generation uses the full enabled level catalog regardless of hired specialists; focused Unity EditMode checks confirmed first-customer Coca in Chicago and Vélez, every enabled product across all 11 levels without extra hires, no locked products, preserved mixed 1–4-unit tickets, and that a waiting Coca order earns nothing until a Cocacolero is hired and completes the real handoff (4/4 cases).
 - [ ] Focused Unity EditMode checks verify every table row, attempt-entry path, quota predicate and real handoff accounting after the adjustment.
+- [ ] Focused tests verify unbounded role-local hiring and cost scaling, all eleven speed tables, attempt reset baseline, parallel handoffs and idle-worker visibility.
 - [ ] Representative real-simulation strategies A–D complete all levels; results and any limitations are recorded in [status](../status.md).
 - [ ] Review quota HUD/results and portrait layout in the active Unity Game view.
 
@@ -144,9 +145,9 @@ Every construction/load, level selection, next-level entry, StartRound and retry
 - Workers automatically reserve an outstanding unit, move to its station, pick up, carry to the customer's handoff position, deliver, then repeat. A configurable short station/condiment delay can remain automatic, but must not interrupt the circuit with manual cooking. Food always includes bread; condiments remain automatic and are never extra products.
 - For each outbound, return, and successive-unit leg, compute the shortest traversable route from the worker's actual current feet position to the exact pickup/handoff. Use a direct diagonal when its full segment is clear; otherwise route around active solid station bases using the 36×12 feet geometry. A table/Fernet solid is only its front base band; a barrel uses its full footprint; an active grill uses its physical bounds. Compute the return independently; never force the outbound waypoints in reverse or send an employee to its home point between assigned units. Keep reservations, specialty ownership, physical item IDs, pickup/handoff delays, speed and delivery/income rules unchanged. Do not introduce worker-vs-worker collisions, NavMesh or packages. Apply identically to all four worker roles and every catalog/future level.
 - On Nueva Chicago, keep idle workers and every handoff at logical y=485 on the player-side floor, below the counter front (bottom y=384). Their station route may approach the grill/table/barrel, but must never send the parrillero across or visually through the counter. Vélez uses one wide two-zone Chori/Paty grill plus the separate Coca barrel; food approaches use the clear side lanes around the grill, and the Cocacolero uses the barrel approach. Do not walk a worker through the hot cooking surface. Other levels retain their existing handoff positions.
-- Hire up to five independently moving workers by default. Reservations prevent duplicate delivery to the same final unit; clients that leave release reservations, and in-flight workers cancel safely without earning coins or decrementing another order. Delivery refreshes customer patience. Waiting expiry makes the customer leave and compacts that same FIFO column, without changing the identities/orders/patience of those advancing.
+- Hire an unlimited number of independently moving Parrilleros, Cocacoleros, Premium Parrilleros and Ferneteros when that role is enabled in the level and its next price is affordable. Each hire keeps a role-local price progression and independent worker identity/reservations; parallel assignments must not duplicate a final unit, delivery or payment. Clients that leave release reservations, and in-flight workers cancel safely without earning coins or decrementing another order. Delivery refreshes customer patience. Waiting expiry makes the customer leave and compacts that same FIFO column, without changing the identities/orders/patience of those advancing. Overlapping inactive worker sprites are suppressed until dispatch; the existing HUD continues to show the simulation worker count.
 - Simulation position/state is authoritative: revenue and quantity changes are gated by arrival and handoff, not by an unrelated view timer. View animates entering/waiting/receiving/exiting customers and directional worker walking/pickup/carry/handoff; coin amount/effect, upgrade and hire feedback reflect actual events.
-- Speed/hire purchases use the per-level tables above, role-independent hire tiers, five Parrilleros/four of each specialist caps, and a ×1.90 speed maximum. Purchases update the next cost and affect productivity immediately. Reject insufficient-funds or capped purchases without side effects, and dispatch each tap exactly once.
+- Hire purchases use per-level/per-role base costs with the unbounded paid-hire formula above. Speed alone has nine purchases, +10% each to ×1.90, using the per-level table above. Purchases update the next cost and affect productivity immediately. Reject disabled-role, insufficient-funds and maximum-speed purchases without side effects, and dispatch each tap exactly once.
 - Every level wins immediately only when all its per-product quotas are met by real handoffs; a total-unit sum is informational and cannot substitute. At the deadline, any outstanding product quota causes loss and the level's normal trifulca. Freeze remaining handoffs on victory. Results show completed/pending products, delivered units and time remaining; successful completion unlocks the next location. Do not require clearing every customer to win.
 
 ## Historical shared upgrade economy — superseded 2026-10-08

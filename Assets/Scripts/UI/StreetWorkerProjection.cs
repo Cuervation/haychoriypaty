@@ -36,6 +36,7 @@ namespace HayChoriYPaty
         private readonly Dictionary<SpriteKey, Sprite> sprites = new Dictionary<SpriteKey, Sprite>();
         private readonly HashSet<int> liveIds = new HashSet<int>();
         private readonly List<int> stale = new List<int>();
+        private readonly HashSet<Vector2Int> idleFootprintCells = new HashSet<Vector2Int>();
         private readonly Texture2D extension, premiumExtension, fernetExtension;
         private Texture2D normal, diagonal, premium, premiumDiagonal, drink, fernet;
         private bool matched;
@@ -61,6 +62,45 @@ namespace HayChoriYPaty
             this.drink = drink; this.fernet = fernet; this.matched = matched;
         }
         private static bool Beverage(StreetWorker w) => w.Role == StreetWorkerRole.Cocacolero || w.Role == StreetWorkerRole.Fernetero;
+        internal static bool IsObscuredIdleWorker(IReadOnlyList<StreetWorker> allWorkers, StreetWorker candidate, float verticalScale)
+        {
+            if (candidate == null || candidate.State != StreetWorkerState.Idle) return false;
+            Rect bounds = IdleBounds(candidate, verticalScale);
+            for (int i = 0; i < allWorkers.Count; i++)
+            {
+                StreetWorker other = allWorkers[i];
+                if (other == null || other == candidate || other.Id >= candidate.Id || other.State != StreetWorkerState.Idle) continue;
+                if (bounds.Overlaps(IdleBounds(other, verticalScale))) return true;
+            }
+            return false;
+        }
+        private static Rect IdleBounds(StreetWorker worker, float verticalScale)
+        {
+            float scale = Mathf.Max(.01f, verticalScale);
+            return new Rect(worker.Position.x - Width * .5f, (worker.Position.y - Height) * scale, Width, Height * scale);
+        }
+        private static void IdleCellRange(Rect bounds, float verticalScale, out int minX, out int maxX, out int minY, out int maxY)
+        {
+            float cellHeight = Height * Mathf.Max(.01f, verticalScale) * .5f;
+            minX = Mathf.FloorToInt(bounds.xMin / (Width * .5f));
+            maxX = Mathf.FloorToInt((bounds.xMax - .001f) / (Width * .5f));
+            minY = Mathf.FloorToInt(bounds.yMin / cellHeight);
+            maxY = Mathf.FloorToInt((bounds.yMax - .001f) / cellHeight);
+        }
+        private bool HasVisibleIdleOverlap(Rect bounds, float verticalScale)
+        {
+            IdleCellRange(bounds, verticalScale, out int minX, out int maxX, out int minY, out int maxY);
+            for (int x = minX; x <= maxX; x++)
+                for (int y = minY; y <= maxY; y++)
+                    if (idleFootprintCells.Contains(new Vector2Int(x, y))) return true;
+            return false;
+        }
+        private void OccupyIdleFootprint(Rect bounds, float verticalScale)
+        {
+            IdleCellRange(bounds, verticalScale, out int minX, out int maxX, out int minY, out int maxY);
+            for (int x = minX; x <= maxX; x++)
+                for (int y = minY; y <= maxY; y++) idleFootprintCells.Add(new Vector2Int(x, y));
+        }
         private Texture2D BaseTexture(StreetWorker w) => Beverage(w) ? (w.Role == StreetWorkerRole.Fernetero ? fernet : drink)
             : w.Role == StreetWorkerRole.ParrilleroPremium ? premium : normal;
         private Texture2D Extension(StreetWorker w) => w.Role == StreetWorkerRole.ParrilleroPremium ? premiumExtension
@@ -151,10 +191,19 @@ namespace HayChoriYPaty
         {
             if (!Ready) return;
             liveIds.Clear();
+            idleFootprintCells.Clear();
             foreach (StreetWorker w in sim.Workers)
             {
                 liveIds.Add(w.Id); Visual v;
                 if (!workers.TryGetValue(w.Id,out v)) v = Create(w.Id);
+                Rect idleBounds = w.State == StreetWorkerState.Idle ? IdleBounds(w, verticalScale) : default(Rect);
+                if (w.State == StreetWorkerState.Idle && HasVisibleIdleOverlap(idleBounds, verticalScale))
+                {
+                    if (v.Root.gameObject.activeSelf) v.Root.gameObject.SetActive(false);
+                    continue;
+                }
+                if (!v.Root.gameObject.activeSelf) v.Root.gameObject.SetActive(true);
+                if (w.State == StreetWorkerState.Idle) OccupyIdleFootprint(idleBounds, verticalScale);
                 StreetWorkerPose pose = StreetWorkerAnimation.Sample(w);
                 int contact = pose.Frame >= 2 ? 1 : 0;
                 Art upper = pose.Carrying ? Carry(w,pose.Facing) : Walk(w,pose.Facing,contact,pose.Moving);

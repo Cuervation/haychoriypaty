@@ -1,5 +1,9 @@
 # Project status
 
+## Unlimited workers and speed-price scale — 2026-10-09
+
+Removed employee-count caps for all catalog-enabled roles while preserving the free opening Parrillero, per-level/role base costs, and independent paid-hire curves (x1/x2.5/x5, then n(n+1)/2−1 with safe $5 rounding). Updated all eleven speed multipliers; the existing nine +10% speed purchases still stop at ×1.90. Idle overlapping worker visuals are suppressed without moving simulation workers or changing routes, and legacy cap/save fields remain compatible but no longer constrain hiring. Focused EditMode/PlayMode regression tests were updated/added for 15 hires per role, legacy caps, 15 workers servicing real handoffs, price overflow, exact speed pricing, attempt reset, and idle sprite visibility. `git diff --check` and static source/table arithmetic checks passed. Unity MCP returned no active editor instance; the Unity Editor could not compile or run the focused tests, so runtime validation remains pending. No APK built.
+
 ## Orders independent of hired specialists — 2026-10-09
 
 Removed employee-count filtering from quota-balanced order generation; demand now draws only from the active level catalog and existing quota/time weights. Coca and other specialist products may be requested before hiring; lines wait normally and require the correct worker plus a real handoff for delivery and revenue. Unity 6000.6.3f1 focused EditMode validation passed 4/4 cases: first-customer Coca in Chicago/Vélez, all enabled catalogs across 11 levels with zero specialists hired, no locked products, mixed 1–4 quantities, and a pre-existing Coca order remaining pending without fake delivery then served after Cocacolero hire. No APK or broader suite run.

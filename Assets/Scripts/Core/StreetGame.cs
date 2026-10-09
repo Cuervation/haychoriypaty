@@ -107,7 +107,7 @@ namespace HayChoriYPaty
                 data.unlockedLevel = Mathf.Clamp(data.unlockedLevel, 0, StreetSimulation.LevelNames.Length - 1);
                 data.price = Mathf.Clamp(data.price, balance.minPrice, balance.maxPrice);
                 data.coins = 0; // Legacy balances are not transferable to a newly loaded attempt.
-                data.staff = Mathf.Clamp(data.staff, 1, balance.maxStaff);
+                data.staff = Mathf.Max(1, data.staff);
                 data.speed = Mathf.Max(0, data.speed);
                 return data;
             }

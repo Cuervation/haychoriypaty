@@ -95,5 +95,50 @@ namespace HayChoriYPaty.Tests
             finally { UnityEngine.Object.Destroy(root); }
             yield return null;
         }
+
+        [UnityTest]
+        public IEnumerator OverlappingIdleWorkersAreHiddenUntilTheyBecomeActive()
+        {
+            var root = new GameObject("Idle worker overlap acceptance");
+            try
+            {
+                object sim = Activator.CreateInstance(T("StreetSimulation"), new object[] { Activator.CreateInstance(T("StreetBalance")), 4, 5f, 0, 1, 0 });
+                Call(sim, "StartRound"); Set(sim, "Coins", 100000);
+                foreach (string role in new[] { "Parrillero", "Cocacolero", "ParrilleroPremium", "Fernetero" })
+                    Assert.IsTrue((bool)Call(sim, "TryHire", Enum.Parse(T("StreetWorkerRole"), role)));
+                var workers = (IList)Get(sim, "Workers");
+                var renderer = root.AddComponent(T("StreetKitchenRenderer"));
+                Texture2D normal = Resources.Load<Texture2D>("street-parrillero");
+                Texture2D diagonal = Resources.Load<Texture2D>("street-parrillero-diagonal-v1");
+                Texture2D beverage = Resources.Load<Texture2D>("street-cocacolero-levels3-5-v1");
+                Call(renderer, "Prepare", sim, 1f, 960f);
+                Call(renderer, "PrepareWorkers", normal, diagonal, normal, diagonal, beverage, beverage, true);
+                Assert.IsTrue((bool)Get(renderer, "WorkersReady"));
+                object projection = Field(renderer, "workerProjection");
+                var views = (IDictionary)Field(projection, "workers");
+                Assert.AreEqual(5, views.Count, "All purchased workers remain represented by independent visual objects.");
+                Assert.AreEqual(1, CountActive(views), "Only one identical idle pose should be visible at the shared home point.");
+
+                object dispatched = workers[1];
+                Set(dispatched, "State", Enum.Parse(T("StreetWorkerState"), "ToStation"));
+                Set(dispatched, "Position", new Vector2(300f, 450f));
+                Set(dispatched, "Target", new Vector2(330f, 430f));
+                Call(renderer, "PrepareWorkers", normal, diagonal, normal, diagonal, beverage, beverage, true);
+                Assert.AreEqual(2, CountActive(views), "A dispatched worker becomes visible without shifting its route.");
+            }
+            finally { UnityEngine.Object.Destroy(root); }
+            yield return null;
+        }
+
+        private static int CountActive(IDictionary views)
+        {
+            int count = 0;
+            foreach (DictionaryEntry entry in views)
+            {
+                Transform root = (Transform)entry.Value.GetType().GetField("Root", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).GetValue(entry.Value);
+                if (root.gameObject.activeSelf) count++;
+            }
+            return count;
+        }
     }
 }

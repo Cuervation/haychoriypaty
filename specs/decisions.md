@@ -205,3 +205,8 @@ Widen both barrels20% horizontally while retaining their height, and scatter eac
 ## 2026-10-09 — Stabilize the late per-product quota economy
 
 Keep the requested per-product targets, fixed selling prices, employee hire-cost tables and speed-up costs. Real `StreetSimulation` seeds showed the specified all-zero opening economy could not reliably complete River–Los Redondos; instead of silently lowering quotas or changing prices, set River to 295 seconds and grant $50/$150/$200 at the start of Boca/Camioneros/Los Redondos. These are unearned attempt-local starting balances. Re-evaluate only with full route/production/multi-seed simulation; preserve all remaining specified values unless new evidence requires an explicit adjustment.
+
+
+## 2026-10-09 — Unlimited worker hiring; speed remains the only capped purchase
+
+Remove gameplay caps for Parrillero, Cocacolero, Premium Parrillero and Fernetero; the level catalog still controls role availability, and each role retains an independent count-based price progression. Keep the first three paid multipliers ×1/×2.5/×5, extend from paid hire four with n(n+1)/2−1, and round up to $5. Treat serialized maxStaff/role-cap fields as ignored compatibility data. Prevent permanently overlapping idle sprites in the existing worker projection without changing simulation positions, routes, stations or worker assignments. Replace the eleven speed multipliers exactly as specified in the authoritative street-automation table; speed remains +10% and capped at ×1.90.

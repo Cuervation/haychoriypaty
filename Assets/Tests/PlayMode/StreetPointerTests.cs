@@ -492,7 +492,7 @@ namespace HayChoriYPaty.Tests
         {
             yield return Click(270, 585);
             ((Behaviour)game).enabled = false; SetSim("Coins", 10000);
-            int[] hires = { 15, 30, 60, 100 };
+            int[] hires = { 15, 40, 75, 135, 210, 300 };
             int[] speeds = { 5, 10, 15, 20, 30, 45, 65, 90, 125 };
             int remaining = 10000;
             for (int i = 0; i < hires.Length; i++)
@@ -509,12 +509,12 @@ namespace HayChoriYPaty.Tests
                 Assert.AreEqual(i + 1, Sim.GetType().GetProperty("SpeedLevel").GetValue(Sim, null));
                 Assert.AreEqual(remaining, Sim.GetType().GetProperty("Coins").GetValue(Sim, null));
             }
-            Assert.AreEqual(0, Sim.GetType().GetProperty("HireCost").GetValue(Sim, null));
+            Assert.AreEqual(405, Sim.GetType().GetProperty("HireCost").GetValue(Sim, null), "Hire pricing continues beyond five workers.");
             Assert.AreEqual(0, Sim.GetType().GetProperty("SpeedCost").GetValue(Sim, null));
             yield return Click(395, 770); yield return Click(145, 770);
-            Assert.AreEqual(5, Sim.GetType().GetProperty("StaffCount").GetValue(Sim, null));
+            Assert.AreEqual(8, Sim.GetType().GetProperty("StaffCount").GetValue(Sim, null));
             Assert.AreEqual(9, Sim.GetType().GetProperty("SpeedLevel").GetValue(Sim, null));
-            Assert.AreEqual(9390, Sim.GetType().GetProperty("Coins").GetValue(Sim, null));
+            Assert.AreEqual(8415, Sim.GetType().GetProperty("Coins").GetValue(Sim, null));
         }
 
         [UnityTest]
@@ -683,8 +683,8 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(1, Sim.GetType().GetProperty("StaffCount").GetValue(Sim, null));
             Assert.AreEqual(0, Sim.GetType().GetProperty("SpeedLevel").GetValue(Sim, null));
             Assert.AreEqual(1f, Sim.GetType().GetProperty("WorkRate").GetValue(Sim, null));
-            Assert.AreEqual(15, Sim.GetType().GetProperty("HireCost").GetValue(Sim, null));
-            Assert.AreEqual(5, Sim.GetType().GetProperty("SpeedCost").GetValue(Sim, null));
+            Assert.AreEqual(25, Sim.GetType().GetProperty("HireCost").GetValue(Sim, null));
+            Assert.AreEqual(15, Sim.GetType().GetProperty("SpeedCost").GetValue(Sim, null));
 
             Invoke(game, "StartRound"); SetSim("Coins", 234);
             SetSim("Phase", Enum.Parse(Sim.GetType().GetProperty("Phase").PropertyType, "Lost"));
@@ -792,9 +792,9 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(1,Sim.GetType().GetProperty("FerneteroCount").GetValue(Sim));
             Assert.AreEqual(1,Sim.GetType().GetProperty("ParrilleroCount").GetValue(Sim));
             Assert.AreEqual(0,Sim.GetType().GetProperty("CocacoleroCount").GetValue(Sim));
-            Assert.AreEqual(9970,Sim.GetType().GetProperty("Coins").GetValue(Sim));
-            Assert.AreEqual(30,Sim.GetType().GetProperty("ParrilleroPremiumHireCost").GetValue(Sim));
-            Assert.AreEqual(30,Sim.GetType().GetProperty("FerneteroHireCost").GetValue(Sim));
+            Assert.AreEqual(9915,Sim.GetType().GetProperty("Coins").GetValue(Sim));
+            Assert.AreEqual(115,Sim.GetType().GetProperty("ParrilleroPremiumHireCost").GetValue(Sim));
+            Assert.AreEqual(100,Sim.GetType().GetProperty("FerneteroHireCost").GetValue(Sim));
         }
         private Rect CatalogCard(int action) => (Rect)view.GetType().GetMethod("CatalogUpgradeCardBounds",StaticPrivate).Invoke(null,new object[]{Sim,action});
 

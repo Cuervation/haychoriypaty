@@ -2014,6 +2014,7 @@ namespace HayChoriYPaty
 
         private void DrawWorker(StreetWorker w)
         {
+            if (StreetWorkerProjection.IsObscuredIdleWorker(game.Sim.Workers, w, layoutVerticalScale)) return;
             bool moving=w.State==StreetWorkerState.ToStation||w.State==StreetWorkerState.ToCounter;
             int levelIndex = game.Sim.LevelIndex;
             Texture2D cocacoleroArt = CocacoleroArtForLevel(levelIndex);

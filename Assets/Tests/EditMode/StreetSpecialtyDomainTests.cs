@@ -70,14 +70,14 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void FourSpecialtiesHireIndependentlyOnTheSharedConfiguredCurve()
+        public void FourSpecialtiesHireIndependentlyOnTheirLevelAndRoleBases()
         {
             object sim = Make(4, 10000);
             string[] countNames = { "ParrilleroCount", "CocacoleroCount", "ParrilleroPremiumCount", "FerneteroCount" };
             string[] costNames = { "ParrilleroHireCost", "CocacoleroHireCost", "ParrilleroPremiumHireCost", "FerneteroHireCost" };
             string[] roles = { "Parrillero", "Cocacolero", "ParrilleroPremium", "Fernetero" };
-            Assert.AreEqual(15, Get(sim, costNames[0]), "The free opening Parrillero leaves the first paid tier at $15.");
-            for (int i = 1; i < roles.Length; i++) Assert.AreEqual(15, Get(sim, costNames[i]));
+            int[] bases = { 35, 35, 45, 40 };
+            CollectionAssert.AreEqual(bases, Array.ConvertAll(costNames, name => (int)Get(sim, name)));
             for (int hiredRole = 0; hiredRole < roles.Length; hiredRole++)
             {
                 int[] beforeHire = new int[countNames.Length];
@@ -86,51 +86,70 @@ namespace HayChoriYPaty.Tests
                 for (int role = 0; role < roles.Length; role++)
                     Assert.AreEqual(beforeHire[role] + (role == hiredRole ? 1 : 0), Get(sim, countNames[role]),
                         roles[role] + " count changes only when that role is hired.");
+                Assert.AreEqual(CeilToFive(bases[hiredRole] * 2.5d), Get(sim, costNames[hiredRole]), "Only the hired role advances its own curve.");
             }
-            for (int i = 0; i < roles.Length; i++)
-                Assert.AreEqual(30, Get(sim, costNames[i]), roles[i] + " must advance only its own tier.");
             Assert.AreEqual(5, Get(sim, "StaffCount"));
         }
 
-
         [Test]
-        public void EachRoleHasAnIndependentFifteenThirtySixtyHundredThenMaxTier()
+        public void EveryRoleHasFifteenPaidHiresWithAnIndependentUnboundedProgression()
         {
-            object sim = Make(4, 100000);
+            object sim = Make(4, 1000000);
             string[] roles = { "Parrillero", "Cocacolero", "ParrilleroPremium", "Fernetero" };
             string[] costProperties = { "ParrilleroHireCost", "CocacoleroHireCost", "ParrilleroPremiumHireCost", "FerneteroHireCost" };
             string[] countProperties = { "ParrilleroCount", "CocacoleroCount", "ParrilleroPremiumCount", "FerneteroCount" };
-            int[] curve = { 15, 30, 60, 100 };
+            int[] bases = { 35, 35, 45, 40 };
             for (int roleIndex = 0; roleIndex < roles.Length; roleIndex++)
             {
                 int initialCount = (int)Get(sim, countProperties[roleIndex]);
-                for (int tier = 0; tier < curve.Length; tier++)
+                for (int paidNumber = 1; paidNumber <= 15; paidNumber++)
                 {
-                    Assert.AreEqual(curve[tier], Get(sim, costProperties[roleIndex]), roles[roleIndex] + " tier " + tier);
+                    Assert.AreEqual(ExpectedHireCost(bases[roleIndex], paidNumber), Get(sim, costProperties[roleIndex]),
+                        roles[roleIndex] + " paid hire " + paidNumber);
                     int[] otherCosts = new int[costProperties.Length];
                     for (int other = 0; other < roles.Length; other++) otherCosts[other] = (int)Get(sim, costProperties[other]);
-                    Assert.IsTrue((bool)Call(sim, "TryHire", Role(roles[roleIndex])));
-                    Assert.AreEqual(initialCount + tier + 1, Get(sim, countProperties[roleIndex]));
+                    Assert.IsTrue((bool)Call(sim, "TryHire", Role(roles[roleIndex])), roles[roleIndex] + " paid hire " + paidNumber);
+                    Assert.AreEqual(initialCount + paidNumber, Get(sim, countProperties[roleIndex]));
                     for (int other = 0; other < roles.Length; other++)
                         if (other != roleIndex) Assert.AreEqual(otherCosts[other], Get(sim, costProperties[other]), roles[other] + " tier must not advance");
+                    Assert.GreaterOrEqual((int)Get(sim, "Coins"), 0);
                 }
-                Assert.AreEqual(initialCount == 1 ? 5 : 4, Get(sim, countProperties[roleIndex]));
-                Assert.AreEqual(0, Get(sim, costProperties[roleIndex]));
-                Assert.IsFalse((bool)Get(sim, "CanHire" + roles[roleIndex]));
-                Assert.AreEqual(5, Call(sim, "MaxWorkersForRole", Role(roles[roleIndex])));
+                Assert.AreEqual(ExpectedHireCost(bases[roleIndex], 16), Get(sim, costProperties[roleIndex]));
+                Assert.IsTrue((bool)Call(sim, "CanHireRole", Role(roles[roleIndex])));
+                Assert.AreEqual(int.MaxValue, Call(sim, "MaxWorkersForRole", Role(roles[roleIndex])));
             }
-            Assert.AreEqual(17, Get(sim, "StaffCount"));
+            Assert.AreEqual(61, Get(sim, "StaffCount"));
         }
 
         [Test]
-        public void RoleSpecificHireCurvesCanInheritLevelProfileOrOverrideIndependently()
+        public void HireCostSaturatesAtTheLargestFiveDollarAmountWithoutOverflow()
+        {
+            MethodInfo compute = TypeOf("StreetSimulation").GetMethod("ComputeHireCost", BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.NotNull(compute);
+            int maxRoundedCost = int.MaxValue - int.MaxValue % 5;
+            Assert.AreEqual(35, compute.Invoke(null, new object[] { 35, 1L }));
+            Assert.AreEqual(maxRoundedCost, compute.Invoke(null, new object[] { 35, 2147483648L }));
+            Assert.AreEqual(maxRoundedCost, compute.Invoke(null, new object[] { 35, long.MaxValue }));
+            Assert.AreEqual(0, compute.Invoke(null, new object[] { -35, 15L }));
+            Assert.AreEqual(0, compute.Invoke(null, new object[] { 35, 0L }));
+        }
+
+        private static int ExpectedHireCost(int baseCost, int paidNumber)
+        {
+            double multiplier = paidNumber == 1 ? 1d : paidNumber == 2 ? 2.5d : paidNumber == 3 ? 5d
+                : paidNumber * (paidNumber + 1) / 2d - 1d;
+            return CeilToFive(baseCost * multiplier);
+        }
+        private static int CeilToFive(double amount) => (int)(Math.Ceiling(amount / 5d) * 5d);
+
+        [Test]
+        public void OfficialPerLevelRoleBasesIgnoreLegacyUpgradeProfiles()
         {
             object balance = NewBalance();
             Type balanceType = TypeOf("StreetBalance");
-            var costs = new[] { 15, 30, 60, 100 };
             var alternate = Activator.CreateInstance(TypeOf("StreetUpgradeCostProfile"));
             TypeOf("StreetUpgradeCostProfile").GetField("hireCosts", PublicInstance).SetValue(alternate, new[] { 17, 33, 66, 111 });
-            Set(alternate, "profileId", "PREMIUM_TEST");
+            Set(alternate, "profileId", "IGNORED_LEGACY_TEST");
             Array profiles = Array.CreateInstance(TypeOf("StreetUpgradeCostProfile"), 2);
             profiles.SetValue(((Array)balanceType.GetField("upgradeCostProfiles", PublicInstance).GetValue(balance)).GetValue(0), 0);
             profiles.SetValue(alternate, 1);
@@ -138,13 +157,12 @@ namespace HayChoriYPaty.Tests
             int[] roleOverrides = (int[])balanceType.GetField("roleHireCostProfileIds", PublicInstance).GetValue(balance);
             roleOverrides[2] = 1;
             object sim = Make(4, 1000, balance);
-            Assert.AreEqual(costs[0], Get(sim, "ParrilleroHireCost"));
-            Assert.AreEqual(17, Get(sim, "ParrilleroPremiumHireCost"));
+            Assert.AreEqual(35, Get(sim, "ParrilleroHireCost"));
+            Assert.AreEqual(45, Get(sim, "ParrilleroPremiumHireCost"));
             Assert.IsTrue((bool)Call(sim, "TryHire", Role("ParrilleroPremium")));
-            Assert.AreEqual(33, Get(sim, "ParrilleroPremiumHireCost"));
-            Assert.AreEqual(costs[0], Get(sim, "ParrilleroHireCost"));
+            Assert.AreEqual(CeilToFive(45 * 2.5d), Get(sim, "ParrilleroPremiumHireCost"));
+            Assert.AreEqual(35, Get(sim, "ParrilleroHireCost"));
         }
-
 
         [Test]
         public void FourRolesFulfillOneMixedTicketWithoutCrossSpecialtyHandoffs()
