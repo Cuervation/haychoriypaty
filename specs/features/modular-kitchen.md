@@ -124,3 +124,7 @@ The player Game View showed Choris at the rear corners outside the grill's trape
 ### 2026-10-08 — Larger sandwich presentation
 
 The user noted that sandwiches looked disproportionately small. Increase their renderer-only target size by 1.5× on the prep tables and 1.25× while carried; the existing aspect-preserving sizing keeps each source illustration undistorted. Drinks, station bounds, stock, capacity, recipes, routes and economy are unchanged. Focused `StreetKitchenRendererTests` PlayMode class passed 12/12, including all four sandwich families in table/carried states and unchanged drink targets. Main-only Android0.2.20/code22 APK built successfully and package/integrity/signature verified; Motorola installation is pending device reconnection (see `android-prototype.md`).
+
+### 2026-10-09 — Explicit beverage barrel pickup anchors
+
+Coca and beer trips now target an explicit free point on the front edge of their own barrel (center.x, yMin−12) before returning to the customer. Existing obstacle-expanded shortest-path routing remains responsible for avoiding fixed station bases. There is no barrel lock, so Cocacoleros can retrieve Coca and beer simultaneously. Focused EditMode route matrix passed for catalog levels0–4; a concurrent Unity simulation verified both workers reached their respective anchors and completed real deliveries without duplicate revenue.

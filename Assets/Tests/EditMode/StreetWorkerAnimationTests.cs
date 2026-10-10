@@ -40,13 +40,13 @@ namespace HayChoriYPaty.Tests
         [Test]
         public void WalkFrameHasFourSamplesAndClampsNegativeDistance()
         {
-            Assert.AreEqual(48f, (float)Runtime("StreetWorkerAnimation").GetField("StrideLength", PublicStatic).GetValue(null));
+            Assert.AreEqual(80f, (float)Runtime("StreetWorkerAnimation").GetField("StrideLength", PublicStatic).GetValue(null));
             Assert.AreEqual(0, Call("WalkFrame", 0f));
-            Assert.AreEqual(1, Call("WalkFrame", 12f));
-            Assert.AreEqual(2, Call("WalkFrame", 24f));
-            Assert.AreEqual(3, Call("WalkFrame", 36f));
-            Assert.AreEqual(0, Call("WalkFrame", 48f));
-            Assert.AreEqual(0, Call("WalkFrame", -12f));
+            Assert.AreEqual(1, Call("WalkFrame", 20f));
+            Assert.AreEqual(2, Call("WalkFrame", 40f));
+            Assert.AreEqual(3, Call("WalkFrame", 60f));
+            Assert.AreEqual(0, Call("WalkFrame", 80f));
+            Assert.AreEqual(0, Call("WalkFrame", -20f));
         }
 
         [Test]
@@ -56,7 +56,7 @@ namespace HayChoriYPaty.Tests
             Type stateType = Runtime("StreetWorkerState");
             Set(worker, "State", Enum.Parse(stateType, "ToCounter"));
             Set(worker, "FacingVector", Vector2.right);
-            Set(worker, "TravelDistance", 24f);
+            Set(worker, "TravelDistance", 40f);
             Set(worker, "StepDistance", 1f);
             Set(worker, "AnimationTime", 0f);
             object pose = Call("Sample", worker);
@@ -129,6 +129,25 @@ namespace HayChoriYPaty.Tests
             object pose = Call("Sample", worker);
             Assert.IsFalse((bool)Field(pose, "Moving"));
             Assert.AreEqual(0f, (float)Field(pose, "Bob"));
+        }
+
+        [Test]
+        public void PickupAnimationIsProgressDrivenWithoutFakingACarriedItem()
+        {
+            object worker = Activator.CreateInstance(Runtime("StreetWorker"), true);
+            Set(worker, "State", Enum.Parse(Runtime("StreetWorkerState"), "Pickup"));
+            Set(worker, "CarriedItemId", 0);
+            Set(worker, "StepDistance", 0f);
+            Set(worker, "PickupProgress", .5f);
+            object reaching = Call("Sample", worker);
+            Assert.IsTrue((bool)Field(reaching, "PickingUp"));
+            Assert.IsFalse((bool)Field(reaching, "Moving"));
+            Assert.IsFalse((bool)Field(reaching, "Carrying"));
+            Assert.AreEqual(.5f, (float)Field(reaching, "PickupProgress"));
+            Set(worker, "CarriedItemId", 12);
+            object taken = Call("Sample", worker);
+            Assert.IsFalse((bool)Field(taken, "PickingUp"));
+            Assert.IsTrue((bool)Field(taken, "Carrying"));
         }
 
         [TestCase("Pickup")]

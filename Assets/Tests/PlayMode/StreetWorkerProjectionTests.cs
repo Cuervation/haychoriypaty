@@ -54,6 +54,29 @@ namespace HayChoriYPaty.Tests
                         string role=product<2?"Parrillero":product<4?"ParrilleroPremium":product==5?"Fernetero":"Cocacolero";
                         object worker=null;foreach(object candidate in workers)if(Get(candidate,"Role").ToString()==role){worker=candidate;break;}
                         int workerId=(int)Get(worker,"Id");
+                        if(product==4||product==6)
+                        {
+                            Vector2 pickup=(Vector2)Call(Get(sim,"KitchenLayout"),"PickupPosition",product);
+                            Assert.AreEqual(pickup,Call(Get(sim,"KitchenLayout"),"BarrelPickupPosition",product));
+                            Set(worker,"Product",product);Set(worker,"State",Enum.Parse(T("StreetWorkerState"),"Pickup"));
+                            Set(worker,"Position",pickup);Set(worker,"Target",pickup);Set(worker,"StepDistance",0f);
+                            Set(worker,"CarriedItemId",0);Set(worker,"PickupProgress",0f);
+                            object workerVisual=views[workerId];
+                            var torso=(SpriteRenderer)Field(workerVisual,"Torso");
+                            Call(renderer,"PrepareWorkers",normal,diagonal,normal,diagonal,beverage,beverage,true);
+                            float idleReachY=torso.transform.localPosition.y;
+                            GameObject carryRoot=(GameObject)Field(renderer,"carryRoot");
+                            foreach(DictionaryEntry entry in objects)
+                            {
+                                GameObject existing=(GameObject)entry.Value;
+                                Assert.IsFalse(existing!=null&&existing.transform.parent==carryRoot.transform,
+                                    "A barrel drink must remain at its station until TryTake succeeds.");
+                            }
+                            Set(worker,"PickupProgress",.5f);
+                            Call(renderer,"PrepareWorkers",normal,diagonal,normal,diagonal,beverage,beverage,true);
+                            Assert.AreNotEqual(idleReachY,torso.transform.localPosition.y,
+                                "Pickup dwell must animate a brief empty-handed reach.");
+                        }
                         object unit=Call(kitchen,"TryTake",product,Get(worker,"Role"),workerId);Assert.NotNull(unit);
                         int itemId=(int)Get(unit,"Id");
                         Set(worker,"CarriedItemId",itemId);Set(worker,"Product",product);Set(worker,"State",Enum.Parse(T("StreetWorkerState"),"ToCounter"));
@@ -66,9 +89,11 @@ namespace HayChoriYPaty.Tests
                             Set(worker,"FacingVector",directions[direction]);
                             for(int phase=0;phase<4;phase++)
                             {
-                                Set(worker,"TravelDistance",phase*12f);
+                                Set(worker,"TravelDistance",phase*20f);
                                 Call(renderer,"PrepareWorkers",normal,diagonal,normal,diagonal,beverage,beverage,true);
                                 GameObject item=(GameObject)objects[itemId];
+                                Assert.AreSame(((GameObject)Field(renderer,"carryRoot")).transform,item.transform.parent,
+                                    "The real unit enters the hand/carry projection only after station withdrawal.");
                                 var sr=item.GetComponentInChildren<SpriteRenderer>();
                                 Vector2 palm=(Vector2)Field(view,"Palm");
                                 Assert.AreEqual((palm.x-270f)*.01f,sr.bounds.center.x,.0002f);

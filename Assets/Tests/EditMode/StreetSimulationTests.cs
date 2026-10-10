@@ -209,7 +209,7 @@ namespace HayChoriYPaty.Tests
                         if (!props.Contains(grill)) props.Add(grill);
                     }
                 }
-                bool picked = false, carried = false, handed = false;
+                bool picked = false, pickupProgressObserved = false, carried = false, handed = false;
                 bool firstDeliveryAtHandoff = false, secondTripStartedFromThatHandoff = false;
                 Vector2 firstDeliveryPosition = Vector2.zero;
                 int assignedWorkerId = 0;
@@ -241,10 +241,22 @@ namespace HayChoriYPaty.Tests
                             Assert.IsFalse(KitchenWorkerFootBounds(feet).Overlaps(prop),
                                 "Worker product " + p + " feet at " + feet + " crossed prop " + prop + " in " + state);
                         }
-                        if (state == "Pickup") { picked = true; Assert.AreEqual(KitchenPickupPosition(kitchenLayout, product), feet); }
+                        if (state == "Pickup")
+                        {
+                            picked = true;
+                            Assert.AreEqual(KitchenPickupPosition(kitchenLayout, product), feet);
+                            Assert.AreEqual(0, Get(worker, "CarriedItemId"), "No drink/product is held before the station pickup completes.");
+                            if ((float)Get(worker, "PickupProgress") > 0f) pickupProgressObserved = true;
+                        }
                         if (state == "ToCounter")
                         {
                             carried = true;
+                            int carriedId = (int)Get(worker, "CarriedItemId");
+                            Assert.Greater(carriedId, 0, "The physical unit is assigned only after leaving the pickup dwell.");
+                            object carriedUnit = Call(Get(sim, "Kitchen"), "Find", carriedId);
+                            Assert.NotNull(carriedUnit);
+                            Assert.AreEqual("Carried", Get(carriedUnit, "Location").ToString());
+                            Assert.AreEqual(workerId, Get(carriedUnit, "WorkerId"));
                             Vector2[] independentReturn = KitchenShortestRoute(kitchenLayout, KitchenPickupPosition(kitchenLayout, product), new Vector2(target.x, WorkerServiceY));
                             Assert.Greater(independentReturn.Length, 0);
                             Vector2[] activeReturn = (Vector2[])Get(worker, "Route");
@@ -260,12 +272,87 @@ namespace HayChoriYPaty.Tests
                         }
                     }
                 }
-                Assert.IsTrue(picked && carried && handed);
+                Assert.IsTrue(picked && pickupProgressObserved && carried && handed);
                 Assert.IsTrue(firstDeliveryAtHandoff && secondTripStartedFromThatHandoff, "Two-unit orders reuse the worker from its real current position without a return-home leg.");
-                Assert.AreEqual(2, Get(sim, "Delivered")); Assert.AreEqual(10, Get(sim, "Coins"));
+                Assert.AreEqual(2, Get(sim, "Delivered"));
+                Assert.AreEqual(2 * Mathf.RoundToInt((float)Call(sim, "GetProductPrice", product)), Get(sim, "Coins"));
                 Assert.AreEqual(0, Get(client, "Reserved"));
                 foreach (object worker in (IList)Get(sim, "Workers")) Assert.AreEqual("Idle", Get(worker, "State").ToString());
             }
+        }
+
+        [Test]
+        public void CocaAndBeerWorkersReachTheirOwnBarrelsAndServeInParallel()
+        {
+            object balance = NewBalance();
+            Tune(balance, "maxCustomers", 2);
+            Tune(balance, "customerPatienceSeconds", 600f);
+            Tune(balance, "deliveryPatienceRefreshSeconds", 600f);
+            Tune(balance, "customerArrivalSeconds", 10000f);
+            object sim = Make(level: 4, balance: balance);
+            Start(sim);
+            Set(sim, "Coins", 100000);
+            object cocaRole = Role("Cocacolero");
+            Assert.IsTrue((bool)Call(sim, "TryHire", cocaRole));
+            Assert.IsTrue((bool)Call(sim, "TryHire", cocaRole));
+            Set(sim, "Coins", 0);
+
+            Assert.IsTrue(Spawn(sim, 4, 1));
+            object cocaCustomer = Customers(sim)[0];
+            SetWaiting(cocaCustomer);
+            Assert.IsTrue(Spawn(sim, 6, 1));
+            object beerCustomer = Customers(sim)[1];
+            SetWaiting(beerCustomer);
+
+            object layout = Get(sim, "KitchenLayout");
+            object kitchen = Get(sim, "Kitchen");
+            Assert.AreEqual(KitchenPickupPosition(layout, 4),
+                KitchenLayout.GetMethod("BarrelPickupPosition").Invoke(layout, new object[] { 4 }));
+            Assert.AreEqual(KitchenPickupPosition(layout, 6),
+                KitchenLayout.GetMethod("BarrelPickupPosition").Invoke(layout, new object[] { 6 }));
+
+            bool bothActive = false, cocaPickupProgress = false, beerPickupProgress = false;
+            int coinsBefore = (int)Get(sim, "Coins");
+            for (int frame = 0; frame < 4000 && (int)Get(sim, "Delivered") < 2; frame++)
+            {
+                Step(sim, .02f);
+                bool activeCoca = false, activeBeer = false;
+                foreach (object worker in (IList)Get(sim, "Workers"))
+                {
+                    int product = (int)Get(worker, "Product");
+                    string state = Get(worker, "State").ToString();
+                    if (product != 4 && product != 6) continue;
+                    if (state != "Idle") { activeCoca |= product == 4; activeBeer |= product == 6; }
+                    if (state == "Pickup")
+                    {
+                        Assert.AreEqual(KitchenPickupPosition(layout, product), Get(worker, "Position"));
+                        Assert.AreEqual(0, Get(worker, "CarriedItemId"));
+                        if ((float)Get(worker, "PickupProgress") > 0f)
+                        {
+                            if (product == 4) cocaPickupProgress = true;
+                            else beerPickupProgress = true;
+                        }
+                    }
+                    if (state == "ToCounter" || state == "Handoff")
+                    {
+                        int itemId = (int)Get(worker, "CarriedItemId");
+                        Assert.Greater(itemId, 0);
+                        object unit = Call(kitchen, "Find", itemId);
+                        Assert.AreEqual(product, Get(unit, "Product"));
+                        Assert.AreEqual("Carried", Get(unit, "Location").ToString());
+                        Assert.AreEqual(Get(worker, "Id"), Get(unit, "WorkerId"));
+                    }
+                }
+                bothActive |= activeCoca && activeBeer;
+            }
+
+            Assert.IsTrue(bothActive, "Both beverage staff members should work simultaneously rather than waiting on a shared barrel lock.");
+            Assert.IsTrue(cocaPickupProgress && beerPickupProgress, "Each employee must visibly complete a short dwell/reach at the correct barrel.");
+            Assert.AreEqual(2, Get(sim, "Delivered"));
+            Assert.AreEqual(coinsBefore + 12, Get(sim, "Coins"), "Only the actual Coca and beer handoffs award their existing prices.");
+            Assert.AreEqual(12, Get(sim, "CoinsEarned"));
+            Assert.AreEqual(0, Get(cocaCustomer, "Reserved"));
+            Assert.AreEqual(0, Get(beerCustomer, "Reserved"));
         }
 
         [Test]

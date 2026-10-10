@@ -248,11 +248,13 @@ namespace HayChoriYPaty
         public Vector2 Target { get; internal set; }
         public StreetWorkerState State { get; internal set; }
         public float AnimationTime { get; internal set; }
+        public float PickupProgress { get; internal set; }
         // Visual telemetry only; movement math and service timing are unchanged.
         public float TravelDistance { get; internal set; }
         public float StepDistance { get; internal set; }
         public Vector2 FacingVector { get; internal set; }
         internal float Delay;
+        internal float PickupDuration;
         internal Vector2[] Route;
         internal int RouteIndex;
         internal StreetCustomer Customer;
@@ -771,15 +773,27 @@ namespace HayChoriYPaty
                 {
                     MoveWorker(w, dt);
                     if (w.Position == w.Target && AdvanceWorkerRoute(w))
-                    { w.State = StreetWorkerState.Pickup; w.Delay = balance.pickupSeconds / WorkRate; }
+                    {
+                        w.State = StreetWorkerState.Pickup;
+                        w.Delay = balance.pickupSeconds / WorkRate;
+                        w.PickupDuration = w.Delay;
+                        w.PickupProgress = 0f;
+                    }
                 }
                 else if (w.State == StreetWorkerState.Pickup)
                 {
                     w.Delay -= dt;
+                    w.PickupProgress = 1f - Mathf.Clamp01(w.Delay / Mathf.Max(.001f, w.PickupDuration));
                     if (w.Delay <= 0f)
                     {
                         StreetFoodUnit item = Kitchen.TryTake(w.Product, w.Role, w.Id);
-                        if (item == null) { w.Delay = balance.pickupSeconds / WorkRate; continue; }
+                        if (item == null)
+                        {
+                            w.Delay = balance.pickupSeconds / WorkRate;
+                            w.PickupDuration = w.Delay;
+                            w.PickupProgress = 0f;
+                            continue;
+                        }
                         w.CarriedItemId = item.Id;
                         w.State = StreetWorkerState.ToCounter;
                         if (!SetWorkerRoute(w, CounterHandoffPosition(w.Customer))) { CancelAssignment(w); continue; }
@@ -879,6 +893,8 @@ namespace HayChoriYPaty
 
         private void DispatchToStation(StreetWorker worker)
         {
+            worker.PickupProgress = 0f;
+            worker.PickupDuration = 0f;
             if (!SetWorkerRoute(worker, KitchenLayout.PickupPosition(worker.Product))) { CancelAssignment(worker); return; }
             worker.State = StreetWorkerState.ToStation;
         }
@@ -1074,7 +1090,7 @@ namespace HayChoriYPaty
             workers.Add(new StreetWorker { Id = nextWorker++, Role = role, Product = -1,
                 Position = WorkerHomePosition, Target = WorkerHomePosition, State = StreetWorkerState.Idle });
         }
-        private void ResetWorker(StreetWorker w) { w.StepDistance = 0f; w.Customer = null; w.CustomerId = 0; w.Product = -1; w.CarriedItemId = 0; w.State = StreetWorkerState.Idle; w.Route = null; w.RouteIndex = 0; w.Target = w.Position; }
+        private void ResetWorker(StreetWorker w) { w.StepDistance = 0f; w.PickupProgress = 0f; w.PickupDuration = 0f; w.Customer = null; w.CustomerId = 0; w.Product = -1; w.CarriedItemId = 0; w.State = StreetWorkerState.Idle; w.Route = null; w.RouteIndex = 0; w.Target = w.Position; }
         private static Vector2 Move(Vector2 from, Vector2 to, float speed, float dt) { return Vector2.MoveTowards(from, to, speed * dt); }
     }
 }

@@ -207,7 +207,7 @@ namespace HayChoriYPaty
                 StreetWorkerPose pose = StreetWorkerAnimation.Sample(w);
                 int contact = pose.Frame >= 2 ? 1 : 0;
                 Art upper = pose.Carrying ? Carry(w,pose.Facing) : Walk(w,pose.Facing,contact,pose.Moving);
-                if (w.State == StreetWorkerState.Pickup)
+                if (pose.PickingUp)
                     upper = Beverage(w) ? Carry(w,pose.Facing)
                         : Original(w,11, w.Position.x < sim.KitchenLayout.BoundsForProduct(w.Product).center.x);
                 bool passing = !pose.Moving || (pose.Frame & 1) == 1;
@@ -215,7 +215,8 @@ namespace HayChoriYPaty
                 Art legs = passing ? Walk(w,legFacing,0,false) : Walk(w,pose.Facing,contact,true);
                 float upperScale = Scale(upper), legScale = Scale(legs);
                 float split = upper.Bounds.height * Waist;
-                float upperBottom = upper.Bounds.height * (1f-Waist) * upperScale - pose.Bob;
+                float reach = pose.PickingUp ? Mathf.Sin(pose.PickupProgress * Mathf.PI) * 5.5f : 0f;
+                float upperBottom = upper.Bounds.height * (1f-Waist) * upperScale - pose.Bob - reach;
                 int depth = -5000 + Mathf.RoundToInt(w.Position.y * verticalScale);
                 v.Root.localPosition = new Vector3((w.Position.x-270f)*.01f, (canvasHeight*.5f-w.Position.y*verticalScale)*.01f,0);
                 DrawPart(v.Torso,upper,new Rect(upper.Bounds.x,upper.Bounds.y,upper.Bounds.width,split),new Vector2(0,upperBottom),depth+2);

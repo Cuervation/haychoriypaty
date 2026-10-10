@@ -1,6 +1,16 @@
-# Current Android delivery — 2026-10-08 (0.2.20/code22, larger sandwiches)
+# Current Android delivery — 2026-10-09 (0.2.20/code22, responsive corrections)
 
-Unity6000.6.3f1 Main-only Android Development IL2CPP/ARM64 build `build-f0bd2b66cd`: **Succeeded in73s; BuildReport0 errors/1 warning**. Package `com.haychoriypaty.game`, version0.2.20/code22, min API26/target36, `arm64-v8a`.
+Unity 6000.6.3f1 Main-only Development Android IL2CPP/ARM64 build `build-8d0c922186`: **Succeeded in 460.65s; BuildReport: 0 errors, 1 warning**. Package `com.haychoriypaty.game`, version0.2.20/code22, min API26/target36, `arm64-v8a`.
+
+APK `/tmp/HayChoriYPaty-0.2.20-code22-responsive.apk`: **618,752,341 bytes**. SHA-256 `6609a746936d7795e25185aaa8d617acc3a1bcbbdfc96dc29bf88c1201f5b069`. `aapt dump badging` confirms package/version/min/target; `unzip -t` reports no archive errors; Unity-bundled OpenJDK + `apksigner` verifies Signature Scheme v2 and the established Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`. No phone installation or physical-device review was requested/performed. This is Development/debug signed, not a Play Store release.
+
+Focused Unity EditMode `StreetArtTests` report at `TestResults.xml` records 8/8 passing: safe-area HUD, tablet selector/upgrade bounds, seven NPOT mural imports, pennant masking, and queue bubble geometry at v=.75/1/1.25/1.42. The MCP job tracker timed out after Unity had written the successful 8/8 result; report XML is the validation source. Archive size is file size; BuildReport total-size field includes other outputs.
+
+---
+
+## Previous Android delivery — 2026-10-08 (0.2.20/code22, larger sandwiches)
+
+Unity 6000.6.3f1 Main-only Android Development IL2CPP/ARM64 build `build-f0bd2b66cd`: **Succeeded in73s; BuildReport: 0 errors, 1 warning**. Package `com.haychoriypaty.game`, version0.2.20/code22, min API26/target36, `arm64-v8a`.
 
 APK `Builds/Android/Archive/HayChoriYPaty-0.2.20-code22-sandwich-scale.apk`: **618,489,985 bytes**. SHA-256 `3f948c1f1235023b3c4d9a2264fe23d63680f4a879b6eb5fe87d518bde956024`. `aapt dump badging` confirms package/version/API/architecture; `unzip -t` reports no archive errors; Unity-bundled OpenJDK + `apksigner` verifies Signature Scheme v2 and established Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`. Versioned alias and rolling APK match the archive byte-for-byte.
 
@@ -10,7 +20,7 @@ Includes the renderer-only increase of four sandwich families to1.5× on tables 
 
 ## Previous Android delivery — 2026-10-08 (0.2.19/code21, perspective grill fit)
 
-Unity6000.6.3f1 Main-only Development Android IL2CPP/ARM64 build `build-4524fd8d93`: **Succeeded in409.62s; BuildReport0 errors/1 warning**. Package `com.haychoriypaty.game`, version0.2.19/code21, min API26/target36, `arm64-v8a`.
+Unity 6000.6.3f1 Main-only Development Android IL2CPP/ARM64 build `build-4524fd8d93`: **Succeeded in409.62s; BuildReport: 0 errors, 1 warning**. Package `com.haychoriypaty.game`, version0.2.19/code21, min API26/target36, `arm64-v8a`.
 
 APK `Builds/Android/Archive/HayChoriYPaty-0.2.19-code21-grill-fit.apk`: **492,872,066 bytes**. SHA-256 `078b09aa340f8ca7bcd36f4c21c185a2bdcdacd6f095d58b265d346b2b39e9fe`. `aapt dump badging` confirms package/version/API/architecture; `unzip -t` reports no archive errors; Unity-bundled OpenJDK + `apksigner` verifies Signature Scheme v2 and established Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`. Versioned alias and rolling APK match the archive; previous archives preserved. BuildReport's total-size figure includes other build outputs and is not the APK file size.
 
@@ -20,7 +30,7 @@ Includes pushed perspective-grill correction commit `9648dfbafba65ee536f5b105cca
 
 # Current Android delivery — 2026-10-08 (0.2.18/code20, station layout)
 
-Unity6000.6.3f1 Main-only Development Android IL2CPP/ARM64 build `build-ff697f0c18`: **Succeeded in28.71s; BuildReport0 errors/1 warning** (`1 URP assets included in build`). Package `com.haychoriypaty.game`, version0.2.18/code20, min API26/target36, `arm64-v8a`.
+Unity 6000.6.3f1 Main-only Development Android IL2CPP/ARM64 build `build-ff697f0c18`: **Succeeded in28.71s; BuildReport: 0 errors, 1 warning** (`1 URP assets included in build`). Package `com.haychoriypaty.game`, version0.2.18/code20, min API26/target36, `arm64-v8a`.
 
 APK `/tmp/HayChoriYPaty-0.2.18-code20.apk`: **492,866,782 bytes**. SHA-256 `00835bd2f3c050cc3b168650a6d9b5c6440bb30d497fa210c7f1d9b2682f5ed4`. `aapt dump badging` confirms package/version/min/target; `unzip -t` reports no archive errors; Unity-bundled OpenJDK + `apksigner` confirms APK Signature Scheme v2 and established Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`.
 
@@ -30,7 +40,7 @@ Built from station-layout commit `1718aedb619b95bb1151feb4cb880aed6c170b95`; `Pr
 
 ## Previous Android delivery — 2026-10-07 (0.2.16/code18, four specialties)
 
-Unity6000.6.3f1 Main-only Development Android IL2CPP ARM64 build `build-c291df4c16`: **Succeeded in424.81s; BuildReport0 errors/1 warning**. The sole build warning is URP reporting1 asset included. Console additionally logs a Diagnostics Data debug-symbol configuration advisory at Error log level; it did not produce a build error. Package `com.haychoriypaty.game`, version0.2.16/code18, min API26/target36, `arm64-v8a`.
+Unity 6000.6.3f1 Main-only Development Android IL2CPP ARM64 build `build-c291df4c16`: **Succeeded in424.81s; BuildReport: 0 errors, 1 warning**. The sole build warning is URP reporting1 asset included. Console additionally logs a Diagnostics Data debug-symbol configuration advisory at Error log level; it did not produce a build error. Package `com.haychoriypaty.game`, version0.2.16/code18, min API26/target36, `arm64-v8a`.
 
 Fresh archive `Builds/Android/Archive/HayChoriYPaty-0.2.16-code18-four-specialties.apk`: **439,337,048 bytes**. SHA-256 `df2944e2975c5c96e03e0c133df78550028f686991c675910aac0c22fe46ed1c`. `aapt dump badging` verifies package/version/min/target; `unzip -t` reports no archive errors; Unity-bundled OpenJDK + `apksigner` confirms APK Signature Scheme v2 and the established Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`. Root alias `Builds/Android/HayChoriYPaty-0.2.16.apk` and rolling `Builds/Android/HayChoriYPaty-street.apk` match the archive byte-for-byte. Earlier archive deliveries were preserved.
 
@@ -58,7 +68,7 @@ Versioned APK `Builds/Android/Archive/HayChoriYPaty-0.2.14-code16-levels4-5.apk`
 
 # Current Android delivery — 2026-10-06 (0.2.13/code15, victory popup)
 
-Unity6000.6.3f1 Main-only Development Android IL2CPP/ARM64 build `build-f93d61fec0`: **Succeeded in 263.61s**, 0 errors / 1 warning (Diagnostics Data recommends enabling debug symbols for detailed crash reports). The complete Street test assemblies passed: **139/139 EditMode + 23/23 PlayMode**, 0 failures/skips. Two test/source compilation issues found in the first validation attempt were fixed before these passing runs.
+Unity 6000.6.3f1 Main-only Development Android IL2CPP/ARM64 build `build-f93d61fec0`: **Succeeded in 263.61s**, 0 errors / 1 warning (Diagnostics Data recommends enabling debug symbols for detailed crash reports). The complete Street test assemblies passed: **139/139 EditMode + 23/23 PlayMode**, 0 failures/skips. Two test/source compilation issues found in the first validation attempt were fixed before these passing runs.
 
 Versioned APK `Builds/Android/Archive/HayChoriYPaty-0.2.13-code15-victory-popup.apk`: **190,308,172 bytes**, package `com.haychoriypaty.game`, version0.2.13/code15, min API26 / target36, `arm64-v8a`. SHA-256 `f0b963338611ad7cd12fadc1a282dee81bac59294ed2d70520541893e4aa9680`. APK v2 signature verified; Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`. Rolling APK `Builds/Android/HayChoriYPaty-street.apk` matches byte-for-byte.
 
@@ -68,7 +78,7 @@ Versioned APK `Builds/Android/Archive/HayChoriYPaty-0.2.13-code15-victory-popup.
 
 # Current Android delivery — 2026-10-05 (0.2.12/code14, trifulca smoke)
 
-Unity6000.6.3f1 Main-only Development Android IL2CPP/ARM64 build `build-059ad48e84`: **Succeeded in 273.46s**, 0 errors / 2 warnings. The user requested the APK and phone installation; no tests or in-game gameplay review were requested or run.
+Unity 6000.6.3f1 Main-only Development Android IL2CPP/ARM64 build `build-059ad48e84`: **Succeeded in 273.46s**, 0 errors / 2 warnings. The user requested the APK and phone installation; no tests or in-game gameplay review were requested or run.
 
 Versioned APK `Builds/Android/Archive/HayChoriYPaty-0.2.12-code14-trifulca-smoke.apk`: **186,968,662 bytes**, package `com.haychoriypaty.game`, version0.2.12/code14, min API26 / target36, `arm64-v8a`. SHA-256 `524b63abbfb4ea413ab597282b798f743221329c2f2667c224884662de5da926`. APK v2 signature verified; Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`. The rolling APK `Builds/Android/HayChoriYPaty-street.apk` matches byte-for-byte.
 
@@ -78,13 +88,13 @@ Versioned APK `Builds/Android/Archive/HayChoriYPaty-0.2.12-code14-trifulca-smoke
 
 # Current Android delivery — 2026-10-05 (0.2.11/code13, upgrade status ribbon)
 
-Unity6000.6.3f1 Main-only Development Android IL2CPP/ARM64 build `build-2dccbdc803`: **Succeeded in 19.38s**, 0 errors / 1 warning. Tests were not run per the user's standing instruction.
+Unity 6000.6.3f1 Main-only Development Android IL2CPP/ARM64 build `build-2dccbdc803`: **Succeeded in 19.38s**, 0 errors / 1 warning. Tests were not run per the user's standing instruction.
 
 Versioned APK `Builds/Android/Archive/HayChoriYPaty-0.2.11-code13-upgrade-option1.apk`: **181,258,740 bytes**, package `com.haychoriypaty.game`, version0.2.11/code13, min API26 / target36, `arm64-v8a`. SHA-256 `7ff670d8c5999a4c980fd263433c57289a6468c09aeea1928da9aec5ffe4fbab`. APK V2 signature verified; Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`. No phone installation was requested or performed; the previous rolling APK remains unchanged.
 
 ## Previous Android delivery — 2026-10-05 (0.2.10/code12, Floresta mural and apparel)
 
-Current Unity source built as a Main-only Development Android IL2CPP/ARM64 APK with Unity6000.6.3f1. Build report: **Succeeded in 246.68s**; the build log also contains a non-blocking Licensing access-token update diagnostic and the Diagnostics Data debug-symbol recommendation. The requested game tests were not run.
+Current Unity source built as a Main-only Development Android IL2CPP/ARM64 APK with Unity 6000.6.3f1. Build report: **Succeeded in 246.68s**; the build log also contains a non-blocking Licensing access-token update diagnostic and the Diagnostics Data debug-symbol recommendation. The requested game tests were not run.
 
 APK `Builds/Android/HayChoriYPaty-street.apk`; versioned archive `Builds/Android/Archive/HayChoriYPaty-0.2.10-code12-mural-wardrobe.apk`; **212,807,089 bytes**, package `com.haychoriypaty.game`, version0.2.10/code12, min API26 / target36, `arm64-v8a`. SHA-256 `639e11908265ff2b228afc2a40621f69a6b2d000f5dd1993f4aa5bb8244eb8a4`. APK V2 signature verified; Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`. `aapt` confirms package/version metadata; archive matches rolling APK byte-for-byte.
 
@@ -92,7 +102,7 @@ APK `Builds/Android/HayChoriYPaty-street.apk`; versioned archive `Builds/Android
 
 ## Previous Android delivery — 2026-10-05 (0.2.9/code11, Level 2 fix)
 
-The complete Unity Editor test suite for the shipped source passed on Unity6000.6.3f1 immediately before this version-only build: **116/116 EditMode + 21/21 PlayMode**, 0 failures/skips. Development Android IL2CPP/ARM64 build **Succeeded in 240.64s**, 0 errors / 1 warning (Diagnostics Data recommends debug symbols for detailed crash stack traces). Main scene only; min API26 / target36; `arm64-v8a`.
+The complete Unity Editor test suite for the shipped source passed on Unity 6000.6.3f1 immediately before this version-only build: **116/116 EditMode + 21/21 PlayMode**, 0 failures/skips. Development Android IL2CPP/ARM64 build **Succeeded in 240.64s**, 0 errors / 1 warning (Diagnostics Data recommends debug symbols for detailed crash stack traces). Main scene only; min API26 / target36; `arm64-v8a`.
 
 APK **0.2.9/code11**, **171,936,606 bytes (~164 MiB)**, package `com.haychoriypaty.game`. V2 signature verified with the existing local Android Debug certificate (SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`). APK SHA-256 `be171c5d141d7de2fd4af2dab0bd8654d67b5c629c14ae3e299d525a9bdf08fb`.
 
@@ -100,7 +110,7 @@ Versioned archive: `Builds/Android/Archive/HayChoriYPaty-0.2.9-code11-level2.apk
 
 ## Previous Android delivery — 2026-10-05 (0.2.8/code10, full suite)
 
-The complete Unity Editor test suite passed on Unity6000.6.3f1: **115/115 EditMode + 21/21 PlayMode**, 0 failures/skips. Development Android IL2CPP/ARM64 build **Succeeded**, 0 errors / 1 warning (Diagnostics Data recommends debug symbols for detailed crash stack traces). APK **0.2.8/code10**, **168,244,348 bytes**, package `com.haychoriypaty.game`, min API26 / target36, `arm64-v8a`. V2 signature verified with the existing local Android Debug certificate (SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`). APK SHA-256 `6600a5dc54d5c9f917ce2d33d8f2ee999f613ba87cebcd8ef02f44ea8371b240`.
+The complete Unity Editor test suite passed on Unity 6000.6.3f1: **115/115 EditMode + 21/21 PlayMode**, 0 failures/skips. Development Android IL2CPP/ARM64 build **Succeeded**, 0 errors / 1 warning (Diagnostics Data recommends debug symbols for detailed crash stack traces). APK **0.2.8/code10**, **168,244,348 bytes**, package `com.haychoriypaty.game`, min API26 / target36, `arm64-v8a`. V2 signature verified with the existing local Android Debug certificate (SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`). APK SHA-256 `6600a5dc54d5c9f917ce2d33d8f2ee999f613ba87cebcd8ef02f44ea8371b240`.
 
 Versioned archive: `Builds/Android/Archive/HayChoriYPaty-0.2.8-code10-fullsuite.apk`; APK was not installed in that delivery. Evidence is in ignored `Logs/Acceptance/FullSuite-20261005/`.
 
@@ -108,7 +118,7 @@ Versioned archive: `Builds/Android/Archive/HayChoriYPaty-0.2.8-code10-fullsuite.
 
 ## Previous Android delivery — 2026-10-04 (0.2.7/code9, timeout riot)
 
-Current Main source (including the timeout-riot presentation) built with Unity6000.6.3f1 as Development Android IL2CPP ARM64: **Succeeded**,255.41s,0errors/1 Clang warning (`'-x c++' after last input file has no effect`). APK archive `Builds/Android/Archive/HayChoriYPaty-0.2.7-code9-deadline-riot.apk`,157,471,790bytes; rolling artifact `Builds/Android/HayChoriYPaty-street.apk`; package `com.haychoriypaty.game`, version0.2.7/code9, minAPI26/target36, `arm64-v8a`. V2 signature verified; SHA-256 `0c9708a210939c256414ea3c059e64659f73de767482dcfbbe2101c2ffb25ded`; local Android Debug certificate unchanged (`d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`).
+Current Main source (including the timeout-riot presentation) built with Unity 6000.6.3f1 as Development Android IL2CPP ARM64: **Succeeded**,255.41s,0errors/1 Clang warning (`'-x c++' after last input file has no effect`). APK archive `Builds/Android/Archive/HayChoriYPaty-0.2.7-code9-deadline-riot.apk`,157,471,790bytes; rolling artifact `Builds/Android/HayChoriYPaty-street.apk`; package `com.haychoriypaty.game`, version0.2.7/code9, minAPI26/target36, `arm64-v8a`. V2 signature verified; SHA-256 `0c9708a210939c256414ea3c059e64659f73de767482dcfbbe2101c2ffb25ded`; local Android Debug certificate unchanged (`d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`).
 
 Installed on the authorized Motorola Edge60 Fusion (`ZY22MBNWRB`) using `adb install -r`: **Success**, PackageManager reports0.2.7/code9. PlayerPrefs XML matched byte-for-byte before/after; no uninstall or data clear. GameActivity launch succeeded and the app process remained live; at final inspection Android showed Rappi resumed over the game, so it was not forced back to the foreground. The focused deadline→riot→replay PlayMode test had passed1/1 before this delivery; no tests were rerun during the build/install, and no native gameplay/visual acceptance review was performed. Evidence (build log, APK metadata/signature and preference snapshots) is in ignored `Logs/Acceptance/DeadlineRiot20261004/`.
 
@@ -119,7 +129,7 @@ Installed on the authorized Motorola Edge60 Fusion (`ZY22MBNWRB`) using `adb ins
 
 ## Current combined validation and phone delivery — 2026-10-04 (0.2.6/code8)
 
-Latest user authorized tests, APK and phone installation. Installed Unity6000.6.3f1 was closed (no running editor/MCP); used the exact installed editor in sequential batch runs, without new packages or a second editor. Current Street **82/82 EditMode + 15/15 PlayMode passed**,0failed/0skipped. Scope includes200-handoff victory/180s deadline, FIFO/reservations, round-local coins and first-level reset, exact progressive prices/caps/MAX, mouse/touch dispatch/start/replay/load, intro timing/asset/viewport guards, current art/HUD/mural/footer imports and layout. Not an unrelated legacy full-suite run or mobile performance certification.
+Latest user authorized tests, APK and phone installation. Installed Unity 6000.6.3f1 was closed (no running editor/MCP); used the exact installed editor in sequential batch runs, without new packages or a second editor. Current Street **82/82 EditMode + 15/15 PlayMode passed**,0failed/0skipped. Scope includes200-handoff victory/180s deadline, FIFO/reservations, round-local coins and first-level reset, exact progressive prices/caps/MAX, mouse/touch dispatch/start/replay/load, intro timing/asset/viewport guards, current art/HUD/mural/footer imports and layout. Not an unrelated legacy full-suite run or mobile performance certification.
 
 Initial batch pointer runs failed due to unfocused simulated input; swapping transient InputSettings also destroyed the previous instance. Final fixture only saves/restores backgroundBehavior and editorInputBehaviorInPlayMode enum values on the existing settings (IgnoreFocus/AllDeviceInputAlwaysGoesToGameView during tests). No runtime input code or persistent input settings changed. Failed attempts remain in ignored evidence; final15/15 is the successful rerun.
 
@@ -142,7 +152,7 @@ Use the same selected `Assets/Art/Street/Resources/street-logo.png` as the appli
 
 ## Historical Street0.2.5 — combined tested APK (2026-10-04)
 
-- Latest user authorized tests/build/phone update. Existing Unity6000.6.3f1/Android/Main: relevant EditMode52completed/succeeded/no reported failures; PlayMode12/12passed,0failed/0skipped. Regression scope and jobs are in[street automation](street-automation.md#combined-validation--2026-10-04-current-accumulated-implementation). Actual menu,21-fan crowd, paired idle animation frames and seven-product Ready/Playing captures reviewed in ignored`Logs/Acceptance/Combined`; exact editor progress restored and Play stopped.
+- Latest user authorized tests/build/phone update. Existing Unity 6000.6.3f1/Android/Main: relevant EditMode52completed/succeeded/no reported failures; PlayMode12/12passed,0failed/0skipped. Regression scope and jobs are in[street automation](street-automation.md#combined-validation--2026-10-04-current-accumulated-implementation). Actual menu,21-fan crowd, paired idle animation frames and seven-product Ready/Playing captures reviewed in ignored`Logs/Acceptance/Combined`; exact editor progress restored and Play stopped.
 - Build`build-47e1c59fff`: **Succeeded**,277.796s,**0errors/3warnings**. Main-only Android development/IL2CPP ARM64. Warnings: Diagnostics Data recommends fuller debug symbols; obsolete Unity splash PVRTC plus uncompressed-logo fallback. These are recorded, not hidden errors or zero-warning claims. No package/toolchain install or second editor.
 - APK`Builds/Android/HayChoriYPaty-street.apk`, archive`Builds/Android/Archive/HayChoriYPaty-0.2.5-code7.apk`: **114,272,726bytes (108.98MiB)**, package`com.haychoriypaty.game`,0.2.5/code7,minAPI26/targetAPI36,`arm64-v8a`,GameActivity. BuildReport998.76MiB includes separate debug outputs, not download size.
 - SHA256:`99d78efd142a624e612259737664ab013a0667e41d8319a62e6733b3d296403c`. V2signature verified; same local Android Debug certificate as0.2.4 (SHA256`d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`), suitable for non-destructive`install -r`; not Play Store release signing.

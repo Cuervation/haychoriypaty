@@ -210,7 +210,7 @@ namespace HayChoriYPaty.Tests
         public void SingleRemainingProductIsCentered()
         {
             Rect bubble = Bubble(new Vector2(58f, 324f), 1);
-            Rect row = OrderRect("OrderLineBounds", bubble, 0, 1);
+            Rect row = OrderRect("OrderLineBounds", bubble, 0, 1, 1f);
             Assert.AreEqual(62f, bubble.width); Assert.AreEqual(49f, bubble.height);
             Assert.AreEqual(bubble.y + (bubble.height - 8f) * .5f, row.center.y, .01f);
             Assert.AreEqual(58f, bubble.center.x);
@@ -222,9 +222,9 @@ namespace HayChoriYPaty.Tests
         public void OrderBubbleTwoRowsAndMoreFooterFitInsideAdaptiveCard()
         {
             Rect bubble = Bubble(new Vector2(270f, 324f), 4);
-            Rect first = OrderRect("OrderLineBounds", bubble, 0, 2);
-            Rect second = OrderRect("OrderLineBounds", bubble, 1, 2);
-            Rect more = OrderRect("OrderMoreBounds", bubble);
+            Rect first = OrderRect("OrderLineBounds", bubble, 0, 2, 1f);
+            Rect second = OrderRect("OrderLineBounds", bubble, 1, 2, 1f);
+            Rect more = OrderRect("OrderMoreBounds", bubble, 1f);
             Assert.AreEqual(62f, bubble.width); Assert.AreEqual(88f, bubble.height);
             Assert.LessOrEqual(first.yMax, second.yMin); Assert.LessOrEqual(second.yMax, more.yMin);
             Assert.GreaterOrEqual(first.xMin, bubble.xMin); Assert.LessOrEqual(first.xMax, bubble.xMax);
@@ -246,9 +246,9 @@ namespace HayChoriYPaty.Tests
             int rows = Mathf.Min(2, pendingLines);
             for (int i = 0; i < rows; i++)
             {
-                Rect row = OrderRect("OrderLineBounds", bubble, i, rows);
-                Rect icon = OrderRect("OrderIconBounds", row);
-                Rect quantity = OrderRect("OrderQuantityBounds", row);
+                Rect row = OrderRect("OrderLineBounds", bubble, i, rows, 1f);
+                Rect icon = OrderRect("OrderIconBounds", row, 1f);
+                Rect quantity = OrderRect("OrderQuantityBounds", row, 1f);
                 Assert.AreEqual(new Vector2(26f, 23f), icon.size);
                 Assert.AreEqual(new Vector2(20f, 25f), quantity.size);
                 Assert.GreaterOrEqual(icon.xMin, bubble.xMin); Assert.LessOrEqual(quantity.xMax, bubble.xMax);
@@ -267,23 +267,45 @@ namespace HayChoriYPaty.Tests
             Assert.LessOrEqual(wide.width, 70f, "Keep the existing seven-column envelope for legacy large quantities.");
         }
 
+        [TestCase(.75f)]
         [TestCase(1f)]
         [TestCase(1.25f)]
         [TestCase(1.42f)]
-        public void OrderBubbleTallScreenKeepsTailAnchorAndLocalContent(float verticalScale)
+        public void OrderBubblesFitQueuePitchAndRetainCustomerTail(float verticalScale)
         {
             for (int pendingLines = 1; pendingLines <= 4; pendingLines++)
             {
                 Rect logical = Bubble(new Vector2(270f, 324f), pendingLines);
                 Rect drawn = OrderRect("OrderBubbleLayoutBounds", logical, verticalScale);
+                float contentScale = OrderContentScale(logical.height, verticalScale);
                 Assert.AreEqual(logical.yMax * verticalScale, drawn.yMax, .01f);
                 Assert.AreEqual(logical.center.x, drawn.center.x);
-                Assert.AreEqual(logical.size, drawn.size);
-                Rect row = OrderRect("OrderLineBounds", drawn, 0, Mathf.Min(2, pendingLines));
-                Assert.AreEqual(8f, row.y - drawn.y, .01f);
-                Assert.LessOrEqual(row.yMax, drawn.yMax - 8f);
+                Assert.AreEqual(logical.height * contentScale, drawn.height, .01f);
+                Assert.LessOrEqual(drawn.height, 56f * verticalScale + .01f);
+                int rows = Mathf.Min(2, pendingLines);
+                Rect previous = default;
+                for (int i = 0; i < rows; i++)
+                {
+                    Rect row = OrderRect("OrderLineBounds", drawn, i, rows, contentScale);
+                    Rect icon = OrderRect("OrderIconBounds", row, contentScale);
+                    Rect quantity = OrderRect("OrderQuantityBounds", row, contentScale);
+                    Assert.GreaterOrEqual(row.yMin, drawn.yMin); Assert.LessOrEqual(row.yMax, drawn.yMax);
+                    Assert.GreaterOrEqual(icon.yMin, drawn.yMin); Assert.LessOrEqual(quantity.yMax, drawn.yMax);
+                    if (i > 0) Assert.LessOrEqual(previous.yMax, row.yMin);
+                    previous = row;
+                }
+                if (pendingLines > rows)
+                {
+                    Rect more = OrderRect("OrderMoreBounds", drawn, contentScale);
+                    Assert.GreaterOrEqual(more.yMin, drawn.yMin); Assert.LessOrEqual(more.yMax, drawn.yMax);
+                    Assert.LessOrEqual(previous.yMax, more.yMin);
+                }
             }
         }
+
+        private static float OrderContentScale(float bubbleHeight, float verticalScale) =>
+            (float)View.GetMethod("OrderBubbleContentScale", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { bubbleHeight, verticalScale });
 
         [TestCase(1)]
         [TestCase(2)]
@@ -393,7 +415,7 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void ParrilleroWalkSelectionCyclesOppositeDiagonalAndCardinalStrides()
+        public void ParrilleroWalkSelectionUsesDistanceDrivenGaitPhases()
         {
             MethodInfo select = View.GetMethod("SelectParrilleroWalkFrame", BindingFlags.Static | BindingFlags.NonPublic);
             Vector2[] directions = {
@@ -402,17 +424,17 @@ namespace HayChoriYPaty.Tests
             };
             for (int i = 0; i < directions.Length; i++)
             {
-                Assert.AreEqual(16 + i * 2, (int)select.Invoke(null, new object[] { directions[i], 0f }));
-                Assert.AreEqual(17 + i * 2, (int)select.Invoke(null, new object[] { directions[i], .13f }));
+                Assert.AreEqual(16 + i * 2, (int)select.Invoke(null, new object[] { directions[i], 0 }));
+                Assert.AreEqual(17 + i * 2, (int)select.Invoke(null, new object[] { directions[i], 1 }));
             }
 
-            Assert.AreEqual(1, (int)select.Invoke(null, new object[] { Vector2.up, 0f }));
-            Assert.AreEqual(2, (int)select.Invoke(null, new object[] { Vector2.up, .13f }));
-            Assert.AreEqual(5, (int)select.Invoke(null, new object[] { Vector2.down, 0f }));
-            Assert.AreEqual(6, (int)select.Invoke(null, new object[] { Vector2.down, .13f }));
-            Assert.AreEqual(9, (int)select.Invoke(null, new object[] { Vector2.right, 0f }));
-            Assert.AreEqual(10, (int)select.Invoke(null, new object[] { Vector2.right, .13f }));
-            Assert.AreEqual(1, (int)select.Invoke(null, new object[] { new Vector2(20, 100), 0f }), "Near-vertical travel stays on the front walk pair");
+            Assert.AreEqual(1, (int)select.Invoke(null, new object[] { Vector2.up, 0 }));
+            Assert.AreEqual(2, (int)select.Invoke(null, new object[] { Vector2.up, 1 }));
+            Assert.AreEqual(5, (int)select.Invoke(null, new object[] { Vector2.down, 0 }));
+            Assert.AreEqual(6, (int)select.Invoke(null, new object[] { Vector2.down, 1 }));
+            Assert.AreEqual(9, (int)select.Invoke(null, new object[] { Vector2.right, 0 }));
+            Assert.AreEqual(10, (int)select.Invoke(null, new object[] { Vector2.right, 1 }));
+            Assert.AreEqual(1, (int)select.Invoke(null, new object[] { new Vector2(20, 100), 0 }), "Near-vertical travel stays on the front walk pair");
         }
 
         [Test]
@@ -871,18 +893,103 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void NormalHudFillsScreenEdgeAndDoesNotUseCutoutLayouts()
+        public void TabletSelectorCardsAndPurchaseCardsFitRowsAndKeepTheirVisibleBounds()
         {
-            Rect physical = (Rect)View.GetMethod("ScreenBounds", BindingFlags.Static | BindingFlags.NonPublic)
-                .Invoke(null, new object[] { new Vector2(1220, 2712) });
-            Assert.AreEqual(new Rect(0, 0, 1220, 2712), physical);
+            const float verticalScale = .75f;
+            MethodInfo cardBounds = View.GetMethod("LevelSelectCardBounds", BindingFlags.Static | BindingFlags.NonPublic);
+            MethodInfo scaleCard = View.GetMethod("ScaleCardBounds", BindingFlags.Static | BindingFlags.NonPublic);
+            Rect previous = default;
+            for (int i = 0; i < 6; i++)
+            {
+                Rect logical = (Rect)cardBounds.Invoke(null, new object[] { i });
+                Rect responsive = (Rect)scaleCard.Invoke(null, new object[] { logical, verticalScale });
+                Rect drawn = new Rect(responsive.x, responsive.y * verticalScale, responsive.width, responsive.height);
+                Assert.AreEqual(logical.y * verticalScale, drawn.y, .01f);
+                Assert.AreEqual(logical.height * verticalScale, drawn.height, .01f);
+                Assert.AreEqual(logical.height, responsive.height / verticalScale, .01f,
+                    "Inverse pointer conversion must exactly recover the visible card height.");
+                if (i > 0 && i % 2 == 0)
+                    Assert.LessOrEqual(previous.yMax, drawn.yMin, "Tablet card rows cannot overlap.");
+                previous = drawn;
+            }
+            Rect lastCard = (Rect)scaleCard.Invoke(null, new object[] { cardBounds.Invoke(null, new object[] { 4 }), verticalScale });
+            float drawnLastCardBottom = (lastCard.y + lastCard.height) * verticalScale;
+            Assert.Less(drawnLastCardBottom, 666f * verticalScale, "Selector pagination remains outside the last row.");
+
+            MethodInfo catalogBounds = View.GetMethod("CatalogUpgradeCardBounds", BindingFlags.Static | BindingFlags.NonPublic);
+            Type simType = Type.GetType("HayChoriYPaty.StreetSimulation, Assembly-CSharp", true);
+            Type balanceType = Type.GetType("HayChoriYPaty.StreetBalance, Assembly-CSharp", true);
+            object balance = Activator.CreateInstance(balanceType, true);
+            Type[] signature = { balanceType, typeof(int), typeof(float), typeof(int), typeof(int), typeof(int) };
+            object sim = simType.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                null, signature, null).Invoke(new object[] { balance, 4, 5f, 0, 1, 0 });
+            int[] actions = (int[])View.GetMethod("CatalogUpgradeActions", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new[] { sim });
+            for (int i = 0; i < actions.Length; i++)
+            {
+                Rect logical = (Rect)catalogBounds.Invoke(null, new[] { sim, (object)actions[i] });
+                Rect responsive = (Rect)scaleCard.Invoke(null, new object[] { logical, verticalScale });
+                Assert.AreEqual(logical.height, responsive.height / verticalScale, .01f);
+            }
+        }
+
+        [Test]
+        public void ThemedMuralsImportAtTheirAuthoredNonPowerOfTwoDimensions()
+        {
+            string[] names = { "street-mural-velez-master-v1", "street-mural-ferro-master-v1",
+                "street-mural-independiente-master-v1", "street-background-sanlorenzo-v1", "street-background-boca-v1",
+                "street-background-camioneros-v1", "street-background-losredondos-v1" };
+            Vector2Int[] dimensions = { new Vector2Int(2116, 743), new Vector2Int(1898, 829), new Vector2Int(2054, 766),
+                new Vector2Int(887, 1774), new Vector2Int(887, 1774), new Vector2Int(941, 1672), new Vector2Int(941, 1672) };
+            for (int i = 0; i < names.Length; i++)
+            {
+                string path = "Assets/Art/Street/Resources/" + names[i] + ".png";
+                TextureImporter importer = (TextureImporter)AssetImporter.GetAtPath(path);
+                Assert.NotNull(importer, path);
+                Assert.AreEqual(TextureImporterNPOTScale.None, importer.npotScale, path);
+                Texture2D texture = Resources.Load<Texture2D>(names[i]);
+                Assert.NotNull(texture, path);
+                Assert.AreEqual(dimensions[i].x, texture.width, path);
+                Assert.AreEqual(dimensions[i].y, texture.height, path);
+            }
+        }
+
+        [Test]
+        public void ThemedPennantOverlayMasksRootRowWithoutChangingTransparentDefault()
+        {
+            Type themes = Type.GetType("HayChoriYPaty.ClubVisualTheme, Assembly-CSharp", true);
+            Type renderer = Type.GetType("HayChoriYPaty.ClubPennantRenderer, Assembly-CSharp", true);
+            object theme = themes.GetMethod("ForLevel").Invoke(null, new object[] { 1 });
+            MethodInfo create = renderer.GetMethod("CreateTexture", BindingFlags.Static | BindingFlags.Public);
+            Texture2D opaque = (Texture2D)create.Invoke(null, new[] { theme, (object)true, true });
+            Texture2D transparent = (Texture2D)create.Invoke(null, new[] { theme, (object)true, false });
+            try
+            {
+                Assert.AreEqual(255, opaque.GetPixel(opaque.width - 1, opaque.height - 1).a * 255f, .01f);
+                Assert.AreEqual(0, transparent.GetPixel(transparent.width - 1, transparent.height - 1).a, .01f);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(opaque); UnityEngine.Object.DestroyImmediate(transparent); }
+        }
+
+        [Test]
+        public void HudStaysInsideSafeViewportWhileBackdropCanBleedToScreenEdges()
+        {
+            MethodInfo viewportMethod = View.GetMethod("CanvasViewport", BindingFlags.Static | BindingFlags.NonPublic);
+            Rect viewport = (Rect)viewportMethod.Invoke(null, new object[] {
+                new Vector2(1200, 2640), new Rect(0, 102, 1200, 2397) });
+            Assert.AreEqual(new Rect(0, 141, 1200, 2397), viewport);
+            float logicalHeight = (float)View.GetMethod("CanvasLogicalHeight", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { viewport });
+            Assert.AreEqual(1078.65f, logicalHeight, .1f);
             Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
-            Assert.AreEqual(0f, bar.yMin);
+            Assert.AreEqual(0f, bar.yMin, "HUD begins at the safe viewport origin, below the physical inset");
             foreach (string name in new[] { "HudCoins", "HudTime", "HudSales" })
             {
                 Rect field = (Rect)View.GetField(name, BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
                 Assert.IsTrue(bar.Contains(field.min)); Assert.IsTrue(bar.Contains(field.max));
             }
+            Rect punchHoleViewport = (Rect)viewportMethod.Invoke(null, new object[] {
+                new Vector2(1440, 3088), new Rect(0, 0, 1440, 2999) });
+            Assert.AreEqual(2999f, punchHoleViewport.height);
             foreach (string name in new[] { "CutoutHudCoins", "CutoutHudTime", "CutoutHudSales" })
                 Assert.IsNull(View.GetField(name, BindingFlags.Static | BindingFlags.NonPublic), name + " must not draw an alternate HUD");
         }

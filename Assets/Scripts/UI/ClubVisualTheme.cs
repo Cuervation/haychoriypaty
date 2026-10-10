@@ -330,7 +330,7 @@ namespace HayChoriYPaty
         private static readonly Color32 Outline = new Color32(31, 25, 21, 255);
         private static readonly Color32 RopeHighlight = new Color32(206, 184, 151, 255);
 
-        public static Texture2D CreateTexture(ClubVisualTheme theme, bool keepReadable = false)
+        public static Texture2D CreateTexture(ClubVisualTheme theme, bool keepReadable = false, bool opaqueBackground = false)
         {
             if (theme == null) theme = ClubVisualTheme.ForLevel(-1);
 
@@ -343,6 +343,13 @@ namespace HayChoriYPaty
             };
 
             var pixels = new Color32[TextureWidth * TextureHeight];
+            if (opaqueBackground)
+            {
+                // Match the parchment footer baked into the invariant root backdrop while
+                // masking its Floresta pennants for other clubs.
+                var parchment = new Color32(255, 244, 224, 255);
+                for (int i = 0; i < pixels.Length; i++) pixels[i] = parchment;
+            }
             Vector2 ropeStart = new Vector2(0f, RopeY(0f));
             for (int i = 1; i <= TextureWidth; i++)
             {

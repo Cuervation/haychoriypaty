@@ -8,13 +8,14 @@ namespace HayChoriYPaty
     {
         public StreetFacing Facing;
         public int Frame;
-        public bool Moving, Carrying;
-        public float Bob;
+        public bool Moving, Carrying, PickingUp;
+        public float Bob, PickupProgress;
     }
     /// <summary>Presentation only: distance-driven gait; never advances service or creates food.</summary>
     public static class StreetWorkerAnimation
     {
-        public const float StrideLength = 48f;
+        // A full four-sample cycle now spans 80 logical units: 60% of the previous cadence.
+        public const float StrideLength = 80f;
         public static StreetFacing ResolveFacing(Vector2 movement, StreetFacing fallback)
         {
             if (movement.sqrMagnitude < .000001f) return fallback;
@@ -31,8 +32,10 @@ namespace HayChoriYPaty
             bool moving = worker.StepDistance > .0001f &&
                 (worker.State == StreetWorkerState.ToStation || worker.State == StreetWorkerState.ToCounter);
             int frame = WalkFrame(worker.TravelDistance);
+            bool pickingUp = worker.State == StreetWorkerState.Pickup && worker.CarriedItemId <= 0;
             return new StreetWorkerPose { Facing = ResolveFacing(worker.FacingVector, StreetFacing.Down),
                 Frame = frame, Moving = moving, Carrying = worker.CarriedItemId > 0,
+                PickingUp = pickingUp, PickupProgress = pickingUp ? Mathf.Clamp01(worker.PickupProgress) : 0f,
                 Bob = moving && (frame & 1) == 1 ? -.8f : 0f };
         }
     }

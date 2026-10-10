@@ -158,8 +158,18 @@ namespace HayChoriYPaty
             return station;
         }
 
+        public Vector2 BarrelPickupPosition(int product)
+        {
+            Rect barrel = product == 4 ? cocaBarrel : product == 6 ? beerBarrel : Rect.zero;
+            if (barrel.width <= 0f) return Vector2.zero;
+            float safeX = Mathf.Clamp(barrel.center.x, StreetWorkstationLayout.WorkerHalfWidth,
+                StreetSceneLayout.Width - StreetWorkstationLayout.WorkerHalfWidth);
+            return new Vector2(safeX, barrel.yMin - (BarrelY - BarrelPickupY));
+        }
+
         public Vector2 PickupPosition(int product)
         {
+            if (product == 4 || product == 6) return BarrelPickupPosition(product);
             Rect r = BoundsForProduct(product);
             float y = product < 4 || product == 5 ? TablePickupY : BarrelPickupY;
             float safeX = Mathf.Clamp(r.center.x, StreetWorkstationLayout.WorkerHalfWidth, StreetSceneLayout.Width - StreetWorkstationLayout.WorkerHalfWidth);

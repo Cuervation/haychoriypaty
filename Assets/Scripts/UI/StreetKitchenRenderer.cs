@@ -235,7 +235,7 @@ namespace HayChoriYPaty
                     GameObject existing = propsRoot.transform.GetChild(i).gameObject;
                     existing.SetActive(visible);
                     SetStationTransform(existing.transform, bounds);
-                    FitFirstSprite(existing, bounds.width, bounds.height, !IsBarrelStation(prefabName));
+                    FitStation(existing, bounds, !IsBarrelStation(prefabName));
                     return;
                 }
             GameObject source = Prefab(prefabName);
@@ -244,7 +244,7 @@ namespace HayChoriYPaty
             instance.name = key;
             SetLayerRecursively(instance, PropLayer);
             SetStationTransform(instance.transform, bounds);
-            FitFirstSprite(instance, bounds.width, bounds.height, !IsBarrelStation(prefabName));
+            FitStation(instance, bounds, !IsBarrelStation(prefabName));
             SetSorting(instance, 0);
             instance.SetActive(visible);
         }
@@ -563,16 +563,23 @@ namespace HayChoriYPaty
 
         private void SetStationTransform(Transform target, Rect bounds)
         {
-            // LayoutRect scales the anchor (the image's top edge) but leaves sprite dimensions unchanged.
-            Vector2 center = new Vector2(bounds.center.x, bounds.y * verticalScale + bounds.height * .5f);
+            // The y transform applies to both station anchors and their footprint; scaling only
+            // the anchor makes the table/grill gap negative on short 4:3 canvases.
+            Vector2 center = new Vector2(bounds.center.x, (bounds.y + bounds.height * .5f) * verticalScale);
             SetCanvasTransform(target, center, 1f);
+        }
+
+        private void FitStation(GameObject instance, Rect bounds, bool preserveAspect)
+        {
+            FitFirstSprite(instance, bounds.width, bounds.height, preserveAspect);
+            Vector3 scale = instance.transform.localScale;
+            scale.y *= verticalScale;
+            instance.transform.localScale = scale;
         }
 
         private void SetItemTransform(Transform target, Vector2 itemPosition, Rect stationBounds)
         {
-            // Keep each item's local offset relative to the station top unscaled vertically.
-            float displayedY = stationBounds.y * verticalScale + (itemPosition.y - stationBounds.y);
-            SetCanvasTransform(target, new Vector2(itemPosition.x, displayedY), 1f);
+            SetCanvasTransform(target, new Vector2(itemPosition.x, itemPosition.y * verticalScale), 1f);
         }
 
         private void SetCanvasTransform(Transform target, Vector2 canvasPosition, float yScale)
