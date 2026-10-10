@@ -1,4 +1,14 @@
-# Current Android delivery — 2026-10-10 (0.2.20/code22, responsive gameplay regions)
+# Current Android delivery — 2026-10-10 (0.2.21/code23, victory popup fix)
+
+Unity 6000.6.3f1 Main-only Development Android IL2CPP/ARM64 APK build from responsive commit 18e697a plus the victory-popup source fix: Succeeded; 0 build errors. The build ran in an isolated project copy because the authoritative checkout is already open in Unity. Unity emitted non-blocking diagnostics from the temporary build helper (SetScriptingBackend deprecation), clang++ and licensing-token refresh; none prevented the successful build.
+
+APK Builds/Android/Archive/HayChoriYPaty-0.2.21-code23-victory-popup.apk: 402,286,236 bytes. SHA-256 b3ced92c175ff47ff23b3767e37d8a4cfac3886c06232ed9a6bc7623be128ace. Package com.haychoriypaty.game, version0.2.21/code23, min API26/target36, arm64-v8a. aapt dump badging confirms package/version/SDK metadata, unzip -t reports no archive errors, and Unity-bundled OpenJDK + apksigner verifies APK Signature Scheme v2 with the established Android Debug certificate SHA-256 d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e. Versioned and rolling aliases at Builds/Android/HayChoriYPaty-0.2.21.apk and Builds/Android/HayChoriYPaty-street.apk match byte-for-byte.
+
+The source prevents upgrade-card drawing in terminal phases so the Won result popup can render. The focused regression test was added but not executed; the current request covered Git delivery and APK generation, not test/play/device verification. No phone install or native visual review was performed. This is a local Development/debug-signed APK, not a Play Store release.
+
+---
+
+## Previous Android delivery — 2026-10-10 (0.2.20/code22, responsive gameplay regions)
 
 Unity 6000.6.3f1 Main-only Development Android IL2CPP/ARM64 build: **Succeeded in 524.75s; BuildReport: 0 errors, 2 warnings**. Package `com.haychoriypaty.game`, version0.2.20/code22, min API26/target36, `arm64-v8a`.
 

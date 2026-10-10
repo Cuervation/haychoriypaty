@@ -1037,6 +1037,21 @@ namespace HayChoriYPaty.Tests
                 "The backdrop owns the only counter rendering; actors are clipped against its projection.");
         }
 
+        [TestCase("Playing", 5, true)]
+        [TestCase("Ready", 2, true)]
+        [TestCase("Ready", 3, true)]
+        [TestCase("Ready", 4, false)]
+        [TestCase("Won", 5, false)]
+        [TestCase("Lost", 5, false)]
+        public void UpgradeCardsAreDrawnOnlyWhilePlayingOrInCompactReady(string phase, int catalogActionCount, bool expected)
+        {
+            Type phaseType = Type.GetType("HayChoriYPaty.RoundPhase, Assembly-CSharp", true);
+            object phaseValue = Enum.Parse(phaseType, phase);
+            MethodInfo shouldDraw = View.GetMethod("ShouldDrawUpgradeCards", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.IsNotNull(shouldDraw);
+            Assert.AreEqual(expected, shouldDraw.Invoke(null, new[] { phaseValue, (object)catalogActionCount }));
+        }
+
         [TestCase(1080, 1920)]
         [TestCase(1080, 2340)]
         [TestCase(1080, 2400)]

@@ -1,6 +1,6 @@
 # Continuidad — Hay Chori y Paty
 
-Checkpoint: 2026-10-05 — Nivel 1 120s y Nivel 2 180s. Nivel 2: servicio del parrillero debajo del mostrador e indumentaria ajustada por pose; suite completa Unity aprobada (116 EditMode + 21 PlayMode). APK 0.2.9/code11 ARM64 generada, verificada e instalada por USB en el Motorola Edge 60 Fusion; PlayerPrefs idénticas antes/después. No se abrió la app ni se hizo revisión visual nativa. Detalle y hash en `specs/status.md` y `specs/features/android-prototype.md`.
+Checkpoint: 2026-10-10 — La corrección del popup de victoria quedó compilada, subida a codex/street-automation, y empaquetada en APK Development Android ARM64 0.2.21/code23. SHA-256 b3ced92c175ff47ff23b3767e37d8a4cfac3886c06232ed9a6bc7623be128ace; ruta archivada Builds/Android/Archive/HayChoriYPaty-0.2.21-code23-victory-popup.apk. Compilación con 0 errores; sin pruebas automatizadas, instalación en teléfono ni revisión visual en esta entrega. Detalle en specs/features/android-prototype.md.
 
 ## Dónde continuar
 

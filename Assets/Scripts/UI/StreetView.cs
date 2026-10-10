@@ -632,6 +632,12 @@ namespace HayChoriYPaty
             DispatchAction(a);
 #endif
         }
+        private static bool ShouldDrawUpgradeCards(RoundPhase phase, int catalogActionCount)
+        {
+            return phase == RoundPhase.Playing ||
+                (phase == RoundPhase.Ready && catalogActionCount <= 3);
+        }
+
         private void OnGUI()
         {
             if (game==null||game.Sim==null) return;
@@ -659,7 +665,7 @@ namespace HayChoriYPaty
             {
                 DrawRiotScene();
                 DrawCounters(sim);
-                DrawRiotResult(sim);
+                DrawRiotResult();
                 GUI.color=old; GUI.matrix=m;
                 return;
             }
@@ -693,7 +699,7 @@ namespace HayChoriYPaty
             DrawCounters(sim);
             // The same footer geometry drives rendering, touch targets and the decorative pennant gap.
             int[] catalogActions = CatalogUpgradeActions(sim);
-            if (sim.Phase != RoundPhase.Ready || catalogActions.Length <= 3)
+            if (ShouldDrawUpgradeCards(sim.Phase, catalogActions.Length))
                 for (int i = 0; i < catalogActions.Length; i++)
                 {
                     int action = catalogActions[i];
@@ -950,21 +956,41 @@ namespace HayChoriYPaty
             return bounds;
         }
 
-        private void DrawRiotResult(StreetSimulation sim)
+        private static Rect RiotGameOverBounds(float canvasHeight)
+        {
+            float height = Mathf.Min(380f, Mathf.Max(200f, canvasHeight * .5f));
+            return new Rect(18f, (canvasHeight - height) * .5f, W - 36f, height);
+        }
+
+        private void DrawRiotResult()
         {
             float previousVertical = layoutVerticalScale;
             layoutVerticalScale = 1f;
             try
             {
-                GUI.color = new Color(.035f, .025f, .02f, .82f);
-                GUI.DrawTexture(new Rect(18, HudBar.yMax + 8f, 504, 154), Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
-                GUI.color = Color.white;
-                Label(new Rect(27, HudBar.yMax + 12f, 486, 43), "No completaste\ntodas las metas.", header);
-                Label(new Rect(31, HudBar.yMax + 55f, 478, 34), FormatPendingQuotas(sim), tiny);
-                DrawAnimatedGameOver(new Rect(54, HudBar.yMax + 92f, 432, 48), Mathf.Max(0f, Time.unscaledTime - riotStartedAt));
+                Rect titleBounds = RiotGameOverBounds(logicalCanvasHeight);
+                DrawRiotWaitMessage(new Rect(22f, titleBounds.y - 66f, W - 44f, 56f));
+                DrawAnimatedGameOver(titleBounds, Mathf.Max(0f, Time.unscaledTime - riotStartedAt));
                 DrawStandardButton(RiotResultButtonBounds(), RiotReturnAction, "VOLVER");
             }
             finally { layoutVerticalScale = previousVertical; }
+        }
+
+        private void DrawRiotWaitMessage(Rect bounds)
+        {
+            const string message = "Los hinchas se cansaron de esperar......";
+            int fontSize = FitStandardButtonFontSize(menuTitle, message, bounds);
+            GUIStyle caption = CreateStandardButtonLabelStyle(menuTitle, fontSize, Color.white);
+            GUIStyle outline = CreateStandardButtonLabelStyle(menuTitle, fontSize, new Color(.035f, .075f, .16f));
+            float stroke = 2.2f * fontSize / 38f;
+            Rect letters = new Rect(bounds.x, bounds.y - 2f * bounds.height / 92f,
+                bounds.width, bounds.height - 8f * bounds.height / 92f);
+            for (int y = -1; y <= 1; y++)
+            for (int x = -1; x <= 1; x++)
+                if (x != 0 || y != 0)
+                    Label(new Rect(letters.x + x * stroke, letters.y + y * stroke,
+                        letters.width, letters.height), message, outline);
+            Label(letters, message, caption);
         }
 
         private void DrawAnimatedGameOver(Rect bounds, float elapsed)
@@ -979,9 +1005,13 @@ namespace HayChoriYPaty
             Color fill = Color.Lerp(new Color(1f, .32f, .07f), new Color(1f, .82f, .16f), flash);
             int previousSize = menuTitle.fontSize;
             TextAnchor previousAlignment = menuTitle.alignment;
-            menuTitle.fontSize = FitVictoryFont(menuTitle, "GAME OVER", 36, animated);
             menuTitle.alignment = TextAnchor.MiddleCenter;
-            OutlineLabel(animated, "GAME OVER", menuTitle, fill, 2f);
+            Rect gameLine = new Rect(animated.x, animated.y, animated.width, animated.height * .5f);
+            Rect overLine = new Rect(animated.x, animated.y + animated.height * .5f, animated.width, animated.height * .5f);
+            menuTitle.fontSize = FitVictoryFont(menuTitle, "GAME", 190, gameLine);
+            OutlineLabel(gameLine, "GAME", menuTitle, fill, 2f);
+            menuTitle.fontSize = FitVictoryFont(menuTitle, "OVER", 190, overLine);
+            OutlineLabel(overLine, "OVER", menuTitle, fill, 2f);
             menuTitle.fontSize = previousSize;
             menuTitle.alignment = previousAlignment;
         }
@@ -2491,11 +2521,6 @@ namespace HayChoriYPaty
             for (int i = 0; i < entries.Count; i += 4)
                 lines.Add(string.Join("  ·  ", entries.GetRange(i, Mathf.Min(4, entries.Count - i)).ToArray()));
             return string.Join("\n", lines.ToArray());
-        }
-
-        private static string FormatPendingQuotas(StreetSimulation sim)
-        {
-            return "PENDIENTES: " + FormatQuotaSummary(sim, true);
         }
 
         private void ResultPanel()

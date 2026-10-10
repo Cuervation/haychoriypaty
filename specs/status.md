@@ -699,3 +699,15 @@ The counter is now rendered only from the backdrop, with crowd occlusion project
 **Android verification:** Main-only Unity 6000.6.3f1 Development IL2CPP/ARM64 build succeeded with 0 errors and 2 warnings; APK archive, package/version/SDK metadata and v2 debug signature verified. Delivery details and SHA-256 are in [android-prototype.md](features/android-prototype.md).
 
 **Still unverified:** No Unity Game-view/device screenshot or physical-device run was available, so the in-game appearance has not been visually confirmed. The attached obelisk screenshot does not match the current v4 runtime background resource.
+
+
+## Victory popup regression — source fix (2026-10-10)
+
+The responsive footer reserves no upgrade-card bounds during terminal phases, but the OnGUI upgrade loop previously still iterated catalog actions after a win. That indexed the empty footer array and threw before ResultPanel() ran. Upgrade cards now draw only while Playing, or in Ready when the catalog fits the single row; Won skips directly to the result panel and Lost keeps its dedicated riot path. Added a focused EditMode regression matrix for Playing/Ready/Won/Lost and compact/large catalogs.
+
+Validation: git diff --check passed. The Main-only Android build of this source as 0.2.21/code23 succeeded with 0 build errors; the APK was integrity/package/signature-verified. Focused EditMode/PlayMode regression and visual/Game View/device verification remain pending; no device install was done.
+
+
+## Git and Android delivery — 2026-10-10 (0.2.21/code23)
+
+Committed and pushed the victory-popup regression fix on codex/street-automation. Main-only Unity 6000.6.3f1 Development Android IL2CPP/ARM64 build succeeded (0 errors). APK: Builds/Android/Archive/HayChoriYPaty-0.2.21-code23-victory-popup.apk, 402,286,236 bytes, SHA-256 b3ced92c175ff47ff23b3767e37d8a4cfac3886c06232ed9a6bc7623be128ace. Package/version/min/target: com.haychoriypaty.game, 0.2.21/code23, API26/36. Archive integrity and v2 debug signature verified. No EditMode/PlayMode run, phone installation, or visual review was requested or performed.
