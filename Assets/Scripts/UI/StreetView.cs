@@ -136,6 +136,83 @@ namespace HayChoriYPaty
             if (count == 4) return new Rect(28 + (index % 2) * 250, 710 + (index / 2) * 116, 234, 104);
             return index < 3 ? new Rect(24 + index * 168, 740, 156, 100) : new Rect(28 + (index - 3) * 250, 848, 234, 100);
         }
+
+        private struct ResponsiveFooterLayout
+        {
+            public Rect[] UpgradeBounds;
+            public Rect LevelBadge;
+            public Rect ReadySelector;
+            // Safe-canvas coordinates, drawn over the full-bleed background after root-row masking.
+            public Rect Pennants;
+        }
+
+        private static ResponsiveFooterLayout BuildResponsiveFooterLayout(
+            StreetSimulation sim, float canvasHeight, bool showUpgrades, bool showReadySelector)
+        {
+            float verticalScale = Mathf.Max(.01f, canvasHeight / H);
+            float compactScale = Mathf.Min(1f, verticalScale);
+            int[] actions = showUpgrades ? CatalogUpgradeActions(sim) : new int[0];
+            int count = actions.Length;
+            int rows = count == 0 ? 0 : count <= 3 ? 1 : 2;
+            float cardHeight = (count >= 5 ? 100f : count == 4 ? 104f : 120f) * compactScale;
+            float rowGap = rows > 1 ? 8f * compactScale : 0f;
+            float badgeHeight = (count >= 5 ? 20f : count == 4 ? 22f : 26f) * compactScale;
+            float sectionGap = (rows > 0 || showReadySelector) ? 6f * compactScale : 0f;
+            float selectorHeight = showReadySelector ? ReadyLevelSelector.height * compactScale : 0f;
+            float selectorGap = showReadySelector && rows > 0 ? 6f * compactScale : 0f;
+            float topPadding = 4f * compactScale;
+            float bottomPadding = 8f * compactScale;
+            float cardBlockHeight = rows * cardHeight + Mathf.Max(0, rows - 1) * rowGap;
+            float panelHeight = badgeHeight + sectionGap + cardBlockHeight + selectorGap + selectorHeight;
+            float stageBottom = StreetKitchenLayout.TiledPlayfieldBottom * verticalScale;
+            float panelTop = stageBottom + topPadding;
+            float panelBottom = panelTop + panelHeight;
+            float cardTop = panelTop + badgeHeight + sectionGap;
+
+            var cards = new Rect[count];
+            for (int i = 0; i < count; i++)
+            {
+                Rect authored = CatalogUpgradeCardBounds(sim, actions[i]);
+                int row = count == 4 ? i / 2 : count == 5 && i >= 3 ? 1 : 0;
+                cards[i] = new Rect(authored.x, (cardTop + row * (cardHeight + rowGap)) / verticalScale,
+                    authored.width, authored.height);
+            }
+
+            Rect selector = Rect.zero;
+            if (showReadySelector)
+            {
+                float selectorY = cardTop + cardBlockHeight + selectorGap;
+                float width = ReadyLevelSelector.width * compactScale;
+                selector = new Rect(ReadyLevelSelector.center.x - width * .5f, selectorY / verticalScale,
+                    width, selectorHeight);
+            }
+
+            Rect badge = new Rect(45f, panelTop / verticalScale, 450f, badgeHeight);
+            bool hasFooterControls = rows > 0 || showReadySelector;
+            float pennantClearance = hasFooterControls ? 2f * compactScale : 0f;
+            float decorationGap = Mathf.Max(0f, canvasHeight - bottomPadding - panelBottom - pennantClearance);
+            float pennantHeight = !hasFooterControls
+                ? ClubPennantRenderer.LogicalHeight * verticalScale
+                : Mathf.Min(ClubPennantRenderer.LogicalHeight * verticalScale,
+                    decorationGap);
+            float pennantTop = hasFooterControls ? panelBottom + pennantClearance : canvasHeight - pennantHeight;
+            Rect pennants = pennantHeight > 1f
+                ? new Rect(0f, pennantTop, W, pennantHeight)
+                : new Rect(0f, pennantTop, W, 0f);
+
+            return new ResponsiveFooterLayout {
+                UpgradeBounds = cards, LevelBadge = badge, ReadySelector = selector, Pennants = pennants
+            };
+        }
+
+        private ResponsiveFooterLayout CurrentResponsiveFooter(StreetSimulation sim, float canvasHeight)
+        {
+            bool ready = !levelSelectActive && sim.Phase == RoundPhase.Ready;
+            bool play = !levelSelectActive && sim.Phase == RoundPhase.Playing;
+            bool showCards = play || (ready && CatalogUpgradeActions(sim).Length <= 3);
+            return BuildResponsiveFooterLayout(sim, canvasHeight, showCards, ready);
+        }
+
         private Rect CatalogUpgradeTouchBounds(int action)
         {
             Rect rect = ResponsiveUpgradeCardBounds(game.Sim, action);
@@ -221,6 +298,9 @@ namespace HayChoriYPaty
         private float feedbackUntil, feedbackScale;
         private float layoutVerticalScale = 1f;
         private float logicalCanvasHeight = H;
+        // Customer occlusion follows the baked full-screen plate after projection into the safe canvas.
+        private float projectedCounterTopY = StreetSceneLayout.CounterTop(H);
+        private Rect cachedHudCutoutGap = CutoutHudGap;
         // Individually reviewed authored pixel bounds, not a geometric-grid assumption.
         private static readonly Rect[] Items = {
             new Rect(13,58,298,240), new Rect(310,48,253,250), new Rect(566,66,303,232), new Rect(856,63,334,232), new Rect(1190,63,195,236),
@@ -416,7 +496,12 @@ namespace HayChoriYPaty
                 child.width * scale, child.height * scale);
         }
         private Rect ResponsiveUpgradeCardBounds(StreetSimulation sim, int action)
-            => ScaleCardBounds(CatalogUpgradeCardBounds(sim, action), layoutVerticalScale);
+        {
+            ResponsiveFooterLayout footer = CurrentResponsiveFooter(sim, logicalCanvasHeight);
+            int index = System.Array.IndexOf(CatalogUpgradeActions(sim), action);
+            if (index < 0 || footer.UpgradeBounds == null || index >= footer.UpgradeBounds.Length) return Rect.zero;
+            return ScaleCardBounds(footer.UpgradeBounds[index], layoutVerticalScale);
+        }
         private void HandlePointer(Vector2 pixel, bool down, bool up)
         {
             if (game == null || game.Sim == null) return;
@@ -449,7 +534,8 @@ namespace HayChoriYPaty
             if (game.Sim.Phase == RoundPhase.Ready)
             {
                 if (PointerHitBounds(Start).Contains(p)) return 1;
-                if (PointerHitBounds(ReadyLevelSelector).Contains(p)) return ReadyLevelSelectorAction;
+                Rect selector = CurrentResponsiveFooter(game.Sim, logicalCanvasHeight).ReadySelector;
+                if (PointerHitBounds(selector).Contains(p)) return ReadyLevelSelectorAction;
                 return 0;
             }
             if (game.Sim.Phase == RoundPhase.Playing)
@@ -552,6 +638,7 @@ namespace HayChoriYPaty
             Styles(); Rect v=CanvasViewport(new Vector2(Screen.width,Screen.height),Screen.safeArea); if(v.width<=0)return;
             logicalCanvasHeight = CanvasLogicalHeight(v);
             layoutVerticalScale = logicalCanvasHeight / H;
+            projectedCounterTopY = StreetSceneLayout.CounterTopInViewport(Screen.width, Screen.height, v);
             Matrix4x4 m=GUI.matrix; Color old=GUI.color;
             var sim=game.Sim;
             if (!introActive && sim.Phase != RoundPhase.Lost) DrawGameplayScreenFill();
@@ -577,10 +664,9 @@ namespace HayChoriYPaty
                 return;
             }
             riotScreenActive = false;
-            // The full-bleed pass already composed the scenery once; scene actors are safe-area anchored.
-            // Keep the expanded customer street clear; order icons live on their customers.
+            ResponsiveFooterLayout footer = CurrentResponsiveFooter(sim, logicalCanvasHeight);
+            // The baked counter is rendered once by the full-bleed backdrop; queue clipping uses that same projection.
             DrawWaitingCrowd(sim);
-            DrawClubCounter();
             if (kitchenRenderer == null)
                 kitchenRenderer = GetComponent<StreetKitchenRenderer>() ?? gameObject.AddComponent<StreetKitchenRenderer>();
             kitchenRenderer.Prepare(sim, layoutVerticalScale, logicalCanvasHeight);
@@ -605,19 +691,21 @@ namespace HayChoriYPaty
                 Label(new Rect(s.Position.x-3,s.Position.y-86-s.Age*33,48,25),"+"+s.Amount,text);GUI.color=Color.white;
             }
             DrawCounters(sim);
-            // Large catalogs need two rows; Ready navigation remains an unobstructed layer.
-            if (sim.Phase != RoundPhase.Ready || CatalogUpgradeActions(sim).Length <= 3)
-                foreach (int action in CatalogUpgradeActions(sim))
+            // The same footer geometry drives rendering, touch targets and the decorative pennant gap.
+            int[] catalogActions = CatalogUpgradeActions(sim);
+            if (sim.Phase != RoundPhase.Ready || catalogActions.Length <= 3)
+                for (int i = 0; i < catalogActions.Length; i++)
                 {
+                    int action = catalogActions[i];
                     bool speed = action == 3;
                     StreetWorkerRole role = RoleForAction(action);
-                    Upgrade(ResponsiveUpgradeCardBounds(sim, action), action, speed ? 15 : 16,
+                    Upgrade(ScaleCardBounds(footer.UpgradeBounds[i], layoutVerticalScale), action, speed ? 15 : 16,
                         speed ? "VELOCIDAD" : RoleCaption(role), speed ? sim.SpeedCost : sim.HireCostForRole(role),
                         speed ? sim.CanUpgradeSpeed : sim.CanHireRole(role));
                 }
-            if(sim.Phase==RoundPhase.Ready) ReadyPanel();
+            if(sim.Phase==RoundPhase.Ready) ReadyPanel(footer);
             else if(sim.Phase==RoundPhase.Won||sim.Phase==RoundPhase.Lost) ResultPanel();
-            else DrawLevelBadge(sim.LevelIndex, CatalogLevelBadge());
+            else DrawLevelBadge(sim.LevelIndex, footer.LevelBadge);
             GUI.color=old;GUI.matrix=m;
         }
         private static Rect ScreenBounds(Vector2 size) => new Rect(0, 0, size.x, size.y);
@@ -655,7 +743,6 @@ namespace HayChoriYPaty
             }
 
             DrawRiotWaitingCrowd(game != null ? game.Sim : null, elapsed);
-            DrawClubCounter(1f - destruction);
             DrawRiotImpactCloud(elapsed);
             DrawRiotDebris(elapsed);
         }
@@ -907,11 +994,13 @@ namespace HayChoriYPaty
             Color color = GUI.color;
             float scale = Screen.width / W;
             float fullHeight = Screen.height / scale;
+            Rect viewport = CanvasViewport(new Vector2(Screen.width, Screen.height), Screen.safeArea);
+            ResponsiveFooterLayout footer = CurrentResponsiveFooter(game.Sim, CanvasLogicalHeight(viewport));
             try
             {
                 GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1));
                 GUI.color = Color.white;
-                DrawBackdropLayers(fullHeight, fullHeight / H);
+                DrawBackdropLayers(fullHeight, fullHeight / H, viewport, footer.Pennants);
             }
             finally { GUI.matrix = previous; GUI.color = color; }
         }
@@ -930,7 +1019,7 @@ namespace HayChoriYPaty
             if (game.Sim.LevelIndex == 10 && losRedondosBackground != null) return losRedondosBackground;
             return backdrop;
         }
-        private void DrawBackdropLayers(float canvasHeight, float verticalScale)
+        private void DrawBackdropLayers(float canvasHeight, float verticalScale, Rect safeViewport, Rect safePennants)
         {
             ClubVisualTheme theme = ClubVisualTheme.ForLevel(VisualLevelIndex);
             // The root public ground/counter/operator floor is invariant; only scenery is themed.
@@ -946,7 +1035,7 @@ namespace HayChoriYPaty
                 Rect band = new Rect(0f, HudBar.yMax, W, MuralBounds.height * verticalScale);
                 DrawRawCover(band, muralArt, MuralSource);
             }
-            DrawClubPennants(canvasHeight, verticalScale);
+            DrawClubPennants(canvasHeight, verticalScale, safeViewport, safePennants);
         }
 
         private void DrawThemedMural(ClubVisualTheme theme, float canvasHeight, float verticalScale)
@@ -977,13 +1066,9 @@ namespace HayChoriYPaty
             GUI.color = previous;
         }
 
-        private void DrawClubPennants(float canvasHeight, float verticalScale)
+        private void DrawClubPennants(float canvasHeight, float verticalScale, Rect safeViewport, Rect safePennants)
         {
-            int levelIndex = VisualLevelIndex;
-            // The original Floresta row is part of its background art; leave it pixel-identical.
-            if (levelIndex == 0) return;
-
-            ClubVisualTheme theme = ClubVisualTheme.ForLevel(levelIndex);
+            ClubVisualTheme theme = ClubVisualTheme.ForLevel(VisualLevelIndex);
             if (clubPennantTexture == null || clubPennantThemeName != theme.ClubName)
             {
                 if (clubPennantTexture != null) Destroy(clubPennantTexture);
@@ -991,14 +1076,24 @@ namespace HayChoriYPaty
                 clubPennantThemeName = theme.ClubName;
             }
 
-            float height = ClubPennantRenderer.LogicalHeight * verticalScale;
             Color previousColor = GUI.color;
             try
             {
-                // Keep club colors opaque even when a caller is drawing a faded transition layer.
+                // Mask the Floresta pennants baked into the root plate before placing the adaptive row.
+                GUI.color = new Color32(255, 244, 224, 255);
+                float rootHeight = ClubPennantRenderer.LogicalHeight * verticalScale;
+                GUI.DrawTexture(new Rect(0f, canvasHeight - rootHeight, W, rootHeight),
+                    Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
+
+                if (safePennants.height <= 1f || safeViewport.width <= 0f) return;
+                float fullScale = Screen.width / W;
+                float safeScale = safeViewport.width / W;
+                Rect destination = new Rect(0f,
+                    (safeViewport.y + safePennants.y * safeScale) / fullScale,
+                    W, safePennants.height * safeScale / fullScale);
                 GUI.color = Color.white;
-                GUI.DrawTexture(new Rect(0f, canvasHeight - height, W, height),
-                    clubPennantTexture, ScaleMode.StretchToFill, true);
+                // ScaleToFit preserves the pennant artwork when the remaining footer band is shorter.
+                GUI.DrawTexture(destination, clubPennantTexture, ScaleMode.ScaleToFit, true);
             }
             finally
             {
@@ -1040,41 +1135,92 @@ namespace HayChoriYPaty
                 new Rect(start + iconSize + gap, bounds.y, textWidth, bounds.height)
             };
         }
+        private static Rect TopHudCutoutBounds(Vector2 screenSize, Rect[] cutouts)
+        {
+            if (screenSize.x <= 0f || screenSize.y <= 0f || cutouts == null || cutouts.Length == 0) return Rect.zero;
+            float scale = screenSize.x / W;
+            float xMin = W, xMax = 0f;
+            bool found = false;
+            for (int i = 0; i < cutouts.Length; i++)
+            {
+                Rect cutout = cutouts[i];
+                if (cutout.width <= 0f || cutout.height <= 0f || cutout.yMax < screenSize.y - 1f) continue;
+                float top = screenSize.y - cutout.yMax;
+                if (top > CutoutHudGap.height * scale) continue;
+                xMin = Mathf.Min(xMin, cutout.xMin / scale - 8f);
+                xMax = Mathf.Max(xMax, cutout.xMax / scale + 8f);
+                found = true;
+            }
+            if (!found) return Rect.zero;
+            xMin = Mathf.Clamp(xMin, 0f, W);
+            xMax = Mathf.Clamp(xMax, 0f, W);
+            return xMax > xMin ? new Rect(xMin, 0f, xMax - xMin, CutoutHudGap.height) : Rect.zero;
+        }
+
+        private void EnsureCutoutHudTexture(Rect gap)
+        {
+            if (gap.width <= 0f || gap.height <= 0f || cachedHudCutoutGap == gap) return;
+            if (cutoutHudBarTexture != null) Destroy(cutoutHudBarTexture);
+            cutoutHudBarTexture = CreateHudBarTexture(true, gap);
+            cachedHudCutoutGap = gap;
+        }
+
         private void DrawCounters(StreetSimulation sim)
         {
-            // One compact per-SKU quota grid keeps every target visible without covering the rear queue.
+            // Read-only status is pinned to physical y=0; only interactive controls use Screen.safeArea.
             Matrix4x4 previous = GUI.matrix;
             Color color = GUI.color;
             float previousVertical = layoutVerticalScale;
             try
             {
-                // OnGUI already uses CanvasViewport's safe-area transform; keep key information inside it.
                 layoutVerticalScale = 1f;
+                Vector2 screenSize = new Vector2(Screen.width, Screen.height);
+                Rect cutoutGap = TopHudCutoutBounds(screenSize, Screen.cutouts);
+                EnsureCutoutHudTexture(cutoutGap);
+                GUI.matrix = Matrix4x4.Scale(new Vector3(Screen.width / W, Screen.width / W, 1f));
                 GUI.color = Color.white;
-                if (hudBarTexture != null) GUI.DrawTexture(HudBar, hudBarTexture, ScaleMode.StretchToFill, true);
+                Texture2D bar = cutoutGap.width > 0f ? cutoutHudBarTexture : hudBarTexture;
+                if (bar != null) GUI.DrawTexture(HudBar, bar, ScaleMode.StretchToFill, true);
                 DrawHudIcon(new Rect(5, 5, 40, 56), 10);
                 DrawHudNumber(HudCoins, sim.Coins.ToString(), 34);
                 DrawHudNumber(HudTime, FormatRemainingTime(sim.TimeRemaining), 40);
-                for (int slot = 0; slot < sim.ProductCount; slot++) DrawQuotaChip(sim, slot);
+                for (int slot = 0; slot < sim.ProductCount; slot++) DrawQuotaChip(sim, slot, cutoutGap);
             }
             finally { GUI.matrix = previous; GUI.color = color; layoutVerticalScale = previousVertical; }
         }
 
-        private static Rect HudQuotaCellBounds(int slot)
+        private static Rect HudQuotaCellBounds(int slot) => HudQuotaCellBounds(slot, Rect.zero);
+
+        private static Rect HudQuotaCellBounds(int slot, Rect cutoutGap)
         {
-            float cellWidth = HudQuotaGrid.width / 4f;
-            float cellHeight = HudQuotaGrid.height / 2f;
-            return new Rect(HudQuotaGrid.x + (slot % 4) * cellWidth + 1f,
-                HudQuotaGrid.y + (slot / 4) * cellHeight + 1f, cellWidth - 2f, cellHeight - 2f);
+            if (cutoutGap.width <= 0f) {
+                float cellWidth = HudQuotaGrid.width / 4f;
+                float cellHeight = HudQuotaGrid.height / 2f;
+                return new Rect(HudQuotaGrid.x + (slot % 4) * cellWidth + 1f,
+                    HudQuotaGrid.y + (slot / 4) * cellHeight + 1f, cellWidth - 2f, cellHeight - 2f);
+            }
+
+            float topLeftWidth = Mathf.Max(0f, Mathf.Min(cutoutGap.xMin, HudQuotaGrid.xMax) - HudQuotaGrid.x);
+            float topRightStart = Mathf.Max(HudQuotaGrid.x, cutoutGap.xMax);
+            float topRightWidth = Mathf.Max(0f, HudQuotaGrid.xMax - topRightStart);
+            bool useRight = topRightWidth >= topLeftWidth;
+            float start = useRight ? topRightStart : HudQuotaGrid.x;
+            float cell = Mathf.Max(1f, (useRight ? topRightWidth : topLeftWidth) / 3f);
+            if (slot < 3)
+                return new Rect(start + (slot % 3) * cell + 1f, 1f, Mathf.Max(1f, cell - 2f), 32f);
+
+            float lowerCell = HudQuotaGrid.width / 4f;
+            return new Rect(HudQuotaGrid.x + (slot - 3) * lowerCell + 1f, 35f,
+                lowerCell - 2f, 30f);
         }
 
-        private void DrawQuotaChip(StreetSimulation sim, int slot)
+        private void DrawQuotaChip(StreetSimulation sim, int slot, Rect cutoutGap)
         {
             int product = sim.GetAvailableProduct(slot);
             int goal = sim.GetProductGoal(product);
             int delivered = sim.GetProductDelivered(product);
             bool complete = sim.IsProductGoalComplete(product);
-            Rect bounds = HudQuotaCellBounds(slot);
+            Rect bounds = HudQuotaCellBounds(slot, cutoutGap);
             FillRect(bounds, complete ? new Color(.33f, .54f, .27f, .92f) : new Color(.25f, .15f, .08f, .80f));
             DrawHudIcon(new Rect(bounds.x + 2f, bounds.y + 5f, 17f, 17f), product);
             DrawHudNumber(new Rect(bounds.x + 20f, bounds.y + 1f, bounds.width - 21f, bounds.height - 6f),
@@ -1130,6 +1276,9 @@ namespace HayChoriYPaty
         }
         private static Texture2D CreateHudBar() => CreateHudBarTexture(false);
         private static Texture2D CreateHudBarTexture(bool cutout)
+            => CreateHudBarTexture(cutout, cutout ? CutoutHudGap : Rect.zero);
+
+        private static Texture2D CreateHudBarTexture(bool cutout, Rect clearGap)
         {
             // Original code-authored artwork: no reference pixels or baked-in live numbers.
             const int width = 1080, height = 136;
@@ -1167,6 +1316,9 @@ namespace HayChoriYPaty
                 bool minuteHand = Mathf.Abs(dx) < .8f && dy >= -5.5f && dy <= .8f;
                 bool hourHand = dx >= -.5f && dx <= 4.8f && Mathf.Abs(dy - dx * .5f) < .9f;
                 if (minuteHand || hourHand) color = new Color(.24f, .12f, .045f);
+                if (cutout && clearGap.width > 0f && clearGap.height > 0f &&
+                    px >= clearGap.xMin && px < clearGap.xMax && py >= clearGap.yMin && py < clearGap.yMax)
+                    color = Color.clear;
                 pixels[y * width + x] = color;
             }
             texture.SetPixels(pixels);
@@ -1590,24 +1742,9 @@ namespace HayChoriYPaty
             }
             finally { GUI.EndGroup(); }
         }
-        private void DrawClubCounter(float opacity = 1f)
-        {
-            if (backdrop == null || opacity <= 0f) return;
-            // Already canvas-space geometry: applying LayoutRect again would move the counter on tall screens.
-            Rect destination = StreetSceneLayout.CounterBounds(logicalCanvasHeight);
-            Color previous = GUI.color;
-            try
-            {
-                Color tint = ClubVisualTheme.ForLevel(game.Sim.LevelIndex).SceneryTint;
-                tint.a = Mathf.Clamp01(opacity);
-                GUI.color = tint;
-                DrawRaw(destination, backdrop, StreetSceneLayout.CounterSource, true, false);
-            }
-            finally { GUI.color = previous; }
-        }
         private float CustomerCounterTopY()
         {
-            return StreetSceneLayout.CounterTop(logicalCanvasHeight);
+            return projectedCounterTopY;
         }
         private static float CounterSurfaceY(float canvasHeight, Vector2 backdropSize, int levelIndex)
         {
@@ -2286,16 +2423,12 @@ namespace HayChoriYPaty
                 Label(new Rect(bounds.x+x,bounds.y+y,bounds.width,bounds.height),value,style);
             style.normal.textColor=fill;Label(bounds,value,style);style.normal.textColor=previous;
         }
-        private void ReadyPanel()
+        private void ReadyPanel(ResponsiveFooterLayout footer)
         {
             // Prices are fixed in every location; Ready has no price-selection panel or hidden controls.
             DrawStandardButton(Start, 1, "JUGAR");
-            ReadyLevels();
-        }
-        private void ReadyLevels()
-        {
-            DrawLevelBadge(game.SelectedLevel, ReadyLevelBadge);
-            DrawStandardButton(ReadyLevelSelector, ReadyLevelSelectorAction, "CANCHAS");
+            DrawLevelBadge(game.SelectedLevel, footer.LevelBadge);
+            DrawStandardButton(footer.ReadySelector, ReadyLevelSelectorAction, "CANCHAS");
         }
         private static Rect LevelButton(int i){return new Rect(108+i*67,912,57,35);}
         private static Rect VictoryPopupBounds(float canvasHeight)

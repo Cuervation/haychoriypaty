@@ -18,6 +18,19 @@ namespace HayChoriYPaty
             return (canvasHeight - ReferenceBackdropSize.y * scale) * .5f + sourceY * scale;
         }
         public static float CounterTop(float canvasHeight) => SourceY(CounterSource.y, canvasHeight);
+
+        /// <summary>Project the single baked full-screen counter into the controls' top-origin safe viewport.</summary>
+        public static float CounterTopInViewport(float screenWidth, float screenHeight, Rect viewport)
+        {
+            if (screenWidth <= 0f || viewport.width <= 0f) return CounterTop(Height);
+            float fullScale = screenWidth / Width;
+            float safeScale = viewport.width / Width;
+            float fullCanvasHeight = screenHeight / fullScale;
+            float physicalCounterTop = CounterTop(fullCanvasHeight) * fullScale;
+            return Mathf.Clamp((physicalCounterTop - viewport.y) / safeScale, 0f,
+                viewport.height / safeScale);
+        }
+
         public static float CounterFrontBottom(float canvasHeight) => SourceY(CounterSource.yMax, canvasHeight);
         public static Rect BackgroundBounds(float canvasHeight)
         {

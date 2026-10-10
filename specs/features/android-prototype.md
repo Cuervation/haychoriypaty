@@ -1,4 +1,14 @@
-# Current Android delivery — 2026-10-09 (0.2.20/code22, responsive corrections)
+# Current Android delivery — 2026-10-10 (0.2.20/code22, responsive gameplay regions)
+
+Unity 6000.6.3f1 Main-only Development Android IL2CPP/ARM64 build: **Succeeded in 524.75s; BuildReport: 0 errors, 2 warnings**. Package `com.haychoriypaty.game`, version0.2.20/code22, min API26/target36, `arm64-v8a`.
+
+APK `/tmp/HayChoriYPaty-0.2.20-code22-responsive-regions.apk`: **402,287,116 bytes**. SHA-256 `b810f2f0aceedcabc89bda92d5c8d2c19497841c118f677423a62583887feee4`. `aapt dump badging` confirms package/version/min/target; `unzip -t` reports no archive errors; Unity-bundled OpenJDK + `apksigner` verifies APK Signature Scheme v2 and the established Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`. This is Development/debug signed, not a Play Store release. No phone installation or physical-device review was performed. Unity build and tests ran in an isolated copy because another Unity instance already had the primary checkout open.
+
+Focused `StreetArtTests` executed 145 cases: **144 passed, 1 unrelated existing quota-label assertion failed** (`VACÍO` expected, current abbreviated product label is `VAC`). All **11 new responsive geometry cases** passed across the five requested resolutions, including the eleven level catalogs, single-counter projection, and safe top-cutout.
+
+---
+
+## Previous Android delivery — 2026-10-09 (0.2.20/code22, responsive corrections)
 
 Unity 6000.6.3f1 Main-only Development Android IL2CPP/ARM64 build `build-8d0c922186`: **Succeeded in 460.65s; BuildReport: 0 errors, 1 warning**. Package `com.haychoriypaty.game`, version0.2.20/code22, min API26/target36, `arm64-v8a`.
 

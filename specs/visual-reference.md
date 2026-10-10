@@ -370,3 +370,10 @@ Prefer the staggered table-left, grill-lower/right, drinks-upper/right compositi
 ## Kitchen reference update —2026-10-07
 
 For furniture/food and row composition the latest [modular kitchen reference](../Assets/Art/Reference/modular-kitchen-layout-reference-20261007.jpg) and [approved feature](features/modular-kitchen.md) supersede former kitchen size/placement rules. Keep existing club scenery, crowd, workers and HUD. Reference guides independent original sprites, never a baked gameplay background.
+
+
+## Shared responsive gameplay regions — 2026-10-10
+
+The common IMGUI screen is divided into a physical-edge read-only HUD, a safe-area central playfield and a safe-area lower footer. The root backdrop contains the only counter; crowd clipping and service presentation project that baked edge into the safe viewport instead of painting a second counter strip. The HUD fills physical y=0 and uses the platform-reported top cutout to clear/reflow quota chips; gameplay input remains inside the safe-area viewport. The lower level name, catalog-derived upgrade cards and optional Ready selector are laid out from the shared kitchen-field bottom. Club pennants mask the root plate's baked row and render aspect-preserved only in the leftover footer band; when no safe space remains they are omitted as decoration.
+
+- [x] Added EditMode geometry fixtures for the five requested portrait/tablet sizes, safe-area insets, seven quota slots and all eleven catalog profiles. Execution and Unity editor/Game-view comparison remain pending if the editor bridge is unavailable.
