@@ -65,6 +65,7 @@ namespace HayChoriYPaty.Tests
                             var torso=(SpriteRenderer)Field(workerVisual,"Torso");
                             Call(renderer,"PrepareWorkers",normal,diagonal,normal,diagonal,beverage,beverage,true);
                             float idleReachY=torso.transform.localPosition.y;
+                            Vector2 idlePalm=(Vector2)Field(workerVisual,"Palm");
                             GameObject carryRoot=(GameObject)Field(renderer,"carryRoot");
                             foreach(DictionaryEntry entry in objects)
                             {
@@ -74,8 +75,11 @@ namespace HayChoriYPaty.Tests
                             }
                             Set(worker,"PickupProgress",.5f);
                             Call(renderer,"PrepareWorkers",normal,diagonal,normal,diagonal,beverage,beverage,true);
-                            Assert.AreNotEqual(idleReachY,torso.transform.localPosition.y,
-                                "Pickup dwell must animate a brief empty-handed reach.");
+                            Assert.That(idleReachY-torso.transform.localPosition.y, Is.EqualTo(0.196f).Within(.002f),
+                                "At peak dwell, the empty-handed torso must reach 20% of the authored worker height toward the barrel.");
+                            Vector2 reachingPalm=(Vector2)Field(workerVisual,"Palm");
+                            Assert.That(reachingPalm.y-idlePalm.y, Is.EqualTo(19.6f).Within(.02f),
+                                "The hand anchor must follow the visible reach instead of staying at the carry pose.");
                         }
                         object unit=Call(kitchen,"TryTake",product,Get(worker,"Role"),workerId);Assert.NotNull(unit);
                         int itemId=(int)Get(unit,"Id");

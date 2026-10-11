@@ -11,6 +11,7 @@ namespace HayChoriYPaty
         [SerializeField] private StreetBalance balance = new StreetBalance();
         [SerializeField, Range(0, 10)] private int selectedLevel;
         private StreetSimulation sim;
+        private OrderDeliverySound deliverySound;
         private SaveData save;
         private bool resultSaved;
 
@@ -43,6 +44,7 @@ namespace HayChoriYPaty
             selectedLevel = Mathf.Clamp(selectedLevel, 0, save.unlockedLevel);
             sim = new StreetSimulation(balance, selectedLevel, save.price);
             if(save.prices!=null && save.prices.Length==7)for(int i=0;i<7;i++)sim.SetProductPrice(i,save.prices[i]);
+            InitializeDeliverySound();
         }
 
         private void Update()
@@ -82,12 +84,22 @@ namespace HayChoriYPaty
         {
             if (sim == null || !sim.NextLevel()) return false;
             selectedLevel = sim.LevelIndex; save.unlockedLevel = Mathf.Max(save.unlockedLevel, selectedLevel);
-            sim = NewReadySimulation(selectedLevel); Save(); return true;
+            sim = NewReadySimulation(selectedLevel); InitializeDeliverySound(); Save(); return true;
         }
         public bool Retry()
         {
             if (sim == null || (sim.Phase != RoundPhase.Won && sim.Phase != RoundPhase.Lost)) return false;
-            resultSaved = false; sim = NewReadySimulation(selectedLevel); Save(); return true;
+            resultSaved = false; sim = NewReadySimulation(selectedLevel); InitializeDeliverySound(); Save(); return true;
+        }
+
+        private void InitializeDeliverySound()
+        {
+            if (deliverySound == null)
+            {
+                deliverySound = GetComponent<OrderDeliverySound>();
+                if (deliverySound == null) deliverySound = gameObject.AddComponent<OrderDeliverySound>();
+            }
+            deliverySound.Initialize(sim);
         }
 
         private StreetSimulation NewReadySimulation(int level)

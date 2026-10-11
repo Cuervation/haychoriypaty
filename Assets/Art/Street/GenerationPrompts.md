@@ -358,3 +358,8 @@ Use case: stylized-concept. Transparent game sprite sheet for Hay Chori y Paty, 
 
 Asset: Resources/street-grill-premium-v1.png. Built-in imagegen edit of existing street-grill-four-zones-v1.png; retain rectangular Argentine iron grill, elevated frontal cartoon perspective, embers, full handles/feet,3:1 shape. Replace all chorizo/paty/bread with only pork shoulder steaks on left and beef flank strips on right. Second edit removes all floor shadows/gray smears and requests clean transparent gutters. Original assets retained. Preview reviewed; import/Game View validation recorded in specs/status.md.
 SHA256: dfc0585e6270b07867b18fa95bf9fc8ee75ecc042f9dc9bc8ed6c5c4cb3456d0
+
+
+## River Plate header extension — 2026-10-11
+
+Built with the in-app image generator using the original River Plate mural as a style/seam reference. A separate 2172×274 horizontal crop adds Núñez rooftops, treetops, sky and a red-brick coping edge above the mural; it contains no people, text or logos. Imported as `Resources/street-river-header-extension-v1.png`, kept independent from `street-mural-river-master-v1.png`, and drawn only in the header band behind the HUD. The original River mural file and `.meta` remain untouched.

@@ -215,7 +215,7 @@ namespace HayChoriYPaty
                 Art legs = passing ? Walk(w,legFacing,0,false) : Walk(w,pose.Facing,contact,true);
                 float upperScale = Scale(upper), legScale = Scale(legs);
                 float split = upper.Bounds.height * Waist;
-                float reach = pose.PickingUp ? Mathf.Sin(pose.PickupProgress * Mathf.PI) * 5.5f : 0f;
+                float reach = pose.PickingUp ? Mathf.Sin(pose.PickupProgress * Mathf.PI) * Height * .20f : 0f;
                 float upperBottom = upper.Bounds.height * (1f-Waist) * upperScale - pose.Bob - reach;
                 int depth = -5000 + Mathf.RoundToInt(w.Position.y * verticalScale);
                 v.Root.localPosition = new Vector3((w.Position.x-270f)*.01f, (canvasHeight*.5f-w.Position.y*verticalScale)*.01f,0);
@@ -231,7 +231,7 @@ namespace HayChoriYPaty
                 v.Fingers.enabled = pose.Carrying;
                 float handX = (upper.Palm.x-.5f)*upper.Bounds.width*upperScale;
                 if (upper.Flip) handX = -handX;
-                float handY = -(1f-upper.Palm.y)*upper.Bounds.height*upperScale + pose.Bob;
+                float handY = -(1f-upper.Palm.y)*upper.Bounds.height*upperScale + pose.Bob + (pose.PickingUp ? reach : 0f);
                 v.Palm = new Vector2(w.Position.x+handX,w.Position.y*verticalScale+handY);
                 bool rear = pose.Facing == StreetFacing.Up || pose.Facing == StreetFacing.UpLeft || pose.Facing == StreetFacing.UpRight;
                 v.ProductOrder = rear ? depth-1 : depth+10000;

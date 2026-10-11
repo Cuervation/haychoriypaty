@@ -447,23 +447,31 @@ object sim = Make(level: 2);
             Assert.AreEqual(parrilleroId, Get(Call(customer, "GetOrderLine", 1), "OwnerWorkerId"));
             Assert.AreEqual(Get(cocacolero, "Id"), Get(Call(customer, "GetOrderLine", 2), "OwnerWorkerId"));
             Assert.AreEqual(0, Get(Call(customer, "GetOrderLine", 1), "Reserved"), "Paty is owned by the Parrillero but waits while its Chori trip completes.");
+            int completedOrderSignals = 0;
+            Action completedOrderHandler = () => completedOrderSignals++;
+            EventInfo orderCompleted = simType.GetEvent("OrderCompleted");
+            orderCompleted.AddEventHandler(sim, completedOrderHandler);
 
             for (int i = 0; i < 800 && (int)Get(sim, "Delivered") < 5; i++)
             {
                 Step(sim, .02f);
                 if ((int)Get(sim, "Delivered") < 5)
                 {
+                    Assert.AreEqual(0, completedOrderSignals, "No cue is emitted while any requested unit remains undelivered.");
                     Assert.IsTrue(Customers(sim).Contains(customer), "The mixed customer must wait for both specialties.");
                     Assert.AreNotEqual("Leaving", Get(customer, "State").ToString());
                 }
             }
             Assert.AreEqual(5, Get(sim, "Delivered"));
+            Assert.AreEqual(1, completedOrderSignals, "A mixed ticket emits the presentation cue once, after its final successful unit.");
+            orderCompleted.RemoveEventHandler(sim, completedOrderHandler);
             Assert.AreEqual(2, Get(sim, "ChoriDelivered"));
             Assert.AreEqual(2, Get(sim, "CocaDelivered"));
             for (int i = 0; i < 3; i++) Assert.AreEqual(0, Get(Call(customer, "GetOrderLine", i), "Remaining"));
             Assert.AreEqual(25, Get(sim, "Coins"));
             Step(sim, .35f); // Receiving finishes only after the final unit; then the customer begins leaving.
             Assert.AreEqual("Leaving", Get(customer, "State").ToString());
+            Assert.AreEqual(1, completedOrderSignals, "The completed ticket cannot emit a duplicate cue on later simulation steps.");
         }
 
         [Test]

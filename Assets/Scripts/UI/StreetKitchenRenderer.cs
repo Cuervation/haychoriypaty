@@ -11,7 +11,7 @@ namespace HayChoriYPaty
     {
         private const int PropLayer = 30, CarryLayer = 31;
         private const int RenderScale = 2;
-        private const float TableSandwichScale = 1.5f, CarriedSandwichScale = 1.25f;
+        private const float TableSandwichScale = 1.5f, CarriedSandwichScale = 1.25f, BarrelDrinkScale = 1.35f;
         private const string PrefabRoot = "ModularKitchen/Prefabs/";
         private const string SpriteRoot = "ModularKitchen/Sprites/";
         private readonly Dictionary<int, GameObject> foodObjects = new Dictionary<int, GameObject>();
@@ -20,6 +20,7 @@ namespace HayChoriYPaty
         private readonly Dictionary<int, SpriteRenderer> foodRenderers = new Dictionary<int, SpriteRenderer>();
         private readonly Dictionary<int, GameObject> cookingEffects = new Dictionary<int, GameObject>();
         private readonly Dictionary<int, GameObject> heatEffects = new Dictionary<int, GameObject>();
+        private Sprite fernetCupSprite, fernetBottleSprite;
         private sealed class AmbientGrillEffects
         {
             public GameObject Heat, SmokeA, SmokeB;
@@ -99,6 +100,7 @@ namespace HayChoriYPaty
         private bool EnsureCreated()
         {
             if (propsRoot != null) return true;
+            LoadOptionalFernetSprites();
             string[] prefabNames = {
                 "Station_NormalGrill", "Station_PremiumGrill", "Station_NormalTable", "Station_PremiumTable",
                 "Station_FernetTable", "Station_BeerBarrel", "Station_CocaBarrel",
@@ -236,6 +238,7 @@ namespace HayChoriYPaty
                     existing.SetActive(visible);
                     SetStationTransform(existing.transform, bounds);
                     FitStation(existing, bounds, !IsBarrelStation(prefabName));
+                    if (prefabName == "Station_FernetTable") EnsureFernetBottleShelf(existing);
                     return;
                 }
             GameObject source = Prefab(prefabName);
@@ -246,7 +249,64 @@ namespace HayChoriYPaty
             SetStationTransform(instance.transform, bounds);
             FitStation(instance, bounds, !IsBarrelStation(prefabName));
             SetSorting(instance, 0);
+            if (prefabName == "Station_FernetTable") EnsureFernetBottleShelf(instance);
             instance.SetActive(visible);
+        }
+
+        private void LoadOptionalFernetSprites()
+        {
+            if (fernetCupSprite == null)
+            {
+                Texture2D texture = Resources.Load<Texture2D>("ModularKitchen/Art/fernet-cup-800cc-v1");
+                if (texture != null) fernetCupSprite = CreateRuntimeSprite(texture, "fernet-cup-800cc-v1");
+            }
+            if (fernetBottleSprite == null)
+            {
+                Texture2D texture = Resources.Load<Texture2D>("ModularKitchen/Art/fernet-bottle-1l-v1");
+                if (texture != null) fernetBottleSprite = CreateRuntimeSprite(texture, "fernet-bottle-1l-v1");
+            }
+        }
+
+        private static Sprite CreateRuntimeSprite(Texture2D texture, string spriteName)
+        {
+            Sprite sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height),
+                new Vector2(.5f, .5f), 100f, 0, SpriteMeshType.FullRect);
+            sprite.name = spriteName;
+            return sprite;
+        }
+
+        private void EnsureFernetBottleShelf(GameObject station)
+        {
+            if (station == null || fernetBottleSprite == null ||
+                station.transform.Find("FernetBottleShelf") != null) return;
+
+            SpriteRenderer table = station.GetComponentInChildren<SpriteRenderer>(true);
+            Sprite colaSprite = FirstSprite("coca");
+            if (table == null || table.sprite == null || colaSprite == null) return;
+
+            Vector2 tableSize = table.sprite.bounds.size;
+            float bottleHeight = tableSize.y * .16f;
+            float bottleY = table.sprite.bounds.min.y + tableSize.y * .30f;
+            float bottleScale = bottleHeight / fernetBottleSprite.bounds.size.y;
+            float colaScale = bottleHeight / colaSprite.bounds.size.y;
+            float[] xPositions = { -.24f, -.17f, -.10f, .10f, .17f, .24f };
+            Transform shelf = new GameObject("FernetBottleShelf").transform;
+            shelf.SetParent(station.transform, false);
+            shelf.gameObject.layer = PropLayer;
+            for (int i = 0; i < xPositions.Length; i++)
+            {
+                bool fernet = i < 3;
+                GameObject bottle = new GameObject(fernet ? "FernetBrancaBottle_" + i : "CocaColaBottle_" + (i - 3));
+                bottle.layer = PropLayer;
+                bottle.transform.SetParent(shelf, false);
+                bottle.transform.localPosition = new Vector3(tableSize.x * xPositions[i], bottleY, -.01f);
+                float scale = fernet ? bottleScale : colaScale;
+                bottle.transform.localScale = new Vector3(scale, scale, 1f);
+                SpriteRenderer renderer = bottle.AddComponent<SpriteRenderer>();
+                renderer.sprite = fernet ? fernetBottleSprite : colaSprite;
+                renderer.sharedMaterial = table.sharedMaterial;
+                renderer.sortingOrder = 1;
+            }
         }
 
         private void SyncFood()
@@ -315,9 +375,14 @@ namespace HayChoriYPaty
                     renderer.color = unit.State == StreetFoodState.Burned
                         ? new Color(.94f, .78f, .60f, 1f) : Color.white;
                 }
-                else { renderer.sprite = FirstSprite(key); renderer.color = Color.white; }
+                else
+                {
+                    renderer.sprite = unit.Product == 5 && fernetCupSprite != null
+                        ? fernetCupSprite : FirstSprite(key);
+                    renderer.color = Color.white;
+                }
                 Vector2 size = isGrill ? simulation.KitchenLayout.GrillMeatSize(unit.Product, grillCompanionAvailable)
-                    : isBarrelDrink && !carried ? new Vector2(8f, 15f) : ServingSize(unit.Product, carried);
+                    : isBarrelDrink && !carried ? new Vector2(8f, 15f) * BarrelDrinkScale : ServingSize(unit.Product, carried);
                 SetDesiredSize(go.transform, renderer, size);
             }
             Vector2 position;
@@ -558,7 +623,8 @@ namespace HayChoriYPaty
                 return baseSize * (carried ? CarriedSandwichScale : TableSandwichScale);
             }
 
-            return product == 5 ? new Vector2(18f, 32f) : new Vector2(9f, 20f);
+            // Fernet is an 800 cc disposable plastic cup, not a tall heavy-based whisky glass.
+            return product == 5 ? new Vector2(18f, 28f) : new Vector2(9f, 20f);
         }
 
         private void SetStationTransform(Transform target, Rect bounds)
@@ -626,6 +692,8 @@ namespace HayChoriYPaty
         private void OnDestroy()
         {
             if (workerProjection != null) workerProjection.Dispose();
+            if (fernetCupSprite != null) Destroy(fernetCupSprite);
+            if (fernetBottleSprite != null) Destroy(fernetBottleSprite);
             ReleaseCamera(propsCamera);
             ReleaseCamera(carryCamera);
             ReleaseTexture(ref propsTexture);

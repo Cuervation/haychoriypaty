@@ -85,6 +85,67 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
+        public void FernetPresentationUses800CcCupAndBrancaBottlesOnTheLowerShelf()
+        {
+            string cupPath = "Assets/Resources/ModularKitchen/Art/fernet-cup-800cc-v1.png";
+            string bottlePath = "Assets/Resources/ModularKitchen/Art/fernet-bottle-1l-v1.png";
+            TextureImporter cupImporter = AssetImporter.GetAtPath(cupPath) as TextureImporter;
+            TextureImporter bottleImporter = AssetImporter.GetAtPath(bottlePath) as TextureImporter;
+            Assert.NotNull(cupImporter, cupPath);
+            Assert.NotNull(bottleImporter, bottlePath);
+            Assert.IsTrue(cupImporter.DoesSourceTextureHaveAlpha());
+            Assert.IsTrue(bottleImporter.DoesSourceTextureHaveAlpha());
+            Texture2D cup = Resources.Load<Texture2D>("ModularKitchen/Art/fernet-cup-800cc-v1");
+            Texture2D bottle = Resources.Load<Texture2D>("ModularKitchen/Art/fernet-bottle-1l-v1");
+            Assert.NotNull(cup);
+            Assert.NotNull(bottle);
+            Assert.That((float)cup.width / cup.height, Is.InRange(.60f, .70f), "The serving cup keeps its broad plastic silhouette.");
+            Assert.That((float)bottle.width / bottle.height, Is.InRange(.24f, .31f), "The bottle keeps its tall 1 L silhouette.");
+
+            Type rendererType = Runtime("StreetKitchenRenderer");
+            MethodInfo servingSize = rendererType.GetMethod("ServingSize", BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.NotNull(servingSize);
+            Assert.AreEqual(new Vector2(18f, 28f), (Vector2)servingSize.Invoke(null, new object[] { 5, false }));
+
+            GameObject rendererRoot = new GameObject("FernetPresentationTestRenderer");
+            GameObject station = null;
+            try
+            {
+                Component renderer = rendererRoot.AddComponent(rendererType);
+                MethodInfo load = rendererType.GetMethod("LoadOptionalFernetSprites", BindingFlags.NonPublic | BindingFlags.Instance);
+                MethodInfo populateShelf = rendererType.GetMethod("EnsureFernetBottleShelf", BindingFlags.NonPublic | BindingFlags.Instance);
+                Assert.NotNull(load);
+                Assert.NotNull(populateShelf);
+                load.Invoke(renderer, null);
+                station = UnityEngine.Object.Instantiate(Resources.Load<GameObject>("ModularKitchen/Prefabs/Station_FernetTable"));
+                Assert.NotNull(station);
+                populateShelf.Invoke(renderer, new object[] { station });
+                Transform shelf = station.transform.Find("FernetBottleShelf");
+                Assert.NotNull(shelf);
+                Assert.AreEqual(6, shelf.childCount, "The lower shelf carries three Fernet and three existing Coca-Cola bottles.");
+                int fernetBottles = 0, cocaBottles = 0;
+                foreach (Transform item in shelf)
+                {
+                    SpriteRenderer spriteRenderer = item.GetComponent<SpriteRenderer>();
+                    Assert.NotNull(spriteRenderer);
+                    Assert.Less(item.localPosition.y, 0f, "Bottle props must stay below the table center/top surface.");
+                    Assert.AreEqual(1, spriteRenderer.sortingOrder);
+                    if (spriteRenderer.sprite.name == "fernet-bottle-1l-v1") fernetBottles++;
+                    if (spriteRenderer.sprite.name == "coca") cocaBottles++;
+                }
+                Assert.AreEqual(3, fernetBottles);
+                Assert.AreEqual(3, cocaBottles);
+                populateShelf.Invoke(renderer, new object[] { station });
+                Assert.AreEqual(1, station.transform.childCount, "Repeated responsive layout must not duplicate shelf bottles.");
+            }
+            finally
+            {
+                if (station != null) UnityEngine.Object.DestroyImmediate(station);
+                UnityEngine.Object.DestroyImmediate(rendererRoot);
+            }
+        }
+
+        [Test]
         public void ActiveStationsReflowAcrossTheWidthWithConsistentSizesAndSafeGrillRows()
         {
             float width = SceneWidth();
@@ -123,6 +184,7 @@ namespace HayChoriYPaty.Tests
                 float totalWidth = 0f;
                 foreach (Rect item in top) totalWidth += item.width;
                 float gap = (width - totalWidth) / (top.Count + 1);
+                Assert.Greater(gap, 0f, "All active upper stations must remain separated after widening the barrels.");
                 Assert.AreEqual(gap, top[0].xMin, .02f, "First active prep station should use the responsive row margin.");
                 for (int i = 0; i < top.Count; i++)
                 {
@@ -176,8 +238,10 @@ namespace HayChoriYPaty.Tests
             }
             Assert.AreEqual(196f * (width / (float)LayoutConstant("SourceWidth")), tableSize.Value.width, .02f);
             Assert.AreEqual(98f * (width / (float)LayoutConstant("SourceWidth")), tableSize.Value.height, .02f);
-            Assert.AreEqual(72f * (width / (float)LayoutConstant("SourceWidth")), barrelSize.Value.width, .02f);
+            Assert.AreEqual(72f * 1.15f * (width / (float)LayoutConstant("SourceWidth")), barrelSize.Value.width, .02f);
             Assert.AreEqual(117.6f * (width / (float)LayoutConstant("SourceWidth")), barrelSize.Value.height, .02f);
+            Assert.AreEqual(72f * 1.15f, LayoutConstant("BarrelAuthoredWidth"), .001f);
+            Assert.AreEqual(117.6f, LayoutConstant("BarrelAuthoredHeight"), .001f);
         }
 
         [Test]

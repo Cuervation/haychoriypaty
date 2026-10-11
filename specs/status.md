@@ -1,3 +1,7 @@
+## Whole-order delivery sound — source implemented, runtime verification pending (2026-10-11)
+
+Added a single order-completion event at the final valid real handoff, guarded once per customer ticket; mixed multi-line and multi-quantity orders do not cue on partial delivery. `OrderDeliverySound` attaches as a reusable 2D AudioSource adapter to `StreetGame`, rebinds on retry/next level, and loads a locally synthesized 0.19s soft-pop from `Assets/Resources/Audio/order-delivery-soft-pop.wav` at 20% volume with ±3% pitch and 150ms spacing. This is a fallback equivalent, not Pixabay's Happy Pop 2 file. A focused mixed-order regression assertion was added but Unity execution and audible playback remain unverified. The active Unity editor is open, and no Unity MCP build/test tool is available in this session, so no second Editor process was started. Source version is prepared as 0.2.23/code25; no matching APK was generated.
+
 # Project status
 
 ## Unlimited workers and speed-price scale — 2026-10-09
@@ -705,9 +709,28 @@ The counter is now rendered only from the backdrop, with crowd occlusion project
 
 The responsive footer reserves no upgrade-card bounds during terminal phases, but the OnGUI upgrade loop previously still iterated catalog actions after a win. That indexed the empty footer array and threw before ResultPanel() ran. Upgrade cards now draw only while Playing, or in Ready when the catalog fits the single row; Won skips directly to the result panel and Lost keeps its dedicated riot path. Added a focused EditMode regression matrix for Playing/Ready/Won/Lost and compact/large catalogs.
 
-Validation: git diff --check passed. The Main-only Android build of this source as 0.2.21/code23 succeeded with 0 build errors; the APK was integrity/package/signature-verified. Focused EditMode/PlayMode regression and visual/Game View/device verification remain pending; no device install was done.
+Validation: git diff --check passed. The Main-only Android build of this source as 0.2.21/code23 succeeded with 0 build errors; the APK was integrity/package/signature-verified. Focused Unity 6000.6.3f1 EditMode checks passed 21/21 on an isolated copy of commit cec7d36: 6 upgrade-draw guard cases, 5 responsive-footer resolutions covering all 11 catalogs, and 10 popup frame/text/time cases. Full EditMode/PlayMode suites and visual/Game View/device verification remain unrun; no device install was done.
 
 
 ## Git and Android delivery — 2026-10-10 (0.2.21/code23)
 
 Committed and pushed the victory-popup regression fix on codex/street-automation. Main-only Unity 6000.6.3f1 Development Android IL2CPP/ARM64 build succeeded (0 errors). APK: Builds/Android/Archive/HayChoriYPaty-0.2.21-code23-victory-popup.apk, 402,286,236 bytes, SHA-256 b3ced92c175ff47ff23b3767e37d8a4cfac3886c06232ed9a6bc7623be128ace. Package/version/min/target: com.haychoriypaty.game, 0.2.21/code23, API26/36. Archive integrity and v2 debug signature verified. No EditMode/PlayMode run, phone installation, or visual review was requested or performed.
+
+
+## Barrel diameter follow-up — 2026-10-10
+
+Expanded both barrel bounds/art from72×117.6 to82.8×117.6 authored units (+15% from current width, height unchanged). The shared catalog layout automatically reduces its equal upper-row gutters while keeping them positive in the full five-station layout; station and worker-route footprints continue to use the same bounds. No stock, worker, route policy, production or serving logic changed. Focused Unity 6000.6.3f1 tests passed3/3 EditMode (11-level responsive geometry, drink scatter, all-catalog paths) and1/1 PlayMode (Coca/beer sprite bounds match the new width and unchanged height). Tests ran on an isolated candidate copy due the open editor; no fresh visual/device capture.
+
+## Barrel beverage visual scale (2026-10-10)
+
+- [x] Increased the on-barrel Coca/beer display targets uniformly by 35%; carried drinks and gameplay data remain unchanged.
+- [x] Focused full-catalog renderer PlayMode test passed 1/1 in an isolated Unity 6000.6.3f1 project copy.
+- [ ] Current Unity Game View screenshot/visual review remains unverified; the shared preview is illustrative, not a capture from the modified runtime.
+- [x] Development APK generated as 0.2.22/code24 (Main-only, IL2CPP/ARM64); signature, package, SDK metadata and ZIP integrity verified. No device install or runtime screenshot.
+
+
+## Mural header gap — source fix, visual confirmation pending (2026-10-11)
+
+`StreetView.DrawThemedMural` previously painted a theme-tinted solid rectangle over the scenery above every themed mural, causing a flat empty band behind the top bar. Replaced that fill with an aspect-preserved draw of the matching level backdrop’s upper strip, or directly adjacent mural pixels when that texture is already the full backdrop. River Plate receives an independent skyline strip because its mural begins at the texture’s top edge. The original mural bands remain in place and the HUD still draws above them; no existing mural pixels/files, game rules, UI controls, or animations changed.
+
+`git diff --check` and static source/aspect calculations across all 11 level backdrops plus the River extension, at seven portrait/tablet sizes, completed. The Camioneros before/after preview is composited offline from the supplied screenshot using the same source crop; it is not a Unity capture. Unity MCP/editor visual capture was unavailable, so runtime appearance remains unverified. New files: `street-river-header-extension-v1.png` and its `.meta`; import references are in StreetView.

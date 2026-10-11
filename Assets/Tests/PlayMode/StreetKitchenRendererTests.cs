@@ -100,6 +100,19 @@ namespace HayChoriYPaty.Tests
                 var objects = (IDictionary)renderer.GetType().GetField("foodObjects", Instance).GetValue(renderer);
                 object kitchen = Get(sim, "Kitchen");
                 object layout = Get(sim, "KitchenLayout");
+                var propsRoot = (GameObject)renderer.GetType().GetField("propsRoot", Instance).GetValue(renderer);
+                foreach (string barrel in new[] { "Coca", "Beer" })
+                {
+                    Transform station = propsRoot.transform.Find("station:Station_" + barrel + "Barrel");
+                    Assert.IsNotNull(station, barrel + " barrel station should render once.");
+                    SpriteRenderer stationSprite = station.GetComponentInChildren<SpriteRenderer>();
+                    Assert.IsNotNull(stationSprite);
+                    Rect stationBounds = (Rect)Get(layout, barrel + "BarrelBounds");
+                    Assert.AreEqual(stationBounds.width * .01f, stationSprite.bounds.size.x, .0001f,
+                        barrel + " barrel sprite width should match the expanded hit/route footprint.");
+                    Assert.AreEqual(stationBounds.height * .01f, stationSprite.bounds.size.y, .0001f,
+                        barrel + " barrel sprite height should remain unchanged.");
+                }
                 int coca = 0, beer = 0;
                 foreach (object unit in (IEnumerable)Get(kitchen, "Units"))
                 {
@@ -114,6 +127,14 @@ namespace HayChoriYPaty.Tests
                     Assert.AreEqual((480f - point.y) * .01f, view.transform.localPosition.y, .0001f);
                     float angle = (float)Call(layout, "BarrelSlotRotation", slot);
                     Assert.That(Mathf.Abs(Mathf.DeltaAngle(angle, view.transform.localEulerAngles.z)), Is.LessThan(.01f));
+                    SpriteRenderer drinkSprite = view.GetComponentInChildren<SpriteRenderer>(true);
+                    Assert.IsNotNull(drinkSprite);
+                    Vector2 sourceSize = drinkSprite.sprite.bounds.size;
+                    float baseScale = Mathf.Min(8f * .01f / sourceSize.x, 15f * .01f / sourceSize.y);
+                    Vector2 expectedSize = sourceSize * (baseScale * 1.35f * 100f);
+                    Vector2 renderedSize = sourceSize * (view.transform.localScale.x * 100f);
+                    Assert.AreEqual(expectedSize.x, renderedSize.x, .01f, "Barrel Coca/beer should be 35% larger while preserving each sprite's aspect ratio.");
+                    Assert.AreEqual(expectedSize.y, renderedSize.y, .01f, "Barrel Coca/beer should be 35% larger while preserving each sprite's aspect ratio.");
                     Assert.GreaterOrEqual(point.x, bounds.xMin);
                     Assert.LessOrEqual(point.x, bounds.xMax);
                 }

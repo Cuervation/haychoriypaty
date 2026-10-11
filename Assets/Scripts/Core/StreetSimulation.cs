@@ -206,6 +206,7 @@ namespace HayChoriYPaty
         internal float Patience;
         internal float ReceiveRemaining;
         internal int Slot;
+        internal bool DeliverySoundPlayed;
 
         public StreetOrderLine GetOrderLine(int index) => index >= 0 && index < orderLines.Count ? orderLines[index] : null;
         public StreetOrderLine GetPendingOrderLine(int pendingIndex)
@@ -304,6 +305,8 @@ namespace HayChoriYPaty
         private readonly int[] deliveredByProduct = new int[7];
         private float price;
         private System.Random random;
+
+        public event Action OrderCompleted;
 
         public RoundPhase Phase { get; private set; } = RoundPhase.Ready;
         public int LevelIndex { get; private set; }
@@ -978,6 +981,11 @@ namespace HayChoriYPaty
                         ClaimAndDispatch(worker, customer, next);
                         return;
                     }
+                }
+                if (!customer.DeliverySoundPlayed && customer.PendingOrderLineCount == 0 && customer.Reserved == 0)
+                {
+                    customer.DeliverySoundPlayed = true;
+                    OrderCompleted?.Invoke();
                 }
                 ResetWorker(worker);
             }

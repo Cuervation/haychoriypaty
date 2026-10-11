@@ -12,7 +12,7 @@ namespace HayChoriYPaty
         public const float GrillBottomClearance = 5f;
         public const float GrillVerticalGap = 4f;
         public const float TableWidth = 196f * Scale, TableHeight = 98f * Scale;
-        public const float BarrelAuthoredWidth = 72f, BarrelAuthoredHeight = 117.6f;
+        public const float BarrelAuthoredWidth = 72f * 1.15f, BarrelAuthoredHeight = 117.6f;
         public const float BarrelWidth = BarrelAuthoredWidth * Scale, BarrelHeight = BarrelAuthoredHeight * Scale;
         public const float StandardGrillWidth = 352f * Scale, StandardGrillHeight = 117.3333f * Scale;
         public const float TableY = TiledPlayfieldBottom - GrillBottomClearance - StandardGrillHeight - TableHeight - GrillVerticalGap;

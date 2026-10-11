@@ -37,6 +37,7 @@ namespace HayChoriYPaty
         private const string BocaBackgroundResource = "street-background-boca-v1";
         private const int RiverVisualLevelIndex = 7;
         private const string RiverMuralResource = "street-mural-river-master-v1";
+        private const string RiverHeaderExtensionResource = "street-river-header-extension-v1";
         private const string RiverFansResource = "street-river-fans-paired-v1";
         private const string RiverRiotFansResource = "street-river-riot-fans-v2";
         private const string BocaFansResource = "street-boca-fans-paired-v1";
@@ -272,7 +273,7 @@ namespace HayChoriYPaty
         private Texture2D racingBackground, racingFans, racingRiotFans;
         private Texture2D sanLorenzoBackground, sanLorenzoFans, sanLorenzoRiotFans;
         private Texture2D bocaBackground, bocaFans, bocaRiotFans;
-        private Texture2D riverMural, riverFans, riverRiotFans;
+        private Texture2D riverMural, riverHeaderExtension, riverFans, riverRiotFans;
         private Texture2D camionerosBackground;
         private Texture2D losRedondosBackground, losRedondosFrontFans, losRedondosWalkingFans;
         private Texture2D fourZoneGrill, premiumGrill, beerBarrel, fernetTable, readySandwichesTable;
@@ -382,6 +383,7 @@ namespace HayChoriYPaty
             sanLorenzoBackground = Resources.Load<Texture2D>(SanLorenzoBackgroundResource);
             bocaBackground = Resources.Load<Texture2D>(BocaBackgroundResource);
             riverMural = Resources.Load<Texture2D>(RiverMuralResource);
+            riverHeaderExtension = Resources.Load<Texture2D>(RiverHeaderExtensionResource);
             camionerosBackground = Resources.Load<Texture2D>(CamionerosBackgroundResource);
             losRedondosBackground = Resources.Load<Texture2D>(LosRedondosBackgroundResource);
             fourZoneGrill = Resources.Load<Texture2D>(FourZoneGrillResource);
@@ -1086,14 +1088,52 @@ namespace HayChoriYPaty
             // Align the complete, aspect-preserved crop directly below the HUD; expand only to its
             // natural aspect or the available counter band, whichever is smaller.
             band.height = Mathf.Min(Mathf.Max(band.height, naturalHeight), availableHeight);
-            // Frontal wall panels may have different aspect ratios, never stretched portrait figures.
-            Color previous = GUI.color;
-            GUI.color = VisualLevelIndex == 9 ? new Color(.43f, .73f, .92f)
-                : Color.Lerp(theme.PrimaryColor, new Color(.36f, .32f, .27f), .22f);
-            GUI.DrawTexture(new Rect(0, 0, W, band.yMax), Texture2D.whiteTexture);
-            GUI.color = Color.white;
+            // Draw an independent neighborhood continuation behind the HUD. Prefer the full
+            // club backdrop when the cropped mural has no suitable matching pixels above it.
+            Texture2D continuation = VisualLevelIndex == RiverVisualLevelIndex && riverHeaderExtension != null
+                ? riverHeaderExtension : CurrentGameplayBackdrop();
+            if (continuation != null && continuation != clubMuralTexture)
+                DrawMuralHeaderFromBackdrop(continuation, band);
+            else
+                DrawMuralContinuation(clubMuralTexture, source, band);
             DrawRawCover(band, clubMuralTexture, source);
-            GUI.color = previous;
+        }
+
+        private static void DrawMuralHeaderFromBackdrop(Texture2D texture, Rect muralBand)
+        {
+            if (texture == null || muralBand.y <= 0f || muralBand.width <= 0f) return;
+            float extensionHeight = Mathf.Min(muralBand.y, HudBar.yMax);
+            float sourceHeight = texture.width * extensionHeight / muralBand.width;
+            if (sourceHeight > texture.height)
+            {
+                sourceHeight = texture.height;
+                extensionHeight = sourceHeight * muralBand.width / texture.width;
+            }
+            Rect source = new Rect(0f, 0f, texture.width, sourceHeight);
+            Rect destination = new Rect(muralBand.x, muralBand.y - extensionHeight,
+                muralBand.width, extensionHeight);
+            DrawRaw(destination, texture, source, true, false);
+        }
+
+        private static void DrawMuralContinuation(Texture2D texture, Rect muralSource, Rect muralBand)
+        {
+            if (texture == null || muralBand.y <= 0f || muralBand.width <= 0f || muralBand.height <= 0f) return;
+
+            // DrawRawCover crops the source to this aspect ratio. Use that same crop and scale so
+            // adjacent authored pixels join the unchanged mural band without distortion.
+            Rect visibleSource = CropSourceToAspect(muralSource, muralBand.width / muralBand.height);
+            if (visibleSource.y <= 0f || visibleSource.height <= 0f) return;
+
+            float extensionHeight = Mathf.Min(muralBand.y,
+                visibleSource.y * muralBand.height / visibleSource.height);
+            if (extensionHeight <= 0f) return;
+
+            float sourceHeight = extensionHeight * visibleSource.height / muralBand.height;
+            Rect source = new Rect(visibleSource.x, visibleSource.y - sourceHeight,
+                visibleSource.width, sourceHeight);
+            Rect destination = new Rect(muralBand.x, muralBand.y - extensionHeight,
+                muralBand.width, extensionHeight);
+            DrawRaw(destination, texture, source, true, false);
         }
 
         private void DrawClubPennants(float canvasHeight, float verticalScale, Rect safeViewport, Rect safePennants)

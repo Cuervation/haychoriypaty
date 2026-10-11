@@ -1,10 +1,22 @@
-# Current Android delivery — 2026-10-10 (0.2.21/code23, victory popup fix)
+# Latest verified Android delivery — 2026-10-10 (0.2.22/code24, Coca/beer barrel scale)
+
+The current local source is prepared as 0.2.23/code25, but no matching APK is available yet: the installed Unity editor is active and no editor build bridge is exposed in this task. Do not treat the 0.2.22 artifact below as containing subsequent source changes.
+
+Unity 6000.6.3f1 Main-only Android Development IL2CPP/ARM64 build from the current local `codex/street-automation` tree, including the +35% on-barrel Coca/beer sprite display size and the wider barrels: **Succeeded**, 0 build errors / 1 warning. Built in an isolated project copy so the user's open Unity editor was not disturbed. BuildReport total size is 1,698,854,456 bytes and is not the APK file size.
+
+APK `Builds/Android/Archive/HayChoriYPaty-0.2.22-code24-barrel-drinks.apk`: **506,529,693 bytes**. SHA-256 `ac7b078c4f5fd74511ac00d318812bc29c678986ae70f102c78962337256cd81`. Package `com.haychoriypaty.game`, version0.2.22/code24, min API26/target36, `arm64-v8a`. `aapt dump badging` confirms package/version/SDK metadata; `unzip -t` reports no archive errors; Unity-bundled `apksigner` verifies APK Signature Scheme v2 using the established Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`. Versioned aliases `Builds/Android/HayChoriYPaty-0.2.22.apk` and `Builds/Android/HayChoriYPaty-street.apk` point to the same verified artifact.
+
+The focused `FullCatalogBarrelDrinksRenderAsTossedIndividualObjects` PlayMode test passed 1/1 in an isolated Unity project copy. No phone installation, current Game View capture, or on-device visual review was performed. This is a local Development/debug-signed APK, not a Play Store release. Source/version changes remain local and were not committed or pushed.
+
+---
+
+## Previous Android delivery — 2026-10-10 (0.2.21/code23, victory popup fix)
 
 Unity 6000.6.3f1 Main-only Development Android IL2CPP/ARM64 APK build from responsive commit 18e697a plus the victory-popup source fix: Succeeded; 0 build errors. The build ran in an isolated project copy because the authoritative checkout is already open in Unity. Unity emitted non-blocking diagnostics from the temporary build helper (SetScriptingBackend deprecation), clang++ and licensing-token refresh; none prevented the successful build.
 
 APK Builds/Android/Archive/HayChoriYPaty-0.2.21-code23-victory-popup.apk: 402,286,236 bytes. SHA-256 b3ced92c175ff47ff23b3767e37d8a4cfac3886c06232ed9a6bc7623be128ace. Package com.haychoriypaty.game, version0.2.21/code23, min API26/target36, arm64-v8a. aapt dump badging confirms package/version/SDK metadata, unzip -t reports no archive errors, and Unity-bundled OpenJDK + apksigner verifies APK Signature Scheme v2 with the established Android Debug certificate SHA-256 d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e. Versioned and rolling aliases at Builds/Android/HayChoriYPaty-0.2.21.apk and Builds/Android/HayChoriYPaty-street.apk match byte-for-byte.
 
-The source prevents upgrade-card drawing in terminal phases so the Won result popup can render. The focused regression test was added but not executed; the current request covered Git delivery and APK generation, not test/play/device verification. No phone install or native visual review was performed. This is a local Development/debug-signed APK, not a Play Store release.
+The source prevents upgrade-card drawing in terminal phases so the Won result popup can render. Focused Unity 6000.6.3f1 EditMode validation in an isolated copy of commit cec7d36 passed 21/21 cases: 6 upgrade-draw guard cases, 5 responsive footer resolutions covering all 11 level catalogs, and 10 victory popup frame/text/time cases. Full EditMode/PlayMode suites and visual/Game View/device verification remain unrun; no phone install or native visual review was performed. This is a local Development/debug-signed APK, not a Play Store release.
 
 ---
 

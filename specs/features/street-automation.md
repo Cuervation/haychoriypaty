@@ -78,6 +78,13 @@ The first Parrillero is free. All four roles can be hired without a worker-count
 
 Quota-aware demand retains random 1–4 quantities and mixed tickets (up to five unlocked products), weighting every product in the level catalog by outstanding goal deficit/time independently of hired staff. A missing specialist does not suppress demand: those order lines wait under normal customer patience and become serviceable if the responsible worker is hired later. Delivery/revenue still requires that responsible worker and a real handoff; no synthetic delivery is allowed. Completed quotas stay visible and may still sell for real revenue. Role responsibilities, stations, routes, stock and handoff accounting remain unchanged. Victory requires every unlocked product quota.
 
+### Completed-order audio cue — 2026-10-11
+
+A brief, low-volume 2D soft-pop is a presentation-only response to the first successful completion of a customer's whole ticket. `StreetSimulation.OrderCompleted` fires only after all product lines and quantities reach zero at real handoffs, and a per-customer guard prevents duplicate signals. Cooking, pickup, partial/composite tickets, failed handoffs and other gameplay transitions do not trigger it. The reusable `OrderDeliverySound` adapter uses `Assets/Resources/Audio/order-delivery-soft-pop.wav`, 20% one-shot volume, ±3% pitch variation and a 150ms minimum playback interval; it is rebound when `StreetGame` replaces its simulation. The WAV is a locally synthesized soft-pop equivalent rather than a third-party recording; the selected Pixabay file could not be incorporated into this Unity checkout.
+
+- [x] Added a regression assertion for exactly one signal on a five-unit mixed-specialty ticket after its final real handoff.
+- [ ] Unity EditMode execution and Android/editor audible playback remain pending; do not claim runtime verification until run.
+
 - [x] The code centralizes all 11 per-ID quota, hire, speed-multiplier and opening-balance rows; the real simulation identified the Level-8 deadline and Level-9–11 opening-balance adjustments recorded above.
 - [x] Order generation uses the full enabled level catalog regardless of hired specialists; focused Unity EditMode checks confirmed first-customer Coca in Chicago and Vélez, every enabled product across all 11 levels without extra hires, no locked products, preserved mixed 1–4-unit tickets, and that a waiting Coca order earns nothing until a Cocacolero is hired and completes the real handoff (4/4 cases).
 - [ ] Focused Unity EditMode checks verify every table row, attempt-entry path, quota predicate and real handoff accounting after the adjustment.

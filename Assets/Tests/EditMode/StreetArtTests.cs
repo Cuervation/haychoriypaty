@@ -17,6 +17,9 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual("River Plate / Núñez", themes.GetProperty("ClubName").GetValue(theme));
             Assert.AreEqual("street-mural-river-master-v1", themes.GetProperty("MuralResource").GetValue(theme));
             Assert.NotNull(Resources.Load<Texture2D>("street-mural-river-master-v1"));
+            Texture2D header = Resources.Load<Texture2D>("street-river-header-extension-v1");
+            Assert.NotNull(header);
+            Assert.AreEqual(2172, header.width); Assert.AreEqual(274, header.height);
             string[] names = (string[])Type.GetType("HayChoriYPaty.StreetSimulation, Assembly-CSharp", true)
                 .GetField("LevelNames").GetValue(null);
             Assert.AreEqual(11, names.Length);
