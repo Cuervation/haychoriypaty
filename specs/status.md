@@ -1,8 +1,19 @@
 ## Whole-order delivery sound — source implemented, runtime verification pending (2026-10-11)
 
-Added a single order-completion event at the final valid real handoff, guarded once per customer ticket; mixed multi-line and multi-quantity orders do not cue on partial delivery. `OrderDeliverySound` attaches as a reusable 2D AudioSource adapter to `StreetGame`, rebinds on retry/next level, and loads a locally synthesized 0.19s soft-pop from `Assets/Resources/Audio/order-delivery-soft-pop.wav` at 20% volume with ±3% pitch and 150ms spacing. This is a fallback equivalent, not Pixabay's Happy Pop 2 file. A focused mixed-order regression assertion was added but Unity execution and audible playback remain unverified. The active Unity editor is open, and no Unity MCP build/test tool is available in this session, so no second Editor process was started. Source version is prepared as 0.2.23/code25; no matching APK was generated.
+Added a single order-completion event at the final valid real handoff, guarded once per customer ticket; mixed multi-line and multi-quantity orders do not cue on partial delivery. `OrderDeliverySound` attaches as a reusable 2D AudioSource adapter to `StreetGame`, rebinds on retry/next level, and loads a locally synthesized 0.19s soft-pop from `Assets/Resources/Audio/order-delivery-soft-pop.wav` at 20% volume with ±3% pitch and 150ms spacing. This is a fallback equivalent, not Pixabay's Happy Pop 2 file. A focused mixed-order regression assertion was added but Unity execution and audible playback remain unverified. The Android 0.2.23/code25 APK now contains this source, but packaging and installation do not verify audible playback; no gameplay/audio test was run during delivery. See the current Android receipt in `features/android-prototype.md`.
+
+## Two-row gameplay header — source and focused validation (2026-10-12)
+
+Reorganized the shared in-game HUD: coins left, remaining time centered, dynamic `NIVEL N` right, then compact per-product actual/goal cards. Existing catalogs of 1/2/3 products use one centered objective row; 5/7 use two balanced rows. The notch gap remains clear and expands the header vertically only when needed. Game state, goals and gameplay are unchanged. Focused Unity 6000.6.3f1 EditMode checks passed 9/9 across five HUD/cutout/layout tests; Game-view/device review remains pending. Android source version prepared as 0.2.24/code26 for requested packaging.
 
 # Project status
+
+## Club pennant color correction — source change (2026-10-12)
+
+Corrected the live ClubVisualTheme palettes to match the requested flag colors: Ferro starts green then white, Vélez blue/white, All Boys white/black, Boca blue/yellow, River white/red, Racing celeste/white, and San Lorenzo blue/red. Removed stray third accent pennants from Boca, Racing and San Lorenzo; other club palettes and all pennant geometry/layout remain unchanged. Added a focused regression that checks all 20 flags in left-to-right alternating order for these seven clubs.
+
+**Validation:** `git diff --check` passed. Unity MCP at `127.0.0.1:8080` was unavailable, so the EditMode test and in-game visual review have not been run.
+
 
 ## Unlimited workers and speed-price scale — 2026-10-09
 
@@ -557,7 +568,7 @@ Installed on Motorola Edge 60 Fusion `ZY22MBNWRB` using `adb install -r`; Packag
 
 ## Global multi-product order window — 2026-10-06
 
-The current live order model previously stored only `Product/Remaining` and one `SecondaryProduct/SecondaryRemaining`; the view switched between one and two independent bubble layouts. It now retains up to five ordered, distinct product lines with a reservation count per line while preserving the legacy one-/two-product API. Workers still reserve and finish every unit of an earlier line before starting the next. StreetView uses one shared, fixed-size two-line window: zero-quantity lines disappear immediately, following lines reveal in original order, and “+N más” counts hidden product types. Existing automatic generation and level balancing are unchanged. Focused model/layout and legacy-delivery tests were added. Unity6000.6.3f1 compilation and the complete EditMode suite passed 154/154; the complete PlayMode suite passed 23/23. These cover 1–5-line windows/reveals/count/order, bubble bounds, FIFO rows, reservations, worker delivery, coins and legacy Chicago combined orders. No actual Game-view or device screenshot was captured, and no APK was requested.
+The current live order model previously stored only `Product/Remaining` and one `SecondaryProduct/SecondaryRemaining`; the view switched between one and two independent bubble layouts. It now retains up to five ordered, distinct product lines with a reservation count per line while preserving the legacy one-/two-product API. Workers still reserve and finish every unit of an earlier line before starting the next. StreetView uses one shared, fixed-size two-line window: zero-quantity lines disappear immediately, following lines reveal in original order, and centered “•••” appears only while pending product types remain hidden (without displaying their count). Existing automatic generation and level balancing are unchanged. Focused model/layout and legacy-delivery tests were added. Unity6000.6.3f1 compilation and the complete EditMode suite passed 154/154; the complete PlayMode suite passed 23/23. These cover 1–5-line windows/reveals/count/order, bubble bounds, FIFO rows, reservations, worker delivery, coins and legacy Chicago combined orders. No actual Game-view or device screenshot was captured, and no APK was requested.
 
 ## Chicago role-specific customer ownership — implementation checkpoint (2026-10-06)
 
@@ -729,8 +740,18 @@ Expanded both barrel bounds/art from72×117.6 to82.8×117.6 authored units (+15%
 - [x] Development APK generated as 0.2.22/code24 (Main-only, IL2CPP/ARM64); signature, package, SDK metadata and ZIP integrity verified. No device install or runtime screenshot.
 
 
+## Additional barrel width — source updated (2026-10-12)
+
+Increased the existing 82.8-unit barrel width by another 10% to91.08 authored units; height remains117.6. The maximum five-station row's equal authored gutter becomes−1.69 units (a small bounds overlap), and the focused eleven-level layout regression now caps that at2 units. `git diff --check` passed; Unity EditMode/PlayMode and Game View were not run because the existing editor is open and Unity MCP is unavailable. No gameplay, pickup, stock or beverage-size behavior changed.
+
+
 ## Mural header gap — source fix, visual confirmation pending (2026-10-11)
 
 `StreetView.DrawThemedMural` previously painted a theme-tinted solid rectangle over the scenery above every themed mural, causing a flat empty band behind the top bar. Replaced that fill with an aspect-preserved draw of the matching level backdrop’s upper strip, or directly adjacent mural pixels when that texture is already the full backdrop. River Plate receives an independent skyline strip because its mural begins at the texture’s top edge. The original mural bands remain in place and the HUD still draws above them; no existing mural pixels/files, game rules, UI controls, or animations changed.
 
 `git diff --check` and static source/aspect calculations across all 11 level backdrops plus the River extension, at seven portrait/tablet sizes, completed. The Camioneros before/after preview is composited offline from the supplied screenshot using the same source crop; it is not a Unity capture. Unity MCP/editor visual capture was unavailable, so runtime appearance remains unverified. New files: `street-river-header-extension-v1.png` and its `.meta`; import references are in StreetView.
+
+
+## Two-row mobile HUD — Android delivery (2026-10-12)
+
+Added a two-row gameplay header: coins left, timer centered, dynamic level badge right, and objective chips using one row for up to four goals or two rows for five/seven goals. The cutout-aware header expands only as needed; all values remain read-only. Focused Unity 6000.6.3f1 EditMode checks passed 9/9; `git diff --check` passed. Main-only Android Development IL2CPP/ARM64 build `build-85da0aba77` succeeded (0 errors, 1 warning). APK `Builds/Android/Archive/HayChoriYPaty-0.2.24-code26-responsive-header.apk`, 474,896,975 bytes, SHA-256 `2502f389d90766c5755ed281804093e83caef806f3c549b332de113566ceec64`, package `com.haychoriypaty.game`, version0.2.24/code26, API26/36; archive and v2 debug signature verified. Unity Game View/device appearance remains unverified; no phone install was performed.

@@ -14,6 +14,7 @@ Eight canvas-space directions; four distinct gait samples per direction, reusing
 - [x] Original artwork/metas, player save, and mechanics preserved.
 - [x] Beverage pickup reaches a safe barrel anchor, animates empty-handed during the existing dwell, and only carries the real inventory unit after withdrawal; Coca/beer workers operate concurrently.
 - [x] Worker gait cadence is40% slower, remains distance-proportional for all four roles (including the fallback renderer), and halts in idle/pickup/handoff without changing fan animation.
+- [ ] Cocacolero faces forward throughout beverage pickup and stops 2 logical units from the barrel front without intersecting it.
 
 ## Validation
 - Original PNGs and their `.meta` GUIDs are unchanged. New transparent `street-worker-direction-extension-v1.png` adds only 20 missing poses (1086×1448): food quarter-carry, beverage quarter-walk and empty-handed carry views. Existing contact art plus articulated passing legs provide four **runtime-composed gait samples**, not 32 newly authored bitmap frames. Supplement imports at original dimensions, Android RGBA32, no obsolete iPhone PVRTC override.
@@ -32,3 +33,8 @@ Focused Unity checks passed: four EditMode worker/pickup cases, five route-matri
 ### 2026-10-11 — Stronger visible barrel reach
 
 Visual code review found the native Cocacolero borrowed an empty-handed carry pose and moved its torso only 5.5 logical units at peak dwell (about 5.6% of the 98-unit worker frame); its grip/palm anchor did not follow that movement. The larger barrel drink scale is render-only and does not move the pickup anchor. Peak reach now lowers the torso and palm anchor together by 20% of worker height (19.6 logical units); the pickup route, dwell, inventory and `TryTake` timing remain unchanged. The focused PlayMode regression now checks the displacement and continued absence of a carried object before withdrawal. `git diff --check` passed. The updated PlayMode test and live visual result have not been rerun/captured in this change because the Unity editor state could not be confirmed (a Unity lock file is present) and no current device capture was available.
+
+
+### 2026-10-12 — Front-facing, closer Cocacolero pickup
+
+During an empty-handed Cocacolero barrel-pickup dwell, presentation now forces the existing front-facing reach pose, independent of the worker's last route direction; normal route-facing resumes outside the pickup state. Coca/beer pickup anchors moved from 12 to 2 logical units in front of each barrel (10 units closer), retaining 2 units of worker-foot clearance. Routes still use the shared catalog layout; pickup duration, inventory withdrawal, carried-item timing, movement, and delivery logic are unchanged. Focused EditMode regressions cover front-facing state and all 11 catalog layouts; Unity execution/visual capture status is pending.

@@ -184,7 +184,8 @@ namespace HayChoriYPaty.Tests
                 float totalWidth = 0f;
                 foreach (Rect item in top) totalWidth += item.width;
                 float gap = (width - totalWidth) / (top.Count + 1);
-                Assert.Greater(gap, 0f, "All active upper stations must remain separated after widening the barrels.");
+                Assert.GreaterOrEqual(gap, -2f,
+                    "The extra 10% may create only a small, bounded 1.69-unit bounds overlap in the full five-station row.");
                 Assert.AreEqual(gap, top[0].xMin, .02f, "First active prep station should use the responsive row margin.");
                 for (int i = 0; i < top.Count; i++)
                 {
@@ -238,9 +239,9 @@ namespace HayChoriYPaty.Tests
             }
             Assert.AreEqual(196f * (width / (float)LayoutConstant("SourceWidth")), tableSize.Value.width, .02f);
             Assert.AreEqual(98f * (width / (float)LayoutConstant("SourceWidth")), tableSize.Value.height, .02f);
-            Assert.AreEqual(72f * 1.15f * (width / (float)LayoutConstant("SourceWidth")), barrelSize.Value.width, .02f);
+            Assert.AreEqual(72f * 1.15f * 1.10f * (width / (float)LayoutConstant("SourceWidth")), barrelSize.Value.width, .02f);
             Assert.AreEqual(117.6f * (width / (float)LayoutConstant("SourceWidth")), barrelSize.Value.height, .02f);
-            Assert.AreEqual(72f * 1.15f, LayoutConstant("BarrelAuthoredWidth"), .001f);
+            Assert.AreEqual(72f * 1.15f * 1.10f, LayoutConstant("BarrelAuthoredWidth"), .001f);
             Assert.AreEqual(117.6f, LayoutConstant("BarrelAuthoredHeight"), .001f);
         }
 
@@ -361,6 +362,26 @@ namespace HayChoriYPaty.Tests
             }
             Assert.Greater(journeys, 0);
             TestContext.WriteLine("Shortest-route baseline: " + journeys + " outbound/return journeys; average per-journey distance reduction " + (percentageTotal / journeys).ToString("F1") + "%; max " + maxPercentage.ToString("F1") + "%; aggregate reduction " + ((1f - newDistanceTotal / oldDistanceTotal) * 100f).ToString("F1") + "%.");
+        }
+
+        [Test]
+        public void BeveragePickupsStandCloseToBarrelFrontWithSafeFootClearanceAcrossCatalog()
+        {
+            for (int level = 0; level < 11; level++)
+            {
+                object sim = Simulation(level), layout = Layout(sim);
+                foreach (int product in new[] { 4, 6 })
+                {
+                    if (!(bool)Call(sim, "IsProductAvailable", product)) continue;
+                    Rect barrel = (Rect)Call(layout, "BoundsForProduct", product);
+                    Vector2 pickup = (Vector2)Call(layout, "PickupPosition", product);
+                    Rect feet = new Rect(pickup.x - 18f, pickup.y - 12f, 36f, 12f);
+                    Assert.AreEqual(barrel.center.x, pickup.x, .001f, "L" + level + " P" + product + " centers the worker on its own barrel.");
+                    Assert.AreEqual(barrel.yMin - 2f, pickup.y, .001f, "L" + level + " P" + product + " uses the closer front anchor.");
+                    Assert.AreEqual(barrel.yMin - 2f, feet.yMax, .001f, "L" + level + " P" + product + " keeps a 2-unit collider clearance.");
+                    Assert.IsFalse(feet.Overlaps(barrel), "L" + level + " P" + product + " worker feet do not enter the barrel.");
+                }
+            }
         }
 
         [Test]

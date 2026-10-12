@@ -1,6 +1,25 @@
-# Latest verified Android delivery — 2026-10-10 (0.2.22/code24, Coca/beer barrel scale)
+# Latest verified Android delivery — 2026-10-12 (0.2.24/code26, responsive gameplay HUD)
 
-The current local source is prepared as 0.2.23/code25, but no matching APK is available yet: the installed Unity editor is active and no editor build bridge is exposed in this task. Do not treat the 0.2.22 artifact below as containing subsequent source changes.
+Unity 6000.6.3f1 Main-only Android Development IL2CPP/ARM64 build `build-85da0aba77`: **Succeeded in 37.46s; 0 errors, 1 warning**. BuildReport total output size was 2,059.62 MB (not APK file size).
+
+APK `Builds/Android/Archive/HayChoriYPaty-0.2.24-code26-responsive-header.apk`: **474,896,975 bytes**. SHA-256 `2502f389d90766c5755ed281804093e83caef806f3c549b332de113566ceec64`. Package `com.haychoriypaty.game`, version0.2.24/code26, min API26/target36, `arm64-v8a`. `aapt dump badging` confirms metadata; `unzip -t` reports no archive errors; Unity-bundled JDK + `apksigner` verifies APK Signature Scheme v2 with the established Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`. The focused Unity EditMode HUD/layout checks passed 9/9. This is a Development/debug-signed APK, not a Play Store release. No phone install or Unity Game View/device visual review was performed.
+
+---
+
+## Previous Android delivery — 2026-10-12 (0.2.23/code25, order-delivery soft pop)
+
+Unity 6000.6.3f1 Main-only Android Development IL2CPP/ARM64 build `build-814afe9a12`, run from the active Editor through Unity MCP: **Succeeded in 332.55s; BuildReport reported 0 errors and 1 warning**. BuildReport total output size was 2,059.7 MB and is not the APK file size. Build scene override was `Assets/Scenes/Main.unity`; PlayerSettings remained IL2CPP/ARM64.
+
+APK `Builds/Android/Archive/HayChoriYPaty-0.2.23-code25-order-pop.apk`: **474,897,283 bytes**. SHA-256 `6344d4277aa13f0f3f4529583f4838517580bed0b6ba8e548f320f6ba7a79651`. Package `com.haychoriypaty.game`, version0.2.23/code25, min API26/target36, `arm64-v8a`. `aapt dump badging` confirms metadata; `unzip -t` reports no archive errors; Unity-bundled OpenJDK + `apksigner` verifies APK Signature Scheme v2 using the established Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`. Root aliases `Builds/Android/HayChoriYPaty-0.2.23.apk` and `Builds/Android/HayChoriYPaty-street.apk` are hardlinks to the same verified artifact.
+
+**Installed:** `adb install -r` returned **Success** on Motorola Edge 60 Fusion (`ZY22MBNWRB`); PackageManager confirms versionCode25/versionName0.2.23. Replacement install only: no uninstall or data-clear command was used. The app was not launched and no native visual/playback review was performed; the whole-order soft-pop runtime behavior remains unverified, and tests were not rerun for this packaging request. This is a local Development/debug-signed APK, not a Play Store release. No source code was committed or pushed.
+
+
+---
+
+## Previous Android delivery — 2026-10-10 (0.2.22/code24, Coca/beer barrel scale)
+
+This historical 0.2.22 artifact predates source version 0.2.23/code25 and does not include subsequent changes. The latest verified APK is documented above.
 
 Unity 6000.6.3f1 Main-only Android Development IL2CPP/ARM64 build from the current local `codex/street-automation` tree, including the +35% on-barrel Coca/beer sprite display size and the wider barrels: **Succeeded**, 0 build errors / 1 warning. Built in an isolated project copy so the user's open Unity editor was not disturbed. BuildReport total size is 1,698,854,456 bytes and is not the APK file size.
 

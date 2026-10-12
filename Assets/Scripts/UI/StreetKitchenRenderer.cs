@@ -12,6 +12,7 @@ namespace HayChoriYPaty
         private const int PropLayer = 30, CarryLayer = 31;
         private const int RenderScale = 2;
         private const float TableSandwichScale = 1.5f, CarriedSandwichScale = 1.25f, BarrelDrinkScale = 1.35f;
+        private const float FernetShelfHeightFraction = .25f, CocaShelfHeightFraction = .333f;
         private const string PrefabRoot = "ModularKitchen/Prefabs/";
         private const string SpriteRoot = "ModularKitchen/Sprites/";
         private readonly Dictionary<int, GameObject> foodObjects = new Dictionary<int, GameObject>();
@@ -285,11 +286,15 @@ namespace HayChoriYPaty
             if (table == null || table.sprite == null || colaSprite == null) return;
 
             Vector2 tableSize = table.sprite.bounds.size;
-            float bottleHeight = tableSize.y * .16f;
+            // Shelf containers reflect their real capacities: the decorative Coca bottle is 2.5 L,
+            // while Fernet is 1 L. Keep each sprite uniformly scaled and give the wider Coca art
+            // enough spacing so the larger bottle silhouettes never collide.
+            float fernetHeight = tableSize.y * FernetShelfHeightFraction;
+            float colaHeight = tableSize.y * CocaShelfHeightFraction;
             float bottleY = table.sprite.bounds.min.y + tableSize.y * .30f;
-            float bottleScale = bottleHeight / fernetBottleSprite.bounds.size.y;
-            float colaScale = bottleHeight / colaSprite.bounds.size.y;
-            float[] xPositions = { -.24f, -.17f, -.10f, .10f, .17f, .24f };
+            float fernetScale = fernetHeight / fernetBottleSprite.bounds.size.y;
+            float colaScale = colaHeight / colaSprite.bounds.size.y;
+            float[] xPositions = { -.36f, -.25f, -.14f, .08f, .25f, .42f };
             Transform shelf = new GameObject("FernetBottleShelf").transform;
             shelf.SetParent(station.transform, false);
             shelf.gameObject.layer = PropLayer;
@@ -300,7 +305,7 @@ namespace HayChoriYPaty
                 bottle.layer = PropLayer;
                 bottle.transform.SetParent(shelf, false);
                 bottle.transform.localPosition = new Vector3(tableSize.x * xPositions[i], bottleY, -.01f);
-                float scale = fernet ? bottleScale : colaScale;
+                float scale = fernet ? fernetScale : colaScale;
                 bottle.transform.localScale = new Vector3(scale, scale, 1f);
                 SpriteRenderer renderer = bottle.AddComponent<SpriteRenderer>();
                 renderer.sprite = fernet ? fernetBottleSprite : colaSprite;

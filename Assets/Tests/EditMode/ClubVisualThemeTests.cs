@@ -65,6 +65,18 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
+        public void RequestedClubPennantsUseOnlyTheirTwoColorsFromLeftToRight()
+        {
+            AssertPennantColors("Ferro Carril Oeste", new Color32(0, 105, 63, 255), new Color32(245, 242, 234, 255));
+            AssertPennantColors("Liniers - Velez Sarsfield", new Color32(8, 48, 132, 255), new Color32(245, 242, 234, 255));
+            AssertPennantColors("Floresta / All Boys", new Color32(245, 242, 234, 255), new Color32(0, 0, 0, 255));
+            AssertPennantColors("Boca Juniors / La Boca", new Color32(0, 66, 145, 255), new Color32(255, 197, 0, 255));
+            AssertPennantColors("River Plate / Núñez", new Color32(247, 245, 239, 255), new Color32(210, 28, 42, 255));
+            AssertPennantColors("Racing Club / Avellaneda", new Color32(70, 174, 223, 255), new Color32(245, 248, 252, 255));
+            AssertPennantColors("San Lorenzo / Boedo", new Color32(18, 47, 104, 255), new Color32(194, 31, 55, 255));
+        }
+
+        [Test]
         public void PennantStripUsesOneSharedTextureSize()
         {
             object theme = ThemeType.GetMethod("ForLevel", BindingFlags.Public | BindingFlags.Static).Invoke(null, new object[] { 1 });
@@ -123,6 +135,16 @@ namespace HayChoriYPaty.Tests
             return (Color)ThemeType.GetMethod("GetPennantColor").Invoke(theme, new object[] { index });
         }
 
+        private static void AssertPennantColors(string club, Color32 leftmost, Color32 next)
+        {
+            object theme = ForClub(club);
+            AssertColor(leftmost, PennantColor(theme, 0));
+            AssertColor(next, PennantColor(theme, 1));
+            for (int i = 0; i < 20; i++)
+                AssertColor(i % 2 == 0 ? leftmost : next, PennantColor(theme, i),
+                    club + " pennant " + i + " should alternate only the requested colors.");
+        }
+
         private static void AssertPalette(string club, Color32 primary, Color32 secondary)
         {
             object theme = ForClub(club);
@@ -133,12 +155,12 @@ namespace HayChoriYPaty.Tests
             AssertColor(secondary, PennantColor(theme, 1));
         }
 
-        private static void AssertColor(Color expected, Color actual)
+        private static void AssertColor(Color expected, Color actual, string message = null)
         {
-            Assert.That(actual.r, Is.EqualTo(expected.r).Within(.005f));
-            Assert.That(actual.g, Is.EqualTo(expected.g).Within(.005f));
-            Assert.That(actual.b, Is.EqualTo(expected.b).Within(.005f));
-            Assert.That(actual.a, Is.EqualTo(expected.a).Within(.005f));
+            Assert.That(actual.r, Is.EqualTo(expected.r).Within(.005f), message);
+            Assert.That(actual.g, Is.EqualTo(expected.g).Within(.005f), message);
+            Assert.That(actual.b, Is.EqualTo(expected.b).Within(.005f), message);
+            Assert.That(actual.a, Is.EqualTo(expected.a).Within(.005f), message);
         }
     }
 }

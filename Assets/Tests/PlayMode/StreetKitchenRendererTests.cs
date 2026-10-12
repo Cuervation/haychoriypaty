@@ -87,6 +87,66 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
+        public IEnumerator FernetTableShelfUsesProportionalBottleSizesWithoutOverlap()
+        {
+            var root = new GameObject("Fernet bottle shelf sizing test");
+            try
+            {
+                Component renderer = root.AddComponent(GameType("StreetKitchenRenderer"));
+                var station = new GameObject("Station_FernetTable");
+                station.transform.SetParent(root.transform, false);
+                Sprite tableSprite = Resources.LoadAll<Sprite>("ModularKitchen/Sprites/empty-table")[0];
+                SpriteRenderer table = station.AddComponent<SpriteRenderer>();
+                table.sprite = tableSprite;
+
+                Texture2D fernetTexture = Resources.Load<Texture2D>("ModularKitchen/Art/fernet-bottle-1l-v1");
+                Assert.IsNotNull(fernetTexture);
+                Sprite fernetSprite = Sprite.Create(fernetTexture, new Rect(0, 0, fernetTexture.width, fernetTexture.height),
+                    new Vector2(.5f, .5f), 100f, 0, SpriteMeshType.FullRect);
+                renderer.GetType().GetField("fernetBottleSprite", Instance).SetValue(renderer, fernetSprite);
+                Call(renderer, "EnsureFernetBottleShelf", station);
+
+                Transform shelf = station.transform.Find("FernetBottleShelf");
+                Assert.IsNotNull(shelf);
+                Assert.AreEqual(6, shelf.childCount);
+                float tableHeight = table.sprite.bounds.size.y;
+                for (int i = 0; i < shelf.childCount; i++)
+                {
+                    Transform bottle = shelf.GetChild(i);
+                    SpriteRenderer bottleRenderer = bottle.GetComponent<SpriteRenderer>();
+                    float expectedHeight = tableHeight * (i < 3 ? .25f : .333f);
+                    Assert.AreEqual(expectedHeight, bottleRenderer.sprite.bounds.size.y * bottle.localScale.y, .001f,
+                        "Fernet 1 L and Coca 2.5 L shelf bottles should scale to different, larger proportions.");
+                    Assert.AreEqual(bottle.localScale.x, bottle.localScale.y, .0001f,
+                        "Bottle sprites must preserve their original aspect ratios.");
+                    Vector2 bottleSize = bottleRenderer.sprite.bounds.size * bottle.localScale.x;
+                    Assert.GreaterOrEqual(bottle.localPosition.x - bottleSize.x * .5f, table.sprite.bounds.min.x - .001f,
+                        "Enlarged bottles should remain within the table width.");
+                    Assert.LessOrEqual(bottle.localPosition.x + bottleSize.x * .5f, table.sprite.bounds.max.x + .001f,
+                        "Enlarged bottles should remain within the table width.");
+                    Assert.GreaterOrEqual(bottle.localPosition.y - bottleSize.y * .5f, table.sprite.bounds.min.y - .001f,
+                        "Enlarged bottles should remain within the table height.");
+                    Assert.LessOrEqual(bottle.localPosition.y + bottleSize.y * .5f, table.sprite.bounds.max.y + .001f,
+                        "Enlarged bottles should remain within the table height.");
+                    for (int other = 0; other < i; other++)
+                    {
+                        Transform previous = shelf.GetChild(other);
+                        SpriteRenderer previousRenderer = previous.GetComponent<SpriteRenderer>();
+                        float separation = Mathf.Abs(bottle.localPosition.x - previous.localPosition.x);
+                        float required = (bottleSize.x + previousRenderer.sprite.bounds.size.x * previous.localScale.x) * .5f;
+                        Assert.GreaterOrEqual(separation + .001f, required, "Shelf bottles should not overlap.");
+                    }
+                }
+                Assert.Greater(shelf.GetChild(0).GetComponent<SpriteRenderer>().bounds.size.y,
+                    tableHeight * .16f * 1.5f, "The 1 L Fernet bottle should be visibly larger than before.");
+                Assert.Greater(shelf.GetChild(3).GetComponent<SpriteRenderer>().bounds.size.y,
+                    tableHeight * .16f * 1.5f, "The 2.5 L Coca bottle should be visibly larger than before.");
+            }
+            finally { UnityEngine.Object.Destroy(root); }
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator FullCatalogBarrelDrinksRenderAsTossedIndividualObjects()
         {
             var root = new GameObject("Barrel drink projection test");

@@ -150,6 +150,25 @@ namespace HayChoriYPaty.Tests
             Assert.IsTrue((bool)Field(taken, "Carrying"));
         }
 
+        [Test]
+        public void CocacoleroFacesForwardOnlyWhilePickingUpFromBarrels()
+        {
+            object worker = Activator.CreateInstance(Runtime("StreetWorker"), true);
+            Set(worker, "Role", Enum.Parse(Runtime("StreetWorkerRole"), "Cocacolero"));
+            Set(worker, "State", Enum.Parse(Runtime("StreetWorkerState"), "Pickup"));
+            Set(worker, "CarriedItemId", 0);
+            Set(worker, "FacingVector", Vector2.right);
+
+            object pickup = Call("Sample", worker);
+            Assert.IsTrue((bool)Field(pickup, "PickingUp"));
+            Assert.AreEqual(Facing("Down"), Field(pickup, "Facing"),
+                "The Cocacolero must use the existing front-facing reach pose regardless of its last route direction.");
+
+            Set(worker, "State", Enum.Parse(Runtime("StreetWorkerState"), "ToCounter"));
+            Assert.AreEqual(Facing("Right"), Field(Call("Sample", worker), "Facing"),
+                "Once pickup ends, route-based facing should resume normally.");
+        }
+
         [TestCase("Pickup")]
         [TestCase("ToCounter")]
         [TestCase("Handoff")]

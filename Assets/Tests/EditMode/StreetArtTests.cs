@@ -234,6 +234,18 @@ namespace HayChoriYPaty.Tests
             Assert.GreaterOrEqual(second.xMin, bubble.xMin); Assert.LessOrEqual(second.xMax, bubble.xMax);
             Assert.LessOrEqual(more.yMax, bubble.yMax - 8f);
             Assert.LessOrEqual(more.xMax, bubble.xMax);
+            Assert.AreEqual(bubble.center.x, more.center.x);
+        }
+
+        [TestCase(0, "")]
+        [TestCase(1, "•••")]
+        [TestCase(2, "•••")]
+        [TestCase(3, "•••")]
+        public void HiddenOrderIndicatorShowsDotsOnlyWhenProductsAreHidden(int hiddenLines, string expected)
+        {
+            string actual = (string)View.GetMethod("HiddenOrderIndicatorText", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { hiddenLines });
+            Assert.AreEqual(expected, actual);
         }
 
         [TestCase(1, 49f)]
@@ -985,7 +997,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(1078.65f, logicalHeight, .1f);
             Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
             Assert.AreEqual(0f, bar.yMin, "The read-only HUD is drawn at the physical screen top, separately from safe controls");
-            foreach (string name in new[] { "HudCoins", "HudTime", "HudSales" })
+            foreach (string name in new[] { "HudCoins", "HudTime", "HudLevel", "HudSales" })
             {
                 Rect field = (Rect)View.GetField(name, BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
                 Assert.IsTrue(bar.Contains(field.min)); Assert.IsTrue(bar.Contains(field.max));
@@ -1016,6 +1028,17 @@ namespace HayChoriYPaty.Tests
                 Assert.IsFalse(cells[i].Overlaps(gap), "Quota chip " + i + " crosses the hardware camera channel");
                 for (int j = 0; j < i; j++) Assert.IsFalse(cells[i].Overlaps(cells[j]));
             }
+            Rect[] statusCells = new Rect[3];
+            MethodInfo statusMethod = View.GetMethod("HudStatusCellBounds", BindingFlags.Static | BindingFlags.NonPublic);
+            for (int i = 0; i < statusCells.Length; i++)
+            {
+                statusCells[i] = (Rect)statusMethod.Invoke(null, new object[] { i, gap });
+                Assert.GreaterOrEqual(statusCells[i].yMin, gap.yMax, "Status cell " + i + " must sit below the camera channel");
+                for (int j = 0; j < i; j++) Assert.IsFalse(statusCells[i].Overlaps(statusCells[j]));
+            }
+            float cutoutHeight = (float)View.GetMethod("HudBarHeightFor", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { gap });
+            Assert.Greater(cutoutHeight, 70f, "The second row must remain fully visible below the notch");
         }
 
         [TestCase(1080, 1920)]
@@ -1277,13 +1300,15 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
             Rect grid = (Rect)View.GetField("HudQuotaGrid", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
             Rect coins = (Rect)View.GetField("HudCoins", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
             Rect clock = (Rect)View.GetField("HudTime", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
-            Assert.AreEqual(0f, bar.yMin); Assert.AreEqual(68f, bar.height);
-            Assert.AreEqual(new Rect(204, 1, 334, 66), grid);
+            Rect level = (Rect)View.GetField("HudLevel", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+            Assert.AreEqual(0f, bar.yMin); Assert.AreEqual(70f, bar.height);
+            Assert.AreEqual(new Rect(8, 29, 524, 38), grid);
             Assert.IsTrue(bar.Contains(coins.min)); Assert.IsTrue(bar.Contains(coins.max));
             Assert.IsTrue(bar.Contains(clock.min)); Assert.IsTrue(bar.Contains(clock.max));
-            Assert.IsFalse(coins.Overlaps(clock)); Assert.IsFalse(coins.Overlaps(grid)); Assert.IsFalse(clock.Overlaps(grid));
-            Assert.AreEqual(new Vector2(82, 48), clock.size);
-            Assert.That(Mathf.Abs(clock.center.y - bar.center.y), Is.LessThanOrEqualTo(1f));
+            Assert.IsTrue(bar.Contains(level.min)); Assert.IsTrue(bar.Contains(level.max));
+            Assert.IsFalse(coins.Overlaps(clock)); Assert.IsFalse(coins.Overlaps(level)); Assert.IsFalse(clock.Overlaps(level));
+            Assert.IsFalse(coins.Overlaps(grid)); Assert.IsFalse(clock.Overlaps(grid)); Assert.IsFalse(level.Overlaps(grid));
+            Assert.AreEqual(new Vector2(135, 24), clock.size);
             MethodInfo cellMethod = View.GetMethod("HudQuotaCellBounds", BindingFlags.Static | BindingFlags.NonPublic,
                 null, new[] { typeof(int) }, null);
             Rect[] cells = new Rect[7];
@@ -1295,7 +1320,36 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
             }
             foreach (string name in new[] { "CutoutHudCoins", "CutoutHudTime", "CutoutHudSales" })
                 Assert.IsNull(View.GetField(name, BindingFlags.Static | BindingFlags.NonPublic), name + " is not a supported HUD layout");
-            Assert.AreEqual(48, (int)View.GetField("HudClockFontSize", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue());
+            Assert.AreEqual(24, (int)View.GetField("HudClockFontSize", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue());
+        }
+
+        [TestCase(1, 1, 1)]
+        [TestCase(2, 1, 2)]
+        [TestCase(3, 1, 3)]
+        [TestCase(5, 2, 3)]
+        [TestCase(7, 2, 4)]
+        public void HudObjectiveCardsUseOneOrTwoCenteredRowsByLevelCatalog(int productCount, int expectedRows, int expectedColumns)
+        {
+            MethodInfo rowMethod = View.GetMethod("HudQuotaRowCount", BindingFlags.Static | BindingFlags.NonPublic);
+            MethodInfo columnMethod = View.GetMethod("HudQuotaColumnCount", BindingFlags.Static | BindingFlags.NonPublic);
+            MethodInfo gridMethod = View.GetMethod("HudQuotaGridBounds", BindingFlags.Static | BindingFlags.NonPublic);
+            MethodInfo cellMethod = View.GetMethod("HudQuotaCellBounds", BindingFlags.Static | BindingFlags.NonPublic,
+                null, new[] { typeof(int), typeof(int), typeof(Rect) }, null);
+            Assert.AreEqual(expectedRows, (int)rowMethod.Invoke(null, new object[] { productCount }));
+            Assert.AreEqual(expectedColumns, (int)columnMethod.Invoke(null, new object[] { productCount }));
+            Rect area = (Rect)gridMethod.Invoke(null, new object[] { Rect.zero });
+            Rect[] cards = new Rect[productCount];
+            for (int i = 0; i < productCount; i++)
+            {
+                cards[i] = (Rect)cellMethod.Invoke(null, new object[] { i, productCount, Rect.zero });
+                Assert.IsTrue(area.Contains(cards[i].min)); Assert.IsTrue(area.Contains(cards[i].max));
+                Assert.Greater(cards[i].width, 60f); Assert.Greater(cards[i].height, 15f);
+                for (int j = 0; j < i; j++) Assert.IsFalse(cards[i].Overlaps(cards[j]));
+            }
+            if (expectedRows == 1 && productCount > 1)
+                Assert.Less(cards[0].center.x, cards[productCount - 1].center.x);
+            if (expectedRows == 2)
+                Assert.AreNotEqual(cards[0].center.y, cards[productCount - 1].center.y);
         }
 
         [TestCase(900f, 500f)]
@@ -1333,9 +1387,9 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
                 null, new[] { typeof(bool) }, null).Invoke(null, new object[] { true });
             try
             {
-                Assert.AreEqual(1080, texture.width); Assert.AreEqual(136, texture.height);
+                Assert.AreEqual(1080, texture.width); Assert.AreEqual(140, texture.height);
                 Assert.AreEqual(TextureWrapMode.Clamp, texture.wrapMode);
-                Assert.IsTrue(texture.name.Contains("clock"));
+                Assert.IsTrue(texture.name.Contains("objective"));
                 Assert.AreEqual(HideFlags.HideAndDontSave, texture.hideFlags);
                 // Runtime textures deliberately discard their CPU copy after upload.
                 Assert.IsFalse(texture.isReadable); Assert.IsFalse(cutout.isReadable);

@@ -12,7 +12,7 @@ namespace HayChoriYPaty
         public const float GrillBottomClearance = 5f;
         public const float GrillVerticalGap = 4f;
         public const float TableWidth = 196f * Scale, TableHeight = 98f * Scale;
-        public const float BarrelAuthoredWidth = 72f * 1.15f, BarrelAuthoredHeight = 117.6f;
+        public const float BarrelAuthoredWidth = 72f * 1.15f * 1.10f, BarrelAuthoredHeight = 117.6f;
         public const float BarrelWidth = BarrelAuthoredWidth * Scale, BarrelHeight = BarrelAuthoredHeight * Scale;
         public const float StandardGrillWidth = 352f * Scale, StandardGrillHeight = 117.3333f * Scale;
         public const float TableY = TiledPlayfieldBottom - GrillBottomClearance - StandardGrillHeight - TableHeight - GrillVerticalGap;
@@ -21,7 +21,9 @@ namespace HayChoriYPaty
         public const float WorkerLaneY = 450f;
         public const float TablePickupY = TableY + 36f;
         public const float GrillPickupY = TableY + TableHeight + GrillVerticalGap + 14.4f;
-        public const float BarrelPickupY = BarrelY - 12f;
+        // Keep only a 2-unit foot clearance from the barrel front (the worker collider is 36x12).
+        public const float BarrelPickupClearance = 2f;
+        public const float BarrelPickupY = BarrelY - BarrelPickupClearance;
         public const float GrillBottomLimit = TiledPlayfieldBottom - GrillBottomClearance;
         private const float GrillSurfaceTop = .115f, GrillSurfaceBottom = .46f;
         private const float GrillBackLeft = .145f, GrillBackRight = .855f;
