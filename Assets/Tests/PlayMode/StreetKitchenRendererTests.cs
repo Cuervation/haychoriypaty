@@ -14,18 +14,17 @@ namespace HayChoriYPaty.Tests
         private static object Get(object value, string name) => value.GetType().GetProperty(name, Instance).GetValue(value);
         private static object Call(object value, string name, params object[] args) => value.GetType().GetMethod(name, Instance).Invoke(value, args);
 
-        [TestCase(0, false, 22f, 10f)]
-        [TestCase(1, false, 20f, 14f)]
-        [TestCase(2, false, 20f, 12f)]
-        [TestCase(3, false, 21f, 12f)]
-        [TestCase(0, true, 24.2f, 11f)]
-        [TestCase(1, true, 22f, 15.4f)]
-        [TestCase(2, true, 22f, 13.2f)]
-        [TestCase(3, true, 23.1f, 13.2f)]
-        [TestCase(4, false, 10.8f, 20.25f)]
-        [TestCase(5, false, 12f, 12.065625f)]
-        [TestCase(6, false, 7.065f, 13.246875f)]
-        public void ProductTargetsRespectPackageAndServingRatios(
+        [TestCase(0, false, 39f, 21f)]
+        [TestCase(1, false, 30f, 21f)]
+        [TestCase(2, false, 30f, 21f)]
+        [TestCase(3, false, 30f, 21f)]
+        [TestCase(0, true, 39f, 22.5f)]
+        [TestCase(1, true, 30f, 22.5f)]
+        [TestCase(2, true, 30f, 22.5f)]
+        [TestCase(3, true, 30f, 22.5f)]
+        [TestCase(4, false, 9f, 20f)]
+        [TestCase(5, false, 18f, 28f)]
+        public void SandwichesUseLargerAspectPreservingDisplayTargetsWithoutScalingDrinks(
             int product, bool carried, float expectedWidth, float expectedHeight)
         {
             MethodInfo method = GameType("StreetKitchenRenderer").GetMethod("ServingSize", BindingFlags.Static | BindingFlags.NonPublic);
@@ -105,23 +104,17 @@ namespace HayChoriYPaty.Tests
                 Sprite fernetSprite = Sprite.Create(fernetTexture, new Rect(0, 0, fernetTexture.width, fernetTexture.height),
                     new Vector2(.5f, .5f), 100f, 0, SpriteMeshType.FullRect);
                 renderer.GetType().GetField("fernetBottleSprite", Instance).SetValue(renderer, fernetSprite);
-                Call(renderer, "LoadOptionalFernetSprites");
-                Assert.IsNotNull(renderer.GetType().GetField("coca25ShelfSprite", Instance).GetValue(renderer));
                 Call(renderer, "EnsureFernetBottleShelf", station);
 
                 Transform shelf = station.transform.Find("FernetBottleShelf");
                 Assert.IsNotNull(shelf);
                 Assert.AreEqual(6, shelf.childCount);
                 float tableHeight = table.sprite.bounds.size.y;
-                Type scaleType = GameType("StreetProductVisualScale");
-                MethodInfo shelfFraction = scaleType.GetMethod("ShelfBottleHeightFraction", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
-                float fernetFraction = (float)shelfFraction.Invoke(null, new object[] { true });
-                float cocaFraction = (float)shelfFraction.Invoke(null, new object[] { false });
                 for (int i = 0; i < shelf.childCount; i++)
                 {
                     Transform bottle = shelf.GetChild(i);
                     SpriteRenderer bottleRenderer = bottle.GetComponent<SpriteRenderer>();
-                    float expectedHeight = tableHeight * (i < 3 ? fernetFraction : cocaFraction);
+                    float expectedHeight = tableHeight * (i < 3 ? .25f : .333f);
                     Assert.AreEqual(expectedHeight, bottleRenderer.sprite.bounds.size.y * bottle.localScale.y, .001f,
                         "Fernet 1 L and Coca 2.5 L shelf bottles should scale to different, larger proportions.");
                     Assert.AreEqual(bottle.localScale.x, bottle.localScale.y, .0001f,
@@ -144,11 +137,10 @@ namespace HayChoriYPaty.Tests
                         Assert.GreaterOrEqual(separation + .001f, required, "Shelf bottles should not overlap.");
                     }
                 }
-                float fernetHeight = shelf.GetChild(0).GetComponent<SpriteRenderer>().sprite.bounds.size.y * shelf.GetChild(0).localScale.y;
-                float cocaHeight = shelf.GetChild(3).GetComponent<SpriteRenderer>().sprite.bounds.size.y * shelf.GetChild(3).localScale.y;
-                Assert.Greater(fernetHeight, tableHeight * .16f * 1.5f, "The 1 L Fernet bottle should be visibly larger than before.");
-                Assert.Greater(cocaHeight, tableHeight * .16f * 1.5f, "The 2.5 L Coca bottle should be visibly larger than before.");
-                Assert.AreEqual(1.40f / 1.31f, cocaHeight / fernetHeight, .01f, "Shelf scale must distinguish the real package heights, not their volume ratio.");
+                Assert.Greater(shelf.GetChild(0).GetComponent<SpriteRenderer>().bounds.size.y,
+                    tableHeight * .16f * 1.5f, "The 1 L Fernet bottle should be visibly larger than before.");
+                Assert.Greater(shelf.GetChild(3).GetComponent<SpriteRenderer>().bounds.size.y,
+                    tableHeight * .16f * 1.5f, "The 2.5 L Coca bottle should be visibly larger than before.");
             }
             finally { UnityEngine.Object.Destroy(root); }
             yield return null;
@@ -198,13 +190,11 @@ namespace HayChoriYPaty.Tests
                     SpriteRenderer drinkSprite = view.GetComponentInChildren<SpriteRenderer>(true);
                     Assert.IsNotNull(drinkSprite);
                     Vector2 sourceSize = drinkSprite.sprite.bounds.size;
-                    Vector2 target = (Vector2)GameType("StreetKitchenRenderer").GetMethod("ServingSize", BindingFlags.NonPublic | BindingFlags.Static)
-                        .Invoke(null, new object[] { product, false });
-                    float fitScale = Mathf.Min(target.x * .01f / sourceSize.x, target.y * .01f / sourceSize.y);
-                    Vector2 expectedSize = sourceSize * (fitScale * 100f);
+                    float baseScale = Mathf.Min(8f * .01f / sourceSize.x, 15f * .01f / sourceSize.y);
+                    Vector2 expectedSize = sourceSize * (baseScale * 1.35f * 100f);
                     Vector2 renderedSize = sourceSize * (view.transform.localScale.x * 100f);
-                    Assert.AreEqual(expectedSize.x, renderedSize.x, .01f, "Barrel items should use the shared package scale and preserve sprite aspect ratio.");
-                    Assert.AreEqual(expectedSize.y, renderedSize.y, .01f, "Barrel items should use the shared package scale and preserve sprite aspect ratio.");
+                    Assert.AreEqual(expectedSize.x, renderedSize.x, .01f, "Barrel Coca/beer should be 35% larger while preserving each sprite's aspect ratio.");
+                    Assert.AreEqual(expectedSize.y, renderedSize.y, .01f, "Barrel Coca/beer should be 35% larger while preserving each sprite's aspect ratio.");
                     Assert.GreaterOrEqual(point.x, bounds.xMin);
                     Assert.LessOrEqual(point.x, bounds.xMax);
                 }

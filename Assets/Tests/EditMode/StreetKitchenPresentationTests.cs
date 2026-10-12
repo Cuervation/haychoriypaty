@@ -89,41 +89,23 @@ namespace HayChoriYPaty.Tests
         {
             string cupPath = "Assets/Resources/ModularKitchen/Art/fernet-cup-800cc-v1.png";
             string bottlePath = "Assets/Resources/ModularKitchen/Art/fernet-bottle-1l-v1.png";
-            string cocaDisplayPath = "Assets/Resources/ModularKitchen/Art/coca-2500ml-display-v1.png";
             TextureImporter cupImporter = AssetImporter.GetAtPath(cupPath) as TextureImporter;
             TextureImporter bottleImporter = AssetImporter.GetAtPath(bottlePath) as TextureImporter;
-            TextureImporter cocaImporter = AssetImporter.GetAtPath(cocaDisplayPath) as TextureImporter;
             Assert.NotNull(cupImporter, cupPath);
             Assert.NotNull(bottleImporter, bottlePath);
-            Assert.NotNull(cocaImporter, cocaDisplayPath);
             Assert.IsTrue(cupImporter.DoesSourceTextureHaveAlpha());
             Assert.IsTrue(bottleImporter.DoesSourceTextureHaveAlpha());
-            Assert.IsTrue(cocaImporter.DoesSourceTextureHaveAlpha());
             Texture2D cup = Resources.Load<Texture2D>("ModularKitchen/Art/fernet-cup-800cc-v1");
             Texture2D bottle = Resources.Load<Texture2D>("ModularKitchen/Art/fernet-bottle-1l-v1");
-            Texture2D cocaDisplay = Resources.Load<Texture2D>("ModularKitchen/Art/coca-2500ml-display-v1");
             Assert.NotNull(cup);
             Assert.NotNull(bottle);
-            Assert.NotNull(cocaDisplay);
             Assert.That((float)cup.width / cup.height, Is.InRange(.60f, .70f), "The serving cup keeps its broad plastic silhouette.");
             Assert.That((float)bottle.width / bottle.height, Is.InRange(.24f, .31f), "The bottle keeps its tall 1 L silhouette.");
 
             Type rendererType = Runtime("StreetKitchenRenderer");
             MethodInfo servingSize = rendererType.GetMethod("ServingSize", BindingFlags.NonPublic | BindingFlags.Static);
             Assert.NotNull(servingSize);
-            Vector2 cocaSize = (Vector2)servingSize.Invoke(null, new object[] { 4, false });
-            Vector2 cupSize = (Vector2)servingSize.Invoke(null, new object[] { 5, false });
-            Vector2 beerSize = (Vector2)servingSize.Invoke(null, new object[] { 6, false });
-            Assert.AreEqual(14.3f / 24f, cupSize.y / cocaSize.y, .001f, "The 800 cc plastic cup follows its real height, not its volume.");
-            Assert.AreEqual(15.7f / 24f, beerSize.y / cocaSize.y, .001f, "A 473 ml can is shorter than the 600 ml Coca bottle.");
-            Assert.Greater(cupSize.x, beerSize.x, "The cup remains wider than the can while preserving its source aspect.");
-            Type scaleType = Runtime("StreetProductVisualScale");
-            MethodInfo shelfFraction = scaleType.GetMethod("ShelfBottleHeightFraction", BindingFlags.NonPublic | BindingFlags.Static);
-            Assert.NotNull(shelfFraction);
-            float fernetBottleFraction = (float)shelfFraction.Invoke(null, new object[] { true });
-            float cocaBottleFraction = (float)shelfFraction.Invoke(null, new object[] { false });
-            Assert.AreEqual(1.31f, fernetBottleFraction * LayoutConstant("TableHeight") / cocaSize.y, .001f);
-            Assert.AreEqual(1.40f, cocaBottleFraction * LayoutConstant("TableHeight") / cocaSize.y, .001f);
+            Assert.AreEqual(new Vector2(18f, 28f), (Vector2)servingSize.Invoke(null, new object[] { 5, false }));
 
             GameObject rendererRoot = new GameObject("FernetPresentationTestRenderer");
             GameObject station = null;
@@ -149,7 +131,7 @@ namespace HayChoriYPaty.Tests
                     Assert.Less(item.localPosition.y, 0f, "Bottle props must stay below the table center/top surface.");
                     Assert.AreEqual(1, spriteRenderer.sortingOrder);
                     if (spriteRenderer.sprite.name == "fernet-bottle-1l-v1") fernetBottles++;
-                    if (spriteRenderer.sprite.name == "coca-2500ml-display-v1") cocaBottles++;
+                    if (spriteRenderer.sprite.name == "coca") cocaBottles++;
                 }
                 Assert.AreEqual(3, fernetBottles);
                 Assert.AreEqual(3, cocaBottles);
@@ -511,10 +493,10 @@ namespace HayChoriYPaty.Tests
         public void TableAndGrillSlotsDoNotMixTheTwoMeatFamilies()
         {
             object layout = FullLayout();
-            AssertSlotsSeparated(layout, 0, 1, 24, new Vector2(22f, 10f), new Vector2(20f, 14f));
-            AssertSlotsSeparated(layout, 2, 3, 18, new Vector2(20f, 12f), new Vector2(21f, 12f));
-            AssertSlotsSeparated(layout, 0, 1, 18, new Vector2(28f, 11f), new Vector2(17f, 12f), true);
-            AssertSlotsSeparated(layout, 2, 3, 7, new Vector2(16f, 16f), new Vector2(24f, 11f), true);
+            AssertSlotsSeparated(layout, 0, 1, 24, new Vector2(20f, 14f), new Vector2(20f, 14f));
+            AssertSlotsSeparated(layout, 2, 3, 18, new Vector2(20f, 14f), new Vector2(20f, 14f));
+            AssertSlotsSeparated(layout, 0, 1, 18, new Vector2(36.4f, 14f), new Vector2(34f, 20f), true);
+            AssertSlotsSeparated(layout, 2, 3, 7, new Vector2(34f, 38f), new Vector2(90f, 14f), true);
         }
 
         private static void AssertSlotsSeparated(object layout, int first, int second, int count, Vector2 firstSize, Vector2 secondSize, bool grill = false)

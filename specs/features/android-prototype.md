@@ -1,4 +1,14 @@
-# Latest verified Android delivery — 2026-10-12 (0.2.24/code26, responsive gameplay HUD)
+# Latest verified Android delivery — 2026-10-12 (0.2.26/code28, restored product sizes)
+
+Unity 6000.6.3f1 Main-only Android Development IL2CPP/ARM64 build in an isolated project copy: **Succeeded, 0 errors / 1 clang warning**.
+
+APK `Builds/Android/Archive/HayChoriYPaty-0.2.26-code28-product-size-rollback.apk`: **410,224,713 bytes**. SHA-256 `97093346de768d4dd3a2d5c33190194eb90e36f8d17c941369f7aa69e2ae197a`. Package `com.haychoriypaty.game`, version0.2.26/code28, min API26/target36, `arm64-v8a`. ZIP alignment and APK Signature Scheme v2 verified with the established Android Debug certificate.
+
+Focused Unity tests passed 13/13 across EditMode and PlayMode: 800 cc Fernet cup/shelf content, grill meat bounds across all eleven levels, all ten restored service-size cases, and shelf size/aspect/separation. `adb install -r` returned **Success** on Motorola Edge 60 Fusion (`ZY22MBNWRB`); PackageManager confirms versionName0.2.26/versionCode28. No live Unity Game View screenshot or device visual review was captured. This is a Development/debug-signed APK, not a Play Store release.
+
+---
+
+# Previous Android delivery — 2026-10-12 (0.2.24/code26, responsive gameplay HUD)
 
 Unity 6000.6.3f1 Main-only Android Development IL2CPP/ARM64 build `build-85da0aba77`: **Succeeded in 37.46s; 0 errors, 1 warning**. BuildReport total output size was 2,059.62 MB (not APK file size).
 

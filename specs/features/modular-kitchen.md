@@ -144,9 +144,8 @@ Increased the existing 82.8-unit barrel width by a further 10%, to91.08 authored
 
 ## Fernet-table bottle shelf proportions — 2026-10-12
 
-Enlarged only the decorative bottles under the Fernet table: the 1 L Fernet bottle now occupies 25% of table height and the 2.5 L Coca bottle 33.3%, with uniform sprite scaling and redistributed centers to keep all six separated. The 600 ml barrel stock, serving visuals, gameplay and furniture bounds are unchanged. A focused PlayMode renderer test now checks these target heights, aspect ratios and gaps; execution/visual review is pending because the existing Unity Editor is open but Unity MCP is unavailable.
+Enlarged only the decorative bottles under the Fernet table: the 1 L Fernet bottle now occupies 25% of table height and the 2.5 L Coca bottle 33.3%, with uniform sprite scaling and redistributed centers to keep all six separated. The 600 ml barrel stock, serving visuals, gameplay and furniture bounds are unchanged. The focused PlayMode renderer test checks these prior target heights, aspect ratios and gaps; after restoring this sizing, it passed 1/1 in an isolated Unity 6000.6.3f1 copy. A live Game View screenshot was not captured.
 
+## 2026-10-12 — Restore the prior presentation sizes
 
-## 2026-10-12 — Physical product proportions
-
-The shared `StreetProductVisualScale` owns serving and grill presentation targets for every catalog level. The 600 ml Coca bottle is the height reference; the 473 ml can and 800 cc plastic cup are shorter, and per-cut sandwich/meat footprints no longer jump when a companion product is locked. The under-table 1 L Fernet Branca bottle and 2.5 L Coca bottle use distinct uniformly scaled art; the Coca shelf bottle is about 1.40× the barrel 600 ml bottle, while Branca is about 1.31×. This supersedes earlier shelf-size fractions and preserves source sprite aspect. Validation status is recorded in `specs/status.md`; no cooking, order, worker, stock, or economy behavior changes.
+The shared proportional-scale correction from commit `a7937b2` was reverted after it made food and drink sprites too small. Restore the renderer's prior serving/grill dimensions and the Fernet-table bottle targets (Fernet 25%, Coca 33.3% of table height). The Fernet remains an 800 cc disposable plastic cup; this rollback changes only visual size presentation, not products or gameplay.

@@ -219,3 +219,8 @@ Treat the root plate as the sole counter renderer and project its physical edge 
 ## 2026-10-12 — Shared physical product visual scale
 
 Use the 600 ml Coca bottle as the render reference, then size the 473 ml can and the 800 cc plastic cup by package height (not liquid volume); represent the 1 L Fernet Branca and 2.5 L Coca stock bottles with separate art and approximately 1.31×/1.40× the 600 ml reference height. Sandwich portions and grill cuts use fixed per-product visual targets across catalog combinations. All fit remains uniform/aspect-preserving; this is presentation-only and does not change product IDs, stock, demand, production, sales, or progression.
+
+
+## 2026-10-12 — Restore product presentation sizes
+
+Revert the latest shared physical-product scale profile because its authored serving and grill targets rendered too small. Preserve the earlier table/carry dimensions and the prior .25/.333 Fernet/Coca shelf height fractions. Keep the 800 cc disposable plastic Fernet cup and all existing source art/catalog/gameplay unchanged.
