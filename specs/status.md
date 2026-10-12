@@ -755,3 +755,11 @@ Increased the existing 82.8-unit barrel width by another 10% to91.08 authored un
 ## Two-row mobile HUD — Android delivery (2026-10-12)
 
 Added a two-row gameplay header: coins left, timer centered, dynamic level badge right, and objective chips using one row for up to four goals or two rows for five/seven goals. The cutout-aware header expands only as needed; all values remain read-only. Focused Unity 6000.6.3f1 EditMode checks passed 9/9; `git diff --check` passed. Main-only Android Development IL2CPP/ARM64 build `build-85da0aba77` succeeded (0 errors, 1 warning). APK `Builds/Android/Archive/HayChoriYPaty-0.2.24-code26-responsive-header.apk`, 474,896,975 bytes, SHA-256 `2502f389d90766c5755ed281804093e83caef806f3c549b332de113566ceec64`, package `com.haychoriypaty.game`, version0.2.24/code26, API26/36; archive and v2 debug signature verified. Unity Game View/device appearance remains unverified; no phone install was performed.
+
+
+## Physical product proportions (2026-10-12)
+
+- [x] Centralized render-only size targets for drinks, sandwich servings, and grill cuts; all catalog levels share the same per-product sizes.
+- [x] Added a distinct transparent 2.5 L Coca shelf sprite and enlarged/rebalanced both bottle groups under the Fernet table without changing furniture, stock, or gameplay.
+- [x] Aligned the product catalog spec with the current 800 cc disposable plastic Fernet cup.
+- [ ] Unity import, EditMode/PlayMode execution, and live Game View/phone visual comparison remain unverified: Unity 6000.6.3f1 refused batch mode because this same project is already open in another Editor instance; no Unity MCP tool is available in this session.

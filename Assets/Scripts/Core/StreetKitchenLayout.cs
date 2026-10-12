@@ -389,26 +389,8 @@ namespace HayChoriYPaty
         /// <summary>Visual meat footprint adapted to the actual surface of the scaled grill.</summary>
         public Vector2 GrillMeatSize(int product, bool companionAvailable)
         {
-            Rect grill = GrillBoundsForProduct(product);
-            if (product == 0 && !companionAvailable)
-            {
-                float width = Mathf.Min(62f, Mathf.Max(36.4f, grill.width * .12f));
-                return new Vector2(width, width * 14f / 36.4f);
-            }
-            if (product == 2)
-            {
-                float height = Mathf.Min(38f, grill.height * (GrillSurfaceBottom - GrillSurfaceTop));
-                return new Vector2(34f * height / 38f, height);
-            }
-            if (product == 3 && companionAvailable)
-            {
-                float width = Mathf.Min(90f, grill.width * .27f);
-                return new Vector2(width, 14f * width / 90f);
-            }
-            return product == 0 ? new Vector2(36.4f, 14f)
-                : product == 1 ? new Vector2(34f, 20f)
-                : product == 2 ? new Vector2(34f, 38f)
-                : new Vector2(90f, 14f);
+            // Portion scale is a product property, not a function of which other meat is unlocked.
+            return StreetProductVisualScale.GrillMeatSize(product);
         }
 
         public Vector2 GrillSlotPosition(int product, int slot, bool companionAvailable, int capacity)

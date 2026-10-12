@@ -214,3 +214,8 @@ Remove gameplay caps for Parrillero, Cocacolero, Premium Parrillero and Ferneter
 ## 2026-10-10 — Keep responsive regions on one scene projection
 
 Treat the root plate as the sole counter renderer and project its physical edge into the safe-area canvas for crowd clipping; never redraw the baked counter crop in a second coordinate system. Pin read-only status to physical y=0, clear/reflow quota cells around Unity's reported top cutout, and keep the level name, visible catalog cards, Ready navigation and club pennants in one footer calculation bounded by the kitchen frame and safe viewport. Pennants remain aspect-preserved decoration: mask the root row in gameplay and use only footer space left after controls, superseding the 2026-10-06 pixel-identical Floresta-row rule for active gameplay screens. Preserve the themed colors, all simulation behavior and the existing IMGUI/button system.
+
+
+## 2026-10-12 — Shared physical product visual scale
+
+Use the 600 ml Coca bottle as the render reference, then size the 473 ml can and the 800 cc plastic cup by package height (not liquid volume); represent the 1 L Fernet Branca and 2.5 L Coca stock bottles with separate art and approximately 1.31×/1.40× the 600 ml reference height. Sandwich portions and grill cuts use fixed per-product visual targets across catalog combinations. All fit remains uniform/aspect-preserving; this is presentation-only and does not change product IDs, stock, demand, production, sales, or progression.

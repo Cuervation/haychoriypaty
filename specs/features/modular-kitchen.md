@@ -2,7 +2,7 @@
 
 ## Scope / visual authority
 
-The user-supplied [layout reference](../../Assets/Art/Reference/modular-kitchen-layout-reference-20261007.jpg) is composition/style guidance only, never gameplay background. Requested: two separate empty grills with independently placed Chori/Paty vs Bondiola/Vacío; individual Raw/Cooked/Passed meat visuals (Cooking remains an internal timer phase), compact thick cylindrical Bondiola; independent bread sandwiches; three equivalent-size tables for normal/premium/Fernet; separate blue plastic beer/Coca barrels and containers/ice; Fernet1L with ice and no straw. Bottom grills side by side, active preparation stations reflowed in catalog order Normal table→Premium table→Fernet table→Coca barrel→Beer barrel, clear circulation before counter; preserve UI, club scenery/fans/riots and catalog progression.
+The user-supplied [layout reference](../../Assets/Art/Reference/modular-kitchen-layout-reference-20261007.jpg) is composition/style guidance only, never gameplay background. Requested: two separate empty grills with independently placed Chori/Paty vs Bondiola/Vacío; individual Raw/Cooked/Passed meat visuals (Cooking remains an internal timer phase), compact thick cylindrical Bondiola; independent bread sandwiches; three equivalent-size tables for normal/premium/Fernet; separate blue plastic beer/Coca barrels and containers/ice; Fernet served in an 800 cc disposable plastic cup with ice and no straw, with 1 L Branca bottles stored below its table. Bottom grills side by side, active preparation stations reflowed in catalog order Normal table→Premium table→Fernet table→Coca barrel→Beer barrel, clear circulation before counter; preserve UI, club scenery/fans/riots and catalog progression.
 
 ## Verified starting baseline / resolved prerequisites
 
@@ -145,3 +145,8 @@ Increased the existing 82.8-unit barrel width by a further 10%, to91.08 authored
 ## Fernet-table bottle shelf proportions — 2026-10-12
 
 Enlarged only the decorative bottles under the Fernet table: the 1 L Fernet bottle now occupies 25% of table height and the 2.5 L Coca bottle 33.3%, with uniform sprite scaling and redistributed centers to keep all six separated. The 600 ml barrel stock, serving visuals, gameplay and furniture bounds are unchanged. A focused PlayMode renderer test now checks these target heights, aspect ratios and gaps; execution/visual review is pending because the existing Unity Editor is open but Unity MCP is unavailable.
+
+
+## 2026-10-12 — Physical product proportions
+
+The shared `StreetProductVisualScale` owns serving and grill presentation targets for every catalog level. The 600 ml Coca bottle is the height reference; the 473 ml can and 800 cc plastic cup are shorter, and per-cut sandwich/meat footprints no longer jump when a companion product is locked. The under-table 1 L Fernet Branca bottle and 2.5 L Coca bottle use distinct uniformly scaled art; the Coca shelf bottle is about 1.40× the barrel 600 ml bottle, while Branca is about 1.31×. This supersedes earlier shelf-size fractions and preserves source sprite aspect. Validation status is recorded in `specs/status.md`; no cooking, order, worker, stock, or economy behavior changes.
