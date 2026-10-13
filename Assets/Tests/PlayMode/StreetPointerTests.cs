@@ -63,6 +63,7 @@ namespace HayChoriYPaty.Tests
             if (mouse != null && mouse.added) InputSystem.RemoveDevice(mouse);
             InputSystem.settings.backgroundBehavior = previousInputBackground;
             InputSystem.settings.editorInputBehaviorInPlayMode = previousEditorInput;
+            yield return null; // Destroy invokes persistence before restoring the prior player save.
             string key = (string)gameType.GetField("ProgressKey", BindingFlags.Public | BindingFlags.Static).GetValue(null);
             if (hadSavedProgress) PlayerPrefs.SetString(key, previousSavedProgress);
             else PlayerPrefs.DeleteKey(key);
@@ -96,7 +97,19 @@ namespace HayChoriYPaty.Tests
                 if (candidate.Name == method && candidate.GetParameters().Length == arity) return candidate;
             throw new MissingMethodException(type.Name,method);
         }
-        private void Invoke(object target, string method, params object[] args) { Command(target.GetType(),method,args.Length).Invoke(target,args); }
+        private void Invoke(object target, string method, params object[] args)
+        {
+            // These legacy visual/worker fixtures isolate gameplay, not shopping (covered by StreetMarketViewTests).
+            if (ReferenceEquals(target, game) && method == "StartRound") StockSelectedLevel();
+            Command(target.GetType(),method,args.Length).Invoke(target,args);
+        }
+        private void StockSelectedLevel()
+        {
+            object market = Get("Market");
+            for (int id = 0; id < 10; id++)
+                if ((int)market.GetType().GetMethod("MissingPacks").Invoke(market, new[] { Sim, (object)id }) > 0)
+                    Assert.IsTrue((bool)CallGame("BuyMissingIngredient", id));
+        }
         private object CallGame(string method, params object[] args) { return Command(gameType,method,args.Length).Invoke(game,args); }
         private void AssertFreshAttempt(string context)
         {
@@ -197,7 +210,7 @@ namespace HayChoriYPaty.Tests
             gameType.GetMethod("OnEnable",PrivateInstance).Invoke(game,null);
             Assert.AreEqual(1,Sim.GetType().GetProperty("ParrilleroCount").GetValue(Sim,null)); Assert.AreEqual(0,Sim.GetType().GetProperty("CocacoleroCount").GetValue(Sim,null));
             Invoke(game,"StartRound"); for(int i=0;i<19;i++) Invoke(Sim,"Step",10f);
-            Assert.AreEqual("Lost",Phase); Invoke(game,"Retry");
+            Assert.AreEqual("Lost",Phase); Assert.IsFalse((bool)CallGame("Retry")); Invoke(game,"ReturnToLevels");
             Assert.AreEqual(1,Sim.GetType().GetProperty("ParrilleroCount").GetValue(Sim,null)); Assert.AreEqual(0,Sim.GetType().GetProperty("CocacoleroCount").GetValue(Sim,null));
             Assert.AreEqual(0,Sim.GetType().GetProperty("SpeedLevel").GetValue(Sim,null));
         }
@@ -229,7 +242,7 @@ namespace HayChoriYPaty.Tests
                 Assert.AreEqual(1, Sim.GetType().GetProperty("SpeedLevel", PublicInstance).GetValue(Sim, null));
 
                 SetSim("Phase", Enum.Parse(Sim.GetType().GetProperty("Phase", PublicInstance).PropertyType, "Lost"));
-                Assert.IsTrue((bool)CallGame("Retry"));
+                Assert.IsFalse((bool)CallGame("Retry")); Assert.IsTrue((bool)CallGame("ReturnToLevels"));
                 AssertFreshAttempt("retry level " + level);
 
                 int nextLevel = (level + 1) % 5;
@@ -303,14 +316,15 @@ namespace HayChoriYPaty.Tests
 
             SetSim("Phase", Enum.Parse(Sim.GetType().GetProperty("Phase", PublicInstance).PropertyType, "Won"));
             yield return null; // StreetGame persists the win and unlocks the next level during Update.
-            dispatch.Invoke(view, new object[] { 9 }); // The victory popup's only Salir action.
+            dispatch.Invoke(view, new object[] { 163 }); // Return to levels, separate from next match.
             Assert.AreEqual("Ready", Phase);
             Assert.IsTrue((bool)viewType.GetField("levelSelectActive", PrivateInstance).GetValue(view));
             Assert.AreEqual(1, Get("UnlockedLevel"), "Winning Floresta unlocks only Nueva Chicago");
 
             dispatch.Invoke(view, new object[] { 31 });
             Assert.IsFalse((bool)viewType.GetField("levelSelectActive", PrivateInstance).GetValue(view));
-            Assert.AreEqual("Playing", Phase, "Every unlocked level starts directly without a price setup screen");
+            Assert.AreEqual("Ready", Phase, "Levels 2–11 enter Mercado before playing");
+            Assert.IsTrue((bool)viewType.GetField("marketActive", PrivateInstance).GetValue(view));
             Assert.AreEqual(1, Get("SelectedLevel"));
             Assert.IsFalse((bool)Sim.GetType().GetProperty("CanEditPrices", PublicInstance).GetValue(Sim, null));
             Assert.AreEqual(5f, Sim.GetType().GetMethod("GetProductPrice", PublicInstance).Invoke(Sim, new object[] { 4 }));
@@ -331,10 +345,10 @@ namespace HayChoriYPaty.Tests
             float verticalScale = canvasHeight / 960f;
             viewType.GetField("logicalCanvasHeight", PrivateInstance).SetValue(view, canvasHeight);
             viewType.GetField("layoutVerticalScale", PrivateInstance).SetValue(view, verticalScale);
-            Rect exit = (Rect)viewType.GetMethod("VictoryExitBounds", PrivateInstance).Invoke(view, null);
+            Rect exit = (Rect)viewType.GetMethod("ResultLevelsBounds", PrivateInstance).Invoke(view, null);
             MethodInfo hit = viewType.GetMethod("HitAction", PrivateInstance);
             Assert.AreEqual(0, hit.Invoke(view, new object[] { new Vector2(35, 715) }), "The modal blocks the upgrade behind it");
-            Assert.AreEqual(9, hit.Invoke(view, new object[] { new Vector2(exit.center.x, exit.center.y / verticalScale) }));
+            Assert.AreEqual(163, hit.Invoke(view, new object[] { new Vector2(exit.center.x, exit.center.y / verticalScale) }));
             yield return Click(exit.center.x, exit.center.y / verticalScale);
             Assert.AreEqual("Ready", Phase);
             Assert.IsTrue((bool)viewType.GetField("levelSelectActive", PrivateInstance).GetValue(view));
@@ -353,9 +367,12 @@ namespace HayChoriYPaty.Tests
             yield return Click(270, 585); // Starting directly remains supported after reload/retry.
             Assert.AreEqual("Playing", Phase);
 
-            SetSim("Phase", Enum.Parse(Sim.GetType().GetProperty("Phase", PublicInstance).PropertyType, "Ready"));
-            viewType.GetMethod("DispatchAction", PrivateInstance).Invoke(view, new object[] { 11 });
-            Assert.AreEqual("Playing", Phase, "Choosing an unlocked level from Ready starts it without an intermediate panel");
+            Assert.IsTrue((bool)CallGame("ReturnToLevels"));
+            viewType.GetMethod("DispatchAction", PrivateInstance).Invoke(view, new object[] { 19 });
+            Assert.AreEqual("Ready", Phase, "Canchas opens the selector without starting play");
+            Assert.IsTrue((bool)viewType.GetField("levelSelectActive", PrivateInstance).GetValue(view));
+            viewType.GetMethod("DispatchAction", PrivateInstance).Invoke(view, new object[] { 31 });
+            Assert.IsTrue((bool)viewType.GetField("marketActive", PrivateInstance).GetValue(view));
         }
 
         [UnityTest]
@@ -383,7 +400,9 @@ namespace HayChoriYPaty.Tests
                 Assert.AreEqual(30 + level, hit.Invoke(view, new object[] { card.center }));
                 yield return Click(card.center.x, card.center.y);
                 Assert.AreEqual(level, Sim.GetType().GetProperty("LevelIndex").GetValue(Sim));
-                Assert.AreEqual("Playing", Phase);
+                Assert.AreEqual("Ready", Phase);
+                Assert.IsTrue((bool)viewType.GetField("marketActive", PrivateInstance).GetValue(view));
+                viewType.GetField("marketActive", PrivateInstance).SetValue(view, false);
                 Assert.AreEqual(false, viewType.GetField("levelSelectActive", PrivateInstance).GetValue(view));
             }
         }
@@ -413,12 +432,12 @@ namespace HayChoriYPaty.Tests
                 Assert.IsTrue((bool)CallGame("SelectLevel", level));
                 Invoke(game, "StartRound");
                 SetSim("Phase", Enum.Parse(Sim.GetType().GetProperty("Phase").PropertyType, "Won"));
-                gameType.GetMethod("Save", PrivateInstance).Invoke(game, null);
+                CallGame("ProcessRoundResult");
                 int expectedUnlock = Mathf.Min(10, level + 1);
                 Assert.AreEqual(expectedUnlock, gameType.GetProperty("UnlockedLevel").GetValue(game));
                 object loaded = gameType.GetMethod("Load", PrivateInstance).Invoke(game, null);
                 Assert.AreEqual(expectedUnlock, loaded.GetType().GetField("unlockedLevel").GetValue(loaded));
-                Assert.IsTrue((bool)CallGame("Retry"));
+                Assert.IsFalse((bool)CallGame("Retry")); Assert.IsTrue((bool)CallGame("ReturnToLevels"));
                 Assert.AreEqual(1, Sim.GetType().GetProperty("ParrilleroCount").GetValue(Sim));
                 Assert.AreEqual(0, Sim.GetType().GetProperty("CocacoleroCount").GetValue(Sim));
                 Invoke(game, "StartRound");
@@ -527,6 +546,49 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(8, Sim.GetType().GetProperty("StaffCount").GetValue(Sim, null));
             Assert.AreEqual(9, Sim.GetType().GetProperty("SpeedLevel").GetValue(Sim, null));
             Assert.AreEqual(8415, Sim.GetType().GetProperty("Coins").GetValue(Sim, null));
+        }
+
+        [UnityTest]
+        public IEnumerator CapturesResponsiveHeaderForAllElevenLevels()
+        {
+            if (Application.isBatchMode) Assert.Ignore("Game-view captures require the interactive Unity Editor.");
+
+            Time.timeScale = 0f;
+            Type simulationType = Type.GetType("HayChoriYPaty.StreetSimulation, Assembly-CSharp", true);
+            FieldInfo simulationField = gameType.GetField("sim", PrivateInstance);
+            FieldInfo selectedLevelField = gameType.GetField("selectedLevel", PrivateInstance);
+            Type viewType = view.GetType();
+            viewType.GetField("introActive", PrivateInstance).SetValue(view, false);
+            viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, false);
+
+            string directory = System.IO.Path.GetFullPath(System.IO.Path.Combine(
+                Application.dataPath, "../Logs/Acceptance/HudResourceCards-20261013"));
+            System.IO.Directory.CreateDirectory(directory);
+            int levelCount = ((string[])simulationType.GetField("LevelNames", BindingFlags.Public | BindingFlags.Static)
+                .GetValue(null)).Length;
+            for (int level = 0; level < levelCount; level++)
+            {
+                object simulation = Activator.CreateInstance(simulationType, new object[] {
+                    Get("Balance"), level, 5f, 0, 1, 0
+                });
+                simulationType.GetMethod("StartRound", PublicInstance).Invoke(simulation, null);
+                simulationField.SetValue(game, simulation);
+                selectedLevelField.SetValue(game, level);
+                yield return null;
+                yield return WaitForRenderedFrame();
+                SaveHudReviewScreenshot(directory, level);
+            }
+        }
+
+        private static void SaveHudReviewScreenshot(string directory, int level)
+        {
+            Texture2D capture = ScreenCapture.CaptureScreenshotAsTexture();
+            try
+            {
+                string filename = "level-" + (level + 1).ToString("00") + ".png";
+                System.IO.File.WriteAllBytes(System.IO.Path.Combine(directory, filename), capture.EncodeToPNG());
+            }
+            finally { UnityEngine.Object.Destroy(capture); }
         }
 
         [UnityTest]
@@ -716,7 +778,7 @@ namespace HayChoriYPaty.Tests
 
             Invoke(game, "StartRound"); SetSim("Coins", 234);
             SetSim("Phase", Enum.Parse(Sim.GetType().GetProperty("Phase").PropertyType, "Lost"));
-            Invoke(game, "Retry");
+            Assert.IsFalse((bool)CallGame("Retry")); Invoke(game, "ReturnToLevels");
             Assert.AreEqual("Ready", Phase);
             Assert.AreEqual(0, Sim.GetType().GetProperty("Coins").GetValue(Sim, null));
 
@@ -808,7 +870,7 @@ namespace HayChoriYPaty.Tests
         public IEnumerator PremiumAndFernetCardsDispatchIndependentMouseAndTouchPurchases()
         {
             gameType.GetField("save",PrivateInstance).GetValue(game).GetType().GetField("unlockedLevel").SetValue(gameType.GetField("save",PrivateInstance).GetValue(game),10);
-            Assert.IsTrue((bool)CallGame("SelectLevel",4));CallGame("StartRound");SetSim("Coins",10000);
+            Assert.IsTrue((bool)CallGame("SelectLevel",4));Invoke(game,"StartRound");SetSim("Coins",10000);
             Tune("workerSpeed",.1f);Tune("customerArrivalSeconds",10000f);
             Rect premium=CatalogCard(20),fernet=CatalogCard(21);
             yield return Click(premium.center.x,premium.center.y);

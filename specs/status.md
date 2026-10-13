@@ -1,3 +1,21 @@
+## Mercado/Heladera final validation and Android delivery — 2026-10-13
+
+The persistent Market/Heladera implementation is complete and packaged as Android 0.2.30/code32. Focused EditMode Market/kitchen/specialty tests passed 30/30; HUD texture and victory-popup bounds passed 4/4; PlayMode Market view/pointer/navigation passed 39/39. The wider targeted EditMode pass initially exposed a stale 193px HUD texture expectation and the victory popup touching the top edge at a 700px logical height; the expectation now matches the 211px texture and popup scaling reserves the top HUD plus 16px screen insets. The focused reruns passed.
+
+APK build succeeded (Main-only, Development IL2CPP/ARM64, 0 errors / 2 warnings); package/version, ZIP integrity, and v2 Android Debug signature verified. No physical-device install or gameplay validation was performed. Full artifact/hash details are in `features/android-prototype.md`.
+
+## Upper HUD resource cards — 2026-10-13
+
+Removed the level badge from the top row and split the status band into equal coin-left/time-right capsules, enlarged 20%. Re-skinned objective counters as uniform compact translucent cards sized for five columns; 1–5 goals now occupy one row and 6–7 use a second centered row. The single-row bar contracts to remove the unused row. All eleven gameplay and selector captions now show the official team/club followed by its neighborhood, while internal theme lookup names remain stable. The notch geometry still prevents obstruction.
+
+**Validation:** Unity 6000.6.3f1 focused EditMode HUD/caption checks passed 12/12; interactive PlayMode screenshot test passed 1/1 and refreshed eleven 1080×1920 captures in `Logs/Acceptance/HudResourceCards-20261013/`. The updated 11-level contact sheet was reviewed. Physical-device/notch testing was not performed.
+
+**Card-size follow-up:** Quota cards now retain five-column width while growing 20% taller; preferred icon/counter sizes scale ~20% and inner padding is halved. Unity EditMode geometry, five-column, one/two-row and cutout/safe-area checks passed (12 total across two focused runs); the all-level interactive PlayMode capture passed 1/1 and refreshed all eleven 1080×1920 images. The pre-alignment montage was `/private/tmp/hcyp-hud-all-levels-20pct-20261013.png`; the current right-aligned version is `/private/tmp/hcyp-hud-all-levels-rightaligned-20261013.png`. No device test was run.
+
+**Counter alignment follow-up:** Every objective-card counter is right-aligned in its text area, with its product icon anchored at the left inset. Unity 6000.6.3f1 EditMode layout/alignment checks passed 10/10, including 1–7 goal wrapping and notch clearance; PlayMode capture passed 1/1 and refreshed all eleven 1080×1920 level screenshots. No device test was run.
+
+**Counter right-padding follow-up:** Added a 4.8-logical-pixel minimum gap from each right-aligned value to the card edge. Focused Unity EditMode alignment, width, and row-layout checks passed 9/9; the all-11-level 1080×1920 PlayMode capture passed 1/1. Visually reviewed Level 6 at `/private/tmp/hcyp-hud-right-padding-20261013.png`. No device test was run.
+
 ## Fernet tabletop extra row spacing — 2026-10-13
 
 The stock display contains four Coca and four Branca bottles in two close rows. The back/front tabletop positions were separated further to make the second row easier to read while keeping every visible bottle base seated on the plank; the bottles remain grouped to the left of finished Fernet cups. Level 6 Game View was re-captured after the adjustment at 2160×3840: `Logs/Acceptance/FernetTabletop-20261013/level6-after-two-stock-rows-2.png`. Focused EditMode presentation test passed 1/1.
@@ -818,3 +836,10 @@ The Coca/Branca display now has eight tabletop bottles (four of each) in two com
 ## Fernet tabletop extra stock row and visible contact — 2026-10-13
 
 Kept four Coca and four Branca bottles grouped in two close rows, but increased their front/back separation on the tabletop to make the extra row read clearly. Both rows' visible bases remain aligned to the tabletop and use subtle contact shadows. Focused EditMode regression passed 1/1; Level 6 Game View capture reviewed at 2160×3840: `Logs/Acceptance/FernetTabletop-20261013/level6-after-two-stock-rows-2.png`. Android 0.2.29/code31 Main-only Development IL2CPP/ARM64 APK built successfully (0 errors/1 warning), metadata/archive/signature verified; details in `specs/features/android-prototype.md`.
+
+
+## Mercado / persistent Heladera — 2026-10-13
+
+Implemented the approved [market-fridge contract](features/market-fridge.md): ten ingredients, integer cents/four bottle portions, actual-goal requirements/shared bread, one-time kit/legacy migration, minimum-only supplier debt, snapshot recovery, physical handoff consumption, stock/credit settlement deduplication and one shared Mercado/Heladera screen. All Boys remains direct; shopping unlocks after its victory; levels2–11 enter Mercado, losses return to levels, final victory has no level12. Existing art, official prices, quotas, times, hires, routes and gameplay HUD remain unchanged.
+
+Validation via live Unity6000.6.3f1 MCP: EditMode29/29 + final14/14; PlayMode37/37 + final7/7. Actual default-seed minimum-stock campaign11/11 won, with ingredient debit checked against every delivered recipe. Nine real portrait Game View captures at540×960,540×1170,540×1200 under `Logs/Acceptance/MarketFridge-20261013/`; checked tabs, contrast, controls and bottle remainders. `git diff --check` passed. Physical Android QA/build/install not run in this request; no push requested.

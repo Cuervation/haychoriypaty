@@ -226,7 +226,7 @@ namespace HayChoriYPaty.Tests
                 saveType.GetField("parrilleros").SetValue(save, 3);
                 saveType.GetField("cocacoleros").SetValue(save, 2);
                 object migrated = migrate.Invoke(null, new[] { save });
-                Assert.AreEqual(3, saveType.GetField("version").GetValue(migrated));
+                Assert.AreEqual(4, saveType.GetField("version").GetValue(migrated));
                 Assert.AreEqual(7, saveType.GetField("unlockedLevel").GetValue(migrated));
                 Assert.AreEqual(0, saveType.GetField("premiumParrilleros").GetValue(migrated));
                 Assert.AreEqual(0, saveType.GetField("ferneteros").GetValue(migrated));

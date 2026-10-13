@@ -39,6 +39,7 @@ namespace HayChoriYPaty
     public sealed class StreetKitchenProduction
     {
         private readonly StreetKitchenBalance balance;
+        private readonly IStreetKitchenStock ingredientStock;
         private readonly List<StreetFoodUnit> units = new List<StreetFoodUnit>();
         private readonly int[] tableCapacity = new int[7];
         private readonly int[] grillCapacity = new int[7];
@@ -48,9 +49,22 @@ namespace HayChoriYPaty
         public IReadOnlyList<StreetFoodUnit> Units { get { return units; } }
         public StreetKitchenBalance Balance { get { return balance; } }
         public StreetKitchenProduction(StreetKitchenBalance balance, int[] availableProducts)
+            : this(balance, availableProducts, null) { }
+
+        public StreetKitchenProduction(StreetKitchenBalance balance, int[] availableProducts,
+            IStreetKitchenStock ingredientStock)
         {
             this.balance = balance ?? new StreetKitchenBalance();
+            this.ingredientStock = ingredientStock;
             Initialize(availableProducts ?? new int[0]);
+        }
+
+        public bool HasSupply(int product)
+        {
+            if (ingredientStock == null) return true;
+            for (int i = 0; i < units.Count; i++)
+                if (units[i].Product == product && units[i].State != StreetFoodState.Burned) return true;
+            return ingredientStock.CanPrepareFood(product);
         }
 
         public int TableCount(int product)
@@ -85,6 +99,7 @@ namespace HayChoriYPaty
         {
             StreetFoodUnit unit = Find(id);
             if (unit == null || unit.Product != product || unit.Location != StreetFoodLocation.Carried || unit.WorkerId != workerId || unit.State != StreetFoodState.Cooked) return false;
+            if (ingredientStock != null && !ingredientStock.ConsumeReservedFood(id, product)) return false;
             units.Remove(unit);
             return true;
         }
@@ -99,7 +114,11 @@ namespace HayChoriYPaty
                 unit.Location = StreetFoodLocation.Table;
                 unit.Slot = FirstFreeTableSlot(unit.Product);
             }
-            else units.Remove(unit);
+            else
+            {
+                ingredientStock?.ReleaseFood(unit.Id);
+                units.Remove(unit);
+            }
         }
 
         public void Advance(float delta, float workRate, bool normalCook, bool premiumCook, bool cocaWorker, bool fernetero)
@@ -177,8 +196,23 @@ namespace HayChoriYPaty
                     if (unit.BurnedAge >= balance.discardBurnedAfterSeconds)
                     {
                         units.RemoveAt(i);
+                        ingredientStock?.ReleaseFood(unit.Id);
                         Add(unit.Product, StreetFoodState.Raw, StreetFoodLocation.Grill, unit.Slot);
                     }
+                }
+            }
+            // A failed ingredient reservation leaves the slot empty, not permanently disabled.
+            if (ingredientStock != null)
+            for (int product = 0; product < 4; product++)
+            {
+                if (!(product <= 1 ? normalCook : premiumCook)) continue;
+                for (int slot = 0; slot < grillCapacity[product]; slot++)
+                {
+                    bool occupied = false;
+                    for (int i = 0; i < units.Count; i++)
+                        if (units[i].Location == StreetFoodLocation.Grill && units[i].Product == product && units[i].Slot == slot)
+                        { occupied = true; break; }
+                    if (!occupied) Add(product, StreetFoodState.Raw, StreetFoodLocation.Grill, slot);
                 }
             }
         }
@@ -235,6 +269,7 @@ namespace HayChoriYPaty
         private void Add(int product, StreetFoodState state, StreetFoodLocation location, int slot)
         {
             if (slot < 0 && location == StreetFoodLocation.Table) return;
+            if (ingredientStock != null && !ingredientStock.TryReserveFood(nextId, product)) return;
             units.Add(new StreetFoodUnit { Id = nextId++, Product = product, State = state, Location = location, Slot = slot });
         }
     }

@@ -1,4 +1,14 @@
-# Latest Android delivery — 2026-10-13 (0.2.29/code31, Fernet tabletop stock)
+# Latest Android delivery — 2026-10-13 (0.2.30/code32, Mercado and Heladera)
+
+Unity 6000.6.3f1 Main-only Development IL2CPP/ARM64 APK built through Unity MCP: **Succeeded in 449.24s; 0 errors / 2 warnings**. Warnings were the generic uncompiled-code notice and Diagnostics Data's recommendation to use Full debug symbols. Relevant C# assemblies had been compiled after their source edits, and the APK IL2CPP metadata contains the Market/Heladera identifiers. BuildReport output size was 2,068.77 MB (not APK download size).
+
+APK `Builds/Android/Archive/HayChoriYPaty-0.2.30-code32-market-fridge.apk`: **477,497,857 bytes**; SHA-256 `b46a6b851c3d615465304a13553ba9332cf53ac60dbc1bf697d39cb97d8a370d`. Package `com.haychoriypaty.game`, version0.2.30/code32, min API26/target36, `arm64-v8a`. `aapt dump badging` confirms package/version/SDK; `unzip -t` reports no archive errors; Unity-bundled OpenJDK + `apksigner` verifies APK Signature Scheme v2 with the established Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`. Versioned alias: `Builds/Android/HayChoriYPaty-0.2.30.apk`; rolling alias: `Builds/Android/HayChoriYPaty-street.apk`.
+
+**Validation:** Focused EditMode Market/kitchen/specialty tests passed 30/30; HUD texture/popup geometry passed 4/4 (including 700, 960 and 1200 logical-pixel frames); PlayMode Market view/pointer/navigation passed 39/39; `git diff --check` passed. No phone install or device gameplay review was performed. Development/debug-signed; not Play Store release signing.
+
+---
+
+# Previous Android delivery — 2026-10-13 (0.2.29/code31, Fernet tabletop stock)
 
 Unity 6000.6.3f1 Main-only Development IL2CPP/ARM64 APK built through Unity MCP: **Succeeded in 28.10s; 0 errors / 1 warning**. BuildReport total output size was 2,068.29 MB (not APK download size).
 

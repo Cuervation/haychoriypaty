@@ -1025,7 +1025,7 @@ var sim = Make(level: 1); Start(sim); Set(sim, "Coins", 10000);
 
             object migrated = gameType.GetMethod("MigrateSaveData", BindingFlags.NonPublic | BindingFlags.Static)
                 .Invoke(null, new[] { legacy });
-            Assert.AreEqual(3, saveType.GetField("version").GetValue(migrated));
+            Assert.AreEqual(4, saveType.GetField("version").GetValue(migrated));
             Assert.AreEqual(1, saveType.GetField("staff").GetValue(migrated));
             Assert.AreEqual(0, saveType.GetField("speed").GetValue(migrated));
             Assert.AreEqual(2, saveType.GetField("unlockedLevel").GetValue(migrated));

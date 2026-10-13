@@ -92,29 +92,41 @@ namespace HayChoriYPaty
         };
         // Status is screen-edge anchored; interactive controls still use the safe-area canvas.
         private const float HudBandScale = 1.2f;
+        private const float HudStatusHeightScale = 1.2f;
         private const float HudTopPadding = 1f * HudBandScale;
-        private const float HudStateRowHeight = 24f * HudBandScale;
+        private const float HudStateRowHeight = 24f * HudBandScale * HudStatusHeightScale;
         private const float HudObjectiveGap = 2f * HudBandScale;
         private const float HudBottomPadding = 3f * HudBandScale;
-        private const float HudQuotaGridHeight = 38f * HudBandScale;
-        private const float HudStatusIconSize = 20f * HudBandScale;
-        private const float HudQuotaIconMaxSize = 18f * HudBandScale;
+        private const float HudQuotaBaseGridHeight = 38f * HudBandScale * HudStatusHeightScale;
+        private const float HudStatusIconSize = 20f * HudBandScale * HudStatusHeightScale;
+        private const float HudQuotaCardScale = 1.2f;
+        private const float HudStatusCardPadding = 8f;
+        private const float HudStatusCardSpacing = 6f;
+        private const float HudStatusTextGap = 6f * HudBandScale;
+        private const float HudCutoutClearance = 2f * HudBandScale;
         private const float HudChipInset = 2f * HudBandScale;
+        private const float HudQuotaCardInset = HudChipInset * .5f;
+        private const float HudQuotaCounterRightInset = 4f * HudBandScale;
+        private const TextAnchor HudQuotaCounterTextAlignment = TextAnchor.MiddleRight;
         private const float HudChipTextTopInset = 1f * HudBandScale;
         private const float HudChipTextHeightInset = 3f * HudBandScale;
         private const float HudChipTrackHeight = 1f * HudBandScale;
-        private const float HudCutoutClearance = 2f * HudBandScale;
+        private const int HudQuotaMaxColumns = 5;
+        // Width is already consumed by five columns; enlarge the cards vertically and trim inner padding.
+        private const float HudQuotaBaseCardHeight = (HudQuotaBaseGridHeight - HudObjectiveGap - HudChipInset) * .5f;
+        private const float HudQuotaCardHeight = HudQuotaBaseCardHeight * HudQuotaCardScale;
+        private const float HudQuotaGridHeight = HudQuotaCardHeight * 2f + HudObjectiveGap + HudQuotaCardInset;
+        private const float HudQuotaIconMaxSize = (HudQuotaBaseCardHeight - HudChipInset * 2f) * HudQuotaCardScale;
         private static readonly Rect HudBar = new Rect(0, 0, 540,
             HudTopPadding + HudStateRowHeight + HudObjectiveGap + HudQuotaGridHeight + HudBottomPadding);
-        private static readonly Rect HudCoins = new Rect(39, HudTopPadding, 135, HudStateRowHeight);
-        private static readonly Rect HudTime = new Rect(216, HudTopPadding, 135, HudStateRowHeight);
-        private static readonly Rect HudLevel = new Rect(363, HudTopPadding, 167, HudStateRowHeight);
+        private static readonly Rect HudCoins = HudStatusTextBounds(0, Rect.zero);
+        private static readonly Rect HudTime = HudStatusTextBounds(1, Rect.zero);
         private static readonly Rect HudQuotaGrid = new Rect(8,
             HudTopPadding + HudStateRowHeight + HudObjectiveGap, 524, HudQuotaGridHeight);
         // Retained name for layout tests and diagnostics; this encloses the live per-SKU chips.
         private static readonly Rect HudSales = HudQuotaGrid;
         private static readonly Rect CutoutHudGap = new Rect(232, 0, 70, 34);
-        private const int HudStatusValueFontSize = 29, HudLevelFontSize = 24, HudClockFontSize = 29;
+        private const int HudStatusValueFontSize = 35, HudClockFontSize = 35;
         private const float CustomerHiddenLegHeight = StreetSceneLayout.CustomerHiddenLegHeight;
         // Standard station dimensions come from live Floresta, not per-level fitting.
         private const string ChicagoGrillResource = "street-parrilla-large-v4";
@@ -267,13 +279,24 @@ namespace HayChoriYPaty
         private const int LevelSelectorBackAction = 8, VictoryExitAction = 9, RiotReturnAction = 15, LevelSelectFirstAction = 30;
         private const int LevelSelectorPreviousAction = 17, LevelSelectorNextAction = 18, LevelSelectorPageSize = 6;
         private const int ReadyLevelSelectorAction = 19;
+        private const int MarketBackAction = 70, MarketTabAction = 71, MarketHeladeraAction = 72;
+        private const int MarketMinusAction = 80, MarketPlusAction = 100, MarketPlusTenAction = 120;
+        private const int MarketBuyAction = 140, MarketMissingAction = 150, MarketPlayAction = 160;
+        private const int MarketRowMissingAction = 170;
+        private const int MarketCloseAction = 161, ResultLevelsAction = 163;
         private static readonly Rect ReadyLevelSelector = new Rect(161, 905, 218, 44);
         private static readonly Rect LevelSelectPrevious = new Rect(28, 666, 112, 48);
         private static readonly Rect LevelSelectNext = new Rect(400, 666, 112, 48);
         private int levelSelectPage;
+        private bool marketActive, marketFromSelector;
+        private int marketTab;
+        private readonly int[] marketPendingPacks = new int[10];
+        private float marketScroll, marketPointerDownY, marketPointerDownScroll, marketLastPurchaseTime = -10f;
+        private bool marketDragging, marketPointerHeld;
+        private string marketMessage = "";
         private static readonly Rect LevelSelectTitle = new Rect(28, 61, 484, 64);
         private static readonly Rect LevelSelectHint = new Rect(48, 718, 444, 28);
-        private static readonly Rect LevelSelectBack = new Rect(126, 770, 288, 78);
+        private static readonly Rect LevelSelectBack = new Rect(126, 854, 288, 72);
         private const string VictoryPopupResource = "street-victory-popup-wood-v1";
         private static readonly Vector2 VictoryPopupArtSize = new Vector2(1122, 1402);
         // Normalized slots in the transparent artwork; text and pointer bounds use the same frame.
@@ -308,7 +331,7 @@ namespace HayChoriYPaty
         private Texture2D fourZoneGrill, premiumGrill, beerBarrel, fernetTable, readySandwichesTable;
         private Texture2D premiumWorker, premiumDiagonal, fernetWorker, fernetWorkerLater;
         private Texture2D victoryPopup;
-        private Texture2D coverArt, titleLogo, introGlow, menuButton, hudBarTexture, cutoutHudBarTexture, riotBackdrop, riotFanAtlas, riotImpactCloud;
+        private Texture2D coverArt, titleLogo, introGlow, menuButton, hudBarTexture, cutoutHudBarTexture, hudQuotaCardTexture, hudQuotaCardOutlineTexture, riotBackdrop, riotFanAtlas, riotImpactCloud;
         private Font menuFont;
         private GUIStyle menuTitle, levelTitle;
         private bool introActive;
@@ -331,6 +354,7 @@ namespace HayChoriYPaty
         // Customer occlusion follows the baked full-screen plate after projection into the safe canvas.
         private float projectedCounterTopY = StreetSceneLayout.CounterTop(H);
         private Rect cachedHudCutoutGap = CutoutHudGap;
+        private int cachedHudBarRows = 2, cachedHudCutoutRows = 2;
         // Individually reviewed authored pixel bounds, not a geometric-grid assumption.
         private static readonly Rect[] Items = {
             new Rect(13,58,298,240), new Rect(310,48,253,250), new Rect(566,66,303,232), new Rect(856,63,334,232), new Rect(1190,63,195,236),
@@ -444,6 +468,10 @@ namespace HayChoriYPaty
             menuButton = CreateMenuButton();
             hudBarTexture = CreateHudBar();
             cutoutHudBarTexture = CreateHudBarTexture(true);
+            cachedHudBarRows = cachedHudCutoutRows = 2;
+            cachedHudCutoutGap = CutoutHudGap;
+            hudQuotaCardTexture = CreateHudQuotaCardTexture(false);
+            hudQuotaCardOutlineTexture = CreateHudQuotaCardTexture(true);
             menuFont = Resources.Load<Font>("Menu/LuckiestGuy-Regular");
             premiumGrill = Resources.Load<Texture2D>("street-grill-premium-v1");
             premiumWorker = StreetWorkerAppearance.CreateVariant(parrillero, StreetWorkerRole.ParrilleroPremium, ParrilleroPoses, new Vector2(1315,1197));
@@ -469,6 +497,10 @@ namespace HayChoriYPaty
             hudBarTexture = null;
             if (cutoutHudBarTexture != null) Destroy(cutoutHudBarTexture);
             cutoutHudBarTexture = null;
+            if (hudQuotaCardTexture != null) Destroy(hudQuotaCardTexture);
+            hudQuotaCardTexture = null;
+            if (hudQuotaCardOutlineTexture != null) Destroy(hudQuotaCardOutlineTexture);
+            hudQuotaCardOutlineTexture = null;
             if (clubPennantTexture != null) Destroy(clubPennantTexture);
             clubPennantTexture = null;
             clubPennantThemeName = null;
@@ -543,6 +575,24 @@ namespace HayChoriYPaty
             logicalCanvasHeight = CanvasLogicalHeight(v);
             layoutVerticalScale = logicalCanvasHeight / H;
             Vector2 p = ScreenToLayoutPoint(pixel, new Vector2(Screen.width, Screen.height), v);
+            if (marketActive)
+            {
+                p.y *= layoutVerticalScale; // Market geometry uses the full logical safe-area height.
+                if (down) { marketPointerHeld=true; marketPointerDownY = p.y; marketPointerDownScroll = marketScroll; marketDragging = false; pressedAction = HitMarketAction(p); }
+                if (!down && !up && marketPointerHeld)
+                {
+                    float delta = marketPointerDownY - p.y;
+                    if (Mathf.Abs(delta) > 8f) { marketDragging = true; pressedAction = 0; }
+                    if (marketDragging) marketScroll = Mathf.Clamp(marketPointerDownScroll + delta, 0, MarketMaxScroll());
+                }
+                if (up)
+                {
+                    int hit = HitMarketAction(p);
+                    if (!marketDragging && pressedAction != 0 && pressedAction == hit) DispatchAction(pressedAction);
+                    pressedAction = 0; marketDragging = false; marketPointerHeld=false;
+                }
+                return;
+            }
             if (down) pressedAction = HitAction(p);
             if (!up) return;
             if (pressedAction != 0 && pressedAction == HitAction(p)) DispatchAction(pressedAction);
@@ -550,11 +600,13 @@ namespace HayChoriYPaty
         }
         private int HitAction(Vector2 p)
         {
+            if (marketActive) { p.y *= layoutVerticalScale; return HitMarketAction(p); }
             if (introActive)
                 return !MenuAvailable ? 0 : PointerHitBounds(MenuPlay).Contains(p) ? MenuPlayAction
                     : PointerHitBounds(MenuQuit).Contains(p) ? MenuQuitAction : 0;
             if (levelSelectActive)
             {
+                if (PointerHitBounds(MarketSelectorBounds()).Contains(p)) return MarketCloseAction;
                 if (PointerHitBounds(LevelSelectBack).Contains(p)) return LevelSelectorBackAction;
                 if (levelSelectPage > 0 && PointerHitBounds(LevelSelectPrevious).Contains(p)) return LevelSelectorPreviousAction;
                 if ((levelSelectPage + 1) * LevelSelectorPageSize < StreetSimulation.LevelNames.Length
@@ -578,9 +630,12 @@ namespace HayChoriYPaty
                 return 0;
             }
             if (game.Sim.Phase == RoundPhase.Lost)
-                return RiotResultButtonBounds().Contains(new Vector2(p.x, p.y * layoutVerticalScale)) ? RiotReturnAction : 0;
-            return game.Sim.Phase == RoundPhase.Won &&
-                VictoryExitBounds().Contains(new Vector2(p.x, p.y * layoutVerticalScale)) ? VictoryExitAction : 0;
+                return RiotResultButtonBounds().Contains(new Vector2(p.x, p.y * layoutVerticalScale)) ? RiotReturnAction
+                    : ResultLevelsBounds().Contains(new Vector2(p.x, p.y * layoutVerticalScale)) ? ResultLevelsAction : 0;
+            return game.Sim.Phase == RoundPhase.Won
+                ? (game.Sim.LevelIndex < StreetSimulation.LevelNames.Length - 1 && VictoryExitBounds().Contains(new Vector2(p.x, p.y * layoutVerticalScale)) ? VictoryExitAction
+                    : ResultLevelsBounds().Contains(new Vector2(p.x, p.y * layoutVerticalScale)) ? ResultLevelsAction : 0)
+                : 0;
         }
         private void DispatchAction(int a)
         {
@@ -600,6 +655,7 @@ namespace HayChoriYPaty
             }
             if (levelSelectActive)
             {
+                if (a == MarketCloseAction) { levelSelectActive=false; marketActive=true; marketFromSelector=true; marketTab=1; marketMessage=""; return; }
                 if (a == LevelSelectorPreviousAction || a == LevelSelectorNextAction)
                 {
                     levelSelectPage = Mathf.Clamp(levelSelectPage + (a == LevelSelectorNextAction ? 1 : -1),
@@ -621,12 +677,49 @@ namespace HayChoriYPaty
                     if (selectionSucceeded)
                     {
                         levelSelectActive = false;
-                        game.StartRound();
+                        if (level == 0)
+                        {
+                            if (game.CanStartRound) { marketMessage=""; game.TryStartRound(); }
+                            else { marketMessage="Falta stock para iniciar. Revisá Mercado / Heladera."; levelSelectActive=true; }
+                        }
+                        else { marketFromSelector = true; marketActive = true; marketTab = 0; marketMessage = ""; }
                     }
                     lastAction = a; feedbackUntil = Time.unscaledTime + 0.22f; feedbackScale = selectionSucceeded ? 1.04f : 0.97f;
                     return;
                 }
                 return;
+            }
+            if (marketActive)
+            {
+                if (a == MarketBackAction) { marketActive=false; marketMessage=game.CanStartRound?"Stock suficiente para jugar.":"Falta stock para iniciar. Revisá Mercado / Heladera."; if(marketFromSelector)levelSelectActive=true; return; }
+                if (a == MarketTabAction) { if(game.UnlockedLevel>0){marketTab=0; marketScroll=0;} return; }
+                if (a == MarketHeladeraAction) { marketTab=1; marketScroll=0; return; }
+                if (a >= MarketMinusAction && a < MarketMinusAction+10) { int id=a-MarketMinusAction; marketPendingPacks[id]=Mathf.Max(0,marketPendingPacks[id]-1); return; }
+                if (a >= MarketPlusAction && a < MarketPlusAction+10) { int id=a-MarketPlusAction; marketPendingPacks[id]=Mathf.Min(99,marketPendingPacks[id]+1); return; }
+                if (a >= MarketPlusTenAction && a < MarketPlusTenAction+10) { int id=a-MarketPlusTenAction; marketPendingPacks[id]=Mathf.Min(99,marketPendingPacks[id]+10); return; }
+                if (a >= MarketBuyAction && a < MarketBuyAction+10)
+                {
+                    int id=a-MarketBuyAction;
+                    if(Time.unscaledTime-marketLastPurchaseTime<.25f)return;
+                    marketLastPurchaseTime=Time.unscaledTime;
+                    int packs=marketPendingPacks[id];bool success=packs>0&&game.TryBuyIngredient(id,packs,false,game.Market.NextPurchaseId);
+                    marketMessage=success?"Compra realizada":"No se pudo realizar la compra";if(success)marketPendingPacks[id]=0;return;
+                }
+                if(a>=MarketRowMissingAction&&a<MarketRowMissingAction+10)
+                {
+                    int id=a-MarketRowMissingAction;
+                    if(Time.unscaledTime-marketLastPurchaseTime<.25f)return;
+                    marketLastPurchaseTime=Time.unscaledTime;
+                    marketMessage=game.BuyMissingIngredient(id)?"Compra mínima financiada":"No hay faltante o no se pudo comprar";return;
+                }
+                if(a==MarketMissingAction)
+                {
+                    if(Time.unscaledTime-marketLastPurchaseTime<.25f)return;
+                    marketLastPurchaseTime=Time.unscaledTime;bool bought=false;
+                    for(int id=0;id<StreetIngredientCatalog.Names.Length;id++)if(game.Market.MissingPacks(game.Sim,id)>0)bought|=game.BuyMissingIngredient(id);
+                    marketMessage=bought?"Compras mínimas realizadas":"No hace falta financiar o faltan fondos";return;
+                }
+                if(a==MarketPlayAction){marketMessage=game.TryStartRound()?"":"Falta stock para iniciar";if(game.Sim.Phase==RoundPhase.Playing)marketActive=false;return;}
             }
             bool ok = true;
             if (a == ReadyLevelSelectorAction && game.Sim.Phase == RoundPhase.Ready)
@@ -635,17 +728,24 @@ namespace HayChoriYPaty
                 levelSelectPage = game.Sim.LevelIndex / LevelSelectorPageSize;
                 return;
             }
-            if (a==1) game.StartRound(); else if (a==2) ok=game.TryHireParrillero(); else if (a==3) ok=game.TryUpgradeSpeed(); else if (a==HireCocacoleroAction || a==HirePremiumAction || a==HireFerneteroAction) ok=game.TryHire(RoleForAction(a));
-            else if (a==4) ok=game.Retry(); else if (a==5) ok=game.NextLevel(); else if (a>=10&&a<15) {ok=game.SelectLevel(a-10);if(ok)game.StartRound();}
+            if (a==1) game.TryStartRound(); else if (a==2) ok=game.TryHireParrillero(); else if (a==3) ok=game.TryUpgradeSpeed(); else if (a==HireCocacoleroAction || a==HirePremiumAction || a==HireFerneteroAction) ok=game.TryHire(RoleForAction(a));
             else if (a == RiotReturnAction && game.Sim.Phase == RoundPhase.Lost)
             {
-                ok = game.Retry();
+                ok = game.ReturnToLevels();
                 if (ok) { levelSelectActive = true; levelSelectPage = game.Sim.LevelIndex / LevelSelectorPageSize; }
             }
             else if (a == VictoryExitAction && game.Sim.Phase == RoundPhase.Won)
             {
-                ok = game.Retry();
-                if (ok) { levelSelectActive = true; levelSelectPage = game.Sim.LevelIndex / LevelSelectorPageSize; }
+                if (game.Sim.LevelIndex < StreetSimulation.LevelNames.Length - 1)
+                {
+                    ok=game.NextLevel();
+                    if(ok){marketActive=true;marketFromSelector=true;marketTab=0;marketMessage="";}
+                }
+                else ok=false;
+            }
+            else if (a == ResultLevelsAction && (game.Sim.Phase == RoundPhase.Won || game.Sim.Phase == RoundPhase.Lost))
+            {
+                ok=game.ReturnToLevels(); if(ok){marketActive=false;levelSelectActive=true;levelSelectPage=game.Sim.LevelIndex/LevelSelectorPageSize;}
             }
             lastAction=a; feedbackUntil=Time.unscaledTime+0.22f; feedbackScale=ok?1.04f:0.97f;
         }
@@ -693,6 +793,15 @@ namespace HayChoriYPaty
                 DrawLevelSelector();
                 GUI.color=old; GUI.matrix=m;
                 return; // Keep the locked/unlocked selector as the only interactive layer.
+            }
+            if (marketActive)
+            {
+                float marketScale = layoutVerticalScale;
+                layoutVerticalScale = 1f;
+                DrawMarketScreen();
+                layoutVerticalScale = marketScale;
+                GUI.color=old; GUI.matrix=m;
+                return;
             }
             if (sim.Phase == RoundPhase.Lost)
             {
@@ -988,6 +1097,7 @@ namespace HayChoriYPaty
             bounds.y = Mathf.Min(bounds.y, logicalCanvasHeight - bounds.height - 12f);
             return bounds;
         }
+        private Rect ResultLevelsBounds() => new Rect(150, logicalCanvasHeight - 72f, 240, 52);
 
         private static Rect RiotGameOverBounds(float canvasHeight)
         {
@@ -1004,7 +1114,7 @@ namespace HayChoriYPaty
                 Rect titleBounds = RiotGameOverBounds(logicalCanvasHeight);
                 DrawRiotWaitMessage(new Rect(22f, titleBounds.y - 66f, W - 44f, 56f));
                 DrawAnimatedGameOver(titleBounds, Mathf.Max(0f, Time.unscaledTime - riotStartedAt));
-                DrawStandardButton(RiotResultButtonBounds(), RiotReturnAction, "VOLVER");
+                DrawStandardButton(RiotResultButtonBounds(), RiotReturnAction, "VOLVER A NIVELES");
             }
             finally { layoutVerticalScale = previousVertical; }
         }
@@ -1209,8 +1319,7 @@ namespace HayChoriYPaty
         private void DrawLevelBadge(int levelIndex, Rect bounds)
         {
             if (VisualLevelIndex == RiverVisualLevelIndex) levelIndex = RiverVisualLevelIndex;
-            string caption = (levelIndex == RiverVisualLevelIndex ? "River Plate / Núñez"
-                : StreetSimulation.LevelNames[levelIndex]).ToUpperInvariant();
+            string caption = StreetSimulation.LevelDisplayNames[levelIndex].ToUpperInvariant();
             Texture2D crest = levelIndex == 0 ? allBoysCrest : levelIndex == 1 ? chicagoCrest : levelIndex == 2 ? velezCrest : null;
             bool showCrest = crest != null;
             int originalSize = levelTitle.fontSize;
@@ -1262,12 +1371,22 @@ namespace HayChoriYPaty
             return xMax > xMin ? new Rect(xMin, 0f, xMax - xMin, CutoutHudGap.height) : Rect.zero;
         }
 
-        private void EnsureCutoutHudTexture(Rect gap)
+        private void EnsureHudBarTexture(Rect gap, int productCount)
         {
-            if (gap.width <= 0f || gap.height <= 0f || cachedHudCutoutGap == gap) return;
+            int rows = HudQuotaRowCount(productCount);
+            if (gap.width <= 0f || gap.height <= 0f)
+            {
+                if (cachedHudBarRows == rows && hudBarTexture != null) return;
+                if (hudBarTexture != null) Destroy(hudBarTexture);
+                hudBarTexture = CreateHudBarTexture(Rect.zero, false, productCount);
+                cachedHudBarRows = rows;
+                return;
+            }
+            if (cachedHudCutoutGap == gap && cachedHudCutoutRows == rows && cutoutHudBarTexture != null) return;
             if (cutoutHudBarTexture != null) Destroy(cutoutHudBarTexture);
-            cutoutHudBarTexture = CreateHudBarTexture(gap, false);
+            cutoutHudBarTexture = CreateHudBarTexture(gap, false, productCount);
             cachedHudCutoutGap = gap;
+            cachedHudCutoutRows = rows;
         }
 
         private void DrawCounters(StreetSimulation sim)
@@ -1281,18 +1400,21 @@ namespace HayChoriYPaty
                 layoutVerticalScale = 1f;
                 Vector2 screenSize = new Vector2(Screen.width, Screen.height);
                 Rect cutoutGap = TopHudCutoutBounds(screenSize, Screen.cutouts);
-                EnsureCutoutHudTexture(cutoutGap);
+                EnsureHudBarTexture(cutoutGap, sim.ProductCount);
                 GUI.matrix = Matrix4x4.Scale(new Vector3(Screen.width / W, Screen.width / W, 1f));
                 GUI.color = Color.white;
                 Texture2D bar = cutoutGap.width > 0f ? cutoutHudBarTexture : hudBarTexture;
-                Rect barBounds = new Rect(0f, 0f, W, HudBarHeightFor(cutoutGap));
+                Rect barBounds = new Rect(0f, 0f, W, HudBarHeightFor(cutoutGap, sim.ProductCount));
                 if (bar != null) GUI.DrawTexture(barBounds, bar, ScaleMode.StretchToFill, true);
                 Rect coinCell = HudStatusCellBounds(0, cutoutGap);
-                float coinIcon = HudStatusIconSize;
-                DrawHudIcon(new Rect(coinCell.x + 8f, coinCell.center.y - coinIcon * .5f, coinIcon, coinIcon), 10);
-                DrawHudNumber(HudStatusTextBounds(0, cutoutGap), sim.Coins.ToString(), HudStatusValueFontSize);
-                DrawHudNumber(HudStatusTextBounds(1, cutoutGap), FormatRemainingTime(sim.TimeRemaining), HudClockFontSize);
-                DrawHudNumber(HudStatusTextBounds(2, cutoutGap), "NIVEL " + (sim.LevelIndex + 1), HudLevelFontSize);
+                float statusScale = HudStatusScale(cutoutGap);
+                float coinIcon = Mathf.Min(HudStatusIconSize * statusScale, coinCell.height - HudChipInset * 2f);
+                float coinInset = HudStatusCardPadding * statusScale;
+                DrawHudIcon(new Rect(coinCell.x + coinInset, coinCell.center.y - coinIcon * .5f, coinIcon, coinIcon), 10);
+                DrawHudNumber(HudStatusTextBounds(0, cutoutGap), sim.Coins.ToString(),
+                    Mathf.RoundToInt(HudStatusValueFontSize * statusScale));
+                DrawHudNumber(HudStatusTextBounds(1, cutoutGap), FormatRemainingTime(sim.TimeRemaining),
+                    Mathf.RoundToInt(HudClockFontSize * statusScale));
                 for (int slot = 0; slot < sim.ProductCount; slot++)
                     DrawQuotaChip(sim, slot, HudQuotaCellBounds(slot, sim.ProductCount, cutoutGap));
             }
@@ -1301,39 +1423,67 @@ namespace HayChoriYPaty
 
         private static Rect HudStatusCellBounds(int slot, Rect cutoutGap)
         {
-            const float padding = 8f, spacing = 6f;
-            float width = (W - padding * 2f - spacing * 2f) / 3f;
-            float x = padding + slot * (width + spacing);
+            if (slot < 0 || slot > 1) return Rect.zero;
+            float width = (W - HudStatusCardPadding * 2f - HudStatusCardSpacing) * .5f;
+            float x = slot == 0 ? HudStatusCardPadding : W - HudStatusCardPadding - width;
             float y = HudTopPadding;
-            Rect statusBand = new Rect(x, 0f, width, HudStateRowHeight);
-            if (cutoutGap.width > 0f && statusBand.Overlaps(cutoutGap))
-                y = cutoutGap.yMax + HudCutoutClearance;
+            if (cutoutGap.width > 0f)
+            {
+                float leftWidth = cutoutGap.xMin - HudStatusCardPadding - HudCutoutClearance;
+                float rightWidth = W - HudStatusCardPadding - cutoutGap.xMax - HudCutoutClearance;
+                float safeWidth = Mathf.Min(width, Mathf.Min(leftWidth, rightWidth));
+                // Small centered camera channels shrink both cards equally. For an unusually
+                // large/off-center island, preserve readable cards by placing the row below it.
+                if (safeWidth >= width * .55f)
+                    width = Mathf.Max(0f, safeWidth);
+                else
+                    y = cutoutGap.yMax + HudCutoutClearance;
+                x = slot == 0 ? HudStatusCardPadding : W - HudStatusCardPadding - width;
+            }
             return new Rect(x, y, width, HudStateRowHeight);
+        }
+
+        private static float HudStatusScale(Rect cutoutGap)
+        {
+            float defaultWidth = HudStatusCellBounds(0, Rect.zero).width;
+            if (defaultWidth <= 0f) return 1f;
+            return Mathf.Clamp01(HudStatusCellBounds(0, cutoutGap).width / defaultWidth);
         }
 
         private static Rect HudStatusTextBounds(int slot, Rect cutoutGap)
         {
-            Rect bounds = slot == 0 ? HudCoins : slot == 1 ? HudTime : HudLevel;
+            if (slot < 0 || slot > 1) return Rect.zero;
             Rect cell = HudStatusCellBounds(slot, cutoutGap);
-            return new Rect(bounds.x, cell.y, bounds.width, HudStateRowHeight);
+            float scale = HudStatusScale(cutoutGap);
+            float iconSize = Mathf.Min(HudStatusIconSize * scale, cell.height - HudChipInset * 2f);
+            float inset = HudStatusCardPadding * scale;
+            float contentX = cell.x + inset + iconSize + HudStatusTextGap * scale;
+            float contentRight = cell.xMax - inset;
+            return new Rect(contentX, cell.y, Mathf.Max(0f, contentRight - contentX), cell.height);
         }
 
-        private static Rect HudQuotaGridBounds(Rect cutoutGap)
+        private static Rect HudQuotaGridBounds(Rect cutoutGap) => HudQuotaGridBounds(cutoutGap, 7);
+
+        private static Rect HudQuotaGridBounds(Rect cutoutGap, int productCount)
         {
-            float statusBottom = Mathf.Max(
-                HudStatusCellBounds(0, cutoutGap).yMax,
-                Mathf.Max(HudStatusCellBounds(1, cutoutGap).yMax, HudStatusCellBounds(2, cutoutGap).yMax));
-            return new Rect(HudQuotaGrid.x, statusBottom + HudObjectiveGap, HudQuotaGrid.width, HudQuotaGrid.height);
+            float statusBottom = Mathf.Max(HudStatusCellBounds(0, cutoutGap).yMax,
+                HudStatusCellBounds(1, cutoutGap).yMax);
+            int rows = HudQuotaRowCount(productCount);
+            float height = rows <= 0 ? 0f
+                : rows * HudQuotaCardHeight + Mathf.Max(0, rows - 1) * HudObjectiveGap + HudQuotaCardInset;
+            return new Rect(HudQuotaGrid.x, statusBottom + HudObjectiveGap, HudQuotaGrid.width, height);
         }
 
-        private static float HudBarHeightFor(Rect cutoutGap) =>
-            Mathf.Max(HudBar.height, HudQuotaGridBounds(cutoutGap).yMax + HudBottomPadding);
+        private static float HudBarHeightFor(Rect cutoutGap) => HudBarHeightFor(cutoutGap, 7);
 
-        private static int HudQuotaColumnCount(int productCount) => productCount <= 4
-            ? Mathf.Max(1, productCount) : Mathf.CeilToInt(productCount / 2f);
+        private static float HudBarHeightFor(Rect cutoutGap, int productCount) =>
+            HudQuotaGridBounds(cutoutGap, productCount).yMax + HudBottomPadding;
+
+        private static int HudQuotaColumnCount(int productCount) =>
+            productCount <= 0 ? 0 : Mathf.Min(HudQuotaMaxColumns, productCount);
 
         private static int HudQuotaRowCount(int productCount) =>
-            productCount <= 0 ? 0 : Mathf.CeilToInt(productCount / (float)HudQuotaColumnCount(productCount));
+            productCount <= 0 ? 0 : Mathf.CeilToInt(productCount / (float)HudQuotaMaxColumns);
 
         private static Rect HudQuotaCellBounds(int slot) => HudQuotaCellBounds(slot, 7, Rect.zero);
 
@@ -1343,23 +1493,24 @@ namespace HayChoriYPaty
         {
             if (slot < 0 || slot >= productCount || productCount <= 0) return Rect.zero;
             const float spacing = HudObjectiveGap;
-            Rect area = HudQuotaGridBounds(cutoutGap);
+            Rect area = HudQuotaGridBounds(cutoutGap, productCount);
             int columns = HudQuotaColumnCount(productCount);
             int rows = HudQuotaRowCount(productCount);
             int row = slot / columns;
             int column = slot % columns;
             int itemsInRow = Mathf.Min(columns, productCount - row * columns);
-            float width = Mathf.Min(170f, (area.width - spacing * (columns - 1) - HudChipInset) / columns);
-            float height = rows == 1 ? Mathf.Min(31f * HudBandScale, area.height - HudChipInset)
-                : (area.height - spacing * (rows - 1) - HudChipInset) / rows;
+            float width = Mathf.Min(170f,
+                (area.width - spacing * (HudQuotaMaxColumns - 1) - HudQuotaCardInset) / HudQuotaMaxColumns);
+            float height = HudQuotaCardHeight;
             float rowWidth = itemsInRow * width + (itemsInRow - 1) * spacing;
             float x = area.center.x - rowWidth * .5f + column * (width + spacing);
-            float y = area.y + row * (height + spacing) + (rows == 1 ? (area.height - height) * .5f : 0f);
+            float totalRowsHeight = rows * height + (rows - 1) * spacing;
+            float y = area.y + (area.height - totalRowsHeight) * .5f + row * (height + spacing);
             return new Rect(x, y, width, height);
         }
 
         private static Color HudQuotaCardColor(bool complete) =>
-            complete ? new Color(.20f, .48f, .24f, .46f) : new Color(.04f, .34f, .50f, .44f);
+            complete ? new Color(.11f, .31f, .12f, .9f) : new Color(.06f, .08f, .10f, .9f);
 
         private void DrawQuotaChip(StreetSimulation sim, int slot, Rect bounds)
         {
@@ -1368,20 +1519,37 @@ namespace HayChoriYPaty
             int goal = sim.GetProductGoal(product);
             int delivered = sim.GetProductDelivered(product);
             bool complete = sim.IsProductGoalComplete(product);
-            FillRect(bounds, HudQuotaCardColor(complete));
-            float iconSize = Mathf.Min(HudQuotaIconMaxSize, bounds.height - HudChipInset * 2f);
-            Rect icon = new Rect(bounds.x + HudChipInset, bounds.center.y - iconSize * .5f, iconSize, iconSize);
+            Color previous = GUI.color;
+            if (hudQuotaCardTexture != null)
+            {
+                GUI.color = HudQuotaCardColor(complete);
+                GUI.DrawTexture(bounds, hudQuotaCardTexture, ScaleMode.StretchToFill, true);
+                if (hudQuotaCardOutlineTexture != null)
+                {
+                    GUI.color = new Color(.9f, .97f, 1f, .62f);
+                    GUI.DrawTexture(bounds, hudQuotaCardOutlineTexture, ScaleMode.StretchToFill, true);
+                }
+            }
+            else FillRect(bounds, HudQuotaCardColor(complete));
+            GUI.color = previous;
+            float iconSize = Mathf.Min(HudQuotaIconMaxSize, bounds.height - HudQuotaCardInset * 2f);
+            Rect icon = new Rect(bounds.x + HudQuotaCardInset, bounds.center.y - iconSize * .5f, iconSize, iconSize);
             DrawHudIcon(icon, product);
-            Rect counter = new Rect(icon.xMax + HudChipInset, bounds.y + HudChipTextTopInset,
-                Mathf.Max(0f, bounds.xMax - icon.xMax - HudChipInset * 2.5f),
-                Mathf.Max(0f, bounds.height - HudChipTextHeightInset));
-            int fontSize = Mathf.Clamp(Mathf.FloorToInt(bounds.height * .78f), 12, 24);
-            DrawHudNumber(counter, delivered + "/" + goal, fontSize);
-            Rect track = new Rect(bounds.x + HudChipInset, bounds.yMax - HudChipInset,
-                bounds.width - HudChipInset * 2f, HudChipTrackHeight);
+            Rect counter = HudQuotaCounterBounds(bounds, icon);
+            int fontSize = Mathf.Clamp(Mathf.FloorToInt(bounds.height * .78f), 12, 30);
+            DrawHudNumber(counter, delivered + "/" + goal, fontSize, HudQuotaCounterTextAlignment);
+            Rect track = new Rect(bounds.x + HudQuotaCardInset, bounds.yMax - HudQuotaCardInset,
+                bounds.width - HudQuotaCardInset * 2f, HudChipTrackHeight);
             FillRect(track, new Color(.09f, .06f, .035f, .85f));
             FillRect(new Rect(track.x, track.y, track.width * Mathf.Clamp01(delivered / (float)Mathf.Max(1, goal)), track.height),
                 complete ? new Color(.46f, .95f, .28f) : new Color(1f, .75f, .25f));
+        }
+        private static Rect HudQuotaCounterBounds(Rect card, Rect icon)
+        {
+            float x = icon.xMax + HudQuotaCardInset;
+            return new Rect(x, card.y + HudChipTextTopInset,
+                Mathf.Max(0f, card.xMax - HudQuotaCounterRightInset - x),
+                Mathf.Max(0f, card.height - HudChipTextHeightInset));
         }
         private void DrawHudIcon(Rect slot, int itemId)
         {
@@ -1402,9 +1570,13 @@ namespace HayChoriYPaty
             int seconds = Mathf.Max(0, Mathf.CeilToInt(remaining));
             return (seconds / 60) + ":" + (seconds % 60).ToString("00");
         }
-        private void DrawHudNumber(Rect bounds, string value, int preferredFontSize = 40)
+        private void DrawHudNumber(Rect bounds, string value, int preferredFontSize = 40,
+            TextAnchor alignment = TextAnchor.MiddleCenter)
         {
             int originalSize = hudNumber.fontSize;
+            TextAnchor originalAlignment = hudNumber.alignment;
+            Color originalTextColor = hudNumber.normal.textColor;
+            hudNumber.alignment = alignment;
             int baseFontSize = Mathf.Max(12, preferredFontSize);
             hudNumber.fontSize = baseFontSize;
             Vector2 needed = hudNumber.CalcSize(new GUIContent(value));
@@ -1421,16 +1593,21 @@ namespace HayChoriYPaty
             hudNumber.normal.textColor = Color.white;
             Label(bounds, value, hudNumber);
             hudNumber.fontSize = originalSize;
+            hudNumber.alignment = originalAlignment;
+            hudNumber.normal.textColor = originalTextColor;
         }
         private static Texture2D CreateHudBar() => CreateHudBarTexture(false);
         private static Texture2D CreateHudBarTexture(bool cutout)
             => CreateHudBarTexture(cutout ? CutoutHudGap : Rect.zero, false);
 
-        private static Texture2D CreateHudBarTexture(Rect reservedHudGap, bool keepReadable)
+        private static Texture2D CreateHudBarTexture(Rect reservedHudGap, bool keepReadable) =>
+            CreateHudBarTexture(reservedHudGap, keepReadable, 7);
+
+        private static Texture2D CreateHudBarTexture(Rect reservedHudGap, bool keepReadable, int productCount)
         {
             // Original code-authored artwork: no reference pixels or baked-in live numbers.
             const int width = 1080;
-            int height = Mathf.CeilToInt(HudBarHeightFor(reservedHudGap) * 2f);
+            int height = Mathf.CeilToInt(HudBarHeightFor(reservedHudGap, productCount) * 2f);
             float logicalHeight = height * .5f;
             var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
             {
@@ -1445,11 +1622,10 @@ namespace HayChoriYPaty
             var face = new Rect(2, 2, W - 4f, logicalHeight - 4f);
             Rect[] stateCells = {
                 HudStatusCellBounds(0, reservedHudGap),
-                HudStatusCellBounds(1, reservedHudGap),
-                HudStatusCellBounds(2, reservedHudGap)
+                HudStatusCellBounds(1, reservedHudGap)
             };
-            Color[] capsuleTops = { new Color(.96f, .66f, .20f), new Color(.26f, .73f, .79f), new Color(.60f, .86f, .17f) };
-            Color[] capsuleBottoms = { new Color(.62f, .27f, .07f), new Color(.04f, .35f, .46f), new Color(.20f, .48f, .04f) };
+            Color[] capsuleTops = { new Color(.96f, .66f, .20f), new Color(.26f, .73f, .79f) };
+            Color[] capsuleBottoms = { new Color(.62f, .27f, .07f), new Color(.04f, .35f, .46f) };
             Rect clockCell = stateCells[1];
             for (int y = 0; y < height; y++)
             for (int x = 0; x < width; x++)
@@ -1462,7 +1638,7 @@ namespace HayChoriYPaty
                 for (int i = 0; i < stateCells.Length; i++)
                     color = HudCapsule(color, px, py, stateCells[i], capsuleTops[i], capsuleBottoms[i]);
                 // Reuse the original vector clock motif in the centered time capsule.
-                float clockScale = Mathf.Min(1f, clockCell.height / 28f);
+                float clockScale = Mathf.Min(1f, clockCell.height / 28f, HudStatusScale(reservedHudGap));
                 float dx = (px - (clockCell.x + 17f)) / clockScale;
                 float dy = (py - clockCell.center.y) / clockScale;
                 float radius = new Vector2(dx, dy).magnitude;
@@ -1478,6 +1654,33 @@ namespace HayChoriYPaty
             texture.Apply(false, !keepReadable);
             return texture;
         }
+        private static Texture2D CreateHudQuotaCardTexture(bool outline)
+        {
+            const int width = 192, height = 64;
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+            {
+                name = outline ? "Translucent objective card rim" : "Translucent objective card face",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            var pixels = new Color[width * height];
+            Rect outer = new Rect(1f, 1f, width - 2f, height - 2f);
+            Rect inner = new Rect(3f, 3f, width - 6f, height - 6f);
+            for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
+            {
+                float px = x + .5f, py = height - y - .5f;
+                float outerCoverage = RoundedCoverage(px, py, outer, 12f);
+                float innerCoverage = RoundedCoverage(px, py, inner, 9f);
+                float coverage = outline ? Mathf.Max(0f, outerCoverage - innerCoverage) : outerCoverage;
+                pixels[y * width + x] = new Color(1f, 1f, 1f, coverage * (outline ? .82f : .90f));
+            }
+            texture.SetPixels(pixels);
+            texture.Apply(false, true);
+            return texture;
+        }
+
         private static Color HudCapsule(Color below, float x, float y, Rect bounds, Color top, Color bottom)
         {
             float radius = Mathf.Min(15f, bounds.height * .5f);
@@ -1581,9 +1784,148 @@ namespace HayChoriYPaty
             DrawStandardButton(LevelSelectPrevious, LevelSelectorPreviousAction, "ATRÁS", levelSelectPage > 0);
             DrawStandardButton(LevelSelectNext, LevelSelectorNextAction, "MÁS", (levelSelectPage + 1) * LevelSelectorPageSize < StreetSimulation.LevelNames.Length);
             Label(new Rect(148, 675, 244, 30), "CANCHAS " + (levelSelectPage + 1) + " / " + ((StreetSimulation.LevelNames.Length + LevelSelectorPageSize - 1) / LevelSelectorPageSize), small);
-            Label(LevelSelectHint, "Superá cada cancha para desbloquear la siguiente", small);
+            Label(LevelSelectHint, string.IsNullOrEmpty(marketMessage) ? "Superá cada cancha para desbloquear la siguiente" : marketMessage, small);
             DrawStandardButton(LevelSelectBack, LevelSelectorBackAction, "VOLVER");
+            DrawStandardButton(MarketSelectorBounds(), MarketCloseAction, "MERCADO / HELADERA");
         }
+
+        private static Rect MarketBackBounds() => new Rect(20, 30, 150, 54);
+        private static Rect MarketSelectorBounds() => new Rect(115, 766, 310, 64);
+        private Rect MarketBodyBounds() => new Rect(22, 298, W - 44, Mathf.Max(145, logicalCanvasHeight - 508));
+        private int[] MarketVisibleIngredients()
+        {
+            if(marketTab==1){var all=new int[StreetIngredientCatalog.Names.Length];for(int i=0;i<all.Length;i++)all[i]=i;return all;}
+            var visible=new System.Collections.Generic.List<int>();
+            for(int i=0;i<StreetIngredientCatalog.Names.Length;i++)if(game.Market.IsIngredientUnlocked(i,game.UnlockedLevel))visible.Add(i);
+            return visible.ToArray();
+        }
+        private float MarketMaxScroll() => Mathf.Max(0, MarketVisibleIngredients().Length * 145f - MarketBodyBounds().height);
+        private Rect MarketRowBounds(int slot)
+        {
+            Rect body=MarketBodyBounds();return new Rect(body.x,body.y+slot*145f-marketScroll,body.width,145f);
+        }
+        private int HitMarketAction(Vector2 p)
+        {
+            if (MarketBackBounds().Contains(p)) return MarketBackAction;
+            if (game.UnlockedLevel > 0 && new Rect(24, 92, 238, 54).Contains(p)) return MarketTabAction;
+            if (new Rect(278, 92, 238, 54).Contains(p)) return MarketHeladeraAction;
+            Rect body=MarketBodyBounds();
+            if (!body.Contains(p))
+            {
+                if (MarketBottomBounds().Contains(p)) return MarketBackAction;
+                if (MarketFinanceBounds().Contains(p)) return MarketMissingAction;
+                if (MarketPlayBounds().Contains(p)) return MarketPlayAction;
+                return 0;
+            }
+            int[] visible=MarketVisibleIngredients();
+            for(int slot=0;slot<visible.Length;slot++)
+            {
+                int id=visible[slot];Rect row=MarketRowBounds(slot);
+                if(row.y<body.y||row.yMax>body.yMax||!row.Contains(p))continue;
+                if(marketTab==1) return 0;
+                if(new Rect(row.x+2,row.y+97,42,44).Contains(p))return MarketMinusAction+id;
+                if(new Rect(row.x+92,row.y+97,42,44).Contains(p))return MarketPlusAction+id;
+                if(new Rect(row.x+137,row.y+97,60,44).Contains(p))return MarketPlusTenAction+id;
+                if(new Rect(row.x+200,row.y+97,136,44).Contains(p))return MarketBuyAction+id;
+                if(new Rect(row.x+339,row.y+97,156,44).Contains(p))return MarketRowMissingAction+id;
+            }
+            return 0;
+        }
+        private Rect MarketBottomBounds() => new Rect(22, logicalCanvasHeight-154, 150, 50);
+        private Rect MarketFinanceBounds() => new Rect(180, logicalCanvasHeight-154, W-202, 50);
+        private Rect MarketPlayBounds() => new Rect(22, logicalCanvasHeight-86, W-44, 58);
+
+        private void DrawMarketScreen()
+        {
+            FillRect(new Rect(0,0,W,logicalCanvasHeight),new Color(.055f,.035f,.025f,.97f));
+            DrawStandardButton(MarketBackBounds(),MarketBackAction,"NIVELES");
+            OutlineLabel(new Rect(168,25,204,54),marketTab==0?"MERCADO":"HELADERA",menuTitle,new Color(1f,.86f,.48f),1.5f);
+            DrawStandardButton(new Rect(24,92,238,54),MarketTabAction,"MERCADO",game.UnlockedLevel>0);
+            DrawStandardButton(new Rect(278,92,238,54),MarketHeladeraAction,"HELADERA");
+            int level=game.Sim.LevelIndex;
+            MarketLabel(new Rect(28,151,484,28),"NIVEL "+(level+1)+" — "+StreetSimulation.LevelDisplayNames[level].ToUpperInvariant(),header);
+            MarketLabel(new Rect(28,180,484,46),FormatMarketGoals(game.Sim),small);
+            MarketLabel(new Rect(28,228,484,24),"SALDO "+FormatMarketMoney(game.Market.BalanceCents)+"   ·   FIADO "+FormatMarketMoney(game.Market.DebtCents),small);
+            long financing = game.Market.FinancingNeededCents(game.Sim);
+            MarketLabel(new Rect(28,251,484,29),financing > 0
+                ? "FIADO NECESARIO "+FormatMarketMoney(financing)+" · Solo faltantes mínimos. El próximo crédito paga la deuda."
+                : "El fiado cubre solo faltantes mínimos; el próximo crédito paga la deuda, sin interés.",tiny);
+            Rect body=MarketBodyBounds();
+            FillRect(body,new Color(.07f,.05f,.035f,.9f));
+            Event evt=Event.current;
+            if(evt.type==EventType.ScrollWheel)
+            {
+                Vector2 point=ScreenToLayoutPoint(evt.mousePosition,new Vector2(Screen.width,Screen.height),CanvasViewport(new Vector2(Screen.width,Screen.height),Screen.safeArea));
+                point.y *= logicalCanvasHeight / H;
+                if(body.Contains(point)){marketScroll=Mathf.Clamp(marketScroll+evt.delta.y*24f,0,MarketMaxScroll());evt.Use();}
+            }
+            int[] visible=MarketVisibleIngredients();
+            for(int slot=0;slot<visible.Length;slot++)
+            {
+                int id=visible[slot];Rect row=MarketRowBounds(slot);
+                if(row.y<body.y||row.yMax>body.yMax)continue; // Never draw a clipped card's text or hit controls.
+                FillRect(row,slot%2==0?new Color(.18f,.12f,.07f):new Color(.14f,.10f,.06f));
+                int needed=game.Market.RequiredUnits(game.Sim)[id];
+                int missing=game.Market.MissingUnits(game.Sim,id);
+                int packs=marketPendingPacks[id];
+                MarketLabel(new Rect(row.x+10,row.y+5,183,30),StreetIngredientCatalog.Names[id],text);
+                MarketLabel(new Rect(row.x+194,row.y+6,row.width-204,28),"PACK "+FormatMarketMoney(game.Market.PackPriceCents(id))+" · "+StreetIngredientCatalog.PackUnits[id]+" u.",small);
+                string inventory=(id==8||id==9)?FormatBottleStock(game.Market.Units(id)):game.Market.Units(id)+" unidades";
+                MarketLabel(new Rect(row.x+10,row.y+36,row.width-20,24),"OBJETIVO "+needed+"   ·   STOCK "+inventory+"   ·   FALTAN "+missing,small);
+                if(marketTab==0)
+                {
+                    MarketLabel(new Rect(row.x+10,row.y+63,476,25),"SELECCIÓN "+packs+" packs   ·   TOTAL "+FormatMarketMoney((long)packs*game.Market.PackPriceCents(id)),small);
+                    DrawStandardButton(new Rect(row.x+2,row.y+97,42,44),MarketMinusAction+id,"−",packs>0);
+                    MarketLabel(new Rect(row.x+47,row.y+97,42,44),packs.ToString(),small);
+                    DrawStandardButton(new Rect(row.x+92,row.y+97,42,44),MarketPlusAction+id,"+",true);
+                    DrawStandardButton(new Rect(row.x+137,row.y+97,60,44),MarketPlusTenAction+id,"+10",true);
+                    DrawStandardButton(new Rect(row.x+200,row.y+97,136,44),MarketBuyAction+id,"COMPRAR",packs>0);
+                    DrawStandardButton(new Rect(row.x+339,row.y+97,156,44),MarketRowMissingAction+id,"FALTANTES",missing>0);
+                }
+                else MarketLabel(new Rect(row.x+10,row.y+66,row.width-20,58),"HELADERA  ·  "+inventory,text);
+            }
+            float maxScroll = MarketMaxScroll();
+            if (maxScroll > 0f)
+            {
+                Rect track = new Rect(W-17, body.y, 4, body.height);
+                FillRect(track, new Color(.06f,.04f,.02f,.7f));
+                float thumbHeight = Mathf.Max(28f, body.height * body.height / (body.height + maxScroll));
+                FillRect(new Rect(track.x, track.y + (track.height-thumbHeight)*marketScroll/maxScroll, 4, thumbHeight), new Color(1f,.86f,.48f,.9f));
+            }
+            MarketLabel(new Rect(26,body.yMax+3,W-52,28),!string.IsNullOrEmpty(marketMessage)?marketMessage:maxScroll>0?"Deslizá para ver más ingredientes":"",small);
+            DrawStandardButton(MarketBottomBounds(),MarketBackAction,"NIVELES");
+            DrawStandardButton(MarketFinanceBounds(),MarketMissingAction,"COMPRAR FALTANTES",MarketHasMissing());
+            DrawStandardButton(MarketPlayBounds(),MarketPlayAction,"JUGAR PARTIDO",game.CanStartRound);
+        }
+        private void MarketLabel(Rect bounds, string value, GUIStyle style)
+        {
+            Color prior = style.normal.textColor;
+            int priorSize = style.fontSize;
+            try
+            {
+                style.normal.textColor = new Color(1f, .95f, .84f);
+                style.fontSize = FitVictoryFont(style, value, priorSize, bounds);
+                Label(bounds, value, style);
+            }
+            finally { style.normal.textColor = prior; style.fontSize = priorSize; }
+        }
+
+        private string FormatMarketGoals(StreetSimulation sim)
+        {
+            var goals=new System.Collections.Generic.List<string>();
+            for(int slot=0;slot<sim.ProductCount;slot++){int id=sim.GetAvailableProduct(slot);goals.Add(ProductShortNames[id]+" ×"+sim.GetProductGoal(id));}
+            var lines=new System.Collections.Generic.List<string>();
+            for(int i=0;i<goals.Count;i+=4)lines.Add(string.Join("  ·  ",goals.GetRange(i,Mathf.Min(4,goals.Count-i)).ToArray()));
+            return "OBJETIVOS  ·  "+string.Join("\n",lines.ToArray());
+        }
+        private static string FormatBottleStock(int units) => (units/4)+" botella(s) + "+(units%4)+"/4 porción";
+        private bool MarketHasMissing()
+        {
+            for(int i=0;i<StreetIngredientCatalog.Names.Length;i++)
+                if(game.Market.MissingPacks(game.Sim,i)>0)return true;
+            return false;
+        }
+        private static string FormatMarketMoney(long cents) => "$"+(cents/100L)+","+(cents%100L).ToString("00");
         private static Rect LevelSelectCardBounds(int index)
         {
             const float width = 236f, height = 150f;
@@ -1613,7 +1955,7 @@ namespace HayChoriYPaty
                 20 * cardScale), number, menuTitle, unlocked ? Color.white : new Color(.76f, .72f, .67f), 1.3f * cardScale);
             menuTitle.fontSize = oldSize;
 
-            string name = StreetSimulation.LevelNames[index].ToUpperInvariant();
+            string name = StreetSimulation.LevelDisplayNames[index].ToUpperInvariant();
             int oldLevelSize = levelTitle.fontSize;
             levelTitle.fontSize = Mathf.Max(11, Mathf.RoundToInt(17f * cardScale));
             float measured = levelTitle.CalcSize(new GUIContent(name)).x;
@@ -2591,10 +2933,13 @@ namespace HayChoriYPaty
         private static Rect LevelButton(int i){return new Rect(108+i*67,912,57,35);}
         private static Rect VictoryPopupBounds(float canvasHeight)
         {
-            float scale = Mathf.Min((W - 24f) / VictoryPopupArtSize.x,
-                Mathf.Max(1f, canvasHeight - 32f) / VictoryPopupArtSize.y);
+            const float topHudReserve = 110f;
+            const float screenInset = 16f;
+            float availableHeight = Mathf.Max(1f, canvasHeight - topHudReserve - screenInset * 2f);
+            float scale = Mathf.Min((W - 24f) / VictoryPopupArtSize.x, availableHeight / VictoryPopupArtSize.y);
             Vector2 size = VictoryPopupArtSize * scale;
-            return new Rect((W - size.x) * .5f, (canvasHeight - size.y) * .5f, size.x, size.y);
+            float y = topHudReserve + screenInset + (availableHeight - size.y) * .5f;
+            return new Rect((W - size.x) * .5f, y, size.x, size.y);
         }
         private static Rect VictorySlot(Rect frame, Rect normalized) => new Rect(
             frame.x + normalized.x * frame.width, frame.y + normalized.y * frame.height,
@@ -2679,17 +3024,31 @@ namespace HayChoriYPaty
                 string sales = FormatQuotaSummary(game.Sim, !victory);
                 VictoryText(VictorySlot(frame, new Rect(.09f, .398f, .82f, .15f)), sales,
                     Mathf.RoundToInt(17f * fontScale), gold, TextAnchor.MiddleCenter);
-                VictoryText(VictorySlot(frame, new Rect(.333f, .565f, .245f, .09f)),
-                    "MONEDAS\nGANADAS", Mathf.RoundToInt(23f * fontScale), brown, TextAnchor.MiddleLeft);
-                VictoryText(VictorySlot(frame, new Rect(.600f, .565f, .325f, .09f)),
-                    game.Sim.CoinsEarned.ToString(), Mathf.RoundToInt(39f * fontScale), gold, TextAnchor.MiddleCenter);
-                VictoryText(VictorySlot(frame, new Rect(.333f, .691f, .245f, .09f)),
-                    "TIEMPO\nSOBRANTE", Mathf.RoundToInt(23f * fontScale), brown, TextAnchor.MiddleLeft);
-                VictoryText(VictorySlot(frame, new Rect(.588f, .690f, .337f, .09f)),
-                    FormatVictoryTime(game.Sim.TimeRemaining), Mathf.RoundToInt(39f * fontScale), gold, TextAnchor.MiddleCenter);
-                DrawStandardButton(VictorySlot(frame, VictoryExit), VictoryExitAction, "SALIR");
+                DrawMarketReceipt(VictorySlot(frame, new Rect(.10f, .55f, .80f, .27f)));
+                bool canAdvance=game.Sim.LevelIndex < StreetSimulation.LevelNames.Length - 1;
+                DrawStandardButton(VictorySlot(frame, VictoryExit), VictoryExitAction, canAdvance?"SIGUIENTE PARTIDO":"ÚLTIMO NIVEL", canAdvance);
+                DrawStandardButton(ResultLevelsBounds(), ResultLevelsAction, "NIVELES");
             }
             finally { layoutVerticalScale = previousVertical; }
+        }
+        private void DrawMarketReceipt(Rect bounds)
+        {
+            StreetMarketResult r=game.Market!=null?game.Market.LastResult:null;
+            if(r==null)return;
+            string line1="VENTAS "+FormatMarketMoney(r.grossSalesCents)+" → 50% "+FormatMarketMoney(r.halfSalesCents);
+            string line2=r.won?"BONO: 2 × "+FormatMarketMoney(r.leftoverCents)+" sobrante = "+FormatMarketMoney(r.bonusCents):"DERROTA: sin bono por sobrante";
+            string line3="VENTAS RECONOCIDAS: "+FormatMarketMoney(r.recognizedSalesCents);
+            string line4="CRÉDITO NUEVO: "+FormatMarketMoney(r.recognizedSalesCents)+" + "+FormatMarketMoney(r.bonusCents)+" = "+FormatMarketMoney(r.newCreditCents);
+            string line5="DEUDA SALDADA: "+FormatMarketMoney(r.debtRepaidCents);
+            string line6="SALDO ACTUAL: "+FormatMarketMoney(r.totalBalanceCents);
+            string[] lines={line1,line2,line3,line4,line5,line6};
+            int oldSize=small.fontSize;
+            small.fontSize=Mathf.Clamp(Mathf.FloorToInt(bounds.height/lines.Length),11,13);
+            float row=bounds.height/lines.Length;
+            Color oldColor=small.normal.textColor;small.normal.textColor=new Color(.24f,.10f,.035f);
+            for(int i=0;i<lines.Length;i++) Label(new Rect(bounds.x+5,bounds.y+row*i,bounds.width-10,row),lines[i],small);
+            small.normal.textColor=oldColor;
+            small.fontSize=oldSize;
         }
         private void Styles()
         {

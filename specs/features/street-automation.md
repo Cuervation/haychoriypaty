@@ -609,14 +609,20 @@ The top amber HUD remains full-screen-width and physical-top anchored, but grows
 
 **Validation:** Static source/spec review and git diff --check only. No Unity/editor/player tests, APK or device actions.
 
-### Two-row objective header — source update (2026-10-12; supersedes the goal layout above)
+### Two-card resource-style objective header — 2026-10-13 (supersedes the prior header layout above)
 
-Split the upper bar into a status row and a level-goal row. Coins stay left, the remaining clock stays centered, and a dynamic `NIVEL N` badge occupies the right slot; there is no pause control in this header. Show one centered row of compact icon/actual-goal cards when up to four products fit, otherwise use two balanced rows. Product order, goal counts, completion state, and simulation data remain read-only. On cutout phones, shift the status row below the physical camera gap and extend the bar only enough to preserve the same objective-card dimensions.
+The shared in-game header has two equal-width state capsules: coins on the left and remaining time on the right; the upper `NIVEL N` badge is removed (the level/location title remains in the footer). Increase the upper state band by 20%, with matching icon/value scale. If a top camera cutout is detected, shrink both state capsules symmetrically when there is usable width; for an unusually large channel, move the row below the cutout rather than making the values unreadable. Keep the amber frame full-bleed.
 
-- [x] Shared HUD geometry selects one or two rows for the existing 1/2/3/5/7-product catalogs; 1–3 products use one row and 5/7 use two.
-- [x] Header anchors and goal cards share one logical-width scale, stay inside their bounds, and keep the cutout channel clear.
-- [x] Focused Unity 6000.6.3f1 EditMode HUD/cutout checks passed 9/9 for 1/2/3/5/7-product layouts and header texture geometry.
-- [ ] Portrait Game-view/device visual review remains pending.
+Objective cards keep their product icons, actual/goal values and progress indicators, but use uniform compact rounded translucent resource cards sized for five columns. Catalogs with one through five goals use one row; six or seven use a second centered row for the remainder. The header shortens for a single row instead of retaining an empty second-row band. Goal values and simulation state are read-only. The visible level caption and level-selector card consistently show the official team/club first and neighborhood second for all 11 levels; internal `LevelNames` remain unchanged as theme lookup keys.
+
+Follow-up card readability adjustment: preserve the five-column width, increase each card's height by 20%, scale its icon and preferred counter lettering by about 20%, and halve the card's inner inset so the contents remain clear without overflowing. Keep each product icon on the left and right-align every actual/goal counter within its text area, with a small 4.8-logical-pixel minimum gap to the right edge. One-/two-row behavior remains unchanged.
+
+- [x] Unity 6000.6.3f1 EditMode HUD geometry/caption checks passed 12/12, covering equal status widths, no level badge, notch clearance, uniform card dimensions, and 1–7 products (five columns maximum).
+- [x] Interactive PlayMode capture passed 1/1 and refreshed all eleven 1080×1920 level images in `Logs/Acceptance/HudResourceCards-20261013/`; the 11-level contact sheet was visually reviewed.
+- [x] All visible level and selector captions now use the official `Equipo / Barrio` order; the existing theme lookup keys remain stable.
+- [x] The quota-card readability adjustment passed focused geometry/layout tests (20% height/icon/font increase, reduced inset, five-column and two-row fit) and the all-11-level 1080×1920 capture check.
+- [x] Objective-card counter values are right-aligned; product icons remain anchored to the left inset, with a minimum 4.8-logical-pixel gap after the value. Focused Unity EditMode layout/alignment/padding coverage passed 9/9; interactive capture of all 11 levels passed 1/1.
+- [ ] Device-with-cutout behavior still requires a physical device; current notch coverage is synthetic EditMode geometry.
 
 ## Selected victory popup — source update (2026-10-05)
 

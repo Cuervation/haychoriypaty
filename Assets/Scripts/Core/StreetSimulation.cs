@@ -70,6 +70,7 @@ namespace HayChoriYPaty
         [Min(0f)] public float maxPrice = 60f;
         public float[] productPriceMultipliers = { 1f, 1f, 1f, 1f, 1f, 1f, 1f };
         public StreetKitchenBalance kitchen = new StreetKitchenBalance();
+        public StreetMarketBalance market = new StreetMarketBalance();
         [Min(1)] public int minOrderQuantity = 999;
         [Min(1)] public int maxOrderQuantity = 999;
         [Min(0f)] public float initialPrice = 5f;
@@ -284,6 +285,14 @@ namespace HayChoriYPaty
         private const int QueueColumns = 7, QueueSlots = 21;
         public static readonly string[] ProductNames = { "Chori", "Paty", "Bondiola", "Vacío", "Coca 600 ml", "Fernet con Coca 1 L", "Cerveza en lata" };
         public static readonly string[] LevelNames = { "Floresta / All Boys", "Nueva Chicago", "Liniers - Velez Sarsfield", "Ferro Carril Oeste", "Independiente de Avellaneda", "Racing Club / Avellaneda", "San Lorenzo / Boedo", "River Plate / Núñez", "Boca Juniors / La Boca", "Sindicato de Camioneros / Plaza de Mayo", "Los Redondos / Tandil" };
+        // Player-facing captions consistently show the club/team first and its neighborhood second.
+        // LevelNames remain stable theme keys consumed by ClubVisualTheme.
+        public static readonly string[] LevelDisplayNames = {
+            "All Boys / Floresta", "Nueva Chicago / Mataderos", "Vélez Sarsfield / Liniers",
+            "Ferro / Caballito", "Independiente / Avellaneda", "Racing Club / Avellaneda",
+            "San Lorenzo / Boedo", "River Plate / Núñez", "Boca Juniors / La Boca",
+            "Sindicato de Camioneros / Plaza de Mayo", "Los Redondos / Tandil"
+        };
         private static readonly int[] DefaultProductCounts = { 1, 2, 3, 5, 7, 7, 7, 7, 7, 7, 7 };
         private static readonly int[][] DefaultLevelProducts = {
             new[] { 0 }, new[] { 0, 4 }, new[] { 0, 1, 4 },
@@ -305,6 +314,7 @@ namespace HayChoriYPaty
         private readonly int[] deliveredByProduct = new int[7];
         private float price;
         private System.Random random;
+        private IStreetKitchenStock ingredientStock;
 
         public event Action OrderCompleted;
 
@@ -526,11 +536,16 @@ namespace HayChoriYPaty
         {
             customers.Clear(); sales.Clear();
             Coins = balance.GetStartingCoins(LevelIndex); CoinsEarned = 0; // Opening balance is a configured attempt grant, not earned revenue.
+            Elapsed = 0f; Delivered = 0; Array.Clear(deliveredByProduct, 0, deliveredByProduct.Length);
             // Every round entry is a fresh attempt, regardless of selected club.
             ResetTeamAndSpeed();
             foreach (StreetWorker worker in workers) ResetWorker(worker);
-            Elapsed = 0f; Delivered = 0; Array.Clear(deliveredByProduct, 0, deliveredByProduct.Length);
             arrival = 0f; Phase = RoundPhase.Playing;
+        }
+        public void BindIngredientStock(IStreetKitchenStock stock)
+        {
+            if (Phase != RoundPhase.Ready) throw new InvalidOperationException("Bind ingredients before starting the match.");
+            ingredientStock = stock;
         }
         public void SetPrice(float value) { SetProductPrice(0,value); }
         public float GetProductPrice(int product) { return OfficialProductPrices[Mathf.Clamp(product,0,OfficialProductPrices.Length - 1)]; }
@@ -749,9 +764,23 @@ namespace HayChoriYPaty
                 if (c.State == StreetCustomerState.Waiting || c.State == StreetCustomerState.Advancing)
                 { c.Patience -= dt; c.PatienceFraction = Mathf.Clamp01(c.Patience / Mathf.Max(0.1f, balance.customerPatienceSeconds)); }
                 if (c.Patience <= 0f && c.State != StreetCustomerState.Leaving) SetLeaving(c);
+                // A sold-out extra ticket must not block FIFO lanes behind it. Preserve its pending
+                // quantities and normal departure/cancellation; never count it as a completed order.
+                if (c.State == StreetCustomerState.Waiting && IsAtCounter(c) && OnlySoldOutExtrasRemain(c)) SetLeaving(c);
                 if (c.State == StreetCustomerState.Leaving) { c.Position = Move(c.Position, c.Target, 180f, dt); if (c.Position == c.Target) RemoveCustomer(c); }
                 if(c.State==StreetCustomerState.Receiving) { c.ReceiveRemaining-=dt; if(c.ReceiveRemaining<=0f) { if(!HasOutstandingItems(c))SetLeaving(c);else c.State=c.Position==c.Target?StreetCustomerState.Waiting:StreetCustomerState.Advancing; } }
             }
+        }
+
+        private bool OnlySoldOutExtrasRemain(StreetCustomer customer)
+        {
+            if (customer.Reserved > 0 || customer.PendingOrderLineCount == 0) return false;
+            for (int i = 0; i < customer.OrderLineCount; i++)
+            {
+                StreetOrderLine line = customer.GetOrderLine(i);
+                if (line.Remaining > 0 && (!IsProductGoalComplete(line.Product) || Kitchen.HasSupply(line.Product))) return false;
+            }
+            return true; // Unlimited/standalone kitchens always report supply, preserving their rules.
         }
 
         private void MoveWorker(StreetWorker worker, float dt)
@@ -792,6 +821,7 @@ namespace HayChoriYPaty
                         StreetFoodUnit item = Kitchen.TryTake(w.Product, w.Role, w.Id);
                         if (item == null)
                         {
+                            if (!Kitchen.HasSupply(w.Product)) { CancelAssignment(w); continue; }
                             w.Delay = balance.pickupSeconds / WorkRate;
                             w.PickupDuration = w.Delay;
                             w.PickupProgress = 0f;
@@ -853,7 +883,8 @@ namespace HayChoriYPaty
                 {
                     StreetOrderLine line = customer.GetOrderLine(i);
                     if (!IsWorkerResponsibleFor(worker, line.Product)) continue;
-                    if (line.Remaining > line.Reserved && (line.OwnerWorkerId == 0 || line.OwnerWorkerId == worker.Id)) return line;
+                    if (line.Remaining > line.Reserved && Kitchen.HasSupply(line.Product) &&
+                        (line.OwnerWorkerId == 0 || line.OwnerWorkerId == worker.Id)) return line;
                 }
                 return null;
             }
@@ -863,6 +894,7 @@ namespace HayChoriYPaty
             {
                 StreetOrderLine line = customer.GetOrderLine(i);
                 if (line.Remaining <= 0) continue;
+                if (!Kitchen.HasSupply(line.Product)) continue;
                 if (line.Remaining <= line.Reserved || (line.OwnerWorkerId != 0 && line.OwnerWorkerId != worker.Id)) return null;
                 return line;
             }
@@ -953,7 +985,7 @@ namespace HayChoriYPaty
                 customer.PatienceFraction = Mathf.Clamp01(customer.Patience / Mathf.Max(0.1f, balance.customerPatienceSeconds));
                 if (sales.Count > 40) sales.RemoveAt(0);
 
-                if (line.Remaining > 0)
+                if (line.Remaining > 0 && Kitchen.HasSupply(worker.Product))
                 {
                     // The same owner reserves and carries the next unit; nobody else can take this line.
                     line.Reserved++;
@@ -1086,7 +1118,7 @@ namespace HayChoriYPaty
         private static float LevelValue(float[] values, int index, float[] fallback) { return values != null && index < values.Length ? Mathf.Max(.01f, values[index]) : fallback[index]; }
         private void ResetTeamAndSpeed()
         {
-            Kitchen = new StreetKitchenProduction(balance.kitchen, availableProductsByLevel[LevelIndex]);
+            Kitchen = new StreetKitchenProduction(balance.kitchen, availableProductsByLevel[LevelIndex], ingredientStock);
             workers.Clear();
             nextWorker = 1;
             SpeedLevel = 0; // Zero purchased upgrades means the displayed speed is x1.00.

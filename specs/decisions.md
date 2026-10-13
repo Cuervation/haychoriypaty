@@ -229,3 +229,10 @@ Revert the latest shared physical-product scale profile because its authored ser
 ## 2026-10-12 — Restore reliable late-level attempt economy
 
 Preserve all product quotas, fixed sale prices, hire/speed costs and production. Deterministic full-simulation sweeps showed adaptive staffing could not reliably fund enough early hires at levels 6–11, so grant attempt-local opening coins of $250 for levels 6–9, $500 for level 10, and $2,000 for level 11; extend only the final deadline from 5:00 to 5:15 for a small completion margin. Re-evaluate with three-seed route/production/purchase simulations; this supersedes the 2026-10-09 late-level opening amounts while retaining the 295-second River deadline.
+
+
+## 2026-10-13 — Persistent market without a second kitchen
+
+Keep monetary values in integer cents and bottle remainder in integer quarter-portions inside the same v4 StreetGame JSON. Existing physical food IDs hold temporary recipe reservations; only validated handoff consumes permanent ingredients. Active-attempt snapshots roll back stock on abandonment/reload/loss. Supplier credit finances minimum packs only and future credits repay debt first. Per-level sales watermarks and first-win bonus flags prevent replay reward farming; migration preserves unlocks and grants the highest-unlocked kit once.
+
+Exact-minimum stock revealed FIFO starvation hidden by unlimited extra sales. Only residual tickets whose products are all quota-complete and sold out leave through the existing cancellation route, without fake completions/revenue. Order generation, movements, times, prices and quotas are unchanged.
