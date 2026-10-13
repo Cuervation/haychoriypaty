@@ -113,18 +113,25 @@ namespace HayChoriYPaty.Tests
         {
             string cupPath = "Assets/Resources/ModularKitchen/Art/fernet-cup-800cc-v1.png";
             string bottlePath = "Assets/Resources/ModularKitchen/Art/fernet-bottle-1l-v1.png";
+            string cocaBottlePath = "Assets/Resources/ModularKitchen/Art/coca-2500ml-display-v1.png";
             TextureImporter cupImporter = AssetImporter.GetAtPath(cupPath) as TextureImporter;
             TextureImporter bottleImporter = AssetImporter.GetAtPath(bottlePath) as TextureImporter;
+            TextureImporter cocaBottleImporter = AssetImporter.GetAtPath(cocaBottlePath) as TextureImporter;
             Assert.NotNull(cupImporter, cupPath);
             Assert.NotNull(bottleImporter, bottlePath);
+            Assert.NotNull(cocaBottleImporter, cocaBottlePath);
             Assert.IsTrue(cupImporter.DoesSourceTextureHaveAlpha());
             Assert.IsTrue(bottleImporter.DoesSourceTextureHaveAlpha());
+            Assert.IsTrue(cocaBottleImporter.DoesSourceTextureHaveAlpha());
             Texture2D cup = Resources.Load<Texture2D>("ModularKitchen/Art/fernet-cup-800cc-v1");
             Texture2D bottle = Resources.Load<Texture2D>("ModularKitchen/Art/fernet-bottle-1l-v1");
+            Texture2D cocaBottle = Resources.Load<Texture2D>("ModularKitchen/Art/coca-2500ml-display-v1");
             Assert.NotNull(cup);
             Assert.NotNull(bottle);
+            Assert.NotNull(cocaBottle);
             Assert.That((float)cup.width / cup.height, Is.InRange(.60f, .70f), "The serving cup keeps its broad plastic silhouette.");
             Assert.That((float)bottle.width / bottle.height, Is.InRange(.24f, .31f), "The bottle keeps its tall 1 L silhouette.");
+            Assert.That((float)cocaBottle.width / cocaBottle.height, Is.InRange(.62f, .70f), "The tabletop display uses the large 2.5 L Coca art.");
 
             Type rendererType = Runtime("StreetKitchenRenderer");
             MethodInfo servingSize = rendererType.GetMethod("ServingSize", BindingFlags.NonPublic | BindingFlags.Static);
@@ -143,39 +150,72 @@ namespace HayChoriYPaty.Tests
                 load.Invoke(renderer, null);
                 station = UnityEngine.Object.Instantiate(Resources.Load<GameObject>("ModularKitchen/Prefabs/Station_FernetTable"));
                 Assert.NotNull(station);
+                station.transform.SetParent(rendererRoot.transform, false);
+                station.transform.localPosition = new Vector3(3.25f, -2.75f, 0f);
+                station.transform.localScale = new Vector3(.82f, .73f, 1f);
                 populateDisplay.Invoke(renderer, new object[] { station });
                 Transform display = station.transform.Find("FernetBottleDisplay");
                 Assert.NotNull(display);
-                Assert.AreEqual(4, display.childCount, "Two Coca and two Branca bottles share the left tabletop zone.");
+                Assert.AreEqual(8, display.childCount, "Two close rows each contain two Coca and two Branca bottles.");
                 SpriteRenderer table = station.GetComponentInChildren<SpriteRenderer>(true);
-                float tabletopY = table.transform.localPosition.y + table.sprite.bounds.max.y * table.transform.localScale.y;
-                float groupRight = table.transform.localPosition.x + table.sprite.bounds.min.x * table.transform.localScale.x
-                    + table.sprite.bounds.size.x * table.transform.localScale.x * .64f;
+                Vector3 tableMin = station.transform.InverseTransformPoint(table.transform.TransformPoint(table.sprite.bounds.min));
+                Vector3 tableMax = station.transform.InverseTransformPoint(table.transform.TransformPoint(table.sprite.bounds.max));
+                float tableHeight = tableMax.y - tableMin.y;
+                float groupRight = tableMin.x + (tableMax.x - tableMin.x) * .61f + tableHeight * .10f;
                 int fernetBottles = 0, cocaBottles = 0;
+                int[] fernetByRow = new int[2], cocaByRow = new int[2];
+                float[] rowMinX = { float.PositiveInfinity, float.PositiveInfinity };
                 foreach (Transform item in display)
                 {
                     SpriteRenderer spriteRenderer = item.GetComponent<SpriteRenderer>();
                     Assert.NotNull(spriteRenderer);
+                    int row = item.name.Contains("_Row0_") ? 0 : 1;
+                    rowMinX[row] = Mathf.Min(rowMinX[row], item.localPosition.x
+                        - spriteRenderer.sprite.bounds.size.x * item.localScale.x * .5f);
                     float height = spriteRenderer.sprite.bounds.size.y * item.localScale.y;
-                    Assert.AreEqual(tabletopY, item.localPosition.y - height * .5f, .02f,
-                        "Bottles must rest on the tabletop, not its lower shelf.");
+                    float contactDepth = row == 0 ? .03f : .32f;
+                    float tabletopY = tableMax.y - tableHeight * contactDepth;
+                    float visibleBaseInset = spriteRenderer.sprite.name == "coca-2500ml-display-v1"
+                        ? spriteRenderer.sprite.bounds.size.y * .009f : 0f;
+                    float visibleBaseY = item.localPosition.y - height * .5f + visibleBaseInset * item.localScale.y;
+                    Assert.AreEqual(tabletopY, visibleBaseY, .02f,
+                        "Every bottle's visible base must contact its row's tabletop plane.");
+                    Transform contactShadow = item.Find("TabletopContactShadow");
+                    Assert.NotNull(contactShadow, "Each bottle needs a subtle contact shadow to read as resting on the wood.");
+                    SpriteRenderer shadowRenderer = contactShadow.GetComponent<SpriteRenderer>();
+                    Assert.NotNull(shadowRenderer);
+                    Assert.AreEqual("fernet-tabletop-contact-shadow", shadowRenderer.sprite.name);
+                    Assert.Less(shadowRenderer.sortingOrder, spriteRenderer.sortingOrder,
+                        "The bottle must render above its tabletop contact shadow.");
+                    Assert.AreEqual(-spriteRenderer.sprite.bounds.size.y * .5f + visibleBaseInset,
+                        contactShadow.localPosition.y, .02f, "The contact shadow must meet the visible bottle base.");
                     Assert.LessOrEqual(item.localPosition.x + spriteRenderer.sprite.bounds.size.x * item.localScale.x * .5f,
                         groupRight + .02f, "Stock bottles must remain in their dedicated left-side zone.");
-                    Assert.AreEqual(1, spriteRenderer.sortingOrder);
+                    Assert.AreEqual(row == 0 ? 2 : 4, spriteRenderer.sortingOrder,
+                        "The front row must render above the rear row.");
                     if (spriteRenderer.sprite.name == "fernet-bottle-1l-v1")
                     {
                         fernetBottles++;
-                        Assert.AreEqual(table.sprite.bounds.size.y * .25f * 3f, height, .02f);
+                        fernetByRow[row]++;
+                        Assert.AreEqual(tableHeight * .25f * 3f, height, .02f);
                     }
-                    if (spriteRenderer.sprite.name == "coca")
+                    if (spriteRenderer.sprite.name == "coca-2500ml-display-v1")
                     {
                         cocaBottles++;
-                        Assert.AreEqual(table.sprite.bounds.size.y * .333f * 3f * .8f, height, .02f,
-                            "The large Coca bottle is 20% smaller than its previous render target.");
+                        cocaByRow[row]++;
+                        Assert.AreEqual(tableHeight * .333f * 3f * .76f, height, .02f,
+                            "The tabletop Coca is 5% smaller than the previous .8 multiplier.");
                     }
                 }
-                Assert.AreEqual(2, fernetBottles);
-                Assert.AreEqual(2, cocaBottles);
+                Assert.AreEqual(4, fernetBottles);
+                Assert.AreEqual(4, cocaBottles);
+                for (int row = 0; row < 2; row++)
+                {
+                    Assert.AreEqual(2, fernetByRow[row]);
+                    Assert.AreEqual(2, cocaByRow[row]);
+                }
+                Assert.AreEqual(tableHeight * .10f, rowMinX[0] - rowMinX[1], .02f,
+                    "The two compact rows are staggered enough to read as separate rows without reaching the prepared-drink area.");
                 populateDisplay.Invoke(renderer, new object[] { station });
                 Assert.AreEqual(1, station.transform.childCount, "Responsive refresh must not duplicate the tabletop display.");
 

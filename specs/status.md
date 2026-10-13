@@ -1,3 +1,15 @@
+## Fernet tabletop extra row spacing — 2026-10-13
+
+The stock display contains four Coca and four Branca bottles in two close rows. The back/front tabletop positions were separated further to make the second row easier to read while keeping every visible bottle base seated on the plank; the bottles remain grouped to the left of finished Fernet cups. Level 6 Game View was re-captured after the adjustment at 2160×3840: `Logs/Acceptance/FernetTabletop-20261013/level6-after-two-stock-rows-2.png`. Focused EditMode presentation test passed 1/1.
+
+## Fernet tabletop bottle size and contact cue — 2026-10-13
+
+The tabletop Coca render target was reduced 5% relative to its previous setting (`.8` → `.76`). Coca and Branca bases are placed slightly inside the visible top plank, each with a low-alpha contact shadow underneath so the bottles read as supported rather than floating; art assets and gameplay are unchanged. Focused Unity EditMode regression `FernetPresentationUses800CcCupAndBottlesBesideFinishedDrinks` passed 1/1. Live Level 6 Game View was reviewed at 608×1080; the saved supersampled capture is 2160×3840: `Logs/Acceptance/FernetTabletop-20261013/level6-after-contact-fix-verified.png`. Unity Editor returned to stopped mode; the error/warning console was empty.
+
+## Fernet tabletop bottles missing in the live view — 2026-10-13
+
+Root cause: `Station_FernetTable` has its `SpriteRenderer` on the positioned station root; `EnsureFernetTableDisplay` treated the root's `localPosition` as table-local and applied the anchor twice, putting bottles outside the render target. The renderer now converts sprite corners into station-local space and uses the existing 2.5 L Coca display sprite. Unity MCP is connected to `/Users/celestino/HayChoriYPaty` in Unity 6000.6.3f1. The focused `FernetPresentationUses800CcCupAndBottlesBesideFinishedDrinks` EditMode test passed (1/1), Console had no project errors, and a live Level 6 portrait Game View capture at 608×1080 visually confirms the Coca/Branca stock bottles on the tabletop and prepared cups to their right: `Logs/Acceptance/FernetTabletop-20261013/level6-after-display-fix.png`. The visual-only level selection bypassed `StreetGame` save methods; Play mode was stopped after capture. No APK was rebuilt. Do not present the old capture as proof of the fix.
+
 ## Unity Game View QA and Android 0.2.28 — 2026-10-13
 
 Unity MCP's previous Editor session was disconnected. Opened Unity 6000.6.3f1 on an isolated copy to recover a live Game View, set portrait 540×1200 and started Level 6 (Racing). The capture `Logs/Acceptance/VisualSmoke-20261013/level6-gameview-540x1200.png` shows the full gameplay composition. Both grill effect sets are present; all four smoke sprites stay active, rise/fade on staggered phases, and continue updating while gameplay time is frozen. Visual QA is confirmed for this one Editor aspect ratio; no phone screenshot/device install was performed.
@@ -798,3 +810,11 @@ The Fernet table now shows two Branca and two Coca stock bottles on its tabletop
 Coins and level now stay at the header's top edge; only the centered clock moves below a detected camera cutout. Status/objective bands are 20% taller, their icons/counters are larger, and objective chips use translucent teal/green. Premium Bondiola/Vacío servings are 10% larger; barrel Coca/beer items are 8% larger. The existing ambient grill puffs now rise on a slow, faint 3.125 s cycle. No gameplay values or state changed.
 
 **Validation:** Unity 6000.6.3f1 isolated-copy focused checks passed 10/10 EditMode (HUD geometry/notch/reflow/colors/texture and smoke profile math) and 11/11 PlayMode (premium serving sizes and barrel projection). `git diff --check` passed. Actual Game View/device appearance remains unverified: Unity MCP's editor-state ping did not answer, and the headless PlayMode smoke-motion attempt failed in URP's offscreen RenderTexture path. Smoke math passed EditMode; visual runtime QA is still pending.
+## Fernet stock bottles grouped into two rows — 2026-10-13
+
+The Coca/Branca display now has eight tabletop bottles (four of each) in two compact staggered rows. Tightened the row width and increased the horizontal stagger to make every bottle read separately while preserving visible-base contact on the tabletop; gameplay stock and prepared drinks are unchanged. Level 6 Game View capture reviewed at 2160×3840: `Logs/Acceptance/FernetTabletop-20261013/level6-after-two-stock-rows.png`.
+
+**Validation:** focused `FernetPresentationUses800CcCupAndBottlesBesideFinishedDrinks` EditMode regression passed 1/1. `git diff --check` passed. Unity Console had no project errors or warnings after the run.
+## Fernet tabletop extra stock row and visible contact — 2026-10-13
+
+Kept four Coca and four Branca bottles grouped in two close rows, but increased their front/back separation on the tabletop to make the extra row read clearly. Both rows' visible bases remain aligned to the tabletop and use subtle contact shadows. Focused EditMode regression passed 1/1; Level 6 Game View capture reviewed at 2160×3840: `Logs/Acceptance/FernetTabletop-20261013/level6-after-two-stock-rows-2.png`. Android 0.2.29/code31 Main-only Development IL2CPP/ARM64 APK built successfully (0 errors/1 warning), metadata/archive/signature verified; details in `specs/features/android-prototype.md`.
