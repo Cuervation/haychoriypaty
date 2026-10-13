@@ -621,7 +621,7 @@ MonoBehaviour:
     - 295
     - 300
     - 300
-    - 300
+    - 315
     florestaFinishAtDeadline: 0
   selectedLevel: 0
 --- !u!114 &990010007

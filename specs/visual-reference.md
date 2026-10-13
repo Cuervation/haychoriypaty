@@ -384,3 +384,8 @@ The common IMGUI screen is divided into a physical-edge read-only HUD, a safe-ar
 The shared renderer fills the header behind a themed mural with an aspect-preserved upper strip from that level’s existing full backdrop; if the backdrop is the mural texture itself, it may use only source pixels immediately preceding the visible crop. Draw this independent layer before the unchanged mural band and HUD, with its lower edge touching the mural start; never edit or reposition source artwork. Where no matching continuation exists, retain the already-rendered root scenery rather than stretching art. River Plate uses a generated standalone skyline strip because its mural begins at the texture top; the original mural asset remains unchanged.
 
 **Validation limit:** source/geometry review only. Unity MCP and a live editor/Game View capture were unavailable, so the updated appearance has not been visually verified in Unity.
+
+
+## 2026-10-12 — Fill the HUD cutout and bottom footer edge
+
+Keep the camera/notch channel reserved for HUD layout, but fill it with the same generated amber bar background so a crop of the mural is not visible above the header. Keep footer controls inside the safe area; extend only decorative club pennants through the otherwise unused bottom inset and anchor their row flush to the physical screen edge. Preserve pennant aspect ratio. Focused HUD-alpha/footer geometry tests passed 7/7 in isolated Unity6000.6.3f1; a live Game View capture was not available.

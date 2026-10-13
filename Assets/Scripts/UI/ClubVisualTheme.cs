@@ -319,7 +319,7 @@ namespace HayChoriYPaty
         }
     }
 
-    /// <summary>Creates the small shared footer pennant row once per active club palette.</summary>
+    /// <summary>Creates shared footer pennant artwork sized to the responsive free band and active club palette.</summary>
     public static class ClubPennantRenderer
     {
         public const int PennantCount = 20;
@@ -332,9 +332,23 @@ namespace HayChoriYPaty
 
         public static Texture2D CreateTexture(ClubVisualTheme theme, bool keepReadable = false, bool opaqueBackground = false)
         {
-            if (theme == null) theme = ClubVisualTheme.ForLevel(-1);
+            return CreateTextureAtHeight(theme, LogicalHeight, keepReadable, opaqueBackground);
+        }
 
-            var texture = new Texture2D(TextureWidth, TextureHeight, TextureFormat.RGBA32, false, false)
+        public static Texture2D CreateAdaptiveTexture(ClubVisualTheme theme, float logicalHeight,
+            bool keepReadable = false, bool opaqueBackground = false)
+        {
+            return CreateTextureAtHeight(theme, logicalHeight, keepReadable, opaqueBackground);
+        }
+
+        private static Texture2D CreateTextureAtHeight(ClubVisualTheme theme, float logicalHeight,
+            bool keepReadable, bool opaqueBackground)
+        {
+            if (theme == null) theme = ClubVisualTheme.ForLevel(-1);
+            int textureHeight = Mathf.Max(4, Mathf.RoundToInt(Mathf.Max(1f, logicalHeight) * 2f));
+            float verticalScale = textureHeight / (float)TextureHeight;
+
+            var texture = new Texture2D(TextureWidth, textureHeight, TextureFormat.RGBA32, false, false)
             {
                 name = "Club Pennants - " + theme.ClubName,
                 filterMode = FilterMode.Bilinear,
@@ -342,7 +356,7 @@ namespace HayChoriYPaty
                 hideFlags = HideFlags.HideAndDontSave
             };
 
-            var pixels = new Color32[TextureWidth * TextureHeight];
+            var pixels = new Color32[TextureWidth * textureHeight];
             if (opaqueBackground)
             {
                 // Match the parchment footer baked into the invariant root backdrop while
@@ -350,13 +364,14 @@ namespace HayChoriYPaty
                 var parchment = new Color32(255, 244, 224, 255);
                 for (int i = 0; i < pixels.Length; i++) pixels[i] = parchment;
             }
-            Vector2 ropeStart = new Vector2(0f, RopeY(0f));
+            Vector2 ropeStart = new Vector2(0f, RopeY(0f, verticalScale));
             for (int i = 1; i <= TextureWidth; i++)
             {
                 float t = i / (float)TextureWidth;
-                Vector2 next = new Vector2(i, RopeY(t));
-                DrawLine(pixels, ropeStart, next, Outline, 5f);
-                DrawLine(pixels, ropeStart + new Vector2(0f, -1.5f), next + new Vector2(0f, -1.5f), RopeHighlight, 1.2f);
+                Vector2 next = new Vector2(i, RopeY(t, verticalScale));
+                DrawLine(pixels, ropeStart, next, Outline, 5f, textureHeight);
+                DrawLine(pixels, ropeStart + new Vector2(0f, -1.5f * verticalScale),
+                    next + new Vector2(0f, -1.5f * verticalScale), RopeHighlight, 1.2f, textureHeight);
                 ropeStart = next;
             }
 
@@ -366,22 +381,22 @@ namespace HayChoriYPaty
                 float centerX = (i + .5f) * pitch;
                 float leftX = centerX - pitch * .47f;
                 float rightX = centerX + pitch * .47f;
-                var left = new Vector2(leftX, RopeY(leftX / TextureWidth));
-                var right = new Vector2(rightX, RopeY(rightX / TextureWidth));
-                var tip = new Vector2(centerX, TextureHeight - 2f);
+                var left = new Vector2(leftX, RopeY(leftX / TextureWidth, verticalScale));
+                var right = new Vector2(rightX, RopeY(rightX / TextureWidth, verticalScale));
+                var tip = new Vector2(centerX, textureHeight - 2f);
                 Color fill = theme.GetPennantColor(i);
 
-                FillTriangle(pixels, left, right, tip, fill);
-                DrawLine(pixels, left, right, Outline, 4f);
-                DrawLine(pixels, right, tip, Outline, 4f);
-                DrawLine(pixels, tip, left, Outline, 4f);
+                FillTriangle(pixels, left, right, tip, fill, textureHeight);
+                DrawLine(pixels, left, right, Outline, 4f, textureHeight);
+                DrawLine(pixels, right, tip, Outline, 4f, textureHeight);
+                DrawLine(pixels, tip, left, Outline, 4f, textureHeight);
 
                 // A narrow shaded fold keeps the simple generated row in the game's inked, fabric-like style.
                 Vector2 foldStart = Vector2.Lerp(left, right, .30f);
                 Vector2 foldEnd = Vector2.Lerp(tip, Vector2.Lerp(left, right, .30f), .18f);
                 Color fold = Color.Lerp(fill, Outline, .28f);
                 fold.a = .65f;
-                DrawLine(pixels, foldStart, foldEnd, fold, 2f);
+                DrawLine(pixels, foldStart, foldEnd, fold, 2f, textureHeight);
             }
 
             texture.SetPixels32(pixels);
@@ -389,18 +404,18 @@ namespace HayChoriYPaty
             return texture;
         }
 
-        private static float RopeY(float t)
+        private static float RopeY(float t, float verticalScale)
         {
-            // The same shallow, down-curving cord profile as the existing All Boys footer artwork.
-            return 9f + 67f * Mathf.Sin(Mathf.Clamp01(t) * Mathf.PI);
+            // Keep the cord's curve proportional as the pennant row fills the remaining footer height.
+            return (9f + 67f * Mathf.Sin(Mathf.Clamp01(t) * Mathf.PI)) * verticalScale;
         }
 
-        private static void FillTriangle(Color32[] pixels, Vector2 a, Vector2 b, Vector2 c, Color fill)
+        private static void FillTriangle(Color32[] pixels, Vector2 a, Vector2 b, Vector2 c, Color fill, int textureHeight)
         {
             int minX = Mathf.Clamp(Mathf.FloorToInt(Mathf.Min(a.x, Mathf.Min(b.x, c.x))), 0, TextureWidth - 1);
             int maxX = Mathf.Clamp(Mathf.CeilToInt(Mathf.Max(a.x, Mathf.Max(b.x, c.x))), 0, TextureWidth - 1);
-            int minY = Mathf.Clamp(Mathf.FloorToInt(Mathf.Min(a.y, Mathf.Min(b.y, c.y))), 0, TextureHeight - 1);
-            int maxY = Mathf.Clamp(Mathf.CeilToInt(Mathf.Max(a.y, Mathf.Max(b.y, c.y))), 0, TextureHeight - 1);
+            int minY = Mathf.Clamp(Mathf.FloorToInt(Mathf.Min(a.y, Mathf.Min(b.y, c.y))), 0, textureHeight - 1);
+            int maxY = Mathf.Clamp(Mathf.CeilToInt(Mathf.Max(a.y, Mathf.Max(b.y, c.y))), 0, textureHeight - 1);
             float height = Mathf.Max(1f, maxY - minY);
 
             for (int y = minY; y <= maxY; y++)
@@ -412,7 +427,7 @@ namespace HayChoriYPaty
                 float depth = Mathf.Clamp01((y - minY) / height);
                 float highlight = Mathf.Lerp(.11f, 0f, depth);
                 Color shaded = Color.Lerp(fill, Color.white, highlight);
-                SetPixel(pixels, x, y, shaded);
+                SetPixel(pixels, x, y, shaded, textureHeight);
             }
         }
 
@@ -429,7 +444,7 @@ namespace HayChoriYPaty
             return (p.x - b.x) * (a.y - b.y) - (a.x - b.x) * (p.y - b.y);
         }
 
-        private static void DrawLine(Color32[] pixels, Vector2 a, Vector2 b, Color color, float thickness)
+        private static void DrawLine(Color32[] pixels, Vector2 a, Vector2 b, Color color, float thickness, int textureHeight)
         {
             float distance = Vector2.Distance(a, b);
             int steps = Mathf.Max(1, Mathf.CeilToInt(distance));
@@ -443,24 +458,24 @@ namespace HayChoriYPaty
                 for (int y = cy - extent; y <= cy + extent; y++)
                 for (int x = cx - extent; x <= cx + extent; x++)
                 {
-                    if (x < 0 || x >= TextureWidth || y < 0 || y >= TextureHeight) continue;
+                    if (x < 0 || x >= TextureWidth || y < 0 || y >= textureHeight) continue;
                     float dx = x - point.x, dy = y - point.y;
                     if (dx * dx + dy * dy > radius * radius) continue;
-                    BlendPixel(pixels, x, y, color32);
+                    BlendPixel(pixels, x, y, color32, textureHeight);
                 }
             }
         }
 
-        private static void SetPixel(Color32[] pixels, int x, int yFromTop, Color color)
+        private static void SetPixel(Color32[] pixels, int x, int yFromTop, Color color, int textureHeight)
         {
-            if (x < 0 || x >= TextureWidth || yFromTop < 0 || yFromTop >= TextureHeight) return;
+            if (x < 0 || x >= TextureWidth || yFromTop < 0 || yFromTop >= textureHeight) return;
             Color32 value = color;
-            pixels[(TextureHeight - 1 - yFromTop) * TextureWidth + x] = value;
+            pixels[(textureHeight - 1 - yFromTop) * TextureWidth + x] = value;
         }
 
-        private static void BlendPixel(Color32[] pixels, int x, int yFromTop, Color32 source)
+        private static void BlendPixel(Color32[] pixels, int x, int yFromTop, Color32 source, int textureHeight)
         {
-            int index = (TextureHeight - 1 - yFromTop) * TextureWidth + x;
+            int index = (textureHeight - 1 - yFromTop) * TextureWidth + x;
             Color32 destination = pixels[index];
             float alpha = source.a / 255f;
             float inverse = 1f - alpha;

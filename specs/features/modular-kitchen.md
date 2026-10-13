@@ -2,7 +2,7 @@
 
 ## Scope / visual authority
 
-The user-supplied [layout reference](../../Assets/Art/Reference/modular-kitchen-layout-reference-20261007.jpg) is composition/style guidance only, never gameplay background. Requested: two separate empty grills with independently placed Chori/Paty vs Bondiola/Vacío; individual Raw/Cooked/Passed meat visuals (Cooking remains an internal timer phase), compact thick cylindrical Bondiola; independent bread sandwiches; three equivalent-size tables for normal/premium/Fernet; separate blue plastic beer/Coca barrels and containers/ice; Fernet served in an 800 cc disposable plastic cup with ice and no straw, with 1 L Branca bottles stored below its table. Bottom grills side by side, active preparation stations reflowed in catalog order Normal table→Premium table→Fernet table→Coca barrel→Beer barrel, clear circulation before counter; preserve UI, club scenery/fans/riots and catalog progression.
+The user-supplied [layout reference](../../Assets/Art/Reference/modular-kitchen-layout-reference-20261007.jpg) is composition/style guidance only, never gameplay background. Requested: two separate empty grills with independently placed Chori/Paty vs Bondiola/Vacío; individual Raw/Cooked/Passed meat visuals (Cooking remains an internal timer phase), compact thick cylindrical Bondiola; independent bread sandwiches; three equivalent-size tables for normal/premium/Fernet; separate blue plastic beer/Coca barrels and containers/ice; Fernet served in an 800 cc disposable plastic cup with ice and no straw, with 1 L Branca and large Coca bottles displayed on the left side of its tabletop and prepared Fernet cups on the right. Bottom grills side by side, active preparation stations reflowed in catalog order Normal table→Premium table→Fernet table→Coca barrel→Beer barrel, clear circulation before counter; preserve UI, club scenery/fans/riots and catalog progression.
 
 ## Verified starting baseline / resolved prerequisites
 
@@ -45,6 +45,8 @@ Authored prep row Normal→Premium→Fernet→Coca→Beer; tables remain equal19
 - [x] Relevant tests and actual Game Views validated.
 - [x] Scoped initial implementation reviewed and delivered to Git (see the dated refinement notes below).
 - [x] Catalog-driven visibility/reflow, three visual states, and ambient grill effects validated against the active Unity editor and the level1/3/4/5 Game Views.
+- [x] Fernet tabletop stock display is separated from prepared cups; Coca render target is 20% smaller. Footer pennants adapt to consume the unused footer band without moving controls. Focused tests passed (2026-10-12).
+- [x] Premium Bondiola/Vacío table/carried servings render 10% larger and barrel Coca/beer items 8% larger; focused size/projection checks passed. Two staggered low-alpha smoke puffs per active grill rise/fade on a 3.125 s cycle; EditMode profile tests and a live Level 6 portrait Game View capture at 540×1200 confirm the visible subtle effect (capture: `Logs/Acceptance/VisualSmoke-20261013/level6-gameview-540x1200.png`). Device-specific visual review remains untested.
 
 The original modular-kitchen implementation and its historical Unity validation are documented below. The catalog-driven correction is a separate delta; the prior screenshots do not validate its dynamic station rows, new barrel scale, three-stage projection, or ambient effects.
 
@@ -149,3 +151,8 @@ Enlarged only the decorative bottles under the Fernet table: the 1 L Fernet bott
 ## 2026-10-12 — Restore the prior presentation sizes
 
 The shared proportional-scale correction from commit `a7937b2` was reverted after it made food and drink sprites too small. Restore the renderer's prior serving/grill dimensions and the Fernet-table bottle targets (Fernet 25%, Coca 33.3% of table height). The Fernet remains an 800 cc disposable plastic cup; this rollback changes only visual size presentation, not products or gameplay.
+
+
+## Fernet table shelf bottles tripled — 2026-10-12
+
+At the user's request, the six decorative Fernet/Coca bottles below the Fernet table are exactly 3× their former proportional target heights: Fernet 75% and Coca 99.9% of table height. Sprites retain aspect ratio; positions are recomputed from rendered widths with even gaps to keep the row centered and prevent overlap. This is presentation-only; bottle art, table, cup, inventory, delivery and worker behavior do not change. Focused renderer PlayMode validation passed 1/1 in isolated Unity 6000.6.3f1.

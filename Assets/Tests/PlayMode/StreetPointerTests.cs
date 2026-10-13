@@ -126,6 +126,11 @@ namespace HayChoriYPaty.Tests
             InputSystem.QueueStateEvent(mouse, new MouseState { position = p });
             yield return null; yield return null;
         }
+        private Rect UpgradeTouchBounds(int action)
+        {
+            MethodInfo bounds = view.GetType().GetMethod("CatalogUpgradeTouchBounds", PrivateInstance);
+            return (Rect)bounds.Invoke(view, new object[] { action });
+        }
 
         private void StartChicagoForHiring()
         {
@@ -139,7 +144,7 @@ namespace HayChoriYPaty.Tests
             StartChicagoForHiring(); yield return Click(270,770);
             Assert.AreEqual(2,Sim.GetType().GetProperty("ParrilleroCount").GetValue(Sim,null));
             Assert.AreEqual(0,Sim.GetType().GetProperty("CocacoleroCount").GetValue(Sim,null));
-            Assert.AreEqual(9985,Sim.GetType().GetProperty("Coins").GetValue(Sim,null));
+            Assert.AreEqual(9980,Sim.GetType().GetProperty("Coins").GetValue(Sim,null));
         }
         [UnityTest]
         public IEnumerator ClickingCocacoleroDoesNotHireParrillero()
@@ -147,17 +152,24 @@ namespace HayChoriYPaty.Tests
             StartChicagoForHiring(); yield return Click(438,770);
             Assert.AreEqual(1,Sim.GetType().GetProperty("ParrilleroCount").GetValue(Sim,null));
             Assert.AreEqual(1,Sim.GetType().GetProperty("CocacoleroCount").GetValue(Sim,null));
-            Assert.AreEqual(9985,Sim.GetType().GetProperty("Coins").GetValue(Sim,null));
+            Assert.AreEqual(9980,Sim.GetType().GetProperty("Coins").GetValue(Sim,null));
         }
         [UnityTest]
         public IEnumerator UpgradeGapsAndEdgesNeverDispatchAdjacentRole()
         {
             StartChicagoForHiring();
-            foreach(float x in new[]{180f,186f,348f,354f}) yield return Click(x,770);
+            Rect speed = UpgradeTouchBounds(3), parrillero = UpgradeTouchBounds(2), cocacolero = UpgradeTouchBounds(16);
+            Assert.Less(speed.xMax, parrillero.xMin, "Responsive cards keep a real gap between speed and Parrillero.");
+            Assert.Less(parrillero.xMax, cocacolero.xMin, "Responsive cards keep a real gap between worker roles.");
+            float y = parrillero.center.y;
+            foreach(float x in new[] {
+                Mathf.Lerp(speed.xMax, parrillero.xMin, .25f), Mathf.Lerp(speed.xMax, parrillero.xMin, .75f),
+                Mathf.Lerp(parrillero.xMax, cocacolero.xMin, .25f), Mathf.Lerp(parrillero.xMax, cocacolero.xMin, .75f) })
+                yield return Click(x, y);
             Assert.AreEqual(1,Sim.GetType().GetProperty("StaffCount").GetValue(Sim,null)); Assert.AreEqual(10000,Sim.GetType().GetProperty("Coins").GetValue(Sim,null));
-            yield return Click(192,770); yield return Click(360,770);
+            yield return Click(parrillero.center.x, y); yield return Click(cocacolero.center.x, y);
             Assert.AreEqual(2,Sim.GetType().GetProperty("ParrilleroCount").GetValue(Sim,null)); Assert.AreEqual(1,Sim.GetType().GetProperty("CocacoleroCount").GetValue(Sim,null));
-            yield return Click(179,770); Assert.AreEqual(1,Sim.GetType().GetProperty("SpeedLevel").GetValue(Sim,null));
+            yield return Click(speed.center.x, speed.center.y); Assert.AreEqual(1,Sim.GetType().GetProperty("SpeedLevel").GetValue(Sim,null));
         }
         [UnityTest]
         public IEnumerator ChicagoTouchPurchasesEachSpecialtyExactlyOnce()
@@ -169,9 +181,9 @@ namespace HayChoriYPaty.Tests
                 yield return Tap(screen,270,770,101); yield return Tap(screen,438,770,102);
                 Assert.AreEqual(2,Sim.GetType().GetProperty("ParrilleroCount").GetValue(Sim,null));
                 Assert.AreEqual(1,Sim.GetType().GetProperty("CocacoleroCount").GetValue(Sim,null));
-                Assert.AreEqual(9970,Sim.GetType().GetProperty("Coins").GetValue(Sim,null));
+                Assert.AreEqual(9960,Sim.GetType().GetProperty("Coins").GetValue(Sim,null));
                 yield return Tap(screen,186,770,103); yield return Tap(screen,354,770,104);
-                Assert.AreEqual(9970,Sim.GetType().GetProperty("Coins").GetValue(Sim,null));
+                Assert.AreEqual(9960,Sim.GetType().GetProperty("Coins").GetValue(Sim,null));
             }
             finally { InputSystem.RemoveDevice(screen); }
         }
@@ -543,7 +555,7 @@ namespace HayChoriYPaty.Tests
                     Sim.GetType().GetMethod("SpawnCustomer", new[] { typeof(int), typeof(int) }).Invoke(Sim, new object[] { 0, 999 });
                 Invoke(Sim, "Step", 2f);
                 yield return null;
-                yield return new WaitForEndOfFrame();
+                yield return WaitForRenderedFrame();
                 SaveRiotReviewScreenshot(dir, level, "normal");
                 var customers = (System.Collections.IEnumerable)Sim.GetType().GetProperty("Customers").GetValue(Sim);
                 var positions = new System.Collections.Generic.Dictionary<int, Vector2>();
@@ -557,7 +569,7 @@ namespace HayChoriYPaty.Tests
                 Invoke(Sim, "Step", .1f);
                 Assert.AreEqual("Lost", Phase);
                 yield return null;
-                yield return new WaitForEndOfFrame(); // Loss activation runs in LateUpdate, after test-coroutine Update.
+                yield return WaitForRenderedFrame(); // Batchmode advances ordinary frames; the Editor waits through rendering.
                 Assert.IsTrue((bool)viewType.GetField("riotScreenActive", PrivateInstance).GetValue(view), "Riot active at level " + level);
                 object theme = themeType.GetMethod("ForLevel").Invoke(null, new object[] { level });
                 object fans = themeType.GetProperty("Fans").GetValue(theme);
@@ -579,7 +591,7 @@ namespace HayChoriYPaty.Tests
                 {
                     viewType.GetField("riotStartedAt", PrivateInstance).SetValue(view, Time.unscaledTime - (2.2f + pose * .17f));
                     yield return null;
-                    yield return new WaitForEndOfFrame();
+                    yield return WaitForRenderedFrame();
                     SaveRiotReviewScreenshot(dir, level, pose == 0 ? "pose-a" : "pose-b");
                 }
                 yield return Click(270, 891);
@@ -589,8 +601,24 @@ namespace HayChoriYPaty.Tests
             }
         }
 
+        private static IEnumerator WaitForRenderedFrame()
+        {
+            if (!Application.isBatchMode)
+            {
+                yield return new WaitForEndOfFrame();
+                yield break;
+            }
+
+            // Unity Test Framework does not invoke WaitForEndOfFrame in batchmode.
+            // Advance two unscaled frames so LateUpdate/OnGUI can settle before assertions.
+            yield return null;
+            yield return null;
+        }
+
         private static void SaveRiotReviewScreenshot(string directory, int level, string state)
         {
+            // Headless runs validate behavior but do not produce meaningful Game-view captures.
+            if (Application.isBatchMode) return;
             Texture2D capture = ScreenCapture.CaptureScreenshotAsTexture();
             try { System.IO.File.WriteAllBytes(System.IO.Path.Combine(directory, "level" + (level + 1).ToString("00") + "-" + state + ".png"), capture.EncodeToPNG()); }
             finally { UnityEngine.Object.Destroy(capture); }

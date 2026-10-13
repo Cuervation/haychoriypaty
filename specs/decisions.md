@@ -224,3 +224,8 @@ Use the 600 ml Coca bottle as the render reference, then size the 473 ml can and
 ## 2026-10-12 — Restore product presentation sizes
 
 Revert the latest shared physical-product scale profile because its authored serving and grill targets rendered too small. Preserve the earlier table/carry dimensions and the prior .25/.333 Fernet/Coca shelf height fractions. Keep the 800 cc disposable plastic Fernet cup and all existing source art/catalog/gameplay unchanged.
+
+
+## 2026-10-12 — Restore reliable late-level attempt economy
+
+Preserve all product quotas, fixed sale prices, hire/speed costs and production. Deterministic full-simulation sweeps showed adaptive staffing could not reliably fund enough early hires at levels 6–11, so grant attempt-local opening coins of $250 for levels 6–9, $500 for level 10, and $2,000 for level 11; extend only the final deadline from 5:00 to 5:15 for a small completion margin. Re-evaluate with three-seed route/production/purchase simulations; this supersedes the 2026-10-09 late-level opening amounts while retaining the 295-second River deadline.

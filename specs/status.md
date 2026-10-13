@@ -1,3 +1,19 @@
+## Unity Game View QA and Android 0.2.28 — 2026-10-13
+
+Unity MCP's previous Editor session was disconnected. Opened Unity 6000.6.3f1 on an isolated copy to recover a live Game View, set portrait 540×1200 and started Level 6 (Racing). The capture `Logs/Acceptance/VisualSmoke-20261013/level6-gameview-540x1200.png` shows the full gameplay composition. Both grill effect sets are present; all four smoke sprites stay active, rise/fade on staggered phases, and continue updating while gameplay time is frozen. Visual QA is confirmed for this one Editor aspect ratio; no phone screenshot/device install was performed.
+
+Built `Builds/Android/Archive/HayChoriYPaty-0.2.28-code30-responsive-smoke.apk` (475,893,549 bytes; SHA-256 `5e8683774d4e22df68d386a71b05ce7947b3e7022f6f6b358c57aa5d1b8bf327`). Unity Android Main-only Development IL2CPP/ARM64 build succeeded in512.21s with0 errors and547 warnings; package metadata, ZIP integrity and APK v2 debug signature verified. Complete Unity suites previously passed403/403 EditMode and50/50 PlayMode; focused current checks passed10/10 EditMode and11/11 PlayMode.
+
+## Full suite and late-level gameplay balance — 2026-10-12
+
+The first full EditMode sweep exposed real late-level funding failures. Kept product quotas/prices and hire/speed-cost curves intact; set attempt-only starting funds to $250 for Levels 6–9, $500 for Level 10 and $2,000 for Level 11, and extended only Level 11 from 5:00 to 5:15. The final default adaptive strategy (D) now wins each of the 11 levels in all three deterministic seeds (1337/407/2026); Levels 6–11 average 188.4s, 206.2s, 230.6s, 253.8s, 282.5s and 277.5s respectively.
+
+**Validation:** Unity 6000.6.3f1 batchmode on an isolated project copy passed **403/403 EditMode** and **50/50 PlayMode** tests. The full suite also covered all level table entries, real product handoffs, worker/purchase interactions and responsive pointer dispatch. Unity MCP's active Editor did not answer its state ping; no live Game View screenshot, manual visual review or device gameplay check was possible, so those remain unverified.
+
+## Previous Android install — 0.2.27/code29 (2026-10-12)
+
+Installed Development ARM64 APK on Motorola Edge 60 Fusion after the user requested installation. Build succeeded with 0 errors/1 warning; APK verification passed. Broad tests remain red (EditMode 391/403; PlayMode 44/50), so this is for user device review, not a claim that all gameplay is certified. No Game View/native launch review or Git push was performed. Receipt: `features/android-prototype.md`.
+
 ## Whole-order delivery sound — source implemented, runtime verification pending (2026-10-11)
 
 Added a single order-completion event at the final valid real handoff, guarded once per customer ticket; mixed multi-line and multi-quantity orders do not cue on partial delivery. `OrderDeliverySound` attaches as a reusable 2D AudioSource adapter to `StreetGame`, rebinds on retry/next level, and loads a locally synthesized 0.19s soft-pop from `Assets/Resources/Audio/order-delivery-soft-pop.wav` at 20% volume with ±3% pitch and 150ms spacing. This is a fallback equivalent, not Pixabay's Happy Pop 2 file. A focused mixed-order regression assertion was added but Unity execution and audible playback remain unverified. The Android 0.2.23/code25 APK now contains this source, but packaging and installation do not verify audible playback; no gameplay/audio test was run during delivery. See the current Android receipt in `features/android-prototype.md`.
@@ -770,3 +786,15 @@ Added a two-row gameplay header: coins left, timer centered, dynamic level badge
 ## Product-size rollback (2026-10-12)
 
 Restored the visual-size implementation from the parent of `a7937b2`: the prior sandwich/carry and grill-cut dimensions, plus Fernet/Coca shelf bottle heights at 25%/33.3% of table height. The 800 cc disposable plastic cup/product identity is preserved. Unity 6000.6.3f1 isolated-copy validation passed 13/13 focused checks: Fernet 800 cc plastic cup/lower shelf 1/1 EditMode, all-level grill meat bounds 1/1 EditMode, restored serving targets 10/10 PlayMode, and prior shelf proportions/no-overlap 1/1 PlayMode. Main-only Android Development IL2CPP/ARM64 build 0.2.26/code28 succeeded with 0 errors and 1 clang warning. APK: `Builds/Android/Archive/HayChoriYPaty-0.2.26-code28-product-size-rollback.apk`, 410,224,713 bytes, SHA-256 `97093346de768d4dd3a2d5c33190194eb90e36f8d17c941369f7aa69e2ae197a`; package `com.haychoriypaty.game`, API26/36, arm64-v8a. ZIP alignment and v2 debug signature verified. `adb install -r` succeeded on Motorola Edge 60 Fusion (`ZY22MBNWRB`); PackageManager confirms versionName 0.2.26/versionCode 28. No Unity Game View capture was taken.
+
+## Fernet tabletop display and footer pennants (2026-10-12)
+
+The Fernet table now shows two Branca and two Coca stock bottles on its tabletop's left side, with prepared Fernet cups reflowed to the right; Coca's render height is 20% below the previous target. Inventory and worker behavior are unchanged. The empty footer band was caused by a fixed 80-logical-unit pennant height; generated pennants now scale to the remaining band and refresh only when palette/height changes.
+
+**Validation:** Unity 6000.6.3f1 isolated-copy focused EditMode checks passed 3/3 (Fernet presentation, footer inset, adaptive pennant texture); focused PlayMode renderer check passed 1/1. `git diff --check` passed. Unity MCP's live editor ping did not respond, so no Game View or device capture was available; visual runtime QA remains pending.
+
+## Enlarged gameplay HUD and kitchen effects (2026-10-13)
+
+Coins and level now stay at the header's top edge; only the centered clock moves below a detected camera cutout. Status/objective bands are 20% taller, their icons/counters are larger, and objective chips use translucent teal/green. Premium Bondiola/Vacío servings are 10% larger; barrel Coca/beer items are 8% larger. The existing ambient grill puffs now rise on a slow, faint 3.125 s cycle. No gameplay values or state changed.
+
+**Validation:** Unity 6000.6.3f1 isolated-copy focused checks passed 10/10 EditMode (HUD geometry/notch/reflow/colors/texture and smoke profile math) and 11/11 PlayMode (premium serving sizes and barrel projection). `git diff --check` passed. Actual Game View/device appearance remains unverified: Unity MCP's editor-state ping did not answer, and the headless PlayMode smoke-motion attempt failed in URP's offscreen RenderTexture path. Smoke math passed EditMode; visual runtime QA is still pending.

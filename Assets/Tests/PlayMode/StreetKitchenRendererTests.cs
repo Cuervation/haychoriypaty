@@ -16,12 +16,12 @@ namespace HayChoriYPaty.Tests
 
         [TestCase(0, false, 39f, 21f)]
         [TestCase(1, false, 30f, 21f)]
-        [TestCase(2, false, 30f, 21f)]
-        [TestCase(3, false, 30f, 21f)]
+        [TestCase(2, false, 33f, 23.1f)]
+        [TestCase(3, false, 33f, 23.1f)]
         [TestCase(0, true, 39f, 22.5f)]
         [TestCase(1, true, 30f, 22.5f)]
-        [TestCase(2, true, 30f, 22.5f)]
-        [TestCase(3, true, 30f, 22.5f)]
+        [TestCase(2, true, 33f, 24.75f)]
+        [TestCase(3, true, 33f, 24.75f)]
         [TestCase(4, false, 9f, 20f)]
         [TestCase(5, false, 18f, 28f)]
         public void SandwichesUseLargerAspectPreservingDisplayTargetsWithoutScalingDrinks(
@@ -57,7 +57,8 @@ namespace HayChoriYPaty.Tests
                     MethodInfo slots = layoutType.GetMethod("GrillSlotPosition", new[] { typeof(int), typeof(int), typeof(bool), typeof(int) });
                     Vector2 position = (Vector2)slots.Invoke(layout, new object[] { product, slot, true, capacity });
                     Rect bounds = (Rect)layoutType.GetMethod("GrillBoundsForProduct").Invoke(layout, new object[] { product });
-                    float expectedY = (height * .5f - (bounds.y * verticalScale + position.y - bounds.y)) * .01f;
+                    Assert.IsTrue(bounds.Contains(position), "Each initial meat unit must remain within its active grill bounds.");
+                    float expectedY = (height * .5f - position.y * verticalScale) * .01f;
                     var go = (GameObject)objects[(int)Get(unit, "Id")];
                     Assert.AreEqual(expectedY, go.transform.localPosition.y, .0001f, "Meat must use its grill anchor, not the preparation-table anchor.");
                     Assert.AreEqual((position.x - 270f) * .01f, go.transform.localPosition.x, .0001f);
@@ -87,9 +88,9 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
-        public IEnumerator FernetTableShelfUsesProportionalBottleSizesWithoutOverlap()
+        public IEnumerator FernetTableDisplayKeepsBottlesOnTopAndReducesCocaByTwentyPercent()
         {
-            var root = new GameObject("Fernet bottle shelf sizing test");
+            var root = new GameObject("Fernet tabletop bottle display test");
             try
             {
                 Component renderer = root.AddComponent(GameType("StreetKitchenRenderer"));
@@ -104,43 +105,39 @@ namespace HayChoriYPaty.Tests
                 Sprite fernetSprite = Sprite.Create(fernetTexture, new Rect(0, 0, fernetTexture.width, fernetTexture.height),
                     new Vector2(.5f, .5f), 100f, 0, SpriteMeshType.FullRect);
                 renderer.GetType().GetField("fernetBottleSprite", Instance).SetValue(renderer, fernetSprite);
-                Call(renderer, "EnsureFernetBottleShelf", station);
+                Call(renderer, "EnsureFernetTableDisplay", station);
 
-                Transform shelf = station.transform.Find("FernetBottleShelf");
-                Assert.IsNotNull(shelf);
-                Assert.AreEqual(6, shelf.childCount);
+                Transform display = station.transform.Find("FernetBottleDisplay");
+                Assert.IsNotNull(display);
+                Assert.AreEqual(4, display.childCount);
                 float tableHeight = table.sprite.bounds.size.y;
-                for (int i = 0; i < shelf.childCount; i++)
+                float tabletopY = table.sprite.bounds.max.y;
+                float groupRight = table.sprite.bounds.min.x + table.sprite.bounds.size.x * .64f;
+                for (int i = 0; i < display.childCount; i++)
                 {
-                    Transform bottle = shelf.GetChild(i);
+                    Transform bottle = display.GetChild(i);
                     SpriteRenderer bottleRenderer = bottle.GetComponent<SpriteRenderer>();
-                    float expectedHeight = tableHeight * (i < 3 ? .25f : .333f);
-                    Assert.AreEqual(expectedHeight, bottleRenderer.sprite.bounds.size.y * bottle.localScale.y, .001f,
-                        "Fernet 1 L and Coca 2.5 L shelf bottles should scale to different, larger proportions.");
+                    bool fernet = i % 2 == 1;
+                    float expectedHeight = tableHeight * (fernet ? .25f * 3f : .333f * 3f * .8f);
+                    float height = bottleRenderer.sprite.bounds.size.y * bottle.localScale.y;
+                    Assert.AreEqual(expectedHeight, height, .001f);
                     Assert.AreEqual(bottle.localScale.x, bottle.localScale.y, .0001f,
                         "Bottle sprites must preserve their original aspect ratios.");
                     Vector2 bottleSize = bottleRenderer.sprite.bounds.size * bottle.localScale.x;
-                    Assert.GreaterOrEqual(bottle.localPosition.x - bottleSize.x * .5f, table.sprite.bounds.min.x - .001f,
-                        "Enlarged bottles should remain within the table width.");
-                    Assert.LessOrEqual(bottle.localPosition.x + bottleSize.x * .5f, table.sprite.bounds.max.x + .001f,
-                        "Enlarged bottles should remain within the table width.");
-                    Assert.GreaterOrEqual(bottle.localPosition.y - bottleSize.y * .5f, table.sprite.bounds.min.y - .001f,
-                        "Enlarged bottles should remain within the table height.");
-                    Assert.LessOrEqual(bottle.localPosition.y + bottleSize.y * .5f, table.sprite.bounds.max.y + .001f,
-                        "Enlarged bottles should remain within the table height.");
+                    Assert.GreaterOrEqual(bottle.localPosition.x - bottleSize.x * .5f, table.sprite.bounds.min.x - .001f);
+                    Assert.LessOrEqual(bottle.localPosition.x + bottleSize.x * .5f, groupRight + .001f,
+                        "Stock bottles must remain in the left tabletop zone.");
+                    Assert.AreEqual(tabletopY, bottle.localPosition.y - height * .5f, .001f,
+                        "Bottle bases must sit on top of the table.");
                     for (int other = 0; other < i; other++)
                     {
-                        Transform previous = shelf.GetChild(other);
+                        Transform previous = display.GetChild(other);
                         SpriteRenderer previousRenderer = previous.GetComponent<SpriteRenderer>();
                         float separation = Mathf.Abs(bottle.localPosition.x - previous.localPosition.x);
                         float required = (bottleSize.x + previousRenderer.sprite.bounds.size.x * previous.localScale.x) * .5f;
-                        Assert.GreaterOrEqual(separation + .001f, required, "Shelf bottles should not overlap.");
+                        Assert.GreaterOrEqual(separation + .001f, required, "Tabletop stock bottles should not overlap.");
                     }
                 }
-                Assert.Greater(shelf.GetChild(0).GetComponent<SpriteRenderer>().bounds.size.y,
-                    tableHeight * .16f * 1.5f, "The 1 L Fernet bottle should be visibly larger than before.");
-                Assert.Greater(shelf.GetChild(3).GetComponent<SpriteRenderer>().bounds.size.y,
-                    tableHeight * .16f * 1.5f, "The 2.5 L Coca bottle should be visibly larger than before.");
             }
             finally { UnityEngine.Object.Destroy(root); }
             yield return null;
@@ -191,7 +188,7 @@ namespace HayChoriYPaty.Tests
                     Assert.IsNotNull(drinkSprite);
                     Vector2 sourceSize = drinkSprite.sprite.bounds.size;
                     float baseScale = Mathf.Min(8f * .01f / sourceSize.x, 15f * .01f / sourceSize.y);
-                    Vector2 expectedSize = sourceSize * (baseScale * 1.35f * 100f);
+                    Vector2 expectedSize = sourceSize * (baseScale * 1.35f * 1.08f * 100f);
                     Vector2 renderedSize = sourceSize * (view.transform.localScale.x * 100f);
                     Assert.AreEqual(expectedSize.x, renderedSize.x, .01f, "Barrel Coca/beer should be 35% larger while preserving each sprite's aspect ratio.");
                     Assert.AreEqual(expectedSize.y, renderedSize.y, .01f, "Barrel Coca/beer should be 35% larger while preserving each sprite's aspect ratio.");

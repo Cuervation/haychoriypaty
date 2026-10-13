@@ -42,6 +42,30 @@ namespace HayChoriYPaty.Tests
         private static float WorkerServiceY() => (float)Runtime("StreetSceneLayout").GetField("WorkerServiceY", BindingFlags.Public | BindingFlags.Static).GetValue(null);
 
         [Test]
+        public void AmbientGrillSmokeFadesGentlyAndRisesThroughAThreeSecondCycle()
+        {
+            Type renderer = Runtime("StreetKitchenRenderer");
+            const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Static;
+            MethodInfo phaseAt = renderer.GetMethod("AmbientSmokePhaseAt", flags);
+            MethodInfo alphaAt = renderer.GetMethod("AmbientSmokeAlphaAt", flags);
+            MethodInfo positionAt = renderer.GetMethod("AmbientSmokePositionAt", flags);
+            Assert.NotNull(phaseAt); Assert.NotNull(alphaAt); Assert.NotNull(positionAt);
+
+            Assert.AreEqual(0f, (float)phaseAt.Invoke(null, new object[] { 0f, 0f, 0f }), .0001f);
+            Assert.AreEqual(0f, (float)phaseAt.Invoke(null, new object[] { 3.125f, 0f, 0f }), .001f);
+            Assert.AreEqual(0f, (float)alphaAt.Invoke(null, new object[] { 0f }), .0001f);
+            Assert.AreEqual(.18f, (float)alphaAt.Invoke(null, new object[] { .5f }), .0001f);
+
+            Rect grill = new Rect(12f, 20f, 100f, 80f);
+            Vector2 lower = (Vector2)positionAt.Invoke(null, new object[] { grill, .17f, .1f });
+            Vector2 upper = (Vector2)positionAt.Invoke(null, new object[] { grill, .17f, .8f });
+            Assert.AreEqual(29f, lower.x, .001f);
+            Assert.Less(upper.y, lower.y, "Each faint puff rises as its phase advances.");
+            Assert.AreEqual(new Vector2(12f, 26f),
+                (Vector2)renderer.GetField("AmbientSmokeSize", flags).GetValue(null));
+        }
+
+        [Test]
         public void AllElevenCatalogsExposeOnlyRealStockForTheirSevenProductProfile()
         {
             for (int level = 0; level < 11; level++)
@@ -85,7 +109,7 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void FernetPresentationUses800CcCupAndBrancaBottlesOnTheLowerShelf()
+        public void FernetPresentationUses800CcCupAndBottlesBesideFinishedDrinks()
         {
             string cupPath = "Assets/Resources/ModularKitchen/Art/fernet-cup-800cc-v1.png";
             string bottlePath = "Assets/Resources/ModularKitchen/Art/fernet-bottle-1l-v1.png";
@@ -113,30 +137,61 @@ namespace HayChoriYPaty.Tests
             {
                 Component renderer = rendererRoot.AddComponent(rendererType);
                 MethodInfo load = rendererType.GetMethod("LoadOptionalFernetSprites", BindingFlags.NonPublic | BindingFlags.Instance);
-                MethodInfo populateShelf = rendererType.GetMethod("EnsureFernetBottleShelf", BindingFlags.NonPublic | BindingFlags.Instance);
+                MethodInfo populateDisplay = rendererType.GetMethod("EnsureFernetTableDisplay", BindingFlags.NonPublic | BindingFlags.Instance);
                 Assert.NotNull(load);
-                Assert.NotNull(populateShelf);
+                Assert.NotNull(populateDisplay);
                 load.Invoke(renderer, null);
                 station = UnityEngine.Object.Instantiate(Resources.Load<GameObject>("ModularKitchen/Prefabs/Station_FernetTable"));
                 Assert.NotNull(station);
-                populateShelf.Invoke(renderer, new object[] { station });
-                Transform shelf = station.transform.Find("FernetBottleShelf");
-                Assert.NotNull(shelf);
-                Assert.AreEqual(6, shelf.childCount, "The lower shelf carries three Fernet and three existing Coca-Cola bottles.");
+                populateDisplay.Invoke(renderer, new object[] { station });
+                Transform display = station.transform.Find("FernetBottleDisplay");
+                Assert.NotNull(display);
+                Assert.AreEqual(4, display.childCount, "Two Coca and two Branca bottles share the left tabletop zone.");
+                SpriteRenderer table = station.GetComponentInChildren<SpriteRenderer>(true);
+                float tabletopY = table.transform.localPosition.y + table.sprite.bounds.max.y * table.transform.localScale.y;
+                float groupRight = table.transform.localPosition.x + table.sprite.bounds.min.x * table.transform.localScale.x
+                    + table.sprite.bounds.size.x * table.transform.localScale.x * .64f;
                 int fernetBottles = 0, cocaBottles = 0;
-                foreach (Transform item in shelf)
+                foreach (Transform item in display)
                 {
                     SpriteRenderer spriteRenderer = item.GetComponent<SpriteRenderer>();
                     Assert.NotNull(spriteRenderer);
-                    Assert.Less(item.localPosition.y, 0f, "Bottle props must stay below the table center/top surface.");
+                    float height = spriteRenderer.sprite.bounds.size.y * item.localScale.y;
+                    Assert.AreEqual(tabletopY, item.localPosition.y - height * .5f, .02f,
+                        "Bottles must rest on the tabletop, not its lower shelf.");
+                    Assert.LessOrEqual(item.localPosition.x + spriteRenderer.sprite.bounds.size.x * item.localScale.x * .5f,
+                        groupRight + .02f, "Stock bottles must remain in their dedicated left-side zone.");
                     Assert.AreEqual(1, spriteRenderer.sortingOrder);
-                    if (spriteRenderer.sprite.name == "fernet-bottle-1l-v1") fernetBottles++;
-                    if (spriteRenderer.sprite.name == "coca") cocaBottles++;
+                    if (spriteRenderer.sprite.name == "fernet-bottle-1l-v1")
+                    {
+                        fernetBottles++;
+                        Assert.AreEqual(table.sprite.bounds.size.y * .25f * 3f, height, .02f);
+                    }
+                    if (spriteRenderer.sprite.name == "coca")
+                    {
+                        cocaBottles++;
+                        Assert.AreEqual(table.sprite.bounds.size.y * .333f * 3f * .8f, height, .02f,
+                            "The large Coca bottle is 20% smaller than its previous render target.");
+                    }
                 }
-                Assert.AreEqual(3, fernetBottles);
-                Assert.AreEqual(3, cocaBottles);
-                populateShelf.Invoke(renderer, new object[] { station });
-                Assert.AreEqual(1, station.transform.childCount, "Repeated responsive layout must not duplicate shelf bottles.");
+                Assert.AreEqual(2, fernetBottles);
+                Assert.AreEqual(2, cocaBottles);
+                populateDisplay.Invoke(renderer, new object[] { station });
+                Assert.AreEqual(1, station.transform.childCount, "Responsive refresh must not duplicate the tabletop display.");
+
+                object simulation = Simulation(10);
+                object layout = Layout(simulation);
+                Rect bounds = RectProperty(layout, "FernetTableBounds");
+                MethodInfo displayPosition = rendererType.GetMethod("FernetDrinkDisplayPosition", BindingFlags.NonPublic | BindingFlags.Static);
+                Assert.NotNull(displayPosition);
+                for (int slot = 0; slot < 45; slot++)
+                {
+                    Vector2 position = (Vector2)displayPosition.Invoke(null, new object[] { layout, slot });
+                    Assert.GreaterOrEqual(position.x - 9f, bounds.x + bounds.width * .64f - .01f,
+                        "Prepared cups must stay to the right of the bottle group.");
+                    Assert.LessOrEqual(position.x + 9f, bounds.xMax + .01f,
+                        "Every prepared-cup slot must remain on the Fernet table.");
+                }
             }
             finally
             {
@@ -367,6 +422,8 @@ namespace HayChoriYPaty.Tests
         [Test]
         public void BeveragePickupsStandCloseToBarrelFrontWithSafeFootClearanceAcrossCatalog()
         {
+            float workerHalfWidth = (float)Runtime("StreetWorkstationLayout").GetField("WorkerHalfWidth").GetRawConstantValue();
+            float sceneWidth = (float)Runtime("StreetSceneLayout").GetField("Width").GetRawConstantValue();
             for (int level = 0; level < 11; level++)
             {
                 object sim = Simulation(level), layout = Layout(sim);
@@ -376,7 +433,10 @@ namespace HayChoriYPaty.Tests
                     Rect barrel = (Rect)Call(layout, "BoundsForProduct", product);
                     Vector2 pickup = (Vector2)Call(layout, "PickupPosition", product);
                     Rect feet = new Rect(pickup.x - 18f, pickup.y - 12f, 36f, 12f);
-                    Assert.AreEqual(barrel.center.x, pickup.x, .001f, "L" + level + " P" + product + " centers the worker on its own barrel.");
+                    float safeCenterX = Mathf.Clamp(barrel.center.x, workerHalfWidth, sceneWidth - workerHalfWidth);
+                    Assert.AreEqual(safeCenterX, pickup.x, .001f, "L" + level + " P" + product + " centers the worker where its full sprite stays on screen.");
+                    Assert.GreaterOrEqual(pickup.x - workerHalfWidth, 0f, "L" + level + " P" + product + " keeps the complete worker in the left screen bound.");
+                    Assert.LessOrEqual(pickup.x + workerHalfWidth, sceneWidth, "L" + level + " P" + product + " keeps the complete worker in the right screen bound.");
                     Assert.AreEqual(barrel.yMin - 2f, pickup.y, .001f, "L" + level + " P" + product + " uses the closer front anchor.");
                     Assert.AreEqual(barrel.yMin - 2f, feet.yMax, .001f, "L" + level + " P" + product + " keeps a 2-unit collider clearance.");
                     Assert.IsFalse(feet.Overlaps(barrel), "L" + level + " P" + product + " worker feet do not enter the barrel.");

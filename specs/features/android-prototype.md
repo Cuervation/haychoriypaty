@@ -1,4 +1,24 @@
-# Latest verified Android delivery — 2026-10-12 (0.2.26/code28, restored product sizes)
+# Latest Android delivery — 2026-10-13 (0.2.28/code30, responsive HUD/kitchen/smoke)
+
+Unity 6000.6.3f1 Main-only Development IL2CPP/ARM64 APK built through Unity MCP from an isolated project copy: **Succeeded in 512.21s; 0 errors / 547 warnings**. Warnings did not block the build; examples in the Editor log include deprecated PVRTC texture compression and unsupported shader warnings. BuildReport total output size was 2,076.96 MB (not APK size).
+
+APK `Builds/Android/Archive/HayChoriYPaty-0.2.28-code30-responsive-smoke.apk`: **475,893,549 bytes**; SHA-256 `5e8683774d4e22df68d386a71b05ce7947b3e7022f6f6b358c57aa5d1b8bf327`. Package `com.haychoriypaty.game`, version0.2.28/code30, min API26/target36, `arm64-v8a`. `aapt dump badging` confirms metadata; `unzip -t` reports no archive errors; Unity-bundled OpenJDK + `apksigner` verifies APK Signature Scheme v2 with the established Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`. Project aliases: `Builds/Android/HayChoriYPaty-0.2.28.apk` and `Builds/Android/HayChoriYPaty-street.apk`.
+
+**Validation:** latest source had passed the complete Unity 6000.6.3f1 suites on the isolated copy (403/403 EditMode, 50/50 PlayMode); the focused HUD/smoke EditMode cases passed 10/10 and serving/barrel PlayMode cases 11/11. Unity MCP was restored by opening a second Editor on the isolated copy. A portrait Level 6 Game View capture at 540×1200 is stored at `Logs/Acceptance/VisualSmoke-20261013/level6-gameview-540x1200.png`; the four ambient smoke renderers were active with staggered phase/alpha and a subtle visible appearance. This is an Editor capture, not a phone screenshot. No installation or on-device gameplay review was performed. Development/debug-signed, not Play Store signing.
+
+---
+
+# Previous Android delivery — 2026-10-12 (0.2.27/code29, installed for device review)
+
+Unity 6000.6.3f1 Main-only Development IL2CPP/ARM64 APK build from an isolated copy: **Succeeded, 0 build errors / 1 warning** (Diagnostics Data recommends Full debug symbols). APK `Builds/Android/Archive/HayChoriYPaty-0.2.27-code29-responsive-ui.apk`: **410,226,097 bytes**; SHA-256 `707c66a4db6b7cb7ed96828c07ea0922f5435b7f84354087a5ca6ac25200b9f6`. Package `com.haychoriypaty.game`, version0.2.27/code29, min API26/target36, `arm64-v8a`. `aapt dump badging`, ZIP integrity and APK Signature Scheme v2 verified; Android Debug certificate SHA-256 remains `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`.
+
+Installed with `adb install -r` on Motorola Edge 60 Fusion (`ZY22MBNWRB`): **Success**; PackageManager confirms versionName0.2.27/versionCode29 and original firstInstallTime remains 2026-10-03 18:49:24 (no uninstall/data clear). APK was installed at the user's request despite broad test failures; no game launch or native visual review followed. Full EditMode:391/403 pass,12 fail; full PlayMode:44/50 pass,6 fail. Focused current HUD/footer tests (7 across five resolutions and eleven levels) and Fernet bottle shelf test passed. Unity Game View review remains unavailable. This is Development/debug-signed, not Play Store release signing. No commit or push was made.
+
+Versioned APK: `Builds/Android/HayChoriYPaty-0.2.27.apk`; rolling alias: `Builds/Android/HayChoriYPaty-street.apk`.
+
+---
+
+# Previous Android delivery — 2026-10-12 (0.2.26/code28, restored product sizes)
 
 Unity 6000.6.3f1 Main-only Android Development IL2CPP/ARM64 build in an isolated project copy: **Succeeded, 0 errors / 1 clang warning**.
 

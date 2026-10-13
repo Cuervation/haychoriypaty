@@ -791,7 +791,7 @@ var sim = Make(level: 1); Start(sim); Set(sim, "Coins", 10000);
                 Assert.IsTrue((bool)Call(sim, "TryHire", Role("Parrillero")));
             }
             Assert.AreEqual(7, Get(sim, "ParrilleroCount"));
-            Assert.AreEqual(280, Get(sim, "CocacoleroHireCost"));
+            Assert.AreEqual(20, Get(sim, "CocacoleroHireCost"), "Hire progress is role-local; the first Cocacolero keeps the level base price.");
             Assert.IsTrue((bool)Get(sim, "CanHireParrillero"));
 
             for (int i = 0; i < 5; i++) Assert.IsTrue((bool)Call(sim, "TryHire", Role("Cocacolero")));
@@ -822,6 +822,7 @@ var sim = Make(level: 1); Start(sim); Set(sim, "Coins", 10000);
             var balance = NewBalance(); Tune(balance, "maxCustomers", 21); Tune(balance, "workerSpeed", 100000f);
             Tune(balance, "customerSpeed", 100000f); Tune(balance, "customerArrivalSeconds", 100000f); Tune(balance, "pickupSeconds", .01f);
             var sim = Make(level: 0, balance: balance); Start(sim); Set(sim, "Coins", 10000);
+            SetField(sim, "arrival", 100000f);
             for (int i = 0; i < 15; i++) Assert.IsTrue((bool)Call(sim, "TryHire", Role("Parrillero")));
             Assert.AreEqual(16, Get(sim, "StaffCount"));
             Assert.AreEqual(0, Get(sim, "Coins"), "Hiring the fifteenth paid worker must debit the exact growing cost without underflow.");
@@ -835,6 +836,7 @@ var sim = Make(level: 1); Start(sim); Set(sim, "Coins", 10000);
                 Assert.IsTrue(Spawn(sim, 0, 1));
                 SetWaiting(((IList)Get(sim, "Customers"))[i]);
             }
+            Assert.AreEqual(15, Customers(sim).Count, "Only the 15 explicit tickets exist; automatic arrivals are disabled for this accounting check.");
             int maxActive = 0;
             for (int tick = 0; tick < 3000 && (int)Get(sim, "Delivered") < 15; tick++)
             {
@@ -1060,8 +1062,13 @@ var sim = Make(level: 1); Start(sim); Set(sim, "Coins", 10000);
         {
             object balance=NewBalance();Tune(balance,"maxCustomers",1);Tune(balance,"customerArrivalSeconds",1000f);Tune(balance,"levelGoals",new[]{1,1,1,1,1});
             object sim=Make(level:2,balance:balance);Call(sim,"SetProductPrice",1,17f);
-            Start(sim);Spawn(sim,1,1);Step(sim,8f);
-            Assert.AreEqual(5,Get(sim,"Coins"));Assert.AreEqual(5,Get(sim,"CoinsEarned"));Assert.AreEqual(5f,Call(sim,"GetProductPrice",1));
+            Start(sim);
+            SetField(sim, "arrival", 100000f);
+            Assert.IsTrue(Spawn(sim, 1, 1), "The explicit Paty ticket must enter the test queue.");
+            object patyCustomer = Customers(sim)[0]; SetWaiting(patyCustomer);
+            for (int tick = 0; tick < 1000 && (int)Get(sim, "Delivered") == 0; tick++) Step(sim, .02f);
+            Assert.AreEqual(1, Get(sim, "Delivered")); Assert.AreEqual(5, Get(sim, "Coins"));
+            Assert.AreEqual(5, Get(sim, "CoinsEarned")); Assert.AreEqual(5f, Call(sim, "GetProductPrice", 1));
         }
         [Test]
         public void OwnedRandomIgnoresUnityGlobalRandomAndCatalogConfigIsClamped()
@@ -1372,7 +1379,7 @@ object balance = NewBalance();
             Assert.AreEqual(5, Get(fresh, "SpeedCost"));
             object laterDefaults = Make(level: 1, balance: b);
             Assert.AreEqual(400, Get(laterDefaults, "Goal")); Assert.AreEqual(20, Get(laterDefaults, "HireCost"));
-            Assert.AreEqual(5, Get(laterDefaults, "SpeedCost"));
+            Assert.AreEqual(10, Get(laterDefaults, "SpeedCost"), "Level 2 applies its 1.50 multiplier to the first $5 speed tier.");
             object restored = Activator.CreateInstance(simType, new object[] { b, 1, 5f, 10000, 8, 65 });
             Assert.AreEqual(1, Get(restored, "StaffCount")); Assert.AreEqual(0, Get(restored, "SpeedLevel"));
             Assert.AreEqual(1f, Get(restored, "WorkRate"));
@@ -1722,6 +1729,9 @@ string[] names = (string[])simType.GetField("LevelNames", BindingFlags.Public | 
                 int[] products = level == 3 ? new[] { 0, 1, 2, 4, 6 } : new[] { 0, 2, 3, 6, 5 };
                 int[] quantities = { 1, 2, 1, 2, 1 };
                 int expectedTotal = 7;
+                int[] officialPrices = { 5, 5, 10, 12, 5, 12, 7 };
+                int expectedRevenue = 0;
+                for (int i = 0; i < products.Length; i++) expectedRevenue += officialPrices[products[i]] * quantities[i];
                 int staff = level == 3 ? 3 : 4;
                 object sim = Make(staff: staff, level: level, balance: balance); Start(sim);
                 object customer = SpawnOrder(sim, products, quantities); SetWaiting(customer);
@@ -1747,7 +1757,7 @@ string[] names = (string[])simType.GetField("LevelNames", BindingFlags.Public | 
                 }
                 for (int frame = 0; frame < 1800 && (int)Get(sim, "Delivered") < expectedTotal; frame++) Step(sim, .02f);
                 Assert.AreEqual(expectedTotal, Get(sim, "Delivered"));
-                Assert.AreEqual(expectedTotal * 5, Get(sim, "Coins"));
+                Assert.AreEqual(expectedRevenue, Get(sim, "Coins"), "Each delivered unit earns its official product-ID price.");
                 Assert.AreEqual(0, Get(customer, "PendingOrderLineCount")); Assert.AreEqual(0, Get(customer, "Reserved"));
                 for (int i = 0; i < products.Length; i++)
                 {
@@ -1975,7 +1985,7 @@ string[] names = (string[])simType.GetField("LevelNames", BindingFlags.Public | 
         {
 string[] expectedNames = { "Racing Club / Avellaneda", "San Lorenzo / Boedo", "River Plate / Núñez", "Boca Juniors / La Boca", "Sindicato de Camioneros / Plaza de Mayo", "Los Redondos / Tandil" };
             int[] expectedGoals = { 850, 960, 1050, 1150, 1300, 1450 };
-            float[] expectedDurations = { 255f, 270f, 295f, 300f, 300f, 300f };
+            float[] expectedDurations = { 255f, 270f, 295f, 300f, 300f, 315f };
             float[] expectedDemand = { 1.65f, 1.815f, 1.9965f, 2.19615f, 2.415765f, 2.6573415f };
             string[] names = (string[])simType.GetField("LevelNames", BindingFlags.Public | BindingFlags.Static).GetValue(null);
             object balance = NewBalance();
@@ -2014,7 +2024,7 @@ StrategyRun run = SimulateStrategy(10, 1337, "D");
             Tune(balance, "levelProductIds", new[] { "0", "0,4", "0,1,4", "0,1,2,4,6", "0,1,2,3,4,6,5" });
             object sim = Make(level: level, balance: balance);
             Assert.AreEqual(goal, Get(sim, "Goal"));
-            Assert.AreEqual(level == 5 ? 255f : level == 6 ? 270f : level == 7 ? 295f : 300f, Get(sim, "TimeRemaining"));
+            Assert.AreEqual(level == 5 ? 255f : level == 6 ? 270f : level == 7 ? 295f : level == 10 ? 315f : 300f, Get(sim, "TimeRemaining"));
             Assert.AreEqual(7, Get(sim, "ProductCount"));
             Start(sim); Assert.DoesNotThrow(() => Step(sim, 1f));
         }
@@ -2043,8 +2053,8 @@ object sim = Make(level: level);
                 new[] {210,145,80,75,175,75,90}, new[] {230,165,100,85,195,80,105},
                 new[] {250,180,110,95,210,90,115}, new[] {275,195,120,110,225,100,125},
                 new[] {310,220,135,125,255,110,145}, new[] {345,245,150,140,285,120,165} };
-            float[] durations = {120f,180f,180f,210f,240f,255f,270f,295f,300f,300f,300f};
-            int[] openingCoins = {0,0,0,0,0,0,0,0,50,150,200};
+            float[] durations = {120f,180f,180f,210f,240f,255f,270f,295f,300f,300f,315f};
+            int[] openingCoins = {0,0,0,0,0,250,250,250,250,500,2000};
             for (int level = 0; level < 11; level++)
             {
                 object balance = NewBalance(); object sim = Make(level: level, balance: balance); int total = 0;
@@ -2059,7 +2069,7 @@ object sim = Make(level: level);
             }
         }
 
-        [TestCase(8, 50)] [TestCase(9, 150)] [TestCase(10, 200)]
+        [TestCase(8, 250)] [TestCase(9, 500)] [TestCase(10, 2000)]
         public void AdjustedOpeningBalanceAppliesOnSelectionAdvanceStartAndRetry(int level, int expectedCoins)
         {
             object selected = Make();
@@ -2236,7 +2246,7 @@ object sim = Make(level: level);
             Assert.AreEqual("Won", Get(sim, "Phase").ToString());
             Assert.AreEqual(200, Get(sim, "Delivered"));
             Assert.Less((float)Get(sim, "Elapsed"), 120f);
-            Assert.AreEqual(5, Get(sim, "StaffCount")); Assert.AreEqual(9, Get(sim, "SpeedLevel"));
+            Assert.AreEqual(6, Get(sim, "StaffCount"), "The free opener plus five affordable Parrilleros reflects the unbounded role curve."); Assert.AreEqual(9, Get(sim, "SpeedLevel"));
             Assert.AreEqual(200, Call(sim, "GetProductDelivered", 0));
             Assert.AreEqual(1000, Get(sim, "CoinsEarned"));
             Assert.Less((int)Get(sim, "Coins"), (int)Get(sim, "CoinsEarned"));
@@ -2256,7 +2266,7 @@ object sim = Make(level: level);
             object sim = Make(level: level, balance: balance); Start(sim);
             int openingCoins = (int)Get(sim, "Coins");
             int[] products = AvailableProducts(sim);
-            for (int tick = 0; tick < 1200 && Get(sim, "Phase").ToString() == "Playing"; tick++)
+            for (int tick = 0; tick < 1300 && Get(sim, "Phase").ToString() == "Playing"; tick++)
             {
                 Step(sim, .25f);
                 if (strategy != "A") ApplyStrategyPurchases(sim, strategy);

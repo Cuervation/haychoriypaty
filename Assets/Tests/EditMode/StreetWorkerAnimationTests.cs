@@ -75,7 +75,8 @@ namespace HayChoriYPaty.Tests
                 {
                     Set(worker, "State", Enum.Parse(stateType, state));
                     object rolePose = Call("Sample", worker);
-                    Assert.AreEqual(Facing("Right"), Field(rolePose, "Facing"), role + " / " + state);
+                    string expectedFacing = role == "Cocacolero" && state == "Pickup" ? "Down" : "Right";
+                    Assert.AreEqual(Facing(expectedFacing), Field(rolePose, "Facing"), role + " / " + state);
                     Assert.AreEqual(2, Field(rolePose, "Frame"), role + " / " + state);
                 }
             }

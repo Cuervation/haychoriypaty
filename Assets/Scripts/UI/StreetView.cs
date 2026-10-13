@@ -91,16 +91,30 @@ namespace HayChoriYPaty
             new[] { 0, 1, 2 }, new[] { 0, 1, 2 }, new[] { 3, 5, 6 }
         };
         // Status is screen-edge anchored; interactive controls still use the safe-area canvas.
-        private static readonly Rect HudBar = new Rect(0, 0, 540, 70);
-        private static readonly Rect HudCoins = new Rect(39, 3, 135, 24);
-        private static readonly Rect HudTime = new Rect(216, 3, 135, 24);
-        private static readonly Rect HudLevel = new Rect(363, 3, 167, 24);
-        private static readonly Rect HudQuotaGrid = new Rect(8, 29, 524, 38);
+        private const float HudBandScale = 1.2f;
+        private const float HudTopPadding = 1f * HudBandScale;
+        private const float HudStateRowHeight = 24f * HudBandScale;
+        private const float HudObjectiveGap = 2f * HudBandScale;
+        private const float HudBottomPadding = 3f * HudBandScale;
+        private const float HudQuotaGridHeight = 38f * HudBandScale;
+        private const float HudStatusIconSize = 20f * HudBandScale;
+        private const float HudQuotaIconMaxSize = 18f * HudBandScale;
+        private const float HudChipInset = 2f * HudBandScale;
+        private const float HudChipTextTopInset = 1f * HudBandScale;
+        private const float HudChipTextHeightInset = 3f * HudBandScale;
+        private const float HudChipTrackHeight = 1f * HudBandScale;
+        private const float HudCutoutClearance = 2f * HudBandScale;
+        private static readonly Rect HudBar = new Rect(0, 0, 540,
+            HudTopPadding + HudStateRowHeight + HudObjectiveGap + HudQuotaGridHeight + HudBottomPadding);
+        private static readonly Rect HudCoins = new Rect(39, HudTopPadding, 135, HudStateRowHeight);
+        private static readonly Rect HudTime = new Rect(216, HudTopPadding, 135, HudStateRowHeight);
+        private static readonly Rect HudLevel = new Rect(363, HudTopPadding, 167, HudStateRowHeight);
+        private static readonly Rect HudQuotaGrid = new Rect(8,
+            HudTopPadding + HudStateRowHeight + HudObjectiveGap, 524, HudQuotaGridHeight);
         // Retained name for layout tests and diagnostics; this encloses the live per-SKU chips.
         private static readonly Rect HudSales = HudQuotaGrid;
         private static readonly Rect CutoutHudGap = new Rect(232, 0, 70, 34);
-        private const float HudStateRowHeight = 24f, HudObjectiveGap = 2f, HudBottomPadding = 3f;
-        private const int HudClockFontSize = 24;
+        private const int HudStatusValueFontSize = 29, HudLevelFontSize = 24, HudClockFontSize = 29;
         private const float CustomerHiddenLegHeight = StreetSceneLayout.CustomerHiddenLegHeight;
         // Standard station dimensions come from live Floresta, not per-level fitting.
         private const string ChicagoGrillResource = "street-parrilla-large-v4";
@@ -145,12 +159,25 @@ namespace HayChoriYPaty
             public Rect[] UpgradeBounds;
             public Rect LevelBadge;
             public Rect ReadySelector;
-            // Safe-canvas coordinates, drawn over the full-bleed background after root-row masking.
+            // Footer layout coordinates; decorative pennants may extend through the bottom safe inset.
             public Rect Pennants;
         }
 
         private static ResponsiveFooterLayout BuildResponsiveFooterLayout(
             StreetSimulation sim, float canvasHeight, bool showUpgrades, bool showReadySelector)
+        {
+            return BuildResponsiveFooterLayoutCore(sim, canvasHeight, showUpgrades, showReadySelector, canvasHeight);
+        }
+
+        private static ResponsiveFooterLayout BuildResponsiveFooterLayoutWithBottomBleed(
+            StreetSimulation sim, float canvasHeight, bool showUpgrades, bool showReadySelector, float bottomBleed)
+        {
+            return BuildResponsiveFooterLayoutCore(sim, canvasHeight, showUpgrades, showReadySelector,
+                canvasHeight + Mathf.Max(0f, bottomBleed));
+        }
+
+        private static ResponsiveFooterLayout BuildResponsiveFooterLayoutCore(
+            StreetSimulation sim, float canvasHeight, bool showUpgrades, bool showReadySelector, float decorationBottom)
         {
             float verticalScale = Mathf.Max(.01f, canvasHeight / H);
             float compactScale = Mathf.Min(1f, verticalScale);
@@ -164,7 +191,6 @@ namespace HayChoriYPaty
             float selectorHeight = showReadySelector ? ReadyLevelSelector.height * compactScale : 0f;
             float selectorGap = showReadySelector && rows > 0 ? 6f * compactScale : 0f;
             float topPadding = 4f * compactScale;
-            float bottomPadding = 8f * compactScale;
             float cardBlockHeight = rows * cardHeight + Mathf.Max(0, rows - 1) * rowGap;
             float panelHeight = badgeHeight + sectionGap + cardBlockHeight + selectorGap + selectorHeight;
             float stageBottom = StreetKitchenLayout.TiledPlayfieldBottom * verticalScale;
@@ -193,12 +219,10 @@ namespace HayChoriYPaty
             Rect badge = new Rect(45f, panelTop / verticalScale, 450f, badgeHeight);
             bool hasFooterControls = rows > 0 || showReadySelector;
             float pennantClearance = hasFooterControls ? 2f * compactScale : 0f;
-            float decorationGap = Mathf.Max(0f, canvasHeight - bottomPadding - panelBottom - pennantClearance);
-            float pennantHeight = !hasFooterControls
-                ? ClubPennantRenderer.LogicalHeight * verticalScale
-                : Mathf.Min(ClubPennantRenderer.LogicalHeight * verticalScale,
-                    decorationGap);
-            float pennantTop = hasFooterControls ? panelBottom + pennantClearance : canvasHeight - pennantHeight;
+            float decorationGap = Mathf.Max(0f, decorationBottom - panelBottom - pennantClearance);
+            // The generated pennant row fills the free footer band after the controls, including safe-area bleed.
+            float pennantHeight = decorationGap;
+            float pennantTop = decorationBottom - pennantHeight;
             Rect pennants = pennantHeight > 1f
                 ? new Rect(0f, pennantTop, W, pennantHeight)
                 : new Rect(0f, pennantTop, W, 0f);
@@ -208,12 +232,14 @@ namespace HayChoriYPaty
             };
         }
 
-        private ResponsiveFooterLayout CurrentResponsiveFooter(StreetSimulation sim, float canvasHeight)
+        private ResponsiveFooterLayout CurrentResponsiveFooter(StreetSimulation sim, float canvasHeight, float bottomBleed = 0f)
         {
             bool ready = !levelSelectActive && sim.Phase == RoundPhase.Ready;
             bool play = !levelSelectActive && sim.Phase == RoundPhase.Playing;
             bool showCards = play || (ready && CatalogUpgradeActions(sim).Length <= 3);
-            return BuildResponsiveFooterLayout(sim, canvasHeight, showCards, ready);
+            return bottomBleed > 0f
+                ? BuildResponsiveFooterLayoutWithBottomBleed(sim, canvasHeight, showCards, ready, bottomBleed)
+                : BuildResponsiveFooterLayout(sim, canvasHeight, showCards, ready);
         }
 
         private Rect CatalogUpgradeTouchBounds(int action)
@@ -265,6 +291,7 @@ namespace HayChoriYPaty
         private Texture2D backdrop, chicagoBackground, velezBackground, velezCrest, velezGrill, people, items, parrillero, parrilleroDiagonal, cocacolero, laterCocacolero, parrilleroIcon, upgradeWood, speedArrows, largeGrill, servingTable, gameCoin, muralArt, allBoysCrest, chicagoCrest, cocaBottle, beverageBarrel, chicagoGrill;
         private Texture2D clubPennantTexture;
         private string clubPennantThemeName;
+        private float clubPennantLogicalHeight = -1f;
         private Texture2D clubMuralTexture;
         private string clubMuralResource;
         private Texture2D allBoysFrontFans, allBoysWalkingFans, allBoysRiotFans;
@@ -470,6 +497,8 @@ namespace HayChoriYPaty
             return new Rect(l,size.y-t,r-l,t-b);
         }
         private static float CanvasLogicalHeight(Rect viewport) => viewport.width <= 0 ? H : viewport.height * W / viewport.width;
+        private static float SafeAreaBottomInsetLogical(Rect viewport, float screenHeight) => viewport.width <= 0
+            ? 0f : Mathf.Max(0f, screenHeight - viewport.yMax) * W / viewport.width;
         private static Vector2 ScreenToLayoutPoint(Vector2 pixel, Vector2 screenSize, Rect viewport)
         {
             float scale = viewport.width / W;
@@ -1029,7 +1058,9 @@ namespace HayChoriYPaty
             float scale = Screen.width / W;
             float fullHeight = Screen.height / scale;
             Rect viewport = CanvasViewport(new Vector2(Screen.width, Screen.height), Screen.safeArea);
-            ResponsiveFooterLayout footer = CurrentResponsiveFooter(game.Sim, CanvasLogicalHeight(viewport));
+            float canvasHeight = CanvasLogicalHeight(viewport);
+            float bottomBleed = SafeAreaBottomInsetLogical(viewport, Screen.height);
+            ResponsiveFooterLayout footer = CurrentResponsiveFooter(game.Sim, canvasHeight, bottomBleed);
             try
             {
                 GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1));
@@ -1141,13 +1172,6 @@ namespace HayChoriYPaty
         private void DrawClubPennants(float canvasHeight, float verticalScale, Rect safeViewport, Rect safePennants)
         {
             ClubVisualTheme theme = ClubVisualTheme.ForLevel(VisualLevelIndex);
-            if (clubPennantTexture == null || clubPennantThemeName != theme.ClubName)
-            {
-                if (clubPennantTexture != null) Destroy(clubPennantTexture);
-                clubPennantTexture = ClubPennantRenderer.CreateTexture(theme, false, true);
-                clubPennantThemeName = theme.ClubName;
-            }
-
             Color previousColor = GUI.color;
             try
             {
@@ -1158,13 +1182,22 @@ namespace HayChoriYPaty
                     Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
 
                 if (safePennants.height <= 1f || safeViewport.width <= 0f) return;
+                if (clubPennantTexture == null || clubPennantThemeName != theme.ClubName ||
+                    Mathf.Abs(clubPennantLogicalHeight - safePennants.height) > .25f)
+                {
+                    if (clubPennantTexture != null) Destroy(clubPennantTexture);
+                    clubPennantTexture = ClubPennantRenderer.CreateAdaptiveTexture(theme, safePennants.height, false, true);
+                    clubPennantThemeName = theme.ClubName;
+                    clubPennantLogicalHeight = safePennants.height;
+                }
+
                 float fullScale = Screen.width / W;
                 float safeScale = safeViewport.width / W;
                 Rect destination = new Rect(0f,
                     (safeViewport.y + safePennants.y * safeScale) / fullScale,
                     W, safePennants.height * safeScale / fullScale);
                 GUI.color = Color.white;
-                // ScaleToFit preserves the pennant artwork when the remaining footer band is shorter.
+                // The generated texture matches this full-width destination aspect; keep its pennant geometry undistorted.
                 GUI.DrawTexture(destination, clubPennantTexture, ScaleMode.ScaleToFit, true);
             }
             finally
@@ -1233,7 +1266,7 @@ namespace HayChoriYPaty
         {
             if (gap.width <= 0f || gap.height <= 0f || cachedHudCutoutGap == gap) return;
             if (cutoutHudBarTexture != null) Destroy(cutoutHudBarTexture);
-            cutoutHudBarTexture = CreateHudBarTexture(true, gap);
+            cutoutHudBarTexture = CreateHudBarTexture(gap, false);
             cachedHudCutoutGap = gap;
         }
 
@@ -1255,36 +1288,42 @@ namespace HayChoriYPaty
                 Rect barBounds = new Rect(0f, 0f, W, HudBarHeightFor(cutoutGap));
                 if (bar != null) GUI.DrawTexture(barBounds, bar, ScaleMode.StretchToFill, true);
                 Rect coinCell = HudStatusCellBounds(0, cutoutGap);
-                DrawHudIcon(new Rect(coinCell.x + 8f, coinCell.center.y - 10f, 20f, 20f), 10);
-                DrawHudNumber(HudStatusTextBounds(0, cutoutGap), sim.Coins.ToString(), 24);
+                float coinIcon = HudStatusIconSize;
+                DrawHudIcon(new Rect(coinCell.x + 8f, coinCell.center.y - coinIcon * .5f, coinIcon, coinIcon), 10);
+                DrawHudNumber(HudStatusTextBounds(0, cutoutGap), sim.Coins.ToString(), HudStatusValueFontSize);
                 DrawHudNumber(HudStatusTextBounds(1, cutoutGap), FormatRemainingTime(sim.TimeRemaining), HudClockFontSize);
-                DrawHudNumber(HudStatusTextBounds(2, cutoutGap), "NIVEL " + (sim.LevelIndex + 1), 20);
+                DrawHudNumber(HudStatusTextBounds(2, cutoutGap), "NIVEL " + (sim.LevelIndex + 1), HudLevelFontSize);
                 for (int slot = 0; slot < sim.ProductCount; slot++)
                     DrawQuotaChip(sim, slot, HudQuotaCellBounds(slot, sim.ProductCount, cutoutGap));
             }
             finally { GUI.matrix = previous; GUI.color = color; layoutVerticalScale = previousVertical; }
         }
 
-        private static float HudStatusRowY(Rect cutoutGap) =>
-            cutoutGap.width > 0f ? cutoutGap.yMax + 2f : 3f;
-
         private static Rect HudStatusCellBounds(int slot, Rect cutoutGap)
         {
             const float padding = 8f, spacing = 6f;
             float width = (W - padding * 2f - spacing * 2f) / 3f;
-            return new Rect(padding + slot * (width + spacing), HudStatusRowY(cutoutGap), width, HudStateRowHeight);
+            float x = padding + slot * (width + spacing);
+            float y = HudTopPadding;
+            Rect statusBand = new Rect(x, 0f, width, HudStateRowHeight);
+            if (cutoutGap.width > 0f && statusBand.Overlaps(cutoutGap))
+                y = cutoutGap.yMax + HudCutoutClearance;
+            return new Rect(x, y, width, HudStateRowHeight);
         }
 
         private static Rect HudStatusTextBounds(int slot, Rect cutoutGap)
         {
             Rect bounds = slot == 0 ? HudCoins : slot == 1 ? HudTime : HudLevel;
-            return new Rect(bounds.x, HudStatusRowY(cutoutGap), bounds.width, bounds.height);
+            Rect cell = HudStatusCellBounds(slot, cutoutGap);
+            return new Rect(bounds.x, cell.y, bounds.width, HudStateRowHeight);
         }
 
         private static Rect HudQuotaGridBounds(Rect cutoutGap)
         {
-            float y = HudStatusRowY(cutoutGap) + HudStateRowHeight + HudObjectiveGap;
-            return new Rect(HudQuotaGrid.x, y, HudQuotaGrid.width, HudQuotaGrid.height);
+            float statusBottom = Mathf.Max(
+                HudStatusCellBounds(0, cutoutGap).yMax,
+                Mathf.Max(HudStatusCellBounds(1, cutoutGap).yMax, HudStatusCellBounds(2, cutoutGap).yMax));
+            return new Rect(HudQuotaGrid.x, statusBottom + HudObjectiveGap, HudQuotaGrid.width, HudQuotaGrid.height);
         }
 
         private static float HudBarHeightFor(Rect cutoutGap) =>
@@ -1303,21 +1342,24 @@ namespace HayChoriYPaty
         private static Rect HudQuotaCellBounds(int slot, int productCount, Rect cutoutGap)
         {
             if (slot < 0 || slot >= productCount || productCount <= 0) return Rect.zero;
-            const float spacing = 2f;
+            const float spacing = HudObjectiveGap;
             Rect area = HudQuotaGridBounds(cutoutGap);
             int columns = HudQuotaColumnCount(productCount);
             int rows = HudQuotaRowCount(productCount);
             int row = slot / columns;
             int column = slot % columns;
             int itemsInRow = Mathf.Min(columns, productCount - row * columns);
-            float width = Mathf.Min(170f, (area.width - spacing * (columns - 1) - 2f) / columns);
-            float height = rows == 1 ? Mathf.Min(31f, area.height - 2f)
-                : (area.height - spacing * (rows - 1) - 2f) / rows;
+            float width = Mathf.Min(170f, (area.width - spacing * (columns - 1) - HudChipInset) / columns);
+            float height = rows == 1 ? Mathf.Min(31f * HudBandScale, area.height - HudChipInset)
+                : (area.height - spacing * (rows - 1) - HudChipInset) / rows;
             float rowWidth = itemsInRow * width + (itemsInRow - 1) * spacing;
             float x = area.center.x - rowWidth * .5f + column * (width + spacing);
             float y = area.y + row * (height + spacing) + (rows == 1 ? (area.height - height) * .5f : 0f);
             return new Rect(x, y, width, height);
         }
+
+        private static Color HudQuotaCardColor(bool complete) =>
+            complete ? new Color(.20f, .48f, .24f, .46f) : new Color(.04f, .34f, .50f, .44f);
 
         private void DrawQuotaChip(StreetSimulation sim, int slot, Rect bounds)
         {
@@ -1326,15 +1368,17 @@ namespace HayChoriYPaty
             int goal = sim.GetProductGoal(product);
             int delivered = sim.GetProductDelivered(product);
             bool complete = sim.IsProductGoalComplete(product);
-            FillRect(bounds, complete ? new Color(.33f, .54f, .27f, .92f) : new Color(.25f, .15f, .08f, .80f));
-            float iconSize = Mathf.Min(18f, bounds.height - 4f);
-            Rect icon = new Rect(bounds.x + 2f, bounds.center.y - iconSize * .5f, iconSize, iconSize);
+            FillRect(bounds, HudQuotaCardColor(complete));
+            float iconSize = Mathf.Min(HudQuotaIconMaxSize, bounds.height - HudChipInset * 2f);
+            Rect icon = new Rect(bounds.x + HudChipInset, bounds.center.y - iconSize * .5f, iconSize, iconSize);
             DrawHudIcon(icon, product);
-            Rect counter = new Rect(icon.xMax + 2f, bounds.y + 1f,
-                Mathf.Max(0f, bounds.xMax - icon.xMax - 5f), Mathf.Max(0f, bounds.height - 3f));
-            int fontSize = Mathf.Clamp(Mathf.FloorToInt(bounds.height * .78f), 12, 20);
+            Rect counter = new Rect(icon.xMax + HudChipInset, bounds.y + HudChipTextTopInset,
+                Mathf.Max(0f, bounds.xMax - icon.xMax - HudChipInset * 2.5f),
+                Mathf.Max(0f, bounds.height - HudChipTextHeightInset));
+            int fontSize = Mathf.Clamp(Mathf.FloorToInt(bounds.height * .78f), 12, 24);
             DrawHudNumber(counter, delivered + "/" + goal, fontSize);
-            Rect track = new Rect(bounds.x + 2f, bounds.yMax - 2f, bounds.width - 4f, 1f);
+            Rect track = new Rect(bounds.x + HudChipInset, bounds.yMax - HudChipInset,
+                bounds.width - HudChipInset * 2f, HudChipTrackHeight);
             FillRect(track, new Color(.09f, .06f, .035f, .85f));
             FillRect(new Rect(track.x, track.y, track.width * Mathf.Clamp01(delivered / (float)Mathf.Max(1, goal)), track.height),
                 complete ? new Color(.46f, .95f, .28f) : new Color(1f, .75f, .25f));
@@ -1380,13 +1424,13 @@ namespace HayChoriYPaty
         }
         private static Texture2D CreateHudBar() => CreateHudBarTexture(false);
         private static Texture2D CreateHudBarTexture(bool cutout)
-            => CreateHudBarTexture(cutout, cutout ? CutoutHudGap : Rect.zero);
+            => CreateHudBarTexture(cutout ? CutoutHudGap : Rect.zero, false);
 
-        private static Texture2D CreateHudBarTexture(bool cutout, Rect clearGap)
+        private static Texture2D CreateHudBarTexture(Rect reservedHudGap, bool keepReadable)
         {
             // Original code-authored artwork: no reference pixels or baked-in live numbers.
             const int width = 1080;
-            int height = Mathf.CeilToInt(HudBarHeightFor(clearGap) * 2f);
+            int height = Mathf.CeilToInt(HudBarHeightFor(reservedHudGap) * 2f);
             float logicalHeight = height * .5f;
             var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
             {
@@ -1400,9 +1444,9 @@ namespace HayChoriYPaty
             var rim = new Rect(0, 0, W, logicalHeight);
             var face = new Rect(2, 2, W - 4f, logicalHeight - 4f);
             Rect[] stateCells = {
-                HudStatusCellBounds(0, clearGap),
-                HudStatusCellBounds(1, clearGap),
-                HudStatusCellBounds(2, clearGap)
+                HudStatusCellBounds(0, reservedHudGap),
+                HudStatusCellBounds(1, reservedHudGap),
+                HudStatusCellBounds(2, reservedHudGap)
             };
             Color[] capsuleTops = { new Color(.96f, .66f, .20f), new Color(.26f, .73f, .79f), new Color(.60f, .86f, .17f) };
             Color[] capsuleBottoms = { new Color(.62f, .27f, .07f), new Color(.04f, .35f, .46f), new Color(.20f, .48f, .04f) };
@@ -1428,13 +1472,10 @@ namespace HayChoriYPaty
                 bool minuteHand = Mathf.Abs(dx) < .8f && dy >= -5.5f && dy <= .8f;
                 bool hourHand = dx >= -.5f && dx <= 4.8f && Mathf.Abs(dy - dx * .5f) < .9f;
                 if (minuteHand || hourHand) color = new Color(.24f, .12f, .045f);
-                if (cutout && clearGap.width > 0f && clearGap.height > 0f &&
-                    px >= clearGap.xMin && px < clearGap.xMax && py >= clearGap.yMin && py < clearGap.yMax)
-                    color = Color.clear;
                 pixels[y * width + x] = color;
             }
             texture.SetPixels(pixels);
-            texture.Apply(false, true);
+            texture.Apply(false, !keepReadable);
             return texture;
         }
         private static Color HudCapsule(Color below, float x, float y, Rect bounds, Color top, Color bottom)

@@ -81,7 +81,7 @@ namespace HayChoriYPaty.Tests
         {
             object theme = ThemeType.GetMethod("ForLevel", BindingFlags.Public | BindingFlags.Static).Invoke(null, new object[] { 1 });
             System.Type renderer = System.Type.GetType("HayChoriYPaty.ClubPennantRenderer, Assembly-CSharp", true);
-            Texture2D texture = (Texture2D)renderer.GetMethod("CreateTexture", BindingFlags.Public | BindingFlags.Static).Invoke(null, new object[] { theme, true });
+            Texture2D texture = (Texture2D)renderer.GetMethod("CreateTexture", BindingFlags.Public | BindingFlags.Static).Invoke(null, new object[] { theme, true, false });
             try
             {
                 Assert.AreEqual((int)renderer.GetField("TextureWidth").GetValue(null), texture.width);

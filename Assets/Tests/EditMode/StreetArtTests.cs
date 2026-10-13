@@ -977,12 +977,20 @@ namespace HayChoriYPaty.Tests
             MethodInfo create = renderer.GetMethod("CreateTexture", BindingFlags.Static | BindingFlags.Public);
             Texture2D opaque = (Texture2D)create.Invoke(null, new[] { theme, (object)true, true });
             Texture2D transparent = (Texture2D)create.Invoke(null, new[] { theme, (object)true, false });
+            MethodInfo adaptiveCreate = renderer.GetMethod("CreateAdaptiveTexture", BindingFlags.Static | BindingFlags.Public);
+            Texture2D expanded = (Texture2D)adaptiveCreate.Invoke(null, new object[] { theme, 120f, true, true });
             try
             {
                 Assert.AreEqual(255, opaque.GetPixel(opaque.width - 1, opaque.height - 1).a * 255f, .01f);
                 Assert.AreEqual(0, transparent.GetPixel(transparent.width - 1, transparent.height - 1).a, .01f);
+                Assert.AreEqual(240, expanded.height, "Adaptive pennant geometry is authored at the footer's logical height.");
             }
-            finally { UnityEngine.Object.DestroyImmediate(opaque); UnityEngine.Object.DestroyImmediate(transparent); }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(opaque);
+                UnityEngine.Object.DestroyImmediate(transparent);
+                UnityEngine.Object.DestroyImmediate(expanded);
+            }
         }
 
         [Test]
@@ -1033,12 +1041,15 @@ namespace HayChoriYPaty.Tests
             for (int i = 0; i < statusCells.Length; i++)
             {
                 statusCells[i] = (Rect)statusMethod.Invoke(null, new object[] { i, gap });
-                Assert.GreaterOrEqual(statusCells[i].yMin, gap.yMax, "Status cell " + i + " must sit below the camera channel");
                 for (int j = 0; j < i; j++) Assert.IsFalse(statusCells[i].Overlaps(statusCells[j]));
             }
+            Assert.AreEqual(1.2f, statusCells[0].yMin, .01f, "Coins remain at the top edge.");
+            Assert.GreaterOrEqual(statusCells[1].yMin, gap.yMax, "Only the clock avoids the centered camera channel.");
+            Assert.IsFalse(statusCells[1].Overlaps(gap));
+            Assert.AreEqual(1.2f, statusCells[2].yMin, .01f, "The level badge remains at the top edge.");
             float cutoutHeight = (float)View.GetMethod("HudBarHeightFor", BindingFlags.Static | BindingFlags.NonPublic)
                 .Invoke(null, new object[] { gap });
-            Assert.Greater(cutoutHeight, 70f, "The second row must remain fully visible below the notch");
+            Assert.Greater(cutoutHeight, 81.6f, "The second row must remain fully visible below the notch.");
         }
 
         [TestCase(1080, 1920)]
@@ -1115,6 +1126,7 @@ namespace HayChoriYPaty.Tests
                 Rect badge = (Rect)footerType.GetField("LevelBadge").GetValue(footer);
                 Rect drawnBadge = new Rect(badge.x, badge.y * verticalScale, badge.width, badge.height);
                 Rect flags = (Rect)footerType.GetField("Pennants").GetValue(footer);
+                Assert.AreEqual(canvasHeight, flags.yMax, .1f, "Level " + level + " pennants should end flush with the safe footer edge.");
                 Assert.GreaterOrEqual(drawnBadge.yMin, stageBottom - .1f, "Level " + level + " footer entered the playfield.");
                 for (int i = 0; i < raw.Length; i++)
                 {
@@ -1151,8 +1163,36 @@ namespace HayChoriYPaty.Tests
                 Assert.IsFalse(drawnSelector.Overlaps(drawnReadyBadge));
                 Rect readyFlags = (Rect)ready.GetType().GetField("Pennants").GetValue(ready);
                 Assert.GreaterOrEqual(readyFlags.yMin, drawnSelector.yMax - .1f);
-                Assert.LessOrEqual(readyFlags.yMax, canvasHeight + .1f);
+                Assert.AreEqual(canvasHeight, readyFlags.yMax, .1f);
             }
+        }
+
+        [Test]
+        public void PennantsUseTheDecorativeBottomInsetWithoutMovingFooterControls()
+        {
+            Vector2 screen = new Vector2(1080f, 2400f);
+            Rect safe = new Rect(0f, 80f, 1080f, 2260f);
+            Rect viewport = (Rect)View.GetMethod("CanvasViewport", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { screen, safe });
+            float canvasHeight = (float)View.GetMethod("CanvasLogicalHeight", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { viewport });
+            float bottomBleed = (float)View.GetMethod("SafeAreaBottomInsetLogical", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { viewport, screen.y });
+            Assert.AreEqual(40f, bottomBleed, .01f);
+
+            Type simType = Type.GetType("HayChoriYPaty.StreetSimulation, Assembly-CSharp", true);
+            Type balanceType = Type.GetType("HayChoriYPaty.StreetBalance, Assembly-CSharp", true);
+            ConstructorInfo constructor = simType.GetConstructor(new[] {
+                balanceType, typeof(int), typeof(float), typeof(int), typeof(int), typeof(int)
+            });
+            object sim = constructor.Invoke(new object[] { Activator.CreateInstance(balanceType), 10, 5f, 0, 1, 0 });
+            object footer = View.GetMethod("BuildResponsiveFooterLayoutWithBottomBleed", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { sim, canvasHeight, true, false, bottomBleed });
+            Rect[] cards = (Rect[])footer.GetType().GetField("UpgradeBounds").GetValue(footer);
+            Rect pennants = (Rect)footer.GetType().GetField("Pennants").GetValue(footer);
+            Assert.AreEqual(canvasHeight + bottomBleed, pennants.yMax, .01f);
+            Assert.Greater(pennants.height, 80f, "Tall safe areas expand pennants into the former blank band.");
+            foreach (Rect card in cards) Assert.GreaterOrEqual(pennants.yMin, card.yMax - .01f);
         }
 
         [Test]
@@ -1301,14 +1341,15 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
             Rect coins = (Rect)View.GetField("HudCoins", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
             Rect clock = (Rect)View.GetField("HudTime", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
             Rect level = (Rect)View.GetField("HudLevel", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
-            Assert.AreEqual(0f, bar.yMin); Assert.AreEqual(70f, bar.height);
-            Assert.AreEqual(new Rect(8, 29, 524, 38), grid);
+            Assert.AreEqual(0f, bar.yMin); Assert.AreEqual(81.6f, bar.height, .01f);
+            Assert.AreEqual(8f, grid.x, .01f); Assert.AreEqual(32.4f, grid.y, .01f);
+            Assert.AreEqual(524f, grid.width, .01f); Assert.AreEqual(45.6f, grid.height, .01f);
             Assert.IsTrue(bar.Contains(coins.min)); Assert.IsTrue(bar.Contains(coins.max));
             Assert.IsTrue(bar.Contains(clock.min)); Assert.IsTrue(bar.Contains(clock.max));
             Assert.IsTrue(bar.Contains(level.min)); Assert.IsTrue(bar.Contains(level.max));
             Assert.IsFalse(coins.Overlaps(clock)); Assert.IsFalse(coins.Overlaps(level)); Assert.IsFalse(clock.Overlaps(level));
             Assert.IsFalse(coins.Overlaps(grid)); Assert.IsFalse(clock.Overlaps(grid)); Assert.IsFalse(level.Overlaps(grid));
-            Assert.AreEqual(new Vector2(135, 24), clock.size);
+            Assert.AreEqual(135f, clock.width, .01f); Assert.AreEqual(28.8f, clock.height, .01f);
             MethodInfo cellMethod = View.GetMethod("HudQuotaCellBounds", BindingFlags.Static | BindingFlags.NonPublic,
                 null, new[] { typeof(int) }, null);
             Rect[] cells = new Rect[7];
@@ -1320,7 +1361,22 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
             }
             foreach (string name in new[] { "CutoutHudCoins", "CutoutHudTime", "CutoutHudSales" })
                 Assert.IsNull(View.GetField(name, BindingFlags.Static | BindingFlags.NonPublic), name + " is not a supported HUD layout");
-            Assert.AreEqual(24, (int)View.GetField("HudClockFontSize", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue());
+            Assert.AreEqual(29, (int)View.GetField("HudClockFontSize", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue());
+            Assert.AreEqual(29, (int)View.GetField("HudStatusValueFontSize", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue());
+            Assert.AreEqual(24, (int)View.GetField("HudLevelFontSize", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue());
+            Assert.AreEqual(24f, (float)View.GetField("HudStatusIconSize", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue());
+        }
+
+        [Test]
+        public void ObjectiveChipsUseTranslucentCoolColors()
+        {
+            MethodInfo colorMethod = View.GetMethod("HudQuotaCardColor", BindingFlags.Static | BindingFlags.NonPublic);
+            Color active = (Color)colorMethod.Invoke(null, new object[] { false });
+            Color complete = (Color)colorMethod.Invoke(null, new object[] { true });
+            Assert.LessOrEqual(active.a, .5f);
+            Assert.LessOrEqual(complete.a, .5f);
+            Assert.Greater(active.b, active.r, "The active objective strip contrasts with the warm wooden header.");
+            Assert.AreNotEqual(active, complete);
         }
 
         [TestCase(1, 1, 1)]
@@ -1387,7 +1443,7 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
                 null, new[] { typeof(bool) }, null).Invoke(null, new object[] { true });
             try
             {
-                Assert.AreEqual(1080, texture.width); Assert.AreEqual(140, texture.height);
+                Assert.AreEqual(1080, texture.width); Assert.AreEqual(164, texture.height);
                 Assert.AreEqual(TextureWrapMode.Clamp, texture.wrapMode);
                 Assert.IsTrue(texture.name.Contains("objective"));
                 Assert.AreEqual(HideFlags.HideAndDontSave, texture.hideFlags);
@@ -1395,6 +1451,22 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
                 Assert.IsFalse(texture.isReadable); Assert.IsFalse(cutout.isReadable);
             }
             finally { UnityEngine.Object.DestroyImmediate(texture); UnityEngine.Object.DestroyImmediate(cutout); }
+        }
+
+        [Test]
+        public void HudCutoutKeepsTheHudBackgroundInsteadOfRevealingScenery()
+        {
+            MethodInfo create = View.GetMethod("CreateHudBarTexture", BindingFlags.Static | BindingFlags.NonPublic,
+                null, new[] { typeof(Rect), typeof(bool) }, null);
+            Assert.IsNotNull(create);
+            var gap = new Rect(232f, 0f, 70f, 34f);
+            Texture2D texture = (Texture2D)create.Invoke(null, new object[] { gap, true });
+            try
+            {
+                Color underCamera = texture.GetPixel(Mathf.RoundToInt(267f * 2f), texture.height - Mathf.RoundToInt(17f * 2f) - 1);
+                Assert.Greater(underCamera.a, .99f, "The notch channel keeps HUD fill; only the physical camera covers it.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(texture); }
         }
 
         [TestCase(700f)]
@@ -1439,11 +1511,15 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
             string complete = (string)summary.Invoke(null, new object[] { sim, false });
             string pending = (string)summary.Invoke(null, new object[] { sim, true });
             Assert.AreEqual(2, complete.Split('\n').Length);
-            foreach (string name in new[] { "CHORI", "PATY", "BOND", "VACÍO", "COCA", "FERNET", "CERVEZA" })
-            {
-                Assert.IsTrue(complete.Contains(name));
-                Assert.IsTrue(pending.Contains(name));
-            }
+            int[] delivered = (int[])simType.GetField("deliveredByProduct", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(sim);
+            delivered[5] = (int)simType.GetMethod("GetProductGoal").Invoke(sim, new object[] { 5 });
+            complete = (string)summary.Invoke(null, new object[] { sim, false });
+            pending = (string)summary.Invoke(null, new object[] { sim, true });
+            foreach (string code in new[] { "CHO", "PAT", "BON", "VAC", "COC", "FER", "CER" })
+                Assert.IsTrue(complete.Contains(code + " "), "Complete result lists every catalog product.");
+            foreach (string code in new[] { "CHO", "PAT", "BON", "VAC", "COC", "CER" })
+                Assert.IsTrue(pending.Contains(code + " "), "Defeat result lists each incomplete product.");
+            Assert.IsFalse(pending.Contains("FER "), "Defeat result omits the completed Fernet quota.");
         }
 
         [TestCase(21f, "00:21")]

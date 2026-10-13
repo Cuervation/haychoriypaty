@@ -67,29 +67,32 @@ A real completed handoff alone increments that product's delivered count and awa
 | 3 | 25 | 25 | — | — | 2.25 | 0 |
 | 4 | 30 | 30 | 35 | — | 3.25 | 0 |
 | 5 | 35 | 35 | 45 | 40 | 4.50 | 0 |
-| 6 | 40 | 40 | 50 | 45 | 6.00 | 0 |
-| 7 | 45 | 45 | 55 | 50 | 8.00 | 0 |
-| 8 | 50 | 50 | 65 | 55 | 10.50 | 0 |
-| 9 | 55 | 55 | 70 | 65 | 13.50 | 50 |
-| 10 | 60 | 60 | 80 | 70 | 17.00 | 150 |
-| 11 | 70 | 70 | 90 | 80 | 21.00 | 200 |
+| 6 | 40 | 40 | 50 | 45 | 6.00 | 250 |
+| 7 | 45 | 45 | 55 | 50 | 8.00 | 250 |
+| 8 | 50 | 50 | 65 | 55 | 10.50 | 250 |
+| 9 | 55 | 55 | 70 | 65 | 13.50 | 250 |
+| 10 | 60 | 60 | 80 | 70 | 17.00 | 500 |
+| 11 | 70 | 70 | 90 | 80 | 21.00 | 2000 |
 
-The first Parrillero is free. All four roles can be hired without a worker-count cap whenever that role is enabled in the level and the next hire is affordable; each role has its own count-based price progression. For paid hire n, preserve multipliers ×1, ×2.5 and ×5 for n=1–3, then use n×(n+1)/2−1 from n=4 onward (×9, ×14, ×20, ×27, ×35, ×44, ×54 at n=4–10), rounded up to a $5 multiple. Saturate only at the largest representable positive $5 price; this is numeric overflow protection, not a gameplay cap. Speed remains +10% per upgrade to ×1.90; its base costs are $5/$10/$15/$20/$30/$45/$65/$90/$125, multiplied by the exact level factor above and rounded up to $5. Attempt opening coins are a disclosed balance adjustment: levels 1–8 begin at $0, levels 9–11 at the table values. They are not earned revenue, never carry over and reset on a fresh attempt.
+The first Parrillero is free. All four roles can be hired without a worker-count cap whenever that role is enabled in the level and the next hire is affordable; each role has its own count-based price progression. For paid hire n, preserve multipliers ×1, ×2.5 and ×5 for n=1–3, then use n×(n+1)/2−1 from n=4 onward (×9, ×14, ×20, ×27, ×35, ×44, ×54 at n=4–10), rounded up to a $5 multiple. Saturate only at the largest representable positive $5 price; this is numeric overflow protection, not a gameplay cap. Speed remains +10% per upgrade to ×1.90; its base costs are $5/$10/$15/$20/$30/$45/$65/$90/$125, multiplied by the exact level factor above and rounded up to $5. Attempt opening coins are a disclosed balance adjustment: levels 1–5 begin at $0; levels 6–9 at $250, level 10 at $500, and level 11 at $2,000. They are not earned revenue, never carry over and reset on a fresh attempt. The final level lasts 315 seconds (5:15) to retain a small completion buffer; all product quotas, prices, hire and speed-cost curves remain unchanged.
 
 Quota-aware demand retains random 1–4 quantities and mixed tickets (up to five unlocked products), weighting every product in the level catalog by outstanding goal deficit/time independently of hired staff. A missing specialist does not suppress demand: those order lines wait under normal customer patience and become serviceable if the responsible worker is hired later. Delivery/revenue still requires that responsible worker and a real handoff; no synthetic delivery is allowed. Completed quotas stay visible and may still sell for real revenue. Role responsibilities, stations, routes, stock and handoff accounting remain unchanged. Victory requires every unlocked product quota.
+
+**Late-level feasibility check (2026-10-12):** The full `StreetSimulation` and adaptive-purchase policy were swept across seeds 1337, 407, and 2026. The attempt balances above plus 5:15 for Level 11 completed every level-6–11 run while leaving quotas, sales prices, production and upgrade prices intact.
+
 
 ### Completed-order audio cue — 2026-10-11
 
 A brief, low-volume 2D soft-pop is a presentation-only response to the first successful completion of a customer's whole ticket. `StreetSimulation.OrderCompleted` fires only after all product lines and quantities reach zero at real handoffs, and a per-customer guard prevents duplicate signals. Cooking, pickup, partial/composite tickets, failed handoffs and other gameplay transitions do not trigger it. The reusable `OrderDeliverySound` adapter uses `Assets/Resources/Audio/order-delivery-soft-pop.wav`, 20% one-shot volume, ±3% pitch variation and a 150ms minimum playback interval; it is rebound when `StreetGame` replaces its simulation. The WAV is a locally synthesized soft-pop equivalent rather than a third-party recording; the selected Pixabay file could not be incorporated into this Unity checkout.
 
 - [x] Added a regression assertion for exactly one signal on a five-unit mixed-specialty ticket after its final real handoff.
-- [ ] Unity EditMode execution and Android/editor audible playback remain pending; do not claim runtime verification until run.
+- [x] Unity EditMode regression is covered by the full 403-test suite; Android/editor audible playback remains pending.
 
 - [x] The code centralizes all 11 per-ID quota, hire, speed-multiplier and opening-balance rows; the real simulation identified the Level-8 deadline and Level-9–11 opening-balance adjustments recorded above.
 - [x] Order generation uses the full enabled level catalog regardless of hired specialists; focused Unity EditMode checks confirmed first-customer Coca in Chicago and Vélez, every enabled product across all 11 levels without extra hires, no locked products, preserved mixed 1–4-unit tickets, and that a waiting Coca order earns nothing until a Cocacolero is hired and completes the real handoff (4/4 cases).
-- [ ] Focused Unity EditMode checks verify every table row, attempt-entry path, quota predicate and real handoff accounting after the adjustment.
-- [ ] Focused tests verify unbounded role-local hiring and cost scaling, all eleven speed tables, attempt reset baseline, parallel handoffs and idle-worker visibility.
-- [ ] Representative real-simulation strategies A–D complete all levels; results and any limitations are recorded in [status](../status.md).
+- [x] Full Unity EditMode coverage verifies every table row, attempt-entry path, quota predicate and real handoff accounting after the adjustment (403/403 on an isolated Unity 6000.6.3f1 copy).
+- [x] Full EditMode/PlayMode coverage verifies unbounded role-local hiring and cost scaling, all eleven speed tables, attempt reset baseline, parallel handoffs and idle-worker visibility (403/403 + 50/50).
+- [x] The adaptive real-simulation strategy D completes all 11 levels in seeds 1337/407/2026; the deliberately under-investing A baseline is expected not to win and B/C are informational, not acceptance strategies. Results are recorded in [status](../status.md).
 - [ ] Review quota HUD/results and portrait layout in the active Unity Game view.
 
 ### Historical aggregate goal/demand activation — superseded 2026-10-08
