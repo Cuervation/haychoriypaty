@@ -45,10 +45,14 @@ namespace HayChoriYPaty
         private void OnEnable()
         {
             if (balance == null) balance = new StreetBalance();
+            bool hasPriorSave = PlayerPrefs.HasKey(SaveKey);
             save = Load();
+            bool hasPersistedMarket = save.market != null;
             market = new StreetMarket(save.market, balance);
             save.market = market.Data;
-            market.Initialize(save.unlockedLevel);
+            if (!hasPriorSave) market.InitializeNewGameKit();
+            else if (hasPersistedMarket) market.InitializeExistingSave(save.unlockedLevel);
+            else market.Initialize(save.unlockedLevel); // One-time compatibility migration for pre-Mercado saves.
             market.RecoverAbandonedAttempt();
             selectedLevel = Mathf.Clamp(selectedLevel, 0, save.unlockedLevel);
             sim = new StreetSimulation(balance, selectedLevel, save.price);

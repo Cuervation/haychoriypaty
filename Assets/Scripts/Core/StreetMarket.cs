@@ -164,6 +164,42 @@ namespace HayChoriYPaty
             Data.initializedUnlockedLevel = unlockedLevel;
         }
 
+        /// <summary>Grants the calculated opening kit only when StreetGame has no prior save.</summary>
+        public void InitializeNewGameKit()
+        {
+            if (Data.kitGranted && Data.initializedUnlockedLevel >= 0) return;
+            InitializeStartingBalance();
+            int[] required = RequiredUnits(new StreetSimulation(Balance, 0, 5f));
+            for (int i = 0; i < Data.stockUnits.Length; i++)
+                Data.stockUnits[i] = required[i] <= 0 ? 0 : (int)Math.Min(int.MaxValue, ((long)required[i] * 110L + 99L) / 100L);
+            Data.kitGranted = true;
+            Data.initializedUnlockedLevel = 0;
+        }
+
+        /// <summary>Marks an existing persisted inventory initialized without topping it up or replacing it.</summary>
+        public void InitializeExistingSave(int unlockedLevel)
+        {
+            unlockedLevel = Math.Max(0, Math.Min(StreetSimulation.LevelNames.Length - 1, unlockedLevel));
+            if (Data.kitGranted && Data.initializedUnlockedLevel >= 0) return;
+            InitializeStartingBalance();
+            if (unlockedLevel > 0)
+                for (int level = 0; level < unlockedLevel; level++)
+                {
+                    StreetSimulation prior = new StreetSimulation(Balance, level, 5f);
+                    long reward = EstimatedGrossSales(prior) / 2;
+                    Data.highestRecognizedSalesByLevel[level] = Math.Max(Data.highestRecognizedSalesByLevel[level], reward);
+                    Data.bonusPaidByLevel[level] = true;
+                }
+            Data.kitGranted = true;
+            Data.initializedUnlockedLevel = unlockedLevel;
+        }
+
+        private void InitializeStartingBalance()
+        {
+            if (BalanceCents == 0 && Balance.market != null)
+                Data.balanceCents = Math.Max(0L, Balance.market.startingBalanceCents);
+        }
+
         public bool RecoverAbandonedAttempt()
         {
             if (!Data.attemptActive) return false;

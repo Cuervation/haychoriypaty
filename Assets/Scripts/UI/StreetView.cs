@@ -279,17 +279,21 @@ namespace HayChoriYPaty
         private const int LevelSelectorBackAction = 8, VictoryExitAction = 9, RiotReturnAction = 15, LevelSelectFirstAction = 30;
         private const int LevelSelectorPreviousAction = 17, LevelSelectorNextAction = 18, LevelSelectorPageSize = 6;
         private const int ReadyLevelSelectorAction = 19;
-        private const int MarketBackAction = 70, MarketTabAction = 71, MarketHeladeraAction = 72;
+        private const int MarketBackAction = 70, MarketOtherAction = 190;
         private const int MarketMinusAction = 80, MarketPlusAction = 100, MarketPlusTenAction = 120;
         private const int MarketBuyAction = 140, MarketMissingAction = 150, MarketPlayAction = 160;
-        private const int MarketRowMissingAction = 170;
+        private const int MarketRowMissingAction = 170, MarketExpandAction = 180;
         private const int MarketCloseAction = 161, ResultLevelsAction = 163;
         private static readonly Rect ReadyLevelSelector = new Rect(161, 905, 218, 44);
         private static readonly Rect LevelSelectPrevious = new Rect(28, 666, 112, 48);
         private static readonly Rect LevelSelectNext = new Rect(400, 666, 112, 48);
         private int levelSelectPage;
         private bool marketActive, marketFromSelector;
-        private int marketTab;
+        private bool marketOtherExpanded;
+        private int marketExpandedIngredient = -1;
+        private GUIStyle marketLabelStyle;
+        private readonly Sprite[] marketIngredientSprites = new Sprite[10];
+        private Texture2D marketFernetBottle, marketCocaLarge;
         private readonly int[] marketPendingPacks = new int[10];
         private float marketScroll, marketPointerDownY, marketPointerDownScroll, marketLastPurchaseTime = -10f;
         private bool marketDragging, marketPointerHeld;
@@ -458,6 +462,12 @@ namespace HayChoriYPaty
             chicagoGrill = Resources.Load<Texture2D>(ChicagoGrillResource);
             servingTable = Resources.Load<Texture2D>("street-serving-table-v1");
             gameCoin = Resources.Load<Texture2D>("street-coin-gold-v2");
+            string[] marketArt = { "meat-chori/meat-chori_Raw", "sandwich-paty/sandwich-paty",
+                "meat-paty/meat-paty_Raw", "sandwich-paty/sandwich-paty", "meat-bondiola/meat-bondiola_Raw",
+                "meat-vacio/meat-vacio_Raw", "coca/coca", "beer/beer" };
+            for (int i = 0; i < marketArt.Length; i++) marketIngredientSprites[i] = Resources.Load<Sprite>("ModularKitchen/Sprites/" + marketArt[i]);
+            marketFernetBottle = Resources.Load<Texture2D>("ModularKitchen/Art/fernet-bottle-1l-v1");
+            marketCocaLarge = Resources.Load<Texture2D>("ModularKitchen/Art/coca-2500ml-display-v1");
             coverArt = Resources.Load<Texture2D>(IntroBackdropResource);
             victoryPopup = Resources.Load<Texture2D>(VictoryPopupResource);
             riotBackdrop = Resources.Load<Texture2D>(RiotBackdropResource);
@@ -481,7 +491,7 @@ namespace HayChoriYPaty
             introActive = true;
             levelSelectActive = false;
             introStarted = Time.unscaledTime;
-            tiny = small = text = title = header = amount = invisible = menuTitle = levelTitle = null;
+            tiny = small = text = title = header = amount = invisible = menuTitle = levelTitle = marketLabelStyle = null;
             upgradeTitle = upgradePercent = upgradePrice = riotCue = null;
             pressedAction = lastAction = 0;
         }
@@ -655,7 +665,7 @@ namespace HayChoriYPaty
             }
             if (levelSelectActive)
             {
-                if (a == MarketCloseAction) { levelSelectActive=false; marketActive=true; marketFromSelector=true; marketTab=1; marketMessage=""; return; }
+                if (a == MarketCloseAction) { levelSelectActive=false; marketActive=true; marketFromSelector=true; marketMessage=""; marketScroll=0; marketOtherExpanded=false; marketExpandedIngredient=-1; return; }
                 if (a == LevelSelectorPreviousAction || a == LevelSelectorNextAction)
                 {
                     levelSelectPage = Mathf.Clamp(levelSelectPage + (a == LevelSelectorNextAction ? 1 : -1),
@@ -680,9 +690,9 @@ namespace HayChoriYPaty
                         if (level == 0)
                         {
                             if (game.CanStartRound) { marketMessage=""; game.TryStartRound(); }
-                            else { marketMessage="Falta stock para iniciar. Revisá Mercado / Heladera."; levelSelectActive=true; }
+                            else { marketMessage="Falta stock para iniciar. Revisá Mercado."; levelSelectActive=true; }
                         }
-                        else { marketFromSelector = true; marketActive = true; marketTab = 0; marketMessage = ""; }
+                        else { marketFromSelector = true; marketActive = true; marketMessage = ""; marketScroll = 0; marketOtherExpanded = false; marketExpandedIngredient = -1; }
                     }
                     lastAction = a; feedbackUntil = Time.unscaledTime + 0.22f; feedbackScale = selectionSucceeded ? 1.04f : 0.97f;
                     return;
@@ -691,9 +701,14 @@ namespace HayChoriYPaty
             }
             if (marketActive)
             {
-                if (a == MarketBackAction) { marketActive=false; marketMessage=game.CanStartRound?"Stock suficiente para jugar.":"Falta stock para iniciar. Revisá Mercado / Heladera."; if(marketFromSelector)levelSelectActive=true; return; }
-                if (a == MarketTabAction) { if(game.UnlockedLevel>0){marketTab=0; marketScroll=0;} return; }
-                if (a == MarketHeladeraAction) { marketTab=1; marketScroll=0; return; }
+                if (a == MarketBackAction) { marketActive=false; marketMessage=game.CanStartRound?"Stock suficiente para jugar.":"Falta stock para iniciar. Revisá Mercado."; if(marketFromSelector)levelSelectActive=true; return; }
+                if (a == MarketOtherAction) { marketOtherExpanded = !marketOtherExpanded; marketScroll = Mathf.Clamp(marketScroll, 0, MarketMaxScroll()); return; }
+                if (a >= MarketExpandAction && a < MarketExpandAction + 10)
+                {
+                    int id = a - MarketExpandAction;
+                    marketExpandedIngredient = MarketExpandedId() == id ? -2 : id;
+                    MarketRevealIngredient(id); return;
+                }
                 if (a >= MarketMinusAction && a < MarketMinusAction+10) { int id=a-MarketMinusAction; marketPendingPacks[id]=Mathf.Max(0,marketPendingPacks[id]-1); return; }
                 if (a >= MarketPlusAction && a < MarketPlusAction+10) { int id=a-MarketPlusAction; marketPendingPacks[id]=Mathf.Min(99,marketPendingPacks[id]+1); return; }
                 if (a >= MarketPlusTenAction && a < MarketPlusTenAction+10) { int id=a-MarketPlusTenAction; marketPendingPacks[id]=Mathf.Min(99,marketPendingPacks[id]+10); return; }
@@ -704,7 +719,7 @@ namespace HayChoriYPaty
                     marketLastPurchaseTime=Time.unscaledTime;
                     int packs=marketPendingPacks[id];long cost=(long)packs*game.Market.PackPriceCents(id);
                     bool success=packs>0&&cost<=game.Market.BalanceCents&&game.TryBuyIngredient(id,packs,game.Market.NextPurchaseId);
-                    marketMessage=success?"Compra realizada":cost>game.Market.BalanceCents?MarketInsufficientFundsMessage(cost):"No se pudo realizar la compra";if(success)marketPendingPacks[id]=0;return;
+                    marketMessage=success?"Compra realizada":cost>game.Market.BalanceCents?MarketInsufficientFundsMessage(cost):"No se pudo realizar la compra";if(success){marketPendingPacks[id]=0;if(game.Market.MissingUnits(game.Sim,id)==0)marketExpandedIngredient=-1;marketScroll=Mathf.Clamp(marketScroll,0,MarketMaxScroll());}return;
                 }
                 if(a>=MarketRowMissingAction&&a<MarketRowMissingAction+10)
                 {
@@ -744,7 +759,7 @@ namespace HayChoriYPaty
                 if (game.Sim.LevelIndex < StreetSimulation.LevelNames.Length - 1)
                 {
                     ok=game.NextLevel();
-                    if(ok){marketActive=true;marketFromSelector=true;marketTab=0;marketMessage="";}
+                    if(ok){marketActive=true;marketFromSelector=true;marketOtherExpanded=false;marketMessage="";}
                 }
                 else ok=false;
             }
@@ -1791,274 +1806,421 @@ namespace HayChoriYPaty
             Label(new Rect(148, 675, 244, 30), "CANCHAS " + (levelSelectPage + 1) + " / " + ((StreetSimulation.LevelNames.Length + LevelSelectorPageSize - 1) / LevelSelectorPageSize), small);
             Label(LevelSelectHint, string.IsNullOrEmpty(marketMessage) ? "Superá cada cancha para desbloquear la siguiente" : marketMessage, small);
             DrawStandardButton(LevelSelectBack, LevelSelectorBackAction, "VOLVER");
-            DrawStandardButton(MarketSelectorBounds(), MarketCloseAction, "MERCADO / HELADERA");
+            DrawStandardButton(MarketSelectorBounds(), MarketCloseAction, "MERCADO");
         }
 
-        private static Rect MarketBackBounds() => new Rect(20, 30, 150, 54);
+        private static Rect MarketBackBounds() => new Rect(12, 10, 132, 50);
         private static Rect MarketSelectorBounds() => new Rect(115, 766, 310, 64);
-        private const float MarketObjectiveTop = 198f;
-        private const float MarketFooterInfoInset = 184f;
+        private const float MarketObjectiveTop = 202f;
+        private const float MarketCompactRowHeight = 104f, MarketPurchaseHeight = 64f, MarketOthersHeight = 48f;
+        private static readonly Color MarketInk = new Color(.20f, .08f, .025f);
+        private static readonly Color MarketCream = new Color(.98f, .88f, .69f);
+        private static readonly Color MarketGreen = new Color(.06f, .42f, .09f);
+        private static readonly Color MarketRed = new Color(.73f, .09f, .04f);
         private Rect MarketBodyBounds() => MarketBodyBounds(game.Sim.ProductCount, logicalCanvasHeight);
-        private static Rect MarketBodyBounds(int productCount, float canvasHeight)
+        private static Rect MarketBodyBounds(int productCount, float canvasHeight) =>
+            new Rect(12, MarketBodyTop(productCount), W - 24, Mathf.Max(140f, canvasHeight - 184f - MarketBodyTop(productCount)));
+        private static Rect MarketEconomyFooterBounds(float canvasHeight) => new Rect(12, canvasHeight - 154f, W - 24, 66f);
+        private static Rect MarketBuyMissingBounds(float canvasHeight)
         {
-            float top = MarketBodyTop(productCount);
-            float bottom = Mathf.Max(top + 145f, canvasHeight - 218f);
-            return new Rect(22, top, W - 44, bottom - top);
+            Rect footer = MarketEconomyFooterBounds(canvasHeight);
+            return new Rect(footer.x + 270f, footer.y + 8f, footer.width - 282f, footer.height - 16f);
         }
-        private static Rect MarketEconomyFooterBounds(float canvasHeight) =>
-            new Rect(26, canvasHeight - MarketFooterInfoInset, W - 52, 20f);
         private static int MarketObjectiveRowCount(int productCount)
         {
             int count = Mathf.Clamp(productCount, 0, 7);
-            return count <= 0 ? 0 : count <= 3 ? 1 : 2;
+            return count == 0 ? 0 : count <= 3 ? 1 : 2;
         }
         private static int MarketObjectiveFirstRowCount(int productCount)
         {
             int count = Mathf.Clamp(productCount, 0, 7);
-            if (count <= 3) return count;
-            return count == 4 ? 2 : count == 7 ? 4 : 3;
+            return count <= 3 ? count : count == 4 ? 2 : count == 7 ? 4 : 3;
         }
         private static int MarketObjectiveItemsInRow(int productCount, int row)
         {
-            int count = Mathf.Clamp(productCount, 0, 7);
-            int rows = MarketObjectiveRowCount(count);
+            int count = Mathf.Clamp(productCount, 0, 7), rows = MarketObjectiveRowCount(count);
             if (row < 0 || row >= rows) return 0;
-            if (rows == 1) return count;
-            int first = MarketObjectiveFirstRowCount(count);
-            return row == 0 ? first : count - first;
+            return rows == 1 ? count : row == 0 ? MarketObjectiveFirstRowCount(count) : count - MarketObjectiveFirstRowCount(count);
         }
-        private static float MarketObjectiveCardHeight(int productCount) =>
-            Mathf.Clamp(productCount, 0, 7) <= 3 ? 36f : 24f;
+        private static float MarketObjectiveCardHeight(int productCount) => productCount <= 3 ? 72f : 64f;
         private static float MarketObjectiveBandHeight(int productCount)
         {
             int rows = MarketObjectiveRowCount(productCount);
-            if (rows == 0) return 0f;
-            return rows * MarketObjectiveCardHeight(productCount) + (rows - 1) * 4f;
+            return rows == 0 ? 0f : rows * MarketObjectiveCardHeight(productCount) + (rows - 1) * 4f;
         }
         private static Rect MarketObjectiveCardBounds(int slot, int productCount)
         {
             int count = Mathf.Clamp(productCount, 0, 7);
             if (slot < 0 || slot >= count) return Rect.zero;
-            int first = MarketObjectiveFirstRowCount(count);
-            int row = count > 3 && slot >= first ? 1 : 0;
-            int column = row == 0 ? slot : slot - first;
-            int itemsInRow = MarketObjectiveItemsInRow(count, row);
+            int first = MarketObjectiveFirstRowCount(count), row = count > 3 && slot >= first ? 1 : 0;
+            int column = row == 0 ? slot : slot - first, itemsInRow = MarketObjectiveItemsInRow(count, row);
             const float gap = 6f;
-            Rect area = new Rect(26f, MarketObjectiveTop, W - 52f, MarketObjectiveBandHeight(count));
-            float width = itemsInRow == 1 ? Mathf.Min(240f, area.width)
-                : (area.width - gap * (itemsInRow - 1)) / itemsInRow;
+            float width = itemsInRow == 1 ? 240f : (W - 52f - gap * (itemsInRow - 1)) / itemsInRow;
             float rowWidth = width * itemsInRow + gap * (itemsInRow - 1);
-            float x = area.center.x - rowWidth * .5f + column * (width + gap);
-            float y = area.y + row * (MarketObjectiveCardHeight(count) + 4f);
-            return new Rect(x, y, width, MarketObjectiveCardHeight(count));
+            return new Rect((W - rowWidth) * .5f + column * (width + gap),
+                MarketObjectiveTop + row * (MarketObjectiveCardHeight(count) + 4f), width, MarketObjectiveCardHeight(count));
         }
-        private static float MarketBodyTop(int productCount)
+        private static Rect MarketEconomyBounds(int productCount) =>
+            new Rect(46, MarketObjectiveTop + MarketObjectiveBandHeight(productCount) + 8f, W - 92, 58f);
+        private static float MarketBodyTop(int productCount) => MarketEconomyBounds(productCount).yMax + 10f;
+        private int[] MarketIngredientIds(bool required)
         {
-            float economyY = MarketObjectiveTop + MarketObjectiveBandHeight(productCount) + 4f;
-            return economyY + 26f + 6f;
+            int[] need = game.Market.RequiredUnits(game.Sim);
+            var ids = new System.Collections.Generic.List<int>();
+            for (int i = 0; i < need.Length; i++)
+                if (required ? need[i] > 0 : need[i] == 0 && game.Market.IsIngredientUnlocked(i, game.UnlockedLevel)) ids.Add(i);
+            return ids.ToArray();
         }
         private int[] MarketVisibleIngredients()
         {
-            if(marketTab==1){var all=new int[StreetIngredientCatalog.Names.Length];for(int i=0;i<all.Length;i++)all[i]=i;return all;}
-            var visible=new System.Collections.Generic.List<int>();
-            for(int i=0;i<StreetIngredientCatalog.Names.Length;i++)if(game.Market.IsIngredientUnlocked(i,game.UnlockedLevel))visible.Add(i);
-            return visible.ToArray();
+            var ids = new System.Collections.Generic.List<int>(MarketIngredientIds(true));
+            if (marketOtherExpanded) ids.AddRange(MarketIngredientIds(false));
+            return ids.ToArray();
         }
-        private float MarketMaxScroll() => Mathf.Max(0, MarketVisibleIngredients().Length * 145f - MarketBodyBounds().height);
+        private int MarketExpandedId()
+        {
+            if (marketExpandedIngredient == -2) return -1;
+            foreach (int id in MarketVisibleIngredients()) if (id == marketExpandedIngredient && game.Market.IsIngredientUnlocked(id, game.UnlockedLevel)) return id;
+            foreach (int id in MarketIngredientIds(true)) if (game.Market.MissingUnits(game.Sim, id) > 0) return id;
+            return -1;
+        }
+        private float MarketRowHeight(int id) =>
+            (game.Market.RequiredUnits(game.Sim)[id] > 0 ? MarketCompactRowHeight : 96f) + (id == MarketExpandedId() ? MarketPurchaseHeight : 0f);
+        private float MarketRequiredContentHeight()
+        {
+            float height = 0f;
+            foreach (int id in MarketIngredientIds(true)) height += MarketRowHeight(id);
+            return height;
+        }
+        private float MarketContentHeight()
+        {
+            float height = 0f;
+            foreach (int id in MarketVisibleIngredients()) height += MarketRowHeight(id);
+            if (MarketIngredientIds(false).Length > 0) height += MarketOthersHeight;
+            return height;
+        }
+        private float MarketMaxScroll() => Mathf.Max(0, MarketContentHeight() - MarketBodyBounds().height);
         private Rect MarketRowBounds(int slot)
         {
-            Rect body=MarketBodyBounds();return new Rect(body.x,body.y+slot*145f-marketScroll,body.width,145f);
+            int[] visible = MarketVisibleIngredients();
+            if (slot < 0 || slot >= visible.Length) return Rect.zero;
+            Rect body = MarketBodyBounds();
+            float y = body.y - marketScroll;
+            for (int i = 0; i < slot; i++) y += MarketRowHeight(visible[i]);
+            if (slot >= MarketIngredientIds(true).Length) y += MarketOthersHeight;
+            return new Rect(body.x, y, body.width, MarketRowHeight(visible[slot]));
         }
+        private Rect MarketOthersBounds() => new Rect(12, MarketBodyBounds().y + MarketRequiredContentHeight() - marketScroll, W - 24, MarketOthersHeight);
+        // These same rectangles drive native pointer input and IMGUI rendering.
+        private static Rect MarketPurchaseControlBounds(Rect row, int action)
+        {
+            float y = row.yMax - MarketPurchaseHeight + 10f;
+            switch (action)
+            {
+                case MarketMinusAction: return new Rect(row.x + 10, y, 40, 46);
+                case MarketPlusAction: return new Rect(row.x + 98, y, 40, 46);
+                case MarketPlusTenAction: return new Rect(row.x + 142, y, 56, 46);
+                case MarketBuyAction: return new Rect(row.x + 202, y, 142, 46);
+                default: return new Rect(row.x + 348, y, row.width - 358, 46);
+            }
+        }
+        private static bool MarketPurchaseControlsVisible(Rect row, Rect viewport) =>
+            row.yMax <= viewport.yMax && row.yMax - MarketPurchaseHeight >= viewport.y;
         private int HitMarketAction(Vector2 p)
         {
             if (MarketBackBounds().Contains(p)) return MarketBackAction;
-            if (game.UnlockedLevel > 0 && new Rect(24, 92, 238, 54).Contains(p)) return MarketTabAction;
-            if (new Rect(278, 92, 238, 54).Contains(p)) return MarketHeladeraAction;
-            Rect body=MarketBodyBounds();
-            if (!body.Contains(p))
+            if (MarketBuyMissingBounds(logicalCanvasHeight).Contains(p)) return MarketCanBuyMissing() ? MarketMissingAction : 0;
+            if (MarketPlayBounds().Contains(p)) return MarketPlayAction;
+            Rect body = MarketBodyBounds();
+            if (!body.Contains(p)) return 0;
+            if (MarketIngredientIds(false).Length > 0 && MarketOthersBounds().Contains(p)) return MarketOtherAction;
+            int[] visible = MarketVisibleIngredients();
+            for (int slot = 0; slot < visible.Length; slot++)
             {
-                if (MarketBottomBounds().Contains(p)) return MarketBackAction;
-                if (MarketBuyMissingBounds().Contains(p)) return MarketMissingAction;
-                if (MarketPlayBounds().Contains(p)) return MarketPlayAction;
-                return 0;
-            }
-            int[] visible=MarketVisibleIngredients();
-            for(int slot=0;slot<visible.Length;slot++)
-            {
-                int id=visible[slot];Rect row=MarketRowBounds(slot);
-                if(row.y<body.y||row.yMax>body.yMax||!row.Contains(p))continue;
-                if(marketTab==1) return 0;
-                if(new Rect(row.x+2,row.y+97,42,44).Contains(p))return MarketMinusAction+id;
-                if(new Rect(row.x+92,row.y+97,42,44).Contains(p))return MarketPlusAction+id;
-                if(new Rect(row.x+137,row.y+97,60,44).Contains(p))return MarketPlusTenAction+id;
-                if(new Rect(row.x+200,row.y+97,136,44).Contains(p))return MarketBuyAction+id;
-                if(new Rect(row.x+339,row.y+97,156,44).Contains(p))return MarketRowMissingAction+id;
+                int id = visible[slot]; Rect row = MarketRowBounds(slot);
+                if (!row.Contains(p) || !game.Market.IsIngredientUnlocked(id, game.UnlockedLevel)) continue;
+                if (id == MarketExpandedId() && MarketPurchaseControlsVisible(row, body))
+                    foreach (int action in new[] { MarketMinusAction, MarketPlusAction, MarketPlusTenAction, MarketBuyAction, MarketRowMissingAction })
+                        if (MarketPurchaseControlBounds(row, action).Contains(p)) return action + id;
+                return MarketExpandAction + id;
             }
             return 0;
         }
-        private Rect MarketBottomBounds() => new Rect(22, logicalCanvasHeight-154, 150, 50);
-        private Rect MarketBuyMissingBounds() => new Rect(180, logicalCanvasHeight-154, W-202, 50);
-        private Rect MarketPlayBounds() => new Rect(22, logicalCanvasHeight-86, W-44, 58);
-
+        private Rect MarketPlayBounds() => new Rect(22, logicalCanvasHeight - 80, W - 44, 66);
+        private void MarketRevealIngredient(int id)
+        {
+            int[] ids = MarketVisibleIngredients();
+            int slot = System.Array.IndexOf(ids, id);
+            if (slot < 0) { marketScroll = Mathf.Clamp(marketScroll, 0, MarketMaxScroll()); return; }
+            Rect row = MarketRowBounds(slot), body = MarketBodyBounds();
+            if (row.y < body.y) marketScroll -= body.y - row.y;
+            else if (row.yMax > body.yMax) marketScroll += row.yMax - body.yMax;
+            marketScroll = Mathf.Clamp(marketScroll, 0, MarketMaxScroll());
+        }
         private void DrawMarketScreen()
         {
-            FillRect(new Rect(0,0,W,logicalCanvasHeight),new Color(.055f,.035f,.025f,.97f));
-            DrawStandardButton(MarketBackBounds(),MarketBackAction,"NIVELES");
-            OutlineLabel(new Rect(168,25,204,54),marketTab==0?"MERCADO":"HELADERA",menuTitle,new Color(1f,.86f,.48f),1.5f);
-            DrawStandardButton(new Rect(24,92,238,54),MarketTabAction,"MERCADO",game.UnlockedLevel>0);
-            DrawStandardButton(new Rect(278,92,238,54),MarketHeladeraAction,"HELADERA");
-            int level=game.Sim.LevelIndex;
-            MarketLabel(new Rect(28,151,484,28),"NIVEL "+(level+1)+" — "+StreetSimulation.LevelDisplayNames[level].ToUpperInvariant(),header);
-            MarketLabel(new Rect(28,180,484,18),"OBJETIVOS DEL PARTIDO",tiny);
+            Texture2D scene = MarketSceneArt();
+            if (scene != null) DrawRawCover(new Rect(0, 0, W, logicalCanvasHeight), scene, new Rect(0, 0, scene.width, scene.height * .58f));
+            FillRect(new Rect(0, 0, W, logicalCanvasHeight), new Color(.04f, .025f, .015f, .40f));
+            DrawStandardButton(MarketBackBounds(), MarketBackAction, "NIVELES");
+            DrawMarketWoodPanel(new Rect(150, 8, 240, 56), new Color(.39f, .17f, .04f));
+            MarketText(new Rect(164, 10, 212, 50), "MERCADO", 34, Color.white);
+            DrawMarketClubHeader();
+            MarketText(new Rect(26, 176, 488, 22), "OBJETIVOS DEL PARTIDO", 18, Color.white);
             DrawMarketObjectiveCards(game.Sim);
-            string economyStatus = "SALDO DISPONIBLE " + FormatMarketMoney(game.Market.BalanceCents);
-            if (!MarketHasMissing()) economyStatus += "   ·   STOCK COMPLETO";
-            MarketLabel(MarketEconomyBounds(game.Sim.ProductCount),economyStatus,small);
-            Rect body=MarketBodyBounds();
-            FillRect(body,new Color(.07f,.05f,.035f,.9f));
-            Event evt=Event.current;
-            if(evt.type==EventType.ScrollWheel)
+            Rect economy = MarketEconomyBounds(game.Sim.ProductCount);
+            DrawMarketWoodPanel(economy, new Color(.095f, .055f, .025f, .98f));
+            if (gameCoin != null) GUI.DrawTexture(new Rect(economy.x + 12, economy.y + 11, 36, 36), gameCoin, ScaleMode.ScaleToFit, true);
+            MarketText(new Rect(economy.x + 54, economy.y + 12, 210, 32), "SALDO DISPONIBLE", 18, Color.white, TextAnchor.MiddleLeft);
+            MarketText(new Rect(economy.x + 267, economy.y + 7, economy.width - 278, 44), FormatMarketMoney(game.Market.BalanceCents), 38, new Color(.35f, 1f, .15f), TextAnchor.MiddleRight);
+            Rect body = MarketBodyBounds();
+            Event evt = Event.current;
+            if (evt.type == EventType.ScrollWheel)
             {
-                Vector2 point=ScreenToLayoutPoint(evt.mousePosition,new Vector2(Screen.width,Screen.height),CanvasViewport(new Vector2(Screen.width,Screen.height),Screen.safeArea));
+                Vector2 point = ScreenToLayoutPoint(evt.mousePosition, new Vector2(Screen.width, Screen.height), CanvasViewport(new Vector2(Screen.width, Screen.height), Screen.safeArea));
                 point.y *= logicalCanvasHeight / H;
-                if(body.Contains(point)){marketScroll=Mathf.Clamp(marketScroll+evt.delta.y*24f,0,MarketMaxScroll());evt.Use();}
+                if (body.Contains(point)) { marketScroll = Mathf.Clamp(marketScroll + evt.delta.y * 24f, 0, MarketMaxScroll()); evt.Use(); }
             }
-            int[] visible=MarketVisibleIngredients();
-            for(int slot=0;slot<visible.Length;slot++)
-            {
-                int id=visible[slot];Rect row=MarketRowBounds(slot);
-                if(row.y<body.y||row.yMax>body.yMax)continue; // Never draw a clipped card's text or hit controls.
-                FillRect(row,slot%2==0?new Color(.18f,.12f,.07f):new Color(.14f,.10f,.06f));
-                int needed=game.Market.RequiredUnits(game.Sim)[id];
-                int missing=game.Market.MissingUnits(game.Sim,id);
-                int packs=marketPendingPacks[id];
-                MarketLabel(new Rect(row.x+10,row.y+5,183,30),StreetIngredientCatalog.Names[id],text);
-                MarketLabel(new Rect(row.x+194,row.y+6,row.width-204,28),"PACK "+FormatMarketMoney(game.Market.PackPriceCents(id))+" · "+StreetIngredientCatalog.PackUnits[id]+" u.",small);
-                string inventory=(id==8||id==9)?FormatBottleStock(game.Market.Units(id)):game.Market.Units(id)+" unidades";
-                MarketLabel(new Rect(row.x+10,row.y+36,row.width-20,24),"OBJETIVO "+needed+"   ·   STOCK "+inventory+"   ·   FALTAN "+missing,small);
-                if(marketTab==0)
-                {
-                    MarketLabel(new Rect(row.x+10,row.y+63,476,25),"SELECCIÓN "+packs+" packs   ·   TOTAL "+FormatMarketMoney((long)packs*game.Market.PackPriceCents(id)),small);
-                    DrawStandardButton(new Rect(row.x+2,row.y+97,42,44),MarketMinusAction+id,"−",packs>0);
-                    MarketLabel(new Rect(row.x+47,row.y+97,42,44),packs.ToString(),small);
-                    DrawStandardButton(new Rect(row.x+92,row.y+97,42,44),MarketPlusAction+id,"+",true);
-                    DrawStandardButton(new Rect(row.x+137,row.y+97,60,44),MarketPlusTenAction+id,"+10",true);
-                    DrawStandardButton(new Rect(row.x+200,row.y+97,136,44),MarketBuyAction+id,"COMPRAR",packs>0);
-                    DrawStandardButton(new Rect(row.x+339,row.y+97,156,44),MarketRowMissingAction+id,"FALTANTES",missing>0);
-                }
-                else MarketLabel(new Rect(row.x+10,row.y+66,row.width-20,58),"HELADERA  ·  "+inventory,text);
-            }
-            float maxScroll = MarketMaxScroll();
-            if (maxScroll > 0f)
-            {
-                Rect track = new Rect(W-17, body.y, 4, body.height);
-                FillRect(track, new Color(.06f,.04f,.02f,.7f));
-                float thumbHeight = Mathf.Max(28f, body.height * body.height / (body.height + maxScroll));
-                FillRect(new Rect(track.x, track.y + (track.height-thumbHeight)*marketScroll/maxScroll, 4, thumbHeight), new Color(1f,.86f,.48f,.9f));
-            }
-            MarketLabel(new Rect(26,body.yMax+3,W-52,28),!string.IsNullOrEmpty(marketMessage)?marketMessage:maxScroll>0?"Deslizá la lista de ingredientes":"",small);
-            MarketLabel(MarketEconomyFooterBounds(logicalCanvasHeight),MarketEconomyFooterSummary(),small);
-            DrawStandardButton(MarketBottomBounds(),MarketBackAction,"NIVELES");
-            bool canBuyMissing=MarketCanBuyMissing();
-            DrawStandardButton(MarketBuyMissingBounds(),MarketMissingAction,MarketHasMissing()?(canBuyMissing?"COMPRAR FALTANTES":"SALDO INSUFICIENTE"):"STOCK COMPLETO",canBuyMissing);
-            DrawStandardButton(MarketPlayBounds(),MarketPlayAction,"JUGAR PARTIDO",game.CanStartRound);
-        }
-        private void MarketLabel(Rect bounds, string value, GUIStyle style)
-        {
-            Color prior = style.normal.textColor;
-            int priorSize = style.fontSize;
+            marketScroll = Mathf.Clamp(marketScroll, 0, MarketMaxScroll());
+            int[] visible = MarketVisibleIngredients();
+            GUI.BeginGroup(body);
             try
             {
-                style.normal.textColor = new Color(1f, .95f, .84f);
-                style.fontSize = FitVictoryFont(style, value, priorSize, bounds);
-                Label(bounds, value, style);
+                for (int slot = 0; slot < visible.Length; slot++)
+                {
+                    Rect row = MarketRowBounds(slot);
+                    if (row.yMax <= body.y || row.y >= body.yMax) continue;
+                    bool showControls = MarketPurchaseControlsVisible(row, body);
+                    row.x -= body.x; row.y -= body.y;
+                    DrawMarketIngredientRow(row, visible[slot], showControls);
+                }
+                if (MarketIngredientIds(false).Length > 0)
+                {
+                    Rect others = MarketOthersBounds(); others.x -= body.x; others.y -= body.y;
+                    DrawMarketOthers(others);
+                }
             }
-            finally { style.normal.textColor = prior; style.fontSize = priorSize; }
+            finally { GUI.EndGroup(); }
+            DrawMarketScrollBar(body);
+            if (!string.IsNullOrEmpty(marketMessage))
+                MarketText(new Rect(20, logicalCanvasHeight - 180, W - 40, 20), marketMessage, 14, Color.white);
+            DrawMarketEconomyFooter();
+            DrawMarketPlayButton(MarketPlayBounds(), "JUGAR PARTIDO", game.CanStartRound);
         }
-
-        private static Rect MarketEconomyBounds(int productCount)
+        private Texture2D MarketSceneArt()
         {
-            float y = MarketObjectiveTop + MarketObjectiveBandHeight(productCount) + 4f;
-            return new Rect(28f, y, 484f, 26f);
+            switch (VisualLevelIndex)
+            {
+                case 0: return muralArt; case 1: return chicagoBackground; case 2: return velezBackground;
+                case 3: return ferroBackground; case 4: return independienteBackground; case 5: return racingBackground;
+                case 6: return sanLorenzoBackground; case 7: return riverMural; case 8: return bocaBackground;
+                case 9: return camionerosBackground; default: return losRedondosBackground;
+            }
+        }
+        private void DrawMarketClubHeader()
+        {
+            DrawMarketWoodPanel(new Rect(12, 70, W - 24, 100), new Color(.10f, .055f, .025f, .97f));
+            int level = game.Sim.LevelIndex;
+            Texture2D crest = level == 0 ? allBoysCrest : level == 1 ? chicagoCrest : level == 2 ? velezCrest : null;
+            Rect badge = new Rect(28, 82, 76, 76);
+            if (crest != null) GUI.DrawTexture(badge, crest, ScaleMode.ScaleToFit, true);
+            else
+            {
+                // No invented official crest: existing club palette/initials identify levels without a crest asset.
+                DrawMarketWoodPanel(badge, ClubVisualTheme.ForLevel(level).PrimaryColor);
+                MarketText(new Rect(badge.x + 6, badge.y + 20, badge.width - 12, 36), MarketClubInitials(level), 22, Color.white);
+            }
+            string[] club = StreetSimulation.LevelDisplayNames[level].Split('/');
+            MarketText(new Rect(120, 77, 386, 24), "NIVEL " + (level + 1), 19, new Color(1f, .78f, .34f), TextAnchor.MiddleLeft);
+            MarketText(new Rect(120, 100, 386, 35), club[0].Trim().ToUpperInvariant(), 29, Color.white, TextAnchor.MiddleLeft);
+            MarketText(new Rect(120, 136, 386, 23), club.Length > 1 ? club[1].Trim().ToUpperInvariant() : "", 19, new Color(1f, .78f, .34f), TextAnchor.MiddleLeft);
+        }
+        private static string MarketClubInitials(int level)
+        {
+            string name = StreetSimulation.LevelNames[level];
+            string[] words = name.Split(' '); string value = "";
+            foreach (string word in words) if (word.Length > 0 && value.Length < 3) value += char.ToUpperInvariant(word[0]);
+            return value;
         }
         private static string MarketObjectiveCaption(StreetSimulation sim, int slot, bool compact)
         {
             if (sim == null || slot < 0 || slot >= sim.ProductCount) return string.Empty;
             int product = sim.GetAvailableProduct(slot);
-            if (product < 0 || product >= StreetSimulation.ProductNames.Length) return string.Empty;
-            string name;
-            if (compact) name = ProductShortNames[product];
-            else
-            {
-                string fullName = StreetSimulation.ProductNames[product];
-                int separator = fullName.IndexOf(' ');
-                name = separator > 0 ? fullName.Substring(0, separator) : fullName;
-            }
-            return name + " ×" + sim.GetProductGoal(product);
+            string name = StreetSimulation.ProductNames[product]; int separator = name.IndexOf(' ');
+            return (separator > 0 ? name.Substring(0, separator) : name) + " ×" + sim.GetProductGoal(product);
         }
         private void DrawMarketObjectiveCards(StreetSimulation sim)
         {
-            if (sim == null) return;
-            int count = Mathf.Clamp(sim.ProductCount, 0, 7);
-            bool compact = count >= 5;
-            for (int slot = 0; slot < count; slot++)
+            for (int slot = 0; slot < sim.ProductCount; slot++)
             {
-                int product = sim.GetAvailableProduct(slot);
-                if (product < 0 || product >= StreetSimulation.ProductNames.Length) continue;
-                Rect card = MarketObjectiveCardBounds(slot, count);
-                FillRect(card, new Color(.31f, .17f, .075f, .98f));
-                Rect face = new Rect(card.x + 1f, card.y + 1f, card.width - 2f, card.height - 2f);
-                FillRect(face, new Color(.96f, .87f, .70f, .98f));
-                float iconSize = Mathf.Min(compact || count >= 4 ? 18f : 27f, face.height - 4f);
-                Rect icon = new Rect(face.x + 4f, face.center.y - iconSize * .5f, iconSize, iconSize);
+                int product = sim.GetAvailableProduct(slot); Rect card = MarketObjectiveCardBounds(slot, sim.ProductCount);
+                DrawMarketWoodPanel(card, MarketCream);
+                float iconSize = sim.ProductCount > 3 ? 32f : 48f;
+                Rect icon = new Rect(card.x + 10, card.center.y - iconSize * .5f, iconSize, iconSize);
                 DrawProductIcon(icon, product);
-                Rect caption = new Rect(icon.xMax + 4f, face.y + 1f,
-                    Mathf.Max(0f, face.xMax - icon.xMax - 8f), face.height - 2f);
-                MarketObjectiveLabel(caption, MarketObjectiveCaption(sim, slot, compact), compact);
+                float textX = icon.xMax + 4f, textWidth = card.xMax - textX - 10f;
+                string name = MarketObjectiveCaption(sim, slot, false).Split('×')[0].Trim();
+                MarketText(new Rect(textX, card.y + 12, textWidth, 20), name, sim.ProductCount > 3 ? 14 : 20, MarketInk, TextAnchor.MiddleLeft);
+                MarketText(new Rect(textX, card.y + 31, textWidth, 27), "×" + sim.GetProductGoal(product), sim.ProductCount > 3 ? 24 : 28, MarketInk, TextAnchor.MiddleLeft);
             }
         }
-        private void MarketObjectiveLabel(Rect bounds, string value, bool compact)
+        private static string MarketIngredientName(int id) => id == 9 ? "Coca 2,25 L" : StreetIngredientCatalog.Names[id];
+        private void DrawMarketIngredientRow(Rect row, int id, bool showControls)
         {
-            int priorSize = small.fontSize;
-            TextAnchor priorAlignment = small.alignment;
-            bool priorWrap = small.wordWrap;
-            Color priorColor = small.normal.textColor;
-            try
+            bool expanded = id == MarketExpandedId();
+            float faceHeight = row.height - (expanded ? MarketPurchaseHeight : 0f);
+            Rect card = new Rect(row.x, row.y + 2, row.width, row.height - 5);
+            DrawMarketWoodPanel(card, MarketCream);
+            float iconSize = faceHeight < 100 ? 62 : 78;
+            DrawMarketIngredientIcon(new Rect(row.x + 14, row.y + 13, iconSize, iconSize), id);
+            float nameX = row.x + 100;
+            MarketText(new Rect(nameX, row.y + 17, 144, 27), MarketIngredientName(id), 28, MarketInk, TextAnchor.MiddleLeft);
+            MarketText(new Rect(nameX, row.y + 47, 94, 26), FormatMarketMoney(game.Market.PackPriceCents(id)), 25, MarketInk, TextAnchor.MiddleLeft);
+            MarketText(new Rect(nameX + 96, row.y + 47, 50, 27), StreetIngredientCatalog.PackUnits[id] == 1 ? "1 u." : "4 porc.", 12, MarketInk, TextAnchor.MiddleLeft);
+            int needed = game.Market.RequiredUnits(game.Sim)[id], stock = game.Market.Units(id), missing = game.Market.MissingUnits(game.Sim, id);
+            float statsX = row.x + 252, statsWidth = row.width - 264, column = statsWidth / 3f;
+            string[] labels = { "NECESITÁS", "TENÉS", "FALTAN" };
+            int[] values = { needed, stock, missing };
+            for (int i = 0; i < 3; i++)
             {
-                small.alignment = TextAnchor.MiddleLeft;
-                small.wordWrap = false;
-                small.normal.textColor = new Color(.20f, .095f, .035f);
-                small.fontSize = FitVictoryFont(small, value, compact ? 13 : 14, bounds);
-                Label(bounds, value, small);
+                MarketText(new Rect(statsX + i * column, row.y + 12, column, 17), labels[i], 13, MarketInk);
+                MarketText(new Rect(statsX + i * column, row.y + 28, column, 30), values[i].ToString(), 28,
+                    i == 1 ? MarketGreen : i == 2 && missing > 0 ? MarketRed : MarketInk);
             }
-            finally
+            Rect track = new Rect(statsX, row.y + 66, statsWidth - 84, 16);
+            FillRect(track, new Color(.22f, .16f, .10f));
+            bool unlocked = game.Market.IsIngredientUnlocked(id, game.UnlockedLevel);
+            float coverage = needed > 0 ? Mathf.Clamp01((float)stock / needed) : 0f;
+            FillRect(new Rect(track.x + 2, track.y + 2, (track.width - 4) * coverage, track.height - 4), missing > 0 ? new Color(1f, .65f, .05f) : new Color(.20f, .78f, .09f));
+            MarketText(new Rect(track.xMax + 4, row.y + 62, 80, 24), !unlocked ? "BLOQUEADO" : needed == 0 ? "RESERVA" : missing == 0 ? "COMPLETO" : "FALTANTE", 12,
+                !unlocked || needed == 0 ? MarketInk : missing > 0 ? MarketRed : MarketGreen);
+            if (unlocked)
             {
-                small.fontSize = priorSize;
-                small.alignment = priorAlignment;
-                small.wordWrap = priorWrap;
-                small.normal.textColor = priorColor;
+                if (expanded && showControls)
+                {
+                    int packs = marketPendingPacks[id];
+                    DrawStandardButton(MarketPurchaseControlBounds(row, MarketMinusAction), MarketMinusAction + id, "−", packs > 0);
+                    Rect minus = MarketPurchaseControlBounds(row, MarketMinusAction);
+                    FillRect(new Rect(row.x + 54, minus.y + 3, 40, 40), new Color(.13f, .08f, .04f));
+                    MarketText(new Rect(row.x + 54, minus.y, 40, 46), packs.ToString(), 24, Color.white);
+                    DrawStandardButton(MarketPurchaseControlBounds(row, MarketPlusAction), MarketPlusAction + id, "+");
+                    DrawStandardButton(MarketPurchaseControlBounds(row, MarketPlusTenAction), MarketPlusTenAction + id, "+10");
+                    long cost = (long)packs * game.Market.PackPriceCents(id);
+                    DrawStandardButton(MarketPurchaseControlBounds(row, MarketBuyAction), MarketBuyAction + id, "COMPRAR\n" + FormatMarketMoney(cost), packs > 0 && cost <= game.Market.BalanceCents);
+                    DrawStandardButton(MarketPurchaseControlBounds(row, MarketRowMissingAction), MarketRowMissingAction + id, "COMPRAR\nFALTANTES", missing > 0 && (long)game.Market.MissingPacks(game.Sim, id) * game.Market.PackPriceCents(id) <= game.Market.BalanceCents);
+                }
+                // Row expansion never buys anything. On Android the hit surface is limited to its compact face.
+                bool prior = GUI.enabled;
+                if (GUI.Button(new Rect(row.x, row.y, row.width, faceHeight), "", invisible)) NativeAction(MarketExpandAction + id);
+                GUI.enabled = prior;
             }
+        }
+        private void DrawMarketIngredientIcon(Rect bounds, int id)
+        {
+            if (id == 8 || id == 9)
+            {
+                Texture2D bottle = id == 8 ? marketFernetBottle : marketCocaLarge;
+                if (bottle != null) { GUI.DrawTexture(bounds, bottle, ScaleMode.ScaleToFit, true); return; }
+            }
+            Sprite sprite = marketIngredientSprites[id];
+            if (sprite == null) { DrawProductIcon(bounds, id == 6 ? 4 : id == 7 ? 6 : id == 8 ? 5 : 0); return; }
+            Rect source = sprite.rect;
+            source.y = sprite.texture.height - source.yMax;
+            // Dedicated bread sprites do not exist: use the complete upper-bun area for both breads.
+            if (id == 1 || id == 3) source.height *= .45f;
+            float scale = Mathf.Min(bounds.width / source.width, bounds.height / source.height);
+            Rect fit = new Rect(bounds.center.x - source.width * scale * .5f, bounds.center.y - source.height * scale * .5f,
+                source.width * scale, source.height * scale);
+            DrawRaw(fit, sprite.texture, source, true, false);
+        }
+        private void DrawMarketScrollBar(Rect body)
+        {
+            float max = MarketMaxScroll(); if (max <= 0) return;
+            Rect track = new Rect(W - 9, body.y, 4, body.height);
+            FillRect(track, new Color(.05f, .035f, .015f, .8f));
+            float height = Mathf.Max(28, body.height * body.height / (body.height + max));
+            FillRect(new Rect(track.x, track.y + (track.height - height) * marketScroll / max, 4, height), new Color(1f, .80f, .36f));
+        }
+        private void DrawMarketOthers(Rect bounds)
+        {
+            DrawMarketWoodPanel(new Rect(bounds.x, bounds.y + 2, bounds.width, bounds.height - 4), new Color(.10f, .055f, .025f));
+            int[] others = MarketIngredientIds(false);
+            for (int i = 0; i < Mathf.Min(3, others.Length); i++) DrawMarketIngredientIcon(new Rect(bounds.x + 10 + i * 34, bounds.y + 8, 30, 30), others[i]);
+            MarketText(new Rect(bounds.x + 118, bounds.y + 7, bounds.width - 156, 32), "OTROS INGREDIENTES", 18, Color.white, TextAnchor.MiddleLeft);
+            MarketText(new Rect(bounds.xMax - 38, bounds.y + 6, 28, 32), marketOtherExpanded ? "−" : "+", 28, Color.white);
+            if (GUI.Button(bounds, "", invisible)) NativeAction(MarketOtherAction);
+        }
+        private void DrawMarketEconomyFooter()
+        {
+            Rect footer = MarketEconomyFooterBounds(logicalCanvasHeight);
+            DrawMarketWoodPanel(footer, new Color(.10f, .055f, .025f));
+            long cost = game.Market.MinimumPurchaseCostCents(game.Sim);
+            MarketText(new Rect(footer.x + 12, footer.y + 7, 230, 23), "COSTO PARA COMPLETAR", 14, Color.white);
+            MarketText(new Rect(footer.x + 12, footer.y + 30, 230, 30), FormatMarketMoney(cost), 36, new Color(1f, .80f, .25f));
+            bool canBuyMissing = MarketCanBuyMissing();
+            string caption = !MarketHasMissing() ? "STOCK COMPLETO" : canBuyMissing ? "COMPRAR FALTANTES" : "SALDO INSUFICIENTE";
+            DrawStandardButton(MarketBuyMissingBounds(logicalCanvasHeight), MarketMissingAction, caption, canBuyMissing);
+        }
+        private void DrawMarketPlayButton(Rect bounds, string caption, bool enabled)
+        {
+            Rect drawn = StandardButtonVisualBounds(bounds, pressedAction == MarketPlayAction);
+            Color previous = GUI.color; bool priorEnabled = GUI.enabled;
+            GUI.color = enabled ? Color.white : new Color(.48f, .48f, .48f, .9f);
+            if (items != null)
+            {
+                Rect source = Items[13];
+                float sourceCap = source.height * .5f, cap = drawn.height * .5f;
+                DrawRaw(new Rect(drawn.x, drawn.y, cap, drawn.height), items, new Rect(source.x, source.y, sourceCap, source.height), true, false);
+                DrawRaw(new Rect(drawn.x + cap - .3f, drawn.y, drawn.width - 2 * cap + .6f, drawn.height), items,
+                    new Rect(source.x + sourceCap, source.y, source.width - 2 * sourceCap, source.height), true, false);
+                DrawRaw(new Rect(drawn.xMax - cap, drawn.y, cap, drawn.height), items, new Rect(source.xMax - sourceCap, source.y, sourceCap, source.height), true, false);
+            }
+            GUI.color = Color.white;
+            MarketText(new Rect(drawn.x + 16, drawn.y + 5, drawn.width - 32, drawn.height - 10), caption, 34, enabled ? Color.white : new Color(.80f, .80f, .80f));
+            GUI.enabled = enabled && priorEnabled;
+            if (GUI.Button(bounds, "", invisible)) NativeAction(MarketPlayAction);
+            GUI.enabled = priorEnabled; GUI.color = previous;
+        }
+        private void DrawMarketWoodPanel(Rect bounds, Color face)
+        {
+            FillRect(bounds, new Color(.24f, .105f, .025f));
+            if (upgradeWood != null)
+            {
+                const float border = 12f, sourceBorder = 180f;
+                Rect src = UpgradeWoodBounds;
+                float[] sx = { src.x, src.x + sourceBorder, src.xMax - sourceBorder, src.xMax };
+                float[] sy = { src.y, src.y + sourceBorder, src.yMax - sourceBorder, src.yMax };
+                float[] dx = { bounds.x, bounds.x + border, bounds.xMax - border, bounds.xMax };
+                float[] dy = { bounds.y, bounds.y + border, bounds.yMax - border, bounds.yMax };
+                for (int y = 0; y < 3; y++) for (int x = 0; x < 3; x++)
+                    DrawRaw(Rect.MinMaxRect(dx[x], dy[y], dx[x + 1], dy[y + 1]), upgradeWood,
+                        Rect.MinMaxRect(sx[x], sy[y], sx[x + 1], sy[y + 1]), true, false);
+            }
+            FillRect(new Rect(bounds.x + 12, bounds.y + 12, bounds.width - 24, bounds.height - 24), face);
+        }
+        private void MarketText(Rect bounds, string value, int size, Color color, TextAnchor alignment = TextAnchor.MiddleCenter)
+        {
+            if (marketLabelStyle == null) marketLabelStyle = new GUIStyle(menuTitle) { padding = new RectOffset(), wordWrap = false };
+            marketLabelStyle.alignment = alignment;
+            marketLabelStyle.fontSize = size;
+            float measured = marketLabelStyle.CalcSize(new GUIContent(value)).x;
+            marketLabelStyle.fontSize = Mathf.Max(12, Mathf.FloorToInt(size * Mathf.Min(1f, Mathf.Max(1f, bounds.width - 2f) / Mathf.Max(1f, measured))));
+            marketLabelStyle.normal.textColor = color;
+            GUI.Label(bounds, value, marketLabelStyle);
         }
         private string MarketEconomyFooterSummary()
         {
-            long balance = game.Market.BalanceCents;
-            if (!MarketHasMissing()) return "STOCK COMPLETO   ·   SALDO " + FormatMarketMoney(balance);
-            long cost = game.Market.MinimumPurchaseCostCents(game.Sim);
-            return cost <= balance
-                ? "FALTANTES " + FormatMarketMoney(cost) + "   ·   SALDO DESPUÉS " + FormatMarketMoney(balance - cost)
-                : "FALTANTES " + FormatMarketMoney(cost) + "   ·   SALDO " + FormatMarketMoney(balance);
+            long balance = game.Market.BalanceCents, cost = game.Market.MinimumPurchaseCostCents(game.Sim);
+            return "FALTANTES " + FormatMarketMoney(cost) + " · SALDO DESPUÉS " + (cost <= balance ? FormatMarketMoney(balance - cost) : "INSUFICIENTE");
         }
         private static string FormatBottleStock(int units) => (units/4)+" botella(s) + "+(units%4)+"/4 porción";
         private bool MarketHasMissing()
         {
-            for(int i=0;i<StreetIngredientCatalog.Names.Length;i++)
-                if(game.Market.MissingPacks(game.Sim,i)>0)return true;
+            for (int i = 0; i < StreetIngredientCatalog.Names.Length; i++) if (game.Market.MissingPacks(game.Sim, i) > 0) return true;
             return false;
         }
-        private bool MarketCanBuyMissing() => MarketHasMissing() &&
-            game.Market.MinimumPurchaseCostCents(game.Sim) <= game.Market.BalanceCents;
-        private string MarketInsufficientFundsMessage(long totalCost) =>
-            "Saldo insuficiente: faltan "+FormatMarketMoney(totalCost-game.Market.BalanceCents);
+        private bool MarketCanBuyMissing() => MarketHasMissing() && game.Market.MinimumPurchaseCostCents(game.Sim) <= game.Market.BalanceCents;
+        private string MarketInsufficientFundsMessage(long totalCost) => "Saldo insuficiente: faltan " + FormatMarketMoney(totalCost-game.Market.BalanceCents);
         private static string FormatMarketMoney(long cents) => "$"+(cents/100L)+","+(cents%100L).ToString("00");
         private static Rect LevelSelectCardBounds(int index)
         {

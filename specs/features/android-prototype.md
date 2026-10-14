@@ -1,4 +1,24 @@
-# Latest Android delivery — 2026-10-13 (0.2.31/code33, Mercado cash-only and objective cards)
+# Latest Android delivery — 2026-10-14 (0.2.33/code35, unified Mercado + Level 1 stock kit)
+
+Unity 6000.6.3f1 Main-only Development IL2CPP/ARM64 APK built through Unity MCP job `build-f915a3143b`: **Succeeded in 27.68s; 0 errors / 3 warnings** (incremental build). The build included the unified Mercado UI, bread icon crop, and fresh-save Level 1 kit calculation. Unity test suite was not verified in this delivery: MCP returned zero tests for filtered calls and timed out on the assembly run.
+
+APK `Builds/Android/Archive/HayChoriYPaty-0.2.33-code35-level1-kit.apk`: **477,637,589 bytes**; SHA-256 `333f891ba1b18da0d13a5f383fb6b5e3bcd3a2448ef3985f8f6f63a67e2bcef9`. Package `com.haychoriypaty.game`, version0.2.33/code35, min API26/target36, `arm64-v8a`. `aapt` confirmed package/version, `unzip -t` passed, APK Signature Scheme v2 verified with established Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`. Versioned and rolling aliases: `Builds/Android/HayChoriYPaty-0.2.33.apk`, `Builds/Android/HayChoriYPaty-street.apk`.
+
+Development/debug-signed; not Play Store release signing. No phone installation or gameplay validation performed.
+
+---
+
+# Previous Android delivery — 2026-10-13 (0.2.32/code34, Mercado visual redesign)
+
+Unity 6000.6.3f1 Main-only Development IL2CPP/ARM64 APK built through Unity MCP job `build-5b5b4bbe2f`: **Succeeded in 447.26s; 0 errors / 4 warnings**. Warnings: Diagnostics Data recommends Full debug symbols; generic uncompiled-code notice; obsolete PVRTC compression of Unity splash logo and uncompressed fallback. The updated Mercado source was compiled and tested before packaging; APK IL2CPP metadata contains the new card/wood-panel/others renderers. BuildReport output size 2,078.84 MB is not the APK download size.
+
+APK `Builds/Android/Archive/HayChoriYPaty-0.2.32-code34-market-visual-redesign.apk`: **477,642,081 bytes**; SHA-256 `2b862092559416463af13940775e014aba2ff1f080be8c547067f17ea6e831b2`. Package `com.haychoriypaty.game`, version0.2.32/code34, min API26/target36, `arm64-v8a`. `aapt` metadata, ZIP integrity, source/copy hashes and APK Signature Scheme v2 verified with established Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`. Versioned and rolling aliases: `Builds/Android/HayChoriYPaty-0.2.32.apk`, `Builds/Android/HayChoriYPaty-street.apk`.
+
+**Validation:** Identical Mercado source passed focused PlayMode checks 9/9 before packaging; real Game View captures reviewed at 540×960, 540×1170 and 540×1200, including levels2/4/10, purchase/unused states and unchanged Heladera. Evidence: `Logs/Acceptance/MarketVisualRedesign-20261013/`, test job `3bd96811f4fe44cba75d56ef01f63585`. `git diff --check` passed. No full-suite rerun, Git publication, phone installation or physical-device review in this packaging task. Development/debug-signed; not Play Store release signing. Official crest resource coverage remains levels1–3 only; later Mercado clubs use palette/initials fallback tiles, not fabricated crests.
+
+---
+
+# Previous Android delivery — 2026-10-13 (0.2.31/code33, Mercado cash-only and objective cards)
 
 Unity 6000.6.3f1 Development IL2CPP/ARM64 APK built from `Assets/Scenes/Main.unity`: **Succeeded; 0 errors / 2 warnings**. Unity MCP was unavailable, so the build used a temporary batch-mode editor entry point (removed after build).
 

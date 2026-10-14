@@ -42,6 +42,18 @@ namespace HayChoriYPaty.Tests
             Assert.IsFalse((bool)Call(market,"IsIngredientUnlocked",8,0));
             Assert.IsTrue((bool)Call(market,"IsIngredientUnlocked",8,4));
         }
+        [Test] public void NewGameKitUsesCeilingOfLevelOneRecipeGoalsAndAddsOnlyRequiredIngredients()
+        {
+            object balance=Activator.CreateInstance(balanceType), data=Activator.CreateInstance(dataType), market=Market(data,balance);
+            Call(market,"InitializeNewGameKit");
+            Assert.AreEqual(220,Call(market,"Units",0)); Assert.AreEqual(220,Call(market,"Units",1));
+            for(int i=2;i<10;i++) Assert.AreEqual(0,Call(market,"Units",i),"No optional ingredient should be included.");
+            // Future goal edits feed the kit automatically; 201 × 1.10 rounds up to 222.
+            Array levels=(Array)balanceType.GetField("levelBalances",Public).GetValue(balance);
+            object first=levels.GetValue(0); int[] goals=(int[])first.GetType().GetField("goalsByProductId",Public).GetValue(first); goals[0]=201;
+            data=Activator.CreateInstance(dataType); market=Market(data,balance); Call(market,"InitializeNewGameKit");
+            Assert.AreEqual(222,Call(market,"Units",0)); Assert.AreEqual(222,Call(market,"Units",1));
+        }
         [Test] public void PurchaseRejectsDuplicateFutureIngredientAndNumericOverflow()
         {
             object data=Activator.CreateInstance(dataType), market=Market(data), sim=Sim(); Call(market,"Initialize",0);

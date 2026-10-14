@@ -152,6 +152,33 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
+        public void ExistingPersistedInventoryIsNeverReplacedByTheNewGameKit()
+        {
+            Type gameType = Runtime("StreetGame"); string key = (string)gameType.GetField("ProgressKey").GetValue(null);
+            bool had = PlayerPrefs.HasKey(key); string prior = had ? PlayerPrefs.GetString(key) : null;
+            GameObject root = null;
+            try
+            {
+                // Observed quantities are persisted inventory, even if an older save lacks the kit marker.
+                PlayerPrefs.SetString(key, "{\"version\":4,\"unlockedLevel\":0,\"price\":5,\"market\":{\"stockUnits\":[145,435,0,0,0,0,0,0,0,0],\"kitGranted\":false,\"initializedUnlockedLevel\":-1}}");
+                PlayerPrefs.Save(); root = new GameObject("Existing stock preservation test");
+                Component game = root.AddComponent(gameType); gameType.GetMethod("OnEnable", Private).Invoke(game, null);
+                object market = Get(game, "Market");
+                Assert.AreEqual(145, Call(market, "Units", 0)); Assert.AreEqual(435, Call(market, "Units", 1));
+                gameType.GetMethod("OnEnable", Private).Invoke(game, null);
+                market = Get(game, "Market");
+                Assert.AreEqual(145, Call(market, "Units", 0), "Reopening must preserve saved stock.");
+                Assert.AreEqual(435, Call(market, "Units", 1), "Reopening must not add the new-game kit.");
+            }
+            finally
+            {
+                if (root != null) UnityEngine.Object.DestroyImmediate(root);
+                if (had) PlayerPrefs.SetString(key, prior); else PlayerPrefs.DeleteKey(key);
+                PlayerPrefs.Save();
+            }
+        }
+
+        [Test]
         public void LifecyclePersistsKitRecoversAbandonmentAndSettlesLossOnce()
         {
             Type gameType = Runtime("StreetGame"); string key = (string)gameType.GetField("ProgressKey").GetValue(null);
@@ -164,22 +191,22 @@ namespace HayChoriYPaty.Tests
                 gameType.GetMethod("OnEnable", Private).Invoke(game, null);
                 Component sound = root.GetComponent(Runtime("OrderDeliverySound"));
                 if (sound != null) sound.GetType().GetMethod("OnDisable", Private).Invoke(sound, null); // No audible/AudioSource lifecycle in this EditMode fixture.
-                object market = Get(game, "Market"); Assert.AreEqual(200, Call(market, "Units", 0));
+                object market = Get(game, "Market"); Assert.AreEqual(220, Call(market, "Units", 0)); Assert.AreEqual(220, Call(market, "Units", 1));
                 Assert.IsTrue((bool)Call(game, "TryStartRound"));
                 object sim = Get(game, "Sim"); for (int i = 0; i < 60; i++) Call(sim, "Step", .25f);
                 Assert.Greater((int)Get(sim, "Delivered"), 0);
-                Assert.AreEqual(200 - (int)Get(sim, "Delivered"), Call(market, "Units", 0));
+                Assert.AreEqual(220 - (int)Get(sim, "Delivered"), Call(market, "Units", 0));
                 gameType.GetMethod("OnApplicationPause", Private).Invoke(game, new object[] { true });
                 gameType.GetMethod("OnEnable", Private).Invoke(game, null); // Simulated process recovery of an active snapshot.
                 if (sound != null) sound.GetType().GetMethod("OnDisable", Private).Invoke(sound, null);
-                market = Get(game, "Market"); Assert.AreEqual(200, Call(market, "Units", 0));
+                market = Get(game, "Market"); Assert.AreEqual(220, Call(market, "Units", 0)); Assert.AreEqual(220, Call(market, "Units", 1));
                 Assert.AreEqual(0L, Get(market, "BalanceCents"));
                 Assert.IsTrue((bool)Call(game, "TryStartRound")); sim = Get(game, "Sim");
                 for (int i = 0; i < 60; i++) Call(sim, "Step", .25f);
                 int gross = (int)Get(sim, "CoinsEarned"); Assert.Greater(gross, 0);
                 Set(sim, "Phase", Enum.Parse(Runtime("RoundPhase"), "Lost"));
                 Assert.IsTrue((bool)Call(game, "ProcessRoundResult"));
-                Assert.AreEqual((long)gross * 50L, Get(market, "BalanceCents")); Assert.AreEqual(200, Call(market, "Units", 0));
+                Assert.AreEqual((long)gross * 50L, Get(market, "BalanceCents")); Assert.AreEqual(220, Call(market, "Units", 0)); Assert.AreEqual(220, Call(market, "Units", 1));
                 Assert.IsFalse((bool)Call(game, "ProcessRoundResult")); Assert.IsFalse((bool)Call(game, "Retry"));
                 Assert.AreEqual(0, Get(game, "UnlockedLevel")); Assert.IsTrue((bool)Call(game, "ReturnToLevels"));
                 Assert.AreEqual("Ready", Get(Get(game, "Sim"), "Phase").ToString());

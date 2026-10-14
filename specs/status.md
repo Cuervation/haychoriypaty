@@ -858,3 +858,23 @@ Purchases now require available Mercado cash; old v4 `debtCents` is ignored and 
 Replaced the multiline text summary with compact product-icon cards generated from the selected simulation's active products and actual goal quantities. 1–3 objectives fit one row; 4–7 use the requested two-row patterns. Header height grows only for the second row, the ingredient list remains the sole scroll area, and the fixed footer summarizes missing-stock cost/current-or-projected balance above its NIVELES/COMPRAR FALTANTES/JUGAR PARTIDO actions. This preserves the current no-fiado policy.
 
 Validation: Unity 6000.6.3f1 focused PlayMode: 3/3 passed (MarketObjectiveCardsFitOneOrTwoRowsAndFollowLiveLevelData, SelectorTabsAndQuantitySelectionRequireExplicitDebouncedPurchase, PlayIsStockGatedCashOnlyRestockAndRetryIsGone). Layout bounds were checked for all counts 1–7 at 540×960, 540×1170, and 540×1200. git diff --check passed. Unity MCP is unavailable; captures/visual appearance remain unverified.
+
+## Mercado visual redesign — 2026-10-13
+
+Implemented the approved visual-reference layout in StreetView only: original wood/club art, large ingredient icons and summary coverage cards, one expanded purchase row, level-required ingredient list, dynamic1–7 objective cards, prominent cash and fixed green play CTA. At that stage the unused group was hidden; later single-screen integration supersedes that detail. Heladera retained its previous renderer/actions; domain recipes/prices/stock/economy/production remain unchanged.
+
+## Unify Mercado and inventory UI — 2026-10-14
+
+Removed the independent Heladera/Stock screen, switch button/tab and screen-switch state. Kept `StreetMarket` inventory/save/recipes/consumption/purchase logic; Mercado now presents required ingredients and a collapsed OTROS INGREDIENTES group for unlocked optional stock, with explicit purchase controls. The fixed footer combines missing-stock cost and COMPRAR FALTANTES while JUGAR PARTIDO remains stock-gated. All Boys starts with only Chorizo/Pan needed rows; later unlocked optional ingredients can be consulted and purchased. Current Unity focused validation and screenshots pending.
+
+Validation attempt: Unity 6000.6.3f1 accepted a script refresh/compile request, returned to ready state, and the console query showed 0 errors/warnings. The focused PlayMode job then failed before starting any tests (`Test job failed to initialize (tests did not start within timeout)`); the editor MCP stopped answering pings afterward. Thus no PlayMode result or Game View capture is claimed. `git diff --check` passed; rerun the focused tests and visual capture when the editor session is responsive.
+
+**Mercado bread icon correction — 2026-10-14:** The Chori-bread crop cut across its sloped lower crust. Both bread stock icons now use the existing complete upper-bun region from the Paty sandwich sprite (no source art edited). Source crop was visually inspected; Unity Game View retest/capture could not run because the MCP disconnected while starting the focused capture test.
+
+Validation: Unity6000.6.3f1 MCP focused PlayMode **9/9 passed**, job `3bd96811f4fe44cba75d56ef01f63585`; actual level2/4/10 screenshots reviewed at540×960 (16:9),540×1170 (19.5:9),540×1200 (20:9), plus unused-group/expanded-purchase states. Evidence: ignored `Logs/Acceptance/MarketVisualRedesign-20261013/`; `git diff --check` passed. Dedicated crest assets still cover only levels1–3: later clubs show palette/initials identity tiles, not invented official crests. No new APK, push or device validation requested/performed.
+
+## Nivel 1 stock inicial — 2026-10-14
+
+New saves now get a one-time 10% reserve over All Boys' recipe-derived objective: 220 chorizos and 220 panes for the current target of 200. Existing Market inventories are preserved exactly; saves predating Mercado retain their prior compatibility migration. The observed 145/435 values are from persisted `market.stockUnits`, not scene defaults; per-ingredient historical transactions are unavailable to determine how that valid inventory accumulated.
+
+Focused EditMode regression tests were added for formula/dynamic goal, persisted 145/435 preservation, and fresh-save lifecycle/defeat. Unity test execution is pending: filtered MCP runs reported zero tests and the assembly run timed out/disconnected; `git diff --check` passed.
