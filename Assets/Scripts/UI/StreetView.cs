@@ -702,22 +702,27 @@ namespace HayChoriYPaty
                     int id=a-MarketBuyAction;
                     if(Time.unscaledTime-marketLastPurchaseTime<.25f)return;
                     marketLastPurchaseTime=Time.unscaledTime;
-                    int packs=marketPendingPacks[id];bool success=packs>0&&game.TryBuyIngredient(id,packs,false,game.Market.NextPurchaseId);
-                    marketMessage=success?"Compra realizada":"No se pudo realizar la compra";if(success)marketPendingPacks[id]=0;return;
+                    int packs=marketPendingPacks[id];long cost=(long)packs*game.Market.PackPriceCents(id);
+                    bool success=packs>0&&cost<=game.Market.BalanceCents&&game.TryBuyIngredient(id,packs,game.Market.NextPurchaseId);
+                    marketMessage=success?"Compra realizada":cost>game.Market.BalanceCents?MarketInsufficientFundsMessage(cost):"No se pudo realizar la compra";if(success)marketPendingPacks[id]=0;return;
                 }
                 if(a>=MarketRowMissingAction&&a<MarketRowMissingAction+10)
                 {
                     int id=a-MarketRowMissingAction;
                     if(Time.unscaledTime-marketLastPurchaseTime<.25f)return;
                     marketLastPurchaseTime=Time.unscaledTime;
-                    marketMessage=game.BuyMissingIngredient(id)?"Compra mínima financiada":"No hay faltante o no se pudo comprar";return;
+                    long cost=(long)game.Market.MissingPacks(game.Sim,id)*game.Market.PackPriceCents(id);
+                    marketMessage=cost>game.Market.BalanceCents?MarketInsufficientFundsMessage(cost):game.BuyMissingIngredient(id)?"Compra mínima realizada":"No hay faltante o no se pudo comprar";return;
                 }
                 if(a==MarketMissingAction)
                 {
                     if(Time.unscaledTime-marketLastPurchaseTime<.25f)return;
-                    marketLastPurchaseTime=Time.unscaledTime;bool bought=false;
+                    marketLastPurchaseTime=Time.unscaledTime;
+                    long cost=game.Market.MinimumPurchaseCostCents(game.Sim);
+                    if(cost>game.Market.BalanceCents){marketMessage=MarketInsufficientFundsMessage(cost);return;}
+                    bool bought=false;
                     for(int id=0;id<StreetIngredientCatalog.Names.Length;id++)if(game.Market.MissingPacks(game.Sim,id)>0)bought|=game.BuyMissingIngredient(id);
-                    marketMessage=bought?"Compras mínimas realizadas":"No hace falta financiar o faltan fondos";return;
+                    marketMessage=bought?"Compras mínimas realizadas":"No hay faltantes pendientes";return;
                 }
                 if(a==MarketPlayAction){marketMessage=game.TryStartRound()?"":"Falta stock para iniciar";if(game.Sim.Phase==RoundPhase.Playing)marketActive=false;return;}
             }
@@ -1791,7 +1796,67 @@ namespace HayChoriYPaty
 
         private static Rect MarketBackBounds() => new Rect(20, 30, 150, 54);
         private static Rect MarketSelectorBounds() => new Rect(115, 766, 310, 64);
-        private Rect MarketBodyBounds() => new Rect(22, 298, W - 44, Mathf.Max(145, logicalCanvasHeight - 508));
+        private const float MarketObjectiveTop = 198f;
+        private const float MarketFooterInfoInset = 184f;
+        private Rect MarketBodyBounds() => MarketBodyBounds(game.Sim.ProductCount, logicalCanvasHeight);
+        private static Rect MarketBodyBounds(int productCount, float canvasHeight)
+        {
+            float top = MarketBodyTop(productCount);
+            float bottom = Mathf.Max(top + 145f, canvasHeight - 218f);
+            return new Rect(22, top, W - 44, bottom - top);
+        }
+        private static Rect MarketEconomyFooterBounds(float canvasHeight) =>
+            new Rect(26, canvasHeight - MarketFooterInfoInset, W - 52, 20f);
+        private static int MarketObjectiveRowCount(int productCount)
+        {
+            int count = Mathf.Clamp(productCount, 0, 7);
+            return count <= 0 ? 0 : count <= 3 ? 1 : 2;
+        }
+        private static int MarketObjectiveFirstRowCount(int productCount)
+        {
+            int count = Mathf.Clamp(productCount, 0, 7);
+            if (count <= 3) return count;
+            return count == 4 ? 2 : count == 7 ? 4 : 3;
+        }
+        private static int MarketObjectiveItemsInRow(int productCount, int row)
+        {
+            int count = Mathf.Clamp(productCount, 0, 7);
+            int rows = MarketObjectiveRowCount(count);
+            if (row < 0 || row >= rows) return 0;
+            if (rows == 1) return count;
+            int first = MarketObjectiveFirstRowCount(count);
+            return row == 0 ? first : count - first;
+        }
+        private static float MarketObjectiveCardHeight(int productCount) =>
+            Mathf.Clamp(productCount, 0, 7) <= 3 ? 36f : 24f;
+        private static float MarketObjectiveBandHeight(int productCount)
+        {
+            int rows = MarketObjectiveRowCount(productCount);
+            if (rows == 0) return 0f;
+            return rows * MarketObjectiveCardHeight(productCount) + (rows - 1) * 4f;
+        }
+        private static Rect MarketObjectiveCardBounds(int slot, int productCount)
+        {
+            int count = Mathf.Clamp(productCount, 0, 7);
+            if (slot < 0 || slot >= count) return Rect.zero;
+            int first = MarketObjectiveFirstRowCount(count);
+            int row = count > 3 && slot >= first ? 1 : 0;
+            int column = row == 0 ? slot : slot - first;
+            int itemsInRow = MarketObjectiveItemsInRow(count, row);
+            const float gap = 6f;
+            Rect area = new Rect(26f, MarketObjectiveTop, W - 52f, MarketObjectiveBandHeight(count));
+            float width = itemsInRow == 1 ? Mathf.Min(240f, area.width)
+                : (area.width - gap * (itemsInRow - 1)) / itemsInRow;
+            float rowWidth = width * itemsInRow + gap * (itemsInRow - 1);
+            float x = area.center.x - rowWidth * .5f + column * (width + gap);
+            float y = area.y + row * (MarketObjectiveCardHeight(count) + 4f);
+            return new Rect(x, y, width, MarketObjectiveCardHeight(count));
+        }
+        private static float MarketBodyTop(int productCount)
+        {
+            float economyY = MarketObjectiveTop + MarketObjectiveBandHeight(productCount) + 4f;
+            return economyY + 26f + 6f;
+        }
         private int[] MarketVisibleIngredients()
         {
             if(marketTab==1){var all=new int[StreetIngredientCatalog.Names.Length];for(int i=0;i<all.Length;i++)all[i]=i;return all;}
@@ -1813,7 +1878,7 @@ namespace HayChoriYPaty
             if (!body.Contains(p))
             {
                 if (MarketBottomBounds().Contains(p)) return MarketBackAction;
-                if (MarketFinanceBounds().Contains(p)) return MarketMissingAction;
+                if (MarketBuyMissingBounds().Contains(p)) return MarketMissingAction;
                 if (MarketPlayBounds().Contains(p)) return MarketPlayAction;
                 return 0;
             }
@@ -1832,7 +1897,7 @@ namespace HayChoriYPaty
             return 0;
         }
         private Rect MarketBottomBounds() => new Rect(22, logicalCanvasHeight-154, 150, 50);
-        private Rect MarketFinanceBounds() => new Rect(180, logicalCanvasHeight-154, W-202, 50);
+        private Rect MarketBuyMissingBounds() => new Rect(180, logicalCanvasHeight-154, W-202, 50);
         private Rect MarketPlayBounds() => new Rect(22, logicalCanvasHeight-86, W-44, 58);
 
         private void DrawMarketScreen()
@@ -1844,12 +1909,11 @@ namespace HayChoriYPaty
             DrawStandardButton(new Rect(278,92,238,54),MarketHeladeraAction,"HELADERA");
             int level=game.Sim.LevelIndex;
             MarketLabel(new Rect(28,151,484,28),"NIVEL "+(level+1)+" — "+StreetSimulation.LevelDisplayNames[level].ToUpperInvariant(),header);
-            MarketLabel(new Rect(28,180,484,46),FormatMarketGoals(game.Sim),small);
-            MarketLabel(new Rect(28,228,484,24),"SALDO "+FormatMarketMoney(game.Market.BalanceCents)+"   ·   FIADO "+FormatMarketMoney(game.Market.DebtCents),small);
-            long financing = game.Market.FinancingNeededCents(game.Sim);
-            MarketLabel(new Rect(28,251,484,29),financing > 0
-                ? "FIADO NECESARIO "+FormatMarketMoney(financing)+" · Solo faltantes mínimos. El próximo crédito paga la deuda."
-                : "El fiado cubre solo faltantes mínimos; el próximo crédito paga la deuda, sin interés.",tiny);
+            MarketLabel(new Rect(28,180,484,18),"OBJETIVOS DEL PARTIDO",tiny);
+            DrawMarketObjectiveCards(game.Sim);
+            string economyStatus = "SALDO DISPONIBLE " + FormatMarketMoney(game.Market.BalanceCents);
+            if (!MarketHasMissing()) economyStatus += "   ·   STOCK COMPLETO";
+            MarketLabel(MarketEconomyBounds(game.Sim.ProductCount),economyStatus,small);
             Rect body=MarketBodyBounds();
             FillRect(body,new Color(.07f,.05f,.035f,.9f));
             Event evt=Event.current;
@@ -1892,9 +1956,11 @@ namespace HayChoriYPaty
                 float thumbHeight = Mathf.Max(28f, body.height * body.height / (body.height + maxScroll));
                 FillRect(new Rect(track.x, track.y + (track.height-thumbHeight)*marketScroll/maxScroll, 4, thumbHeight), new Color(1f,.86f,.48f,.9f));
             }
-            MarketLabel(new Rect(26,body.yMax+3,W-52,28),!string.IsNullOrEmpty(marketMessage)?marketMessage:maxScroll>0?"Deslizá para ver más ingredientes":"",small);
+            MarketLabel(new Rect(26,body.yMax+3,W-52,28),!string.IsNullOrEmpty(marketMessage)?marketMessage:maxScroll>0?"Deslizá la lista de ingredientes":"",small);
+            MarketLabel(MarketEconomyFooterBounds(logicalCanvasHeight),MarketEconomyFooterSummary(),small);
             DrawStandardButton(MarketBottomBounds(),MarketBackAction,"NIVELES");
-            DrawStandardButton(MarketFinanceBounds(),MarketMissingAction,"COMPRAR FALTANTES",MarketHasMissing());
+            bool canBuyMissing=MarketCanBuyMissing();
+            DrawStandardButton(MarketBuyMissingBounds(),MarketMissingAction,MarketHasMissing()?(canBuyMissing?"COMPRAR FALTANTES":"SALDO INSUFICIENTE"):"STOCK COMPLETO",canBuyMissing);
             DrawStandardButton(MarketPlayBounds(),MarketPlayAction,"JUGAR PARTIDO",game.CanStartRound);
         }
         private void MarketLabel(Rect bounds, string value, GUIStyle style)
@@ -1910,13 +1976,77 @@ namespace HayChoriYPaty
             finally { style.normal.textColor = prior; style.fontSize = priorSize; }
         }
 
-        private string FormatMarketGoals(StreetSimulation sim)
+        private static Rect MarketEconomyBounds(int productCount)
         {
-            var goals=new System.Collections.Generic.List<string>();
-            for(int slot=0;slot<sim.ProductCount;slot++){int id=sim.GetAvailableProduct(slot);goals.Add(ProductShortNames[id]+" ×"+sim.GetProductGoal(id));}
-            var lines=new System.Collections.Generic.List<string>();
-            for(int i=0;i<goals.Count;i+=4)lines.Add(string.Join("  ·  ",goals.GetRange(i,Mathf.Min(4,goals.Count-i)).ToArray()));
-            return "OBJETIVOS  ·  "+string.Join("\n",lines.ToArray());
+            float y = MarketObjectiveTop + MarketObjectiveBandHeight(productCount) + 4f;
+            return new Rect(28f, y, 484f, 26f);
+        }
+        private static string MarketObjectiveCaption(StreetSimulation sim, int slot, bool compact)
+        {
+            if (sim == null || slot < 0 || slot >= sim.ProductCount) return string.Empty;
+            int product = sim.GetAvailableProduct(slot);
+            if (product < 0 || product >= StreetSimulation.ProductNames.Length) return string.Empty;
+            string name;
+            if (compact) name = ProductShortNames[product];
+            else
+            {
+                string fullName = StreetSimulation.ProductNames[product];
+                int separator = fullName.IndexOf(' ');
+                name = separator > 0 ? fullName.Substring(0, separator) : fullName;
+            }
+            return name + " ×" + sim.GetProductGoal(product);
+        }
+        private void DrawMarketObjectiveCards(StreetSimulation sim)
+        {
+            if (sim == null) return;
+            int count = Mathf.Clamp(sim.ProductCount, 0, 7);
+            bool compact = count >= 5;
+            for (int slot = 0; slot < count; slot++)
+            {
+                int product = sim.GetAvailableProduct(slot);
+                if (product < 0 || product >= StreetSimulation.ProductNames.Length) continue;
+                Rect card = MarketObjectiveCardBounds(slot, count);
+                FillRect(card, new Color(.31f, .17f, .075f, .98f));
+                Rect face = new Rect(card.x + 1f, card.y + 1f, card.width - 2f, card.height - 2f);
+                FillRect(face, new Color(.96f, .87f, .70f, .98f));
+                float iconSize = Mathf.Min(compact || count >= 4 ? 18f : 27f, face.height - 4f);
+                Rect icon = new Rect(face.x + 4f, face.center.y - iconSize * .5f, iconSize, iconSize);
+                DrawProductIcon(icon, product);
+                Rect caption = new Rect(icon.xMax + 4f, face.y + 1f,
+                    Mathf.Max(0f, face.xMax - icon.xMax - 8f), face.height - 2f);
+                MarketObjectiveLabel(caption, MarketObjectiveCaption(sim, slot, compact), compact);
+            }
+        }
+        private void MarketObjectiveLabel(Rect bounds, string value, bool compact)
+        {
+            int priorSize = small.fontSize;
+            TextAnchor priorAlignment = small.alignment;
+            bool priorWrap = small.wordWrap;
+            Color priorColor = small.normal.textColor;
+            try
+            {
+                small.alignment = TextAnchor.MiddleLeft;
+                small.wordWrap = false;
+                small.normal.textColor = new Color(.20f, .095f, .035f);
+                small.fontSize = FitVictoryFont(small, value, compact ? 13 : 14, bounds);
+                Label(bounds, value, small);
+            }
+            finally
+            {
+                small.fontSize = priorSize;
+                small.alignment = priorAlignment;
+                small.wordWrap = priorWrap;
+                small.normal.textColor = priorColor;
+            }
+        }
+        private string MarketEconomyFooterSummary()
+        {
+            long balance = game.Market.BalanceCents;
+            if (!MarketHasMissing()) return "STOCK COMPLETO   ·   SALDO " + FormatMarketMoney(balance);
+            long cost = game.Market.MinimumPurchaseCostCents(game.Sim);
+            return cost <= balance
+                ? "FALTANTES " + FormatMarketMoney(cost) + "   ·   SALDO DESPUÉS " + FormatMarketMoney(balance - cost)
+                : "FALTANTES " + FormatMarketMoney(cost) + "   ·   SALDO " + FormatMarketMoney(balance);
         }
         private static string FormatBottleStock(int units) => (units/4)+" botella(s) + "+(units%4)+"/4 porción";
         private bool MarketHasMissing()
@@ -1925,6 +2055,10 @@ namespace HayChoriYPaty
                 if(game.Market.MissingPacks(game.Sim,i)>0)return true;
             return false;
         }
+        private bool MarketCanBuyMissing() => MarketHasMissing() &&
+            game.Market.MinimumPurchaseCostCents(game.Sim) <= game.Market.BalanceCents;
+        private string MarketInsufficientFundsMessage(long totalCost) =>
+            "Saldo insuficiente: faltan "+FormatMarketMoney(totalCost-game.Market.BalanceCents);
         private static string FormatMarketMoney(long cents) => "$"+(cents/100L)+","+(cents%100L).ToString("00");
         private static Rect LevelSelectCardBounds(int index)
         {
@@ -3038,10 +3172,9 @@ namespace HayChoriYPaty
             string line1="VENTAS "+FormatMarketMoney(r.grossSalesCents)+" → 50% "+FormatMarketMoney(r.halfSalesCents);
             string line2=r.won?"BONO: 2 × "+FormatMarketMoney(r.leftoverCents)+" sobrante = "+FormatMarketMoney(r.bonusCents):"DERROTA: sin bono por sobrante";
             string line3="VENTAS RECONOCIDAS: "+FormatMarketMoney(r.recognizedSalesCents);
-            string line4="CRÉDITO NUEVO: "+FormatMarketMoney(r.recognizedSalesCents)+" + "+FormatMarketMoney(r.bonusCents)+" = "+FormatMarketMoney(r.newCreditCents);
-            string line5="DEUDA SALDADA: "+FormatMarketMoney(r.debtRepaidCents);
-            string line6="SALDO ACTUAL: "+FormatMarketMoney(r.totalBalanceCents);
-            string[] lines={line1,line2,line3,line4,line5,line6};
+            string line4="INGRESO NUEVO: "+FormatMarketMoney(r.recognizedSalesCents)+" + "+FormatMarketMoney(r.bonusCents)+" = "+FormatMarketMoney(r.earnedCents);
+            string line5="SALDO ACTUAL: "+FormatMarketMoney(r.totalBalanceCents);
+            string[] lines={line1,line2,line3,line4,line5};
             int oldSize=small.fontSize;
             small.fontSize=Mathf.Clamp(Mathf.FloorToInt(bounds.height/lines.Length),11,13);
             float row=bounds.height/lines.Length;

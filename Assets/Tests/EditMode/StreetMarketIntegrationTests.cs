@@ -45,28 +45,65 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void ActualHandoffsAndAdaptivePurchasesCompleteElevenStockedLevels()
+        public void ActualHandoffsAndAdaptivePurchasesNeverSpendBeyondBalance()
         {
             object balance = Activator.CreateInstance(Runtime("StreetBalance"));
             object market = NewMarket(balance); Call(market, "Initialize", 0);
             var strategy = new StreetSimulationTests(); strategy.SetUp();
             MethodInfo purchase = typeof(StreetSimulationTests).GetMethod("ApplyStrategyPurchases", Private);
+            int completed = 0;
             for (int level = 0; level < 11; level++)
             {
                 object sim = NewSim(balance, level);
+                long needed = (long)Call(market, "MinimumPurchaseCostCents", sim);
+                long available = (long)Get(market, "BalanceCents");
+                if (needed > available)
+                {
+                    bool checkedReject = false;
+                    while (!(bool)Call(market, "HasRequiredStock", sim) && !checkedReject)
+                    {
+                        bool purchased = false;
+                        for (int ingredient = 0; ingredient < 10; ingredient++)
+                        {
+                            int packs = (int)Call(market, "MissingPacks", sim, ingredient);
+                            if (packs <= 0) continue;
+                            long itemCost = (long)packs * (int)Call(market, "PackPriceCents", ingredient);
+                            long currentCash = (long)Get(market, "BalanceCents");
+                            long operation = (long)Get(market, "NextPurchaseId");
+                            int stockBefore = (int)Call(market, "Units", ingredient);
+                            if (itemCost > currentCash)
+                            {
+                                Assert.IsFalse((bool)Call(market, "TryBuy", sim, ingredient, packs, level, operation));
+                                Assert.AreEqual(currentCash, Get(market, "BalanceCents"));
+                                Assert.AreEqual(stockBefore, Call(market, "Units", ingredient));
+                                checkedReject = true;
+                                break;
+                            }
+                            Assert.IsTrue((bool)Call(market, "TryBuy", sim, ingredient, packs, level, operation));
+                            Assert.LessOrEqual((long)Get(market, "BalanceCents"), currentCash);
+                            Assert.GreaterOrEqual((long)Get(market, "BalanceCents"), 0L);
+                            purchased = true;
+                            break;
+                        }
+                        if (!purchased && !checkedReject) break;
+                    }
+                    Assert.IsTrue(checkedReject, "The first pack beyond the remaining balance must be rejected.");
+                    Assert.IsFalse((bool)Call(market, "BeginAttempt", sim), "Unstocked L" + (level + 1) + " must remain gated.");
+                    TestContext.WriteLine("ECONOMIC BLOCK: level " + (level + 1) + " needs $" + (needed / 100L) + ", available at entry $" + (available / 100L) + ". Cash-only purchases stop at $" + ((long)Get(market, "BalanceCents") / 100L) + " and the match remains gated.");
+                    break;
+                }
                 for (int ingredient = 0; ingredient < 10; ingredient++)
                 {
                     int missing = (int)Call(market, "MissingPacks", sim, ingredient);
-                    if (missing > 0) Assert.IsTrue((bool)Call(market, "TryBuy", sim, ingredient, missing, true, level,
-                        (long)Get(market, "NextPurchaseId")), "Minimum finance L" + (level + 1) + " ingredient " + ingredient);
+                    if (missing > 0) Assert.IsTrue((bool)Call(market, "TryBuy", sim, ingredient, missing, level,
+                        (long)Get(market, "NextPurchaseId")), "Cash-only purchase L" + (level + 1) + " ingredient " + ingredient);
                 }
                 int[] before = (int[])((int[])Get(market, "Data").GetType().GetField("stockUnits").GetValue(Get(market, "Data"))).Clone();
                 Assert.IsTrue((bool)Call(market, "BeginAttempt", sim));
                 Call(sim, "BindIngredientStock", market); Call(sim, "StartRound");
                 for (int tick = 0; tick < 1300 && Get(sim, "Phase").ToString() == "Playing"; tick++)
                 {
-                    Call(sim, "Step", .25f);
-                    purchase.Invoke(strategy, new[] { sim, "D" });
+                    Call(sim, "Step", .25f); purchase.Invoke(strategy, new[] { sim, "D" });
                 }
                 int[] consumed = new int[10];
                 for (int product = 0; product < 7; product++)
@@ -77,12 +114,40 @@ namespace HayChoriYPaty.Tests
                 }
                 for (int i = 0; i < 10; i++) Assert.AreEqual(before[i] - consumed[i], Call(market, "Units", i), "Real consumption L" + (level + 1) + " ingredient " + i);
                 TestContext.WriteLine("L" + (level + 1) + ": " + Get(sim, "Phase") + ", t=" + Get(sim, "Elapsed") + ", sales=" + Get(sim, "CoinsEarned"));
-                for (int product = 0; product < 7; product++) TestContext.WriteLine("P"+product+": "+Call(sim,"GetProductDelivered",product)+"/"+Call(sim,"GetProductGoal",product));
-                Assert.AreEqual("Won", Get(sim, "Phase").ToString(), "Stocked actual level " + (level + 1));
+                Assert.AreEqual("Won", Get(sim, "Phase").ToString(), "Cash-stocked actual level " + (level + 1));
                 Assert.IsNotNull(Call(market, "SettleAttempt", sim));
-                Assert.GreaterOrEqual((long)Get(market, "BalanceCents"), 0L); Assert.GreaterOrEqual((long)Get(market, "DebtCents"), 0L);
+                Assert.GreaterOrEqual((long)Get(market, "BalanceCents"), 0L);
                 object persisted = JsonUtility.FromJson(JsonUtility.ToJson(Get(market, "Data")), Runtime("StreetMarketData"));
-                market = NewMarket(balance, persisted);
+                market = NewMarket(balance, persisted); completed++;
+            }
+            Assert.GreaterOrEqual(completed, 1, "At least the starting level must complete from its one-time stock kit.");
+            TestContext.WriteLine("Cash-funded levels completed: " + completed + "/11");
+        }
+
+        [Test]
+        public void VersionFourSaveIgnoresFormerDebtFieldAndWritesCashOnly()
+        {
+            Type gameType = Runtime("StreetGame");
+            string key = (string)gameType.GetField("ProgressKey").GetValue(null);
+            bool had = PlayerPrefs.HasKey(key); string prior = had ? PlayerPrefs.GetString(key) : null;
+            GameObject root = null;
+            try
+            {
+                string legacy = "{\"version\":4,\"unlockedLevel\":0,\"price\":5,\"market\":{\"balanceCents\":1234,\"debtCents\":987654,\"stockUnits\":[200,200,0,0,0,0,0,0,0,0],\"kitGranted\":true,\"initializedUnlockedLevel\":0}}";
+                PlayerPrefs.SetString(key, legacy); PlayerPrefs.Save();
+                root = new GameObject("Legacy debt save test");
+                Component game = root.AddComponent(gameType);
+                gameType.GetMethod("OnEnable", Private).Invoke(game, null);
+                object market = Get(game, "Market");
+                Assert.AreEqual(1234L, Get(market, "BalanceCents"));
+                Assert.IsFalse(PlayerPrefs.GetString(key).Contains("debtCents"), "Saving should drop the legacy-only field.");
+                Assert.AreEqual(1234L, Get(Get(game, "Market"), "BalanceCents"));
+            }
+            finally
+            {
+                if (root != null) UnityEngine.Object.DestroyImmediate(root);
+                if (had) PlayerPrefs.SetString(key, prior); else PlayerPrefs.DeleteKey(key);
+                PlayerPrefs.Save();
             }
         }
 

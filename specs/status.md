@@ -840,6 +840,21 @@ Kept four Coca and four Branca bottles grouped in two close rows, but increased 
 
 ## Mercado / persistent Heladera — 2026-10-13
 
-Implemented the approved [market-fridge contract](features/market-fridge.md): ten ingredients, integer cents/four bottle portions, actual-goal requirements/shared bread, one-time kit/legacy migration, minimum-only supplier debt, snapshot recovery, physical handoff consumption, stock/credit settlement deduplication and one shared Mercado/Heladera screen. All Boys remains direct; shopping unlocks after its victory; levels2–11 enter Mercado, losses return to levels, final victory has no level12. Existing art, official prices, quotas, times, hires, routes and gameplay HUD remain unchanged.
+Implemented the approved [market-fridge contract](features/market-fridge.md): ten ingredients, integer cents/four bottle portions, actual-goal requirements/shared bread, one-time kit/legacy migration, cash-only purchases, snapshot recovery, physical handoff consumption, stock/earned-sales settlement deduplication and one shared Mercado/Heladera screen. All Boys remains direct; shopping unlocks after its victory; levels2–11 enter Mercado, losses return to levels, final victory has no level12. Existing art, official prices, quotas, times, hires, routes and gameplay HUD remain unchanged.
 
-Validation via live Unity6000.6.3f1 MCP: EditMode29/29 + final14/14; PlayMode37/37 + final7/7. Actual default-seed minimum-stock campaign11/11 won, with ingredient debit checked against every delivered recipe. Nine real portrait Game View captures at540×960,540×1170,540×1200 under `Logs/Acceptance/MarketFridge-20261013/`; checked tabs, contrast, controls and bottle remainders. `git diff --check` passed. Physical Android QA/build/install not run in this request; no push requested.
+Historical launch validation via live Unity6000.6.3f1 MCP: EditMode29/29 + final14/14; PlayMode37/37 + final7/7. The earlier default-seed campaign used the original minimum-stock financing policy and does not establish cash-only solvency. Nine real portrait Game View captures at540×960,540×1170,540×1200 under `Logs/Acceptance/MarketFridge-20261013/`; checked tabs, contrast, controls and bottle remainders. `git diff --check` passed. Physical Android QA/build/install not run. Current cash-only behavior is specified in the market-fridge feature contract.
+
+## Supplier credit removal — focused validation (2026-10-13)
+
+Purchases now require available Mercado cash; old v4 `debtCents` is ignored and dropped on the next save. Legacy credit/debt UI and settlement deductions were removed. The mercado list starts higher in the space released by the removed debt copy. Existing v4 balance, stock, migration, recipes, prices and rewards remain unchanged.
+
+**Validation:** Unity 6000.6.3f1 focused EditMode: 15/15 passed, including cash-only atomic rejection, handoff/settlement, and v4 save migration. Six focused PlayMode functional cases passed across the filtered run and targeted reruns (including affordability UI, restock, stock-gated match and purchase debounce). GameView capture could not run in `-nographics` (`No graphic device is available to initialize the view`); Unity MCP was disconnected. `git diff --check` passed.
+
+**Economic blocker:** under the default seeded campaign, Level 1 completes with $7.40 and Level 2 minimum stock costs $10.00. With financing removed, the player can spend remaining cash only (up to $2.40 of the shortage); insufficient purchases are rejected and `JUGAR PARTIDO` stays disabled. Prices, objectives and progression were intentionally not changed. No visual capture/device validation was completed.
+
+
+## Dynamic Mercado objectives — UI layout (2026-10-13)
+
+Replaced the multiline text summary with compact product-icon cards generated from the selected simulation's active products and actual goal quantities. 1–3 objectives fit one row; 4–7 use the requested two-row patterns. Header height grows only for the second row, the ingredient list remains the sole scroll area, and the fixed footer summarizes missing-stock cost/current-or-projected balance above its NIVELES/COMPRAR FALTANTES/JUGAR PARTIDO actions. This preserves the current no-fiado policy.
+
+Validation: Unity 6000.6.3f1 focused PlayMode: 3/3 passed (MarketObjectiveCardsFitOneOrTwoRowsAndFollowLiveLevelData, SelectorTabsAndQuantitySelectionRequireExplicitDebouncedPurchase, PlayIsStockGatedCashOnlyRestockAndRetryIsGone). Layout bounds were checked for all counts 1–7 at 540×960, 540×1170, and 540×1200. git diff --check passed. Unity MCP is unavailable; captures/visual appearance remain unverified.

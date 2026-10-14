@@ -47,10 +47,10 @@ namespace HayChoriYPaty.Tests
             object data=Activator.CreateInstance(dataType), market=Market(data), sim=Sim(); Call(market,"Initialize",0);
             dataType.GetField("balanceCents").SetValue(Get(market,"Data"),100000L);
             int before=(int)Call(market,"Units",0);
-            Assert.IsFalse((bool)Call(market,"TryBuy",sim,8,1,false,0,1L));
-            Assert.IsFalse((bool)Call(market,"TryBuy",sim,0,int.MaxValue,false,0,1L));
-            Assert.IsTrue((bool)Call(market,"TryBuy",sim,0,1,false,0,1L));
-            Assert.IsFalse((bool)Call(market,"TryBuy",sim,0,1,false,0,1L));
+            Assert.IsFalse((bool)Call(market,"TryBuy",sim,8,1,0,1L));
+            Assert.IsFalse((bool)Call(market,"TryBuy",sim,0,int.MaxValue,0,1L));
+            Assert.IsTrue((bool)Call(market,"TryBuy",sim,0,1,0,1L));
+            Assert.IsFalse((bool)Call(market,"TryBuy",sim,0,1,0,1L));
             Assert.AreEqual(before+1,Call(market,"Units",0));
         }
         [Test] public void ReservationsRequireAttemptAndReleaseOnAbort()
@@ -68,7 +68,7 @@ namespace HayChoriYPaty.Tests
             FieldInfo backing=target.GetType().GetField("<"+field+">k__BackingField",BindingFlags.Instance|BindingFlags.NonPublic);
             Assert.IsNotNull(backing,field+" backing field"); backing.SetValue(target,value);
         }
-        [Test] public void WrongStateCannotSettleAndLossCreditsOnlyNewHalfSales()
+        [Test] public void WrongStateCannotSettleAndLossAddsOnlyNewRecognizedSales()
         {
             object market=Market(), sim=Sim(); Call(market,"Initialize",0);
             Assert.IsTrue((bool)Call(market,"BeginAttempt",sim));
@@ -104,18 +104,19 @@ namespace HayChoriYPaty.Tests
             object ready=Sim(); Call(market,"Initialize",0); Assert.IsTrue((bool)Call(market,"BeginAttempt",ready));
             Assert.IsFalse((bool)Call(market,"BeginAttempt",ready)); Call(market,"AbortAttempt");
         }
-        [Test] public void ReadyCannotSettleAndDebtOrOperationOverflowRejectsAtomically()
+        [Test] public void ReadyCannotSettleAndUnaffordablePurchaseRejectsAtomically()
         {
             object data=Activator.CreateInstance(dataType), market=Market(data), sim=Sim(); Call(market,"Initialize",0);
             Assert.IsTrue((bool)Call(market,"BeginAttempt",sim)); Assert.IsNull(Call(market,"SettleAttempt",sim));
             Assert.IsTrue((bool)dataType.GetField("attemptActive").GetValue(Get(market,"Data"))); Call(market,"AbortAttempt");
             market=Market(); Call(market,"Initialize",1); sim=Sim(1);
-            int[] stock=(int[])dataType.GetField("stockUnits").GetValue(Get(market,"Data")); stock[4]=0;
-            dataType.GetField("debtCents").SetValue(Get(market,"Data"),long.MaxValue);
+            int[] stock=(int[])dataType.GetField("stockUnits").GetValue(Get(market,"Data")); Array.Clear(stock,0,stock.Length);
             dataType.GetField("balanceCents").SetValue(Get(market,"Data"),0L);
             long op=(long)Get(market,"NextPurchaseId");
-            Assert.IsFalse((bool)Call(market,"TryBuy",sim,4,1,true,1,op));
-            Assert.AreEqual(long.MaxValue,Get(market,"DebtCents")); Assert.AreEqual(0,Call(market,"Units",4));
+            Assert.IsFalse((bool)Call(market,"TryBuy",sim,0,1,1,op));
+            Assert.AreEqual(0L,Get(market,"BalanceCents")); Assert.AreEqual(0,Call(market,"Units",0));
+            Assert.AreEqual(op,Get(market,"NextPurchaseId"));
+            Assert.IsFalse((bool)Call(market,"HasRequiredStock",sim));
         }
         [Test] public void ReservationsCannotSpendOtherProductsSharedBreadQuota()
         {
@@ -141,13 +142,14 @@ namespace HayChoriYPaty.Tests
         [Test] public void BottleShortagesAreIndependentAndPartialPortionsRestoreExactly()
         {
             object sim=Sim(4), market=Market(); Call(market,"Initialize",4);
-            object data=Get(market,"Data"); int[] stock=(int[])dataType.GetField("stockUnits").GetValue(data);
+            object data=Get(market,"Data"); dataType.GetField("balanceCents").SetValue(data,800L);
+            int[] stock=(int[])dataType.GetField("stockUnits").GetValue(data);
             int required=((int[])Call(market,"RequiredUnits",sim))[8];
             stock[8]=required; stock[9]=required-1;
             Assert.AreEqual(0,Call(market,"MissingPacks",sim,8));
             Assert.AreEqual(1,Call(market,"MissingUnits",sim,9));
             Assert.AreEqual(1,Call(market,"MissingPacks",sim,9));
-            Assert.IsTrue((bool)Call(market,"TryBuy",sim,9,1,true,4,1L));
+            Assert.IsTrue((bool)Call(market,"TryBuy",sim,9,1,4,1L));
             Assert.AreEqual(required+3,Call(market,"Units",9));
             Assert.IsTrue((bool)Call(market,"BeginAttempt",sim));
             Assert.IsTrue((bool)Call(market,"TryReserveFood",91,5));
@@ -171,38 +173,15 @@ namespace HayChoriYPaty.Tests
             int before=(int)Call(market,"Units",0); ((int[])dataType.GetField("stockUnits").GetValue(data))[0]=0;
             Call(market,"Initialize",3); Assert.AreEqual(0,Call(market,"Units",0)); Assert.Greater(before,0);
         }
-        [Test] public void ElevenLevelMinimumOnlyFiadoChainSettlesWithoutUnpayableDebt()
+        [Test] public void LegacyDebtJsonIsIgnoredAndNotWrittenBack()
         {
-            object market=Market(); Call(market,"Initialize",0); int foodId=1000;
-            for(int level=0;level<11;level++)
-            {
-                object sim=Sim(level);
-                for(int ingredient=0;ingredient<10;ingredient++)
-                {
-                    int packs=(int)Call(market,"MissingPacks",sim,ingredient);
-                    if(packs<=0) continue;
-                    long operation=(long)Get(market,"NextPurchaseId");
-                    Assert.IsTrue((bool)Call(market,"TryBuy",sim,ingredient,packs,true,level,operation),"level "+level+", ingredient "+ingredient);
-                }
-                Assert.IsTrue((bool)Call(market,"BeginAttempt",sim),"stocked level "+level);
-                int grossCoins=0; Array delivered=(Array)simType.GetField("deliveredByProduct",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(sim);
-                int count=(int)simType.GetProperty("ProductCount",Public).GetValue(sim,null);
-                for(int slot=0;slot<count;slot++)
-                {
-                    int product=(int)simType.GetMethod("GetAvailableProduct",Public).Invoke(sim,new object[]{slot});
-                    int goal=(int)simType.GetMethod("GetProductGoal",Public).Invoke(sim,new object[]{product});
-                    int each=Mathf.RoundToInt((float)simType.GetMethod("GetProductPrice",Public).Invoke(sim,new object[]{product}));
-                    for(int unit=0;unit<goal;unit++)
-                    {
-                        Assert.IsTrue((bool)Call(market,"TryReserveFood",foodId,product),"reserve level "+level+" product "+product+" portion "+unit);
-                        Assert.IsTrue((bool)Call(market,"ConsumeReservedFood",foodId,product)); foodId++;
-                        delivered.SetValue(unit+1,product); grossCoins+=each;
-                    }
-                }
-                Set(sim,"CoinsEarned",grossCoins); Set(sim,"Coins",0);
-                Set(sim,"Phase",Enum.Parse(Type.GetType("HayChoriYPaty.RoundPhase, Assembly-CSharp",true),"Won"));
-                Assert.IsNotNull(Call(market,"SettleAttempt",sim)); Assert.AreEqual(0L,Get(market,"DebtCents"),"debt after level "+level);
-            }
+            string legacy="{\"balanceCents\":1234,\"debtCents\":987654,\"stockUnits\":[0,0,0,0,0,0,0,0,0,0]}";
+            object data=JsonUtility.FromJson(legacy,dataType); object market=Market(data);
+            Assert.AreEqual(1234L,Get(market,"BalanceCents"));
+            Assert.IsNull(dataType.GetField("debtCents"));
+            Assert.IsNull(marketType.GetProperty("DebtCents",Public));
+            Assert.IsNull(marketType.GetMethod("FinancingNeededCents",Public));
+            Assert.IsFalse(JsonUtility.ToJson(Get(market,"Data")).Contains("debtCents"));
         }
     }
 }

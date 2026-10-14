@@ -1,4 +1,14 @@
-# Latest Android delivery — 2026-10-13 (0.2.30/code32, Mercado and Heladera)
+# Latest Android delivery — 2026-10-13 (0.2.31/code33, Mercado cash-only and objective cards)
+
+Unity 6000.6.3f1 Development IL2CPP/ARM64 APK built from `Assets/Scenes/Main.unity`: **Succeeded; 0 errors / 2 warnings**. Unity MCP was unavailable, so the build used a temporary batch-mode editor entry point (removed after build).
+
+APK `Builds/Android/Archive/HayChoriYPaty-0.2.31-code33-market-cashonly-objective-cards.apk`: **410,257,353 bytes**; SHA-256 `f2c443c23878c515d063be7d5235a7022c49ea2c2cb8249bfab3c1b878b8a165`. Package `com.haychoriypaty.game`, version0.2.31/code33, min API26/target36, `arm64-v8a`. `aapt` metadata and ZIP integrity passed; APK Signature Scheme v2 verified with the established Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`. Versioned and rolling aliases: `Builds/Android/HayChoriYPaty-0.2.31.apk`, `Builds/Android/HayChoriYPaty-street.apk`.
+
+**Validation:** Focused Mercado PlayMode checks passed 3/3 (objective card layout, explicit cash-only purchase, and stock gate) across logical frames 540×960, 540×1170 and 540×1200; `git diff --check` passed. Unity MCP was unavailable, so no Game View screenshot or manual visual review was captured. Development/debug-signed; not Play Store release signing.
+
+---
+
+# Previous Android delivery — 2026-10-13 (0.2.30/code32, Mercado and Heladera)
 
 Unity 6000.6.3f1 Main-only Development IL2CPP/ARM64 APK built through Unity MCP: **Succeeded in 449.24s; 0 errors / 2 warnings**. Warnings were the generic uncompiled-code notice and Diagnostics Data's recommendation to use Full debug symbols. Relevant C# assemblies had been compiled after their source edits, and the APK IL2CPP metadata contains the Market/Heladera identifiers. BuildReport output size was 2,068.77 MB (not APK download size).
 

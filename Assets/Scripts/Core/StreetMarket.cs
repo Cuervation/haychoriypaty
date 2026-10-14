@@ -25,14 +25,14 @@ namespace HayChoriYPaty
     {
         public bool won;
         public int level;
-        public long grossSalesCents, leftoverCents, halfSalesCents, recognizedSalesCents, bonusCents, newCreditCents, debtRepaidCents, totalBalanceCents;
+        public long grossSalesCents, leftoverCents, halfSalesCents, recognizedSalesCents, bonusCents, earnedCents, totalBalanceCents;
         public int[] consumedUnits, remainingUnits;
     }
 
     [Serializable]
     public sealed class StreetMarketData
     {
-        public long balanceCents, debtCents, nextPurchaseId = 1, lastPurchaseId, cumulativePurchaseUnits, cumulativePurchaseSpendCents;
+        public long balanceCents, nextPurchaseId = 1, lastPurchaseId, cumulativePurchaseUnits, cumulativePurchaseSpendCents;
         public long nextAttemptId = 1, attemptId, settledAttemptId;
         public int attemptLevel = -1, initializedUnlockedLevel = -1;
         public int[] stockUnits = new int[10], attemptStock;
@@ -57,7 +57,6 @@ namespace HayChoriYPaty
         public StreetMarketData Data { get; private set; }
         public StreetBalance Balance { get; private set; }
         public long BalanceCents { get { return Data.balanceCents; } }
-        public long DebtCents { get { return Data.debtCents; } }
         public long NextPurchaseId { get { return Data.nextPurchaseId; } }
         public StreetMarketResult LastResult { get { return Data.lastResult; } }
         private readonly Dictionary<int, Reservation> reservations = new Dictionary<int, Reservation>();
@@ -76,10 +75,12 @@ namespace HayChoriYPaty
             Data.highestRecognizedSalesByLevel = Normalize(Data.highestRecognizedSalesByLevel, 11);
             Data.bonusPaidByLevel = Normalize(Data.bonusPaidByLevel, 11);
             Data.attemptStock = Data.attemptStock == null ? null : Normalize(Data.attemptStock, 10);
-            Data.balanceCents = Math.Max(0L, Data.balanceCents); Data.debtCents = Math.Max(0L, Data.debtCents);
+            Data.balanceCents = Math.Max(0L, Data.balanceCents);
             Data.cumulativePurchaseUnits = Math.Max(0L, Data.cumulativePurchaseUnits);
             Data.cumulativePurchaseSpendCents = Math.Max(0L, Data.cumulativePurchaseSpendCents);
             Data.nextPurchaseId = Math.Max(1L, Data.nextPurchaseId); Data.nextAttemptId = Math.Max(1L, Data.nextAttemptId);
+            if (Data.lastResult != null && Data.lastResult.earnedCents == 0)
+                Data.lastResult.earnedCents = Math.Max(0L, Data.lastResult.recognizedSalesCents) + Math.Max(0L, Data.lastResult.bonusCents);
         }
 
         public int Units(int id) { return id >= 0 && id < 10 ? Data.stockUnits[id] : 0; }
@@ -138,14 +139,13 @@ namespace HayChoriYPaty
             for (int i = 0; i < 10; i++) if (!TryAdd(sum, (long)MissingPacks(sim, i) * PackPriceCents(i), out sum)) return long.MaxValue;
             return sum;
         }
-        public long FinancingNeededCents(StreetSimulation sim) { long cost = MinimumPurchaseCostCents(sim); return Math.Max(0L, cost - BalanceCents); }
 
         /// <summary>First migration grants the level-one kit. Older progress gets its high-level kit once and reward watermarks.</summary>
         public void Initialize(int unlockedLevel)
         {
             unlockedLevel = Math.Max(0, Math.Min(StreetSimulation.LevelNames.Length - 1, unlockedLevel));
             if (Data.kitGranted && Data.initializedUnlockedLevel >= 0) return;
-            if (BalanceCents == 0 && DebtCents == 0 && Balance.market != null) Data.balanceCents = Math.Max(0L, Balance.market.startingBalanceCents);
+            if (BalanceCents == 0 && Balance.market != null) Data.balanceCents = Math.Max(0L, Balance.market.startingBalanceCents);
             int kitLevel = unlockedLevel > 0 ? unlockedLevel : 0;
             int[] kit = RequiredUnits(new StreetSimulation(Balance, kitLevel, 5f));
             if (!Data.kitGranted)
@@ -171,7 +171,7 @@ namespace HayChoriYPaty
         }
         private void RestoreSnapshot() { if (Data.attemptStock != null) Array.Copy(Data.attemptStock, Data.stockUnits, 10); }
 
-        public bool TryBuy(StreetSimulation sim, int id, int packs, bool financeMinimum, int unlocked, long operationId)
+        public bool TryBuy(StreetSimulation sim, int id, int packs, int unlocked, long operationId)
         {
             if (sim == null || sim.Phase != RoundPhase.Ready || Data.attemptActive || id < 0 || id >= 10 || packs <= 0 ||
                 !IsIngredientUnlocked(id, unlocked) || operationId <= Data.lastPurchaseId || operationId != Data.nextPurchaseId) return false;
@@ -179,19 +179,9 @@ namespace HayChoriYPaty
             long cost = (long)packs * PackPriceCents(id);
             if (unitCount > int.MaxValue - Units(id) || cost < 0 || cost > long.MaxValue - Data.cumulativePurchaseSpendCents ||
                 unitCount > long.MaxValue - Data.cumulativePurchaseUnits) return false;
-            long cash = Data.balanceCents, debt = Data.debtCents;
-            int minimumPacks = MissingPacks(sim, id);
-            if (cost > cash)
-            {
-                // Fiado may finance only the exact missing minimum; debt overflow is a hard rejection.
-                if (!financeMinimum || packs != minimumPacks) return false;
-                long newDebt = debt + (cost - cash);
-                if (newDebt < debt) return false;
-                debt = newDebt; cash = 0;
-            }
-            else cash -= cost;
-            if (operationId == long.MaxValue) return false;
-            Data.balanceCents = cash; Data.debtCents = debt; Data.stockUnits[id] += (int)unitCount;
+            long cash = Data.balanceCents;
+            if (cost > cash || operationId == long.MaxValue) return false;
+            Data.balanceCents = cash - cost; Data.stockUnits[id] += (int)unitCount;
             Data.lastPurchaseId = operationId; Data.nextPurchaseId = operationId + 1;
             Data.cumulativePurchaseUnits += unitCount; Data.cumulativePurchaseSpendCents += cost;
             return true;
@@ -215,17 +205,14 @@ namespace HayChoriYPaty
             long watermark = Data.highestRecognizedSalesByLevel[level];
             long recognized = Math.Max(0L, half - watermark);
             long bonus = won && !Data.bonusPaidByLevel[level] ? (long)Math.Max(0, sim.Coins) * 200L : 0L;
-            long credit = recognized + bonus;
-            long repaid = Math.Min(Data.debtCents, credit);
-            long spendable = credit - repaid;
-            if (Data.balanceCents > long.MaxValue - spendable) return null;
+            long earned = recognized + bonus;
+            if (Data.balanceCents > long.MaxValue - earned) return null;
             if (!won) RestoreSnapshot();
             if (won) Data.bonusPaidByLevel[level] = true;
             Data.highestRecognizedSalesByLevel[level] = Math.Max(watermark, half);
-            Data.debtCents -= repaid;
-            Data.balanceCents += spendable;
+            Data.balanceCents += earned;
             Data.lastResult = new StreetMarketResult { won = won, level = level, grossSalesCents = gross, leftoverCents = (long)Math.Max(0, sim.Coins) * 100L,
-                halfSalesCents = half, recognizedSalesCents = recognized, bonusCents = bonus, newCreditCents = credit, debtRepaidCents = repaid,
+                halfSalesCents = half, recognizedSalesCents = recognized, bonusCents = bonus, earnedCents = earned,
                 totalBalanceCents = Data.balanceCents, consumedUnits = (int[])attemptConsumed.Clone(), remainingUnits = (int[])Data.stockUnits.Clone() };
             Data.settledAttemptId = Data.attemptId; Data.attemptActive = false; reservations.Clear(); attemptSimulation = null; return Data.lastResult;
         }

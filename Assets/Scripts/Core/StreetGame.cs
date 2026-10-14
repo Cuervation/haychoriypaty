@@ -117,11 +117,11 @@ namespace HayChoriYPaty
             sim.BindIngredientStock(market);
             resultSaved = false; sim.StartRound(); Save(); return true;
         }
-        public bool TryBuyIngredient(int ingredient, int packs, bool financeMinimum = false, long operationId = 0)
+        public bool TryBuyIngredient(int ingredient, int packs, long operationId = 0)
         {
             if (market == null || sim == null || sim.Phase != RoundPhase.Ready || UnlockedLevel == 0) return false;
             string before = JsonUtility.ToJson(market.Data);
-            if (!market.TryBuy(sim, ingredient, packs, financeMinimum, UnlockedLevel,
+            if (!market.TryBuy(sim, ingredient, packs, UnlockedLevel,
                 operationId == 0 ? market.NextPurchaseId : operationId)) return false;
             if (Save()) return true;
             market = new StreetMarket(JsonUtility.FromJson<StreetMarketData>(before), balance);
@@ -129,7 +129,7 @@ namespace HayChoriYPaty
             return false;
         }
         public bool BuyMissingIngredient(int ingredient) => market != null &&
-            TryBuyIngredient(ingredient, market.MissingPacks(sim, ingredient), true);
+            TryBuyIngredient(ingredient, market.MissingPacks(sim, ingredient));
         public bool TryHire() { return TryHireParrillero(); }
         public bool TryHireParrillero() { return HireRole(StreetWorkerRole.Parrillero); }
         public bool TryHireCocacolero() { return HireRole(StreetWorkerRole.Cocacolero); }

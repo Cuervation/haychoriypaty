@@ -233,6 +233,15 @@ Preserve all product quotas, fixed sale prices, hire/speed costs and production.
 
 ## 2026-10-13 — Persistent market without a second kitchen
 
-Keep monetary values in integer cents and bottle remainder in integer quarter-portions inside the same v4 StreetGame JSON. Existing physical food IDs hold temporary recipe reservations; only validated handoff consumes permanent ingredients. Active-attempt snapshots roll back stock on abandonment/reload/loss. Supplier credit finances minimum packs only and future credits repay debt first. Per-level sales watermarks and first-win bonus flags prevent replay reward farming; migration preserves unlocks and grants the highest-unlocked kit once.
+Keep monetary values in integer cents and bottle remainder in integer quarter-portions inside the same v4 StreetGame JSON. Existing physical food IDs hold temporary recipe reservations; only validated handoff consumes permanent ingredients. Active-attempt snapshots roll back stock on abandonment/reload/loss. All purchases require available Mercado cash; legacy `debtCents` is ignored when loading v4 saves, and future settlement earnings go directly to balance. Per-level sales watermarks and first-win bonus flags prevent replay reward farming; migration preserves unlocks and grants the highest-unlocked kit once.
 
 Exact-minimum stock revealed FIFO starvation hidden by unlimited extra sales. Only residual tickets whose products are all quota-complete and sold out leave through the existing cancellation route, without fake completions/revenue. Order generation, movements, times, prices and quotas are unchanged.
+
+## 2026-10-13 — Remove supplier financing
+
+Cash-only Mercado is the final rule: never buy above the current available balance, and keep `JUGAR PARTIDO` disabled until required stock exists. Existing prices, recipes, quantities, level targets, and earned-sales rules are unchanged.
+
+
+## 2026-10-13 — Data-driven Mercado objective cards
+
+Render Mercado goals in StreetSimulation product order from its current product/goal getters; keep the ingredient list as the only scrolling content and keep economy/action controls fixed. Use the compact two-row patterns for four to seven goals. Preserve the cash-only/no-fiado rule; a stale layout prompt is not approval to restore financing.
