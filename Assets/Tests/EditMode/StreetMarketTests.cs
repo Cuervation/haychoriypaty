@@ -42,17 +42,35 @@ namespace HayChoriYPaty.Tests
             Assert.IsFalse((bool)Call(market,"IsIngredientUnlocked",8,0));
             Assert.IsTrue((bool)Call(market,"IsIngredientUnlocked",8,4));
         }
-        [Test] public void NewGameKitUsesCeilingOfLevelOneRecipeGoalsAndAddsOnlyRequiredIngredients()
+        [Test] public void NewGameKitUsesExactLevelOneRecipeGoalsAndAddsOnlyRequiredIngredients()
         {
             object balance=Activator.CreateInstance(balanceType), data=Activator.CreateInstance(dataType), market=Market(data,balance);
             Call(market,"InitializeNewGameKit");
-            Assert.AreEqual(220,Call(market,"Units",0)); Assert.AreEqual(220,Call(market,"Units",1));
+            Assert.AreEqual(200,Call(market,"Units",0)); Assert.AreEqual(200,Call(market,"Units",1));
             for(int i=2;i<10;i++) Assert.AreEqual(0,Call(market,"Units",i),"No optional ingredient should be included.");
-            // Future goal edits feed the kit automatically; 201 × 1.10 rounds up to 222.
+            // The first-level recipe goal remains the authority if its configured amount changes.
             Array levels=(Array)balanceType.GetField("levelBalances",Public).GetValue(balance);
             object first=levels.GetValue(0); int[] goals=(int[])first.GetType().GetField("goalsByProductId",Public).GetValue(first); goals[0]=201;
             data=Activator.CreateInstance(dataType); market=Market(data,balance); Call(market,"InitializeNewGameKit");
-            Assert.AreEqual(222,Call(market,"Units",0)); Assert.AreEqual(222,Call(market,"Units",1));
+            Assert.AreEqual(201,Call(market,"Units",0)); Assert.AreEqual(201,Call(market,"Units",1));
+        }
+
+        [Test] public void LevelOneStockFloorFillsOnlyShortagesAndNeverAppliesToLaterLevels()
+        {
+            object data=Activator.CreateInstance(dataType), market=Market(data), levelOne=Sim(0);
+            int[] stock=(int[])dataType.GetField("stockUnits").GetValue(data); stock[0]=145; stock[1]=435;
+            Assert.IsTrue((bool)Call(market,"CanMeetRequiredStockWithLevelOneFloor",levelOne));
+            Assert.IsFalse((bool)Call(market,"HasRequiredStock",levelOne));
+            Assert.IsTrue((bool)Call(market,"EnsureLevelOneStartingStock",levelOne));
+            Assert.AreEqual(200,Call(market,"Units",0)); Assert.AreEqual(435,Call(market,"Units",1));
+            Assert.IsFalse((bool)Call(market,"EnsureLevelOneStartingStock",levelOne),"A repeat entry must not grant beyond the floor.");
+            stock[0]=199; stock[1]=50;
+            Assert.IsTrue((bool)Call(market,"EnsureLevelOneStartingStock",levelOne));
+            Assert.AreEqual(200,Call(market,"Units",0)); Assert.AreEqual(200,Call(market,"Units",1));
+            object levelTwo=Sim(1); stock[0]=145; stock[1]=150;
+            Assert.IsFalse((bool)Call(market,"CanMeetRequiredStockWithLevelOneFloor",levelTwo));
+            Assert.IsFalse((bool)Call(market,"EnsureLevelOneStartingStock",levelTwo));
+            Assert.AreEqual(145,Call(market,"Units",0)); Assert.AreEqual(150,Call(market,"Units",1));
         }
         [Test] public void PurchaseRejectsDuplicateFutureIngredientAndNumericOverflow()
         {
@@ -185,6 +203,44 @@ namespace HayChoriYPaty.Tests
             int before=(int)Call(market,"Units",0); ((int[])dataType.GetField("stockUnits").GetValue(data))[0]=0;
             Call(market,"Initialize",3); Assert.AreEqual(0,Call(market,"Units",0)); Assert.Greater(before,0);
         }
+        [Test] public void LegacyProgressionRepairPaysOnlyTheExactNextLevelStockShortageOnce()
+        {
+            object balance=Activator.CreateInstance(balanceType), data=Activator.CreateInstance(dataType);
+            dataType.GetField("balanceCents").SetValue(data,0L);
+            dataType.GetField("cumulativePurchaseSpendCents").SetValue(data,0L);
+            dataType.GetField("kitGranted").SetValue(data,true);
+            dataType.GetField("initializedUnlockedLevel").SetValue(data,1);
+            dataType.GetField("stockUnits").SetValue(data,new[]{0,235,0,0,0,0,85,0,0,0});
+            ((long[])dataType.GetField("highestRecognizedSalesByLevel").GetValue(data))[0]=50000L;
+            ((bool[])dataType.GetField("bonusPaidByLevel").GetValue(data))[0]=true;
+            object market=Market(data,balance), levelTwo=Sim(1);
+
+            Assert.AreEqual(58750L,Call(market,"ReconcileLegacyProgressionBalance",levelTwo,1));
+            Assert.AreEqual(58750L,Get(market,"BalanceCents"));
+            Assert.AreEqual(0,Call(market,"Units",0)); Assert.AreEqual(235,Call(market,"Units",1)); Assert.AreEqual(85,Call(market,"Units",6));
+            Assert.AreEqual(0L,Call(market,"ReconcileLegacyProgressionBalance",levelTwo,1),"Persisted migration marker must prevent a second grant.");
+            Assert.AreEqual(58750L,Get(market,"BalanceCents"));
+            Assert.IsTrue((bool)Call(market,"TryBuy",levelTwo,0,200,1,1L));
+            Assert.IsTrue((bool)Call(market,"TryBuy",levelTwo,6,115,1,2L));
+            Assert.AreEqual(0L,Get(market,"BalanceCents")); Assert.IsTrue((bool)Call(market,"HasRequiredStock",levelTwo));
+            object persisted=JsonUtility.FromJson(JsonUtility.ToJson(Get(market,"Data")),dataType);
+            Assert.IsTrue((bool)dataType.GetField("legacyTransitionRepairApplied").GetValue(persisted));
+        }
+
+        [Test] public void LegacyProgressionRepairSkipsCurrentCashAndAnyPriorMarketSpend()
+        {
+            object data=Activator.CreateInstance(dataType), market=Market(data), levelTwo=Sim(1);
+            dataType.GetField("kitGranted").SetValue(data,true); dataType.GetField("initializedUnlockedLevel").SetValue(data,1);
+            ((long[])dataType.GetField("highestRecognizedSalesByLevel").GetValue(data))[0]=50000L;
+            ((bool[])dataType.GetField("bonusPaidByLevel").GetValue(data))[0]=true;
+            dataType.GetField("balanceCents").SetValue(data,1L);
+            Assert.AreEqual(0L,Call(market,"ReconcileLegacyProgressionBalance",levelTwo,1));
+            dataType.GetField("balanceCents").SetValue(data,0L);
+            dataType.GetField("cumulativePurchaseSpendCents").SetValue(data,150L);
+            Assert.AreEqual(0L,Call(market,"ReconcileLegacyProgressionBalance",levelTwo,1));
+            Assert.IsFalse((bool)dataType.GetField("legacyTransitionRepairApplied").GetValue(data));
+        }
+
         [Test] public void LegacyDebtJsonIsIgnoredAndNotWrittenBack()
         {
             string legacy="{\"balanceCents\":1234,\"debtCents\":987654,\"stockUnits\":[0,0,0,0,0,0,0,0,0,0]}";

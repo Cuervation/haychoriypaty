@@ -40,7 +40,7 @@ namespace HayChoriYPaty
         public int UnlockedLevel { get { return save == null ? 0 : save.unlockedLevel; } }
         public StreetMarket Market => market;
         public bool CanStartRound => sim != null && sim.Phase == RoundPhase.Ready &&
-            market != null && !market.Data.attemptActive && market.HasRequiredStock(sim);
+            market != null && !market.Data.attemptActive && market.CanMeetRequiredStockWithLevelOneFloor(sim);
 
         private void OnEnable()
         {
@@ -57,6 +57,13 @@ namespace HayChoriYPaty
             selectedLevel = Mathf.Clamp(selectedLevel, 0, save.unlockedLevel);
             sim = new StreetSimulation(balance, selectedLevel, save.price);
             if(save.prices!=null && save.prices.Length==7)for(int i=0;i<7;i++)sim.SetProductPrice(i,save.prices[i]);
+            if (save.unlockedLevel > 0)
+            {
+                // Some older saves entered Mercado with completed-level rewards already watermarked,
+                // but no Mercado cash existed to pay them. Reconcile only the next unlocked level once.
+                var nextUnlockedSimulation = new StreetSimulation(balance, save.unlockedLevel, save.price);
+                market.ReconcileLegacyProgressionBalance(nextUnlockedSimulation, save.unlockedLevel);
+            }
             InitializeDeliverySound();
             resultSaved = false;
             Save(); // Persist the one-time initialization/recovery, never grant it again on navigation.
@@ -115,11 +122,29 @@ namespace HayChoriYPaty
         public void StartRound() { TryStartRound(); }
         public bool TryStartRound()
         {
-            if (!CanStartRound || !market.BeginAttempt(sim)) return false;
-            // Write the full pre-attempt snapshot before any delivery can consume stock.
-            if (!Save()) { market.AbortAttempt(); return false; }
+            if (!CanStartRound) return false;
+            string previousMarket = JsonUtility.ToJson(market.Data);
+            market.EnsureLevelOneStartingStock(sim);
+            if (!market.BeginAttempt(sim))
+            {
+                RestoreMarketAfterFailedStart(previousMarket);
+                return false;
+            }
+            // Persist the top-up and full pre-attempt snapshot before any delivery can consume stock.
+            if (!Save())
+            {
+                market.AbortAttempt();
+                RestoreMarketAfterFailedStart(previousMarket);
+                return false;
+            }
             sim.BindIngredientStock(market);
             resultSaved = false; sim.StartRound(); Save(); return true;
+        }
+
+        private void RestoreMarketAfterFailedStart(string serializedMarket)
+        {
+            market = new StreetMarket(JsonUtility.FromJson<StreetMarketData>(serializedMarket), balance);
+            save.market = market.Data;
         }
         public bool TryBuyIngredient(int ingredient, int packs, long operationId = 0)
         {

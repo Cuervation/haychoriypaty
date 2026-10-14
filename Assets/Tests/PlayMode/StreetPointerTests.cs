@@ -106,6 +106,11 @@ namespace HayChoriYPaty.Tests
         private void StockSelectedLevel()
         {
             object market = Get("Market");
+            // These tests target gameplay/pointer behavior, not Mercado affordability. Keep a
+            // fixture-only cash reserve so realistic cash-only purchases can satisfy their setup.
+            object marketData = market.GetType().GetProperty("Data", PublicInstance).GetValue(market, null);
+            FieldInfo balanceCents = marketData.GetType().GetField("balanceCents");
+            balanceCents.SetValue(marketData, Math.Max((long)balanceCents.GetValue(marketData), 1000000000L));
             for (int id = 0; id < 10; id++)
                 if ((int)market.GetType().GetMethod("MissingPacks").Invoke(market, new[] { Sim, (object)id }) > 0)
                     Assert.IsTrue((bool)CallGame("BuyMissingIngredient", id));
@@ -343,9 +348,20 @@ namespace HayChoriYPaty.Tests
                 .Invoke(null, new object[] { new Vector2(Screen.width, Screen.height), Screen.safeArea });
             float canvasHeight = (float)viewType.GetMethod("CanvasLogicalHeight", StaticPrivate).Invoke(null, new object[] { viewport });
             float verticalScale = canvasHeight / 960f;
-            viewType.GetField("logicalCanvasHeight", PrivateInstance).SetValue(view, canvasHeight);
-            viewType.GetField("layoutVerticalScale", PrivateInstance).SetValue(view, verticalScale);
-            Rect exit = (Rect)viewType.GetMethod("ResultLevelsBounds", PrivateInstance).Invoke(view, null);
+            FieldInfo logicalHeightField = viewType.GetField("logicalCanvasHeight", PrivateInstance);
+            FieldInfo verticalScaleField = viewType.GetField("layoutVerticalScale", PrivateInstance);
+            MethodInfo resultBounds = viewType.GetMethod("ResultLevelsBounds", PrivateInstance);
+            MethodInfo nextBounds = viewType.GetMethod("VictoryExitBounds", PrivateInstance);
+            foreach (float testHeight in new[] { 600f, 720f, 864f, 960f, 1200f })
+            {
+                logicalHeightField.SetValue(view, testHeight);
+                Rect next = (Rect)nextBounds.Invoke(view, null);
+                Rect levels = (Rect)resultBounds.Invoke(view, null);
+                Assert.IsFalse(next.Overlaps(levels), "Victory actions must not overlap at logical height " + testHeight);
+            }
+            logicalHeightField.SetValue(view, canvasHeight);
+            verticalScaleField.SetValue(view, verticalScale);
+            Rect exit = (Rect)resultBounds.Invoke(view, null);
             MethodInfo hit = viewType.GetMethod("HitAction", PrivateInstance);
             Assert.AreEqual(0, hit.Invoke(view, new object[] { new Vector2(35, 715) }), "The modal blocks the upgrade behind it");
             Assert.AreEqual(163, hit.Invoke(view, new object[] { new Vector2(exit.center.x, exit.center.y / verticalScale) }));
@@ -364,6 +380,7 @@ namespace HayChoriYPaty.Tests
             MethodInfo hit = viewType.GetMethod("HitAction", PrivateInstance);
             Assert.AreEqual(0, hit.Invoke(view, new object[] { new Vector2(270, 502) }), "Former slider location is inert");
             Assert.AreEqual(0, hit.Invoke(view, new object[] { new Vector2(154, 288) }), "Former product-tab location is inert");
+            StockSelectedLevel(); // Direct-start path still requires the selected level's stock.
             yield return Click(270, 585); // Starting directly remains supported after reload/retry.
             Assert.AreEqual("Playing", Phase);
 

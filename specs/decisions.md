@@ -1,5 +1,9 @@
 # Technical decision log
 
+## 2026-10-14 — Repair one unpaid legacy Mercado transition
+
+For already-unlocked next levels, reconcile only the migrated-save case where prior earnings are watermarked, no Mercado reward is recorded, current cash is zero, and cumulative Mercado purchase spend is zero. Persist a one-time amount equal to the exact current minimum missing-stock cost for that next level. This restores the transition the legacy save could not fund without reviving FIADO, resetting stock, or changing ongoing reward/price rules; any cash or recorded market spend makes the repair ineligible.
+
 ## 2026-10-08 — Official sale prices by product ID
 
 Supersede the 2026-10-06 uniform-$5 price rule with one immutable seven-ID table: $5, $5, $10, $12, $5, $12, $7. Continue using legacy save/setter fields only as compatibility shims; selling price must not alter demand generation, upgrade/hire costs, delivery-count goals, or other balance.

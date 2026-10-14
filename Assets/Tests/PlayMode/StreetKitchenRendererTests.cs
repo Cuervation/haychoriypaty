@@ -88,7 +88,7 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
-        public IEnumerator FernetTableDisplayKeepsBottlesOnTopAndReducesCocaByTwentyPercent()
+        public IEnumerator FernetTableDisplayKeepsTwoRowsSupportedAndProportional()
         {
             var root = new GameObject("Fernet tabletop bottle display test");
             try
@@ -109,35 +109,50 @@ namespace HayChoriYPaty.Tests
 
                 Transform display = station.transform.Find("FernetBottleDisplay");
                 Assert.IsNotNull(display);
-                Assert.AreEqual(4, display.childCount);
+                Assert.AreEqual(8, display.childCount, "The tabletop display uses four bottles in each of two rows.");
                 float tableHeight = table.sprite.bounds.size.y;
-                float tabletopY = table.sprite.bounds.max.y;
                 float groupRight = table.sprite.bounds.min.x + table.sprite.bounds.size.x * .64f;
+                int[] cocaByRow = new int[2], fernetByRow = new int[2];
+                float[] rearY = { float.NaN, float.NaN };
                 for (int i = 0; i < display.childCount; i++)
                 {
                     Transform bottle = display.GetChild(i);
                     SpriteRenderer bottleRenderer = bottle.GetComponent<SpriteRenderer>();
-                    bool fernet = i % 2 == 1;
-                    float expectedHeight = tableHeight * (fernet ? .25f * 3f : .333f * 3f * .8f);
+                    bool fernet = bottle.name.StartsWith("FernetBrancaBottle");
+                    int row = bottle.name.Contains("Row0_") ? 0 : 1;
+                    Assert.IsTrue(row == 0 || bottle.name.Contains("Row1_"), "Every stock bottle belongs to a known tabletop row.");
+                    if (fernet) fernetByRow[row]++; else cocaByRow[row]++;
+                    float expectedHeight = tableHeight * (fernet ? .25f * 3f : .333f * 3f * .76f);
                     float height = bottleRenderer.sprite.bounds.size.y * bottle.localScale.y;
-                    Assert.AreEqual(expectedHeight, height, .001f);
+                    Assert.AreEqual(expectedHeight, height, .001f, "Fernet and Coca keep their requested relative visual sizes.");
                     Assert.AreEqual(bottle.localScale.x, bottle.localScale.y, .0001f,
                         "Bottle sprites must preserve their original aspect ratios.");
                     Vector2 bottleSize = bottleRenderer.sprite.bounds.size * bottle.localScale.x;
                     Assert.GreaterOrEqual(bottle.localPosition.x - bottleSize.x * .5f, table.sprite.bounds.min.x - .001f);
                     Assert.LessOrEqual(bottle.localPosition.x + bottleSize.x * .5f, groupRight + .001f,
                         "Stock bottles must remain in the left tabletop zone.");
-                    Assert.AreEqual(tabletopY, bottle.localPosition.y - height * .5f, .001f,
-                        "Bottle bases must sit on top of the table.");
+                    float depthFraction = row == 0 ? .03f : .32f;
+                    float tabletopY = table.sprite.bounds.max.y - tableHeight * depthFraction;
+                    float visibleInset = fernet ? 0f : bottleRenderer.sprite.bounds.size.y * .009f * bottle.localScale.y;
+                    Assert.AreEqual(tabletopY - visibleInset, bottle.localPosition.y - height * .5f, .001f,
+                        "Each row's bottle bases must sit on its tabletop depth plane.");
+                    rearY[row] = bottle.localPosition.y;
                     for (int other = 0; other < i; other++)
                     {
                         Transform previous = display.GetChild(other);
+                        if (!previous.name.Contains("Row" + row + "_")) continue;
                         SpriteRenderer previousRenderer = previous.GetComponent<SpriteRenderer>();
                         float separation = Mathf.Abs(bottle.localPosition.x - previous.localPosition.x);
                         float required = (bottleSize.x + previousRenderer.sprite.bounds.size.x * previous.localScale.x) * .5f;
-                        Assert.GreaterOrEqual(separation + .001f, required, "Tabletop stock bottles should not overlap.");
+                        Assert.GreaterOrEqual(separation + .001f, required, "Bottles in each row must not overlap horizontally.");
                     }
                 }
+                for (int row = 0; row < 2; row++)
+                {
+                    Assert.AreEqual(2, cocaByRow[row], "Each row has two Coca bottles.");
+                    Assert.AreEqual(2, fernetByRow[row], "Each row has two Fernet bottles.");
+                }
+                Assert.Greater(rearY[0], rearY[1], "The rear row is staggered behind the front row.");
             }
             finally { UnityEngine.Object.Destroy(root); }
             yield return null;

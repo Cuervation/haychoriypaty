@@ -1,3 +1,27 @@
+# Latest Android delivery — 2026-10-14 (0.2.36/code38, Mercado recovery and suite fixes)
+
+Unity 6000.6.3f1 batch build from `Assets/Scenes/Main.unity`: **Succeeded in 84.54s; 0 errors / 1 warning** (Main-only Development IL2CPP/ARM64). The warning is a deprecated API used only by the temporary build entry point; no build helper was retained in project source. Current source passed the full Unity suite immediately before packaging: EditMode **434/434 passed**, PlayMode **59 passed / 0 failed / 1 skipped** (the interactive 11-level Game View capture test).
+
+Archive APK `Builds/Android/Archive/HayChoriYPaty-0.2.36-code38-suite-and-market-fixes.apk`; rolling copies `Builds/Android/HayChoriYPaty-0.2.36.apk` and `Builds/Android/HayChoriYPaty-street.apk`: **410,264,721 bytes**; SHA-256 `9d6c303574de05f948aea7af9051f5ae10df86e45c557cecaaa44d07bafb7f06`. Package `com.haychoriypaty.game`, version0.2.36/code38, min API26/target36, `arm64-v8a`. `aapt` metadata and `unzip -t` archive integrity pass; APK Signature Scheme v2 verified with the established Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`. All three paths are byte-identical. Development/debug-signed; not Play Store release signing. Phone installation was not requested or performed.
+
+---
+
+# Latest Android delivery — 2026-10-14 (0.2.35/code37, legacy Mercado reward repair)
+
+Unity 6000.6.3f1 batch build from `Assets/Scenes/Main.unity`: **Succeeded in 275.3s; 0 errors / 1 warning** (Main-only Development IL2CPP/ARM64). Focused Unity validation: Market EditMode **22/22** and cash-only PlayMode stock-gate regression **1/1** passed before packaging.
+
+Archive APK `Builds/Android/Archive/HayChoriYPaty-0.2.35-code37-market-migration.apk`; rolling copy `Builds/Android/HayChoriYPaty-street.apk`: **410,265,717 bytes**; SHA-256 `4d407239dede83d421a75cfc0f2e90586bb98bc4877685f42378d690bfa95b21`. Package `com.haychoriypaty.game`, version0.2.35/code37, min API26/target36, `arm64-v8a`. `aapt` metadata, ZIP integrity, and APK Signature Scheme v2 verified; Android Debug signer SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`. The two APK paths are byte-identical. Development/debug-signed; not Play Store release signing. Phone install was not performed because ADB returned no connected device.
+
+---
+
+# Latest Android delivery — 2026-10-14 (0.2.34/code36, Level 1 stock floor)
+
+Unity 6000.6.3f1 batch build from `Assets/Scenes/Main.unity`: **Succeeded in 288.55s** (Main-only Development IL2CPP/ARM64). Focused stock validation: EditMode **19/19** and PlayMode **1/1** passed before packaging.
+
+Archive APK `Builds/Android/Archive/HayChoriYPaty-0.2.34-code36-level1-stock.apk`; rolling copy `Builds/Android/HayChoriYPaty-street.apk`: **410,263,293 bytes**; SHA-256 `bcd7da753a551fdab9b2220faf01e92b6fc17197f1bae52d88fe25315e814cc2`. Package `com.haychoriypaty.game`, version0.2.34/code36, min API26/target36, `arm64-v8a`. `aapt` metadata, APK archive integrity and APK Signature Scheme v2 verified; Android Debug signer SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`. Archive and rolling artifact are byte-identical. Development/debug-signed, not Play Store release signing. No phone install or device gameplay validation was performed.
+
+---
+
 # Latest Android delivery — 2026-10-14 (0.2.33/code35, unified Mercado + Level 1 stock kit)
 
 Unity 6000.6.3f1 Main-only Development IL2CPP/ARM64 APK built through Unity MCP job `build-f915a3143b`: **Succeeded in 27.68s; 0 errors / 3 warnings** (incremental build). The build included the unified Mercado UI, bread icon crop, and fresh-save Level 1 kit calculation. Unity test suite was not verified in this delivery: MCP returned zero tests for filtered calls and timed out on the assembly run.

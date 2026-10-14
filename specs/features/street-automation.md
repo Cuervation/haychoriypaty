@@ -747,9 +747,10 @@ The established station order stays Coca barrel left → centered parrilla → f
 
 ## Shared cover-standard navigation buttons — 2026-10-06
 
-Consolidate the existing IMGUI cover button renderer rather than adding a prefab/uGUI system. Ordinary cover/menu/selector/Ready/result controls use the same generated blue capsule and bundled outlined white Luckiest Guy caption. GAME OVER VOLVER retains its exact return action/position; victory SALIR retains its normalized exit slot/navigation and replaces the earlier green face with the shared style. Ready 1–5 controls retain unlock and input rules. Gameplay, persistence/progression, economics and special upgrade/mural cards are unchanged.
+Consolidate the existing IMGUI cover button renderer rather than adding a prefab/uGUI system. Ordinary cover/menu/selector/Ready/result controls use the same generated blue capsule and bundled outlined white Luckiest Guy caption. GAME OVER VOLVER retains its exact return action/position; victory SALIR retains its normalized exit slot/navigation and replaces the earlier green face with the shared style. Ready 1–5 controls retain unlock and input rules. The victory popup reserves the external NIVELES footer while fitting its artwork so its next-level action never overlaps the return action on short screens. Gameplay, persistence/progression, economics and special upgrade/mural cards are unchanged.
 
 - [x] One shared texture/font/renderer; no duplicate assets or fallback fonts.
+- [x] Victory action hitboxes remain disjoint at logical heights 600, 720, 864, 960, and 1200 (focused PlayMode regression).
 - [x] Normal/pressed/disabled states and unchanged locked navigation validated.
 - [x] Cover reference preserved; focused mouse/touch routing and result exit tests passed.
 - [x] Ordinary controls audited/migrated; special card exceptions documented.

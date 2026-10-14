@@ -3231,7 +3231,10 @@ namespace HayChoriYPaty
         {
             const float topHudReserve = 110f;
             const float screenInset = 16f;
-            float availableHeight = Mathf.Max(1f, canvasHeight - topHudReserve - screenInset * 2f);
+            const float resultButtonTopInset = 72f;
+            const float resultButtonGap = 8f;
+            // Keep the external NIVELES button below, not behind, the artwork's next-level action.
+            float availableHeight = Mathf.Max(1f, canvasHeight - topHudReserve - screenInset - resultButtonTopInset - resultButtonGap);
             float scale = Mathf.Min((W - 24f) / VictoryPopupArtSize.x, availableHeight / VictoryPopupArtSize.y);
             Vector2 size = VictoryPopupArtSize * scale;
             float y = topHudReserve + screenInset + (availableHeight - size.y) * .5f;

@@ -38,7 +38,7 @@ namespace HayChoriYPaty
         public int[] stockUnits = new int[10], attemptStock;
         public long[] highestRecognizedSalesByLevel = new long[11];
         public bool[] bonusPaidByLevel = new bool[11];
-        public bool attemptActive, kitGranted;
+        public bool attemptActive, kitGranted, legacyTransitionRepairApplied;
         public StreetMarketResult lastResult;
     }
 
@@ -53,6 +53,7 @@ namespace HayChoriYPaty
     /// <summary>Persistent cent-exact market economy embedded in the StreetGame save.</summary>
     public sealed class StreetMarket : IStreetKitchenStock
     {
+        public const int LevelOneStarterStockFloor = 200;
         private sealed class Reservation { public int product; public int[] recipe; }
         public StreetMarketData Data { get; private set; }
         public StreetBalance Balance { get; private set; }
@@ -133,6 +134,33 @@ namespace HayChoriYPaty
             for (int i = 0; i < 10; i++) if (Units(i) < required[i]) return false;
             return true;
         }
+
+        public bool CanMeetRequiredStockWithLevelOneFloor(StreetSimulation sim)
+        {
+            if (sim == null) return false;
+            int[] required = RequiredUnits(sim);
+            int[] levelOneRecipe = sim.LevelIndex == 0 ? StreetIngredientCatalog.Recipe(0) : new int[0];
+            for (int i = 0; i < 10; i++)
+            {
+                int available = Units(i);
+                if (Array.IndexOf(levelOneRecipe, i) >= 0) available = Math.Max(available, LevelOneStarterStockFloor);
+                if (available < required[i]) return false;
+            }
+            return true;
+        }
+
+        public bool EnsureLevelOneStartingStock(StreetSimulation sim)
+        {
+            if (sim == null || sim.LevelIndex != 0) return false;
+            bool changed = false;
+            foreach (int ingredient in StreetIngredientCatalog.Recipe(0))
+            {
+                if (Data.stockUnits[ingredient] >= LevelOneStarterStockFloor) continue;
+                Data.stockUnits[ingredient] = LevelOneStarterStockFloor;
+                changed = true;
+            }
+            return changed;
+        }
         public long MinimumPurchaseCostCents(StreetSimulation sim)
         {
             long sum = 0;
@@ -171,7 +199,7 @@ namespace HayChoriYPaty
             InitializeStartingBalance();
             int[] required = RequiredUnits(new StreetSimulation(Balance, 0, 5f));
             for (int i = 0; i < Data.stockUnits.Length; i++)
-                Data.stockUnits[i] = required[i] <= 0 ? 0 : (int)Math.Min(int.MaxValue, ((long)required[i] * 110L + 99L) / 100L);
+                Data.stockUnits[i] = Math.Max(Data.stockUnits[i], required[i]);
             Data.kitGranted = true;
             Data.initializedUnlockedLevel = 0;
         }
@@ -192,6 +220,40 @@ namespace HayChoriYPaty
                 }
             Data.kitGranted = true;
             Data.initializedUnlockedLevel = unlockedLevel;
+        }
+
+        /// <summary>
+        /// Repairs a one-time legacy progression dead end when a completed level was watermarked as paid
+        /// during migration but its Mercado balance was never credited. This is a bounded transition grant,
+        /// not financing: it equals only the current missing-stock cost and is permanently marked in the save.
+        /// </summary>
+        public long ReconcileLegacyProgressionBalance(StreetSimulation nextLevelSimulation, int unlockedLevel)
+        {
+            if (Data.legacyTransitionRepairApplied || nextLevelSimulation == null || unlockedLevel <= 0 ||
+                unlockedLevel >= StreetSimulation.LevelNames.Length || nextLevelSimulation.LevelIndex != unlockedLevel ||
+                Data.attemptActive || BalanceCents != 0 || Data.cumulativePurchaseSpendCents != 0) return 0L;
+
+            int completedLevel = unlockedLevel - 1;
+            if (completedLevel < 0 || completedLevel >= Data.highestRecognizedSalesByLevel.Length ||
+                !Data.bonusPaidByLevel[completedLevel]) return 0L;
+
+            StreetSimulation completedSimulation = new StreetSimulation(Balance, completedLevel, 5f);
+            long expectedRecognizedSales = EstimatedGrossSales(completedSimulation) / 2L;
+            if (expectedRecognizedSales <= 0 || Data.highestRecognizedSalesByLevel[completedLevel] < expectedRecognizedSales) return 0L;
+
+            StreetMarketResult previousResult = Data.lastResult;
+            if (previousResult != null &&
+                (previousResult.level != completedLevel || !previousResult.won || previousResult.earnedCents != 0 ||
+                 previousResult.totalBalanceCents != 0 || previousResult.halfSalesCents <= 0)) return 0L;
+
+            long missingCost = MinimumPurchaseCostCents(nextLevelSimulation);
+            if (missingCost < 0 || missingCost == long.MaxValue) return 0L;
+
+            // Set even when there is no shortage: this migration repair is never a recurring allowance.
+            Data.legacyTransitionRepairApplied = true;
+            if (missingCost == 0) return 0L;
+            Data.balanceCents = missingCost;
+            return missingCost;
         }
 
         private void InitializeStartingBalance()

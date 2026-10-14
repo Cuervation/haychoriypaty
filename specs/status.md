@@ -1,3 +1,26 @@
+## Suite PlayMode y geometría de resultados — 2026-10-14
+
+Se resolvieron las fallas de la corrida completa, paso a paso:
+
+- Los 12 fallos de `StreetPointerTests` nacían de un fixture heredado sin saldo de Mercado; los tests intentaban compras cash-only antes de ejercitar punteros/partida. El fixture ahora carga fondos solo para pruebas y prepara stock; la economía del juego no cambió.
+- Un fallo sí era visual/funcional: en alturas cortas el botón de siguiente partido del popup invadía el botón NIVELES. `VictoryPopupBounds` ahora reserva el zócalo; se agregaron comprobaciones geométricas entre 600 y 1200 unidades lógicas.
+- La interacción de Mercado fallaba por asumir que el host batch apaisado de 640×480 equivalía al layout vertical; el test ahora valida hit-actions/debounce con altura lógica 960.
+- El test del display de botellas estaba desactualizado: esperaba cuatro unidades y multiplicador Coca 0,8; el arte actual implementa ocho (cuatro por fila) y 0,76 tras la reducción adicional de 5%. La aserción ahora comprueba composición, proporción, apoyo y separación.
+
+**Validación Unity 6000.6.3f1:** EditMode **434/434 pass**; PlayMode **59 pass, 0 fail, 1 skip (60 total)**. El único skip es la captura responsive de los 11 niveles, que requiere Editor interactivo. Unity MCP solo expuso `hcyp-visual-test` y no respondió al ping, por lo que no se obtuvieron capturas visuales. `git diff --check` pasó.
+
+## Reparación de recompensa migrada en Mercado — 2026-10-14
+
+Los guardados heredados podían conservar Nivel 2 desbloqueado y watermark de recompensa del Nivel 1, pero saldo Mercado cero. Al reabrir la partida, si no hubo saldo disponible ni compras Mercado registradas, se entrega una única reparación por el coste exacto del stock faltante del siguiente nivel desbloqueado (en la partida de referencia, $587,50). Queda persistida; no cambia inventario, precios, objetivos ni FIADO. Las pruebas focalizadas pasaron: EditMode Mercado **22/22**, PlayMode stock-gate **1/1**, incluyendo recarga/idempotencia y exclusión de partidas con saldo o compras previas.
+
+APK Android 0.2.35/code37 Main-only Development IL2CPP/ARM64 generada en 275.3 s, 0 errores/1 warning. Package/version, ZIP e firma v2 verificados; SHA-256 `4d407239dede83d421a75cfc0f2e90586bb98bc4877685f42378d690bfa95b21`. No se instaló en el teléfono: ADB no detectó el dispositivo al intentar verificar conexión. Recibo completo en `features/android-prototype.md`.
+
+## Level 1 minimum opening stock — 2026-10-14
+
+Every actual Level 1 attempt now starts with at least the live recipe requirement (200 Chorizo + 200 Pan común): persisted surplus is consumed as-is and only partial deficits are granted. Fresh saves seed exactly the live goal rather than a fixed 220; the top-up is persisted in the pre-attempt snapshot so defeat restores it and replay does not stack a kit. Other ingredients, later levels, prices and economy are unchanged.
+
+**Validation/delivery:** Unity 6000.6.3f1 batch run passed 19/19 focused EditMode Market tests and 1/1 focused PlayMode stock-gate regression. Android Main-only Development IL2CPP/ARM64 APK 0.2.34/code36 built successfully in 288.55s; package/version/min API/ABI, ZIP integrity and v2 debug signature verified. Archive and rolling artifact details are in `features/android-prototype.md`. No physical-device install or gameplay check was performed.
+
 ## Mercado/Heladera final validation and Android delivery — 2026-10-13
 
 The persistent Market/Heladera implementation is complete and packaged as Android 0.2.30/code32. Focused EditMode Market/kitchen/specialty tests passed 30/30; HUD texture and victory-popup bounds passed 4/4; PlayMode Market view/pointer/navigation passed 39/39. The wider targeted EditMode pass initially exposed a stale 193px HUD texture expectation and the victory popup touching the top edge at a 700px logical height; the expectation now matches the 211px texture and popup scaling reserves the top HUD plus 16px screen insets. The focused reruns passed.

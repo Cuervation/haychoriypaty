@@ -86,18 +86,25 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(0, (int)viewType.GetMethod("HitMarketAction", Priv).Invoke(view, new object[] { new Vector2(462, 35) }),
                 "The old HELADERA header button is gone.");
 
+            // The batch PlayMode host is landscape 640x480, unlike the portrait product layout.
+            // Exercise the actual logical market geometry at a 9:16 height instead of letting the
+            // test host clip the expanded row before the purchase control exists on screen.
+            viewType.GetField("logicalCanvasHeight", Priv).SetValue(view, 960f);
             int before = (int)Market.GetType().GetMethod("Units", Pub).Invoke(Market, new object[] { 0 });
             Rect firstRow = (Rect)viewType.GetMethod("MarketRowBounds", Priv).Invoke(view, new object[] { 0 });
-            Click(firstRow.x + 60, firstRow.y + 40); // Expand a complete card to buy optional reserves.
-            firstRow = (Rect)viewType.GetMethod("MarketRowBounds", Priv).Invoke(view, new object[] { 0 });
             MethodInfo control = viewType.GetMethod("MarketPurchaseControlBounds", PrivStatic);
+            MethodInfo hitMarket = viewType.GetMethod("HitMarketAction", Priv);
             Rect plus = (Rect)control.Invoke(null, new object[] { firstRow, 100 });
-            Click(plus.center.x, plus.center.y);
+            int plusAction = (int)hitMarket.Invoke(view, new object[] { plus.center });
+            Assert.AreEqual(100, plusAction, "The visible + control changes pending quantity only.");
+            Dispatch(plusAction);
             Assert.AreEqual(1, ((int[])viewType.GetField("marketPendingPacks", Priv).GetValue(view))[0]);
             Assert.AreEqual(before, (int)Market.GetType().GetMethod("Units", Pub).Invoke(Market, new object[] { 0 }));
             Rect buy = (Rect)control.Invoke(null, new object[] { firstRow, 140 });
-            Click(buy.center.x, buy.center.y);
-            Click(buy.center.x, buy.center.y);
+            int buyAction = (int)hitMarket.Invoke(view, new object[] { buy.center });
+            Assert.AreEqual(140, buyAction, "Buying requires a separate explicit confirmation.");
+            Dispatch(buyAction);
+            Dispatch(buyAction); // An immediate duplicate confirmation is debounced.
             Assert.AreEqual(before + 1, (int)Market.GetType().GetMethod("Units", Pub).Invoke(Market, new object[] { 0 }));
             yield return null;
         }
@@ -105,8 +112,11 @@ namespace HayChoriYPaty.Tests
         [UnityTest]
         public IEnumerator PlayIsStockGatedCashOnlyRestockAndRetryIsGone()
         {
+            Assert.IsTrue((bool)gameType.GetMethod("SelectLevel", Pub).Invoke(game, new object[] { 1 }),
+                "This test covers a later level; Level 1 has its separate bounded starter stock floor.");
             viewType.GetField("marketActive", Priv).SetValue(view, true);
             object data = Market.GetType().GetProperty("Data", Pub).GetValue(Market, null);
+            data.GetType().GetField("balanceCents", Pub).SetValue(data, 150000L); // Level 2's Chori+Coca minimum costs $1,000.
             Array.Clear((int[])data.GetType().GetField("stockUnits", Pub).GetValue(data), 0, 10);
             Assert.IsFalse((bool)GetGame("CanStartRound"));
             Dispatch(160);
