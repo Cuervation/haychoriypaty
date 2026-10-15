@@ -702,7 +702,7 @@ namespace HayChoriYPaty
             if (marketActive)
             {
                 if (a == MarketBackAction) { marketActive=false; marketMessage=game.CanStartRound?"Stock suficiente para jugar.":"Falta stock para iniciar. Revisá Mercado."; if(marketFromSelector)levelSelectActive=true; return; }
-                if (a == MarketOtherAction) { marketOtherExpanded = !marketOtherExpanded; marketScroll = Mathf.Clamp(marketScroll, 0, MarketMaxScroll()); return; }
+                if (a == MarketOtherAction && MarketIngredientIds(false).Length > 0) { marketOtherExpanded = !marketOtherExpanded; marketScroll = Mathf.Clamp(marketScroll, 0, MarketMaxScroll()); return; }
                 if (a >= MarketExpandAction && a < MarketExpandAction + 10)
                 {
                     int id = a - MarketExpandAction;
@@ -1865,6 +1865,8 @@ namespace HayChoriYPaty
         private static float MarketBodyTop(int productCount) => MarketEconomyBounds(productCount).yMax + 10f;
         private int[] MarketIngredientIds(bool required)
         {
+            // All Boys' opening market is intentionally limited to its two required products.
+            if (!required && game.Sim.LevelIndex == 0) return new int[0];
             int[] need = game.Market.RequiredUnits(game.Sim);
             var ids = new System.Collections.Generic.List<int>();
             for (int i = 0; i < need.Length; i++)

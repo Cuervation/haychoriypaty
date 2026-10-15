@@ -34,6 +34,7 @@ Do not create a second simulation. StreetSimulation optionally binds an IStreetK
 - [x] A legacy Level 2 save with watermarked Level 1 earnings but no Mercado payout gets only its exact current minimum-stock transition cost once; existing cash/purchase history excludes repair.
 - [x] Actual requirements and shared bread; quarter-bottle remainder and independent shortages.
 - [x] Cash-only purchases reject unaffordable transactions atomically; debt is not serialized or deducted from earnings; existing v4 saves ignore legacy `debtCents`.
+- [x] All Boys Level 1 hides the optional ingredients section and reserves no layout/hit-test area for it; later levels retain the expandable group (focused PlayMode regression passed 1/1, 2026-10-15).
 - [x] Successful physical handoff consumes once; unavailable ingredients cannot produce/deliver; production and movement preserved.
 - [x] Victory stock/earned balance/progression, defeat snapshot/earnings, abandonment/reload restoration and settlement/replay deduplication.
 - [x] Single Mercado navigation, disabled play until stocked, no retry, no level 12.
@@ -64,7 +65,7 @@ Validation: focused Unity 6000.6.3f1 PlayMode checks passed 3/3: dynamic counts/
 
 Keep IMGUI, current recipes/prices/persistence/stock gates and cash-only purchasing unchanged. Reuse original club scenery, wood frame, menu buttons, font and kitchen ingredient sprites. Header: one NIVELES action, title, club identity/locality, dynamic objective cards, and prominent available cash. Objectives retain the accepted 1–7 distributions, now with larger individual icons, names and amounts.
 
-The scroll-only Mercado list shows current-goal ingredients first. One collapsed OTROS INGREDIENTES row lists optional products available through unlocked progression; opening it allows stock consultation and explicit purchases, but locked products are never shown. Each ingredient card summarizes pack price, NECESITÁS/TENÉS/FALTAN and coverage. Only one row's quantity/purchase controls may expand at once; no automatic purchase. The fixed footer keeps minimum-missing cost and COMPRAR FALTANTES beside the primary JUGAR PARTIDO action; playing remains stock-gated. No separate Heladera view, screen-switch state, FIADO or financing.
+The scroll-only Mercado list shows current-goal ingredients first. One collapsed OTROS INGREDIENTES row lists optional products available through unlocked progression; opening it allows stock consultation and explicit purchases, but locked products are never shown. All Boys (Level 1) omits this row entirely because the opening market contains only Chorizo and Pan común; later levels retain the optional group. Each ingredient card summarizes pack price, NECESITÁS/TENÉS/FALTAN and coverage. Only one row's quantity/purchase controls may expand at once; no automatic purchase. The fixed footer keeps minimum-missing cost and COMPRAR FALTANTES beside the primary JUGAR PARTIDO action; playing remains stock-gated. No separate Heladera view, screen-switch state, FIADO or financing.
 
 - [x] Focused pointer/expansion/stock gate and layout checks at 16:9, 19.5:9, 20:9.
 - [x] Real visual review for Nueva Chicago (2), Ferro (4), Camioneros (10).

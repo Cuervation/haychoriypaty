@@ -264,19 +264,23 @@ namespace HayChoriYPaty.Tests
         [Test]
         public void MercadoShowsRequiredRowsAndExpandableUnlockedOtherIngredients()
         {
+            viewType.GetField("logicalCanvasHeight", Priv).SetValue(view, 960f);
             Assert.IsTrue((bool)gameType.GetMethod("SelectLevel", Pub).Invoke(game, new object[] { 0 }));
             MethodInfo visible = viewType.GetMethod("MarketVisibleIngredients", Priv);
             CollectionAssert.AreEqual(new[] { 0, 1 }, (int[])visible.Invoke(view, null), "Level 1 initially shows only Chorizo and Pan común.");
             Assert.IsTrue((bool)viewType.GetField("marketOtherExpanded", Priv).GetValue(view) == false);
-            Assert.AreEqual(8, ((int[])viewType.GetMethod("MarketIngredientIds", Priv).Invoke(view, new object[] { false })).Length,
-                "The optional section includes unlocked, non-required inventory products, not locked future products.");
+            Assert.AreEqual(0, ((int[])viewType.GetMethod("MarketIngredientIds", Priv).Invoke(view, new object[] { false })).Length,
+                "All Boys only sells the two products required for its opening match.");
             viewType.GetField("marketActive", Priv).SetValue(view, true);
-            Dispatch(190); // Open OTROS INGREDIENTES.
-            int[] expandedList = (int[])visible.Invoke(view, null);
-            Assert.AreEqual(10, expandedList.Length);
-            Assert.AreEqual(10, expandedList.Distinct().Count());
-            Dispatch(190); // Close the optional section.
+            Rect hiddenOthers = (Rect)viewType.GetMethod("MarketOthersBounds", Priv).Invoke(view, null);
+            Assert.AreEqual(0, (int)viewType.GetMethod("HitMarketAction", Priv).Invoke(view, new object[] { hiddenOthers.center }),
+                "There is no invisible hit target where the optional section would have been.");
+            Dispatch(190); // A stale/direct action cannot open a section that is absent.
+            Assert.IsFalse((bool)viewType.GetField("marketOtherExpanded", Priv).GetValue(view));
             CollectionAssert.AreEqual(new[] { 0, 1 }, (int[])visible.Invoke(view, null));
+            Assert.AreEqual((float)viewType.GetMethod("MarketRequiredContentHeight", Priv).Invoke(view, null),
+                (float)viewType.GetMethod("MarketContentHeight", Priv).Invoke(view, null),
+                "Level 1 allocates no vertical space to the absent optional section.");
             viewType.GetField("marketExpandedIngredient", Priv).SetValue(view, 0);
             MethodInfo rowBounds = viewType.GetMethod("MarketRowBounds", Priv);
             Rect expanded = (Rect)rowBounds.Invoke(view, new object[] { 0 });
@@ -301,6 +305,16 @@ namespace HayChoriYPaty.Tests
             CollectionAssert.AreEqual(new[] { 0, 1 }, (int[])visible.Invoke(view, null));
             Assert.IsTrue((bool)gameType.GetMethod("SelectLevel", Pub).Invoke(game, new object[] { 1 }));
             CollectionAssert.AreEqual(new[] { 0, 1, 6 }, (int[])visible.Invoke(view, null), "Next level automatically includes Coca only because its current goals require it.");
+            Assert.AreEqual(7, ((int[])viewType.GetMethod("MarketIngredientIds", Priv).Invoke(view, new object[] { false })).Length,
+                "Later levels retain unlocked optional products.");
+            Assert.IsFalse((bool)viewType.GetField("marketOtherExpanded", Priv).GetValue(view), "The optional section starts collapsed in later levels.");
+            Rect levelTwoOthers = (Rect)viewType.GetMethod("MarketOthersBounds", Priv).Invoke(view, null);
+            Assert.AreEqual(190, (int)viewType.GetMethod("HitMarketAction", Priv).Invoke(view, new object[] { levelTwoOthers.center }));
+            Dispatch(190);
+            int[] expandedList = (int[])visible.Invoke(view, null);
+            Assert.AreEqual(10, expandedList.Length);
+            Assert.AreEqual(10, expandedList.Distinct().Count());
+            Dispatch(190); // Collapse the later-level optional section.
             object save = gameType.GetField("save", Priv).GetValue(game);
             save.GetType().GetField("unlockedLevel").SetValue(save, 1);
             viewType.GetField("marketOtherExpanded", Priv).SetValue(view, true);
