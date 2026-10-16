@@ -2,6 +2,8 @@
 
 ## Contract
 
+> Current cash-only contract includes the 2026-10-15 per-attempt victory payout correction below; it supersedes old per-level victory suppression. The separate first-unlock solvency/legacy updates remain scoped compatibility history. Historical release tests and the all-level settlement campaign predate active cooks; they do not certify Racing+ gameplay balance after its layout change. See [active-cooks-mozos.md](active-cooks-mozos.md) for open balance9–11 acceptance.
+
 Keep inventory persistent in StreetGame, but present all stock and purchasing through one Mercado IMGUI screen; there is no separate Heladera/Stock view or tab. Reuse StreetView's existing visual style and controls. Preserve all eleven actual catalogs/quotas, seven final products, kitchen lifecycle, sale prices, routes, hiring/speed costs, existing cover and gameplay HUD. Level 1 enters directly; levels 2–11 enter Mercado first. Mercado access from the selector must not start a match. Purchasing unlocks only after winning All Boys. No retry action: loss returns to levels. Last-level victory never selects level 12.
 
 ## Domain and persistence
@@ -12,31 +14,31 @@ StreetMarketData is embedded in the existing versioned StreetGame save (v4). A g
 
 Purchases validate before changing money or stock. Persist a monotonic purchase operation ID and cumulative purchases; same/stale ID rejects. UI confirm controls also debounce accidental double taps. Every purchase, including minimum missing packs, requires sufficient available balance and is rejected atomically otherwise. There is no supplier credit, debt, loan, or other financing.
 
-At victory: add 50% gross sales + 2×attempt cash remaining to the available Mercado balance; at loss add only 50% gross sales and restore the exact pre-attempt stock. On a first-time victory that unlocks the next level, award only the cash shortfall between current balance and that next level’s exact minimum missing-stock purchase cost; this is a one-time earned progression/restocking reward, not financing. Replays, losses and the final level receive no such reward. No debt deduction occurs. Guard settlement with the persisted attempt ID. To prevent replay farming, only recognize the increase over each level's highest previously recognized 50%-sales amount; pay the remaining-cash bonus once on the first victory of that level. Include the progression award separately in the saved result/receipt and its earned/total amounts.
+On **every real victory**, including a replay of an unlocked level, add the full 50% gross sales + 2×attempt cash remaining to the available Mercado balance (user-confirmed 2026-10-15). Deduplicate by persisted attempt ID, not by level. Defeats retain the existing incremental recognized-sales policy and exact pre-attempt stock restoration, with no leftover bonus. On a first-time victory that unlocks the next level, award only the cash shortfall between current balance and that next level’s exact minimum missing-stock purchase cost; this is a one-time earned progression/restocking reward, not financing. Replays, losses and the final level receive no such reward. No debt deduction occurs. Guard settlement with the persisted attempt ID. The former per-level victory watermark/once-only bonus restriction is superseded: `highestRecognizedSalesByLevel` and `bonusPaidByLevel` remain compatibility/accounting fields, not gates on a new victory. Only the existing defeat sales-increment guard continues to use its watermark. Include the progression award separately in the saved result/receipt and its earned/total amounts.
 
 ## Production and handoff
 
 Do not create a second simulation. StreetSimulation optionally binds an IStreetKitchenStock provider (standalone simulation remains unlimited for compatibility). StreetKitchenProduction reserves ingredients temporarily per physical food ID when creating units; failed preparation/burn/discard/cancel releases reservations without consuming permanent stock. Validate physical carried food before committing a recipe once in Kitchen.Consume at successful handoff. Quotas and revenue mutate only after that same valid consume. Reservations protect outstanding minimum goals of other products that share ingredients, avoiding extra Chori tying up bread required for Bondiola/Vacío. Remaining stock survives victory; reservations do not. Loss restores snapshot including bottle portions.
 
-## Shared APIs / file ownership for implementation
+## API reference / historical implementation allocation
 
 - StreetMarket.cs: StreetIngredientCatalog (Names, PackUnits, recipe authority); StreetMarketBalance; StreetMarketData; StreetMarketResult; IStreetKitchenStock; StreetMarket.
 - StreetMarket ctor(StreetMarketData, StreetBalance), Initialize(int unlockedLevel), RecoverAbandonedAttempt(), Units(int), PackPriceCents(int), RequiredUnits(StreetSimulation), MissingUnits(sim,id), MissingPacks(sim,id), IsIngredientUnlocked(id,unlocked), HasRequiredStock(sim), MinimumPurchaseCostCents(sim), TryBuy(sim,id,packs,unlocked,operationId), BeginAttempt(sim), SettleAttempt(sim), AbortAttempt(). Properties Data, BalanceCents, NextPurchaseId, LastResult.
 - IStreetKitchenStock: bool CanPrepareFood(int product), bool TryReserveFood(int foodId,int product), bool ConsumeReservedFood(int foodId,int product), void ReleaseFood(int foodId).
 - StreetMarketResult fields: won, level, grossSalesCents, leftoverCents, halfSalesCents, recognizedSalesCents, bonusCents, earnedCents, totalBalanceCents, consumedUnits[], remainingUnits[].
 - StreetGame exposes Market, CanStartRound, TryStartRound(), TryBuyIngredient(id,packs,operationId=0), BuyMissingIngredient(id), ReturnToLevels(), ProcessRoundResult(). Keep StartRound wrapper; Retry rejects. SelectLevel allows Ready/result selection but not live match; NextLevel only selects a valid next Ready level. Parent owns StreetGame, StreetSimulation, StreetKitchenProduction and integration/specs.
-- UI worker owns only StreetView.cs and new market UI tests; core domain worker owns only new StreetMarket.cs and new domain tests. Preserve prior uncommitted HUD edits.
+- Historical task allocation was UI→StreetView/tests and domain→StreetMarket/tests. It is not an ongoing ownership lock or instruction to spawn agents; assign fresh exclusive file ownership only if a future task benefits from delegation.
 
 ## Acceptance / focused validation
 
 - [x] Exact individual purchases, no negative stock/cash or duplicate operations; persistence/migration and starter stock behavior.
 - [x] Fresh-save kit equals level 1 recipe requirements; existing inventory is unchanged on load and Level 1 starts top up only shortages to 200 Chorizo/Pan (focused EditMode tests passed).
-- [x] A watermarked legacy Level 1 victory whose payout is suppressed gets its exact current missing-stock transition cost before the same-session next Mercado opens; already-unlocked legacy saves are also repaired on load, and a persisted marker prevents repeat grants.
+- [x] Legacy paid flags do not suppress a current victory; its full sales/leftover reward precedes the bounded first-unlock shortfall grant. Older zero-payout transition repairs remain idempotent compatibility paths. Latest valid settled receipts are reconciled once by `victoryPayoutVersion` (eight focused payout cases passed).
 - [x] Actual requirements and shared bread; quarter-bottle remainder and independent shortages.
 - [x] Cash-only purchases reject unaffordable transactions atomically; debt is not serialized or deducted from earnings; existing v4 saves ignore legacy `debtCents`.
 - [x] All Boys Level 1 hides the optional ingredients section and reserves no layout/hit-test area for it; later levels retain the expandable group (focused PlayMode regression passed 1/1, 2026-10-15).
 - [x] Successful physical handoff consumes once; unavailable ingredients cannot produce/deliver; production and movement preserved.
-- [x] Victory stock/earned balance/progression, defeat snapshot/earnings, abandonment/reload restoration and settlement/replay deduplication. The cash-only first-unlock campaign must be able to buy exact missing stock and win all eleven levels; replay cannot repeat the restocking award.
+- [x] Victory stock/earned balance/progression, defeat snapshot/earnings, abandonment/reload restoration and settlement/replay deduplication. The pre-active-cook cash-only campaign verified stock affordability, wins and replay-award deduplication across eleven levels. This settlement evidence is not final acceptance of current active-kitchen balance9–11.
 - [x] Single Mercado navigation, disabled play until stocked, no retry, no level 12.
 - [x] Unity focused EditMode/PlayMode checks and real portrait captures; report unavailable/device validation truthfully.
 - [x] Mercado objectives render current simulation products and goals in at most two compact rows (1–3: one row; 4: 2+2; 5: 3+2; 6: 3+3; 7: 4+3), while the ingredient list alone scrolls and fixed purchase/play controls remain accessible.
@@ -95,3 +97,14 @@ Every Level 1 attempt starts with at least 200 Chorizo and 200 Pan común. Exist
 The deterministic real-simulation campaign showed that ordinary Level 1 settlement could leave $7.40 while Level 2 required $10.00 of missing stock. Preserve cash-only purchase gates and all sale/pricing rules: when a victory unlocks a level for the first time, award only the current shortfall to that next level's exact missing-stock cost. This award is persisted as `progressionBonusCents`, included once in the result receipt/income, and cannot be claimed on replay, loss, or the last level. Also recover legacy v4 zero-payout wins missed by the already-consumed migration repair marker; require the persisted success/watermark proof and zero wallet, preserve purchases/stock, and persist an idempotency marker.
 
 Focused Unity EditMode jobs passed: `3ce33e9afa7540f39d8121aaa7cde684` (3/3: all-level actual-handoff/economy campaign, legacy zero-payout save with purchase history, replay deduplication) and `0fb698bfb03c4887ae74ab658ee11891` (6/6: settlement, cash-only gate, migration and legacy transition domain checks). The campaign completed levels 1–11 in sequence, buying required stock with cash, settling wins, preserving consumption, and topping up only first-unlock shortages. A redundant combined-filter request failed before tests initialized; the focused reruns passed. No new device or Game View QA was done.
+
+
+## Every real victory pays — confirmed 2026-10-15
+
+User explicitly selected **Cobrar cada victoria real**: repeated successful attempts earn 50% of their full real sales plus twice their actual unspent attempt cash. The same attempt cannot be settled twice, but another victory is not a duplicate. Purchases remain cash-only; no changes to sale prices, recipes, quotas, deadlines, starting grants, hired-worker/speed resets or defeat rules. First-unlock stock-shortfall rewards remain distinct and cannot repeat on an already-unlocked replay.
+
+Read-only phone evidence (0.2.39/code41): migrated unlockedLevel10, both old repair markers already consumed, Level2 win gross$2000/leftover$1285 but recognized/bonus/earned all0. Correct omitted reward is$1000+$2570=**$3570**. The persistent245Paty are inherited stock, not proof of a new purchase.
+
+Additive v4 `victoryPayoutVersion` guards `RecoverLegacyVictoryPayout`: on load, before earlier compatibility repairs, reconcile only a valid latest settled successful receipt with matching attempt/level and internally consistent money. Credit only full formula minus receipt components actually paid, preserve prior progression awards and all stock/purchase/unlock data, update wallet/receipt/version atomically through StreetGame save. No active/lost/unsettled/corrupt/overflow receipt invents money. Earlier missing-stock recovery markers do not block this exact earned-income correction.
+
+Focused validation and strict fresh all-level campaign results belong in status; do not infer them from older artificially funded strategy tests or the pre-Mozo campaign.

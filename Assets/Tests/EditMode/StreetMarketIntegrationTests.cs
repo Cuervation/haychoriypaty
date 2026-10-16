@@ -150,8 +150,8 @@ namespace HayChoriYPaty.Tests
             GameObject root = null;
             try
             {
-                // A migrated save can already have Level 1's sales watermark and one-time bonus
-                // marked paid. Completing it in the same app session suppresses normal earnings.
+                // Migrated paid flags must no longer suppress a real victory. The first-unlock
+                // grant still covers only the shortage after its full sales reward.
                 string migrated = "{\"version\":4,\"unlockedLevel\":0,\"price\":5,\"market\":{" +
                     "\"balanceCents\":0,\"cumulativePurchaseSpendCents\":0," +
                     "\"stockUnits\":[200,200,0,0,0,0,85,0,0,0]," +
@@ -175,7 +175,7 @@ namespace HayChoriYPaty.Tests
                 Assert.AreEqual(1, Get(game, "UnlockedLevel"));
                 Assert.AreEqual(78750L, Get(market, "BalanceCents"), "Exact remaining Level 2 stock cost must be available before Mercado is shown.");
                 data = Get(market, "Data");
-                Assert.IsTrue((bool)data.GetType().GetField("legacyTransitionRepairApplied").GetValue(data));
+                Assert.IsFalse((bool)data.GetType().GetField("legacyTransitionRepairApplied").GetValue(data), "A paid victory uses the normal first-unlock shortfall grant, not legacy zero-payout repair.");
 
                 // Reload and navigate as the game does; the transition amount must persist once.
                 gameType.GetMethod("OnEnable", Private).Invoke(game, null);
@@ -275,7 +275,7 @@ namespace HayChoriYPaty.Tests
                 Set(sim, "CoinsEarned", 1000); Set(sim, "Coins", 0);
                 Set(sim, "Phase", Enum.Parse(Runtime("RoundPhase"), "Won"));
                 Assert.IsTrue((bool)Call(game, "ProcessRoundResult"));
-                Assert.AreEqual(firstUnlockBalance, Get(Get(game, "Market"), "BalanceCents"), "Replaying an already unlocked level cannot claim the progression reward again.");
+                Assert.AreEqual(firstUnlockBalance + 50000L, Get(Get(game, "Market"), "BalanceCents"), "Replay earns its full victory sales reward, but cannot claim the progression reward again.");
                 Assert.AreEqual(0L, Get(Get(game, "Market"), "LastResult").GetType().GetField("progressionBonusCents").GetValue(Get(Get(game, "Market"), "LastResult")));
             }
             finally

@@ -1,21 +1,23 @@
-# SDD index
+# SDD — índice de lectura progresiva
 
-Specs are authoritative; implementation and short status belong in code/status, not duplicated requirement lists.
+`AGENTS.md` contiene reglas permanentes. Para retomar, leer [continuity.md](continuity.md); para una tarea concreta, abrir **solo su contrato**. No cargar automáticamente los historiales completos.
 
-| Need | Read |
+| Necesidad | Documento vigente |
 |---|---|
-| Product boundary and definitive products | [product.md](product.md) |
-| Current street automation, mass orders and progression | [gameplay.md](gameplay.md), [features/street-automation.md](features/street-automation.md) |
-| Historical first slice (superseded delivery scope; retain validation) | [features/floresta-prototype.md](features/floresta-prototype.md) |
-| Android build/emulator delivery | [features/android-prototype.md](features/android-prototype.md) |
-| Approved modular kitchen / real cooking, inventory and responsive layout | [features/modular-kitchen.md](features/modular-kitchen.md) |
-| Active cooks, Mozo and expanded kitchen from Racing | [features/active-cooks-mozos.md](features/active-cooks-mozos.md) |
-| Persistent ingredient Mercado/Heladera with cash-only purchases | [features/market-fridge.md](features/market-fridge.md) |
-| Employee gait and physical carry presentation | [features/worker-animation.md](features/worker-animation.md) |
-| Visual art direction and composition | [visual-reference.md](visual-reference.md) (consult before any screen, character, object, or animation design) |
-| Code boundaries and Unity folders | [architecture.md](architecture.md) |
-| Brief technical tradeoffs | [decisions.md](decisions.md) |
-| Current implementation and next steps | [status.md](status.md) |
-| Resume in a new chat / latest saved checkpoint | [continuity.md](continuity.md) |
+| Estado confirmado, versión, pendientes y entorno | [continuity.md](continuity.md) |
+| Límite del producto y siete IDs | [product.md](product.md) |
+| Resumen del loop actual | [gameplay.md](gameplay.md) |
+| Catálogos, precios, metas/tiempos y contratación/velocidad | [street-automation.md](features/street-automation.md#current-per-product-level-balance--2026-10-08) (tablas vigentes; resto contiene evolución histórica) |
+| Cocineros 0,5 s, Mozo, seis cards y ampliación desde Racing | [active-cooks-mozos.md](features/active-cooks-mozos.md) (incluye restauración posterior del escenario) |
+| Cocina modular, stock físico, geometría y proyección | [modular-kitchen.md](features/modular-kitchen.md) (modo base niveles 1–5; Racing+ aplica el delta anterior) |
+| Mercado/Heladera persistentes y compras sin crédito | [market-fridge.md](features/market-fridge.md) |
+| Workers, gait y agarre físico | [worker-animation.md](features/worker-animation.md) |
+| Arte/UI y composición | [visual-reference.md](visual-reference.md) (solo si se modifica presentación) |
+| Límites de código/render/persistencia | [architecture.md](architecture.md) |
+| APK/instalaciones y comprobaciones de entrega | [android-prototype.md](features/android-prototype.md) (consultar encabezado reciente) |
+| Evidencia histórica de avances y pruebas | [status.md](status.md) (buscar fecha/sistema) |
+| Decisiones históricas y reemplazos | [decisions.md](decisions.md) (buscar tema/fecha) |
+| Primer prototipo, no runtime actual | [floresta-prototype.md](features/floresta-prototype.md) |
+| Checkpoint anterior completo, solo antecedentes | [history/continuity-before-20261015-audit.md](history/continuity-before-20261015-audit.md) |
 
-For each feature, consult its spec, keep scope minimal, validate only affected behavior, and update its acceptance/status if behavior or completion changes.
+Los contratos recientes de cocineros/Mercado/modular reemplazan sus reglas antiguas, no toda la funcionalidad de otros documentos. Frente a una discrepancia, contrastar código y serialización actuales antes de editar documentación; no modificar el juego para ajustarlo a un registro histórico. Pendientes no son órdenes de implementación.

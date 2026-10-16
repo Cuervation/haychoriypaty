@@ -1,81 +1,56 @@
-# Technical architecture
+# Arquitectura técnica vigente
 
-## Current runtime contract
+Consultar [README.md](README.md) para el contrato de cada tarea y [continuity.md](continuity.md) para la referencia de versión. Este archivo describe el runtime actual; decisiones anteriores permanecen en [decisions.md](decisions.md), no constituyen una arquitectura alternativa.
 
-`StreetSceneLayout` now fixes the All Boys spatial root for every club: master background projection, counter top/front, crowd clipping/offset and one player-side service height. `StreetKitchenLayout` supplies the approved uniformly fitted modular kitchen and actual worker routes; `StreetWorkstationLayout` remains historical geometry/API compatibility only. `StreetView` recomposes club-specific murals into the root scenery band; `ClubVisualTheme` stores mural resource/crop and subtle scenery-only atmosphere, not geometry. Later backdrops never set counter heights or camera perspective. Every fresh attempt/load/selection/start/retry begins with one normal Parrillero, no Premium/Cocacolero/Fernetero and SpeedLevel0; saved purchases remain compatibility fields, not restored teams.
+## Runtime y responsabilidades
 
-See [features/street-automation.md](features/street-automation.md) for behavior and acceptance. These are intended boundaries; validation/status records determine what has actually been imported and run.
+- `StreetGame` (MonoBehaviour): lifecycle, configuración `StreetBalance`, comandos, progresión y save JSON PlayerPrefs v4 con Mercado. Normaliza campos legacy; no restaura equipos comprados ni partidas en vuelo.
+- `StreetSimulation` (C#): clientes/colas FIFO, paciencia, workers, rutas, reservas/ownership, unidades, handoff, ingresos, cuotas y resultados. Siete columnas y hasta21clientes. Subpasos limitados/catch-up acotado; contratación sin tope de gameplay, velocidad sí limitada.
+- `StreetKitchenProduction`: IDs físicos y estados/reservas/capacidades. Lo avanza la simulación; producción/render nunca acreditan ventas por sí solos. `StreetMarket` enlaza recetas/ingredientes mediante `IStreetKitchenStock`.
+- `StreetView`: dibujo IMGUI y un catálogo compartido de acciones/hit-test. Canvas seguro de ancho540 y altura adaptable para interacción; escena/HUD decorativos pueden llenar pantalla física con su transformación separada. El puente Input System es para editor/desktop; Android GameActivity no debe duplicar el despacho nativo de touch IMGUI.
+- `StreetSceneLayout`: proyección de fondo raíz, mostrador, crowd y servicio compartidos. `ClubVisualTheme` define mural/ambiente e identidad de fans, no cambia perspectiva/alturas de gameplay.
+- `StreetKitchenLayout`: única geometría activa de muebles/anchors/obstáculos/rutas. Ajuste modular uniforme760→540; pies36×12 y proporciones de worker90×98. Grafo de visibilidad sobre bases sólidas expandidas: ruta directa/diagonal si es segura, cada tramo desde la posición real. No NavMesh ni colisión worker-vs-worker.
+- `StreetKitchenRenderer` y proyección/animación de workers: prefabs/objetos SpriteRenderer independientes renderizados en capas transparentes en vivo, compuestas por IMGUI. Carga/palma/profundidad siguen el ID real; nada de producto duplicado horneado. Texturas/sprites derivados cacheados y liberados al desactivar. `StreetKitchenPrefabBuilder` editor conserva GUIDs al regenerar sprites alpha-trimmed; no requiere Sprite Editor nuevo.
 
-- `StreetGame` (MonoBehaviour): lifecycle, scene inspector `StreetBalance`, management commands and dedicated versioned PlayerPrefs JSON persistence for progression/purchases and legacy-compatible fixed-price fields. Coins are attempt-local; discard saved legacy balances on load and start new/retried levels at zero.
-- `StreetSimulation` (plain C#): deterministic customer/worker states and movement, station/pickup/handoff progression, reservations, units, income, demand and outcomes. Bounded substeps/capped frame catch-up prevent unbounded loops. Limits default to 21 customers; worker caps and paid tiers are specialty-local (one free normal plus four paid hires, four paid hires per other role); speed/hiring use explicit capped price tables. Customer slots are seven FIFO columns: departure compacts existing people, admission appends at a column tail, and worker service requires a settled front-row customer.
-- `StreetView`: renders actual positions/state and original replaceable art, including coin/delivery feedback. Art and animation never mint income or independently complete an order. Use one aspect-responsive540-wide portrait safe-area transform for actionable drawing/hit-testing; full-physical-screen scenery and read-only edge HUD use a separate decorative transform so safe-area insets never expose camera clear color. Center-cutout status text avoids the camera without interrupting the full-width decorative HUD or moving hit targets.
-- ClubVisualTheme resolves the current StreetSimulation.LevelNames entry to one club palette; StreetView uses it for the same cached bottom-edge pennant strip on non-Floresta levels. At a fixed safe viewport, reserve one common strip height across all level catalogs/states and adapt it only to available aspect/safe-area space; align smaller footer layouts above it rather than sizing flags from each level's leftover gap. Keep Floresta's existing baked black/white row untouched. Register a palette by the exact runtime club name when adding a level; never duplicate color selection in scenes.
-- Main must disable legacy `GameController`/`PrototypeView` when integrating StreetGame/StreetView; retain legacy code, scene/script GUIDs, assets and tests as the historical prototype, not a second concurrent simulation.
+Main usa una simulación, una escena y los paquetes URP/Input System existentes. Mantener desactivado `GameController`/`PrototypeView`, que son el prototipo histórico con tests/escena/GUIDs conservados. Sin servicios externos, framework de DI, uGUI paralelo ni dependencias nuevas por conveniencia.
 
-Keep this in-process and single-scene. The explicitly requested small local save now has a concrete need; it does not justify services, dependency injection, Addressables or a generalized pipeline. Save progression/purchases and normalized legacy price fields only; full in-flight round resume is not asserted.
+## Cinco roles y responsabilidad de productos
 
-## Retained legacy prototype
+`StreetSpecialties` es la autoridad de producto→producción/entrega; IDs estables:
 
-The existing ClubVisualTheme owns each club's ClubFanDefinition: resource names, expected wardrobe count, front/walk/paired-riot layouts, deterministic customerId selection and optional authored Riot pose body-scale/foot-padding metrics. Active normal, walking and defeat drawing share this definition rather than per-level renderer branches. Metrics compensate transparent atlas margins without measuring the raised stick as body height; existing validated atlases keep their original bounds. Official-level completeness is enforced by ClubFanContractTests; generic Riot remains an emergency asset only.
+| Productos | Producción / estación | Entrega niveles1–5 | Entrega Racing+ |
+|---|---|---|---|
+| Chori0, Paty1 | Parrillero0 / parrilla y mesa normal | Parrillero | Mozo4 |
+| Bondiola2, Vacío3 | Premium2 / parrilla y mesa Premium | Premium | Mozo4 |
+| Coca4, Cerveza6 | Cocacolero1 / barriles existentes | Cocacolero | Cocacolero |
+| Fernet5 | Fernetero3 / mesa existente | Fernetero | Fernetero |
 
-`GameController`, `CustomerOrder`, `GameBalance` and `PrototypeView` implement the earlier timed two-product round. Its v2 empty backdrop/cropped original atlas and view-only movement remain historical replaceable art. Do not interpret its passed tests or Android build as validation of the new moving-worker simulation.
+El catálogo habilita los cuatro productores; Mozo además requiere `UsesActiveCooks` (LevelIndex>=5). `GetProductionRole` no cambia IDs; `GetDeliveryRole` aplica el gate de entrega. Líneas de un ticket pueden correr en paralelo entre especialidades; ownership/reservas impiden doble entrega. Solo consume/cobra el handoff físico válido; abandono/cancelación libera reclamos.
 
-## Unity layout
+Desde Racing cada cocinero reserva grill, ID de producto y lugar de mesa; viaja, cocina0,5/WorkRate, transporta y deposita la misma unidad. Mozo reserva stock real antes de ir a buscarlo y servir. No hay timer autónomo de sándwiches en este modo. Niveles1–5 conservan el ciclo base. Detalle y límites de stock: [active-cooks-mozos.md](features/active-cooks-mozos.md), [modular-kitchen.md](features/modular-kitchen.md).
 
-- `Assets/Scenes`: main playable scene.
-- `Assets/Scripts/Core`: orders, balancing data, simulation.
-- `Assets/Scripts/UI`: placeholder view and results.
-- `Assets/Scripts/Editor`: scene/setup utilities only.
-- `Assets/Art/Reference`: user-provided style/layout reference, not game content.
-- `Assets/Art/Placeholder`: original provisional background and seller sprites; replace with final art without changing simulation.
-- `Assets/Animations`, `Assets/Audio`, `Assets/Prefabs`: prepared extension points, initially empty.
-- `Assets/Tests/EditMode`: focused simulation/lifecycle tests in an Editor-only test assembly; existing legacy tests remain intact.
-- `Assets/Tests/PlayMode`: pointer-event integration tests for mouse/touch buttons. Test assemblies locate Assembly-CSharp by reflection so existing scene/script GUIDs stay unchanged.
+## Contratación, velocidad y reinicio
 
-Use Unity 6 as installed (`6000.6.3f1`). Keep the supplied URP template and package versions; this slice adds no package dependencies. The view uses built-in IMGUI rendering. Input-System-only editor/desktop needs the existing Input System pointer bridge; Android GameActivity supplies native IMGUI touch and must not also poll/dispatch that touch. No package or Input Handling setting change is required. Code remains plain, readable C# with no external dependencies.
+`StreetBalance.levelBalances`/sus defaults configuran cuotas, bases por rol, multiplicador de velocidad y grant de monedas por intento; `levelProductIds` define disponibilidad. `HireCostForRole` es la autoridad de costo actual: ×1/×2,5/×5, luego n(n+1)/2−1, redondeado arriba a $5. No hay MAX de empleados por gameplay; `maxStaff`/caps y arrays antiguos son compatibilidad, no deben reactivarse. La saturación numérica no es un cap de diseño.
 
-## Four exclusive catalog-derived specialties
+Velocidad: nueve costos base5/10/15/20/30/45/65/90/125, multiplicador del nivel y redondeo a $5; +0,10 hasta×1,90. Toda nueva construcción/carga/selección/inicio/reintento reinicia a un Parrillero normal, cero otros roles/Mozo y SpeedLevel0; StartRound fija las monedas iniciales del nivel. No restaurar compras de plantilla/velocidad de saves antiguos. Tablas vigentes: [street-automation.md](features/street-automation.md#current-per-product-level-balance--2026-10-08).
 
-`StreetSpecialties` is the sole product → worker/station authority. Stable IDs remain unchanged:
+## UI, geometría y arte
 
-| IDs / products | Worker | Physical station |
-|---|---|---|
-| 0 Chori, 1 Paty | Parrillero | Normal grill and normal finished-food table |
-| 2 Bondiola, 3 Vacío | Parrillero Premium | One separate Premium grill |
-| 4 Coca, 6 Cerveza | Cocacolero | Existing Coca/beer barrels |
-| 5 Fernet con Coca 1 L | Fernetero | Existing Fernet table |
+- Botones comunes: `StreetView.DrawStandardButton`, textura azul compartida, Luckiest Guy y input existente. Cards madera/hierro y selector mural son excepciones documentadas; no crear estilos/paralelos sin pedido.
+- Acciones derivadas de catálogo; desde Racing seis cards: Velocidad/Normal/Premium y Coca/Fernet/Mozo. Retratos/flechas centrados proporcionalmente en óvalos; estado de velocidad elevado respecto al precio.
+- Geometría base: cocina modular, no tamaños fijos pre-modulares. Racing+ amplía piso/circulación, baja parrillas y quita banderines inferiores; conserva muebles originales y fila de Fernet. Composición de calle/mural y eliminación de mesa lateral no aprobada según restauración en [active-cooks-mozos.md](features/active-cooks-mozos.md#restauración-visual-solicitada--2026-10-15).
+- `StreetWorkstationLayout` conserva APIs/geometría histórica para compatibilidad/tests, no dirige rutas activas. No usar sus282×94/196×98 como regla universal contra el layout modular.
+- `ClubFanDefinition` mantiene variantes Front/Walking/Riot por customerId y dos poses reales de palo; compensa alpha/foot padding sin deformar cuerpos. `ClubFanContractTests` cubre estructura; trifulca genérica es fallback, no arte final de un club publicado. Ver [visual-reference.md](visual-reference.md).
 
-Role availability, hire cards and station visibility derive from actual `levelProductIds`, never the level index. Unknown IDs are rejected by the authority; existing catalog parser rejects invalid IDs. Every product must resolve to exactly one role/station. Each worker retains its customer’s complete specialty-specific share in original request order; other specialties may own other lines of that same ticket concurrently. Same-specialty workers cannot double-own a customer. In-flight unit reservations remain one per worker; only actual handoff decrements quantities/mints coins. Timeout/departure/cancellation releases line ownership and reservations.
+## Persistencia y Mercado
 
-Existing enum IDs are stable: Parrillero0, Cocacolero1; append Premium2, Fernetero3. Save v3 extends compatibility counters; v1/v2 migrate without resetting unlocks. No in-flight resume or restore of purchased workers is introduced: every attempt has one free normal worker, no other workers, speed ×1.00, zero coins.
+Save v4 conserva desbloqueo de niveles, saldo/stock de Mercado, IDs de compra/intento, watermarks/resultados y campos legacy compatibles. No hay resume de ronda en vuelo: el snapshot recupera abandono/derrota. No confundir saldo persistente de Mercado con monedas y mejoras locales del intento.
 
-## Independent hiring and shared costs
+Compras atómicas con saldo suficiente, sin deuda/crédito. Ingredientes se reservan por ID físico y se consumen una vez en entrega. Victoria conserva sobrantes; derrota restaura snapshot; cada victoria real cobra una vez por intento (no por nivel); liquidación/recompensas/reparaciones son idempotentes. La regla50%/bonus/reposición exacta está exclusivamente en [market-fridge.md](features/market-fridge.md); no es5% ni plantilla permanente. Una simulación sin proveedor de stock conserva compatibilidad ilimitada de fixtures, no describe inventario de campaña.
 
-All four roles use the same `StreetUpgradeCostProfile` selected by `levelUpgradeCostProfileIds`, with current hire curve **$15 → $30 → $60 → $100 → MAX**. Paid tiers are independent; only normal subtracts its free initial worker when calculating the tier. Exhausted arrays/caps return zero/MAX and purchases reject zero-cost hires. Optional `roleHireCostProfileIds` overrides refer to existing profile objects for future differentiation; absent/negative overrides inherit the common level profile. No duplicate per-role price arrays.
+## Carpetas y validación
 
-`StreetView` uses one catalog action list for drawing/hit testing: speed followed by Normal/Premium/Coca/Fernet when available. Two/three cards keep the established row; four/five cards use two responsive rows with the same wood/iron visual family. Hidden specialties reserve no slot. Large-catalog Ready navigation is shown without overlapping non-interactive upgrade cards.
+`Assets/Scenes` contiene Main; `Scripts/Core` dominio; `Scripts/UI` presentación; `Scripts/Editor` herramientas; `Resources`/arte/prefabs son recursos originales. EditMode valida dominio/geometría; PlayMode interacción/puente de entrada, usando assemblies de tests que acceden por reflexión sin cambiar GUIDs. Versiones en `ProjectSettings/ProjectVersion.txt`; preservar `.meta`, escenas y paquetes.
 
-The normal grill retains its282×94 frame and original artwork; Premium is a separate same-size frame. With Premium present, the normal table moves16px left at unchanged196×98 size; beer moves into the upper-right band and the existing Fernet station moves below the table. Catalog-derived responsive layout keeps4 points between the prep row and grills and5 between grill bounds and the tiled-field/lower-UI frame, without distorting grill art. Each trip uses a shortest-path visibility graph around active physical station bases expanded by the worker's36×12 feet; direct/diagonal travel is used whenever unobstructed. Outbound and return legs are computed independently from the employee's actual position, including successive assigned units; there is no forced center-lane or home-return leg. Table/Fernet obstacles use only their solid front base band, barrels their full footprint, and active grills their full bounds. This is not worker-vs-worker collision or NavMesh. Normal/Premium pickup points remain accessible. New workers reuse exact original atlas geometry and animation poses with cached outfit palettes (blue Premium apron, black Fernetero apron); faces, alpha, pose sizes and normal/Coca sprites remain unchanged. Cached runtime textures are destroyed on view disable.
-
-## Ordinary button source of truth — 2026-10-06
-
-The active Main scene uses StreetView IMGUI, not uGUI Button components or prefabs. `DrawStandardButton(bounds, action, caption, enabled)` consolidates the existing cover renderer and reuses the single `CreateMenuButton()` runtime texture and bundled Luckiest Guy font. Original cover mapping, glossy blue palette, white outlined lettering and pressed `.97`/blue tint remain; disabled buttons use a muted blue palette. Other aspect ratios resize only the straight center through horizontal three-slicing, with subpixel internal-edge overlap to prevent portrait raster gaps. Caption/outline styles reuse the same font with isolated normal/hover/active/focused colors, preventing inherited skin-hover whitening and shared-style leakage. Hit bounds and NativeAction/DispatchAction routes are unchanged. No new assets, package or parallel UI system.
-
-All ordinary runtime buttons use this helper. Explicit exceptions are the user-selected wood/iron upgrade cards (integrated live values/prices) and mural level tiles (content previews). Historical inactive PrototypeView UI is outside this change.
-
-## Shared workstation sizing and circulation — 2026-10-06
-
-StreetWorkstationLayout is the single canvas-space geometry configuration used by StreetView and StreetSimulation. The live Main has no workstation GameObjects, SpriteRenderers, pivots, colliders or prefabs; equivalent visual/occupancy bounds are the draw rectangles, texture source proportions and worker feet. Reference sizes were read directly from the running Floresta view: grill282×94 and table196×98. Size does not depend on level/product/worker count. Fit existing grill art proportionally inside that frame; reuse Floresta's actual196×98 table artwork in every level. No new sprite assets.
-
-Placement is separate from sizing: keep the table left, stagger the grill lower/right and secondary stations in an upper line. Coke and beer leave a full worker-width corridor; Fernet uses an upper-left work point. Normal food is picked up beside the finished-product table; Premium food uses its separate Premium pickup. `StreetKitchenLayout` computes shortest safe paths from actual feet positions around active physical base footprints; direct segments are preferred and diagonal routes are allowed only when their full swept feet path is clear. The simulation recalculates each return and each subsequent order from the actual position without sending a worker home. Minimum station spacing and full36×12 foot bounds are explicit occupancy checks. No worker-vs-worker collision or NavMesh is introduced. Future levels automatically inherit furniture dimensions; added secondary layouts must validate bounds, interaction clearance and all seven customer-to-station routes.
-
-## Modular kitchen projection (approved2026-10-07)
-
-See [features/modular-kitchen.md](features/modular-kitchen.md) for the actual stock lifecycle/defaults and layout authority. `StreetSimulation` owns/steps `StreetKitchenProduction`; physical carried IDs gate handoff. `StreetKitchenRenderer` projects independent SpriteRenderer prefab instances into transparent live render textures, composed with retained club scenery/HUD by `StreetView`. Renderers never mint stock/revenue. Editor-only `StreetKitchenPrefabBuilder` creates persistent alpha-trimmed Sprite assets with Sprite.Create (no Sprite Editor package installed), preserving .meta GUIDs on rebuild. Source PNGs remain unchanged.
-
-
-## Active kitchen from Racing — 2026-10-15
-
-The gated delta in [active-cooks-mozos](features/active-cooks-mozos.md) supersedes the four-role delivery description above for LevelIndex >= 5 only. `StreetSpecialties.GetProductionRole` retains the original responsibility; `GetDeliveryRole` maps sandwich IDs0–3 to appended Mozo4. `StreetSimulation.UsesActiveCooks` drives both `StreetKitchenProduction` and immutable `StreetKitchenLayout`. Original constructors/layout mode remain legacy-compatible.
-
-Each active cook owns an individual food ID, grill slot, real cooking progress and reserved destination table slot; no background sandwich timer runs. States ToGrill/Cooking/ToTable/Deposit are independent of customer delivery. Mozo reserves an existing table unit before travel, then uses the existing pickup/counter/handoff and ticket ownership paths. The unit retains its table slot while carried by either role, guaranteeing cancellation returns without deleting edible stock. Ingredients remain reserved until actual consumption at validated handoff, the only source of revenue. Save v4 adds an optional zero-default mozos compatibility counter; no purchased team resumes across attempts. Per-level missing fifth cost entries fall back to configurable official Mozo base costs; all existing four entries are unchanged.
+Usar el editor ya abierto y las pruebas afectadas según `targeted-testing`; los registros de builds/tests previos no prueban cambios posteriores ni QA físico. Estado de pendientes y evidencia: [continuity.md](continuity.md), [status.md](status.md).

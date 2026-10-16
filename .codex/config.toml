@@ -1,3 +1,4 @@
 [agents]
 enabled = true
+# Two spawned agents; the primary is additional. Keep this limit unless justified.
 max_concurrent_threads_per_session = 2

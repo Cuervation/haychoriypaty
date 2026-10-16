@@ -1,4 +1,16 @@
+# Current Android delivery — 2026-10-16 (0.2.40/code42, Mercado every-victory payout)
+
+Unity6000.6.3f1 Main-only Development IL2CPP/ARM64 Android build through the restored existing Unity/MCP editor: **Succeeded in284.55s; 0 errors/1 warning**. Build job `build-38c7ba9d9d`. Package `com.haychoriypaty.game`, version0.2.40/code42, min API26/target36, `arm64-v8a`.
+
+Archive APK `Builds/Android/Archive/HayChoriYPaty-0.2.40-code42-every-victory-market.apk`; versioned copy `Builds/Android/HayChoriYPaty-0.2.40.apk`; rolling copy `Builds/Android/HayChoriYPaty-street.apk`. Each is **477,523,029 bytes**, SHA-256 `18f6366ba50e33cbbcc2d02f85e48e27bc3bbd18a80f39b31e7dbb9996e8a7ff`; the three copies compare byte-for-byte. `aapt` confirmed package/version/API and `arm64-v8a`; `unzip -t` found no archive errors; Unity-bundled OpenJDK `apksigner` verified APK Signature Scheme v2 with the established Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`.
+
+Includes full payout on every real victory, per-attempt deduplication, and exact one-time recovery of a valid legacy victory receipt. Targeted EditMode regressions passed **19/19 market +5/5 lifecycle +8/8 payout**; two Level11 audits using the phone's already-unlocked progress also passed separately, but fresh-campaign balance10 remains unresolved. APK is Development/debug-signed, not Play Store release signed. **Generated only; not installed or launched.** The phone save was not written/cleared; no post-build device QA.
+
+---
+
 # Latest Android delivery — 2026-10-15 (0.2.39/code41, restored street + worker layout)
+
+**Installation follow-up:** user subsequently requested the phone update. Motorola Edge60Fusion (`ZY22MBNWRB`), `adb install -r`: Success; PackageManager confirmed versionName0.2.39/versionCode41. No uninstall/data clear, launch or post-install gameplay/visual/performance check. The packaging paragraph below records the earlier build-only state.
 
 Pushed source commit `f077324` (`codex/street-automation`). Unity 6000.6.3f1 Main-only Development IL2CPP/ARM64 Android build (`build-2a50e40720`): **Succeeded in 516.95s; 0 errors / 2 warnings** (Unity build result reported warning count only). Focused EditMode job for `StreetActiveCooksTests` and `StreetSpecialtyPresentationTests` failed to initialize within timeout before any tests ran; no new test pass is claimed. `git diff --cached --check` passed before source commit.
 

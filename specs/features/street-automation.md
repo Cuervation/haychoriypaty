@@ -2,9 +2,11 @@
 
 ## Authority and scope
 
+> Current reading: the catalog/balance/price tables below remain authoritative. [Active cooks/Mozos](active-cooks-mozos.md) supersedes sandwich delivery/layout from Racing only; [modular kitchen](modular-kitchen.md) supersedes pre-modular fixed furniture geometry; [Mercado](market-fridge.md) owns persistent cash/ingredients and cash-only purchases. Dated sections below retain history: old caps, editable/uniform prices and prior validation are not current rules. Do not read the whole log for a local change.
+
 This newly requested milestone supersedes the delivery boundary of the [historical Floresta prototype](floresta-prototype.md), not its validation record. [Product](../product.md) retains the exact seven-product catalog and outdoor standing-only setting. [Visual reference](../visual-reference.md) distinguishes observed video evidence from prompt requirements. No copied Food Fever assets, new services/packages, manual movement or complex cooking controls.
 
-Playable Floresta first; reuse the same small scene/simulation for Nueva Chicago, Liniers - Velez Sarsfield, Ferro Carril Oeste and Independiente de Avellaneda. Defaults below are implementation balance choices, not values inferred from unseen video action; all other gameplay balance values remain inspector-editable; the $5 sale price is fixed.
+All eleven clubs below reuse the same scene/simulation. Current balance is configured in StreetBalance/Main, not inferred from reference video; product prices use the seven-ID fixed table, not a uniform $5 rule. Read-only code/serialized evidence resolves stale documentation; changing official balance still requires authorization.
 
 ### Official definitive level order — 2026-10-07
 
@@ -42,7 +44,7 @@ This table supersedes the historical aggregate-goal and shared-economy sections 
 | 8 River | 250 | 180 | 210 | 115 | 110 | 95 | 90 | 295* |
 | 9 Boca | 275 | 195 | 225 | 125 | 120 | 110 | 100 | 300 |
 | 10 Camioneros | 310 | 220 | 255 | 145 | 135 | 125 | 110 | 300 |
-| 11 Los Redondos | 345 | 245 | 285 | 165 | 150 | 140 | 120 | 300 |
+| 11 Los Redondos | 345 | 245 | 285 | 165 | 150 | 140 | 120 | 315 |
 
 *River's deadline is 10 seconds longer than the originally requested 285 seconds. Real runs missed only the last unit in one representative seed at 285 seconds; 295 seconds yielded 3/3 wins with the optimized purchase strategy.
 
@@ -60,25 +62,25 @@ Official unit-sale price by ID is fixed:
 
 A real completed handoff alone increments that product's delivered count and awards its exact price. Price has no effect on order distribution or arrival rate.
 
-| Level | First paid Parrillero | Cocacolero | Premium | Fernetero | Speed-cost multiplier | Opening coins |
-|---|---:|---:|---:|---:|---:|---:|
-| 1 | 15 | — | — | — | 1.00 | 0 |
-| 2 | 20 | 20 | — | — | 1.50 | 0 |
-| 3 | 25 | 25 | — | — | 2.25 | 0 |
-| 4 | 30 | 30 | 35 | — | 3.25 | 0 |
-| 5 | 35 | 35 | 45 | 40 | 4.50 | 0 |
-| 6 | 40 | 40 | 50 | 45 | 6.00 | 250 |
-| 7 | 45 | 45 | 55 | 50 | 8.00 | 250 |
-| 8 | 50 | 50 | 65 | 55 | 10.50 | 250 |
-| 9 | 55 | 55 | 70 | 65 | 13.50 | 250 |
-| 10 | 60 | 60 | 80 | 70 | 17.00 | 500 |
-| 11 | 70 | 70 | 90 | 80 | 21.00 | 2000 |
+| Level | First paid Parrillero | Cocacolero | Premium | Fernetero | Mozo (Racing+) | Speed-cost multiplier | Opening coins |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 15 | — | — | — | — | 1.00 | 0 |
+| 2 | 20 | 20 | — | — | — | 1.50 | 0 |
+| 3 | 25 | 25 | — | — | — | 2.25 | 0 |
+| 4 | 30 | 30 | 35 | — | — | 3.25 | 0 |
+| 5 | 35 | 35 | 45 | 40 | — | 4.50 | 0 |
+| 6 | 40 | 40 | 50 | 45 | 50 | 6.00 | 250 |
+| 7 | 45 | 45 | 55 | 50 | 55 | 8.00 | 250 |
+| 8 | 50 | 50 | 65 | 55 | 60 | 10.50 | 250 |
+| 9 | 55 | 55 | 70 | 65 | 65 | 13.50 | 250 |
+| 10 | 60 | 60 | 80 | 70 | 70 | 17.00 | 500 |
+| 11 | 70 | 70 | 90 | 80 | 80 | 21.00 | 2000 |
 
-The first Parrillero is free. All four roles can be hired without a worker-count cap whenever that role is enabled in the level and the next hire is affordable; each role has its own count-based price progression. For paid hire n, preserve multipliers ×1, ×2.5 and ×5 for n=1–3, then use n×(n+1)/2−1 from n=4 onward (×9, ×14, ×20, ×27, ×35, ×44, ×54 at n=4–10), rounded up to a $5 multiple. Saturate only at the largest representable positive $5 price; this is numeric overflow protection, not a gameplay cap. Speed remains +10% per upgrade to ×1.90; its base costs are $5/$10/$15/$20/$30/$45/$65/$90/$125, multiplied by the exact level factor above and rounded up to $5. Attempt opening coins are a disclosed balance adjustment: levels 1–5 begin at $0; levels 6–9 at $250, level 10 at $500, and level 11 at $2,000. They are not earned revenue, never carry over and reset on a fresh attempt. The final level lasts 315 seconds (5:15) to retain a small completion buffer; all product quotas, prices, hire and speed-cost curves remain unchanged.
+The first Parrillero is free. All five roles (Mozo only from Racing, during play) can be hired without a worker-count cap whenever that role is enabled in the level and the next hire is affordable; each role has its own count-based price progression. For paid hire n, preserve multipliers ×1, ×2.5 and ×5 for n=1–3, then use n×(n+1)/2−1 from n=4 onward (×9, ×14, ×20, ×27, ×35, ×44, ×54 at n=4–10), rounded up to a $5 multiple. Saturate only at the largest representable positive $5 price; this is numeric overflow protection, not a gameplay cap. Speed remains +10% per upgrade to ×1.90; its base costs are $5/$10/$15/$20/$30/$45/$65/$90/$125, multiplied by the exact level factor above and rounded up to $5. Attempt opening coins are a disclosed balance adjustment: levels 1–5 begin at $0; levels 6–9 at $250, level 10 at $500, and level 11 at $2,000. They are not earned revenue, never carry over and reset on a fresh attempt. The final level lasts 315 seconds (5:15) to retain a small completion buffer; all product quotas, prices, hire and speed-cost curves remain unchanged.
 
 Quota-aware demand retains random 1–4 quantities and mixed tickets (up to five unlocked products), weighting every product in the level catalog by outstanding goal deficit/time independently of hired staff. A missing specialist does not suppress demand: those order lines wait under normal customer patience and become serviceable if the responsible worker is hired later. Delivery/revenue still requires that responsible worker and a real handoff; no synthetic delivery is allowed. Completed quotas stay visible and may still sell for real revenue. Role responsibilities, stations, routes, stock and handoff accounting remain unchanged. Victory requires every unlocked product quota.
 
-**Late-level feasibility check (2026-10-12):** The full `StreetSimulation` and adaptive-purchase policy were swept across seeds 1337, 407, and 2026. The attempt balances above plus 5:15 for Level 11 completed every level-6–11 run while leaving quotas, sales prices, production and upgrade prices intact.
+**Historical late-level feasibility check (2026-10-12, before active cooks/Mozos):** The full `StreetSimulation` and adaptive-purchase policy were swept across seeds 1337, 407, and 2026. The attempt balances above plus 5:15 for Level 11 completed every level-6–11 run while leaving quotas, sales prices, production and upgrade prices intact. This does not certify current active-cook or restored-layout balance; levels9–11 remain open in the active-cook contract.
 
 
 ### Completed-order audio cue — 2026-10-11
@@ -414,7 +416,7 @@ Use bundled comic typography and existing All Boys shield for Floresta footer (R
 **Validation:** Static only, Unity transport unavailable; no engine tests/import/Play/device/APK.
 
 
-## Current combined validation and phone delivery — 2026-10-04 (0.2.6/code8)
+## Historical combined validation and phone delivery — 2026-10-04 (0.2.6/code8)
 
 Latest user authorized tests, APK and phone installation. Installed Unity6000.6.3f1 was closed (no running editor/MCP); used the exact installed editor in sequential batch runs, without new packages or a second editor. Current Street **82/82 EditMode + 15/15 PlayMode passed**,0failed/0skipped. Scope includes200-handoff victory/180s deadline, FIFO/reservations, round-local coins and first-level reset, exact progressive prices/caps/MAX, mouse/touch dispatch/start/replay/load, intro timing/asset/viewport guards, current art/HUD/mural/footer imports and layout. Not an unrelated legacy full-suite run or mobile performance certification.
 
@@ -731,7 +733,7 @@ Independiente Store product categories informed the fanwear set: [PUMA range](ht
 
 Official visual research: [Tienda Verdolaga](https://www.tiendaverdolaga.com.ar/productos/) categories and product listings informed Ferro fanwear variety: current green/white jerseys, green polo, green/black hoodies, training sweatshirts, mid-zip tops, windbreaker and outing jacket; the sprite designs are original interpretations, not exact product replicas. [Ferro Carril Oeste 2025 kits](https://www.ferrocarriloeste.org.ar/marketing/camisetas-2025-la-historia-es-nuestra/) documents green home, white/gothic-F away and British-rooted third kit; [Ferro stadium](https://www.ferrocarriloeste.org.ar/estadio/) identifies the Ricardo Etcheverri in Caballito. [Independiente 2026/27 PUMA kit](https://www.clubaindependiente.com.ar/marketing/noticias/1787923475_nueva-camiseta-alternativa-pumaxcai-2026-27) and [the club stadium page](https://clubaindependiente.com.ar/institucion/estadio) ground the identity and Avellaneda setting. Contemporary mural reporting ([Independiente history mural at the Libertadores access](https://www.tycsports.com/futbol/independiente-inauguro-su-mural-para-las-glorias.html), [Ferro/Caballito wall context](https://caballitourbano.com.ar/las-huellas-de-un-barrio/)) is contextual inspiration only. The game backgrounds, fanwear and objects are original illustrations, not copied photos, exact licensed uniforms, or literal mural replicas.
 
-## Independent specialty hiring HUD — 2026-10-06 (supersedes shared total-team hiring tiers/cap)
+## Historical independent specialty hiring HUD — 2026-10-06 (caps superseded by unlimited hiring)
 Floresta keeps two cards. Any specialist level with drinks uses one row ordered Speed, Parrillero, Cocacolero, with exact separate draw/touch rectangles. Each hire buys only the selected role; team count, next cost and MAX are role-local. Existing configured price arrays are shared values, not shared progression: index max(0, roleCount-1). The initial Coca hire from zero and next hire at one both use the first configured row; no price extrapolation. Role caps independently inherit maxStaff (5) unless overridden; food MAX never blocks drink hiring. Speed, stations, service and orders remain unchanged. Retry/load preserve explicit composition rather than re-alternating roles; old saves without composition retain their legacy alternating constructor mapping. Advancement retains one Parrillero/zero Coca/base speed.
 - [x] Role-only hiring/counts, independent price progression/caps and composition restoration verified.
 - [x] Three-card draw/touch layout, four-digit prices and MAX verified; Floresta retains two cards.
@@ -756,7 +758,7 @@ Consolidate the existing IMGUI cover button renderer rather than adding a prefab
 - [x] Ordinary controls audited/migrated; special card exceptions documented.
 - [x] Future-button rule stored in AGENTS.md.
 
-## Definitive fixed furniture sizing and accessible work block — 2026-10-06
+## Historical fixed furniture sizing — 2026-10-06 (superseded by modular kitchen)
 
 Latest user request supersedes earlier per-level scaling/positions, including Chicago's reduced single-line arrangement and the larger Ferro/Independiente table. Main furniture sizes are measured directly from live Floresta IMGUI: grill282×94 and serving table196×98. StreetWorkstationLayout owns those fixed frames for all five current levels and future levels, independent of product/employee/upgrade counts. Existing grill art fits proportionally; the same Floresta table sprite is reused in every club. Food glyphs identify other ready products. Ferro retains the complete grill width, reusing Chori artwork in the otherwise unavailable fourth food bay rather than stretching a three-bay crop; no unavailable recipe/order is enabled.
 
@@ -773,7 +775,7 @@ Validate all available product paths from all seven counter columns using full90
 - [x] Permanent workstation rule recorded in AGENTS.md; original editor save/state restored.
 
 
-## Four specialties and two grills — authoritative update (2026-10-07)
+## Four production specialties and two grills — 2026-10-07 (Racing+ delivery superseded by Mozo)
 
 This section supersedes earlier two-role/all-food/all-drinks rules and four-zone shared-grill descriptions. Historical validation reports are retained for traceability, not the current specialty contract.
 

@@ -1,5 +1,7 @@
 # Worker animation — 2026-10-08
 
+> Original four-role gait contract below; [Racing+ Mozo](#racing-mozo--2026-10-15) extends it to the fifth role. Keep open visual acceptance items open until actual evidence closes them; no new worker/animation QA in the documentation audit.
+
 ## Approved scope
 Improve all four existing roles across catalog levels and arbitrary hired workers. Keep 90×98 worker frame, cartoon identity, route/timing/economy and physical-item lifecycle unchanged. Existing 16 Parrillero poses +8 diagonal poses and16 poses in each Coca atlas are retained. Palette variants remain cached Premium blue/Fernet black.
 

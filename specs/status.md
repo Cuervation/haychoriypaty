@@ -1,3 +1,40 @@
+## 2026-10-16 — Android0.2.40 build and source push requested
+
+- Unity/MCP build `build-38c7ba9d9d`: Main-only Development IL2CPP/ARM64, **success 284.55s, 0 errors/1 warning**. PlayerSettings advanced from0.2.39/code41 to0.2.40/code42.
+- Archive APK `Builds/Android/Archive/HayChoriYPaty-0.2.40-code42-every-victory-market.apk`, versioned `Builds/Android/HayChoriYPaty-0.2.40.apk` and rolling `Builds/Android/HayChoriYPaty-street.apk`:477523029bytes each, SHA-256 `18f6366ba50e33cbbcc2d02f85e48e27bc3bbd18a80f39b31e7dbb9996e8a7ff`. `aapt`, `unzip -t`, `apksigner` v2 verified; Development/debug signature. Not installed/launched.
+- Source push requested in the same turn; commit/hash is recorded after the push below. No commit/push result is inferred from this entry alone.
+
+# Historial de estado y validaciones
+
+## 2026-10-16 — Economía, cada victoria y conexión Unity recuperada
+
+- Causa confirmada en copia de solo lectura del Motorola0.2.39: victoria nivel2 con$2000ventas/$1285sobrante, pero crédito0 por flags/watermarks migrados. Usuario confirmó50%+2×sobrante y **cada victoria real**. Fuente corregida por intento, con guard de simulación y recuperación idempotente del último recibo válido:357000centavos; test del JSON exacto compra82500faltantes de3y deja274500sin duplicar al recargar. Contrato: [market-fridge.md](features/market-fridge.md#every-real-victory-pays--confirmed-2026-10-15).
+- **32/32regresiones únicas aprobadas**: job`e7a373a4cf174cb4b1998837a0744685`19Mercado, `1d0731211b184cfda4e1eef91b480fdb`5lifecycle, ocho payout del XML`policy-sweep-and-exact-phone.xml` (su job`f41a97a7fb004f35a568c82a8cdf3f5b` también contiene3benchmarks fallidos; no declararlo11/11). XML efectivo usado cuando MCP perdió callback.
+- Campañas frescas reales compran solo faltantes con dinero ganado y reglas existentes, pagan equipo/velocidad y recargan cada nivel. Varias políticas ganaron1–9; final job`4fc48e4d964b48068bd97e11024df809`3benchmarks perdieron10. Mejor variante:1289entregas/300s,13Chori pendientes, Mercado$5784−$4567=$1217antes de resultado, $5751,50después de derrota; no softlock de efectivo. Benchmark marcado explícito/manual, sin borrar fallos ni alterar dificultad. **No se logró campaña fresca ganadora1–11.**
+- Nivel11 se probó por separado con el desbloqueo ya existente de la copia del teléfono: recuperación$3570, reposición$1865, saldo$1705, sin desbloqueo/dinero/stock artificial. Job`d3bf9d3afed34aacb57b5067d19eac5c`:2/2victorias a302,9/302,7s y1450entregas dentro de315s. No equivale a pasar el cuello de botella10ni QA humano.
+- Informe/ledgers/XML ignorados: `Logs/Acceptance/EconomyAudit-20261015/economy-audit.md`. Main/default difieren solo en dos arrays legacy con fallback equivalente; metas/costos/tiempos restantes coinciden. Editor955caracteres restaurados exactamente. Unity6000.6.3f1/MCP10.0 reconectados con herramientas locales existentes, sin installs/global config. No teléfono escrito, APK, instalación, cambios de balance/escena/UI, PlayMode, commit/push. ADBsin dispositivo al cierre; arreglo aún no está en APK instalada.
+
+
+> Para el estado vigente leer [continuity.md](continuity.md), no este archivo completo. Entradas conservadas por tarea/fecha, no siempre ordenadas cronológicamente. Un resultado vale para su código/alcance: los totales no se acumulan y las instrucciones temporales de una tarea vieja no autorizan acciones futuras. Racing+ reemplaza la franja de banderines y el flujo anteriores según [active-cooks-mozos.md](features/active-cooks-mozos.md).
+
+## Auditoría de agentes, skills y contexto SDD — 2026-10-15
+
+**Alcance documental/configuración:** revisados AGENTS, `.codex/config.toml`, tres TOML de roles, cuatro SKILL.md, índice/continuidad/arquitectura/estado/decisiones y contratos actuales. Se contrastaron solo símbolos/valores relevantes de StreetGame/Simulation/Specialties/Kitchen/Market/View y Main, sin modificarlos. Actualizados los entrypoints y contratos contradichos, no gameplay, assets, metas, tiempos, precios o inventario. Checkpoint anterior completo conservado en [history/continuity-before-20261015-audit.md](history/continuity-before-20261015-audit.md); AGENTS de la copia inicial ahora solo redirige al checkout real.
+
+**Entorno:** rama `codex/street-automation`, HEAD base `6fcbf39`, Unity6000.6.3f1; app26.1002.52244/build13536 y CLI0.162.0-alpha.2. Check de versión del app confirmó esos valores; updater devolvió busy, sin conclusión de actualización ni instalación. MCP solo lectura confirmó raíz real, Main detenido/idle, sin tests/compilación; la otra instancia temporal no se confundió con este proyecto.
+
+**Contradicciones resueltas:** tamaños fijos pre-modulares vs StreetKitchenLayout; caps/MAX de personal vs contratación ilimitada; cuatro roles de producción vs quinto Mozo con gate Racing; timers/entrega base vs cocción0,5s→mesa→Mozo; banderines/layout viejo vs ampliación desde6 y restauración de Fernet/calle; cinco niveles/precios editables vs once/fijos por ID; monedas/equipo locales vs Mercado persistente sin crédito; tabla Redondos300s vs fuente y Main315s. ARMÁ TU PLANTEL/5%/plantilla permanente siguen pendientes. Pruebas antiguas de campaña no certifican el nuevo balance9–11.
+
+**Configuración conservada:** architecture=`gpt-6.1-sol`/medium, implementation=`gpt-6-luna`/medium, validation=`gpt-6-luna`/low. Dos subagentes adicionales al principal; sin roles/skills nuevos ni pipeline obligatorio. Config global leída sigue Sol/xhigh, sin cambio ni afirmación sobre overrides del chat. Categorías SIMPLE/MEDIA/COMPLEJA, ownership exclusivo, lectura progresiva y pruebas proporcionales ahora explícitas. Modelo/esfuerzo de cada rol y valores efectivos del config de proyecto son idénticos a HEAD; solo prompts/comentario cambiaron.
+
+**Validación estática ejecutada:** cuatro TOML parseados con tomllib; schema mínimo de roles y esfuerzos contrastados con catálogo `codex debug models --bundled`; cuatro skills pasaron `quick_validate.py` con PyYAML ya disponible (sin instalación); Markdown/rutas/anchors resueltos y dos anchors previos corregidos; once filas de metas, duración, costos por rol, multiplicadores/grants comparadas con fuente y duraciones serializadas de Main. `git diff --check` pasó; sin diferencias en Assets/Packages/ProjectSettings ni archivos versionados eliminados. `config/read` del app-server en modo estricto y `skills/list` ejecutados sin inferencia: cuatro skills habilitados/sin errores. Capa global idéntica antes/después. Esquema/discovery también contrastados con la documentación oficial enlazada en [decisions.md](decisions.md).
+
+**Limitación sin resolver por restricción del pedido:** el checkout real no tiene trust en la configuración global; config/read marca su capa `.codex` inactiva. Los roles existen/válidos y están expuestos en este chat ya abierto, pero no se certifica su carga en una sesión nueva del checkout real ni que su límite local sea efectivo allí. Requiere seleccionar el proyecto correcto y autorizar trust; no se modificó globalmente ni se forzó un override de seguridad para el diagnóstico. Otra discrepancia explícita, sin resolver por invención: nombre runtime Fernet1L frente al vaso visual800cc; queda registrada en product/continuity sin alterar rótulo, receta, arte o volumen.
+
+No se lanzaron subagentes, Unity tests, PlayMode, APK o instalación en esta auditoría. No commit/push; todo queda local. Pendientes de juego/dispositivo se conservan en sus contratos, no se convierten en trabajo autorizado.
+
+---
+
 ## Altura uniforme de banderines — 2026-10-14
 
 El alto libre se calculaba después de cada panel de mejoras: en Playing, niveles 1–3 tenían 131.5/160.6/187.1/196.0/98.6 unidades lógicas para 16:9/18:9/19.5:9/20:9/tablet 4:3; Ferro (nivel 4), 43.2/68.6/95.1/104.0/32.4; niveles 5–11, 52.8/78.6/105.1/114.0/39.6. La diferencia provenía de las filas: 2–3 acciones en niveles 1–3, 4 en Ferro y 5 en los niveles restantes.
@@ -108,7 +145,7 @@ Implemented the per-ID quota/hire/speed table, individual victory predicate, quo
 
 Measured real-simulation outcomes (three seeds: 1337, 407, 2026, full route/production/order/purchase logic) with those adjustments: River 3/3, average win 285.0s; Boca 3/3, 292.0s; Camioneros 3/3, 252.4s; Los Redondos 3/3, 278.0s. At zero opening funds, L6 and L7 were 3/3 (251s / 260s averages); L8–L11 respectively were 2/3, 2/3, 0/3, 0/3. For L10, $100 opening funds yielded 2/3 and $150 3/3; for L11, $100 yielded 0/3, $150 2/3 and $200 3/3.
 
-Unity 6000.6.3f1 compiled the edited scripts; the console query returned 0 errors/warnings. The focused NUnit job started but Unity MCP Test Runner disconnected/timed out before publishing results; `TestResults.xml` remained stale, so no new NUnit pass is claimed. The all-strategy A–D regression and portrait Game View review remain pending due that editor/MCP outage. See [the authoritative balance table](features/street-automation.md#current-per-product-level-balance).
+Unity 6000.6.3f1 compiled the edited scripts; the console query returned 0 errors/warnings. The focused NUnit job started but Unity MCP Test Runner disconnected/timed out before publishing results; `TestResults.xml` remained stale, so no new NUnit pass is claimed. The all-strategy A–D regression and portrait Game View review remain pending due that editor/MCP outage. See [the authoritative balance table](features/street-automation.md#current-per-product-level-balance--2026-10-08).
 
 ## Official product sale prices — 2026-10-08
 

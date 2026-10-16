@@ -39,6 +39,7 @@ namespace HayChoriYPaty
         public long[] highestRecognizedSalesByLevel = new long[11];
         public bool[] bonusPaidByLevel = new bool[11];
         public bool attemptActive, kitGranted, legacyTransitionRepairApplied, legacyZeroBalanceRecoveryApplied;
+        public int victoryPayoutVersion; // Additive v4 compatibility: latest receipt reconciled once.
         public StreetMarketResult lastResult;
     }
 
@@ -294,6 +295,42 @@ namespace HayChoriYPaty
             return missingCost;
         }
 
+        /// <summary>
+        /// Reconcile only the latest persisted, settled victory when upgrading the old per-level
+        /// payout policy. Credit the recorded formula minus what its receipt already paid, once.
+        /// Inventory, purchases, unlocks and prior restocking awards are not rewritten.
+        /// </summary>
+        public long RecoverLegacyVictoryPayout()
+        {
+            if (Data.victoryPayoutVersion >= 1 || Data.attemptActive) return 0L;
+            StreetMarketResult result = Data.lastResult;
+            if (result == null || !result.won) { Data.victoryPayoutVersion = 1; return 0L; }
+            if (Data.attemptId <= 0 || Data.settledAttemptId != Data.attemptId ||
+                result.level != Data.attemptLevel || result.level < 0 || result.level >= 11 ||
+                result.grossSalesCents < 0 || result.leftoverCents < 0 || result.leftoverCents > long.MaxValue / 2 ||
+                result.halfSalesCents != result.grossSalesCents / 2 ||
+                result.recognizedSalesCents < 0 || result.recognizedSalesCents > result.halfSalesCents ||
+                result.bonusCents < 0 || result.bonusCents > result.leftoverCents * 2 || result.progressionBonusCents < 0) return 0L;
+
+            long previouslyPaid, recordedEarned, fullReward, nextBalance, nextEarned;
+            if (!TryAdd(result.recognizedSalesCents, result.bonusCents, out previouslyPaid) ||
+                !TryAdd(previouslyPaid, result.progressionBonusCents, out recordedEarned) || recordedEarned != result.earnedCents ||
+                !TryAdd(result.halfSalesCents, result.leftoverCents * 2, out fullReward)) return 0L;
+            long missing = fullReward - previouslyPaid;
+            if (!TryAdd(Data.balanceCents, missing, out nextBalance) ||
+                !TryAdd(result.earnedCents, missing, out nextEarned)) return 0L;
+
+            Data.balanceCents = nextBalance;
+            result.recognizedSalesCents = result.halfSalesCents;
+            result.bonusCents = result.leftoverCents * 2;
+            result.earnedCents = nextEarned;
+            result.totalBalanceCents = nextBalance;
+            Data.highestRecognizedSalesByLevel[result.level] = Math.Max(Data.highestRecognizedSalesByLevel[result.level], result.halfSalesCents);
+            Data.bonusPaidByLevel[result.level] = true;
+            Data.victoryPayoutVersion = 1;
+            return missing;
+        }
+
         private void RecordProgressionBonus(long amount)
         {
             if (amount <= 0 || Data.lastResult == null || !Data.lastResult.won) return;
@@ -340,15 +377,17 @@ namespace HayChoriYPaty
 
         public StreetMarketResult SettleAttempt(StreetSimulation sim)
         {
-            if (sim == null || !Data.attemptActive || sim.LevelIndex != Data.attemptLevel ||
+            if (sim == null || !Data.attemptActive || sim != attemptSimulation || sim.LevelIndex != Data.attemptLevel ||
                 (sim.Phase != RoundPhase.Won && sim.Phase != RoundPhase.Lost) || Data.settledAttemptId == Data.attemptId) return LastResult;
             bool won = sim.Phase == RoundPhase.Won;
             int level = Data.attemptLevel;
             long gross = (long)Math.Max(0, sim.CoinsEarned) * 100L;
             long half = gross / 2L;
             long watermark = Data.highestRecognizedSalesByLevel[level];
-            long recognized = Math.Max(0L, half - watermark);
-            long bonus = won && !Data.bonusPaidByLevel[level] ? (long)Math.Max(0, sim.Coins) * 200L : 0L;
+            // Every real victory earns its full reward. Only the persisted attempt ID deduplicates it.
+            // Keep the existing incremental-sales policy on defeats, which have no leftover bonus.
+            long recognized = won ? half : Math.Max(0L, half - watermark);
+            long bonus = won ? (long)Math.Max(0, sim.Coins) * 200L : 0L;
             long earned = recognized + bonus;
             if (Data.balanceCents > long.MaxValue - earned) return null;
             if (!won) RestoreSnapshot();

@@ -1,5 +1,7 @@
 # Visual reference and art direction
 
+> Reading priority: original reference/video analysis below is provenance, not permission to restore old UI/gameplay. Active geometry is [modular kitchen](features/modular-kitchen.md), with Racing+ and original-scene restoration in [active-cooks-mozos](features/active-cooks-mozos.md). Latest dated visual refinements override earlier local presentations; preserve existing artwork, Fernet row, street and the approved button family.
+
 ## Source of truth
 
 The supplied 30-second Food Fever video is the primary audiovisual reference for this milestone, with the user's detailed prompt specifying dynamics not visible in sampled frames. The user's attached gameplay screenshot, stored at [../Assets/Art/Reference/gameplay-layout-reference.png](../Assets/Art/Reference/gameplay-layout-reference.png), is the retained scene composition/style reference. Consult it before designing or changing any screen, character, object, sprite, or animation. Use it for its casual 2D cartoon language and readable vertical layout only; never reproduce its exact characters, illustrations, interface artwork, or assets.

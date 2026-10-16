@@ -1,5 +1,15 @@
 # Technical decision log
 
+> Historical decisions, not a cumulative ruleset. Use [README](README.md)/[continuity](continuity.md) to find the current contract; later scoped replacements override only the affected rule. Old employee caps, uniform prices and pre-modular geometry remain history.
+
+## 2026-10-15 — Pay each actual victory, deduplicate attempts rather than levels
+
+The user confirmed50%fullsales+2×unspentattemptcash and explicitly chose payment on every real victory, including replays. Preserve per-attempt settlement IDs to prevent duplicate callbacks; do not let migration/per-level flags suppress a new win. Keep defeat behavior and all prices/quotas/timers/stock unchanged. Recover only the exact unpaid components of the latest valid settled legacy victory once; no arbitrary wallet grant or inventory reset. Phone evidence proves Level2 earned$3570 but got0. A sequential campaign must use StreetGame, real handoffs, paid hires including Mozo, actual restocking and save/reload—not injected cash or direct first-unlock calls.
+
+## 2026-10-15 — Progressive context, unchanged three-role/four-skill setup
+
+Keep architecture Sol/medium, implementation Luna/medium and validation Luna/low; two concurrent spawned agents, no mandatory pipeline. SIMPLE work stays with the primary; broader tasks delegate only independent exclusive ownership. Instructions route to index→owning contract; continuity is the checkpoint, status/decisions are searched history. Cosmetic edits do not trigger SDD regeneration or full suites. No model/effort, global trust or gameplay changes in this audit. Installed CLI config/read finds the real-checkout layer disabled for missing trust: document the limitation rather than silently editing global settings. Models/efforts are supported by the bundled local catalog; official [subagent schema](https://learn.chatgpt.com/docs/agent-configuration/subagents), [config reference](https://learn.chatgpt.com/docs/config-file/config-reference) and [skill discovery](https://learn.chatgpt.com/docs/build-skills) were checked before edits.
+
 ## 2026-10-14 — Repair one unpaid legacy Mercado transition
 
 For already-unlocked next levels, reconcile only the migrated-save case where prior earnings are watermarked, no Mercado reward is recorded, current cash is zero, and cumulative Mercado purchase spend is zero. Persist a one-time amount equal to the exact current minimum missing-stock cost for that next level. This restores the transition the legacy save could not fund without reviving FIADO, resetting stock, or changing ongoing reward/price rules; any cash or recorded market spend makes the repair ineligible.

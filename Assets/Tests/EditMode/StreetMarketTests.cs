@@ -98,7 +98,7 @@ namespace HayChoriYPaty.Tests
             FieldInfo backing=target.GetType().GetField("<"+field+">k__BackingField",BindingFlags.Instance|BindingFlags.NonPublic);
             Assert.IsNotNull(backing,field+" backing field"); backing.SetValue(target,value);
         }
-        [Test] public void WrongStateCannotSettleAndLossAddsOnlyNewRecognizedSales()
+        [Test] public void LossKeepsIncrementalSalesAndEveryVictoryPaysFullFormula()
         {
             object market=Market(), sim=Sim(); Call(market,"Initialize",0);
             Assert.IsTrue((bool)Call(market,"BeginAttempt",sim));
@@ -113,15 +113,15 @@ namespace HayChoriYPaty.Tests
             Set(replay,"CoinsEarned",60); Set(replay,"Coins",4);
             Set(replay,"Phase",Enum.Parse(Type.GetType("HayChoriYPaty.RoundPhase, Assembly-CSharp",true),"Won"));
             object win=Call(market,"SettleAttempt",replay);
-            Assert.AreEqual(1000L,win.GetType().GetField("recognizedSalesCents",Public).GetValue(win));
+            Assert.AreEqual(3000L,win.GetType().GetField("recognizedSalesCents",Public).GetValue(win));
             Assert.AreEqual(800L,win.GetType().GetField("bonusCents",Public).GetValue(win));
             Assert.AreSame(win,Call(market,"SettleAttempt",replay));
             object later=Sim(); Assert.IsTrue((bool)Call(market,"BeginAttempt",later));
             Set(later,"CoinsEarned",80); Set(later,"Coins",9);
             Set(later,"Phase",Enum.Parse(Type.GetType("HayChoriYPaty.RoundPhase, Assembly-CSharp",true),"Won"));
             object nextWin=Call(market,"SettleAttempt",later);
-            Assert.AreEqual(1000L,nextWin.GetType().GetField("recognizedSalesCents",Public).GetValue(nextWin));
-            Assert.AreEqual(0L,nextWin.GetType().GetField("bonusCents",Public).GetValue(nextWin));
+            Assert.AreEqual(4000L,nextWin.GetType().GetField("recognizedSalesCents",Public).GetValue(nextWin));
+            Assert.AreEqual(1800L,nextWin.GetType().GetField("bonusCents",Public).GetValue(nextWin));
         }
         [Test] public void AttemptsRequireReadyAndAllElevenCostsStayFinite()
         {

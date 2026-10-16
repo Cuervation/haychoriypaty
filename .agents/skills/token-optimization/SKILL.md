@@ -1,9 +1,12 @@
 ---
 name: token-optimization
-description: Use for choosing context, model effort, delegation, or validation scope on a project task where extra work could outweigh its value.
+description: Size context, delegation, reasoning and validation for a Hay Chori y Paty task; keep routine edits direct and concise.
 ---
 
-- Search for relevant paths and use `specs/README.md`; do not read the whole repository by default.
-- Solve simple edits directly. Delegate only independent work whose context isolation or parallelism clearly saves effort; one agent owns each writable file set.
-- Project agents use only the Luna/Sol roles in `.codex/agents/`. Pick the smallest supported effort; the parent must not claim it changed its own model automatically.
-- Avoid duplicate scans, repeated full-doc output, broad test runs after small changes, and long handoffs. Prefer concise changed-file and validation summaries.
+- **SIMPLE** — position, size, text, color: principal only, local inspection/change/check; no long plan, subagents or global tests.
+- **MEDIA** — responsive component, worker route, concrete interaction: principal plus optional delegation only with clear net benefit; focused checks.
+- **COMPLEJA** — specialty, production/economy system, architecture: specialized agents only for independent work whose isolation/parallelism outweighs coordination. No mandatory pipeline or extra agents; preserve two-subagent concurrency.
+- Search once for relevant paths/symbols; read the index and owning contract, not entire historical logs. Reuse findings and applicable test evidence; avoid duplicate scans, unchanged test reruns and long reports.
+- Delegate through the three checked-in roles, with minimal context, exclusive files/responsibility and notice that others are working. Keep handoffs few; do not overlap edits.
+- Retain configured role models/efforts. Use low effort for simple validation, medium for scoped implementation/architecture as currently configured; request a justified adjustment only when complexity demonstrates need. Never silently switch the primary chat's model/effort.
+- Finish with concise changes, actual checks and remaining risks; documentation volume and agent count are not measures of completion.

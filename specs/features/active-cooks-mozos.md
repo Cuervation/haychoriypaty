@@ -73,3 +73,8 @@ El mural activo queda limitado al plano lejano, dejando al menos90 puntos escala
 **Validación final:** Unity6000.6.3f1,35/35 EditMode (cocineros/stock/roles, fila original en6–11, rutas de cada slot, calle y proyección responsive), job`38401aada89e48679e46e9bb5978404a`. El reintento PlayMode de3 pruebas de puntero **no ejecutó casos**: el Test Framework lanzó NullReferenceException en PlayModeRunTask.cs:52; no se declara aprobado. Main se restauró y se eliminó únicamente su escena temporal generada.
 
 Capturas nativas revisadas de River1080×1920 y Racing1440×2960, en `Logs/Acceptance/SceneRestoration-20261015/README.md`. En River se observaron Normal cocinando, Premium transportando, Mozo llevando unidad74 y2 ventas reales después de6s. Consola de la escena sin errores/warnings. Play detenido/Main limpio, JSON de progreso restaurado exactamente, GameView19/timeScale1/runInBackgroundfalse. Sin APK/instalación/commit/push; Android físico no verificado. Las cifras de balance anteriores son históricas, previas a esta restauración de geometría; no se repitió una auditoría de campaña.
+
+
+### Auditoría posterior a la restauración — 2026-10-16
+
+Nueva campaña real cash-only/lifecycle ganó1–9 sin alterar configuración; varias políticas perdieron10, mejor final13Chori pendientes a300s con saldo suficiente (no un bloqueo de Mercado).11ganó302,9/302,7s en dos pruebas separadas desde los desbloqueos existentes del JSON auténtico del teléfono; no acredita campaña fresca ganadora1–11ni QA humano. La aceptación final de balance sigue abierta, ahora concentrada en10y recorrido completo. Ver [status.md](../status.md) y `Logs/Acceptance/EconomyAudit-20261015/economy-audit.md`; no aplicar las duraciones hipotéticas históricas sin autorización.

@@ -55,6 +55,7 @@ namespace HayChoriYPaty
             else if (hasPersistedMarket) market.InitializeExistingSave(save.unlockedLevel);
             else market.Initialize(save.unlockedLevel); // One-time compatibility migration for pre-Mercado saves.
             market.RecoverAbandonedAttempt();
+            market.RecoverLegacyVictoryPayout();
             market.RecoverLegacyZeroPayoutTransition();
             selectedLevel = Mathf.Clamp(selectedLevel, 0, save.unlockedLevel);
             sim = new StreetSimulation(balance, selectedLevel, save.price);
@@ -101,8 +102,8 @@ namespace HayChoriYPaty
                 int nextLevel = sim.LevelIndex + 1;
                 if (market != null && nextLevel < StreetSimulation.LevelNames.Length)
                 {
-                    // A legacy sales watermark can suppress this victory's first Mercado payout.
-                    // Repair before the same-session transition to Mercado, not only on app reload.
+                    // Keep bounded legacy recovery for older receipts; current victories pay in full.
+                    // The normal first-unlock grant covers only the remaining next-stock deficit.
                     var nextLevelSimulation = new StreetSimulation(balance, nextLevel, sim.Price);
                     market.ReconcileLegacyProgressionBalance(nextLevelSimulation, nextLevel);
                     market.GrantFirstUnlockStockBonus(nextLevelSimulation, nextLevel > previousUnlocked);
