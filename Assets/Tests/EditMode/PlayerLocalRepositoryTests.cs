@@ -26,6 +26,15 @@ namespace HayChoriYPaty.Tests
             repo = Repo("google-uid");
             Assert.AreEqual(id, repo.State.pending[0].id); Assert.AreEqual(0, repo.State.pending[0].expectedRevision);
             Assert.AreEqual(Save(), repo.State.snapshot);
+            Assert.IsNull(repo.State.pending[0].match, "Restart must not create a phantom match from Unity inline serialization.");
+        }
+        [Test] public void CopyAndAckNeverTurnNoMatchOperationsIntoEmptyMatches()
+        {
+            var repo = Repo("uid"); Assert.IsTrue(repo.Commit(Save(), null)); Assert.IsTrue(repo.Commit(Save(300), null));
+            Assert.IsNull(repo.State.pending[0].match);
+            repo.Acknowledge(repo.State.pending[0].id, 1);
+            Assert.IsNull(repo.State.pending[0].match);
+            repo = Repo("uid"); Assert.IsNull(repo.State.pending[0].match);
         }
         [Test] public void DuplicateSnapshotDoesNotCreateOperations()
         {

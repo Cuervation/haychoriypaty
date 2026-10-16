@@ -65,7 +65,7 @@ namespace HayChoriYPaty.Cloud
             var record = JsonUtility.FromJson<CheckedFile>(File.ReadAllText(filename));
             if (record == null || record.hash != Hash(record.payload))
                 throw new InvalidDataException("Account file damaged; recovery copy preserved");
-            return JsonUtility.FromJson<PlayerLocalState>(record.payload);
+            return NormalizeOptionalRecords(JsonUtility.FromJson<PlayerLocalState>(record.payload));
         }
         private void Write(PlayerLocalState next)
         {
@@ -78,12 +78,20 @@ namespace HayChoriYPaty.Cloud
             if (File.Exists(path)) File.Replace(temp, path, path + ".bak"); else File.Move(temp, path);
             State = next;
         }
-        private PlayerLocalState Copy() => JsonUtility.FromJson<PlayerLocalState>(JsonUtility.ToJson(State));
+        private static PlayerLocalState NormalizeOptionalRecords(PlayerLocalState state)
+        {
+            if (state?.pending != null)
+                foreach (var operation in state.pending)
+                    if (operation != null && StreetMatchRecord.IsAbsent(operation.match)) operation.match = null;
+            return state;
+        }
+        private PlayerLocalState Copy() => NormalizeOptionalRecords(JsonUtility.FromJson<PlayerLocalState>(JsonUtility.ToJson(State)));
         public bool Commit(string snapshot, StreetMatchRecord match)
         {
             try
             {
                 ValidateSnapshot(snapshot);
+                if (StreetMatchRecord.IsAbsent(match)) match = null;
                 if (match != null)
                 {
                     bool alreadyQueued = State.pending.Exists(op => op.match != null && op.match.id == match.id);

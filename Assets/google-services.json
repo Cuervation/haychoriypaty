@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "800088676868",
+    "project_id": "haychoriypaty",
+    "storage_bucket": "haychoriypaty.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:800088676868:android:6b4b55811e38665dd57351",
+        "android_client_info": {
+          "package_name": "com.haychoriypaty.game"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "800088676868-v48598c6h8g9qmutu6vurt975llghmev.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.haychoriypaty.game",
+            "certificate_hash": "bf9858166f755aac91a33da7409032b1daf1fc61"
+          }
+        },
+        {
+          "client_id": "800088676868-t6ateda5df71jd94qsurb599vu361od6.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC98WNUmDt1Klj2jExCzcXDijCdlDQpp3Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "800088676868-t6ateda5df71jd94qsurb599vu361od6.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

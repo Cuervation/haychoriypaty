@@ -37,3 +37,15 @@ Thumbs.db
 ui-debug.log
 .firebase/
 tools/firebase/node_modules/
+
+# Firebase-generated Android/Desktop config derives from the checked-in public Android JSON.
+/Assets/Plugins/Android/FirebaseApp.androidlib/
+/Assets/Plugins/Android/FirebaseApp.androidlib.meta
+/Assets/StreamingAssets/google-services-desktop.json
+/Assets/StreamingAssets/google-services-desktop.json.meta
+# EDM resolved dependency cache; templates and settings remain versioned.
+/ProjectSettings/AndroidResolverDependencies.xml
+# Native Maven artifacts are copied from the pinned SDK archives by EDM.
+/Assets/GeneratedLocalRepo/
+/Assets/GeneratedLocalRepo.meta
+/Assets/StreamingAssets.meta

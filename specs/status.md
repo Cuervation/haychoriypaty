@@ -1,3 +1,7 @@
+## 2026-10-16 — Backend Firebase configurado, validación del cliente pendiente
+
+Firebase real configurado: Google habilitado, Android com.haychoriypaty.game con SHA debug, Firestore Standard en São Paulo y reglas seguras desplegadas; Billing=false. Roundtrip administrativo IAM real aprobado, no progreso de jugadores. SDK importado y compila; 46/47 EditMode (falla campaña nivel6) y4/4 PlayMode, gate manual sin sesión verificado. APK0.2.43/code45 IL2CPP/ARM64 generada y verificada:0 errores/1 warning existente de símbolos de diagnóstico, sin instalación. Google real del cliente y reapertura/dispositivo pendientes. Detalle: [firebase-player.md](features/firebase-player.md#informe-verificable-de-entrega--2026-10-16).
+
 ## 2026-10-16 — Firebase en preparación, no publicado
 
 Implementación local de Google obligatorio/perfiles UID/outbox/CAS y estadísticas. Emulador187/187; compilación estática administrada y puente Java, no pruebas Unity/Android ni conexión real. Acceso a `haychoriypaty` denegado a cuenta actual y Editor en diálogo externo de Main bloquean aceptación. No APK ni cambios en teléfono. Detalle y pasos exactos: [firebase-player.md](features/firebase-player.md#informe-verificable-de-entrega--2026-10-16). La APK instalada anterior no contiene Firebase.

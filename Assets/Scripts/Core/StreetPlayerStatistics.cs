@@ -129,6 +129,9 @@ namespace HayChoriYPaty
     [Serializable]
     public sealed class StreetMatchRecord
     {
+        public static bool IsAbsent(StreetMatchRecord record) => record == null ||
+            (string.IsNullOrEmpty(record.id) && string.IsNullOrEmpty(record.attemptId));
+
         public string id, attemptId, utc;
         public int level;
         public string club, result;

@@ -17,6 +17,36 @@
       },
       "hash": "d49ae2953580f3481beb1e084a1da2682f0b5610"
     },
+    "com.google.external-dependency-manager": {
+      "version": "file:FirebaseSDK/com.google.external-dependency-manager-1.2.190.tgz",
+      "depth": 0,
+      "source": "local-tarball",
+      "dependencies": {}
+    },
+    "com.google.firebase.app": {
+      "version": "file:FirebaseSDK/com.google.firebase.app-14.0.0.tgz",
+      "depth": 0,
+      "source": "local-tarball",
+      "dependencies": {
+        "com.google.external-dependency-manager": "1.2.190"
+      }
+    },
+    "com.google.firebase.auth": {
+      "version": "file:FirebaseSDK/com.google.firebase.auth-14.0.0.tgz",
+      "depth": 0,
+      "source": "local-tarball",
+      "dependencies": {
+        "com.google.firebase.app": "14.0.0"
+      }
+    },
+    "com.google.firebase.firestore": {
+      "version": "file:FirebaseSDK/com.google.firebase.firestore-14.0.0.tgz",
+      "depth": 0,
+      "source": "local-tarball",
+      "dependencies": {
+        "com.google.firebase.app": "14.0.0"
+      }
+    },
     "com.unity.ai.navigation": {
       "version": "2.0.14",
       "depth": 0,

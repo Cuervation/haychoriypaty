@@ -184,7 +184,7 @@ namespace HayChoriYPaty
                 save.pendingMatch = BuildMatchRecord(receipt);
                 save.statistics.ApplyMatch(save.pendingMatch);
             }
-            resultSaved = Save(save.pendingMatch);
+            resultSaved = SaveWithMatch(save.pendingMatch);
             if (!resultSaved) save.unlockedLevel = previousUnlocked;
             else { ResetAttemptMetrics(); activeAttemptId = null; save.activeAttemptId = null; }
             return resultSaved;
@@ -324,7 +324,7 @@ namespace HayChoriYPaty
                 for (int i = 0; i < 10; i++) abandoned.stockRemaining[i] = market.Units(i);
                 save.pendingMatch = abandoned;
                 save.statistics.ApplyMatch(abandoned);
-                if (!Save(abandoned)) { FreezeAfterUnpersistedMutation(); return false; }
+                if (!SaveWithMatch(abandoned)) { FreezeAfterUnpersistedMutation(); return false; }
                 ResetAttemptMetrics(); activeAttemptId = null; save.activeAttemptId = null;
             }
             else market.AbortAttempt();
@@ -378,6 +378,9 @@ namespace HayChoriYPaty
                 // JsonUtility fills omitted fields with defaults; require a real legacy version marker.
                 if (!System.Text.RegularExpressions.Regex.IsMatch(json, "^\\s*\\{\\s*\\\"version\\\"\\s*:\\s*[1-4](?:\\s*[,}])")) return false;
                 data = MigrateSaveData(JsonUtility.FromJson<SaveData>(json));
+                // Unity serializes inline null DTOs as empty objects; never interpret them as results.
+                if (data != null && StreetMatchRecord.IsAbsent(data.pendingMatch)) data.pendingMatch = null;
+                if (data != null && StreetMatchRecord.IsAbsent(data.activeAttemptSummary)) data.activeAttemptSummary = null;
                 if (data == null || data.version != 4) { data = null; return false; }
                 data.unlockedLevel = Mathf.Clamp(data.unlockedLevel, 0, StreetSimulation.LevelNames.Length - 1);
                 data.price = Mathf.Clamp(data.price, balance.minPrice, balance.maxPrice);
@@ -467,7 +470,9 @@ namespace HayChoriYPaty
 
         private static long At(int[] values, int index) => values != null && index >= 0 && index < values.Length ? Math.Max(0, values[index]) : 0;
 
-        private bool Save(StreetMatchRecord match = null)
+        private bool Save() => SaveWithMatch(null);
+
+        private bool SaveWithMatch(StreetMatchRecord match)
         {
             if (sim == null || save == null || (!playerActive && !suspensionRequested)) return false;
             if(save.prices==null || save.prices.Length!=7)save.prices=new float[7];

@@ -8,6 +8,8 @@ namespace HayChoriYPaty.Tests
     /// <summary>Runtime types live in predefined Assembly-CSharp; keep this asmdef suite reflection-only.</summary>
     public sealed class StreetPlayerStatisticsTests
     {
+        private static bool AbsentRecord(object value) => value == null ||
+            (string.IsNullOrEmpty((string)ReadField(value, "id")) && string.IsNullOrEmpty((string)ReadField(value, "attemptId")));
         private const BindingFlags PublicInstance = BindingFlags.Instance | BindingFlags.Public;
         private const BindingFlags NonPublicInstance = BindingFlags.Instance | BindingFlags.NonPublic;
         private const BindingFlags StaticPublic = BindingFlags.Static | BindingFlags.Public;
@@ -183,8 +185,8 @@ namespace HayChoriYPaty.Tests
                 Assert.AreEqual(0L, ReadField(statistics, "wins"));
                 Assert.AreEqual(0L, ReadField(statistics, "losses"));
                 Assert.AreEqual(0L, ReadField(statistics, "abandons"));
-                Assert.IsNull(ReadField(recoveredSave, "activeAttemptSummary"));
-                Assert.IsNull(ReadField(recoveredSave, "activeAttemptId"));
+                Assert.IsTrue(AbsentRecord(ReadField(recoveredSave, "activeAttemptSummary")));
+                Assert.IsTrue(string.IsNullOrEmpty((string)ReadField(recoveredSave, "activeAttemptId")));
                 Assert.IsFalse((bool)ReadField(ReadField(recoveredSave, "market"), "attemptActive"));
             }
             finally
@@ -215,7 +217,7 @@ namespace HayChoriYPaty.Tests
                 object summary = NewRecord();
                 WriteField(summary, "attemptId", "attempt-stable"); WriteField(summary, "result", "incomplete");
                 WriteField(save, "activeAttemptSummary", summary);
-                MethodInfo saveMethod = gameType.GetMethod("Save", NonPublicInstance);
+                MethodInfo saveMethod = gameType.GetMethod("SaveWithMatch", NonPublicInstance);
                 Assert.IsFalse((bool)saveMethod.Invoke(game, new object[] { null }));
                 Assert.AreSame(matchRecord, ReadField(save, "pendingMatch"), "Failed commit retains the exact retry record.");
                 allowWrite = true;
@@ -223,10 +225,10 @@ namespace HayChoriYPaty.Tests
                 Assert.AreSame(matchRecord, capturedMatch);
                 Assert.AreEqual("attempt-stable", ReadField(capturedMatch, "id"));
                 object committed = Deserialize(saveDataType, capturedJson);
-                Assert.IsNull(ReadField(committed, "pendingMatch"));
-                Assert.IsNull(ReadField(committed, "activeAttemptId"));
-                Assert.IsNull(ReadField(committed, "activeAttemptSummary"), "Terminal snapshot must not retain private in-flight telemetry.");
-                Assert.IsNull(ReadField(ReadField(committed, "statistics"), "lastRecoveredAttemptId"));
+                Assert.IsTrue(AbsentRecord(ReadField(committed, "pendingMatch")));
+                Assert.IsTrue(string.IsNullOrEmpty((string)ReadField(committed, "activeAttemptId")));
+                Assert.IsTrue(AbsentRecord(ReadField(committed, "activeAttemptSummary")), "Terminal snapshot must not retain private in-flight telemetry.");
+                Assert.IsTrue(string.IsNullOrEmpty((string)ReadField(ReadField(committed, "statistics"), "lastRecoveredAttemptId")));
             }
             finally
             {
@@ -304,6 +306,26 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(0L, LongArray(statistics, "deliveredByProduct")[2]);
             Assert.AreEqual(11, LongArray(statistics, "winsByLevel").Length);
             Assert.AreEqual(0L, LongArray(statistics, "winsByLevel")[0]);
+        }
+
+        [Test]
+        public void JsonUtilityEmptyOptionalRecordsNeverEmitPhantomResultsAfterReload()
+        {
+            bool prior = (bool)gameType.GetField("AllowEditorTestInitialization", StaticPublic).GetValue(null);
+            var firstGo = new GameObject("empty-result-first"); var secondGo = new GameObject("empty-result-reload");
+            try
+            {
+                SetEditorTestInitialization(gameType, false);
+                string saved = null; object result = null;
+                Assert.IsTrue(Activate(NewGame(firstGo), null, (json, match) => { saved = json; return true; }));
+                Assert.IsTrue(Activate(NewGame(secondGo), saved, (json, match) => { result = match; return true; }));
+                Assert.IsNull(result, "Inline DTO nulls reconstructed by Unity must not enter history/outbox.");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(firstGo); UnityEngine.Object.DestroyImmediate(secondGo);
+                SetEditorTestInitialization(gameType, prior);
+            }
         }
 
         [Test]
