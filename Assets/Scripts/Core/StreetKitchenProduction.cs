@@ -15,6 +15,7 @@ namespace HayChoriYPaty
         [Min(1)] public int fernetTableCapacity = 45;
         [Min(1)] public int barrelCapacity = 12;
         [Min(.1f)] public float cookSeconds = 4f;
+        [Min(.01f)] public float activeCookSeconds = .5f;
         [Min(.1f)] public float burnAfterSeconds = 20f;
         [Min(.1f)] public float discardBurnedAfterSeconds = 1f;
         [Min(.01f)] public float drinkPrepareSeconds = .28f;
@@ -31,6 +32,7 @@ namespace HayChoriYPaty
         public int Slot { get; internal set; }
         public int WorkerId { get; internal set; }
         public float Progress { get; internal set; }
+        internal int ReservedTableSlot = -1;
         internal float CookedAge;
         internal float BurnedAge;
     }
@@ -45,6 +47,7 @@ namespace HayChoriYPaty
         private readonly int[] grillCapacity = new int[7];
         private readonly float[] drinkProgress = new float[7];
         private int nextId = 1;
+        public bool ActiveCooks { get; private set; }
 
         public IReadOnlyList<StreetFoodUnit> Units { get { return units; } }
         public StreetKitchenBalance Balance { get { return balance; } }
@@ -53,9 +56,14 @@ namespace HayChoriYPaty
 
         public StreetKitchenProduction(StreetKitchenBalance balance, int[] availableProducts,
             IStreetKitchenStock ingredientStock)
+            : this(balance, availableProducts, ingredientStock, false) { }
+
+        public StreetKitchenProduction(StreetKitchenBalance balance, int[] availableProducts,
+            IStreetKitchenStock ingredientStock, bool activeCooks)
         {
             this.balance = balance ?? new StreetKitchenBalance();
             this.ingredientStock = ingredientStock;
+            ActiveCooks = activeCooks;
             Initialize(availableProducts ?? new int[0]);
         }
 
@@ -83,16 +91,117 @@ namespace HayChoriYPaty
 
         public StreetFoodUnit TryTake(int product, StreetWorkerRole role, int workerId)
         {
-            if (product < 0 || product >= 7 || workerId <= 0 || !StreetSpecialties.IsResponsible(role, product)) return null;
+            if (product < 0 || product >= 7 || workerId <= 0 || !StreetSpecialties.IsDeliveryResponsible(role, product, ActiveCooks)) return null;
             for (int i = 0; i < units.Count; i++)
             {
                 StreetFoodUnit unit = units[i];
-                if (unit.Product != product || unit.Location != StreetFoodLocation.Table || unit.State != StreetFoodState.Cooked) continue;
+                if (unit.Product != product || unit.Location != StreetFoodLocation.Table || unit.State != StreetFoodState.Cooked ||
+                    (unit.WorkerId != 0 && unit.WorkerId != workerId) ||
+                    (ActiveCooks && product < 4 && unit.WorkerId != workerId)) continue;
                 unit.Location = StreetFoodLocation.Carried;
                 unit.WorkerId = workerId;
                 return unit;
             }
             return null;
+        }
+
+        public int SupplyCount(int product)
+        {
+            int count = 0;
+            for (int i = 0; i < units.Count; i++)
+                if (units[i].Product == product && units[i].State != StreetFoodState.Burned) count++;
+            return count;
+        }
+        public int AvailableTableCount(int product, int workerId = 0)
+        {
+            int count = 0;
+            foreach (StreetFoodUnit unit in units)
+                if (unit.Product == product && unit.Location == StreetFoodLocation.Table &&
+                    unit.State == StreetFoodState.Cooked && (unit.WorkerId == 0 || unit.WorkerId == workerId)) count++;
+            return count;
+        }
+        public StreetFoodUnit ReserveTableUnit(int product, int workerId)
+        {
+            if (!ActiveCooks || product < 0 || product > 3 || workerId <= 0) return null;
+            // Idempotent for dispatch after an assignment, without reserving a second sandwich.
+            foreach (StreetFoodUnit unit in units)
+                if (unit.WorkerId == workerId)
+                    return unit.Location == StreetFoodLocation.Table && unit.Product == product ? unit : null;
+            foreach (StreetFoodUnit unit in units)
+                if (unit.Location == StreetFoodLocation.Table && unit.Product == product &&
+                    unit.State == StreetFoodState.Cooked && unit.WorkerId == 0)
+                { unit.WorkerId = workerId; return unit; }
+            return null;
+        }
+        public void ReleaseTableReservation(int workerId)
+        {
+            foreach (StreetFoodUnit unit in units)
+                if (unit.Location == StreetFoodLocation.Table && unit.WorkerId == workerId) unit.WorkerId = 0;
+        }
+        private int FreeGrillSlot(int product)
+        {
+            for (int slot = 0; slot < GrillCapacity(product); slot++)
+            {
+                bool occupied = false;
+                foreach (StreetFoodUnit unit in units)
+                    if (unit.Product == product && unit.Location == StreetFoodLocation.Grill && unit.Slot == slot)
+                    { occupied = true; break; }
+                if (!occupied) return slot;
+            }
+            return -1;
+        }
+        public bool CanReserveCook(int product) => ActiveCooks && product >= 0 && product < 4 &&
+            (ingredientStock == null || ingredientStock.CanPrepareFood(product)) &&
+            FirstFreeTableSlot(product) >= 0 && FreeGrillSlot(product) >= 0;
+
+        public StreetFoodUnit ReserveCook(int product, int workerId)
+        {
+            if (workerId <= 0 || !CanReserveCook(product)) return null;
+            foreach (StreetFoodUnit unit in units)
+                if (unit.WorkerId == workerId) return null;
+            int slot = FirstFreeTableSlot(product);
+            StreetFoodUnit created = Add(product, StreetFoodState.Raw, StreetFoodLocation.Grill, FreeGrillSlot(product));
+            if (created != null) { created.WorkerId = workerId; created.ReservedTableSlot = slot; }
+            return created;
+        }
+        public bool AdvanceCook(int id, int workerId, float delta, float workRate)
+        {
+            StreetFoodUnit unit = Find(id);
+            if (!ActiveCooks || unit == null || unit.Location != StreetFoodLocation.Grill || unit.WorkerId != workerId || delta <= 0f) return false;
+            if (unit.State == StreetFoodState.Cooked) return true;
+            if (unit.State != StreetFoodState.Raw && unit.State != StreetFoodState.Cooking) return false;
+            unit.State = StreetFoodState.Cooking;
+            unit.Progress = Mathf.Min(1f, unit.Progress + delta * Mathf.Max(.01f, workRate) / Mathf.Max(.01f, balance.activeCookSeconds));
+            if (unit.Progress >= 1f - .00001f) { unit.Progress = 1f; unit.State = StreetFoodState.Cooked; return true; }
+            return false;
+        }
+        public bool TakeCooked(int id, int workerId)
+        {
+            StreetFoodUnit unit = Find(id);
+            if (!ActiveCooks || unit == null || unit.Location != StreetFoodLocation.Grill ||
+                unit.State != StreetFoodState.Cooked || unit.WorkerId != workerId) return false;
+            unit.Location = StreetFoodLocation.Carried;
+            return true;
+        }
+        public bool DepositCooked(int id, int workerId)
+        {
+            StreetFoodUnit unit = Find(id);
+            if (!ActiveCooks || unit == null || unit.Location != StreetFoodLocation.Carried ||
+                unit.State != StreetFoodState.Cooked || unit.WorkerId != workerId || unit.ReservedTableSlot < 0) return false;
+            unit.Location = StreetFoodLocation.Table; unit.Slot = unit.ReservedTableSlot; unit.WorkerId = 0;
+            return true;
+        }
+        public void CancelCook(int workerId)
+        {
+            if (!ActiveCooks || workerId <= 0) return;
+            for (int i = units.Count - 1; i >= 0; i--)
+            {
+                StreetFoodUnit unit = units[i];
+                if (unit.WorkerId != workerId) continue;
+                if (unit.State == StreetFoodState.Cooked)
+                { unit.Location = StreetFoodLocation.Table; unit.Slot = unit.ReservedTableSlot; unit.WorkerId = 0; }
+                else { ingredientStock?.ReleaseFood(unit.Id); units.RemoveAt(i); }
+            }
         }
 
         public bool Consume(int id, int product, int workerId)
@@ -109,6 +218,13 @@ namespace HayChoriYPaty
             StreetFoodUnit unit = Find(id);
             if (unit == null || unit.Location != StreetFoodLocation.Carried || unit.WorkerId != workerId) return;
             unit.WorkerId = 0;
+            if (ActiveCooks && unit.Product < 4)
+            {
+                // Every in-flight sandwich retains its table slot, including a waiter's trip.
+                unit.Location = StreetFoodLocation.Table;
+                unit.Slot = unit.ReservedTableSlot;
+                return;
+            }
             if (TableCount(unit.Product) < tableCapacity[unit.Product])
             {
                 unit.Location = StreetFoodLocation.Table;
@@ -138,7 +254,7 @@ namespace HayChoriYPaty
             for (int i = units.Count - 1; i >= 0; i--)
             {
                 StreetFoodUnit unit = units[i];
-                if (unit.Location == StreetFoodLocation.Carried) continue;
+                if (unit.Location == StreetFoodLocation.Carried || (ActiveCooks && unit.Product < 4)) continue;
                 bool cookingEnabled = unit.Product <= 1 ? normalCook : unit.Product <= 3 ? premiumCook : unit.Product == 5 ? fernetero : cocaWorker;
                 if (unit.Location == StreetFoodLocation.Table)
                 {
@@ -202,7 +318,7 @@ namespace HayChoriYPaty
                 }
             }
             // A failed ingredient reservation leaves the slot empty, not permanently disabled.
-            if (ingredientStock != null)
+            if (ingredientStock != null && !ActiveCooks)
             for (int product = 0; product < 4; product++)
             {
                 if (!(product <= 1 ? normalCook : premiumCook)) continue;
@@ -231,12 +347,13 @@ namespace HayChoriYPaty
             for (int product = 0; product < 7; product++)
             {
                 int capacity = tableCapacity[product];
-                if (capacity <= 0) continue;
+                if (capacity <= 0 || (ActiveCooks && product < 4)) continue;
                 if (product == 4 || product == 6) capacity = Mathf.Min(capacity, Mathf.Max(1, balance.barrelCapacity));
                 for (int slot = 0; slot < capacity; slot++) Add(product, StreetFoodState.Cooked, StreetFoodLocation.Table, slot);
             }
-            for (int product = 0; product < 4; product++)
-                for (int slot = 0; slot < grillCapacity[product]; slot++) Add(product, StreetFoodState.Raw, StreetFoodLocation.Grill, slot);
+            if (!ActiveCooks)
+                for (int product = 0; product < 4; product++)
+                    for (int slot = 0; slot < grillCapacity[product]; slot++) Add(product, StreetFoodState.Raw, StreetFoodLocation.Grill, slot);
         }
         private void SetGroupCapacities(bool[] available, int first, int second, int capacity)
         {
@@ -261,16 +378,20 @@ namespace HayChoriYPaty
             for (int slot = 0; slot < tableCapacity[product]; slot++)
             {
                 bool occupied = false;
-                for (int i = 0; i < units.Count; i++) if (units[i].Product == product && units[i].Location == StreetFoodLocation.Table && units[i].Slot == slot) { occupied = true; break; }
+                for (int i = 0; i < units.Count; i++) if (units[i].Product == product &&
+                    (ActiveCooks && product < 4 ? units[i].ReservedTableSlot == slot : units[i].Location == StreetFoodLocation.Table && units[i].Slot == slot)) { occupied = true; break; }
                 if (!occupied) return slot;
             }
             return -1;
         }
-        private void Add(int product, StreetFoodState state, StreetFoodLocation location, int slot)
+        private StreetFoodUnit Add(int product, StreetFoodState state, StreetFoodLocation location, int slot)
         {
-            if (slot < 0 && location == StreetFoodLocation.Table) return;
-            if (ingredientStock != null && !ingredientStock.TryReserveFood(nextId, product)) return;
-            units.Add(new StreetFoodUnit { Id = nextId++, Product = product, State = state, Location = location, Slot = slot });
+            if (slot < 0 && location == StreetFoodLocation.Table) return null;
+            if (ingredientStock != null && !ingredientStock.TryReserveFood(nextId, product)) return null;
+            var unit = new StreetFoodUnit { Id = nextId++, Product = product, State = state, Location = location,
+                Slot = slot, ReservedTableSlot = location == StreetFoodLocation.Table ? slot : -1 };
+            units.Add(unit);
+            return unit;
         }
     }
 }

@@ -1,3 +1,9 @@
+## Altura uniforme de banderines — 2026-10-14
+
+El alto libre se calculaba después de cada panel de mejoras: en Playing, niveles 1–3 tenían 131.5/160.6/187.1/196.0/98.6 unidades lógicas para 16:9/18:9/19.5:9/20:9/tablet 4:3; Ferro (nivel 4), 43.2/68.6/95.1/104.0/32.4; niveles 5–11, 52.8/78.6/105.1/114.0/39.6. La diferencia provenía de las filas: 2–3 acciones en niveles 1–3, 4 en Ferro y 5 en los niveles restantes.
+
+Ahora se reserva el mismo alto para los 11 catálogos y fases por viewport, calculado según el mayor panel de pie; paneles menores se alinean sobre esa franja en vez de dejar hueco. La altura continúa adaptándose a la Safe Area/aspect ratio. Se agregaron aserciones geométricas para Playing, Ready y sin controles en las cinco relaciones anteriores. Unity/MCP apunta a una copia temporal distinta y no se ejecutaron esas pruebas ni se capturó Game View en esta tarea; `git diff --check` pasó.
+
 ## Suite PlayMode y geometría de resultados — 2026-10-14
 
 Se resolvieron las fallas de la corrida completa, paso a paso:
@@ -14,6 +20,10 @@ Se resolvieron las fallas de la corrida completa, paso a paso:
 Los guardados heredados podían conservar Nivel 2 desbloqueado y watermark de recompensa del Nivel 1, pero saldo Mercado cero. Al reabrir la partida, si no hubo saldo disponible ni compras Mercado registradas, se entrega una única reparación por el coste exacto del stock faltante del siguiente nivel desbloqueado (en la partida de referencia, $587,50). Queda persistida; no cambia inventario, precios, objetivos ni FIADO. Las pruebas focalizadas pasaron: EditMode Mercado **22/22**, PlayMode stock-gate **1/1**, incluyendo recarga/idempotencia y exclusión de partidas con saldo o compras previas.
 
 APK Android 0.2.35/code37 Main-only Development IL2CPP/ARM64 generada en 275.3 s, 0 errores/1 warning. Package/version, ZIP e firma v2 verificados; SHA-256 `4d407239dede83d421a75cfc0f2e90586bb98bc4877685f42378d690bfa95b21`. No se instaló en el teléfono: ADB no detectó el dispositivo al intentar verificar conexión. Recibo completo en `features/android-prototype.md`.
+
+## Saldo cero al abrir Mercado tras ganar nivel 1 — 2026-10-14
+
+La reparación de watermark heredado corría solo al habilitar `StreetGame`; si una partida migrada ganaba Nivel 1 y el watermark suprimía su pago, la transición inmediata al Mercado de Nivel 2 mostraba saldo $0. `ProcessRoundResult` ahora aplica la misma reparación acotada antes de desbloquear/guardar el siguiente nivel. El crédito es solamente el costo exacto del stock faltante, condicionado al resultado/watermark, saldo cero y cero compras, con marcador persistente de una sola vez. La regresión reprodujo saldo cero antes del cambio; después verificó persistencia, idempotencia, compra cash-only de faltantes y habilitación de JUGAR. Unity 6000.6.3f1 focalizado: Integration **8/8** y Market domain **15/15**; `git diff --check` pasó. APK Android 0.2.37/code39 generada con Unity 6000.6.3f1 (Main-only, Development IL2CPP/ARM64; 0 errores/1 warning). Tamaño 410,268,801 bytes; SHA-256 `a5a7926f889448f858830ba18d25832488b86571db9c419f95a5307280306fc6`. Metadatos de paquete, ZIP y firma v2 verificados. Suite completa, Game View y dispositivo no se validaron en esta tarea de packaging.
 
 ## Level 1 minimum opening stock — 2026-10-14
 
@@ -901,3 +911,32 @@ Validation: Unity6000.6.3f1 MCP focused PlayMode **9/9 passed**, job `3bd96811f4
 New saves now get a one-time 10% reserve over All Boys' recipe-derived objective: 220 chorizos and 220 panes for the current target of 200. Existing Market inventories are preserved exactly; saves predating Mercado retain their prior compatibility migration. The observed 145/435 values are from persisted `market.stockUnits`, not scene defaults; per-ingredient historical transactions are unavailable to determine how that valid inventory accumulated.
 
 Focused EditMode regression tests were added for formula/dynamic goal, persisted 145/435 preservation, and fresh-save lifecycle/defeat. Unity test execution is pending: filtered MCP runs reported zero tests and the assembly run timed out/disconnected; `git diff --check` passed.
+
+
+## Cash-only campaign funding and zero-payout recovery — 2026-10-15
+
+Root cause: the prior full economic simulation won Level 1 but ended with $7.40 against Level 2's $10.00 minimum missing-stock cost, so the cash-only gate correctly blocked the match. Separately, the affected phone save stored a successful Level 1 result with $0 recognized/earned/total, a paid watermark, a previously consumed migration-repair marker and $787.50 purchase history; the older repair path did not cover that state.
+
+At a first-time unlock only, the victory transition now adds the exact shortfall to the next level's current minimum missing-stock cost. It is an earned, non-repayable progression reward, recorded separately on the last result; no purchase can exceed available cash, and replays/loss/final-level wins do not get it. Existing zero-payout v4 saves receive one narrowly scoped recovery, preserving inventory and transaction history with a separate idempotency marker. Receipt text includes the distinct restocking award.
+
+**Validation:** Unity 6000.6.3f1 compiled the final code changes and the console returned 0 errors. Focused EditMode jobs passed: `3ce33e9afa7540f39d8121aaa7cde684` (3/3: full 11/11 actual-simulation campaign, replay award deduplication, old zero-payout save recovery and cash-only purchase gate) and `0fb698bfb03c4887ae74ab658ee11891` (6/6: settlement, cash-only rejection, loss/replay accounting, legacy migration/repair). The campaign logged wins in levels 1 through 11. A wider combined-filter attempt timed out before starting; the focused jobs above are the executed evidence. No new device/Game View QA was done. `git diff --check` passed. No APK, push or install was requested or done.
+
+
+## Cocineros activos + Mozo desde Racing — 2026-10-15
+
+- [x] Implementados circuito físico, cocción individual0.5/WorkRate, reservas/ID/stock, Mozo4 contratado desde nivel6, bebidas/anteriores conservados, seis cards y layout ampliado con assets originales.
+- [x] Unity6000.6.3f1:71/71EditMode+7/7PlayMode; después35/35 y20/20 rechecks de las correcciones visuales. Sin errores/warnings finales.
+- [x] Capturas reales del ciclo completo y320×568/1080×1920/1440×2960; IDs70/71/72 observados, cobro exclusivamente en handoff. Progreso de editor restaurado exactamente, Play detenido/Main limpio; sin APK ni entrega a teléfono.
+- [x] Balance con ingredientes finitos y dinero real: Racing208.61s, SanLorenzo252.06s, River280.75s victorias con valores oficiales.
+- [ ] Balance9–11: estrategia probada perdió; no es demostración de imposibilidad. Propuesta no aplicada320/335/335s ganó en clones de configuración; pedir autorización antes de ajustar.
+- [ ] Dispositivo físico/notch/FPS sin verificar. No declarar cerrado el balance final del cambio.
+
+Especificación, archivos, detalle de pruebas y números: [active-cooks-mozos](features/active-cooks-mozos.md). Galería/telemetría en`Logs/Acceptance/ActiveCooks-20261015/Final/`. Cambios locales previos preservados; no commit/push.
+
+## Escenario original conservando cocineros/Mozos — 2026-10-15
+
+Fernet otra vez alineado en su posición original, calle visible y sin mesa lateral de chimi. Se mantiene solo el espacio inferior ampliado; cocineros/Mozos y economía intactos.35/35 EditMode; revisión nativa River1080×1920 y Racing1440×2960. Reejecución de puntero PlayMode bloqueada por excepción del Test Framework,0casos: no aprobada. Main/progreso/editor restaurados; sin APK. Detalle y evidencia en [active-cooks-mozos](features/active-cooks-mozos.md#restauración-visual-solicitada--2026-10-15).
+
+## Contenido centrado de botones — 2026-10-15
+
+Personajes y flechas centrados dentro de los óvalos existentes, sin deformación; ×1,00/+10% elevado para no tocar el precio.13/13 EditMode, capturas reales de cards compactas/amplias revisadas. Sin cambios de hit areas, escenario o mecánica; sin APK. Evidencia: `Logs/Acceptance/ButtonOvals-20261015/`.

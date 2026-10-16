@@ -38,7 +38,8 @@ namespace HayChoriYPaty
         private readonly List<int> stale = new List<int>();
         private readonly HashSet<Vector2Int> idleFootprintCells = new HashSet<Vector2Int>();
         private readonly Texture2D extension, premiumExtension, fernetExtension;
-        private Texture2D normal, diagonal, premium, premiumDiagonal, drink, fernet;
+        private Texture2D normal, diagonal, premium, premiumDiagonal, drink, fernet, mozo, mozoDiagonal, mozoExtension;
+        private Texture2D mozoSource, mozoDiagonalSource;
         private bool matched;
         private static readonly Rect[] ExtensionBounds = { new Rect(28,11,206,279),new Rect(298,11,195,278),new Rect(562,11,213,277),new Rect(848,11,209,277),new Rect(34,299,226,280),new Rect(296,299,208,280),new Rect(557,299,217,280),new Rect(831,299,223,280),new Rect(41,588,218,281),new Rect(290,588,222,281),new Rect(564,588,217,281),new Rect(835,588,212,281),new Rect(38,876,173,272),new Rect(306,881,195,265),new Rect(598,883,176,268),new Rect(887,878,173,272),new Rect(37,1158,180,272),new Rect(326,1158,187,269),new Rect(567,1158,191,269),new Rect(866,1158,186,267) };
         public bool Ready => normal != null && diagonal != null && drink != null && extension != null;
@@ -60,11 +61,30 @@ namespace HayChoriYPaty
         {
             this.normal = normal; this.diagonal = diagonal; this.premium = premium; this.premiumDiagonal = premiumDiagonal;
             this.drink = drink; this.fernet = fernet; this.matched = matched;
+            if (mozoSource != normal && normal != null)
+            {
+                DestroyMozoVariants();
+                mozoSource = normal; mozo = StreetWorkerAppearance.CreateVariant(normal, StreetWorkerRole.Mozo, StreetView.WorkerFoodPoseBounds, new Vector2(1315,1197));
+            }
+            if (mozoDiagonalSource != diagonal && diagonal != null)
+            {
+                if (mozoDiagonal != null) UnityEngine.Object.Destroy(mozoDiagonal);
+                mozoDiagonalSource = diagonal; mozoDiagonal = StreetWorkerAppearance.CreateVariant(diagonal, StreetWorkerRole.Mozo, StreetView.WorkerDiagonalPoseBounds, new Vector2(1536,1024));
+            }
+            if (extension != null && mozoExtension == null)
+                mozoExtension = StreetWorkerAppearance.CreateVariant(extension, StreetWorkerRole.Mozo, new[] { ExtensionBounds[0], ExtensionBounds[1], ExtensionBounds[2], ExtensionBounds[3] }, new Vector2(extension.width, extension.height));
+        }
+        private void DestroyMozoVariants()
+        {
+            if (mozo != null) UnityEngine.Object.Destroy(mozo);
+            if (mozoDiagonal != null) UnityEngine.Object.Destroy(mozoDiagonal);
+            if (mozoExtension != null) UnityEngine.Object.Destroy(mozoExtension);
+            mozo = mozoDiagonal = mozoExtension = null;
         }
         private static bool Beverage(StreetWorker w) => w.Role == StreetWorkerRole.Cocacolero || w.Role == StreetWorkerRole.Fernetero;
         internal static bool IsObscuredIdleWorker(IReadOnlyList<StreetWorker> allWorkers, StreetWorker candidate, float verticalScale)
         {
-            if (candidate == null || candidate.State != StreetWorkerState.Idle) return false;
+            if (candidate == null || candidate.State != StreetWorkerState.Idle || candidate.Role == StreetWorkerRole.Mozo) return false;
             Rect bounds = IdleBounds(candidate, verticalScale);
             for (int i = 0; i < allWorkers.Count; i++)
             {
@@ -101,9 +121,9 @@ namespace HayChoriYPaty
             for (int x = minX; x <= maxX; x++)
                 for (int y = minY; y <= maxY; y++) idleFootprintCells.Add(new Vector2Int(x, y));
         }
-        private Texture2D BaseTexture(StreetWorker w) => Beverage(w) ? (w.Role == StreetWorkerRole.Fernetero ? fernet : drink)
+        private Texture2D BaseTexture(StreetWorker w) => w.Role == StreetWorkerRole.Mozo && mozo != null ? mozo : Beverage(w) ? (w.Role == StreetWorkerRole.Fernetero ? fernet : drink)
             : w.Role == StreetWorkerRole.ParrilleroPremium ? premium : normal;
-        private Texture2D Extension(StreetWorker w) => w.Role == StreetWorkerRole.ParrilleroPremium ? premiumExtension
+        private Texture2D Extension(StreetWorker w) => w.Role == StreetWorkerRole.Mozo && mozoExtension != null ? mozoExtension : w.Role == StreetWorkerRole.ParrilleroPremium ? premiumExtension
             : w.Role == StreetWorkerRole.Fernetero ? fernetExtension : extension;
         private static bool Diagonal(StreetFacing f) => ((int)f & 1) == 1;
         private static int Quarter(StreetFacing f) => f == StreetFacing.DownLeft ? 0 : f == StreetFacing.DownRight ? 1 : f == StreetFacing.UpLeft ? 2 : 3;
@@ -124,7 +144,7 @@ namespace HayChoriYPaty
             {
                 int quarter = Quarter(facing);
                 if (Beverage(w)) return Supplemental(w, 4 + quarter * 2 + contact, false, Vector2.zero);
-                Texture2D texture = w.Role == StreetWorkerRole.ParrilleroPremium ? premiumDiagonal : diagonal;
+                Texture2D texture = w.Role == StreetWorkerRole.Mozo && mozoDiagonal != null ? mozoDiagonal : w.Role == StreetWorkerRole.ParrilleroPremium ? premiumDiagonal : diagonal;
                 return new Art { Texture = texture, Bounds = StreetView.WorkerDiagonalPoseBounds[quarter * 2 + contact] };
             }
             int first = facing == StreetFacing.Down ? 0 : facing == StreetFacing.Up ? 4 : 8;
@@ -139,6 +159,10 @@ namespace HayChoriYPaty
                 {
                     Art a = Original(w, facing == StreetFacing.Down ? 12 : facing == StreetFacing.Up ? 13 : 7, facing == StreetFacing.Right);
                     a.Palm = facing == StreetFacing.Down ? new Vector2(.5f,.58f) : facing == StreetFacing.Up ? new Vector2(.68f,.54f) : new Vector2(.23f,.57f);
+                    // New sandwich trips keep the real unit visible beside the rear
+                    // forearm instead of hiding it completely behind the worker's back.
+                    if (facing == StreetFacing.Up && (w.Role == StreetWorkerRole.Mozo || w.State == StreetWorkerState.ToTable))
+                        a.Palm = new Vector2(.98f, .58f);
                     return a;
                 }
                 int q = Quarter(facing), index = q < 2 ? 1 - q : q;
@@ -197,7 +221,7 @@ namespace HayChoriYPaty
                 liveIds.Add(w.Id); Visual v;
                 if (!workers.TryGetValue(w.Id,out v)) v = Create(w.Id);
                 Rect idleBounds = w.State == StreetWorkerState.Idle ? IdleBounds(w, verticalScale) : default(Rect);
-                if (w.State == StreetWorkerState.Idle && HasVisibleIdleOverlap(idleBounds, verticalScale))
+                if (w.State == StreetWorkerState.Idle && w.Role != StreetWorkerRole.Mozo && HasVisibleIdleOverlap(idleBounds, verticalScale))
                 {
                     if (v.Root.gameObject.activeSelf) v.Root.gameObject.SetActive(false);
                     continue;
@@ -256,6 +280,7 @@ namespace HayChoriYPaty
             foreach (Sprite sprite in sprites.Values) if (sprite != null) UnityEngine.Object.Destroy(sprite);
             if (premiumExtension != null) UnityEngine.Object.Destroy(premiumExtension);
             if (fernetExtension != null) UnityEngine.Object.Destroy(fernetExtension);
+            DestroyMozoVariants();
             workers.Clear();sprites.Clear();
         }
     }

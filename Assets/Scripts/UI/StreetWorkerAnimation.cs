@@ -30,9 +30,10 @@ namespace HayChoriYPaty
         public static StreetWorkerPose Sample(StreetWorker worker)
         {
             bool moving = worker.StepDistance > .0001f &&
-                (worker.State == StreetWorkerState.ToStation || worker.State == StreetWorkerState.ToCounter);
+                (worker.State == StreetWorkerState.ToStation || worker.State == StreetWorkerState.ToCounter ||
+                 worker.State == StreetWorkerState.ToGrill || worker.State == StreetWorkerState.ToTable);
             int frame = WalkFrame(worker.TravelDistance);
-            bool pickingUp = worker.State == StreetWorkerState.Pickup && worker.CarriedItemId <= 0;
+            bool pickingUp = (worker.State == StreetWorkerState.Pickup || worker.State == StreetWorkerState.Deposit) && worker.CarriedItemId <= 0;
             StreetFacing facing = worker.Role == StreetWorkerRole.Cocacolero && pickingUp
                 ? StreetFacing.Down : ResolveFacing(worker.FacingVector, StreetFacing.Down);
             return new StreetWorkerPose { Facing = facing,

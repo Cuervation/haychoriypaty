@@ -12,3 +12,8 @@ Defaults, exact state contracts, persistence and acceptance are authoritative in
 ## Exclusive worker specialties (2026-10-07)
 
 Product catalog determines specialties/stations, not level number: Normal Chori/Paty; Premium Bondiola/Vacío on a separate grill; Cocacolero Coca/Cerveza; Fernetero exclusively Fernet. Mixed lines run in parallel with specialty-local ownership/FIFO; customers leave only after all lines complete. The first normal Parrillero is free; each role then has an independent per-level base cost and paid-tier curve. Unlimited hiring for catalog-enabled roles, the speed table and attempt opening balances are defined in the authoritative street-automation contract.
+
+
+## Racing+ active kitchen (2026-10-15)
+
+[Active cooks and Mozos](features/active-cooks-mozos.md) overrides automatic sandwich production/direct cook delivery only from level 6 onward. Levels 1–5 and beverage delivery retain their existing rules. Physical per-worker cooking takes configurable 0.5 / WorkRate seconds; production and table placement never earn revenue.

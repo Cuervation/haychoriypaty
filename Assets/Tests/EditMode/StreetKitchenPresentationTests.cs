@@ -41,6 +41,46 @@ namespace HayChoriYPaty.Tests
         private static float SceneWidth() => (float)Runtime("StreetSceneLayout").GetField("Width", BindingFlags.Public | BindingFlags.Static).GetValue(null);
         private static float WorkerServiceY() => (float)Runtime("StreetSceneLayout").GetField("WorkerServiceY", BindingFlags.Public | BindingFlags.Static).GetValue(null);
 
+        [TestCase(5)] [TestCase(6)] [TestCase(7)] [TestCase(8)] [TestCase(9)] [TestCase(10)]
+        public void ActivePrepRowPreservesOriginalFurnitureAndCookSideRoutes(int level)
+        {
+            object sim = Simulation(level), layout = Layout(sim);
+            object legacy = Activator.CreateInstance(Runtime("StreetKitchenLayout"), new object[] { new[] { 0, 1, 2, 3, 4, 5, 6 } });
+            foreach (string name in new[] { "NormalTableBounds", "PremiumTableBounds", "FernetTableBounds", "CocaBarrelBounds", "BeerBarrelBounds" })
+                Assert.AreEqual(RectProperty(legacy, name), RectProperty(layout, name), "Restore original prep positions and sizes, including Fernet.");
+            var workers = (System.Collections.IList)Get(sim, "Workers");
+            Vector2 start = (Vector2)Get(workers[0], "Position");
+            foreach (int product in new[] { 0, 1, 2, 3 })
+            {
+                Vector2 from = product < 2 ? start : (Vector2)Call(layout, "GrillWorkPosition", product, 0);
+                for (int slot = 0; slot < (product < 2 ? 18 : 4); slot++)
+                {
+                    Vector2 work = (Vector2)Call(layout, "GrillWorkPosition", product, slot);
+                    Vector2 deposit = (Vector2)Call(layout, "DepositPosition", product);
+                    foreach (Vector2[] journey in new[] { (Vector2[])Call(layout, "FindShortestSafeRoute", from, work),
+                        (Vector2[])Call(layout, "FindShortestSafeRoute", work, deposit),
+                        (Vector2[])Call(layout, "FindShortestSafeRoute", deposit, work) })
+                        Assert.IsNotNull(journey, "Every real cook slot must be accessible without crossing the prep row.");
+                }
+            }
+        }
+
+        [TestCase(960f)] [TestCase(1110f)] [TestCase(1200f)]
+        public void ActiveBackdropLeavesStreetVisibleAndUsesExistingCleanCounterEdge(float height)
+        {
+            Type scene = Runtime("StreetSceneLayout");
+            float scale = height / 960f;
+            Rect band = (Rect)scene.GetMethod("ActiveMuralBand").Invoke(null, new object[] { height, scale, 105f });
+            float counter = (float)scene.GetMethod("CounterTop").Invoke(null, new object[] { height });
+            Assert.GreaterOrEqual(counter - band.yMax, 90f * scale - .01f, "A club mural must not cover the public street.");
+            Rect source = (Rect)scene.GetField("CleanCounterSideSource").GetValue(null);
+            Rect oldTable = (Rect)scene.GetField("BakedSideTableSource").GetValue(null);
+            Assert.AreEqual(source.size, oldTable.size, "Reuse native pixels without scaling/distortion.");
+            Rect replacement = (Rect)scene.GetMethod("ProjectSourceRect").Invoke(null, new object[] { oldTable, height });
+            Assert.AreEqual(counter, replacement.y, .01f);
+            Assert.LessOrEqual(source.xMax, oldTable.xMin, "The replacement source cannot include the unwanted side table.");
+        }
+
         [Test]
         public void AmbientGrillSmokeFadesGentlyAndRisesThroughAThreeSecondCycle()
         {
@@ -100,8 +140,8 @@ namespace HayChoriYPaty.Tests
                         if (location == "Table") listedTable++;
                         if (location == "Grill") listedGrill++;
                     }
-                    Assert.AreEqual(capacities[p], listedTable, "L" + level + " initial table count for product " + p);
-                    Assert.AreEqual(grills[p], listedGrill, "L" + level + " initial grill count for product " + p);
+                    Assert.AreEqual(level >= 5 && p < 4 ? 0 : capacities[p], listedTable, "L" + level + " initial table count for product " + p);
+                    Assert.AreEqual(level >= 5 ? 0 : grills[p], listedGrill, "L" + level + " initial grill count for product " + p);
                 }
                 Assert.AreEqual(18, grills[0] + grills[1], "Normal grill has 18 real meat units when available.");
                 if (grills[2] + grills[3] > 0) Assert.AreEqual(7, grills[2] + grills[3], "Premium grill has seven real meat units.");
@@ -323,11 +363,12 @@ namespace HayChoriYPaty.Tests
                 }
                 foreach (Rect grill in grills)
                 {
-                    Assert.AreEqual(LayoutConstant("GrillVerticalGap"), grill.yMin - Mathf.Max(top.ConvertAll(item => item.yMax).ToArray()), .02f,
+                    Assert.AreEqual(level >= 5 ? 70f : LayoutConstant("GrillVerticalGap"), grill.yMin - Mathf.Max(top.ConvertAll(item => item.yMax).ToArray()), .02f,
                         "The complete active prep row must retain the configured clearance above the grills.");
-                    Assert.LessOrEqual(grill.yMax, LayoutConstant("GrillBottomLimit") + .02f,
+                    float expectedGrillBottom = LayoutConstant("GrillBottomLimit") + (level >= 5 ? 66f : 0f);
+                    Assert.LessOrEqual(grill.yMax, expectedGrillBottom + .02f,
                         "Every grill must remain completely on the tiled playfield above the lower UI field.");
-                    Assert.AreEqual(LayoutConstant("GrillBottomLimit"), grill.yMax, .03f,
+                    Assert.AreEqual(expectedGrillBottom, grill.yMax, .03f,
                         "Every active grill must end at the two-point lower clearance, not just the solo grill.");
                 }
                 foreach (Rect item in top) foreach (Rect grill in grills) Assert.IsFalse(item.Overlaps(grill));

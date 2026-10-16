@@ -168,7 +168,8 @@ namespace HayChoriYPaty.Tests
         public void FourRolesFulfillOneMixedTicketWithoutCrossSpecialtyHandoffs()
         {
             object balance = NewBalance();
-            object sim = Make(10, balance: balance);
+            Set(balance, "maxCustomers", 1);
+            object sim = Make(4, balance: balance);
             Call(sim, "StartRound");
             SetProperty(sim, "Coins", 10000);
             Assert.IsTrue((bool)Call(sim, "TryHire", Role("Cocacolero")));

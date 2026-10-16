@@ -25,7 +25,7 @@ namespace HayChoriYPaty
     {
         public bool won;
         public int level;
-        public long grossSalesCents, leftoverCents, halfSalesCents, recognizedSalesCents, bonusCents, earnedCents, totalBalanceCents;
+        public long grossSalesCents, leftoverCents, halfSalesCents, recognizedSalesCents, bonusCents, progressionBonusCents, earnedCents, totalBalanceCents;
         public int[] consumedUnits, remainingUnits;
     }
 
@@ -38,7 +38,7 @@ namespace HayChoriYPaty
         public int[] stockUnits = new int[10], attemptStock;
         public long[] highestRecognizedSalesByLevel = new long[11];
         public bool[] bonusPaidByLevel = new bool[11];
-        public bool attemptActive, kitGranted, legacyTransitionRepairApplied;
+        public bool attemptActive, kitGranted, legacyTransitionRepairApplied, legacyZeroBalanceRecoveryApplied;
         public StreetMarketResult lastResult;
     }
 
@@ -81,7 +81,7 @@ namespace HayChoriYPaty
             Data.cumulativePurchaseSpendCents = Math.Max(0L, Data.cumulativePurchaseSpendCents);
             Data.nextPurchaseId = Math.Max(1L, Data.nextPurchaseId); Data.nextAttemptId = Math.Max(1L, Data.nextAttemptId);
             if (Data.lastResult != null && Data.lastResult.earnedCents == 0)
-                Data.lastResult.earnedCents = Math.Max(0L, Data.lastResult.recognizedSalesCents) + Math.Max(0L, Data.lastResult.bonusCents);
+                Data.lastResult.earnedCents = Math.Max(0L, Data.lastResult.recognizedSalesCents) + Math.Max(0L, Data.lastResult.bonusCents) + Math.Max(0L, Data.lastResult.progressionBonusCents);
         }
 
         public int Units(int id) { return id >= 0 && id < 10 ? Data.stockUnits[id] : 0; }
@@ -253,7 +253,53 @@ namespace HayChoriYPaty
             Data.legacyTransitionRepairApplied = true;
             if (missingCost == 0) return 0L;
             Data.balanceCents = missingCost;
+            RecordProgressionBonus(missingCost);
             return missingCost;
+        }
+
+        /// <summary>One-time reward on a first level unlock that ensures the next match's minimum stock is affordable.</summary>
+        public long GrantFirstUnlockStockBonus(StreetSimulation nextLevelSimulation, bool firstTimeUnlock)
+        {
+            if (!firstTimeUnlock || nextLevelSimulation == null || Data.attemptActive ||
+                nextLevelSimulation.LevelIndex <= 0 || nextLevelSimulation.LevelIndex >= StreetSimulation.LevelNames.Length) return 0L;
+            long required = MinimumPurchaseCostCents(nextLevelSimulation);
+            if (required <= BalanceCents || required == long.MaxValue) return 0L;
+            long bonus = required - BalanceCents;
+            Data.balanceCents += bonus;
+            RecordProgressionBonus(bonus);
+            return bonus;
+        }
+
+        /// <summary>
+        /// One-time compatibility recovery for v4 saves already stuck after the earlier migration repair
+        /// was consumed. It requires a persisted successful zero-payout result and a zero wallet.
+        /// </summary>
+        public long RecoverLegacyZeroPayoutTransition()
+        {
+            StreetMarketResult result = Data.lastResult;
+            if (Data.legacyZeroBalanceRecoveryApplied || !Data.legacyTransitionRepairApplied || Data.attemptActive ||
+                BalanceCents != 0 || result == null || !result.won || result.earnedCents != 0 ||
+                result.totalBalanceCents != 0 || result.halfSalesCents <= 0 || result.recognizedSalesCents != 0 || result.bonusCents != 0 ||
+                result.level < 0 || result.level >= Data.highestRecognizedSalesByLevel.Length ||
+                !Data.bonusPaidByLevel[result.level] || Data.highestRecognizedSalesByLevel[result.level] < result.halfSalesCents) return 0L;
+
+            int nextLevel = result.level + 1;
+            if (nextLevel >= StreetSimulation.LevelNames.Length) return 0L;
+            long missingCost = MinimumPurchaseCostCents(new StreetSimulation(Balance, nextLevel, 5f));
+            if (missingCost <= 0 || missingCost == long.MaxValue) return 0L;
+
+            Data.legacyZeroBalanceRecoveryApplied = true;
+            Data.balanceCents = missingCost;
+            RecordProgressionBonus(missingCost);
+            return missingCost;
+        }
+
+        private void RecordProgressionBonus(long amount)
+        {
+            if (amount <= 0 || Data.lastResult == null || !Data.lastResult.won) return;
+            Data.lastResult.progressionBonusCents += amount;
+            Data.lastResult.earnedCents += amount;
+            Data.lastResult.totalBalanceCents = Data.balanceCents;
         }
 
         private void InitializeStartingBalance()

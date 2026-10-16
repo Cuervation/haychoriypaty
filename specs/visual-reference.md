@@ -389,3 +389,9 @@ The shared renderer fills the header behind a themed mural with an aspect-preser
 ## 2026-10-12 — Fill the HUD cutout and bottom footer edge
 
 Keep the camera/notch channel reserved for HUD layout, but fill it with the same generated amber bar background so a crop of the mural is not visible above the header. Keep footer controls inside the safe area; extend only decorative club pennants through the otherwise unused bottom inset and anchor their row flush to the physical screen edge. Preserve pennant aspect ratio. Focused HUD-alpha/footer geometry tests passed 7/7 in isolated Unity6000.6.3f1; a live Game View capture was not available.
+
+### 2026-10-15 — Retratos y velocidad centrados en los óvalos
+
+Por pedido explícito, cada personaje y las flechas de velocidad se ajustan al interior del óvalo original de su card, con centro común y escala uniforme; ningún extremo sale del marco. La misma geometría sirve a las cards234×120/104 y156×120/100. En cards compactas, ×1,00/+10% sube a y29–56 con fuente12, separado del precio en y60; textos de equipo, precios, diseño y hit areas se conservan. Sin cambios de assets/escenario/mecánica.
+
+Validado en Unity6000.6.3f1:13/13 EditMode (`a1e42a77f4bd4ef68e7b9de92940d20a`), incluyendo cuatro tamaños y conservación de proporciones/centro/límite elíptico/separación del precio. Se corrigió un fixture heredado que suponía cocineros iniciando junto al mostrador: ahora lee sus posiciones reales de la restauración anterior, sin alterar runtime. Capturas nativas1080×1920 de River y Floresta revisadas en `Logs/Acceptance/ButtonOvals-20261015/`; progreso original restaurado, Main limpio/Play detenido. Sin APK ni prueba Android física.

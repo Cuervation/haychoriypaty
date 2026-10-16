@@ -45,7 +45,7 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void ActualHandoffsAndAdaptivePurchasesNeverSpendBeyondBalance()
+        public void ActualHandoffsAndAdaptivePurchasesFundAllElevenFirstUnlockTransitions()
         {
             object balance = Activator.CreateInstance(Runtime("StreetBalance"));
             object market = NewMarket(balance); Call(market, "Initialize", 0);
@@ -57,41 +57,7 @@ namespace HayChoriYPaty.Tests
                 object sim = NewSim(balance, level);
                 long needed = (long)Call(market, "MinimumPurchaseCostCents", sim);
                 long available = (long)Get(market, "BalanceCents");
-                if (needed > available)
-                {
-                    bool checkedReject = false;
-                    while (!(bool)Call(market, "HasRequiredStock", sim) && !checkedReject)
-                    {
-                        bool purchased = false;
-                        for (int ingredient = 0; ingredient < 10; ingredient++)
-                        {
-                            int packs = (int)Call(market, "MissingPacks", sim, ingredient);
-                            if (packs <= 0) continue;
-                            long itemCost = (long)packs * (int)Call(market, "PackPriceCents", ingredient);
-                            long currentCash = (long)Get(market, "BalanceCents");
-                            long operation = (long)Get(market, "NextPurchaseId");
-                            int stockBefore = (int)Call(market, "Units", ingredient);
-                            if (itemCost > currentCash)
-                            {
-                                Assert.IsFalse((bool)Call(market, "TryBuy", sim, ingredient, packs, level, operation));
-                                Assert.AreEqual(currentCash, Get(market, "BalanceCents"));
-                                Assert.AreEqual(stockBefore, Call(market, "Units", ingredient));
-                                checkedReject = true;
-                                break;
-                            }
-                            Assert.IsTrue((bool)Call(market, "TryBuy", sim, ingredient, packs, level, operation));
-                            Assert.LessOrEqual((long)Get(market, "BalanceCents"), currentCash);
-                            Assert.GreaterOrEqual((long)Get(market, "BalanceCents"), 0L);
-                            purchased = true;
-                            break;
-                        }
-                        if (!purchased && !checkedReject) break;
-                    }
-                    Assert.IsTrue(checkedReject, "The first pack beyond the remaining balance must be rejected.");
-                    Assert.IsFalse((bool)Call(market, "BeginAttempt", sim), "Unstocked L" + (level + 1) + " must remain gated.");
-                    TestContext.WriteLine("ECONOMIC BLOCK: level " + (level + 1) + " needs $" + (needed / 100L) + ", available at entry $" + (available / 100L) + ". Cash-only purchases stop at $" + ((long)Get(market, "BalanceCents") / 100L) + " and the match remains gated.");
-                    break;
-                }
+                Assert.GreaterOrEqual(available, needed, "First-unlock reward must fund exact missing stock for level " + (level + 1));
                 for (int ingredient = 0; ingredient < 10; ingredient++)
                 {
                     int missing = (int)Call(market, "MissingPacks", sim, ingredient);
@@ -117,11 +83,21 @@ namespace HayChoriYPaty.Tests
                 Assert.AreEqual("Won", Get(sim, "Phase").ToString(), "Cash-stocked actual level " + (level + 1));
                 Assert.IsNotNull(Call(market, "SettleAttempt", sim));
                 Assert.GreaterOrEqual((long)Get(market, "BalanceCents"), 0L);
+                if (level + 1 < 11)
+                {
+                    object next = NewSim(balance, level + 1);
+                    long nextCost = (long)Call(market, "MinimumPurchaseCostCents", next);
+                    long priorCash = (long)Get(market, "BalanceCents");
+                    long bonus = (long)Call(market, "GrantFirstUnlockStockBonus", next, true);
+                    Assert.AreEqual(Math.Max(0L, nextCost - priorCash), bonus, "Only the exact next-level stock shortfall is granted.");
+                    Assert.GreaterOrEqual((long)Get(market, "BalanceCents"), nextCost);
+                    TestContext.WriteLine("Transition to L" + (level + 2) + ": stock=" + (nextCost / 100f).ToString("F2") +
+                        ", reward=" + (bonus / 100f).ToString("F2") + ", wallet=" + ((long)Get(market, "BalanceCents") / 100f).ToString("F2"));
+                }
                 object persisted = JsonUtility.FromJson(JsonUtility.ToJson(Get(market, "Data")), Runtime("StreetMarketData"));
                 market = NewMarket(balance, persisted); completed++;
             }
-            Assert.GreaterOrEqual(completed, 1, "At least the starting level must complete from its one-time stock kit.");
-            TestContext.WriteLine("Cash-funded levels completed: " + completed + "/11");
+            Assert.AreEqual(11, completed, "The cash-only player campaign must reach and complete every level.");
         }
 
         [Test]
@@ -157,6 +133,150 @@ namespace HayChoriYPaty.Tests
                 Assert.IsTrue((bool)Call(game, "TryBuyIngredient", 6, 115, 2L));
                 Assert.AreEqual(0L, Get(Get(game, "Market"), "BalanceCents"));
                 Assert.IsTrue((bool)Call(Get(game, "Market"), "HasRequiredStock", Get(game, "Sim")));
+            }
+            finally
+            {
+                if (root != null) UnityEngine.Object.DestroyImmediate(root);
+                if (had) PlayerPrefs.SetString(key, prior); else PlayerPrefs.DeleteKey(key);
+                PlayerPrefs.Save();
+            }
+        }
+
+        [Test]
+        public void WatermarkedLevelOneWinRepairsUnpaidBalanceBeforeSameSessionLevelTwoMarket()
+        {
+            Type gameType = Runtime("StreetGame"); string key = (string)gameType.GetField("ProgressKey").GetValue(null);
+            bool had = PlayerPrefs.HasKey(key); string prior = had ? PlayerPrefs.GetString(key) : null;
+            GameObject root = null;
+            try
+            {
+                // A migrated save can already have Level 1's sales watermark and one-time bonus
+                // marked paid. Completing it in the same app session suppresses normal earnings.
+                string migrated = "{\"version\":4,\"unlockedLevel\":0,\"price\":5,\"market\":{" +
+                    "\"balanceCents\":0,\"cumulativePurchaseSpendCents\":0," +
+                    "\"stockUnits\":[200,200,0,0,0,0,85,0,0,0]," +
+                    "\"highestRecognizedSalesByLevel\":[50000],\"bonusPaidByLevel\":[true]," +
+                    "\"kitGranted\":true,\"initializedUnlockedLevel\":0}}";
+                PlayerPrefs.SetString(key, migrated); PlayerPrefs.Save();
+                root = new GameObject("Same-session unpaid Level 1 transition repair test");
+                Component game = root.AddComponent(gameType); gameType.GetMethod("OnEnable", Private).Invoke(game, null);
+                Assert.IsTrue((bool)Call(game, "TryStartRound"));
+
+                object sim = Get(game, "Sim"), market = Get(game, "Market");
+                object data = Get(market, "Data");
+                int[] stock = (int[])data.GetType().GetField("stockUnits").GetValue(data);
+                stock[0] = 0; stock[1] = 0; // Consumed by the completed Level 1 match; retain 85 Coca.
+                Set(sim, "CoinsEarned", 1000);
+                Set(sim, "Coins", 0);
+                Set(sim, "Phase", Enum.Parse(Runtime("RoundPhase"), "Won"));
+
+                Assert.IsTrue((bool)Call(game, "ProcessRoundResult"));
+                market = Get(game, "Market");
+                Assert.AreEqual(1, Get(game, "UnlockedLevel"));
+                Assert.AreEqual(78750L, Get(market, "BalanceCents"), "Exact remaining Level 2 stock cost must be available before Mercado is shown.");
+                data = Get(market, "Data");
+                Assert.IsTrue((bool)data.GetType().GetField("legacyTransitionRepairApplied").GetValue(data));
+
+                // Reload and navigate as the game does; the transition amount must persist once.
+                gameType.GetMethod("OnEnable", Private).Invoke(game, null);
+                market = Get(game, "Market"); Assert.AreEqual(78750L, Get(market, "BalanceCents"));
+                Assert.IsTrue((bool)Call(game, "SelectLevel", 1));
+                Assert.AreEqual(78750L, Call(market, "MinimumPurchaseCostCents", Get(game, "Sim")));
+                Assert.IsTrue((bool)Call(game, "TryBuyIngredient", 0, 200, 1L));
+                Assert.IsTrue((bool)Call(game, "TryBuyIngredient", 1, 200, 2L));
+                Assert.IsTrue((bool)Call(game, "TryBuyIngredient", 6, 115, 3L));
+                market = Get(game, "Market");
+                Assert.AreEqual(0L, Get(market, "BalanceCents"));
+                Assert.IsTrue((bool)Call(market, "HasRequiredStock", Get(game, "Sim")));
+                Assert.IsTrue((bool)Get(game, "CanStartRound"));
+            }
+            finally
+            {
+                if (root != null) UnityEngine.Object.DestroyImmediate(root);
+                if (had) PlayerPrefs.SetString(key, prior); else PlayerPrefs.DeleteKey(key);
+                PlayerPrefs.Save();
+            }
+        }
+
+        [Test]
+        public void LegacyZeroPayoutSaveWithPriorPurchasesGetsOneIdempotentRestockRecovery()
+        {
+            Type gameType = Runtime("StreetGame"); string key = (string)gameType.GetField("ProgressKey").GetValue(null);
+            bool had = PlayerPrefs.HasKey(key); string prior = had ? PlayerPrefs.GetString(key) : null;
+            GameObject root = null;
+            try
+            {
+                string migrated = "{\"version\":4,\"unlockedLevel\":10,\"price\":5,\"market\":{" +
+                    "\"balanceCents\":0,\"cumulativePurchaseSpendCents\":78750," +
+                    "\"stockUnits\":[0,235,0,0,0,0,85,0,0,0]," +
+                    "\"highestRecognizedSalesByLevel\":[50000],\"bonusPaidByLevel\":[true]," +
+                    "\"lastResult\":{" +
+                    "\"won\":true,\"level\":0,\"grossSalesCents\":100000,\"halfSalesCents\":50000," +
+                    "\"recognizedSalesCents\":0,\"bonusCents\":0,\"earnedCents\":0,\"totalBalanceCents\":0}," +
+                    "\"kitGranted\":true,\"initializedUnlockedLevel\":10,\"legacyTransitionRepairApplied\":true}}";
+                PlayerPrefs.SetString(key, migrated); PlayerPrefs.Save();
+                root = new GameObject("Legacy zero-payout balance recovery test");
+                Component game = root.AddComponent(gameType); gameType.GetMethod("OnEnable", Private).Invoke(game, null);
+                object market = Get(game, "Market"), data = Get(market, "Data"), result = Get(market, "LastResult");
+                Assert.AreEqual(58750L, Get(market, "BalanceCents"), "Only the actual Level 2 stock shortage is restored.");
+                Assert.AreEqual(78750L, data.GetType().GetField("cumulativePurchaseSpendCents").GetValue(data));
+                Assert.AreEqual(0, Call(market, "Units", 0)); Assert.AreEqual(235, Call(market, "Units", 1)); Assert.AreEqual(85, Call(market, "Units", 6));
+                Assert.IsTrue((bool)data.GetType().GetField("legacyZeroBalanceRecoveryApplied").GetValue(data));
+                Assert.AreEqual(58750L, result.GetType().GetField("progressionBonusCents").GetValue(result));
+
+                gameType.GetMethod("OnEnable", Private).Invoke(game, null);
+                market = Get(game, "Market"); Assert.AreEqual(58750L, Get(market, "BalanceCents"), "Reload must not pay recovery twice.");
+                Assert.IsTrue((bool)Call(game, "SelectLevel", 1));
+                Assert.IsTrue((bool)Call(game, "TryBuyIngredient", 0, 200, 1L));
+                Assert.IsTrue((bool)Call(game, "TryBuyIngredient", 6, 115, 2L));
+                market = Get(game, "Market");
+                Assert.AreEqual(0L, Get(market, "BalanceCents"));
+                Assert.IsTrue((bool)Call(market, "HasRequiredStock", Get(game, "Sim")));
+                Assert.IsTrue((bool)Get(game, "CanStartRound"));
+            }
+            finally
+            {
+                if (root != null) UnityEngine.Object.DestroyImmediate(root);
+                if (had) PlayerPrefs.SetString(key, prior); else PlayerPrefs.DeleteKey(key);
+                PlayerPrefs.Save();
+            }
+        }
+
+        [Test]
+        public void FirstUnlockRestockRewardDoesNotPayAgainOnReplay()
+        {
+            Type gameType = Runtime("StreetGame"); string key = (string)gameType.GetField("ProgressKey").GetValue(null);
+            bool had = PlayerPrefs.HasKey(key); string prior = had ? PlayerPrefs.GetString(key) : null;
+            GameObject root = null;
+            try
+            {
+                PlayerPrefs.DeleteKey(key); PlayerPrefs.Save();
+                root = new GameObject("First-unlock reward and replay test");
+                Component game = root.AddComponent(gameType); gameType.GetMethod("OnEnable", Private).Invoke(game, null);
+                Assert.IsTrue((bool)Call(game, "TryStartRound"));
+                object sim = Get(game, "Sim"), market = Get(game, "Market"), balance = Get(game, "Balance");
+                int[] stock = (int[])Get(market, "Data").GetType().GetField("stockUnits").GetValue(Get(market, "Data"));
+                stock[0] = 0; stock[1] = 0;
+                Set(sim, "CoinsEarned", 1000); Set(sim, "Coins", 0);
+                Set(sim, "Phase", Enum.Parse(Runtime("RoundPhase"), "Won"));
+                Assert.IsTrue((bool)Call(game, "ProcessRoundResult"));
+                market = Get(game, "Market");
+                object next = NewSim(balance, 1);
+                long nextCost = (long)Call(market, "MinimumPurchaseCostCents", next);
+                Assert.GreaterOrEqual((long)Get(market, "BalanceCents"), nextCost);
+                long firstUnlockBalance = (long)Get(market, "BalanceCents");
+                Assert.Greater((long)Get(market, "LastResult").GetType().GetField("progressionBonusCents").GetValue(Get(market, "LastResult")), 0L);
+
+                Assert.IsTrue((bool)Call(game, "SelectLevel", 0));
+                Assert.IsTrue((bool)Call(game, "TryStartRound"));
+                sim = Get(game, "Sim"); market = Get(game, "Market");
+                stock = (int[])Get(market, "Data").GetType().GetField("stockUnits").GetValue(Get(market, "Data"));
+                stock[0] = 0; stock[1] = 0;
+                Set(sim, "CoinsEarned", 1000); Set(sim, "Coins", 0);
+                Set(sim, "Phase", Enum.Parse(Runtime("RoundPhase"), "Won"));
+                Assert.IsTrue((bool)Call(game, "ProcessRoundResult"));
+                Assert.AreEqual(firstUnlockBalance, Get(Get(game, "Market"), "BalanceCents"), "Replaying an already unlocked level cannot claim the progression reward again.");
+                Assert.AreEqual(0L, Get(Get(game, "Market"), "LastResult").GetType().GetField("progressionBonusCents").GetValue(Get(Get(game, "Market"), "LastResult")));
             }
             finally
             {

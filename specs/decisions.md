@@ -249,3 +249,17 @@ Cash-only Mercado is the final rule: never buy above the current available balan
 ## 2026-10-13 — Data-driven Mercado objective cards
 
 Render Mercado goals in StreetSimulation product order from its current product/goal getters; keep the ingredient list as the only scrolling content and keep economy/action controls fixed. Use the compact two-row patterns for four to seven goals. Preserve the cash-only/no-fiado rule; a stale layout prompt is not approval to restore financing.
+
+
+## 2026-10-15 — Earned cash-only restocking on first unlock
+
+A deterministic campaign exposed an unaffordable next Mercado after a valid win. Keep purchases strictly cash-only and preserve sales/prices; award only the missing-stock-cost shortfall when a victory first unlocks the next level. Persist it separately from sale/leftover proceeds, never on replay/loss/final level. Add a narrowly gated, idempotent recovery for v4 saves carrying a proven zero-payout win after the earlier migration repair marker was consumed.
+
+
+## 2026-10-15 — Worker-owned cooking and reserved sandwich slots
+
+From Racing only, append Mozo4 and separate production from delivery in the existing simulation rather than introducing a second kitchen motor. Keep table-slot reservations through cook/transport/service so concurrent tasks cannot overbook capacity and canceled edible units have a guaranteed return slot. Use additive v4 compatibility fields and missing-role-cost fallbacks; preserve prior roles, economy, objectives and earlier levels.
+
+## 2026-10-15 — Restaurar escenario, no revertir empleados
+
+Por confirmación explícita del usuario se restaura la fila original de muebles, incluido Fernet; los cocineros activos inician y permanecen del lado de las parrillas y los Mozos trabajan del lado del mostrador. Es una dependencia de geometría, no un cambio de rol/cocción/economía. Limitar el overlay del mural para no tapar calle; quitar la mesa lateral horneada reutilizando en render la mitad limpia del mostrador/piso original, sin redibujar assets. Conservar solo la ampliación inferior aprobada.

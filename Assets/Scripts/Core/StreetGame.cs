@@ -31,6 +31,7 @@ namespace HayChoriYPaty
             public int cocacoleros;
             public int premiumParrilleros;
             public int ferneteros;
+            public int mozos;
             public StreetMarketData market;
         }
 
@@ -54,6 +55,7 @@ namespace HayChoriYPaty
             else if (hasPersistedMarket) market.InitializeExistingSave(save.unlockedLevel);
             else market.Initialize(save.unlockedLevel); // One-time compatibility migration for pre-Mercado saves.
             market.RecoverAbandonedAttempt();
+            market.RecoverLegacyZeroPayoutTransition();
             selectedLevel = Mathf.Clamp(selectedLevel, 0, save.unlockedLevel);
             sim = new StreetSimulation(balance, selectedLevel, save.price);
             if(save.prices!=null && save.prices.Length==7)for(int i=0;i<7;i++)sim.SetProductPrice(i,save.prices[i]);
@@ -95,7 +97,18 @@ namespace HayChoriYPaty
             if (market != null && market.Data.attemptActive) return false; // Refuse progression if settlement was rejected.
             int previousUnlocked = save.unlockedLevel;
             if (sim.Phase == RoundPhase.Won)
+            {
+                int nextLevel = sim.LevelIndex + 1;
+                if (market != null && nextLevel < StreetSimulation.LevelNames.Length)
+                {
+                    // A legacy sales watermark can suppress this victory's first Mercado payout.
+                    // Repair before the same-session transition to Mercado, not only on app reload.
+                    var nextLevelSimulation = new StreetSimulation(balance, nextLevel, sim.Price);
+                    market.ReconcileLegacyProgressionBalance(nextLevelSimulation, nextLevel);
+                    market.GrantFirstUnlockStockBonus(nextLevelSimulation, nextLevel > previousUnlocked);
+                }
                 save.unlockedLevel = Mathf.Max(save.unlockedLevel, Mathf.Min(StreetSimulation.LevelNames.Length - 1, sim.LevelIndex + 1));
+            }
             resultSaved = Save();
             if (!resultSaved) save.unlockedLevel = previousUnlocked;
             return resultSaved;
@@ -164,6 +177,7 @@ namespace HayChoriYPaty
         public bool TryHireCocacolero() { return HireRole(StreetWorkerRole.Cocacolero); }
         public bool TryHireParrilleroPremium() { return HireRole(StreetWorkerRole.ParrilleroPremium); }
         public bool TryHireFernetero() { return HireRole(StreetWorkerRole.Fernetero); }
+        public bool TryHireMozo() { return HireRole(StreetWorkerRole.Mozo); }
         public bool TryHire(StreetWorkerRole role) { return HireRole(role); }
         private bool HireRole(StreetWorkerRole role) { if (sim == null || !sim.TryHire(role)) return false; Save(); return true; }
         public bool TryUpgradeSpeed() { if (sim == null || !sim.TryUpgradeSpeed()) return false; Save(); return true; }
@@ -252,7 +266,7 @@ namespace HayChoriYPaty
             for(int i=0;i<7;i++)save.prices[i]=sim.GetProductPrice(i);
             save.price = sim.Price; save.coins = sim.Coins; save.staff = sim.StaffCount; save.speed = sim.SpeedLevel;
             save.workerLevel = sim.LevelIndex; save.parrilleros = sim.ParrilleroCount; save.cocacoleros = sim.CocacoleroCount;
-            save.premiumParrilleros = sim.ParrilleroPremiumCount; save.ferneteros = sim.FerneteroCount;
+            save.premiumParrilleros = sim.ParrilleroPremiumCount; save.ferneteros = sim.FerneteroCount; save.mozos = sim.MozoCount;
             save.unlockedLevel = Mathf.Max(save.unlockedLevel, sim.LevelIndex);
             save.market = market?.Data ?? save.market;
             try

@@ -196,11 +196,13 @@ namespace HayChoriYPaty.Tests
             Touchscreen screen=InputSystem.AddDevice<Touchscreen>();
             try
             {
-                yield return Tap(screen,270,770,101); yield return Tap(screen,438,770,102);
+                Rect normal = UpgradeTouchBounds(2), coca = UpgradeTouchBounds(16), speed = UpgradeTouchBounds(3);
+                yield return Tap(screen,normal.center.x,normal.center.y,101); yield return Tap(screen,coca.center.x,coca.center.y,102);
                 Assert.AreEqual(2,Sim.GetType().GetProperty("ParrilleroCount").GetValue(Sim,null));
                 Assert.AreEqual(1,Sim.GetType().GetProperty("CocacoleroCount").GetValue(Sim,null));
                 Assert.AreEqual(9960,Sim.GetType().GetProperty("Coins").GetValue(Sim,null));
-                yield return Tap(screen,186,770,103); yield return Tap(screen,354,770,104);
+                float gapY=normal.center.y;
+                yield return Tap(screen,(speed.xMax+normal.xMin)*.5f,gapY,103); yield return Tap(screen,(normal.xMax+coca.xMin)*.5f,gapY,104);
                 Assert.AreEqual(9960,Sim.GetType().GetProperty("Coins").GetValue(Sim,null));
             }
             finally { InputSystem.RemoveDevice(screen); }
@@ -497,11 +499,12 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(0, Sim.GetType().GetProperty("Coins").GetValue(Sim, null));
             SetSim("Coins", 500); // Simulated income for the purchase-only fixture, not a starting balance.
 
-            yield return Click(395, 770);
+            Rect normal=UpgradeTouchBounds(2), speed=UpgradeTouchBounds(3);
+            yield return Click(normal.center.x, normal.center.y);
             Assert.AreEqual(2, Get("Sim").GetType().GetProperty("StaffCount", PublicInstance).GetValue(Sim, null));
             Assert.AreEqual(485, Get("Sim").GetType().GetProperty("Coins", PublicInstance).GetValue(Sim, null));
 
-            yield return Click(145, 770);
+            yield return Click(speed.center.x, speed.center.y);
             Assert.AreEqual(1, Get("Sim").GetType().GetProperty("SpeedLevel", PublicInstance).GetValue(Sim, null));
             Assert.AreEqual(480, Get("Sim").GetType().GetProperty("Coins", PublicInstance).GetValue(Sim, null));
         }

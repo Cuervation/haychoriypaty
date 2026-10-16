@@ -141,20 +141,23 @@ namespace HayChoriYPaty
         private static readonly Rect HireParrillero = new Rect(278, 710, 234, 120);
         private static readonly Rect HireCocacolero = new Rect(360, 710, 156, 120);
         private const int HireCocacoleroAction = 16;
-        private const int HirePremiumAction = 20, HireFerneteroAction = 21;
+        private const int HirePremiumAction = 20, HireFerneteroAction = 21, HireMozoAction = 22;
         private static int[] CatalogUpgradeActions(StreetSimulation sim)
         {
             var actions = new System.Collections.Generic.List<int> { 3 };
-            foreach (var role in new[] { StreetWorkerRole.Parrillero, StreetWorkerRole.ParrilleroPremium, StreetWorkerRole.Cocacolero, StreetWorkerRole.Fernetero })
-                if (sim.HasRole(role)) actions.Add(ActionForRole(role));
+            if (sim.UsesActiveCooks)
+                actions.AddRange(new[] { 2, HirePremiumAction, HireCocacoleroAction, HireFerneteroAction, HireMozoAction });
+            else
+                foreach (var role in new[] { StreetWorkerRole.Parrillero, StreetWorkerRole.ParrilleroPremium, StreetWorkerRole.Cocacolero, StreetWorkerRole.Fernetero })
+                    if (sim.HasRole(role)) actions.Add(ActionForRole(role));
             return actions.ToArray();
         }
         private static int ActionForRole(StreetWorkerRole role) => role == StreetWorkerRole.Parrillero ? 2
-            : role == StreetWorkerRole.ParrilleroPremium ? HirePremiumAction : role == StreetWorkerRole.Cocacolero ? HireCocacoleroAction : HireFerneteroAction;
+            : role == StreetWorkerRole.ParrilleroPremium ? HirePremiumAction : role == StreetWorkerRole.Cocacolero ? HireCocacoleroAction : role == StreetWorkerRole.Fernetero ? HireFerneteroAction : HireMozoAction;
         private static StreetWorkerRole RoleForAction(int action) => action == 2 ? StreetWorkerRole.Parrillero
-            : action == HirePremiumAction ? StreetWorkerRole.ParrilleroPremium : action == HireCocacoleroAction ? StreetWorkerRole.Cocacolero : StreetWorkerRole.Fernetero;
+            : action == HirePremiumAction ? StreetWorkerRole.ParrilleroPremium : action == HireCocacoleroAction ? StreetWorkerRole.Cocacolero : action == HireFerneteroAction ? StreetWorkerRole.Fernetero : StreetWorkerRole.Mozo;
         private static string RoleCaption(StreetWorkerRole role) => role == StreetWorkerRole.Parrillero ? "PARRILLERO"
-            : role == StreetWorkerRole.ParrilleroPremium ? "PARRILLERO\nPREMIUM" : role == StreetWorkerRole.Cocacolero ? "COCACOLERO" : "FERNETERO";
+            : role == StreetWorkerRole.ParrilleroPremium ? "PARRILLERO\nPREMIUM" : role == StreetWorkerRole.Cocacolero ? "COCACOLERO" : role == StreetWorkerRole.Fernetero ? "FERNETERO" : "MOZO";
         private static Rect CatalogUpgradeCardBounds(StreetSimulation sim, int action)
         {
             int[] actions = CatalogUpgradeActions(sim);
@@ -163,7 +166,12 @@ namespace HayChoriYPaty
             if (count == 2) return index == 0 ? Speed : HireParrillero;
             if (count == 3) return new Rect(24 + index * 168, 710, 156, 120);
             if (count == 4) return new Rect(28 + (index % 2) * 250, 710 + (index / 2) * 116, 234, 104);
-            return index < 3 ? new Rect(24 + index * 168, 740, 156, 100) : new Rect(28 + (index - 3) * 250, 848, 234, 100);
+            if (count == 6 && sim.UsesActiveCooks)
+                return new Rect(24 + (index % 3) * 168, 740 + (index / 3) * 108, 156, 100);
+            if (count == 5) return index < 3
+                ? new Rect(24 + index * 168, 740, 156, 100)
+                : new Rect(28 + (index - 3) * 250, 848, 234, 100);
+            return new Rect(24 + index * 168, 740, 156, 100);
         }
 
         private struct ResponsiveFooterLayout
@@ -188,6 +196,16 @@ namespace HayChoriYPaty
                 canvasHeight + Mathf.Max(0f, bottomBleed));
         }
 
+        private static float MaximumResponsiveFooterPanelHeight(float compactScale)
+        {
+            // Reserve against the tallest supported footer (four-action, two-row layout),
+            // so decorative flags do not change size with the level's upgrade catalog.
+            float fourActionPanel = 22f + 6f + 2f * 104f + 8f;
+            float fiveActionPanel = 20f + 6f + 2f * 100f + 8f;
+            float readyPanel = 26f + 6f + 120f + 6f + ReadyLevelSelector.height;
+            return Mathf.Max(fourActionPanel, Mathf.Max(fiveActionPanel, readyPanel)) * compactScale;
+        }
+
         private static ResponsiveFooterLayout BuildResponsiveFooterLayoutCore(
             StreetSimulation sim, float canvasHeight, bool showUpgrades, bool showReadySelector, float decorationBottom)
         {
@@ -205,16 +223,26 @@ namespace HayChoriYPaty
             float topPadding = 4f * compactScale;
             float cardBlockHeight = rows * cardHeight + Mathf.Max(0, rows - 1) * rowGap;
             float panelHeight = badgeHeight + sectionGap + cardBlockHeight + selectorGap + selectorHeight;
-            float stageBottom = StreetKitchenLayout.TiledPlayfieldBottom * verticalScale;
-            float panelTop = stageBottom + topPadding;
-            float panelBottom = panelTop + panelHeight;
+            float stageBottom = sim.KitchenLayout.PlayfieldBottom * verticalScale;
+            float pennantClearance = 2f * compactScale;
+            float pennantHeight = Mathf.Max(0f, decorationBottom - stageBottom - topPadding
+                - MaximumResponsiveFooterPanelHeight(compactScale) - pennantClearance);
+            float pennantTop = decorationBottom - pennantHeight;
+            // Bottom-align smaller footer layouts to the common pennant band, preserving
+            // its size while using the freed space instead of leaving a blank gap.
+            float panelBottom = sim.UsesActiveCooks
+                ? decorationBottom - 4f * compactScale
+                : pennantHeight > 1f
+                ? pennantTop - pennantClearance
+                : stageBottom + topPadding + panelHeight;
+            float panelTop = panelBottom - panelHeight;
             float cardTop = panelTop + badgeHeight + sectionGap;
 
             var cards = new Rect[count];
             for (int i = 0; i < count; i++)
             {
                 Rect authored = CatalogUpgradeCardBounds(sim, actions[i]);
-                int row = count == 4 ? i / 2 : count == 5 && i >= 3 ? 1 : 0;
+                int row = count == 4 ? i / 2 : count == 6 && sim.UsesActiveCooks ? i / 3 : count == 5 && i >= 3 ? 1 : 0;
                 cards[i] = new Rect(authored.x, (cardTop + row * (cardHeight + rowGap)) / verticalScale,
                     authored.width, authored.height);
             }
@@ -229,16 +257,11 @@ namespace HayChoriYPaty
             }
 
             Rect badge = new Rect(45f, panelTop / verticalScale, 450f, badgeHeight);
-            bool hasFooterControls = rows > 0 || showReadySelector;
-            float pennantClearance = hasFooterControls ? 2f * compactScale : 0f;
-            float decorationGap = Mathf.Max(0f, decorationBottom - panelBottom - pennantClearance);
-            // The generated pennant row fills the free footer band after the controls, including safe-area bleed.
-            float pennantHeight = decorationGap;
-            float pennantTop = decorationBottom - pennantHeight;
             Rect pennants = pennantHeight > 1f
                 ? new Rect(0f, pennantTop, W, pennantHeight)
                 : new Rect(0f, pennantTop, W, 0f);
 
+            if (sim.UsesActiveCooks) pennants = Rect.zero;
             return new ResponsiveFooterLayout {
                 UpgradeBounds = cards, LevelBadge = badge, ReadySelector = selector, Pennants = pennants
             };
@@ -334,6 +357,7 @@ namespace HayChoriYPaty
         private Texture2D losRedondosBackground, losRedondosFrontFans, losRedondosWalkingFans;
         private Texture2D fourZoneGrill, premiumGrill, beerBarrel, fernetTable, readySandwichesTable;
         private Texture2D premiumWorker, premiumDiagonal, fernetWorker, fernetWorkerLater;
+        private Texture2D mozoWorker;
         private Texture2D victoryPopup;
         private Texture2D coverArt, titleLogo, introGlow, menuButton, hudBarTexture, cutoutHudBarTexture, hudQuotaCardTexture, hudQuotaCardOutlineTexture, riotBackdrop, riotFanAtlas, riotImpactCloud;
         private Font menuFont;
@@ -486,6 +510,7 @@ namespace HayChoriYPaty
             premiumGrill = Resources.Load<Texture2D>("street-grill-premium-v1");
             premiumWorker = StreetWorkerAppearance.CreateVariant(parrillero, StreetWorkerRole.ParrilleroPremium, ParrilleroPoses, new Vector2(1315,1197));
             premiumDiagonal = StreetWorkerAppearance.CreateVariant(parrilleroDiagonal, StreetWorkerRole.ParrilleroPremium, ParrilleroDiagonalPoses, new Vector2(1536,1024));
+            mozoWorker = StreetWorkerAppearance.CreateVariant(parrillero, StreetWorkerRole.Mozo, ParrilleroPoses, new Vector2(1315,1197));
             fernetWorker = StreetWorkerAppearance.CreateVariant(cocacolero, StreetWorkerRole.Fernetero, ChicagoCocacoleroPoses, new Vector2(1247,1261));
             fernetWorkerLater = StreetWorkerAppearance.CreateVariant(laterCocacolero, StreetWorkerRole.Fernetero, MatchedCocacoleroPoses, new Vector2(1247,1261));
             introActive = true;
@@ -514,9 +539,9 @@ namespace HayChoriYPaty
             if (clubPennantTexture != null) Destroy(clubPennantTexture);
             clubPennantTexture = null;
             clubPennantThemeName = null;
-            foreach (Texture2D variant in new[] { premiumWorker, premiumDiagonal, fernetWorker, fernetWorkerLater })
+            foreach (Texture2D variant in new[] { premiumWorker, premiumDiagonal, fernetWorker, fernetWorkerLater, mozoWorker })
                 if (variant != null) Destroy(variant);
-            premiumWorker = premiumDiagonal = fernetWorker = fernetWorkerLater = null;
+            premiumWorker = premiumDiagonal = fernetWorker = fernetWorkerLater = mozoWorker = null;
         }
         private void Update()
         {
@@ -748,7 +773,7 @@ namespace HayChoriYPaty
                 levelSelectPage = game.Sim.LevelIndex / LevelSelectorPageSize;
                 return;
             }
-            if (a==1) game.TryStartRound(); else if (a==2) ok=game.TryHireParrillero(); else if (a==3) ok=game.TryUpgradeSpeed(); else if (a==HireCocacoleroAction || a==HirePremiumAction || a==HireFerneteroAction) ok=game.TryHire(RoleForAction(a));
+            if (a==1) game.TryStartRound(); else if (a==2) ok=game.TryHireParrillero(); else if (a==3) ok=game.TryUpgradeSpeed(); else if (a==HireCocacoleroAction || a==HirePremiumAction || a==HireFerneteroAction) ok=game.TryHire(RoleForAction(a)); else if (a==HireMozoAction) ok=game.TryHireMozo();
             else if (a == RiotReturnAction && game.Sim.Phase == RoundPhase.Lost)
             {
                 ok = game.ReturnToLevels();
@@ -852,6 +877,7 @@ namespace HayChoriYPaty
                 GUI.DrawTexture(kitchenCanvas, kitchenRenderer.ForegroundTexture, ScaleMode.StretchToFill, true);
             if (kitchenRenderer.CarriedTexture != null)
                 GUI.DrawTexture(kitchenCanvas, kitchenRenderer.CarriedTexture, ScaleMode.StretchToFill, true);
+            if (sim.UsesActiveCooks) DrawCookingProgress(sim);
             for(int i=0;i<sim.Sales.Count;i++)
             {
                 var s=sim.Sales[i];float a=Mathf.Clamp01(2.2f-s.Age);GUI.color=new Color(1,1,1,a);
@@ -867,9 +893,10 @@ namespace HayChoriYPaty
                     int action = catalogActions[i];
                     bool speed = action == 3;
                     StreetWorkerRole role = RoleForAction(action);
+                    int cost = speed ? sim.SpeedCost : role == StreetWorkerRole.Mozo ? sim.MozoHireCost : sim.HireCostForRole(role);
+                    bool canBuy = speed ? sim.CanUpgradeSpeed : role == StreetWorkerRole.Mozo ? sim.CanHireMozo : sim.CanHireRole(role);
                     Upgrade(ScaleCardBounds(footer.UpgradeBounds[i], layoutVerticalScale), action, speed ? 15 : 16,
-                        speed ? "VELOCIDAD" : RoleCaption(role), speed ? sim.SpeedCost : sim.HireCostForRole(role),
-                        speed ? sim.CanUpgradeSpeed : sim.CanHireRole(role));
+                        speed ? "VELOCIDAD" : RoleCaption(role), cost, canBuy);
                 }
             if(sim.Phase==RoundPhase.Ready) ReadyPanel(footer);
             else if(sim.Phase==RoundPhase.Won||sim.Phase==RoundPhase.Lost) ResultPanel();
@@ -1223,6 +1250,13 @@ namespace HayChoriYPaty
             if (backdrop != null)
                 GUI.DrawTexture(StreetSceneLayout.BackgroundBounds(canvasHeight), backdrop, ScaleMode.StretchToFill, true);
             GUI.color = previous;
+            if (game != null && game.Sim != null && game.Sim.UsesActiveCooks && backdrop != null)
+            {
+                // The wide root plate contains an obsolete condiment table on its right edge.
+                // Reuse its clean opposite counter/floor edge, not a new or repainted asset.
+                DrawRaw(StreetSceneLayout.ProjectSourceRect(StreetSceneLayout.BakedSideTableSource, canvasHeight),
+                    backdrop, StreetSceneLayout.CleanCounterSideSource, true, true);
+            }
             if (!string.IsNullOrEmpty(theme.MuralResource))
                 DrawThemedMural(theme, canvasHeight, verticalScale);
             else if (muralArt != null)
@@ -1251,6 +1285,8 @@ namespace HayChoriYPaty
             // Align the complete, aspect-preserved crop directly below the HUD; expand only to its
             // natural aspect or the available counter band, whichever is smaller.
             band.height = Mathf.Min(Mathf.Max(band.height, naturalHeight), availableHeight);
+            if (game != null && game.Sim != null && game.Sim.UsesActiveCooks)
+                band = StreetSceneLayout.ActiveMuralBand(canvasHeight, verticalScale, HudBar.yMax);
             // Draw an independent neighborhood continuation behind the HUD. Prefer the full
             // club backdrop when the cropped mural has no suitable matching pixels above it.
             Texture2D continuation = VisualLevelIndex == RiverVisualLevelIndex && riverHeaderExtension != null
@@ -1305,6 +1341,34 @@ namespace HayChoriYPaty
             Color previousColor = GUI.color;
             try
             {
+                if (game != null && game.Sim != null && game.Sim.UsesActiveCooks)
+                {
+                    // Continue the source street's own pavement into the cream footer, keeping the
+                    // original counter/mural untouched. The narrow crop avoids stretching scenery.
+                    if (backdrop != null)
+                    {
+                        const float sourceTop = 900f, sourceBottom = 1150f;
+                        float uvY = Mathf.Clamp01((backdrop.height - sourceBottom) / backdrop.height);
+                        float uvHeight = Mathf.Clamp01((sourceBottom - sourceTop) / backdrop.height);
+                        float floorTop = StreetKitchenLayout.TiledPlayfieldBottom * verticalScale;
+                        float tileHeight = (sourceBottom - sourceTop) * W / backdrop.width;
+                        GUI.color = Color.white;
+                        float fieldBottom = game.Sim.KitchenLayout.PlayfieldBottom * verticalScale;
+                        for (float y = floorTop; y < fieldBottom; y += tileHeight)
+                        {
+                            float drawHeight = Mathf.Min(tileHeight, fieldBottom - y);
+                            GUI.DrawTextureWithTexCoords(new Rect(0f, y, W, drawHeight), backdrop,
+                                new Rect(0f, uvY, 1f, uvHeight * drawHeight / tileHeight), true);
+                        }
+                    }
+                    // Lower the existing cream footer with the expanded kitchen; paint over
+                    // the baked flags without changing the counter or mural above it.
+                    GUI.color = new Color32(255, 244, 224, 255);
+                    GUI.DrawTexture(new Rect(0f, game.Sim.KitchenLayout.PlayfieldBottom * verticalScale,
+                        W, Mathf.Max(0f, canvasHeight - game.Sim.KitchenLayout.PlayfieldBottom * verticalScale)),
+                        Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
+                    return;
+                }
                 // Mask the Floresta pennants baked into the root plate before placing the adaptive row.
                 GUI.color = new Color32(255, 244, 224, 255);
                 float rootHeight = ClubPennantRenderer.LogicalHeight * verticalScale;
@@ -1334,6 +1398,41 @@ namespace HayChoriYPaty
             {
                 GUI.color = previousColor;
             }
+        }
+
+        private readonly System.Collections.Generic.List<Vector2> cookingRingCenters = new System.Collections.Generic.List<Vector2>();
+        private void DrawCookingProgress(StreetSimulation sim)
+        {
+            cookingRingCenters.Clear();
+            Color old = GUI.color;
+            const int segments = 24;
+            foreach (StreetWorker worker in sim.Workers)
+            {
+                if (worker.State != StreetWorkerState.Cooking) continue;
+                float cx = Mathf.Clamp(worker.Position.x, 12f, W - 12f), cy = worker.Position.y * layoutVerticalScale - 108f;
+                // Several real slots may share the same approach column. Stack only
+                // their progress rings, rather than overlapping independent clocks.
+                for (int attempt = 0; attempt <= sim.Workers.Count; attempt++)
+                {
+                    bool overlaps = false;
+                    for (int j = 0; j < cookingRingCenters.Count; j++)
+                        if ((cookingRingCenters[j] - new Vector2(cx, cy)).sqrMagnitude < 22f * 22f)
+                        { overlaps = true; break; }
+                    if (!overlaps) break;
+                    cy -= 22f;
+                }
+                cookingRingCenters.Add(new Vector2(cx, cy));
+                int lit = Mathf.CeilToInt(Mathf.Clamp01(worker.CookingProgress) * segments);
+                for (int i = 0; i < segments; i++)
+                {
+                    float a = i / (float)segments * Mathf.PI * 2f - Mathf.PI * .5f;
+                    GUI.color = i < lit ? new Color(1f, .72f, .18f, 1f) : new Color(.12f, .07f, .035f, .85f);
+                    float radius = 8.5f;
+                    GUI.DrawTexture(new Rect(cx + Mathf.Cos(a) * radius - 1.5f,
+                        cy + Mathf.Sin(a) * radius - 1.25f, 2.5f, 2.5f), Texture2D.whiteTexture);
+                }
+            }
+            GUI.color = old;
         }
 
         private void DrawLevelBadge(int levelIndex, Rect bounds)
@@ -3016,7 +3115,7 @@ namespace HayChoriYPaty
         private void DrawWorker(StreetWorker w)
         {
             if (StreetWorkerProjection.IsObscuredIdleWorker(game.Sim.Workers, w, layoutVerticalScale)) return;
-            bool moving=w.State==StreetWorkerState.ToStation||w.State==StreetWorkerState.ToCounter;
+            bool moving=w.State==StreetWorkerState.ToStation||w.State==StreetWorkerState.ToCounter||w.State==StreetWorkerState.ToGrill||w.State==StreetWorkerState.ToTable;
             int levelIndex = game.Sim.LevelIndex;
             Texture2D cocacoleroArt = CocacoleroArtForLevel(levelIndex);
             bool beverageRole = w.Role == StreetWorkerRole.Cocacolero || w.Role == StreetWorkerRole.Fernetero;
@@ -3027,7 +3126,7 @@ namespace HayChoriYPaty
             StreetWorkerPose workerPose = StreetWorkerAnimation.Sample(w);
             moving = workerPose.Moving;
             int frame=moving?SelectParrilleroWalkFrame(movement,workerPose.Frame):0;
-            if(w.State==StreetWorkerState.Pickup)frame=beverageRole?0:11;
+            if(w.State==StreetWorkerState.Pickup||w.State==StreetWorkerState.Deposit)frame=beverageRole?0:11;
             if(w.State==StreetWorkerState.Handoff)frame=beverageRole?0:3;
             float bob=workerPose.Bob*1.875f;
             // Preserve the original90×98worker shape while anchoring its feet to the
@@ -3169,26 +3268,26 @@ namespace HayChoriYPaty
                 ? "×" + game.Sim.WorkRate.ToString("0.00").Replace('.', ',') + "  ·  +10%"
                 : "EQUIPO " + game.Sim.WorkerCount(RoleForAction(action));
             if (compact && action == 3) statusText = "×" + game.Sim.WorkRate.ToString("0.00").Replace('.', ',') + "\n+10%";
-            Rect statusBounds = UpgradeStatusBounds(drawn);
+            Rect statusBounds = action == 3 ? UpgradeSpeedStatusBounds(drawn) : UpgradeStatusBounds(drawn);
             int originalStatusSize = upgradePercent.fontSize;
-            if (compact) upgradePercent.fontSize = 13;
+            if (compact) upgradePercent.fontSize = action == 3 ? 12 : 13;
             upgradePercent.fontSize = FitUpgradeStatusFontSize(upgradePercent, statusText, statusBounds.width);
             UpgradeOutline(statusBounds,statusText,upgradePercent,new Color(1f,.76f,.22f));
             upgradePercent.fontSize = originalStatusSize;
-            Rect portrait = compact ? new Rect(drawn.x+9,drawn.y+39,43,43) : new Rect(drawn.x+24,drawn.y+26,68,68);
             if(action==3)
             {
-                if(speedArrows!=null)Draw(compact ? new Rect(drawn.x+10,drawn.y+48,48,32) : new Rect(drawn.x+20,drawn.y+36,76,48),speedArrows,SpeedArrowBounds,false,false);
+                if(speedArrows!=null) DrawUpgradeOvalContent(drawn,speedArrows,SpeedArrowBounds);
             }
             else if((action==HireCocacoleroAction || action==HireFerneteroAction) && CocacoleroArtForLevel(game.Sim.LevelIndex)!=null)
             {
                 int levelIndex = game.Sim.LevelIndex;
                 Texture2D art = action == HireFerneteroAction ? (UsesMatchedCocacoleroArt(levelIndex) ? fernetWorkerLater : fernetWorker) : CocacoleroArtForLevel(levelIndex);
-                bool laterStyle = UsesMatchedCocacoleroArt(levelIndex) && laterCocacolero != null;
-                Draw(portrait,art,CocacoleroPoseForLevel(levelIndex,0),laterStyle,false);
+                DrawUpgradeOvalContent(drawn,art,CocacoleroPoseForLevel(levelIndex,0));
             }
-            else if (action == HirePremiumAction && premiumWorker != null) Draw(portrait,premiumWorker,ParrilleroPoses[0],false,false);
-            else Item(portrait,icon);
+            else if (action == HirePremiumAction && premiumWorker != null) DrawUpgradeOvalContent(drawn,premiumWorker,ParrilleroPoses[0]);
+            else if (action == HireMozoAction && mozoWorker != null) DrawUpgradeOvalContent(drawn,mozoWorker,ParrilleroPoses[0]);
+            else if (parrilleroIcon != null) DrawUpgradeOvalContent(drawn,parrilleroIcon,new Rect(22,6,1269,1188));
+            else if (items != null) DrawUpgradeOvalContent(drawn,items,Items[icon]);
             string priceText=cost>0?cost.ToString():"MAX";
             if(cost>0)Item(UpgradeCoinBounds(drawn),10);
             int originalPriceSize=upgradePrice.fontSize;
@@ -3200,6 +3299,25 @@ namespace HayChoriYPaty
             if(GUI.Button(LayoutRect(r),"",invisible))NativeAction(action);GUI.enabled=prev;
             layoutVerticalScale = previousVertical;
         }
+        // Interior of the existing gold oval, measured against UpgradeWoodBounds.
+        private static Rect UpgradeOvalBounds(Rect card) => new Rect(card.x + card.width * .10f,
+            card.y + card.height * .22f, card.width * .29f, card.height * .55f);
+        private static Rect UpgradeOvalContentBounds(Rect card, Vector2 sourceSize)
+        {
+            Rect oval = UpgradeOvalBounds(card);
+            // Inscribe all four corners in the ellipse, using one scale for both source axes.
+            float x = sourceSize.x / oval.width, y = sourceSize.y / oval.height;
+            float scale = .94f / Mathf.Sqrt(x * x + y * y);
+            Vector2 size = sourceSize * scale;
+            return new Rect(oval.center - size * .5f, size);
+        }
+        private void DrawUpgradeOvalContent(Rect card, Texture2D texture, Rect source)
+        {
+            if (texture != null) Draw(UpgradeOvalContentBounds(card,source.size),texture,source,true,false);
+        }
+        private static Rect UpgradeSpeedStatusBounds(Rect card) => card.width < 200
+            ? new Rect(card.x+62,card.y+29,card.width-70,27)
+            : UpgradeStatusBounds(card);
         private static Rect UpgradeTitleBounds(Rect card){return card.width < 200 ? new Rect(card.x+6,card.y+6,card.width-12,29) : new Rect(card.x+94,card.y+6,card.width-104,32);}
         private static Rect UpgradeStatusBounds(Rect card){return card.width < 200 ? new Rect(card.x+62,card.y+38,card.width-70,29) : new Rect(card.x+94,card.y+35,card.width-104,22);}
         private static Rect UpgradeCoinBounds(Rect card){return card.width < 200 ? new Rect(card.x+63,card.y+card.height*.64f,18,18) : new Rect(card.x+101,card.y+(card.height < 120 ? 64 : 74),21,21);}
@@ -3337,9 +3455,9 @@ namespace HayChoriYPaty
             StreetMarketResult r=game.Market!=null?game.Market.LastResult:null;
             if(r==null)return;
             string line1="VENTAS "+FormatMarketMoney(r.grossSalesCents)+" → 50% "+FormatMarketMoney(r.halfSalesCents);
-            string line2=r.won?"BONO: 2 × "+FormatMarketMoney(r.leftoverCents)+" sobrante = "+FormatMarketMoney(r.bonusCents):"DERROTA: sin bono por sobrante";
+            string line2=r.won?"BONO SOBRANTE: 2 × "+FormatMarketMoney(r.leftoverCents)+" = "+FormatMarketMoney(r.bonusCents)+" · REPOSICIÓN: "+FormatMarketMoney(r.progressionBonusCents):"DERROTA: sin bono por sobrante";
             string line3="VENTAS RECONOCIDAS: "+FormatMarketMoney(r.recognizedSalesCents);
-            string line4="INGRESO NUEVO: "+FormatMarketMoney(r.recognizedSalesCents)+" + "+FormatMarketMoney(r.bonusCents)+" = "+FormatMarketMoney(r.earnedCents);
+            string line4="INGRESO NUEVO: "+FormatMarketMoney(r.earnedCents);
             string line5="SALDO ACTUAL: "+FormatMarketMoney(r.totalBalanceCents);
             string[] lines={line1,line2,line3,line4,line5};
             int oldSize=small.fontSize;

@@ -19,6 +19,12 @@ namespace HayChoriYPaty
             }
         }
 
+        public static StreetWorkerRole GetProductionRole(int productId) => GetRequiredWorkerRole(productId);
+        public static StreetWorkerRole GetDeliveryRole(int productId, bool activeCooks) =>
+            activeCooks && productId >= 0 && productId <= 3 ? StreetWorkerRole.Mozo : GetRequiredWorkerRole(productId);
+        public static bool IsDeliveryResponsible(StreetWorkerRole role, int productId, bool activeCooks) =>
+            productId >= 0 && productId <= 6 && GetDeliveryRole(productId, activeCooks) == role;
+
         public static Station GetStation(int productId)
         {
             switch (productId)

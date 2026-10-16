@@ -9,6 +9,7 @@ namespace HayChoriYPaty
         public const float SourceWidth = 760f;
         public const float Scale = StreetSceneLayout.Width / SourceWidth;
         public const float TiledPlayfieldBottom = 665f;
+        public const float ActivePlayfieldBottom = TiledPlayfieldBottom + 70f;
         public const float GrillBottomClearance = 5f;
         public const float GrillVerticalGap = 4f;
         public const float TableWidth = 196f * Scale, TableHeight = 98f * Scale;
@@ -30,6 +31,11 @@ namespace HayChoriYPaty
         private const float GrillFrontLeft = .035f, GrillFrontRight = .965f;
 
         private readonly bool hasNormal, hasPremium, hasFernet, hasCoca, hasBeer;
+        private readonly bool activeCooks;
+        private float LayoutTableY => TableY;
+        private float LayoutBarrelY => LayoutTableY + TableHeight - BarrelHeight;
+        public float PlayfieldBottom => activeCooks ? ActivePlayfieldBottom : TiledPlayfieldBottom;
+        private float LayoutGrillGap => activeCooks ? 70f : GrillVerticalGap;
         private readonly Rect normalTable, premiumTable, fernetTable, cocaBarrel, beerBarrel;
         private readonly Rect normalGrill, premiumGrill;
         // Route obstacles describe the actual solid bases expanded by the worker's 36x12 foot collider.
@@ -61,8 +67,11 @@ namespace HayChoriYPaty
         public Rect BeerBarrelBounds { get { return beerBarrel; } }
         public Rect CocaBarrelBounds { get { return cocaBarrel; } }
 
-        public StreetKitchenLayout(int[] availableProducts)
+        public StreetKitchenLayout(int[] availableProducts) : this(availableProducts, false) { }
+
+        public StreetKitchenLayout(int[] availableProducts, bool activeCooks)
         {
+            this.activeCooks = activeCooks;
             bool[] available = new bool[7];
             if (availableProducts != null)
                 for (int i = 0; i < availableProducts.Length; i++)
@@ -96,11 +105,11 @@ namespace HayChoriYPaty
             beer = PlaceUpper(ref x, gap, hasBeer, BarrelAuthoredWidth);
         }
 
-        private static Rect PlaceUpper(ref float x, float gap, bool active, float nativeWidth)
+        private Rect PlaceUpper(ref float x, float gap, bool active, float nativeWidth)
         {
             if (!active) return Rect.zero;
             float scaledWidth = nativeWidth * Scale;
-            Rect result = new Rect(x * Scale, nativeWidth == 196f ? TableY : BarrelY, scaledWidth, nativeWidth == 196f ? TableHeight : BarrelHeight);
+            Rect result = new Rect(x * Scale, nativeWidth == 196f ? LayoutTableY : LayoutBarrelY, scaledWidth, nativeWidth == 196f ? TableHeight : BarrelHeight);
             x += nativeWidth + gap;
             return result;
         }
@@ -110,14 +119,14 @@ namespace HayChoriYPaty
             bool active = hasNormal || hasPremium;
             if (!active) { normal = premium = Rect.zero; return; }
 
-            float upperBottom = TableY;
+            float upperBottom = LayoutTableY;
             if (hasNormal) upperBottom = Mathf.Max(upperBottom, normalTable.yMax);
             if (hasPremium) upperBottom = Mathf.Max(upperBottom, premiumTable.yMax);
             if (hasFernet) upperBottom = Mathf.Max(upperBottom, fernetTable.yMax);
             if (hasCoca) upperBottom = Mathf.Max(upperBottom, cocaBarrel.yMax);
             if (hasBeer) upperBottom = Mathf.Max(upperBottom, beerBarrel.yMax);
             // Keep the entire station block between the requested four-point upper and two-point lower margins.
-            float grillY = upperBottom + GrillVerticalGap;
+            float grillY = upperBottom + LayoutGrillGap;
             float nativeWidth = 352f;
             if (hasNormal && hasPremium)
             {
@@ -125,7 +134,7 @@ namespace HayChoriYPaty
                 premium = new Rect(394f * Scale, grillY, StandardGrillWidth, StandardGrillHeight);
                 return;
             }
-            float availableHeight = Mathf.Max(0f, GrillBottomLimit - grillY);
+            float availableHeight = Mathf.Max(0f, PlayfieldBottom - GrillBottomClearance - grillY);
             nativeWidth = Mathf.Min(SourceWidth - 28f, availableHeight / Scale * 3f);
             float width = nativeWidth * Scale;
             float height = width / 3f;
@@ -173,9 +182,30 @@ namespace HayChoriYPaty
         {
             if (product == 4 || product == 6) return BarrelPickupPosition(product);
             Rect r = BoundsForProduct(product);
-            float y = product < 4 || product == 5 ? TablePickupY : BarrelPickupY;
+            float y = product < 4 || product == 5 ? LayoutTableY + 36f : LayoutBarrelY - BarrelPickupClearance;
             float safeX = Mathf.Clamp(r.center.x, StreetWorkstationLayout.WorkerHalfWidth, StreetSceneLayout.Width - StreetWorkstationLayout.WorkerHalfWidth);
             return new Vector2(safeX, y);
+        }
+
+        /// <summary>Clear grill-side feet anchor for a cook assigned to a real grill slot.</summary>
+        public Vector2 GrillWorkPosition(int product, int slot)
+        {
+            Rect grill = GrillBoundsForProduct(product);
+            if (grill.width <= 0f) return Vector2.zero;
+            int safeSlot = Mathf.Max(0, slot);
+            int column = safeSlot % 9;
+            int row = safeSlot / 9;
+            float x = Mathf.Clamp(grill.x + grill.width * (.18f + column * .08f), 54f, StreetSceneLayout.Width - 54f);
+            return new Vector2(x, grill.yMin - 14f - row * 20f);
+        }
+
+        /// <summary>Reserved-item deposit side of the specialty table.</summary>
+        public Vector2 DepositPosition(int product)
+        {
+            Rect table = BoundsForProduct(product);
+            if (table.width <= 0f) return Vector2.zero;
+            float x = Mathf.Clamp(table.center.x, StreetWorkstationLayout.WorkerHalfWidth, StreetSceneLayout.Width - StreetWorkstationLayout.WorkerHalfWidth);
+            return new Vector2(x, table.yMax + 14f);
         }
 
         /// <summary>Shortest safe route from the initial counter position to this product's pickup.</summary>

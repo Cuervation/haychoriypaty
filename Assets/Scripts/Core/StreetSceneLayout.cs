@@ -19,6 +19,23 @@ namespace HayChoriYPaty
         }
         public static float CounterTop(float canvasHeight) => SourceY(CounterSource.y, canvasHeight);
 
+        // Keep the far-wall overlay out of the public street, even with a wide/tall club mural.
+        public static Rect ActiveMuralBand(float canvasHeight, float verticalScale, float hudBottom)
+        {
+            float available = CounterTop(canvasHeight) - hudBottom - 90f * verticalScale;
+            return new Rect(0f, hudBottom, Width, Mathf.Min(MuralBounds.height * verticalScale, Mathf.Max(0f, available)));
+        }
+
+        public static readonly Rect CleanCounterSideSource = new Rect(0f, 548f, 470f, 608f);
+        public static readonly Rect BakedSideTableSource = new Rect(470f, 548f, 470f, 608f);
+        public static Rect ProjectSourceRect(Rect source, float canvasHeight)
+        {
+            Rect background = BackgroundBounds(canvasHeight);
+            float scale = background.width / ReferenceBackdropSize.x;
+            return new Rect(background.x + source.x * scale, background.y + source.y * scale,
+                source.width * scale, source.height * scale);
+        }
+
         /// <summary>Project the single baked full-screen counter into the controls' top-origin safe viewport.</summary>
         public static float CounterTopInViewport(float screenWidth, float screenHeight, Rect viewport)
         {

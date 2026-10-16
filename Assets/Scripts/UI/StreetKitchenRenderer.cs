@@ -250,6 +250,7 @@ namespace HayChoriYPaty
                     existing.SetActive(visible);
                     SetStationTransform(existing.transform, bounds);
                     FitStation(existing, bounds, !IsBarrelStation(prefabName));
+                    ApplyStationDepth(existing, StationDepth(bounds));
                     if (prefabName == "Station_FernetTable") EnsureFernetTableDisplay(existing);
                     return;
                 }
@@ -260,9 +261,21 @@ namespace HayChoriYPaty
             SetLayerRecursively(instance, PropLayer);
             SetStationTransform(instance.transform, bounds);
             FitStation(instance, bounds, !IsBarrelStation(prefabName));
-            SetSorting(instance, 0);
+            SetSorting(instance, StationDepth(bounds));
             if (prefabName == "Station_FernetTable") EnsureFernetTableDisplay(instance);
             instance.SetActive(visible);
+        }
+
+        private int StationDepth(Rect bounds) => simulation != null && simulation.UsesActiveCooks
+            ? -5000 + Mathf.RoundToInt(bounds.yMax * verticalScale) : 0;
+
+        private static void ApplyStationDepth(GameObject station, int depth)
+        {
+            SpriteRenderer root = station.GetComponentInChildren<SpriteRenderer>(true);
+            if (root == null || root.sortingOrder == depth) return;
+            int delta = depth - root.sortingOrder;
+            foreach (SpriteRenderer part in station.GetComponentsInChildren<SpriteRenderer>(true))
+                part.sortingOrder += delta;
         }
 
         private void LoadOptionalFernetSprites()
@@ -419,7 +432,7 @@ namespace HayChoriYPaty
                     SpriteRenderer renderer = bottle.AddComponent<SpriteRenderer>();
                     renderer.sprite = sprite;
                     renderer.sharedMaterial = table.sharedMaterial;
-                    renderer.sortingOrder = row == 0 ? 2 : 4;
+                    renderer.sortingOrder = table.sortingOrder + (row == 0 ? 2 : 4);
 
                     GameObject shadow = new GameObject("TabletopContactShadow");
                     shadow.layer = PropLayer;
@@ -435,7 +448,7 @@ namespace HayChoriYPaty
                     shadowRenderer.sprite = fernetContactShadowSprite;
                     shadowRenderer.sharedMaterial = table.sharedMaterial;
                     shadowRenderer.color = new Color(.20f, .08f, .025f, .40f);
-                    shadowRenderer.sortingOrder = row == 0 ? 1 : 3;
+                    shadowRenderer.sortingOrder = table.sortingOrder + (row == 0 ? 1 : 3);
                     nextX += bottleWidth + gap;
                 }
             }
@@ -529,6 +542,9 @@ namespace HayChoriYPaty
                         ? fernetCupSprite : FirstSprite(key);
                     renderer.color = Color.white;
                 }
+                if (!carried && simulation.UsesActiveCooks)
+                    renderer.sortingOrder = StationDepth(isGrill ? simulation.KitchenLayout.GrillBoundsForProduct(unit.Product)
+                        : simulation.KitchenLayout.BoundsForProduct(unit.Product)) + 10;
                 Vector2 size = isGrill ? simulation.KitchenLayout.GrillMeatSize(unit.Product, grillCompanionAvailable)
                     : isBarrelDrink && !carried ? new Vector2(8f, 15f) * BarrelDrinkScale : ServingSize(unit.Product, carried);
                 SetDesiredSize(go.transform, renderer, size);

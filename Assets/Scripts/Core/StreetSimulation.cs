@@ -20,7 +20,7 @@ namespace HayChoriYPaty
         [Tooltip("Mandatory targets keyed by stable product ID 0..6; zero only for products not in this level.")]
         public int[] goalsByProductId = new int[7];
         [Tooltip("First paid hire price by StreetWorkerRole enum; zero means the role is not available.")]
-        public int[] hireBaseCostsByRole = new int[4];
+        public int[] hireBaseCostsByRole = new int[5];
         [Min(0.1f)] public float speedCostMultiplier = 1f;
         [Min(0)] public int startingCoins;
 
@@ -50,7 +50,7 @@ namespace HayChoriYPaty
         [Tooltip("Profile index used per level; all current levels share profile 0.")]
         public int[] levelUpgradeCostProfileIds = { 0, 0, 0, 0, 0 };
         [Tooltip("Optional hire-profile override by role enum value; -1 inherits that level's shared profile.")]
-        public int[] roleHireCostProfileIds = { -1, -1, -1, -1 };
+        public int[] roleHireCostProfileIds = { -1, -1, -1, -1, -1 };
         [HideInInspector, Tooltip("Legacy serialized fields retained only for scene compatibility; runtime costs come from upgradeCostProfiles.")]
         public int[] hireCosts = { 15, 30, 60, 100 };
         [HideInInspector, Tooltip("Legacy serialized fields retained only for scene compatibility; runtime costs come from upgradeCostProfiles.")]
@@ -93,12 +93,12 @@ namespace HayChoriYPaty
                 new StreetLevelBalance(new[] {180,120,0,0,150,0,0}, new[] {25,25,0,0}, 2.25f),
                 new StreetLevelBalance(new[] {185,125,60,0,155,0,75}, new[] {30,30,35,0}, 3.25f),
                 new StreetLevelBalance(new[] {190,130,70,65,160,65,80}, new[] {35,35,45,40}, 4.50f),
-                new StreetLevelBalance(new[] {210,145,80,75,175,75,90}, new[] {40,40,50,45}, 6.00f, 250),
-                new StreetLevelBalance(new[] {230,165,100,85,195,80,105}, new[] {45,45,55,50}, 8.00f, 250),
-                new StreetLevelBalance(new[] {250,180,110,95,210,90,115}, new[] {50,50,65,55}, 10.50f, 250),
-                new StreetLevelBalance(new[] {275,195,120,110,225,100,125}, new[] {55,55,70,65}, 13.50f, 250),
-                new StreetLevelBalance(new[] {310,220,135,125,255,110,145}, new[] {60,60,80,70}, 17.00f, 500),
-                new StreetLevelBalance(new[] {345,245,150,140,285,120,165}, new[] {70,70,90,80}, 21.00f, 2000)
+                new StreetLevelBalance(new[] {210,145,80,75,175,75,90}, new[] {40,40,50,45,50}, 6.00f, 250),
+                new StreetLevelBalance(new[] {230,165,100,85,195,80,105}, new[] {45,45,55,50,55}, 8.00f, 250),
+                new StreetLevelBalance(new[] {250,180,110,95,210,90,115}, new[] {50,50,65,55,60}, 10.50f, 250),
+                new StreetLevelBalance(new[] {275,195,120,110,225,100,125}, new[] {55,55,70,65,65}, 13.50f, 250),
+                new StreetLevelBalance(new[] {310,220,135,125,255,110,145}, new[] {60,60,80,70,70}, 17.00f, 500),
+                new StreetLevelBalance(new[] {345,245,150,140,285,120,165}, new[] {70,70,90,80,80}, 21.00f, 2000)
             };
         }
 
@@ -119,6 +119,8 @@ namespace HayChoriYPaty
         public int GetHireBaseCost(int levelIndex, StreetWorkerRole role)
         {
             int roleIndex = (int)role;
+            if (roleIndex < 0 || roleIndex > 4) return 0;
+            if (role == StreetWorkerRole.Mozo && levelIndex < 5) return 0;
             StreetLevelBalance row = GetLevelBalance(levelIndex);
             return row.hireBaseCostsByRole != null && roleIndex >= 0 && roleIndex < row.hireBaseCostsByRole.Length
                 ? Mathf.Max(0, row.hireBaseCostsByRole[roleIndex])
@@ -157,8 +159,8 @@ namespace HayChoriYPaty
     }
 
     public enum StreetCustomerState { Entering, Waiting, Receiving, Leaving, Advancing }
-    public enum StreetWorkerState { Idle, ToStation, Pickup, ToCounter, Handoff }
-    public enum StreetWorkerRole { Parrillero = 0, Cocacolero = 1, ParrilleroPremium = 2, Fernetero = 3 }
+    public enum StreetWorkerState { Idle, ToStation, Pickup, ToCounter, Handoff, ToGrill, Cooking, ToTable, Deposit }
+    public enum StreetWorkerRole { Parrillero = 0, Cocacolero = 1, ParrilleroPremium = 2, Fernetero = 3, Mozo = 4 }
 
     [Serializable]
     public sealed class StreetOrderLine
@@ -251,6 +253,8 @@ namespace HayChoriYPaty
         public StreetWorkerState State { get; internal set; }
         public float AnimationTime { get; internal set; }
         public float PickupProgress { get; internal set; }
+        public float CookingProgress { get; internal set; }
+        public int CookingItemId { get; internal set; }
         // Visual telemetry only; movement math and service timing are unchanged.
         public float TravelDistance { get; internal set; }
         public float StepDistance { get; internal set; }
@@ -355,7 +359,7 @@ namespace HayChoriYPaty
             get
             {
                 StreetWorkerRole[] roles = { StreetWorkerRole.Parrillero, StreetWorkerRole.Cocacolero,
-                    StreetWorkerRole.ParrilleroPremium, StreetWorkerRole.Fernetero };
+                    StreetWorkerRole.ParrilleroPremium, StreetWorkerRole.Fernetero, StreetWorkerRole.Mozo };
                 StreetWorkerRole best = StreetWorkerRole.Parrillero;
                 int lowestCount = int.MaxValue;
                 foreach (StreetWorkerRole role in roles)
@@ -382,7 +386,13 @@ namespace HayChoriYPaty
         public bool CanHireCocacolero { get { return CanHireRole(StreetWorkerRole.Cocacolero); } }
         public bool CanHireParrilleroPremium { get { return CanHireRole(StreetWorkerRole.ParrilleroPremium); } }
         public bool CanHireFernetero { get { return CanHireRole(StreetWorkerRole.Fernetero); } }
-        public bool HasRole(StreetWorkerRole role) { return StreetSpecialties.CatalogHasRole(availableProductsByLevel[LevelIndex], role); }
+        public bool UsesActiveCooks => LevelIndex >= 5;
+        public int MozoCount => WorkerCount(StreetWorkerRole.Mozo);
+        public bool HasMozo => HasRole(StreetWorkerRole.Mozo);
+        public int MozoHireCost => HireCostForRole(StreetWorkerRole.Mozo);
+        public bool CanHireMozo => CanHireRole(StreetWorkerRole.Mozo);
+        public bool HasRole(StreetWorkerRole role) { return role == StreetWorkerRole.Mozo
+            ? UsesActiveCooks && (IsProductAvailable(0) || IsProductAvailable(1) || IsProductAvailable(2) || IsProductAvailable(3)) : StreetSpecialties.CatalogHasRole(availableProductsByLevel[LevelIndex], role); }
         public int WorkerCount(StreetWorkerRole role) { int count = 0; foreach (var worker in workers) if (worker.Role == role) count++; return count; }
         public int MaxWorkersForRole(StreetWorkerRole role)
         {
@@ -432,7 +442,7 @@ namespace HayChoriYPaty
         {
             int hireCost = HireCostForRole(role);
             return (Phase == RoundPhase.Ready || Phase == RoundPhase.Playing) &&
-                   HasRole(role) && hireCost > 0 && Coins >= hireCost;
+                   HasRole(role) && (role != StreetWorkerRole.Mozo || Phase == RoundPhase.Playing) && hireCost > 0 && Coins >= hireCost;
         }
         public int SpeedLevel { get; private set; }
         public bool CanEditPrices { get { return false; } }
@@ -529,7 +539,7 @@ namespace HayChoriYPaty
 
         private void RefreshKitchenLayout()
         {
-            KitchenLayout = new StreetKitchenLayout(availableProductsByLevel[LevelIndex]);
+            KitchenLayout = new StreetKitchenLayout(availableProductsByLevel[LevelIndex], UsesActiveCooks);
         }
 
         public void StartRound()
@@ -799,6 +809,8 @@ namespace HayChoriYPaty
             {
                 w.AnimationTime += dt;
                 w.StepDistance = 0f;
+                if (UsesActiveCooks && (w.Role == StreetWorkerRole.Parrillero || w.Role == StreetWorkerRole.ParrilleroPremium))
+                { AdvanceCookWorker(w, dt); continue; }
                 if (w.State == StreetWorkerState.Idle) { Assign(w); continue; }
                 if (!IsAtCounter(w.Customer) || !customers.Contains(w.Customer)) { CancelAssignment(w); continue; }
                 if (w.State == StreetWorkerState.ToStation)
@@ -855,6 +867,74 @@ namespace HayChoriYPaty
             }
         }
 
+        private readonly int[] productionCursor = new int[2];
+        private void AdvanceCookWorker(StreetWorker worker, float dt)
+        {
+            if (worker.State == StreetWorkerState.Idle)
+            {
+                int first = worker.Role == StreetWorkerRole.Parrillero ? 0 : 2;
+                int group = first / 2;
+                int chosen = -1, bestNeed = int.MinValue;
+                for (int offset = 0; offset < 2; offset++)
+                {
+                    int product = first + (productionCursor[group] + offset) % 2;
+                    if (!IsProductAvailable(product) || !Kitchen.CanReserveCook(product)) continue;
+                    int pending = 0;
+                    for (int c = 0; c < customers.Count; c++)
+                    {
+                        if (customers[c].State == StreetCustomerState.Leaving) continue;
+                        StreetOrderLine line = customers[c].FindOrderLine(product);
+                        if (line != null) pending += line.Remaining;
+                    }
+                    int need = pending - Kitchen.SupplyCount(product);
+                    // A demanded product always precedes spare mise-en-place.
+                    int score = need > 0 ? 100000 + need : -Kitchen.SupplyCount(product);
+                    if (score > bestNeed) { bestNeed = score; chosen = product; }
+                }
+                if (chosen < 0) return;
+                StreetFoodUnit unit = Kitchen.ReserveCook(chosen, worker.Id);
+                if (unit == null) return;
+                worker.Product = chosen; worker.CookingItemId = unit.Id;
+                worker.CookingProgress = 0f;
+                productionCursor[group] = (chosen - first + 1) % 2;
+                if (!SetWorkerRoute(worker, KitchenLayout.GrillWorkPosition(chosen, unit.Slot)))
+                { Kitchen.CancelCook(worker.Id); ResetWorker(worker); return; }
+                worker.State = StreetWorkerState.ToGrill;
+                return;
+            }
+            if (worker.State == StreetWorkerState.ToGrill)
+            {
+                MoveWorker(worker, dt);
+                if (worker.Position == worker.Target && AdvanceWorkerRoute(worker))
+                    worker.State = StreetWorkerState.Cooking;
+            }
+            else if (worker.State == StreetWorkerState.Cooking)
+            {
+                bool complete = Kitchen.AdvanceCook(worker.CookingItemId, worker.Id, dt, WorkRate);
+                StreetFoodUnit unit = Kitchen.Find(worker.CookingItemId);
+                worker.CookingProgress = unit == null ? 0f : unit.Progress;
+                if (!complete) return;
+                if (!Kitchen.TakeCooked(worker.CookingItemId, worker.Id)) return;
+                worker.CarriedItemId = worker.CookingItemId;
+                if (!SetWorkerRoute(worker, KitchenLayout.DepositPosition(worker.Product)))
+                { Kitchen.CancelCook(worker.Id); ResetWorker(worker); return; }
+                worker.State = StreetWorkerState.ToTable;
+            }
+            else if (worker.State == StreetWorkerState.ToTable)
+            {
+                MoveWorker(worker, dt);
+                if (worker.Position == worker.Target && AdvanceWorkerRoute(worker))
+                { worker.State = StreetWorkerState.Deposit; worker.Delay = balance.pickupSeconds / WorkRate; }
+            }
+            else if (worker.State == StreetWorkerState.Deposit)
+            {
+                worker.Delay -= dt;
+                if (worker.Delay > 0f) return;
+                if (!Kitchen.DepositCooked(worker.CarriedItemId, worker.Id)) return;
+                ResetWorker(worker);
+            }
+        }
+
         private void Assign(StreetWorker worker)
         {
             // customers is append-ordered; walking it directly preserves FIFO priority instead of rotating workers.
@@ -884,6 +964,7 @@ namespace HayChoriYPaty
                     StreetOrderLine line = customer.GetOrderLine(i);
                     if (!IsWorkerResponsibleFor(worker, line.Product)) continue;
                     if (line.Remaining > line.Reserved && Kitchen.HasSupply(line.Product) &&
+                        (worker.Role != StreetWorkerRole.Mozo || Kitchen.AvailableTableCount(line.Product, worker.Id) > 0) &&
                         (line.OwnerWorkerId == 0 || line.OwnerWorkerId == worker.Id)) return line;
                 }
                 return null;
@@ -903,11 +984,12 @@ namespace HayChoriYPaty
 
         private bool IsWorkerResponsibleFor(StreetWorker worker, int product)
         {
-            return StreetSpecialties.IsResponsible(worker.Role, product);
+            return StreetSpecialties.IsDeliveryResponsible(worker.Role, product, UsesActiveCooks);
         }
 
         private void ClaimAndDispatch(StreetWorker worker, StreetCustomer customer, StreetOrderLine line)
         {
+            if (worker.Role == StreetWorkerRole.Mozo && Kitchen.ReserveTableUnit(line.Product, worker.Id) == null) return;
             line.OwnerWorkerId = worker.Id;
             if (HasSpecialtyWorkers)
             {
@@ -930,6 +1012,8 @@ namespace HayChoriYPaty
         {
             worker.PickupProgress = 0f;
             worker.PickupDuration = 0f;
+            if (worker.Role == StreetWorkerRole.Mozo && Kitchen.ReserveTableUnit(worker.Product, worker.Id) == null)
+            { CancelAssignment(worker); return; }
             if (!SetWorkerRoute(worker, KitchenLayout.PickupPosition(worker.Product))) { CancelAssignment(worker); return; }
             worker.State = StreetWorkerState.ToStation;
         }
@@ -1101,6 +1185,7 @@ namespace HayChoriYPaty
         private void CancelAssignment(StreetWorker worker)
         {
             if (worker.CarriedItemId > 0) Kitchen.ReturnCarried(worker.CarriedItemId, worker.Id);
+            Kitchen.ReleaseTableReservation(worker.Id);
             if (worker.Customer != null)
             {
                 for (int i = 0; i < worker.Customer.OrderLineCount; i++)
@@ -1118,7 +1203,8 @@ namespace HayChoriYPaty
         private static float LevelValue(float[] values, int index, float[] fallback) { return values != null && index < values.Length ? Mathf.Max(.01f, values[index]) : fallback[index]; }
         private void ResetTeamAndSpeed()
         {
-            Kitchen = new StreetKitchenProduction(balance.kitchen, availableProductsByLevel[LevelIndex], ingredientStock);
+            Array.Clear(productionCursor, 0, productionCursor.Length);
+            Kitchen = new StreetKitchenProduction(balance.kitchen, availableProductsByLevel[LevelIndex], ingredientStock, UsesActiveCooks);
             workers.Clear();
             nextWorker = 1;
             SpeedLevel = 0; // Zero purchased upgrades means the displayed speed is x1.00.
@@ -1127,10 +1213,15 @@ namespace HayChoriYPaty
         private void AddWorker() { AddWorker(StreetWorkerRole.Parrillero); }
         private void AddWorker(StreetWorkerRole role)
         {
+            // Production stays on the grill side of the original prep row; delivery stays on
+            // its counter side. Do not move furniture or route cooks through solid table bases.
+            Vector2 home = UsesActiveCooks && (role == StreetWorkerRole.Parrillero || role == StreetWorkerRole.ParrilleroPremium)
+                ? KitchenLayout.GrillWorkPosition(role == StreetWorkerRole.Parrillero ? 0 : 2, 0)
+                : WorkerHomePosition;
             workers.Add(new StreetWorker { Id = nextWorker++, Role = role, Product = -1,
-                Position = WorkerHomePosition, Target = WorkerHomePosition, State = StreetWorkerState.Idle });
+                Position = home, Target = home, State = StreetWorkerState.Idle });
         }
-        private void ResetWorker(StreetWorker w) { w.StepDistance = 0f; w.PickupProgress = 0f; w.PickupDuration = 0f; w.Customer = null; w.CustomerId = 0; w.Product = -1; w.CarriedItemId = 0; w.State = StreetWorkerState.Idle; w.Route = null; w.RouteIndex = 0; w.Target = w.Position; }
+        private void ResetWorker(StreetWorker w) { w.CookingProgress = 0f; w.CookingItemId = 0; w.StepDistance = 0f; w.PickupProgress = 0f; w.PickupDuration = 0f; w.Customer = null; w.CustomerId = 0; w.Product = -1; w.CarriedItemId = 0; w.State = StreetWorkerState.Idle; w.Route = null; w.RouteIndex = 0; w.Target = w.Position; }
         private static Vector2 Move(Vector2 from, Vector2 to, float speed, float dt) { return Vector2.MoveTowards(from, to, speed * dt); }
     }
 }

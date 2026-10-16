@@ -1,5 +1,7 @@
 # Modular kitchen — requested 2026-10-07, implemented and validated
 
+> Desde Racing (nivel6), [active-cooks-mozos](active-cooks-mozos.md) reemplaza únicamente la producción/traslado de sándwiches y el layout inferior. El flujo automático y la geometría aquí documentados continúan en niveles1–5.
+
 ## Scope / visual authority
 
 The user-supplied [layout reference](../../Assets/Art/Reference/modular-kitchen-layout-reference-20261007.jpg) is composition/style guidance only, never gameplay background. Requested: two separate empty grills with independently placed Chori/Paty vs Bondiola/Vacío; individual Raw/Cooked/Passed meat visuals (Cooking remains an internal timer phase), compact thick cylindrical Bondiola; independent bread sandwiches; three equivalent-size tables for normal/premium/Fernet; separate blue plastic beer/Coca barrels and containers/ice; Fernet served in an 800 cc disposable plastic cup with ice and no straw, with 1 L Branca and large Coca bottles displayed on the left side of its tabletop and prepared Fernet cups on the right. Bottom grills side by side, active preparation stations reflowed in catalog order Normal table→Premium table→Fernet table→Coca barrel→Beer barrel, clear circulation before counter; preserve UI, club scenery/fans/riots and catalog progression.

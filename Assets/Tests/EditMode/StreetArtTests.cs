@@ -1119,6 +1119,7 @@ namespace HayChoriYPaty.Tests
             });
             MethodInfo build = View.GetMethod("BuildResponsiveFooterLayout", BindingFlags.Static | BindingFlags.NonPublic);
             MethodInfo scaleCard = View.GetMethod("ScaleCardBounds", BindingFlags.Static | BindingFlags.NonPublic);
+            float commonPennantHeight = -1f;
             for (int level = 0; level < levelNames.Length; level++)
             {
                 object balance = Activator.CreateInstance(balanceType);
@@ -1132,6 +1133,9 @@ namespace HayChoriYPaty.Tests
                 Rect drawnBadge = new Rect(badge.x, badge.y * verticalScale, badge.width, badge.height);
                 Rect flags = (Rect)footerType.GetField("Pennants").GetValue(footer);
                 Assert.AreEqual(canvasHeight, flags.yMax, .1f, "Level " + level + " pennants should end flush with the safe footer edge.");
+                if (commonPennantHeight < 0f) commonPennantHeight = flags.height;
+                Assert.AreEqual(commonPennantHeight, flags.height, .1f,
+                    "Level " + level + " pennants should use the same height for this viewport.");
                 Assert.GreaterOrEqual(drawnBadge.yMin, stageBottom - .1f, "Level " + level + " footer entered the playfield.");
                 for (int i = 0; i < raw.Length; i++)
                 {
@@ -1167,8 +1171,15 @@ namespace HayChoriYPaty.Tests
                 Rect drawnReadyBadge = new Rect(readyBadge.x, readyBadge.y * verticalScale, readyBadge.width, readyBadge.height);
                 Assert.IsFalse(drawnSelector.Overlaps(drawnReadyBadge));
                 Rect readyFlags = (Rect)ready.GetType().GetField("Pennants").GetValue(ready);
+                Assert.AreEqual(commonPennantHeight, readyFlags.height, .1f,
+                    "Ready-state pennants should match the playing-state height.");
                 Assert.GreaterOrEqual(readyFlags.yMin, drawnSelector.yMax - .1f);
                 Assert.AreEqual(canvasHeight, readyFlags.yMax, .1f);
+
+                object noControls = build.Invoke(null, new object[] { sim, canvasHeight, false, false });
+                Rect noControlFlags = (Rect)noControls.GetType().GetField("Pennants").GetValue(noControls);
+                Assert.AreEqual(commonPennantHeight, noControlFlags.height, .1f,
+                    "Level-selection pennants should match the gameplay height.");
             }
         }
 

@@ -38,3 +38,8 @@ Visual code review found the native Cocacolero borrowed an empty-handed carry po
 ### 2026-10-12 — Front-facing, closer Cocacolero pickup
 
 During an empty-handed Cocacolero barrel-pickup dwell, presentation now forces the existing front-facing reach pose, independent of the worker's last route direction; normal route-facing resumes outside the pickup state. Coca/beer pickup anchors moved from 12 to 2 logical units in front of each barrel (10 units closer), retaining 2 units of worker-foot clearance. Routes still use the shared catalog layout; pickup duration, inventory withdrawal, carried-item timing, movement, and delivery logic are unchanged. Focused EditMode regressions cover front-facing state and all 11 catalog layouts; Unity execution/visual capture status is pending.
+
+
+## Racing+ Mozo — 2026-10-15
+
+[Active cooks and Mozos](active-cooks-mozos.md) agrega Mozo4 con variante de delantal verde del atlas original y mantiene piel/cara/alpha/gait de80unidades. ToGrill/ToTable usan locomoción existente; Deposit reutiliza reach; cualquier transporte requiere CarriedItemId real. El agarre trasero de los nuevos viajes deja la unidad visible junto al antebrazo. Cocción muestra progreso real independiente y anillos separados. Render activo aplica profundidad coherente con muebles/pies; niveles1–5 conservan su proyección previa. Validación:71EditMode+7PlayMode y rechecks focalizados; capturas nativas en1080×1920/1440×2960/320×568.
