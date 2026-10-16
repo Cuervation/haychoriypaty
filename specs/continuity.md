@@ -2,13 +2,13 @@
 
 ## 1. Último estado confirmado — 2026-10-16
 
-Juego Unity Android de 11 niveles. Escenario original restaurado con más circulación desde Racing, sin adelantar Fernet ni agregar mesa lateral de chimi; se mantienen cocineros activos y Mozos. Personajes/flechas centrados en óvalos y ×1/+10% separados del precio. APK 0.2.39/code41 instalada en Motorola por `adb install -r`; PackageManager verificó ambos valores. No se abrió el juego en esa instalación: no equivale a QA del nuevo runtime en teléfono.
+Juego Unity Android de 11 niveles. Escenario original restaurado con más circulación desde Racing, sin adelantar Fernet ni agregar mesa lateral de chimi; se mantienen cocineros activos y Mozos. Personajes/flechas centrados en óvalos y ×1/+10% separados del precio. La última instalada sigue siendo0.2.39/code41 en el Motorola; PackageManager había confirmado esos valores. Se generó0.2.40/code42 con el fix y no se instaló ni abrió. No equivale a QA del nuevo runtime en teléfono.
 
 **APK0.2.40/code42 generada** con el cobro corregido; build verificado, aún no instalado. Cada victoria real cobra50%ventas+2×sobrante, por intento; recupera$3570del último recibo del teléfono (test compra$825faltantes de3y deja$2745). 32regresiones aprobadas, más dos auditorías11desde progreso existente. Campaña fresca ganó1–9, perdió10por13Chori en mejor política; no se declara recorrido1–11 completo. Evidencia: [status.md](status.md).
 
 ## 2. Rama, versión y entorno de referencia
 
-- **Checkout real:** `/Users/celestino/HayChoriYPaty`; rama `codex/street-automation`, HEAD de referencia `6fcbf39` (registro de entrega), código `f077324`, remoto `https://github.com/Cuervation/haychoriypaty.git`. Ambos commits fueron subidos. Esta auditoría documental posterior no implica otro commit/push.
+- **Checkout real:** `/Users/celestino/HayChoriYPaty`; rama `codex/street-automation`, HEAD `1f83e6c` (`Fix Mercado victory payout and ship Android 0.2.40`), también `origin/codex/street-automation`; commit anterior de instalación `f077324`; remoto `https://github.com/Cuervation/haychoriypaty.git`. Push verificado.
 - La carpeta `/Users/celestino/Documents/ChatGPT/Hay Chori y Paty` es una copia inicial sin commits, no el juego activo. No implementar sobre ella ni sincronizar sus assets/código.
 - Unity **6000.6.3f1**, Main, Android; PlayerSettings **0.2.40/code42** (APK generada, no instalada). Build Development IL2CPP/ARM64, firma debug (no release Play Store). Artefacto y hash en [android-prototype.md](features/android-prototype.md).
 - App instalada **26.1002.52244/build13536**, CLI **0.162.0-alpha.2**. Roles conservados: architecture Sol/medium; implementation Luna/medium; validation Luna/low. `.codex/config.toml`: dos subagentes más el principal. Config global leída, no modificada: `gpt-6.1-sol`/`xhigh`; no certifica un override de modelo/esfuerzo de este chat.
@@ -60,4 +60,4 @@ Usar [README.md](README.md) para elegir un contrato; [status.md](status.md) y [d
 
 ## 10. Próximos pasos autorizados
 
-La solicitud vigente autoriza investigar economía desde el inicio, corregir el cobro de **cada victoria real**, probar y recuperar autónomamente la conexión Unity; preservar progreso. Falta resolver/aceptar el balance de10y repetir una campaña fresca ganadora1–11. No se autorizaron nuevos precios/metas/tiempos, configuración global/trust ni instalación en esta tarea. El pedido posterior autoriza generar APK y push; no instalar sin pedido explícito.
+La solicitud vigente autoriza investigar economía desde el inicio, corregir el cobro de **cada victoria real**, probar y recuperar autónomamente la conexión Unity; preservar progreso. Falta resolver/aceptar el balance de10y repetir una campaña fresca ganadora1–11. No se autorizaron nuevos precios/metas/tiempos, configuración global/trust ni instalación en esta tarea. El pedido posterior autorizó build y push: APK0.2.40 generada y commit1f83e6c publicado. Sin pedido de instalación, el teléfono conserva0.2.39. No cambiar tiempos/precios ni campaña pendiente para forzar11/11.

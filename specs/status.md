@@ -2,7 +2,7 @@
 
 - Unity/MCP build `build-38c7ba9d9d`: Main-only Development IL2CPP/ARM64, **success 284.55s, 0 errors/1 warning**. PlayerSettings advanced from0.2.39/code41 to0.2.40/code42.
 - Archive APK `Builds/Android/Archive/HayChoriYPaty-0.2.40-code42-every-victory-market.apk`, versioned `Builds/Android/HayChoriYPaty-0.2.40.apk` and rolling `Builds/Android/HayChoriYPaty-street.apk`:477523029bytes each, SHA-256 `18f6366ba50e33cbbcc2d02f85e48e27bc3bbd18a80f39b31e7dbb9996e8a7ff`. `aapt`, `unzip -t`, `apksigner` v2 verified; Development/debug signature. Not installed/launched.
-- Source push requested in the same turn; commit/hash is recorded after the push below. No commit/push result is inferred from this entry alone.
+- Fuente, pruebas y documentación solicitadas quedaron en `1f83e6c` (`Fix Mercado victory payout and ship Android 0.2.40`), rama `codex/street-automation`, publicada en `origin` el2026-10-16. APK solo generada; no se instaló.
 
 # Historial de estado y validaciones
 
