@@ -1,0 +1,127 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function owner(uid) {
+      return request.auth != null && request.auth.uid == uid
+        && request.auth.token.firebase.sign_in_provider == 'google.com';
+    }
+    function current(uid) { return /databases/$(database)/documents/players/$(uid)/state/current; }
+    function operation(uid, id) { return /databases/$(database)/documents/players/$(uid)/operations/$(id); }
+    function stock(a) {
+      return a is list && a.size() == 10
+        && a[0] is int && a[0] >= 0 && a[1] is int && a[1] >= 0
+        && a[2] is int && a[2] >= 0 && a[3] is int && a[3] >= 0
+        && a[4] is int && a[4] >= 0 && a[5] is int && a[5] >= 0
+        && a[6] is int && a[6] >= 0 && a[7] is int && a[7] >= 0
+        && a[8] is int && a[8] >= 0 && a[9] is int && a[9] >= 0;
+    }
+    function stateShape(uid, d) {
+      return d.keys().hasOnly(['schemaVersion','uid','revision','operationId','payloadHash','snapshot','unlockedLevel','balanceCents','stockUnits','updatedAt'])
+        && d.schemaVersion == 1 && d.uid == uid && d.revision is int && d.revision > 0
+        && d.operationId is string && d.operationId.matches('[a-f0-9]{32}')
+        && d.payloadHash is string && d.payloadHash.matches('[a-f0-9]{64}')
+        && d.snapshot is string && d.snapshot.size() > 0 && d.snapshot.size() <= 450000
+        && d.unlockedLevel is int && d.unlockedLevel >= 0 && d.unlockedLevel <= 10
+        && d.balanceCents is int && d.balanceCents >= 0 && stock(d.stockUnits)
+        && d.updatedAt == request.time;
+    }
+    function receiptMatches(uid, d, previous) {
+      let receipt = getAfter(operation(uid, d.operationId)).data;
+      return !exists(operation(uid, d.operationId)) && receipt.uid == uid
+        && receipt.operationId == d.operationId && receipt.revision == d.revision
+        && receipt.previousRevision == previous && receipt.payloadHash == d.payloadHash;
+    }
+    function workers(a) {
+      return a is list && a.size() == 5 && a[0] is int && a[0] >= 0
+        && a[1] is int && a[1] >= 0 && a[2] is int && a[2] >= 0
+        && a[3] is int && a[3] >= 0 && a[4] is int && a[4] >= 0;
+    }
+    function sales(a) {
+      return a is list && a.size() == 7 && a[0] is int && a[0] >= 0
+        && a[1] is int && a[1] >= 0 && a[2] is int && a[2] >= 0
+        && a[3] is int && a[3] >= 0 && a[4] is int && a[4] >= 0
+        && a[5] is int && a[5] >= 0 && a[6] is int && a[6] >= 0;
+    }
+    function matchShape(d) {
+      return d.keys().hasOnly(['id','attemptId','uid','operationId','revision','schemaVersion','committedAt',
+        'utc','level','club','result','won','abandoned','elapsedSeconds','salesByProduct',
+        'grossSalesCents','hireSpendCents','speedSpendCents','initialCoinsCents','leftoverCents',
+        'halfSalesRewardCents','leftoverBonusCents','progressionBonusCents','rewardCents',
+        'stockConsumed','stockRemaining','hiresByRole','customersAttended','customersLost','ordersCompleted','recordsReached'])
+        && d.utc is string && d.utc.size() <= 64 && d.club is string && d.club.size() <= 128
+        && d.elapsedSeconds is number && d.elapsedSeconds >= 0
+        && d.won is bool && d.abandoned is bool
+        && ((d.result == 'won' && d.won && !d.abandoned)
+          || (d.result == 'lost' && !d.won && !d.abandoned)
+          || (d.result == 'abandoned' && d.abandoned && !d.won && d.rewardCents == 0))
+        && d.hireSpendCents is int && d.hireSpendCents >= 0 && d.speedSpendCents is int && d.speedSpendCents >= 0
+        && d.initialCoinsCents is int && d.initialCoinsCents >= 0 && d.leftoverCents is int && d.leftoverCents >= 0
+        && d.halfSalesRewardCents is int && d.halfSalesRewardCents >= 0
+        && d.leftoverBonusCents is int && d.leftoverBonusCents >= 0
+        && d.progressionBonusCents is int && d.progressionBonusCents >= 0
+        && d.rewardCents == d.halfSalesRewardCents + d.leftoverBonusCents + d.progressionBonusCents
+        && d.customersAttended is int && d.customersAttended >= 0
+        && d.customersLost is int && d.customersLost >= 0 && d.ordersCompleted is int && d.ordersCompleted >= 0
+        && d.recordsReached is int && d.recordsReached >= 0 && d.recordsReached <= 3;
+    }
+    match /players/{uid}/state/current {
+      allow read: if owner(uid);
+      allow create: if owner(uid) && stateShape(uid, request.resource.data)
+        && request.resource.data.revision == 1 && receiptMatches(uid, request.resource.data, 0);
+      allow update: if owner(uid) && stateShape(uid, request.resource.data)
+        && request.resource.data.revision == resource.data.revision + 1
+        && receiptMatches(uid, request.resource.data, resource.data.revision);
+      allow delete: if false;
+    }
+    function linkedMatch(uid, opId, d) {
+      let result = getAfter(/databases/$(database)/documents/players/$(uid)/matches/$(d.matchId)).data;
+      return result.id == d.matchId && result.attemptId == d.matchId && result.uid == uid
+        && result.operationId == opId && result.revision == d.revision;
+    }
+    function validOperation(uid, opId) {
+      let d = request.resource.data;
+      let after = getAfter(current(uid)).data;
+      return d.keys().hasOnly(['schemaVersion','uid','operationId','revision','previousRevision','payloadHash','matchId','createdAt'])
+        && d.schemaVersion == 1 && d.uid == uid
+        && d.operationId == opId && opId.matches('[a-f0-9]{32}')
+        && d.previousRevision is int && d.previousRevision >= 0
+        && d.revision is int && d.revision == d.previousRevision + 1
+        && d.payloadHash is string && d.payloadHash.matches('[a-f0-9]{64}')
+        && d.matchId is string && (d.matchId == '' || d.matchId.matches('[a-f0-9]{32}'))
+        && d.createdAt == request.time
+        && after.operationId == opId && after.revision == d.revision
+        && after.payloadHash == d.payloadHash
+        && (d.matchId == '' || linkedMatch(uid, opId, d));
+    }
+    function validMatch(uid, matchId) {
+      let d = request.resource.data;
+      let after = getAfter(current(uid)).data;
+      let receipt = getAfter(operation(uid, d.operationId)).data;
+      return d.schemaVersion == 1 && d.uid == uid && d.id == matchId
+        && matchId.matches('[a-f0-9]{32}') && d.attemptId == matchId
+        && d.operationId is string && d.operationId.matches('[a-f0-9]{32}')
+        && d.revision is int && d.revision > 0
+        && d.level is int && d.level >= 0 && d.level <= 10
+        && d.grossSalesCents is int && d.grossSalesCents >= 0
+        && d.rewardCents is int && d.rewardCents >= 0
+        && d.committedAt == request.time
+        && d.stockRemaining == after.stockUnits
+        && after.operationId == d.operationId && after.revision == d.revision
+        && !exists(operation(uid, d.operationId)) && receipt.matchId == matchId
+        && matchShape(d) && sales(d.salesByProduct) && workers(d.hiresByRole)
+        && stock(d.stockConsumed);
+    }
+    match /players/{uid}/operations/{opId} {
+      allow read: if owner(uid);
+      allow create: if owner(uid) && validOperation(uid, opId);
+      allow update, delete: if false;
+    }
+    match /players/{uid}/matches/{matchId} {
+      allow read: if owner(uid);
+      allow create: if owner(uid) && validMatch(uid, matchId);
+      allow update, delete: if false;
+    }
+    // No public profile, other-player state, deletes, or unscoped writes.
+    match /{document=**} { allow read, write: if false; }
+  }
+}

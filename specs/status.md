@@ -1,3 +1,7 @@
+## 2026-10-16 — Firebase en preparación, no publicado
+
+Implementación local de Google obligatorio/perfiles UID/outbox/CAS y estadísticas. Emulador187/187; compilación estática administrada y puente Java, no pruebas Unity/Android ni conexión real. Acceso a `haychoriypaty` denegado a cuenta actual y Editor en diálogo externo de Main bloquean aceptación. No APK ni cambios en teléfono. Detalle y pasos exactos: [firebase-player.md](features/firebase-player.md#informe-verificable-de-entrega--2026-10-16). La APK instalada anterior no contiene Firebase.
+
 ## 2026-10-16 — Android0.2.40 build and source push requested
 
 - Unity/MCP build `build-38c7ba9d9d`: Main-only Development IL2CPP/ARM64, **success 284.55s, 0 errors/1 warning**. PlayerSettings advanced from0.2.39/code41 to0.2.40/code42.

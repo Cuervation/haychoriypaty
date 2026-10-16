@@ -1,5 +1,9 @@
 {
   "dependencies": {
+    "com.google.external-dependency-manager": "file:FirebaseSDK/com.google.external-dependency-manager-1.2.190.tgz",
+    "com.google.firebase.app": "file:FirebaseSDK/com.google.firebase.app-14.0.0.tgz",
+    "com.google.firebase.auth": "file:FirebaseSDK/com.google.firebase.auth-14.0.0.tgz",
+    "com.google.firebase.firestore": "file:FirebaseSDK/com.google.firebase.firestore-14.0.0.tgz",
     "com.coplaydev.unity-mcp": "https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#v10.0.0",
     "com.unity.ai.navigation": "2.0.14",
     "com.unity.collab-proxy": "2.13.6",

@@ -604,7 +604,8 @@ namespace HayChoriYPaty
         }
         private void HandlePointer(Vector2 pixel, bool down, bool up)
         {
-            if (game == null || game.Sim == null) return;
+            if (game == null || !game.IsPlayerActive || game.Sim == null ||
+                (Cloud.FirebasePlayerSession.Instance != null && Cloud.FirebasePlayerSession.Instance.BlocksGameInput)) return;
             Rect v = CanvasViewport(new Vector2(Screen.width,Screen.height),Screen.safeArea);
             if (v.width <= 0) return;
             logicalCanvasHeight = CanvasLogicalHeight(v);
@@ -816,9 +817,12 @@ namespace HayChoriYPaty
                 (phase == RoundPhase.Ready && catalogActionCount <= 3);
         }
 
+        public bool AccountMenuVisible => introActive || levelSelectActive;
+
         private void OnGUI()
         {
-            if (game==null||game.Sim==null) return;
+            if (game==null||!game.IsPlayerActive||game.Sim==null ||
+                (Cloud.FirebasePlayerSession.Instance != null && Cloud.FirebasePlayerSession.Instance.BlocksGameInput)) return;
             Styles(); Rect v=CanvasViewport(new Vector2(Screen.width,Screen.height),Screen.safeArea); if(v.width<=0)return;
             logicalCanvasHeight = CanvasLogicalHeight(v);
             layoutVerticalScale = logicalCanvasHeight / H;
@@ -2462,7 +2466,14 @@ namespace HayChoriYPaty
         }
         // The cover is the sole visual source for ordinary runtime buttons.
         // Special upgrade cards and image-based level tiles retain their explicitly selected designs.
-        private void DrawStandardButton(Rect bounds, int action, string caption, bool enabled = true)
+        public void DrawAccountButton(Rect bounds, string caption, System.Action activated)
+        {
+            Styles(); float previousScale = layoutVerticalScale; layoutVerticalScale = 1f;
+            try { DrawStandardButton(bounds, int.MinValue, caption, true, activated); }
+            finally { layoutVerticalScale = previousScale; }
+        }
+
+        private void DrawStandardButton(Rect bounds, int action, string caption, bool enabled = true, System.Action activated = null)
         {
             bool interactive = enabled && GUI.enabled;
             bool pressed = interactive && pressedAction == action;
@@ -2490,7 +2501,7 @@ namespace HayChoriYPaty
                             letters.width, letters.height), caption, borderStyle);
                 GUI.Label(letters, caption, captionStyle);
                 GUI.enabled = interactive;
-                if (GUI.Button(hitBounds, "", invisible)) NativeAction(action);
+                if (GUI.Button(hitBounds, "", invisible)) { if (activated != null) activated(); else NativeAction(action); }
             }
             finally
             {

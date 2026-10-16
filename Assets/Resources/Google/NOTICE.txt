@@ -1,0 +1,5 @@
+Google sign-in branding assets, used only for the Google authentication button.
+Google G: https://developers.google.com/static/identity/images/g-logo.png
+Google Sans Medium: https://fonts.googleapis.com/css2?family=Google+Sans:wght@500
+Branding guidelines: https://developers.google.com/identity/branding-guidelines
+Google marks are trademarks of Google LLC. Do not recolor, distort, or repurpose the G.

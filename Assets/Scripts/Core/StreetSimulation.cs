@@ -210,6 +210,7 @@ namespace HayChoriYPaty
         internal float ReceiveRemaining;
         internal int Slot;
         internal bool DeliverySoundPlayed;
+        internal bool WasServed;
 
         public StreetOrderLine GetOrderLine(int index) => index >= 0 && index < orderLines.Count ? orderLines[index] : null;
         public StreetOrderLine GetPendingOrderLine(int pendingIndex)
@@ -316,6 +317,7 @@ namespace HayChoriYPaty
         private float arrival;
         private int nextCustomer = 1, nextWorker = 1, nextSale = 1;
         private readonly int[] deliveredByProduct = new int[7];
+        private int customersAttended, customersLost, ordersCompleted;
         private float price;
         private System.Random random;
         private IStreetKitchenStock ingredientStock;
@@ -328,6 +330,9 @@ namespace HayChoriYPaty
         public int Coins { get; private set; }
         public int CoinsEarned { get; private set; }
         public int Delivered { get; private set; }
+        public int CustomersAttended => customersAttended;
+        public int CustomersLost => customersLost;
+        public int OrdersCompleted => ordersCompleted;
         public int ChoriDelivered { get { return GetProductDelivered(0); } }
         public int CocaDelivered { get { return GetProductDelivered(4); } }
         // Aggregate target is retained for summaries only; it is never a victory predicate.
@@ -546,7 +551,8 @@ namespace HayChoriYPaty
         {
             customers.Clear(); sales.Clear();
             Coins = balance.GetStartingCoins(LevelIndex); CoinsEarned = 0; // Opening balance is a configured attempt grant, not earned revenue.
-            Elapsed = 0f; Delivered = 0; Array.Clear(deliveredByProduct, 0, deliveredByProduct.Length);
+            Elapsed = 0f; Delivered = 0; customersAttended = customersLost = ordersCompleted = 0;
+            Array.Clear(deliveredByProduct, 0, deliveredByProduct.Length);
             // Every round entry is a fresh attempt, regardless of selected club.
             ResetTeamAndSpeed();
             foreach (StreetWorker worker in workers) ResetWorker(worker);
@@ -595,6 +601,8 @@ namespace HayChoriYPaty
             RefreshKitchenLayout();
             ResetTeamAndSpeed();
             Coins = balance.GetStartingCoins(LevelIndex); CoinsEarned = 0;
+            customersAttended = customersLost = ordersCompleted = 0;
+            Array.Clear(deliveredByProduct, 0, deliveredByProduct.Length); Delivered = 0;
             return true;
         }
         public bool NextLevel()
@@ -604,6 +612,8 @@ namespace HayChoriYPaty
             RefreshKitchenLayout();
             ResetTeamAndSpeed();
             Coins = balance.GetStartingCoins(LevelIndex); CoinsEarned = 0;
+            customersAttended = customersLost = ordersCompleted = 0;
+            Array.Clear(deliveredByProduct, 0, deliveredByProduct.Length); Delivered = 0;
             Phase = RoundPhase.Ready; return true;
         }
 
@@ -773,10 +783,10 @@ namespace HayChoriYPaty
                 }
                 if (c.State == StreetCustomerState.Waiting || c.State == StreetCustomerState.Advancing)
                 { c.Patience -= dt; c.PatienceFraction = Mathf.Clamp01(c.Patience / Mathf.Max(0.1f, balance.customerPatienceSeconds)); }
-                if (c.Patience <= 0f && c.State != StreetCustomerState.Leaving) SetLeaving(c);
+                if (c.Patience <= 0f && c.State != StreetCustomerState.Leaving) SetLeaving(c, true);
                 // A sold-out extra ticket must not block FIFO lanes behind it. Preserve its pending
                 // quantities and normal departure/cancellation; never count it as a completed order.
-                if (c.State == StreetCustomerState.Waiting && IsAtCounter(c) && OnlySoldOutExtrasRemain(c)) SetLeaving(c);
+                if (c.State == StreetCustomerState.Waiting && IsAtCounter(c) && OnlySoldOutExtrasRemain(c)) SetLeaving(c, false);
                 if (c.State == StreetCustomerState.Leaving) { c.Position = Move(c.Position, c.Target, 180f, dt); if (c.Position == c.Target) RemoveCustomer(c); }
                 if(c.State==StreetCustomerState.Receiving) { c.ReceiveRemaining-=dt; if(c.ReceiveRemaining<=0f) { if(!HasOutstandingItems(c))SetLeaving(c);else c.State=c.Position==c.Target?StreetCustomerState.Waiting:StreetCustomerState.Advancing; } }
             }
@@ -1063,6 +1073,7 @@ namespace HayChoriYPaty
                 customer.State = StreetCustomerState.Receiving; customer.ReceiveRemaining = .3f;
                 Delivered++;
                 deliveredByProduct[worker.Product]++;
+                if (!customer.WasServed) { customer.WasServed = true; customersAttended++; }
                 int amount = Mathf.Max(0, Mathf.RoundToInt(GetProductPrice(worker.Product)));
                 Coins += amount; CoinsEarned += amount; sales.Add(new StreetSale { Id = nextSale++, Amount = amount, Position = new Vector2(customer.Target.x, 400) });
                 customer.Patience = Mathf.Max(0.1f, balance.deliveryPatienceRefreshSeconds);
@@ -1101,6 +1112,7 @@ namespace HayChoriYPaty
                 if (!customer.DeliverySoundPlayed && customer.PendingOrderLineCount == 0 && customer.Reserved == 0)
                 {
                     customer.DeliverySoundPlayed = true;
+                    ordersCompleted++;
                     OrderCompleted?.Invoke();
                 }
                 ResetWorker(worker);
@@ -1116,9 +1128,11 @@ namespace HayChoriYPaty
             customers.Remove(c);
             if (column >= 0) CompactQueue(column);
         }
-        private void SetLeaving(StreetCustomer c)
+        private void SetLeaving(StreetCustomer c) { SetLeaving(c, false); }
+        private void SetLeaving(StreetCustomer c, bool impatient)
         {
             if (c.State == StreetCustomerState.Leaving) return;
+            if (impatient) customersLost++;
             int column = c.Slot % QueueColumns;
             c.State = StreetCustomerState.Leaving; c.Target = new Vector2(c.Position.x < 270 ? -50 : 590, c.Position.y);
             c.Slot = -1; // No longer in the queue, but still counted until the exit walk ends.

@@ -11,6 +11,7 @@
 | Cocineros 0,5 s, Mozo, seis cards y ampliación desde Racing | [active-cooks-mozos.md](features/active-cooks-mozos.md) (incluye restauración posterior del escenario) |
 | Cocina modular, stock físico, geometría y proyección | [modular-kitchen.md](features/modular-kitchen.md) (modo base niveles 1–5; Racing+ aplica el delta anterior) |
 | Mercado/Heladera persistentes y compras sin crédito | [market-fridge.md](features/market-fridge.md) |
+| Firebase/Google obligatorio, perfiles UID, outbox y estado de integración | [firebase-player.md](features/firebase-player.md) (implementación local, aceptación real pendiente) |
 | Workers, gait y agarre físico | [worker-animation.md](features/worker-animation.md) |
 | Arte/UI y composición | [visual-reference.md](visual-reference.md) (solo si se modifica presentación) |
 | Límites de código/render/persistencia | [architecture.md](architecture.md) |

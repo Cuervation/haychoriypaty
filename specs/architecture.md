@@ -4,7 +4,7 @@ Consultar [README.md](README.md) para el contrato de cada tarea y [continuity.md
 
 ## Runtime y responsabilidades
 
-- `StreetGame` (MonoBehaviour): lifecycle, configuración `StreetBalance`, comandos, progresión y save JSON PlayerPrefs v4 con Mercado. Normaliza campos legacy; no restaura equipos comprados ni partidas en vuelo.
+- `StreetGame` (MonoBehaviour): lifecycle, configuración `StreetBalance`, comandos, progresión y payload JSON v4 con Mercado, activado por repositorio de cuenta; PlayerPrefs original queda como legado protegido. Normaliza campos legacy; no restaura equipos comprados ni partidas en vuelo.
 - `StreetSimulation` (C#): clientes/colas FIFO, paciencia, workers, rutas, reservas/ownership, unidades, handoff, ingresos, cuotas y resultados. Siete columnas y hasta21clientes. Subpasos limitados/catch-up acotado; contratación sin tope de gameplay, velocidad sí limitada.
 - `StreetKitchenProduction`: IDs físicos y estados/reservas/capacidades. Lo avanza la simulación; producción/render nunca acreditan ventas por sí solos. `StreetMarket` enlaza recetas/ingredientes mediante `IStreetKitchenStock`.
 - `StreetView`: dibujo IMGUI y un catálogo compartido de acciones/hit-test. Canvas seguro de ancho540 y altura adaptable para interacción; escena/HUD decorativos pueden llenar pantalla física con su transformación separada. El puente Input System es para editor/desktop; Android GameActivity no debe duplicar el despacho nativo de touch IMGUI.
@@ -12,7 +12,7 @@ Consultar [README.md](README.md) para el contrato de cada tarea y [continuity.md
 - `StreetKitchenLayout`: única geometría activa de muebles/anchors/obstáculos/rutas. Ajuste modular uniforme760→540; pies36×12 y proporciones de worker90×98. Grafo de visibilidad sobre bases sólidas expandidas: ruta directa/diagonal si es segura, cada tramo desde la posición real. No NavMesh ni colisión worker-vs-worker.
 - `StreetKitchenRenderer` y proyección/animación de workers: prefabs/objetos SpriteRenderer independientes renderizados en capas transparentes en vivo, compuestas por IMGUI. Carga/palma/profundidad siguen el ID real; nada de producto duplicado horneado. Texturas/sprites derivados cacheados y liberados al desactivar. `StreetKitchenPrefabBuilder` editor conserva GUIDs al regenerar sprites alpha-trimmed; no requiere Sprite Editor nuevo.
 
-Main usa una simulación, una escena y los paquetes URP/Input System existentes. Mantener desactivado `GameController`/`PrototypeView`, que son el prototipo histórico con tests/escena/GUIDs conservados. Sin servicios externos, framework de DI, uGUI paralelo ni dependencias nuevas por conveniencia.
+Main usa una simulación, una escena y los paquetes URP/Input System existentes. Mantener desactivado `GameController`/`PrototypeView`, que son el prototipo histórico con tests/escena/GUIDs conservados. Firebase/Auth Google es la extensión autorizada de persistencia; ver [contrato y estado](features/firebase-player.md). Sin framework de DI, uGUI paralelo ni dependencias nuevas por conveniencia.
 
 ## Cinco roles y responsabilidad de productos
 

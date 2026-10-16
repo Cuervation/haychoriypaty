@@ -1,0 +1,369 @@
+using System;
+using System.Reflection;
+using NUnit.Framework;
+using UnityEngine;
+
+namespace HayChoriYPaty.Tests
+{
+    /// <summary>Runtime types live in predefined Assembly-CSharp; keep this asmdef suite reflection-only.</summary>
+    public sealed class StreetPlayerStatisticsTests
+    {
+        private const BindingFlags PublicInstance = BindingFlags.Instance | BindingFlags.Public;
+        private const BindingFlags NonPublicInstance = BindingFlags.Instance | BindingFlags.NonPublic;
+        private const BindingFlags StaticPublic = BindingFlags.Static | BindingFlags.Public;
+        private Type statisticsType, recordType, gameType, saveDataType, simulationType;
+        private Func<string, object, bool> persistHandler;
+
+        [SetUp]
+        public void SetUp()
+        {
+            statisticsType = RuntimeType("StreetPlayerStatistics");
+            recordType = RuntimeType("StreetMatchRecord");
+            gameType = RuntimeType("StreetGame");
+            saveDataType = gameType.GetNestedType("SaveData", BindingFlags.Public);
+            simulationType = RuntimeType("StreetSimulation");
+        }
+
+        private static Type RuntimeType(string name) => Type.GetType("HayChoriYPaty." + name + ", Assembly-CSharp", true);
+        private static void SetEditorTestInitialization(Type type, bool value) => type.GetField("AllowEditorTestInitialization", StaticPublic).SetValue(null, value);
+        private static object ReadProperty(object instance, string name) => instance.GetType().GetProperty(name, PublicInstance).GetValue(instance, null);
+        private static object ReadField(object instance, string name) => instance.GetType().GetField(name, PublicInstance | NonPublicInstance).GetValue(instance);
+        private static void WriteField(object instance, string name, object value) => instance.GetType().GetField(name, PublicInstance | NonPublicInstance).SetValue(instance, value);
+        private static object Invoke(object instance, string method, params object[] args) => instance.GetType().GetMethod(method, PublicInstance).Invoke(instance, args);
+        private static object Deserialize(Type type, string json) => JsonUtility.FromJson(json, type);
+
+        private Delegate PersistDelegate(Type targetType)
+        {
+            Type callbackType = typeof(Func<,,>).MakeGenericType(typeof(string), targetType, typeof(bool));
+            MethodInfo generic = GetType().GetMethod(nameof(Persist), BindingFlags.Instance | BindingFlags.NonPublic).MakeGenericMethod(targetType);
+            return Delegate.CreateDelegate(callbackType, this, generic);
+        }
+
+        private bool Persist<T>(string json, T record) => persistHandler(json, record);
+
+        private object NewGame(GameObject gameObject) => gameObject.AddComponent(gameType);
+
+        private bool Activate(object game, string json, Func<string, object, bool> handler)
+        {
+            persistHandler = handler;
+            return (bool)gameType.GetMethod("ActivatePlayer", PublicInstance).Invoke(game, new object[] { json, PersistDelegate(recordType) });
+        }
+
+        private object NewStatistics() => Activator.CreateInstance(statisticsType);
+        private object NewRecord() => Activator.CreateInstance(recordType);
+        private bool Apply(object statistics, object record) => (bool)statisticsType.GetMethod("ApplyMatch", PublicInstance).Invoke(statistics, new[] { record });
+        private bool ApplyRecovered(object statistics, object summary) =>
+            (bool)statisticsType.GetMethod("ApplyRecoveredAttemptMetrics", PublicInstance).Invoke(statistics, new[] { summary });
+        private static long[] LongArray(object instance, string field) => (long[])ReadField(instance, field);
+
+        [Test]
+        public void MatchCountersUseFixedCatalogSizesAndApplyAttemptOnce()
+        {
+            object statistics = NewStatistics();
+            object record = NewRecord();
+            WriteField(record, "id", "record-id"); WriteField(record, "attemptId", "attempt-id");
+            WriteField(record, "level", 4); WriteField(record, "won", true);
+            WriteField(record, "elapsedSeconds", 42f); WriteField(record, "grossSalesCents", 12000L);
+            WriteField(record, "salesByProduct", new long[] { 2, 1, 0, 0, 0, 0, 0 });
+            WriteField(record, "stockConsumed", new long[10]); WriteField(record, "stockRemaining", new long[10]);
+            WriteField(record, "hiresByRole", new long[5]);
+            WriteField(record, "customersAttended", 3L); WriteField(record, "customersLost", 1L); WriteField(record, "ordersCompleted", 2L);
+            Assert.IsTrue(Apply(statistics, record));
+            Assert.IsFalse(Apply(statistics, record), "A retry for the current attempt must not double counters.");
+            Assert.AreEqual(2, LongArray(statistics, "deliveredByProduct")[0]);
+            Assert.AreEqual(1, LongArray(statistics, "deliveredByProduct")[1]);
+            Assert.AreEqual(1L, ReadField(statistics, "wins"));
+            Assert.AreEqual(1, LongArray(statistics, "winsByLevel")[4]);
+            Assert.AreEqual(42f, ((float[])ReadField(statistics, "bestWinTimeByLevel"))[4]);
+            Assert.AreEqual(3L, ReadField(statistics, "customersAttended"));
+            Assert.AreEqual(1L, ReadField(statistics, "customersLost"));
+            Assert.AreEqual(2L, ReadField(statistics, "ordersCompleted"));
+            Assert.AreEqual(7, LongArray(statistics, "deliveredByProduct").Length);
+            Assert.AreEqual(10, LongArray(statistics, "consumedUnitsByIngredient").Length);
+            Assert.AreEqual(5, LongArray(statistics, "paidHiresByRole").Length);
+            Assert.AreEqual(11, LongArray(statistics, "winsByLevel").Length);
+        }
+
+        [Test]
+        public void MatchAggregatesSalesRewardsAndInitialCoinsWithoutDoubleCountingHires()
+        {
+            object statistics = NewStatistics();
+            WriteField(statistics, "paidHiresByRole", new long[] { 1, 0, 0, 0, 0 });
+            object record = NewRecord();
+            WriteField(record, "attemptId", "attempt-ledger"); WriteField(record, "won", true);
+            WriteField(record, "grossSalesCents", 12345L); WriteField(record, "rewardCents", 4000L);
+            WriteField(record, "initialCoinsCents", 2500L); WriteField(record, "hiresByRole", new long[] { 1, 0, 0, 0, 0 });
+            WriteField(record, "salesByProduct", new long[7]); WriteField(record, "stockConsumed", new long[10]);
+            Assert.IsTrue(Apply(statistics, record));
+            Assert.AreEqual(12345L, ReadField(statistics, "grossSalesCents"));
+            Assert.AreEqual(4000L, ReadField(statistics, "totalMarketRewardsCents"));
+            Assert.AreEqual(2500L, ReadField(statistics, "initialFreeCoinsCents"));
+            Assert.AreEqual(1L, LongArray(statistics, "paidHiresByRole")[0], "The hire is counted at purchase, not again from its receipt.");
+        }
+
+        [Test]
+        public void AbandonedMatchIsNotCountedAsFinishedWinOrLoss()
+        {
+            object statistics = NewStatistics();
+            object record = NewRecord();
+            WriteField(record, "id", "attempt-abandoned"); WriteField(record, "attemptId", "attempt-abandoned");
+            WriteField(record, "abandoned", true); WriteField(record, "result", "abandoned");
+            WriteField(record, "grossSalesCents", 500L); WriteField(record, "salesByProduct", new long[7]);
+            WriteField(record, "stockConsumed", new long[10]);
+            Assert.IsTrue(Apply(statistics, record));
+            Assert.AreEqual(1L, ReadField(statistics, "abandons"));
+            Assert.AreEqual(0L, ReadField(statistics, "attemptsFinished"));
+            Assert.AreEqual(0L, ReadField(statistics, "wins"));
+            Assert.AreEqual(0L, ReadField(statistics, "losses"));
+            Assert.AreEqual(500L, ReadField(statistics, "grossSalesCents"));
+            Assert.AreEqual(0L, ReadField(statistics, "totalMarketRewardsCents"));
+        }
+
+        [Test]
+        public void RecoveredAttemptTelemetryIsDeduplicatedWithoutInventingAnOutcome()
+        {
+            object statistics = NewStatistics();
+            object summary = NewRecord();
+            WriteField(summary, "attemptId", "recovered-attempt");
+            WriteField(summary, "result", "incomplete"); WriteField(summary, "abandoned", false);
+            WriteField(summary, "salesByProduct", new long[] { 2, 1, 0, 0, 0, 0, 0 });
+            WriteField(summary, "stockConsumed", new long[] { 2, 2, 1, 1, 0, 0, 0, 0, 0, 0 });
+            WriteField(summary, "grossSalesCents", 875L); WriteField(summary, "customersAttended", 2L);
+            WriteField(summary, "customersLost", 1L); WriteField(summary, "ordersCompleted", 1L);
+            WriteField(summary, "rewardCents", 900L);
+            Assert.IsTrue(ApplyRecovered(statistics, summary));
+            Assert.IsFalse(ApplyRecovered(statistics, summary), "A replay of a recovered checkpoint must not duplicate metrics.");
+            Assert.AreEqual(3L, ReadField(statistics, "completedProducts"));
+            Assert.AreEqual(875L, ReadField(statistics, "grossSalesCents"));
+            Assert.AreEqual(2L, ReadField(statistics, "customersAttended"));
+            Assert.AreEqual(1L, ReadField(statistics, "customersLost"));
+            Assert.AreEqual(1L, ReadField(statistics, "ordersCompleted"));
+            Assert.AreEqual(0L, ReadField(statistics, "attemptsFinished"));
+            Assert.AreEqual(0L, ReadField(statistics, "wins"));
+            Assert.AreEqual(0L, ReadField(statistics, "losses"));
+            Assert.AreEqual(0L, ReadField(statistics, "abandons"));
+            Assert.AreEqual(0L, ReadField(statistics, "totalMarketRewardsCents"));
+        }
+
+        [Test]
+        public void LoadingActiveAttemptCheckpointKeepsRealMetricsButDoesNotCreateResult()
+        {
+            bool prior = (bool)gameType.GetField("AllowEditorTestInitialization", StaticPublic).GetValue(null);
+            var go = new GameObject("active-attempt-recovery-test");
+            var recoveredGo = new GameObject("active-attempt-recovery-target");
+            try
+            {
+                SetEditorTestInitialization(gameType, false);
+                object sourceGame = NewGame(go);
+                Assert.IsTrue(Activate(sourceGame, null, (json, match) => true));
+                object sourceSave = ReadField(sourceGame, "save");
+                object sourceMarket = ReadProperty(sourceGame, "Market");
+                object marketData = ReadProperty(sourceMarket, "Data");
+                int[] stock = (int[])ReadField(marketData, "stockUnits");
+                WriteField(marketData, "attemptStock", (int[])stock.Clone());
+                WriteField(marketData, "attemptActive", true);
+                WriteField(sourceSave, "activeAttemptId", "crashed-attempt");
+                object summary = NewRecord();
+                WriteField(summary, "attemptId", "crashed-attempt"); WriteField(summary, "id", "crashed-attempt");
+                WriteField(summary, "result", "incomplete"); WriteField(summary, "abandoned", false);
+                WriteField(summary, "salesByProduct", new long[] { 3, 1, 0, 0, 0, 0, 0 });
+                WriteField(summary, "stockConsumed", new long[] { 3, 3, 1, 1, 0, 0, 0, 0, 0, 0 });
+                WriteField(summary, "grossSalesCents", 1125L); WriteField(summary, "customersAttended", 2L);
+                WriteField(sourceSave, "activeAttemptSummary", summary);
+                string interruptedJson = JsonUtility.ToJson(sourceSave);
+
+                object recoveredGame = NewGame(recoveredGo);
+                string persistedJson = null;
+                Assert.IsTrue(Activate(recoveredGame, interruptedJson, (json, match) => { persistedJson = json; return true; }));
+                object recoveredSave = Deserialize(saveDataType, persistedJson);
+                object statistics = ReadField(recoveredSave, "statistics");
+                Assert.AreEqual(4L, ReadField(statistics, "completedProducts"));
+                Assert.AreEqual(1125L, ReadField(statistics, "grossSalesCents"));
+                Assert.AreEqual(0L, ReadField(statistics, "attemptsFinished"));
+                Assert.AreEqual(0L, ReadField(statistics, "wins"));
+                Assert.AreEqual(0L, ReadField(statistics, "losses"));
+                Assert.AreEqual(0L, ReadField(statistics, "abandons"));
+                Assert.IsNull(ReadField(recoveredSave, "activeAttemptSummary"));
+                Assert.IsNull(ReadField(recoveredSave, "activeAttemptId"));
+                Assert.IsFalse((bool)ReadField(ReadField(recoveredSave, "market"), "attemptActive"));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(go);
+                UnityEngine.Object.DestroyImmediate(recoveredGo);
+                SetEditorTestInitialization(gameType, prior);
+            }
+        }
+
+        [Test]
+        public void SaveAcknowledgesMatchSeparatelyAndDoesNotSerializeItForRequeue()
+        {
+            bool prior = (bool)gameType.GetField("AllowEditorTestInitialization", StaticPublic).GetValue(null);
+            var go = new GameObject("cloud-match-outbox-test");
+            try
+            {
+                SetEditorTestInitialization(gameType, false);
+                object game = NewGame(go);
+                string capturedJson = null; object capturedMatch = null; bool allowWrite = true;
+                Assert.IsTrue(Activate(game, null, (json, match) => { capturedJson = json; capturedMatch = match; return allowWrite; }));
+                allowWrite = false;
+                object matchRecord = NewRecord();
+                WriteField(matchRecord, "id", "attempt-stable"); WriteField(matchRecord, "attemptId", "attempt-stable");
+                WriteField(matchRecord, "won", true); WriteField(matchRecord, "level", 0);
+                object save = ReadField(game, "save");
+                WriteField(save, "pendingMatch", matchRecord); WriteField(save, "activeAttemptId", "attempt-stable");
+                object summary = NewRecord();
+                WriteField(summary, "attemptId", "attempt-stable"); WriteField(summary, "result", "incomplete");
+                WriteField(save, "activeAttemptSummary", summary);
+                MethodInfo saveMethod = gameType.GetMethod("Save", NonPublicInstance);
+                Assert.IsFalse((bool)saveMethod.Invoke(game, new object[] { null }));
+                Assert.AreSame(matchRecord, ReadField(save, "pendingMatch"), "Failed commit retains the exact retry record.");
+                allowWrite = true;
+                Assert.IsTrue((bool)saveMethod.Invoke(game, new object[] { null }));
+                Assert.AreSame(matchRecord, capturedMatch);
+                Assert.AreEqual("attempt-stable", ReadField(capturedMatch, "id"));
+                object committed = Deserialize(saveDataType, capturedJson);
+                Assert.IsNull(ReadField(committed, "pendingMatch"));
+                Assert.IsNull(ReadField(committed, "activeAttemptId"));
+                Assert.IsNull(ReadField(committed, "activeAttemptSummary"), "Terminal snapshot must not retain private in-flight telemetry.");
+                Assert.IsNull(ReadField(ReadField(committed, "statistics"), "lastRecoveredAttemptId"));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(go);
+                SetEditorTestInitialization(gameType, prior);
+            }
+        }
+
+        [Test]
+        public void ExplicitReturnDuringRoundPersistsAbandonedAttemptAndRestoresStock()
+        {
+            bool prior = (bool)gameType.GetField("AllowEditorTestInitialization", StaticPublic).GetValue(null);
+            var go = new GameObject("abandoned-match-test");
+            try
+            {
+                SetEditorTestInitialization(gameType, false);
+                object game = NewGame(go); object capturedMatch = null;
+                Assert.IsTrue(Activate(game, null, (json, match) => { if (match != null) capturedMatch = match; return true; }));
+                if (!(bool)Invoke(game, "TryStartRound")) Assert.Ignore("Default market does not provide the level-one start floor.");
+                Assert.IsTrue((bool)Invoke(game, "ReturnToLevels"));
+                Assert.IsNotNull(capturedMatch);
+                Assert.AreEqual("abandoned", ReadField(capturedMatch, "result"));
+                Assert.IsTrue((bool)ReadField(capturedMatch, "abandoned"));
+                Assert.AreEqual(ReadField(capturedMatch, "attemptId"), ReadField(capturedMatch, "id"));
+                object saved = Deserialize(saveDataType, (string)ReadProperty(game, "ActiveSaveJson"));
+                Assert.AreEqual(1L, ReadField(ReadField(saved, "statistics"), "abandons"));
+                object market = ReadProperty(game, "Market");
+                object marketData = ReadProperty(market, "Data");
+                Assert.IsFalse((bool)ReadField(marketData, "attemptActive"));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(go);
+                SetEditorTestInitialization(gameType, prior);
+            }
+        }
+
+        [Test]
+        public void FailedHireSaveIsNotConfirmedAndFreezesFurtherCommands()
+        {
+            bool prior = (bool)gameType.GetField("AllowEditorTestInitialization", StaticPublic).GetValue(null);
+            var go = new GameObject("failed-hire-save-test");
+            try
+            {
+                SetEditorTestInitialization(gameType, false);
+                object game = NewGame(go); bool failWrites = false;
+                Assert.IsTrue(Activate(game, null, (json, match) => !failWrites));
+                object simulation = ReadProperty(game, "Sim");
+                int cost = (int)ReadProperty(simulation, "HireCost");
+                simulationType.GetField("<Coins>k__BackingField", NonPublicInstance).SetValue(simulation, cost + 100);
+                failWrites = true;
+                Assert.IsFalse((bool)Invoke(game, "TryHireParrillero"));
+                Assert.IsFalse((bool)ReadProperty(game, "IsPlayerActive"));
+                Assert.IsNull(ReadProperty(game, "Sim"));
+                object saved = Deserialize(saveDataType, (string)ReadProperty(game, "ActiveSaveJson"));
+                Assert.AreEqual(0L, LongArray(ReadField(saved, "statistics"), "paidHiresByRole")[0]);
+                Assert.IsFalse((bool)Invoke(game, "TryHireParrillero"), "Failed persistence must block subsequent economic commands.");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(go);
+                SetEditorTestInitialization(gameType, prior);
+            }
+        }
+
+        [Test]
+        public void LegacyStatisticsNormalizeMissingAndOversizedArraysWithoutInventingHistory()
+        {
+            object statistics = NewStatistics();
+            WriteField(statistics, "deliveredByProduct", new long[] { 7, 2 });
+            WriteField(statistics, "winsByLevel", null);
+            statisticsType.GetMethod("Normalize", PublicInstance).Invoke(statistics, null);
+            Assert.AreEqual(7L, LongArray(statistics, "deliveredByProduct")[0]);
+            Assert.AreEqual(2L, LongArray(statistics, "deliveredByProduct")[1]);
+            Assert.AreEqual(0L, LongArray(statistics, "deliveredByProduct")[2]);
+            Assert.AreEqual(11, LongArray(statistics, "winsByLevel").Length);
+            Assert.AreEqual(0L, LongArray(statistics, "winsByLevel")[0]);
+        }
+
+        [Test]
+        public void StreetGameWaitsForAuthorizedJsonAndFailsClosedOnInvalidSave()
+        {
+            bool prior = (bool)gameType.GetField("AllowEditorTestInitialization", StaticPublic).GetValue(null);
+            var go = new GameObject("cloud-gate-test");
+            try
+            {
+                SetEditorTestInitialization(gameType, false);
+                object game = NewGame(go);
+                Assert.IsFalse((bool)ReadProperty(game, "IsPlayerActive"));
+                Assert.IsNull(ReadProperty(game, "Sim"));
+                Assert.IsFalse((bool)Invoke(game, "TryStartRound"));
+                Assert.IsFalse(Activate(game, "not-json", (json, match) => true));
+                Assert.IsFalse((bool)ReadProperty(game, "IsPlayerActive"));
+                string written = null;
+                Assert.IsTrue(Activate(game, null, (json, match) => { written = json; return true; }));
+                Assert.IsTrue((bool)ReadProperty(game, "IsPlayerActive"));
+                StringAssert.Contains("\"version\":4", written);
+                Assert.IsTrue((bool)Invoke(game, "SuspendPlayer"));
+                Assert.IsFalse((bool)ReadProperty(game, "IsPlayerActive"));
+                Assert.IsNull(ReadProperty(game, "Sim"));
+                Assert.IsNull(ReadProperty(game, "Market"));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(go);
+                SetEditorTestInitialization(gameType, prior);
+            }
+        }
+
+        [Test]
+        public void FailedSuspendFreezesCommandsAndKeepsStateForRetry()
+        {
+            bool prior = (bool)gameType.GetField("AllowEditorTestInitialization", StaticPublic).GetValue(null);
+            var go = new GameObject("cloud-suspend-retry-test");
+            try
+            {
+                SetEditorTestInitialization(gameType, false);
+                object game = NewGame(go); bool fail = false;
+                Assert.IsTrue(Activate(game, null, (json, match) => !fail));
+                object priorSimulation = ReadField(game, "sim");
+                fail = true;
+                Assert.IsFalse((bool)Invoke(game, "SuspendPlayer"));
+                Assert.IsFalse((bool)ReadProperty(game, "IsPlayerActive"));
+                Assert.IsNull(ReadProperty(game, "Sim"), "Do not expose gameplay references after access is frozen.");
+                Assert.AreSame(priorSimulation, ReadField(game, "sim"), "Retain state internally until persistence succeeds.");
+                Assert.IsFalse((bool)Invoke(game, "TryStartRound"));
+                Assert.IsFalse((bool)Invoke(game, "TryHireParrillero"));
+                fail = false;
+                Assert.IsTrue((bool)Invoke(game, "SuspendPlayer"));
+                Assert.IsNull(ReadProperty(game, "Sim"));
+                Assert.IsNull(ReadProperty(game, "Market"));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(go);
+                SetEditorTestInitialization(gameType, prior);
+            }
+        }
+    }
+}
