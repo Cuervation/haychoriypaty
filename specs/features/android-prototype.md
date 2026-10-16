@@ -1,3 +1,11 @@
+# Latest Android delivery — 2026-10-15 (0.2.39/code41, restored street + worker layout)
+
+Pushed source commit `f077324` (`codex/street-automation`). Unity 6000.6.3f1 Main-only Development IL2CPP/ARM64 Android build (`build-2a50e40720`): **Succeeded in 516.95s; 0 errors / 2 warnings** (Unity build result reported warning count only). Focused EditMode job for `StreetActiveCooksTests` and `StreetSpecialtyPresentationTests` failed to initialize within timeout before any tests ran; no new test pass is claimed. `git diff --cached --check` passed before source commit.
+
+APK `Builds/Android/Archive/HayChoriYPaty-0.2.39-code41-street-restored-workers.apk` (also `Builds/Android/HayChoriYPaty-0.2.39.apk` and rolling `Builds/Android/HayChoriYPaty-street.apk`): 455MB; SHA-256 `e9cf00f55f77fb37645ba22109e7243bbd5fda78160acc0573124344143cd770`. `aapt` confirms package `com.haychoriypaty.game`, version0.2.39/code41, min API26/target36; APK contains `arm64-v8a`. `unzip -t` found no archive errors and `apksigner` verified APK Signature Scheme v2, Android Debug signer SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`. All three copies are byte-identical. Development/debug-signed, not Play Store release signing. APK was not installed on a device.
+
+---
+
 # Latest Android delivery — 2026-10-15 (0.2.38/code40, Level 1 Mercado cleanup)
 
 Unity 6000.6.3f1 batch build from the scoped Git commit, Main-only Development IL2CPP/ARM64: **Succeeded in 445.27s; 0 errors / 1 warning** (clang unused-argument warning). The focused PlayMode Mercado view regression passed **1/1**; it verifies the Level 1 optional group has no content height or pointer hit target, while later levels retain the expandable products. `git diff --check` passed. Unity MCP's editor ping did not answer, so no Game View screenshot or device visual review was available.
