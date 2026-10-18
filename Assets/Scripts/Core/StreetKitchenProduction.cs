@@ -138,29 +138,32 @@ namespace HayChoriYPaty
             foreach (StreetFoodUnit unit in units)
                 if (unit.Location == StreetFoodLocation.Table && unit.WorkerId == workerId) unit.WorkerId = 0;
         }
+        public bool IsGrillSlotFree(int product, int slot)
+        {
+            if (product < 0 || product >= grillCapacity.Length || slot < 0 || slot >= grillCapacity[product]) return false;
+            foreach (StreetFoodUnit unit in units)
+                if (unit.Product == product && unit.Location == StreetFoodLocation.Grill && unit.Slot == slot) return false;
+            return true;
+        }
         private int FreeGrillSlot(int product)
         {
             for (int slot = 0; slot < GrillCapacity(product); slot++)
-            {
-                bool occupied = false;
-                foreach (StreetFoodUnit unit in units)
-                    if (unit.Product == product && unit.Location == StreetFoodLocation.Grill && unit.Slot == slot)
-                    { occupied = true; break; }
-                if (!occupied) return slot;
-            }
+                if (IsGrillSlotFree(product, slot)) return slot;
             return -1;
         }
         public bool CanReserveCook(int product) => ActiveCooks && product >= 0 && product < 4 &&
             (ingredientStock == null || ingredientStock.CanPrepareFood(product)) &&
             FirstFreeTableSlot(product) >= 0 && FreeGrillSlot(product) >= 0;
 
-        public StreetFoodUnit ReserveCook(int product, int workerId)
+        public StreetFoodUnit ReserveCook(int product, int workerId) => ReserveCook(product, workerId, -1);
+        public StreetFoodUnit ReserveCook(int product, int workerId, int preferredGrillSlot)
         {
             if (workerId <= 0 || !CanReserveCook(product)) return null;
             foreach (StreetFoodUnit unit in units)
                 if (unit.WorkerId == workerId) return null;
             int slot = FirstFreeTableSlot(product);
-            StreetFoodUnit created = Add(product, StreetFoodState.Raw, StreetFoodLocation.Grill, FreeGrillSlot(product));
+            int grillSlot = IsGrillSlotFree(product, preferredGrillSlot) ? preferredGrillSlot : FreeGrillSlot(product);
+            StreetFoodUnit created = Add(product, StreetFoodState.Raw, StreetFoodLocation.Grill, grillSlot);
             if (created != null) { created.WorkerId = workerId; created.ReservedTableSlot = slot; }
             return created;
         }

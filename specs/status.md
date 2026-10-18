@@ -1,3 +1,16 @@
+## 2026-10-18 — APK 0.2.48/code50 y push
+Build Android Development Main-only IL2CPP/ARM64 desde copia aislada de Unity 6000.6.3f1: 446.11 s, 0 errores/1 warning. APK 348,924,731 bytes; SHA-256 e06e52d1fb3b433d33ad08834633bd5b02ef82e7e955de8c2f4fff91b3000e29. aapt, ZIP, zipalign y firma APK v2 verificados. Se incluye la restauración de rutas directas de trabajadores y cambios actuales de cocina, con ETC2 Android-only; debug-signed, no instalada. Unity MCP no respondió; el Editor activo del checkout quedó intacto. Los tests focalizados previos dieron 10/10 y no se repitieron en la entrega. Sin Game View ni QA en teléfono.
+
+## 2026-10-18 — Restaurado movimiento directo de trabajadores
+
+Comparación puntual de `349a7b1`→`4b9df91`: se retiró de `MoveWorker` la anticipación de colisiones, radio 48, derecho de paso por ID, desvíos laterales y reducción temporal al 35%. El avance vuelve a ser directo por waypoint y conserva `WorkRateFor`. Se mantienen rutas alrededor de muebles fijos (`FindShortestSafeRoute`), anclas/esperas distintas, selección de handoff y rotación/cola de Parrilleros; no se restauraron commits ni archivos completos.
+
+**Validación:** Unity 6000.6.3f1 compiló en copia aislada; 10/10 pruebas focalizadas pasaron (cruces opuestos y con worker idle, tres Mozos, velocidades por rol, transporte/deposito, handoffs mixtos y ruta con obstáculo fijo). Fixture completo StreetActiveCooksTests: 52/54; fallan las dos variantes ya fallidas de retorno al punto seguro (Parrillero nivel 0, Mozo nivel 5). Unity MCP `127.0.0.1:8080` no respondía; puerto sin listener y log/lock del Editor estaban fechados 16/10; se dejó el Editor del usuario intacto. Sin captura Game View, APK ni Git.
+
+## 2026-10-18 — APK 0.2.47/code49 y reducción de tamaño
+
+141 PNGs de `Resources` ahora usan ETC2_RGBA8 en Android; 87 antes estaban fijadas a RGBA32 y 54 usaban ajustes automáticos/sin override. Solo cambia la importación Android, no el arte fuente, otras plataformas ni gameplay. Unity 6000.6.3f1 batch Main-only Development IL2CPP/ARM64 compiló en 38.84 s, 0 errores/1 warning. APK final **347,748,382 bytes**, 74,522,681 bytes (17.65%) menor que0.2.46; se realineó y re-firmó con el certificado debug habitual. `aapt`, integridad ZIP, `zipalign` y `apksigner` pasaron. Unity MCP estaba caído; el batch aislado funcionó tras habilitar IPC local. Sin tests de gameplay, Game View ni instalación en el teléfono. Ver [android-prototype.md](features/android-prototype.md).
+
 ## 2026-10-18 — APK 0.2.46/code48 y validación focalizada
 
 En una copia aislada de Unity 6000.6.3f1 se compilaron los tests del proyecto y pasaron **17/17 EditMode**: dos filas de sándwiches, puntos de espera/acceso distintos, rotación de cuatro parrilleros por parrilla y entrega mixta de los siete productos. El caso mixto destapó un handoff de Coca-Cola bloqueado por personal estacionado; el selector ahora elige el punto libre más seguro. La grilla de espera usa seis columnas y filas escalonadas para no repetir anchors cercanos.
@@ -18,9 +31,11 @@ La lógica local asigna como máximo cuatro puestos por parrilla, reserva por ro
 
 Racing+ ignora pedidos y stock preparado para priorizar; Parrilleros comparten un weighted virtual-finish por metas, omiten cuotas ya completas y siguen con la receta viable cuando faltan ingredientes o espacio. Los contadores se reinician por intento. Velocidad por mejora: Parrillero/Premium +5% (×1.45 a nueve); Coca/Fernet/Mozo +10% (×1.90). Niveles1–5 conservan producción automática; se separan sus tasas de cocción y bebidas sin tocar capacidades ni economía. Unity6000.6.3f1: `StreetActiveCooksTests` 28/28 EditMode pasó, incluyendo ritmo100:50,80:40 y7:3, concurrencia global, bloqueo/reanudación por capacidad e ingredientes, cuota completa, cero pedidos, stock preparado, bebida independiente y modo automático previo a Racing. Sin APK, cambio de UI, Git commit/push ni ejecución PlayMode.
 
-## 2026-10-18 — Contacto y animación de cocción
+## 2026-10-18 — Corrección integral de brazos de parrilleros
 
-Los Parrilleros Normal/Premium usan un atlas transparente de cuatro poses de brazos y pinzas; el ciclo se vincula al progreso real y la punta se alinea con la unidad/slot reservado, dibujando brazos delante del hierro sin mover pies, rutas ni tiempos. Idle frontal solo en el ancla real; anillos de progreso mayores y separados. Unity compiló durante los tests; 2/2 EditMode y la pasada final 1/1 PlayMode de captura pasaron. Se revisaron capturas reales 1080×1920 con tres/cuatro cocineros, dos fases y transición a transporte. Un intento intermedio no inicializó y no se cuenta. Sin suite global, APK ni Git push/commit.
+Causa confirmada en el video/código: el cuerpo original ya dibujaba brazos y el overlay los duplicaba, desplazándose además hacia el slot; el corte de torso podía dejar fragmentos de pinzas. Se reemplazó durante la cocción el personaje dividido por una pose transparente completa, anclada a los pies y sin offset al alimento. Normal/Premium comparten las cuatro fases del atlas con variante de paleta; los estados de salida recuperan el render normal. Los cocineros se dirigen al borde accesible del slot real y se prefiere una separación de 84 puntos; la cola bloqueada por obstáculos se trasladó al área despejada frente a las parrillas. No cambian metas, recetas, tiempos de producción, inventario ni economía.
+
+Unity 6000.6.3f1 en copia aislada: alcance/espaciado 1/1 PlayMode, poses 1–4 cocineros/cuatro fases/dos alturas 1/1 PlayMode, reserva/fallback 1/1 EditMode y marcha/transporte real 1/1 PlayMode. StreetActiveCooksTests quedó 51/53 (fallaron dos retornos a punto seguro: Parrillero nivel 0 y Mozo nivel 5); el fixture completo StreetWorkerProjectionTests quedó 3/5 (reacomodo inmediato de equipos recién contratados y expectativa de ocultamiento idle). Capturas nativas de cámara (no Game View completa) muestran cocineros Normal/Premium en 1080×1920 y 1080×2400. Unity MCP no respondió en `127.0.0.1:8080`; el editor activo no se reinició. No se ejecutó suite global, APK, commit ni push.
 
 ## 2026-10-18 — Auditoría y tabla central de escudos
 

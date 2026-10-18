@@ -266,6 +266,19 @@ namespace HayChoriYPaty
             return new Vector2(x, y);
         }
 
+        /// <summary>Reachable front-edge post aligned with a specific real item on the grill.</summary>
+        public Vector2 GrillSlotWorkPosition(int product, Vector2 slotPosition)
+        {
+            Rect grill = GrillBoundsForProduct(product);
+            if (grill.width <= 0f) return Vector2.zero;
+            const float visibleHalfWidth = 30f;
+            float left = Mathf.Clamp(grill.xMin + visibleHalfWidth, 54f, StreetSceneLayout.Width - 54f);
+            float right = Mathf.Clamp(grill.xMax - visibleHalfWidth, 54f, StreetSceneLayout.Width - 54f);
+            float sideOffset = (product & 1) == 0 ? -16f : 16f;
+            float x = Mathf.Clamp(slotPosition.x + sideOffset, left, right);
+            return new Vector2(x, grill.yMin - GrillWorkClearance);
+        }
+
         /// <summary>Compact, visible waiting row for cooks that do not currently own one of the four grill posts.</summary>
         public Vector2 CookQueuePosition(int product, int queueIndex, int queueCount)
         {
@@ -273,10 +286,11 @@ namespace HayChoriYPaty
             if (grill.width <= 0f) return Vector2.zero;
             int count = Mathf.Max(1, queueCount);
             int columns = Mathf.Min(MaxCookStationsPerGrill, count);
-            int row = Mathf.Max(0, queueIndex) / columns;
             int column = Mathf.Max(0, queueIndex) % columns;
             Vector2 station = GrillWorkPosition(product, column, columns);
-            return new Vector2(station.x, Mathf.Max(18f, WorkerLaneY - row * 100f));
+            // Queue in the clear apron between the table bases and grill. The old lower lane
+            // was separated from the grill by a continuous row of route obstacles.
+            return new Vector2(station.x, Mathf.Max(18f, grill.yMin - 55f));
         }
 
         /// <summary>Reserved-item deposit side of the specialty table.</summary>

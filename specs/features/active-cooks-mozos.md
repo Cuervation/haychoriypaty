@@ -14,6 +14,12 @@ Mozo is hired only during play, not automatically; starts at zero. Per-level con
 
 Reuse existing furniture, counter, mural, fans, HUD, art, fonts, wood/iron cards and directional worker infrastructure. From Racing remove lower pennants, lower cream footer and both grills, extend existing tiled floor and approximately double actual grill-to-table circulation without resizing/distorting furniture. Geometry, projection, pickup/work anchors and obstacles share the same layout. Six cards: Speed/Normal/Premium then Coca/Fernet/Mozo. Per-worker circular progress only while cooking. Mozo uses an adapted existing worker outfit and real carried unit. Earlier levels remain unchanged.
 
+### Direct employee movement — 2026-10-18
+
+The 2026-10-17 direct movement behavior is restored in `MoveWorker`: each employee moves straight toward the current waypoint at `balance.workerSpeed * WorkRateFor(role)`. There is no look-ahead against other workers, separation radius, worker-ID right-of-way, lateral detour, or yield slowdown; crossing characters may overlap briefly. Fixed furniture avoidance remains in `StreetKitchenLayout.FindShortestSafeRoute` and each movement segment still follows that precomputed safe route. Distinct station/work/wait points and traffic-aware selection of an available counter handoff remain intact; neither changes a worker's mid-route movement.
+
+Focused Unity EditMode validation in an isolated copy (6000.6.3f1): 10/10 passed, covering idle-worker crossing, opposing crossings at the Parrillero +5% / Cocacolero +10% role speeds, three Mozos crossing, Parrillero carry/deposit, product-specific Mozo pickup, mixed deliveries, and routes around fixed worker-foot-expanded furniture. The full `StreetActiveCooksTests` fixture passed 52/54; only the pre-existing `UnassignedWorkerReturnsToItsOwnSafeWaitingPoint` cases (Parrillero level 0 and Mozo level 5) failed as in the prior run. Unity MCP at `127.0.0.1:8080` was unavailable; no Game View test was run.
+
 ## Validation / acceptance
 
 - [x] Active per-worker cooking, one real carried/deposited unit and speed scaling.

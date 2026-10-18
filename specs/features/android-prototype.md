@@ -1,4 +1,24 @@
-# Current Android delivery — 2026-10-18 (0.2.46/code48, two-row tables and worker fixes)
+# Current Android delivery — 2026-10-18 (0.2.48/code50, direct employee movement)
+
+Unity 6000.6.3f1 Main-only Development IL2CPP/ARM64 Android build from an isolated project copy: **Succeeded in 446.11 s; 0 errors / 1 warning** (clang++ unused command-line argument). Unity MCP at 127.0.0.1:8080/mcp was unavailable; inspection found the live Editor on the correct checkout holding its lock, so it was not restarted or used for batch mode. The build ran in an isolated copy. It includes the current worker route/spacing changes and Android-only ETC2 overrides; the user's local Analytics preference was excluded from the build.
+
+APK archive Builds/Android/Archive/HayChoriYPaty-0.2.48-code50-direct-worker-movement.apk; versioned and rolling aliases Builds/Android/HayChoriYPaty-0.2.48.apk and Builds/Android/HayChoriYPaty-street.apk: **348,924,731 bytes**, SHA-256 e06e52d1fb3b433d33ad08834633bd5b02ef82e7e955de8c2f4fff91b3000e29. Package com.haychoriypaty.game, version0.2.48/code50, min API26/target36, arm64-v8a. aapt, unzip -t, zipalign -c -v 4, and apksigner v2 verification passed; signer is the established Android Debug certificate d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e.
+
+Focused direct-movement tests passed 10/10 in the preceding implementation turn; the full StreetActiveCooksTests fixture was 52/54 with the same two safe-wait-point cases already failing before this change. Tests were not rerun for packaging. Development/debug-signed, not Play Store release-signed. No Game View/PlayMode/device visual review or phone installation was performed.
+
+---
+
+# Previous Android delivery — 2026-10-18 (0.2.47/code49, ETC2 texture compression)
+
+Unity 6000.6.3f1 Main-only Development IL2CPP/ARM64 Android build in an isolated copy: **Succeeded in 37.41 s; 0 errors / 1 warning**. The Unity MCP endpoint at `127.0.0.1:8080` was unavailable and the recorded Editor PID was not running; batch mode recovered the build without restarting an Editor or touching the phone. The automatic-compression experiment saved only 1.8%; the final importers use Android-only `ETC2_RGBA8` on all 141 PNGs in `Resources` (87 previously pinned to RGBA32 plus 54 automatic/unset). Source art, other platforms, and gameplay are unchanged. BuildReport Texture2D payload fell from 809.7 to 688.1 MiB.
+
+The Unity-generated APK had a 41.8 MB gap before its ZIP central directory. Rewriting it through `zipalign` and signing it with the established debug key removed the gap and retained a valid aligned APK. Archive `Builds/Android/Archive/HayChoriYPaty-0.2.47-code49-texture-optimized.apk`; versioned `Builds/Android/HayChoriYPaty-0.2.47.apk` and rolling alias `Builds/Android/HayChoriYPaty-street.apk`: **347,748,382 bytes**, SHA-256 `7e63f27a388b01747c27af89264722c812a653612d9a2288d190f6bc0d563303`. This is **74,522,681 bytes (17.65%) smaller** than 0.2.46 (422,271,063 bytes). Package `com.haychoriypaty.game`, version0.2.47/code49, min API26/target36, `arm64-v8a`. `aapt` verified package/version, ZIP integrity passed, `zipalign -c -v 4` passed, and `apksigner` verified APK Signature Scheme v2 with Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`.
+
+Development/debug-signed, not Play Store release-signed. No gameplay tests, Game View screenshot, or phone install/visual review was performed.
+
+---
+
+# Previous Android delivery — 2026-10-18 (0.2.46/code48, two-row tables and worker fixes)
 
 Unity 6000.6.3f1 Main-only Development IL2CPP/ARM64 Android build from an isolated checkout after the Unity MCP editor ping stopped responding: **Succeeded in 405.47s; 0 errors / 1 warning** (clang `-Wunused-command-line-argument`). Focused EditMode regressions: **17/17** across two-row sandwich layout, worker access/wait spacing, four-post rotation and mixed-product delivery. No PlayMode, Game View or device test was run.
 

@@ -196,6 +196,14 @@ namespace HayChoriYPaty.Tests
             yield return new WaitForEndOfFrame();
         }
 
+        private static void SetWorkerProperty(object worker, string name, object value)
+        {
+            PropertyInfo property = worker.GetType().GetProperty(name, PublicInstance);
+            Assert.IsNotNull(property, "Missing worker property " + name);
+            Assert.IsNotNull(property.GetSetMethod(true), "Missing worker setter " + name);
+            property.GetSetMethod(true).Invoke(worker, new[] { value });
+        }
+
         private static void SaveCookingGameViewCapture(string name)
         {
             Texture2D capture = ScreenCapture.CaptureScreenshotAsTexture();
@@ -208,22 +216,41 @@ namespace HayChoriYPaty.Tests
 
 #if UNITY_EDITOR
         [UnityTest]
-        public IEnumerator CaptureThreeAndFourRealCooksThenTheCookingToCarryTransition()
+        public IEnumerator CaptureOneToFourRealCooksAllPhasesAndTransition()
         {
             ActivateTestGameWithoutPersisting();
             StartLevel(5);
             SetSim("Coins", 100000);
-            Assert.IsTrue((bool)Call(Sim, "TryHire", EnumValue(roleType, "Parrillero")));
-            Assert.IsTrue((bool)Call(Sim, "TryHire", EnumValue(roleType, "ParrilleroPremium")));
             for (int product = 0; product < 4; product++)
                 Assert.IsTrue((bool)Call(Sim, "SpawnCustomer", product, 50), "Seed demand for grill product " + product + ".");
 
-            yield return WaitForCookingWorkers(3, 160, "Normal and Premium three-cook capture");
-            SaveCookingGameViewCapture("parrillero-three-cooks-frame-a");
+            yield return WaitForCookingWorkers(1, 160, "One-cook capture");
+            object firstCook = null;
+            foreach (object worker in (System.Collections.IEnumerable)GetProperty(Sim, "Workers"))
+                if (GetProperty(worker, "State").ToString() == "Cooking") { firstCook = worker; break; }
+            Assert.IsNotNull(firstCook, "One real cook must be available for phase captures.");
+            int firstCookId = Convert.ToInt32(GetProperty(firstCook, "Id"));
+            for (int frame = 0; frame < 4; frame++)
+            {
+                int step = (frame - (firstCookId & 3) + 4) & 3;
+                SetWorkerProperty(firstCook, "CookingCycleProgress", (step + .1f) / 8f);
+                yield return null;
+                yield return new WaitForEndOfFrame();
+                SaveCookingGameViewCapture("parrillero-one-cook-frame-" + frame);
+            }
+
+            Assert.IsTrue((bool)Call(Sim, "TryHire", EnumValue(roleType, "Parrillero")));
+            yield return WaitForCookingWorkers(2, 80, "Two-cook capture");
+            SaveCookingGameViewCapture("parrillero-two-cooks");
+
+            SetSim("Coins", 100000);
+            Assert.IsTrue((bool)Call(Sim, "TryHire", EnumValue(roleType, "ParrilleroPremium")));
+            yield return WaitForCookingWorkers(3, 80, "Normal and Premium three-cook capture");
+            SaveCookingGameViewCapture("parrillero-three-cooks");
             Call(Sim, "Step", .25f);
             yield return null;
             yield return new WaitForEndOfFrame();
-            SaveCookingGameViewCapture("parrillero-three-cooks-frame-b");
+            SaveCookingGameViewCapture("parrillero-three-cooks-next-phase");
 
             SetSim("Coins", 100000);
             Assert.IsTrue((bool)Call(Sim, "TryHire", EnumValue(roleType, "ParrilleroPremium")));

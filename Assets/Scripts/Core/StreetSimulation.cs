@@ -893,47 +893,7 @@ namespace HayChoriYPaty
         {
             Vector2 previous = worker.Position;
             float speed = balance.workerSpeed * WorkRateFor(worker.Role);
-            Vector2 next = Move(previous, worker.Target, speed, dt);
-            Vector2 heading = worker.Target - previous;
-            if (heading.sqrMagnitude > .0001f)
-            {
-                heading.Normalize();
-                const float separationRadius = 48f;
-                const float avoidanceLookAhead = .22f;
-                foreach (StreetWorker other in workers)
-                {
-                    if (other == worker || (other.Position - previous).sqrMagnitude > 10800f) continue;
-                    bool otherMoving = IsWorkerTravelling(other) && other.Position != other.Target;
-                    // Lower IDs have right of way between two moving workers; stationary workers
-                    // always keep their station and are never displaced to make room.
-                    if (otherMoving && worker.Id < other.Id) continue;
-                    float otherSpeed = balance.workerSpeed * WorkRateFor(other.Role);
-                    Vector2 otherHeading = otherMoving ? (other.Target - other.Position).normalized : Vector2.zero;
-                    Vector2 relativePosition = other.Position - previous;
-                    Vector2 relativeVelocity = otherHeading * otherSpeed - heading * speed;
-                    float relativeSpeedSquared = relativeVelocity.sqrMagnitude;
-                    float closestTime = relativeSpeedSquared > .0001f
-                        ? Mathf.Clamp(-Vector2.Dot(relativePosition, relativeVelocity) / relativeSpeedSquared, 0f, avoidanceLookAhead)
-                        : 0f;
-                    Vector2 ownFuture = Move(previous, worker.Target, speed * closestTime, 1f);
-                    Vector2 otherFuture = otherMoving ? Move(other.Position, other.Target, otherSpeed * closestTime, 1f) : other.Position;
-                    if ((ownFuture - otherFuture).sqrMagnitude >= separationRadius * separationRadius) continue;
-
-                    Vector2 side = new Vector2(-heading.y, heading.x) * (worker.Id < other.Id ? -1f : 1f);
-                    Vector2 detourHeading = (heading + side * 1.8f).normalized;
-                    float detourDistance = Mathf.Min(speed * dt, Vector2.Distance(previous, worker.Target));
-                    Vector2 detour = previous + detourHeading * detourDistance;
-                    if (!KitchenLayout.IsRouteSegmentClear(previous, detour))
-                    {
-                        detourHeading = (heading - side * 1.8f).normalized;
-                        detour = previous + detourHeading * detourDistance;
-                    }
-                    if (KitchenLayout.IsRouteSegmentClear(previous, detour)) next = detour;
-                    else next = Move(previous, worker.Target, speed * .35f, dt); // brief yield in a narrow passage
-                    break;
-                }
-            }
-            worker.Position = next;
+            worker.Position = Move(previous, worker.Target, speed, dt);
             Vector2 delta = worker.Position - previous;
             worker.StepDistance = delta.magnitude;
             worker.TravelDistance += worker.StepDistance;
@@ -1111,6 +1071,54 @@ namespace HayChoriYPaty
             if (stationCount == 0) stationCount = 1;
         }
 
+        private int NearestFreeGrillSlot(StreetWorker worker, int product)
+        {
+            int capacity = Kitchen.GrillCapacity(product);
+            bool companionAvailable = IsProductAvailable(product ^ 1);
+            const float minimumWorkerSeparation = 84f;
+            int nearestSlot = -1;
+            float nearestDistance = float.PositiveInfinity;
+            int fallbackSlot = -1;
+            float fallbackDistance = float.PositiveInfinity;
+            float fallbackSeparation = -1f;
+            for (int slot = 0; slot < capacity; slot++)
+            {
+                if (!Kitchen.IsGrillSlotFree(product, slot)) continue;
+                Vector2 foodPosition = KitchenLayout.GrillSlotPosition(product, slot, companionAvailable, capacity);
+                Vector2 workPosition = KitchenLayout.GrillSlotWorkPosition(product, foodPosition);
+                float distance = (foodPosition - worker.Position).sqrMagnitude;
+                float minimumSeparation = float.PositiveInfinity;
+                foreach (StreetWorker other in workers)
+                {
+                    if (other == worker || other.CookingItemId <= 0 ||
+                        (other.State != StreetWorkerState.ToGrill && other.State != StreetWorkerState.Cooking)) continue;
+                    StreetFoodUnit otherUnit = Kitchen.Find(other.CookingItemId);
+                    if (otherUnit == null || otherUnit.Product < 0 || otherUnit.Product > 3) continue;
+                    int otherCapacity = Kitchen.GrillCapacity(otherUnit.Product);
+                    bool otherCompanion = IsProductAvailable(otherUnit.Product ^ 1);
+                    Vector2 otherFood = KitchenLayout.GrillSlotPosition(otherUnit.Product, otherUnit.Slot, otherCompanion, otherCapacity);
+                    Vector2 otherWork = KitchenLayout.GrillSlotWorkPosition(otherUnit.Product, otherFood);
+                    minimumSeparation = Mathf.Min(minimumSeparation, Vector2.Distance(workPosition, otherWork));
+                }
+
+                bool separationTied = minimumSeparation == fallbackSeparation ||
+                    Mathf.Abs(minimumSeparation - fallbackSeparation) <= .001f;
+                if (fallbackSlot < 0 || minimumSeparation > fallbackSeparation + .001f ||
+                    (separationTied && distance < fallbackDistance))
+                {
+                    fallbackSeparation = minimumSeparation;
+                    fallbackDistance = distance;
+                    fallbackSlot = slot;
+                }
+                if (minimumSeparation >= minimumWorkerSeparation && distance < nearestDistance)
+                {
+                    nearestDistance = distance;
+                    nearestSlot = slot;
+                }
+            }
+            return nearestSlot >= 0 ? nearestSlot : fallbackSlot;
+        }
+
         private void AdvanceCookWorker(StreetWorker worker, float dt)
         {
             if (worker.State == StreetWorkerState.ToCookQueue)
@@ -1153,15 +1161,18 @@ namespace HayChoriYPaty
                 {
                     int chosen = SelectCookProduct(first, excludedProduct);
                     if (chosen < 0) break;
-                    StreetFoodUnit unit = Kitchen.ReserveCook(chosen, worker.Id);
+                    int preferredSlot = NearestFreeGrillSlot(worker, chosen);
+                    StreetFoodUnit unit = Kitchen.ReserveCook(chosen, worker.Id, preferredSlot);
                     if (unit == null) { excludedProduct = chosen; continue; }
                     bool wasVisuallyCooking = worker.VisualCooking;
                     worker.Product = chosen; worker.CookingItemId = unit.Id;
                     worker.CookingProgress = 0f;
                     worker.VisualCooking = false;
                     worker.VisualCookingProduct = -1;
-                    CookWorkerStation(worker, out int stationIndex, out stationCount);
-                    if (!SetWorkerRoute(worker, KitchenLayout.GrillWorkPosition(chosen, stationIndex, stationCount)))
+                    Vector2 foodPosition = KitchenLayout.GrillSlotPosition(chosen, unit.Slot,
+                        IsProductAvailable(chosen ^ 1), Kitchen.GrillCapacity(chosen));
+                    Vector2 cookingPosition = KitchenLayout.GrillSlotWorkPosition(chosen, foodPosition);
+                    if (!SetWorkerRoute(worker, cookingPosition))
                     { Kitchen.CancelCook(worker.Id); ResetWorker(worker); return; }
                     productionAssignmentsByProduct[chosen]++;
                     worker.State = StreetWorkerState.ToGrill;

@@ -202,8 +202,17 @@ namespace HayChoriYPaty.Tests
             Assert.IsTrue((bool)Call(normal, "TryHire", EnumValue(roleType, "Parrillero")));
             Assert.IsTrue((bool)Call(normal, "TryHire", EnumValue(roleType, "Parrillero")));
             SeedCookedUnits(Get(normal, "Kitchen"), 1, 8, 1000);
-            Step(normal, 1);
-            Assert.AreEqual(new[] { 0, 0, 1 }, WorkerProductsForRole(normal, "Parrillero"),
+            var normalFirstAssignments = new Dictionary<int, int>();
+            for (int tick = 0; tick < 200 && normalFirstAssignments.Count < 3; tick++)
+            {
+                Step(normal, 1);
+                foreach (object worker in Workers(normal))
+                    if (Get(worker, "Role").ToString() == "Parrillero" && (int)Get(worker, "CookingItemId") > 0 &&
+                        !normalFirstAssignments.ContainsKey((int)Get(worker, "Id")))
+                        normalFirstAssignments.Add((int)Get(worker, "Id"), (int)Get(worker, "Product"));
+            }
+            Assert.AreEqual(3, normalFirstAssignments.Count, "Every cook must acquire its first real reservation.");
+            CollectionAssert.AreEquivalent(new[] { 0, 0, 1 }, normalFirstAssignments.Values,
                 "Three simultaneous workers share the 100:50 schedule even with eight prepared Patys and no customers.");
             Assert.AreEqual(0, Get(normal, "Delivered"), "Background production must not manufacture a sale.");
 
@@ -211,8 +220,17 @@ namespace HayChoriYPaty.Tests
             Call(premium, "StartRound");
             SetArrivalFarFuture(premium);
             for (int i = 0; i < 3; i++) Assert.IsTrue((bool)Call(premium, "TryHire", EnumValue(roleType, "ParrilleroPremium")));
-            Step(premium, 1);
-            Assert.AreEqual(new[] { 2, 2, 3 }, WorkerProductsForRole(premium, "ParrilleroPremium"),
+            var premiumFirstAssignments = new Dictionary<int, int>();
+            for (int tick = 0; tick < 200 && premiumFirstAssignments.Count < 3; tick++)
+            {
+                Step(premium, 1);
+                foreach (object worker in Workers(premium))
+                    if (Get(worker, "Role").ToString() == "ParrilleroPremium" && (int)Get(worker, "CookingItemId") > 0 &&
+                        !premiumFirstAssignments.ContainsKey((int)Get(worker, "Id")))
+                        premiumFirstAssignments.Add((int)Get(worker, "Id"), (int)Get(worker, "Product"));
+            }
+            Assert.AreEqual(3, premiumFirstAssignments.Count, "Every Premium cook must acquire its first real reservation.");
+            CollectionAssert.AreEquivalent(new[] { 2, 2, 3 }, premiumFirstAssignments.Values,
                 "Premium workers share the 80:40 schedule globally.");
             Assert.AreEqual(0, Get(premium, "Delivered"));
         }
@@ -538,6 +556,24 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
+        public void CookReservationUsesPreferredFreeGrillSlotAndFallsBackWhenTaken()
+        {
+            object kitchen = Make(new[] { 0 }, true);
+            int capacity = (int)Call(kitchen, "GrillCapacity", 0);
+            Assert.Greater(capacity, 1);
+            int preferred = capacity - 1;
+            object first = Call(kitchen, "ReserveCook", 0, 11, preferred);
+            Assert.IsNotNull(first);
+            Assert.AreEqual(preferred, (int)Get(first, "Slot"));
+            Assert.IsFalse((bool)Call(kitchen, "IsGrillSlotFree", 0, preferred));
+
+            object second = Call(kitchen, "ReserveCook", 0, 12, preferred);
+            Assert.IsNotNull(second);
+            Assert.AreNotEqual(preferred, (int)Get(second, "Slot"), "A preferred but occupied slot must fall back to another valid slot.");
+            Assert.IsFalse((bool)Call(kitchen, "IsGrillSlotFree", 0, (int)Get(second, "Slot")));
+        }
+
+        [Test]
         public void CookedUnitMustBeClaimedAndDepositedIntoItsReservedTableSlot()
         {
             object kitchen = Make(new[] { 0 }, true);
@@ -709,13 +745,15 @@ namespace HayChoriYPaty.Tests
                     if (state == "ToGrill") sawGrillTravel = true;
                     if (state == "Cooking")
                     {
-                        int stationIndex = (int)Get(worker, "CookStationIndex"), stationCount = 0;
-                        foreach (object candidate in Workers(sim))
-                            if (Get(candidate, "Role").ToString() != Get(worker, "Role").ToString()) continue;
-                            stationCount++;
-                        stationCount = Mathf.Min(4, stationCount);
-                        Vector2 work = (Vector2)Call(kitchenLayout, "GrillWorkPosition", Get(worker, "Product"), stationIndex, stationCount);
-                        Assert.AreEqual(work, Get(worker, "Position"), "Parrillero cooks at their own separated team station.");
+                        int itemId = (int)Get(worker, "CookingItemId");
+                        object item = Call(kitchen, "Find", itemId);
+                        Assert.IsNotNull(item, "A real cooking pose must match its reserved food unit.");
+                        int product = (int)Get(item, "Product"), slot = (int)Get(item, "Slot");
+                        int capacity = (int)Call(kitchen, "GrillCapacity", product);
+                        bool companion = (bool)Call(sim, "IsProductAvailable", product ^ 1);
+                        Vector2 food = (Vector2)Call(kitchenLayout, "GrillSlotPosition", product, slot, companion, capacity);
+                        Vector2 work = (Vector2)Call(kitchenLayout, "GrillSlotWorkPosition", product, food);
+                        Assert.AreEqual(work, Get(worker, "Position"), "Parrillero works beside their reserved grill item.");
                     }
                     if (state == "Cooking" && (float)Get(worker, "CookingProgress") > 0f && (float)Get(worker, "CookingProgress") < 1f)
                         sawPartialCook = true;
@@ -847,8 +885,8 @@ namespace HayChoriYPaty.Tests
                 if (progressing >= 2)
                 {
                     Assert.AreEqual(2, liveCookIds.Count);
-                    Assert.Greater(Vector2.Distance(cookingPositions[0], cookingPositions[1]), 120f,
-                        "Two Parrilleros cooking at once must occupy separate grill-side stations.");
+                    Assert.GreaterOrEqual(Vector2.Distance(cookingPositions[0], cookingPositions[1]), 84f,
+                        "Two Parrilleros cooking at once need a visually clear gap between full-body poses.");
                     return;
                 }
             }
@@ -1039,9 +1077,11 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void MovingWorkerCirculatesAroundStationaryWorkerAndStillReachesItsTarget()
+        public void MovingWorkerCrossesStationaryWorkerDirectlyAtRoleSpeed()
         {
-            object sim = MakeActiveSimulation(5, 0);
+            object sim = MakeActiveSimulation(5, 1000000);
+            Call(sim, "StartRound");
+            Assert.IsTrue((bool)Call(sim, "TryUpgradeSpeed"));
             object stationary = Workers(sim)[0];
             object mover = AddWorkerForTest(sim, "Cocacolero");
             Vector2 blockedLane = new Vector2(250f, LayoutConstant(sceneLayoutType, "WorkerServiceY"));
@@ -1054,22 +1094,31 @@ namespace HayChoriYPaty.Tests
 
             MethodInfo moveWorker = simulationType.GetMethod("MoveWorker", PrivateInstance);
             Assert.IsNotNull(moveWorker);
+            const float dt = .03f;
+            float expectedStep = 900f * (float)Get(sim, "WorkRate") * dt;
             float minimumSeparation = float.MaxValue;
             for (int i = 0; i < 200 && (Vector2)Get(mover, "Position") != (Vector2)Get(mover, "Target"); i++)
             {
-                moveWorker.Invoke(sim, new object[] { mover, .03f });
+                Vector2 before = (Vector2)Get(mover, "Position");
+                moveWorker.Invoke(sim, new object[] { mover, dt });
+                Vector2 after = (Vector2)Get(mover, "Position");
+                Assert.That(after.y, Is.EqualTo(blockedLane.y).Within(.001f), "Passing staff do not cause a lateral detour.");
+                if (i == 0) Assert.That(after.x - before.x, Is.EqualTo(expectedStep).Within(.001f), "Cocacolero movement keeps WorkRateFor speed.");
                 minimumSeparation = Mathf.Min(minimumSeparation,
-                    Vector2.Distance((Vector2)Get(mover, "Position"), (Vector2)Get(stationary, "Position")));
+                    Vector2.Distance(after, (Vector2)Get(stationary, "Position")));
             }
-            Assert.Greater(minimumSeparation, 24f, "The moving sprite should not pass through the stationary worker's body.");
-            Assert.AreEqual(new Vector2(350f, blockedLane.y), Get(mover, "Position"), "The short detour must rejoin its original route.");
-            Assert.AreEqual(blockedLane, Get(stationary, "Position"), "Stationary staff are never displaced to make room.");
+            Assert.Less(minimumSeparation, 24f, "Workers may briefly overlap instead of stopping or avoiding each other.");
+            Assert.AreEqual(new Vector2(350f, blockedLane.y), Get(mover, "Position"), "The worker follows the direct segment to its target.");
+            Assert.That((float)Get(mover, "TravelDistance"), Is.EqualTo(200f).Within(.001f));
+            Assert.AreEqual(blockedLane, Get(stationary, "Position"), "Passing workers do not move idle staff.");
         }
 
         [Test]
-        public void OpposingWorkersUseStableRightOfWayWithoutBlockingEachOther()
+        public void OpposingWorkersCrossOnDirectPathsWithoutRightOfWayOrDelay()
         {
-            object sim = MakeActiveSimulation(5, 0);
+            object sim = MakeActiveSimulation(5, 1000000);
+            Call(sim, "StartRound");
+            Assert.IsTrue((bool)Call(sim, "TryUpgradeSpeed"));
             object first = Workers(sim)[0];
             object second = AddWorkerForTest(sim, "Cocacolero");
             float y = LayoutConstant(sceneLayoutType, "WorkerServiceY");
@@ -1082,18 +1131,73 @@ namespace HayChoriYPaty.Tests
 
             MethodInfo moveWorker = simulationType.GetMethod("MoveWorker", PrivateInstance);
             Assert.IsNotNull(moveWorker);
+            const float dt = .03f;
+            float expectedCookStep = 900f * (float)Get(sim, "CookWorkRate") * dt;
+            float expectedOtherStep = 900f * (float)Get(sim, "WorkRate") * dt;
             float minimumSeparation = float.MaxValue;
             for (int i = 0; i < 200 && ((Vector2)Get(first, "Position") != (Vector2)Get(first, "Target") ||
                 (Vector2)Get(second, "Position") != (Vector2)Get(second, "Target")); i++)
             {
-                moveWorker.Invoke(sim, new object[] { first, .03f });
-                moveWorker.Invoke(sim, new object[] { second, .03f });
+                Vector2 beforeFirst = (Vector2)Get(first, "Position");
+                moveWorker.Invoke(sim, new object[] { first, dt });
+                Vector2 afterFirst = (Vector2)Get(first, "Position");
+                Assert.That(afterFirst.y, Is.EqualTo(y).Within(.001f), "The Parrillero stays on its direct route.");
+                if (i == 0) Assert.That(afterFirst.x - beforeFirst.x, Is.EqualTo(expectedCookStep).Within(.001f), "Parrillero retains its +5% role rate.");
                 minimumSeparation = Mathf.Min(minimumSeparation,
-                    Vector2.Distance((Vector2)Get(first, "Position"), (Vector2)Get(second, "Position")));
+                    Vector2.Distance(afterFirst, (Vector2)Get(second, "Position")));
+                Vector2 beforeSecond = (Vector2)Get(second, "Position");
+                moveWorker.Invoke(sim, new object[] { second, dt });
+                Vector2 afterSecond = (Vector2)Get(second, "Position");
+                Assert.That(afterSecond.y, Is.EqualTo(y).Within(.001f), "The Cocacolero stays on its direct route.");
+                if (i == 0) Assert.That(beforeSecond.x - afterSecond.x, Is.EqualTo(expectedOtherStep).Within(.001f), "The Cocacolero retains its +10% role rate.");
+                minimumSeparation = Mathf.Min(minimumSeparation,
+                    Vector2.Distance((Vector2)Get(first, "Position"), afterSecond));
             }
-            Assert.Greater(minimumSeparation, 24f, "Crossing sprites should remain visually distinguishable.");
+            Assert.Less(minimumSeparation, 24f, "Opposing workers may overlap while crossing; no artificial right-of-way is applied.");
             Assert.AreEqual(new Vector2(350f, y), Get(first, "Position"));
             Assert.AreEqual(new Vector2(150f, y), Get(second, "Position"));
+            Assert.That((float)Get(first, "TravelDistance"), Is.EqualTo(200f).Within(.001f));
+            Assert.That((float)Get(second, "TravelDistance"), Is.EqualTo(200f).Within(.001f));
+        }
+
+        [Test]
+        public void MultipleMozosFollowDirectRoutesWhenTheyCross()
+        {
+            object sim = MakeActiveSimulation(5, 0);
+            float y = LayoutConstant(sceneLayoutType, "WorkerServiceY");
+            float[] starts = { 100f, 250f, 400f };
+            float[] destinations = { 400f, 100f, 250f };
+            var mozos = new List<object>();
+            for (int i = 0; i < starts.Length; i++)
+            {
+                object mozo = AddWorkerForTest(sim, "Mozo");
+                SetWorker(mozo, "Position", new Vector2(starts[i], y));
+                SetWorker(mozo, "Target", new Vector2(destinations[i], y));
+                SetWorker(mozo, "State", EnumValue(stateType, "ToCounter"));
+                mozos.Add(mozo);
+            }
+
+            MethodInfo moveWorker = simulationType.GetMethod("MoveWorker", PrivateInstance);
+            Assert.IsNotNull(moveWorker);
+            for (int tick = 0; tick < 100; tick++)
+            {
+                bool allArrived = true;
+                foreach (object mozo in mozos)
+                {
+                    if ((Vector2)Get(mozo, "Position") == (Vector2)Get(mozo, "Target")) continue;
+                    allArrived = false;
+                    moveWorker.Invoke(sim, new object[] { mozo, .03f });
+                    Assert.That(((Vector2)Get(mozo, "Position")).y, Is.EqualTo(y).Within(.001f),
+                        "Mozos continue straight through occupied worker space without a lateral avoidance path.");
+                }
+                if (allArrived) break;
+            }
+
+            for (int i = 0; i < mozos.Count; i++)
+            {
+                Assert.AreEqual(new Vector2(destinations[i], y), Get(mozos[i], "Position"));
+                Assert.That((float)Get(mozos[i], "TravelDistance"), Is.EqualTo(Mathf.Abs(destinations[i] - starts[i])).Within(.001f));
+            }
         }
 
         [TestCase(0, "Parrillero")]

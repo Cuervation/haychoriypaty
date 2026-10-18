@@ -1,5 +1,9 @@
 # Technical decision log
 
+## 2026-10-18 — ETC2_RGBA8 solo para Android
+
+Las 141 PNG de `Resources` usan ETC2_RGBA8, calidad50 y alpha conservado solo en Android; 87 antes fijaban RGBA32 y 54 usaban ajustes automáticos/sin override. No cambiar fuente ni otras plataformas. La compresión automática ahorró solo1.8%; ETC2 en todas, seguido de ZIP realignment y firma debug, redujo el APK0.2.47 **17.65%** frente al0.2.46. Se acepta la compresión visual Android-only para reducir descarga, con prueba visual en teléfono todavía pendiente. No usar ASTC para conservar compatibilidad más amplia de Android.
+
 > Historical decisions, not a cumulative ruleset. Use [README](README.md)/[continuity](continuity.md) to find the current contract; later scoped replacements override only the affected rule. Old employee caps, uniform prices and pre-modular geometry remain history.
 
 ## 2026-10-18 — Local worker circulation without NavMesh
