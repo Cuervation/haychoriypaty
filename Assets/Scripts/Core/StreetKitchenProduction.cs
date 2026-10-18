@@ -15,7 +15,7 @@ namespace HayChoriYPaty
         [Min(1)] public int fernetTableCapacity = 45;
         [Min(1)] public int barrelCapacity = 12;
         [Min(.1f)] public float cookSeconds = 4f;
-        [Min(.01f)] public float activeCookSeconds = .5f;
+        [Min(.01f)] public float activeCookSeconds = 2f;
         [Min(.1f)] public float burnAfterSeconds = 20f;
         [Min(.1f)] public float discardBurnedAfterSeconds = 1f;
         [Min(.01f)] public float drinkPrepareSeconds = .28f;

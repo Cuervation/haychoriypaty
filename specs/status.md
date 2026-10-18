@@ -1,16 +1,52 @@
+## 2026-10-17 — APK0.2.44/code46 con botón “Jugar con Google”
+
+- Unity6000.6.3f1 Main-only Development IL2CPP/ARM64: **Succeeded288.21s,0 errores/2 warnings** (símbolos de diagnóstico y aviso genérico de postprocesamiento/cambios de código). APK420,716,301bytes; SHA-256 `dcadb2f7171665c62ec521f6cbf0a543573c62bcdf6bf1495d132a90e49244dc`; firma debug, paquete, code46, ARM64, recursos de login y librerías Firebase comprobados. `StreetMarketViewTests`9/9 PlayMode. Instalada en Motorola Edge 60 Fusion mediante adb install -r, conservando los datos; el juego no se abrió. Login real sigue pendiente. Detalle: [android-prototype.md](features/android-prototype.md).
+
 ## 2026-10-16 — Backend Firebase configurado, validación del cliente pendiente
 
-Firebase real configurado: Google habilitado, Android com.haychoriypaty.game con SHA debug, Firestore Standard en São Paulo y reglas seguras desplegadas; Billing=false. Roundtrip administrativo IAM real aprobado, no progreso de jugadores. SDK importado y compila; 46/47 EditMode (falla campaña nivel6) y4/4 PlayMode, gate manual sin sesión verificado. APK0.2.43/code45 IL2CPP/ARM64 generada y verificada:0 errores/1 warning existente de símbolos de diagnóstico, sin instalación. Google real del cliente y reapertura/dispositivo pendientes. Detalle: [firebase-player.md](features/firebase-player.md#informe-verificable-de-entrega--2026-10-16).
+Firebase real configurado: Google habilitado, Android com.haychoriypaty.game con SHA debug, Firestore Standard en São Paulo y reglas seguras desplegadas; Billing=false. Roundtrip administrativo IAM real aprobado, no progreso de jugadores. SDK importado y compila; 46/47 EditMode (falla campaña nivel6) y4/4 PlayMode, gate manual sin sesión verificado. APK0.2.44/code46 IL2CPP/ARM64 generada y verificada; ver encabezado actual de [android-prototype.md](features/android-prototype.md). Sin instalación. Google real del cliente y reapertura/dispositivo pendientes. Detalle: [firebase-player.md](features/firebase-player.md#informe-verificable-de-entrega--2026-10-16).
 
-## 2026-10-16 — Firebase en preparación, no publicado
+## 2026-10-16 — Auditoría visual de dibujos del Mercado
 
-Implementación local de Google obligatorio/perfiles UID/outbox/CAS y estadísticas. Emulador187/187; compilación estática administrada y puente Java, no pruebas Unity/Android ni conexión real. Acceso a `haychoriypaty` denegado a cuenta actual y Editor en diálogo externo de Main bloquean aceptación. No APK ni cambios en teléfono. Detalle y pasos exactos: [firebase-player.md](features/firebase-player.md#informe-verificable-de-entrega--2026-10-16). La APK instalada anterior no contiene Firebase.
+- Se corrigió Pan común: el ícono ahora usa el pan largo del sándwich de chori; Pan Paty conserva el pan del sándwich de paty. El cambio es de selección/crop de sprites existentes, sin modificar arte fuente ni catálogo.
+- Revisión manual del Mercado en niveles 2, 4 y 10 a 540×960, 540×1170 y 540×1200, incluyendo OTROS INGREDIENTES expandida y desplazada hasta el final: los dibujos de chorizo, ambos panes, paty, bondiola, vacío, Coca, cerveza, Fernet y Coca 2,25 L entran completos en sus tarjetas. `CaptureUnifiedMarketLevelsAtPortraitGameViewSizes`: **1/1 PlayMode passed**.
+- Unity MCP se reconectó al Editor del proyecto para esta captura. Esto no valida visualmente la separación/posición de Parrilleros; esa revisión sigue pendiente. No se generó APK ni se instaló en el teléfono.
+
+## 2026-10-16 — Parrilleros ocupan puestos separados al cocinar
+
+- Las posiciones de trabajo ya no derivan del slot de comida. Cada Parrillero de su equipo tiene un ancla estable propia: dos trabajadores quedan en extremos opuestos y el tercero en el centro; filas adicionales conservan la ruta y la separación de la base de la mesa.
+- `StreetActiveCooksTests`, `StreetKitchenPresentationTests` y `StreetSpecialtyPresentationTests`: **55/55 EditMode passed** en copia aislada con Unity6000.6.3f1, incluidas rutas para equipos de hasta9 y verificación de dos Parrilleros simultáneos separados por más de120 puntos. Unity MCP no conectó, por eso QA visual no se ejecutó. Sin APK/build/install; la0.2.42 mantiene la posición anterior.
+
+## 2026-10-16 — Parrillero y Cocacolero más cerca de sus estaciones
+
+- Parrillero: clearance de trabajo junto a la parrilla de14a6 puntos (8 más cerca); Cocacolero: clearance al frente del barril de2a0 puntos (2 más cerca). Se mantiene la separación entre filas y la tangencia del área de pies, sin solapar el barril.
+- Validación focalizada en copia aislada con Unity6000.6.3f1: **42/42 EditMode passed** (`StreetActiveCooksTests`, `StreetKitchenPresentationTests` y ruta de bebidas). Unity MCP no conectó, por lo que no hubo revisión visual en vivo. No se generó ni instaló APK; la0.2.42 conserva las posiciones anteriores.
+
+## 2026-10-16 — Parrilleros cocinan en 2 segundos
+
+- Por pedido del usuario, Racing+ cambia `activeCookSeconds` de1.3a2.0: a WorkRate×1 cada cocción tarda2s; con mejoras sigue aplicándose el multiplicador existente. Los niveles1–5 conservan `cookSeconds=4`. Actualizados balance por defecto, `Main.unity` y regresiones de duración/progreso/escalado.
+- Validación focalizada `StreetActiveCooksTests`: **19/19 EditMode passed**, incluida la regresión del umbral de2s. Se generó y verificó APK0.2.42/code44 (Main, Development IL2CPP/ARM64;0 errores/1 warning existente) y `adb install -r` la instaló en Motorola Edge60Fusion; PackageManager confirma versión44. No se borraron datos ni se abrió el juego; PlayMode y revisión visual siguen sin ejecutar. Hash y detalles en [android-prototype.md](features/android-prototype.md).
+
+## 2026-10-16 — APK0.2.41/code43 con pickup por slot de Mozo
+
+- Se generó la APK Development IL2CPP/ARM64 de Main con Unity6000.6.3f1 desde una copia aislada, porque la instancia MCP detectada no respondió al ping. Build incremental: **0 errors/1 warning**; `aapt`, ZIP y firma v2 verificados. PlayerSettings pasa a0.2.41/code43. `adb install -r` actualizó el Motorola Edge60Fusion; PackageManager confirma code43. No se desinstaló/borró datos ni se abrió el juego; no hubo PlayMode ni revisión visual en vivo.
+- `StreetActiveCooksTests` EditMode: **19/19 passed**, incluidos los cuatro destinos de pickup y geometría. APK y hash en [android-prototype.md](features/android-prototype.md). La revisión visual específica todavía queda pendiente.
+
+## 2026-10-16 — Mozo busca el slot real de cada sándwich
+
+- El Mozo reserva una unidad cocida identificada y ahora calcula el destino desde su producto y `Slot` real usando la misma geometría `TableSlotPosition` del renderer. Chori/Bondiola y Paty/Vacío conservan sus zonas separadas; se mantiene el lado accesible, el límite visual del personaje y las rutas seguras. Bebidas, niveles 1–5, stock, ventas y economía no cambian.
+- Se agregaron regresiones geométricas por producto/profundidad y una prueba de flujo real para cada uno de los cuatro sándwiches. El reintento en copia aislada pasó **19/19 EditMode**; Unity MCP sigue sin responder al ping, así que la revisión visual en Editor queda **sin ejecutar**. `git diff --check` pasó. APK0.2.41/code43 generada aparte; ver encabezado actual.
+
+## 2026-10-16 — cocción activa ajustada a 1,3 s (supersedido)
+
+- Racing+ usa ahora `activeCookSeconds=1.3`, dividido por `WorkRate`; Niveles1–5 mantienen su cocción base de4 s. Se fijó el valor también en `Main.unity` y se añadió una regresión focalizada de duración, ajustando expectativas antiguas que dependían de0,5 s.
+- `git diff --check` pasó. El refresco/compilación de Unity MCP agotó60 s y la instancia dejó de responder; la suite EditMode y la comprobación de import quedan **sin ejecutar**. No se generó otra APK ni se probó gameplay en el dispositivo.
 
 ## 2026-10-16 — Android0.2.40 build and source push requested
 
 - Unity/MCP build `build-38c7ba9d9d`: Main-only Development IL2CPP/ARM64, **success 284.55s, 0 errors/1 warning**. PlayerSettings advanced from0.2.39/code41 to0.2.40/code42.
 - Archive APK `Builds/Android/Archive/HayChoriYPaty-0.2.40-code42-every-victory-market.apk`, versioned `Builds/Android/HayChoriYPaty-0.2.40.apk` and rolling `Builds/Android/HayChoriYPaty-street.apk`:477523029bytes each, SHA-256 `18f6366ba50e33cbbcc2d02f85e48e27bc3bbd18a80f39b31e7dbb9996e8a7ff`. `aapt`, `unzip -t`, `apksigner` v2 verified; Development/debug signature. Not installed/launched.
-- Fuente, pruebas y documentación solicitadas quedaron en `1f83e6c` (`Fix Mercado victory payout and ship Android 0.2.40`), rama `codex/street-automation`, publicada en `origin` el2026-10-16. APK solo generada; no se instaló.
+- Fuente, pruebas y documentación solicitadas quedaron en `1f83e6c` (`Fix Mercado victory payout and ship Android 0.2.40`), rama `codex/street-automation`, publicada en `origin` el2026-10-16. APK instalada como actualización en Motorola Edge 60 Fusion; PackageManager confirmó0.2.40/code42, sin abrir el juego.
 
 # Historial de estado y validaciones
 

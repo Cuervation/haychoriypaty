@@ -1,4 +1,24 @@
-# Current Android delivery — 2026-10-16 (0.2.40/code42, Mercado every-victory payout)
+# Current Android delivery — 2026-10-17 (0.2.44/code46, Google sign-in button)
+
+Unity6000.6.3f1 Main-only Development IL2CPP/ARM64 Android build through the existing editor: **Succeeded in288.21s;0 errors/2 warnings**. Warnings: Diagnostics Data recommends SymbolTable/Full crash symbols; generic “uncompiled code changes” post-processing/import notice. APK IL2CPP metadata includes `JUGAR CON GOOGLE` and `google-g`; Firebase App/Auth/Firestore native libraries are present. `StreetMarketViewTests` PlayMode passed **9/9**; no device Google-login validation.
+
+APK `Builds/Android/HayChoriYPaty-0.2.44-Firebase.apk`: **420,716,301 bytes**, SHA-256 `dcadb2f7171665c62ec521f6cbf0a543573c62bcdf6bf1495d132a90e49244dc`. Package `com.haychoriypaty.game`, version0.2.44/code46, min API26/target36, `arm64-v8a`. ZIP integrity and APK Signature Scheme v2 verified with established Android Debug SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`. Development/debug signed, not Play Store release signed. Installed on Motorola Edge 60 Fusion (ZY22MBNWRB) via adb install -r; PackageManager confirms versionName 0.2.44/code46. Existing app data was preserved; the game was not launched and Google sign-in was not tested on-device.
+
+---
+
+# Previous Android delivery — 2026-10-16 (0.2.42/code44, 2 s active cooking)
+
+Unity6000.6.3f1 Main-only Development IL2CPP/ARM64 Android build from an isolated copy of the active checkout: **Succeeded, 0 errors/1 warning**. The Unity MCP endpoint was unavailable, so the installed Editor's CLI built the isolated clone. The sole warning is the existing obsolete `PlayerSettings.SetScriptingBackend(BuildTargetGroup, ...)` call in `Assets/Editor/AutomationAndroidBuild.cs`; gameplay scripts compile. PlayerSettings advanced from0.2.41/code43 to0.2.42/code44. Includes the active Parrillero/Premium cooking duration of **2 / WorkRate seconds**; focused `StreetActiveCooksTests` passed **19/19 EditMode** on this source.
+
+Archive APK `Builds/Android/Archive/HayChoriYPaty-0.2.42-code44-active-cook-2s.apk`; versioned copy `Builds/Android/HayChoriYPaty-0.2.42.apk`; rolling copy `Builds/Android/HayChoriYPaty-street.apk`. Each is **410,348,871 bytes**, SHA-256 `66bd2dc4a13bb571a8bab86f25c3794d93545bb7f7f5c1f703ffb1e58a1eb3bf`. `aapt` confirmed package `com.haychoriypaty.game`, version0.2.42/code44, min API26/target36 and `arm64-v8a`; `unzip -t` passed; bundled OpenJDK `apksigner` verified APK Signature Scheme v2 with Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`. All three APK copies are byte-identical.
+
+**Installation follow-up — 2026-10-16:** On Motorola Edge60Fusion (`ZY22MBNWRB`), `adb install -r` succeeded; PackageManager confirms versionCode44/versionName0.2.42. This updated the existing app without uninstalling or clearing data. The game was not launched, so there is no post-install gameplay/visual QA.
+
+Development/debug-signed, not Play Store release-signed. PlayMode and live Unity Game View/visual review were not performed.
+
+---
+
+# Previous Android delivery — 2026-10-16 (0.2.40/code42, Mercado every-victory payout)
 
 Unity6000.6.3f1 Main-only Development IL2CPP/ARM64 Android build through the restored existing Unity/MCP editor: **Succeeded in284.55s; 0 errors/1 warning**. Build job `build-38c7ba9d9d`. Package `com.haychoriypaty.game`, version0.2.40/code42, min API26/target36, `arm64-v8a`.
 

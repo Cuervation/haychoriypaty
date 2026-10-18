@@ -124,16 +124,14 @@ namespace HayChoriYPaty.Tests
             Vector2 normalHome=(Vector2)cooks[0].GetType().GetProperty("Position").GetValue(cooks[0]);
             Vector2 premiumHome=(Vector2)cooks[1].GetType().GetProperty("Position").GetValue(cooks[1]);
             for(int product=0;product<4;product++)
+            foreach(int workerCount in new[]{1,2,3,4,6,9})
+            for(int workerIndex=0;workerIndex<workerCount;workerIndex++)
             {
-                int slots=product<2?18:7;
-                for(int slot=0;slot<slots;slot++)
-                {
-                    Vector2 grillFeet=(Vector2)work.Invoke(active,new object[]{product,slot});
-                    Vector2 tableFeet=(Vector2)deposit.Invoke(active,new object[]{product});
-                    Assert.NotNull(route.Invoke(active,new object[]{product<2?normalHome:premiumHome,grillFeet}),"Home→grill product "+product+" slot "+slot);
-                    Assert.NotNull(route.Invoke(active,new object[]{grillFeet,tableFeet}),"Grill→deposit product "+product+" slot "+slot);
-                    Assert.NotNull(route.Invoke(active,new object[]{tableFeet,grillFeet}),"Deposit→grill product "+product+" slot "+slot);
-                }
+                Vector2 grillFeet=(Vector2)work.Invoke(active,new object[]{product,workerIndex,workerCount});
+                Vector2 tableFeet=(Vector2)deposit.Invoke(active,new object[]{product});
+                Assert.NotNull(route.Invoke(active,new object[]{product<2?normalHome:premiumHome,grillFeet}),"Home→grill product "+product+" worker "+workerIndex+"/"+workerCount);
+                Assert.NotNull(route.Invoke(active,new object[]{grillFeet,tableFeet}),"Grill→deposit product "+product+" worker "+workerIndex+"/"+workerCount);
+                Assert.NotNull(route.Invoke(active,new object[]{tableFeet,grillFeet}),"Deposit→grill product "+product+" worker "+workerIndex+"/"+workerCount);
             }
             for(int product=0;product<7;product++)
             {

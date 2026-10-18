@@ -8,7 +8,7 @@
 | Límite del producto y siete IDs | [product.md](product.md) |
 | Resumen del loop actual | [gameplay.md](gameplay.md) |
 | Catálogos, precios, metas/tiempos y contratación/velocidad | [street-automation.md](features/street-automation.md#current-per-product-level-balance--2026-10-08) (tablas vigentes; resto contiene evolución histórica) |
-| Cocineros 0,5 s, Mozo, seis cards y ampliación desde Racing | [active-cooks-mozos.md](features/active-cooks-mozos.md) (incluye restauración posterior del escenario) |
+| Cocineros activos 2 / WorkRate s, Mozo, seis cards y ampliación desde Racing | [active-cooks-mozos.md](features/active-cooks-mozos.md) (incluye restauración posterior del escenario) |
 | Cocina modular, stock físico, geometría y proyección | [modular-kitchen.md](features/modular-kitchen.md) (modo base niveles 1–5; Racing+ aplica el delta anterior) |
 | Mercado/Heladera persistentes y compras sin crédito | [market-fridge.md](features/market-fridge.md) |
 | Firebase/Google obligatorio, perfiles UID, outbox y estado de integración | [firebase-player.md](features/firebase-player.md) (implementación local, aceptación real pendiente) |

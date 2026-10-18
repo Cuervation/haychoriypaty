@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using NUnit.Framework;
+using UnityEngine;
 
 namespace HayChoriYPaty.Tests
 {
@@ -110,11 +111,26 @@ namespace HayChoriYPaty.Tests
             Assert.AreNotEqual(firstId, secondId);
             Assert.AreEqual("Raw", Get(first, "State").ToString(), "Dispatch reserves one identifiable raw grill unit; cooking starts on arrival.");
 
-            Assert.IsFalse((bool)Call(kitchen, "AdvanceCook", firstId, 1, .25f, 1f));
+            Assert.IsFalse((bool)Call(kitchen, "AdvanceCook", firstId, 1, 1f, 1f));
             Assert.That((float)Get(first, "Progress"), Is.EqualTo(.5f).Within(.001f));
-            Assert.IsTrue((bool)Call(kitchen, "AdvanceCook", firstId, 1, .125f, 2f));
+            Assert.IsTrue((bool)Call(kitchen, "AdvanceCook", firstId, 1, .5f, 2f));
             Assert.That((float)Get(first, "Progress"), Is.EqualTo(1f).Within(.001f));
             Assert.IsFalse((bool)Call(kitchen, "AdvanceCook", firstId, 99, 1f, 1f), "Only the owning worker advances its cook.");
+        }
+
+        [Test]
+        public void ActiveCookDefaultDurationIsTwoSeconds()
+        {
+            object balance = Activator.CreateInstance(balanceType);
+            float duration = (float)balanceType.GetField("activeCookSeconds", PublicInstance).GetValue(balance);
+            Assert.That(duration, Is.EqualTo(2f).Within(.0001f));
+
+            object kitchen = Make(new[] { 0 }, true);
+            object unit = Call(kitchen, "ReserveCook", 0, 5);
+            int id = (int)Get(unit, "Id");
+            Assert.IsFalse((bool)Call(kitchen, "AdvanceCook", id, 5, 1.99f, 1f));
+            Assert.IsTrue((bool)Call(kitchen, "AdvanceCook", id, 5, .01f, 1f));
+            Assert.AreEqual("Cooked", Get(unit, "State").ToString());
         }
 
         [Test]
@@ -125,7 +141,7 @@ namespace HayChoriYPaty.Tests
             int id = (int)Get(unit, "Id");
             Assert.IsNull(Call(kitchen, "ReserveTableUnit", 0, 7), "An in-flight production item already reserves its destination capacity.");
             Assert.IsFalse((bool)Call(kitchen, "AdvanceCook", id, 8, .5f, 1f));
-            Assert.IsTrue((bool)Call(kitchen, "AdvanceCook", id, 7, .5f, 1f));
+            Assert.IsTrue((bool)Call(kitchen, "AdvanceCook", id, 7, 2f, 1f));
             Assert.IsFalse((bool)Call(kitchen, "TakeCooked", id, 8));
             Assert.IsTrue((bool)Call(kitchen, "TakeCooked", id, 7));
             Assert.AreEqual("Carried", Get(unit, "Location").ToString());
@@ -158,7 +174,7 @@ namespace HayChoriYPaty.Tests
             Assert.IsNull(Call(kitchen, "ReserveTableUnit", 0, 1), "No phantom unit may be reserved.");
             object unit = Call(kitchen, "ReserveCook", 0, 1);
             int id = (int)Get(unit, "Id");
-            Call(kitchen, "AdvanceCook", id, 1, .5f, 1f);
+            Call(kitchen, "AdvanceCook", id, 1, 2f, 1f);
             Assert.IsTrue((bool)Call(kitchen, "TakeCooked", id, 1));
             Assert.IsTrue((bool)Call(kitchen, "DepositCooked", id, 1));
             Assert.IsNotNull(Call(kitchen, "ReserveTableUnit", 0, 3));
@@ -195,7 +211,7 @@ namespace HayChoriYPaty.Tests
 
             object cooked = Call(kitchen, "ReserveCook", 0, 2);
             int cookedId = (int)Get(cooked, "Id");
-            Assert.IsTrue((bool)Call(kitchen, "AdvanceCook", cookedId, 2, .5f, 1f));
+            Assert.IsTrue((bool)Call(kitchen, "AdvanceCook", cookedId, 2, 2f, 1f));
             Assert.IsTrue((bool)Call(kitchen, "TakeCooked", cookedId, 2));
             Assert.IsTrue((bool)Call(kitchen, "DepositCooked", cookedId, 2));
             Assert.AreEqual(chorizoBefore, Call(market, "Units", 0), "Depositing edible food does not consume its ingredient reservation.");
@@ -276,6 +292,8 @@ namespace HayChoriYPaty.Tests
             Call(sim, "StartRound");
             SetArrivalFarFuture(sim);
             Assert.IsTrue((bool)Call(sim, "SpawnCustomer", 0, 1));
+            object kitchen = Get(sim, "Kitchen");
+            object kitchenLayout = Get(sim, "KitchenLayout");
 
             bool sawGrillTravel = false, sawPartialCook = false, sawCarriedUnit = false;
             for (int i = 0; i < 600 && (int)Call(Get(sim, "Kitchen"), "TableCount", 0) == 0; i++)
@@ -285,6 +303,18 @@ namespace HayChoriYPaty.Tests
                 {
                     string state = Get(worker, "State").ToString();
                     if (state == "ToGrill") sawGrillTravel = true;
+                    if (state == "Cooking")
+                    {
+                        int stationIndex = 0, stationCount = 0;
+                        foreach (object candidate in Workers(sim))
+                        {
+                            if (Get(candidate, "Role").ToString() != Get(worker, "Role").ToString()) continue;
+                            if (Equals(Get(candidate, "Id"), Get(worker, "Id"))) stationIndex = stationCount;
+                            stationCount++;
+                        }
+                        Vector2 work = (Vector2)Call(kitchenLayout, "GrillWorkPosition", Get(worker, "Product"), stationIndex, stationCount);
+                        Assert.AreEqual(work, Get(worker, "Position"), "Parrillero cooks at their own separated team station.");
+                    }
                     if (state == "Cooking" && (float)Get(worker, "CookingProgress") > 0f && (float)Get(worker, "CookingProgress") < 1f)
                         sawPartialCook = true;
                     if (state == "ToTable" && (int)Get(worker, "CarriedItemId") > 0) sawCarriedUnit = true;
@@ -303,6 +333,94 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
+        public void MozoPickupAnchorsFollowEachProductAndActualTableSlot()
+        {
+            object sim = MakeActiveSimulation(5, 1000);
+            object layout = Get(sim, "KitchenLayout");
+            object kitchen = Get(sim, "Kitchen");
+            Vector2 home = new Vector2(433f, 400f);
+            const float workerHalfWidth = 45f;
+            float sceneWidth = 540f;
+
+            for (int product = 0; product < 4; product++)
+            {
+                bool companionAvailable = (bool)Call(sim, "IsProductAvailable", product ^ 1);
+                int capacity = (int)Call(kitchen, "TableCapacity", product);
+                Vector2 standard = (Vector2)Call(layout, "PickupPosition", product);
+                Vector2 firstItem = (Vector2)Call(layout, "TableSlotPosition", product, 0, companionAvailable, capacity);
+                HashSet<int> slots = new HashSet<int> { 0, 1, 3, capacity / 2, capacity - 1 };
+
+                foreach (int slot in slots)
+                {
+                    Vector2 item = (Vector2)Call(layout, "TableSlotPosition", product, slot, companionAvailable, capacity);
+                    Vector2 target = (Vector2)Call(layout, "TableSlotPickupPosition", product, slot, companionAvailable, capacity);
+                    Assert.AreEqual(Mathf.Clamp(item.x, workerHalfWidth, sceneWidth - workerHalfWidth), target.x,
+                        "Product " + product + " slot " + slot + " keeps the full Mozo on screen while following the food's X position.");
+                    Assert.AreEqual(standard.y + item.y - firstItem.y, target.y, .001f,
+                        "Product " + product + " slot " + slot + " follows its row/depth on the same reachable table front.");
+                    Vector2[] route = (Vector2[])Call(layout, "FindShortestSafeRoute", home, target);
+                    Assert.IsNotNull(route, "Product " + product + " slot " + slot + " must remain reachable.");
+                    Assert.Greater(route.Length, 0);
+                    Assert.AreEqual(target, route[route.Length - 1]);
+                }
+                Assert.AreNotEqual(standard,
+                    (Vector2)Call(layout, "TableSlotPickupPosition", product, 0, companionAvailable, capacity),
+                    "Mozo no longer uses the shared center point for product " + product + ".");
+            }
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        public void MozoWalksToTheReservedSandwichSlotForEachProduct(int product)
+        {
+            object sim = MakeActiveSimulation(5, 1000);
+            Call(sim, "StartRound");
+            SetArrivalFarFuture(sim);
+            if (product >= 2)
+                Assert.IsTrue((bool)Call(sim, "TryHire", EnumValue(roleType, "ParrilleroPremium")));
+            Assert.IsTrue((bool)Call(sim, "SpawnCustomer", product, 1));
+
+            object kitchen = Get(sim, "Kitchen");
+            for (int i = 0; i < 600 && (int)Call(kitchen, "TableCount", product) == 0; i++)
+                Call(sim, "Step", .05f);
+            Assert.AreEqual(1, (int)Call(kitchen, "TableCount", product), "The requested product must be physically prepared first.");
+
+            object unit = null;
+            foreach (object candidate in Units(kitchen))
+                if ((int)Get(candidate, "Product") == product && Get(candidate, "Location").ToString() == "Table" &&
+                    Get(candidate, "State").ToString() == "Cooked") { unit = candidate; break; }
+            Assert.IsNotNull(unit, "The target must be derived from a real cooked unit.");
+            int slot = (int)Get(unit, "Slot");
+            object layout = Get(sim, "KitchenLayout");
+            bool companionAvailable = (bool)Call(sim, "IsProductAvailable", product ^ 1);
+            int capacity = (int)Call(kitchen, "TableCapacity", product);
+            Vector2 expected = (Vector2)Call(layout, "TableSlotPickupPosition", product, slot, companionAvailable, capacity);
+            Assert.AreNotEqual((Vector2)Call(layout, "PickupPosition", product), expected,
+                "Each of Chori, Paty, Bondiola, and Vacío must have a product-specific table destination.");
+
+            Assert.IsTrue((bool)Call(sim, "TryHire", EnumValue(roleType, "Mozo")));
+            object mozo = null;
+            foreach (object worker in Workers(sim))
+                if (Get(worker, "Role").ToString() == "Mozo") { mozo = worker; break; }
+            Assert.IsNotNull(mozo);
+
+            bool reachedReservedSlot = false;
+            for (int i = 0; i < 300 && !reachedReservedSlot; i++)
+            {
+                Call(sim, "Step", .05f);
+                reachedReservedSlot = Vector2.Distance((Vector2)Get(mozo, "Position"), expected) < .001f;
+            }
+            Assert.IsTrue(reachedReservedSlot, "The Mozo must physically reach product " + product + " slot " + slot + ".");
+
+            for (int i = 0; i < 600 && (int)Call(sim, "GetProductDelivered", product) == 0; i++)
+                Call(sim, "Step", .05f);
+            Assert.AreEqual(1, (int)Call(sim, "GetProductDelivered", product),
+                "Correct slot routing must still complete the real handoff.");
+        }
+
+        [Test]
         public void ConcurrentCooksKeepDistinctIdentifiedUnitsAndPerWorkerProgress()
         {
             object sim = MakeActiveSimulation(5, 1000);
@@ -315,16 +433,20 @@ namespace HayChoriYPaty.Tests
             {
                 Call(sim, "Step", .05f);
                 var liveCookIds = new HashSet<int>();
+                var cookingPositions = new List<Vector2>();
                 int progressing = 0;
                 foreach (object worker in Workers(sim))
                     if (Get(worker, "State").ToString() == "Cooking" && (float)Get(worker, "CookingProgress") > 0f && (int)Get(worker, "CookingItemId") > 0)
                     {
                         progressing++;
                         Assert.IsTrue(liveCookIds.Add((int)Get(worker, "CookingItemId")), "Two cooks cannot own the same physical unit.");
+                        cookingPositions.Add((Vector2)Get(worker, "Position"));
                     }
                 if (progressing >= 2)
                 {
                     Assert.AreEqual(2, liveCookIds.Count);
+                    Assert.Greater(Vector2.Distance(cookingPositions[0], cookingPositions[1]), 120f,
+                        "Two Parrilleros cooking at once must occupy separate grill-side stations.");
                     return;
                 }
             }

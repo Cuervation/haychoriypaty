@@ -39,7 +39,6 @@ namespace HayChoriYPaty.Cloud
         private RemotePlayerState conflictRemote;
         private StreetGame game;
         private Texture2D backdrop, logo, googleButton;
-        private Font googleFont;
         private int generation;
         private bool syncing, offline, accountOpen, initialSyncWaiting;
         private float retryAt, retryDelay = 2;
@@ -61,7 +60,6 @@ namespace HayChoriYPaty.Cloud
             google = gameObject.AddComponent<GoogleCredentialProvider>();
             backdrop = Resources.Load<Texture2D>("street-cover-user-v5"); logo = Resources.Load<Texture2D>("street-logo");
             googleButton = Resources.Load<Texture2D>("Google/google-g");
-            googleFont = Resources.Load<Font>("Google/GoogleSans-Medium");
         }
         private async void Start() { await BootstrapAsync(); }
         private void OnDestroy()
@@ -311,13 +309,9 @@ namespace HayChoriYPaty.Cloud
             else if (State == PlayerSessionState.LoginRequired)
             {
                 var rect = new Rect(70, 610, 400, 60);
-                GUI.color = new Color32(116,119,117,255); GUI.DrawTexture(rect, Texture2D.whiteTexture);
-                GUI.color = Color.white; GUI.DrawTexture(new Rect(rect.x+1.5f,rect.y+1.5f,rect.width-3,rect.height-3), Texture2D.whiteTexture);
-                if (googleButton != null) GUI.DrawTexture(new Rect(rect.x+18,rect.y+16.5f,27,27), googleButton, ScaleMode.ScaleToFit);
-                var label = new GUIStyle(GUI.skin.label) { font = googleFont, fontSize = 21, alignment = TextAnchor.MiddleCenter };
-                label.normal.textColor = new Color32(31,31,31,255);
-                GUI.Label(new Rect(rect.x+60,rect.y,rect.width-78,rect.height), "Iniciar sesión con Google", label);
-                if (GUI.Button(rect, GUIContent.none, GUIStyle.none)) SignIn();
+                var view = FindAnyObjectByType<StreetView>();
+                if (view != null) view.DrawGoogleAccountButton(rect, "JUGAR CON GOOGLE", googleButton, SignIn);
+                else if (GUI.Button(rect, "JUGAR CON GOOGLE")) SignIn();
             }
             else if (State == PlayerSessionState.LegacyConsent) AccountButton(new Rect(55, 600, 430, 65), "VINCULAR PROGRESO DE ESTE TELÉFONO", ConfirmLegacyImport);
             else if (State == PlayerSessionState.Conflict && conflictRemote != null) AccountButton(new Rect(55, 600, 430, 65), "USAR NUBE Y CONSERVAR COPIA LOCAL", UseRemotePreservingLocal);

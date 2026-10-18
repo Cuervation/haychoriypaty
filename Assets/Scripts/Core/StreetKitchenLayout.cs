@@ -22,9 +22,11 @@ namespace HayChoriYPaty
         public const float WorkerLaneY = 450f;
         public const float TablePickupY = TableY + 36f;
         public const float GrillPickupY = TableY + TableHeight + GrillVerticalGap + 14.4f;
-        // Keep only a 2-unit foot clearance from the barrel front (the worker collider is 36x12).
-        public const float BarrelPickupClearance = 2f;
+        // Cocacoleros step the final two points forward and meet the visible barrel front edge.
+        public const float BarrelPickupClearance = 0f;
         public const float BarrelPickupY = BarrelY - BarrelPickupClearance;
+        // Leave a small foot gap while bringing cooks closer than the former 14-point stand-off.
+        public const float GrillWorkClearance = 6f;
         public const float GrillBottomLimit = TiledPlayfieldBottom - GrillBottomClearance;
         private const float GrillSurfaceTop = .115f, GrillSurfaceBottom = .46f;
         private const float GrillBackLeft = .145f, GrillBackRight = .855f;
@@ -187,16 +189,44 @@ namespace HayChoriYPaty
             return new Vector2(safeX, y);
         }
 
-        /// <summary>Clear grill-side feet anchor for a cook assigned to a real grill slot.</summary>
-        public Vector2 GrillWorkPosition(int product, int slot)
+        /// <summary>Front-side pickup point aligned to the exact reserved sandwich slot.</summary>
+        public Vector2 TableSlotPickupPosition(int product, int slot, bool companionAvailable, int capacity)
+        {
+            Vector2 standard = PickupPosition(product);
+            if (product < 0 || product > 3 || BoundsForProduct(product).width <= 0f) return standard;
+            Vector2 firstItem = TableSlotPosition(product, 0, companionAvailable, capacity);
+            Vector2 item = TableSlotPosition(product, slot, companionAvailable, capacity);
+            float safeX = Mathf.Clamp(item.x, StreetWorkstationLayout.WorkerHalfWidth,
+                StreetSceneLayout.Width - StreetWorkstationLayout.WorkerHalfWidth);
+            return new Vector2(safeX, standard.y + item.y - firstItem.y);
+        }
+
+        /// <summary>Stable grill-side station for one worker in a role-specific cook team.</summary>
+        public Vector2 GrillWorkPosition(int product, int workerIndex, int workerCount)
         {
             Rect grill = GrillBoundsForProduct(product);
             if (grill.width <= 0f) return Vector2.zero;
-            int safeSlot = Mathf.Max(0, slot);
-            int column = safeSlot % 9;
-            int row = safeSlot / 9;
-            float x = Mathf.Clamp(grill.x + grill.width * (.18f + column * .08f), 54f, StreetSceneLayout.Width - 54f);
-            return new Vector2(x, grill.yMin - 14f - row * 20f);
+            int count = Mathf.Max(1, workerCount);
+            int safeIndex = Mathf.Clamp(workerIndex, 0, count - 1);
+            const int columns = 3;
+            int column = safeIndex % columns;
+            int row = safeIndex / columns;
+            float xFraction = column == 0 ? .18f : column == 1 ? .82f : .50f;
+            float x = Mathf.Clamp(grill.x + grill.width * xFraction, 54f, StreetSceneLayout.Width - 54f);
+            float y = grill.yMin - GrillWorkClearance;
+
+            // Add a second depth row only when a team exceeds the three clear front-side lanes.
+            // Keep every feet anchor outside the expanded table-base route obstacle.
+            int rows = Mathf.Max(1, Mathf.CeilToInt(count / (float)columns));
+            if (rows > 1)
+            {
+                Rect table = BoundsForProduct(product);
+                float lowestSafeY = table.width > 0f ? table.yMax + 18f : 12f;
+                float availableDepth = Mathf.Max(0f, y - lowestSafeY);
+                float rowSpacing = Mathf.Min(40f, availableDepth / (rows - 1));
+                y -= row * rowSpacing;
+            }
+            return new Vector2(x, y);
         }
 
         /// <summary>Reserved-item deposit side of the specialty table.</summary>

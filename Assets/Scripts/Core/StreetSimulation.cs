@@ -878,6 +878,19 @@ namespace HayChoriYPaty
         }
 
         private readonly int[] productionCursor = new int[2];
+        private void CookWorkerStation(StreetWorker worker, out int stationIndex, out int stationCount)
+        {
+            stationIndex = 0;
+            stationCount = 0;
+            foreach (StreetWorker candidate in workers)
+            {
+                if (candidate.Role != worker.Role) continue;
+                if (candidate.Id == worker.Id) stationIndex = stationCount;
+                stationCount++;
+            }
+            if (stationCount == 0) stationCount = 1;
+        }
+
         private void AdvanceCookWorker(StreetWorker worker, float dt)
         {
             if (worker.State == StreetWorkerState.Idle)
@@ -907,7 +920,8 @@ namespace HayChoriYPaty
                 worker.Product = chosen; worker.CookingItemId = unit.Id;
                 worker.CookingProgress = 0f;
                 productionCursor[group] = (chosen - first + 1) % 2;
-                if (!SetWorkerRoute(worker, KitchenLayout.GrillWorkPosition(chosen, unit.Slot)))
+                CookWorkerStation(worker, out int stationIndex, out int stationCount);
+                if (!SetWorkerRoute(worker, KitchenLayout.GrillWorkPosition(chosen, stationIndex, stationCount)))
                 { Kitchen.CancelCook(worker.Id); ResetWorker(worker); return; }
                 worker.State = StreetWorkerState.ToGrill;
                 return;
@@ -1022,9 +1036,19 @@ namespace HayChoriYPaty
         {
             worker.PickupProgress = 0f;
             worker.PickupDuration = 0f;
-            if (worker.Role == StreetWorkerRole.Mozo && Kitchen.ReserveTableUnit(worker.Product, worker.Id) == null)
-            { CancelAssignment(worker); return; }
-            if (!SetWorkerRoute(worker, KitchenLayout.PickupPosition(worker.Product))) { CancelAssignment(worker); return; }
+            Vector2 pickup = KitchenLayout.PickupPosition(worker.Product);
+            if (worker.Role == StreetWorkerRole.Mozo)
+            {
+                StreetFoodUnit reserved = Kitchen.ReserveTableUnit(worker.Product, worker.Id);
+                if (reserved == null) { CancelAssignment(worker); return; }
+                if (worker.Product < 4)
+                {
+                    bool companionAvailable = IsProductAvailable(worker.Product ^ 1);
+                    pickup = KitchenLayout.TableSlotPickupPosition(worker.Product, reserved.Slot,
+                        companionAvailable, Kitchen.TableCapacity(worker.Product));
+                }
+            }
+            if (!SetWorkerRoute(worker, pickup)) { CancelAssignment(worker); return; }
             worker.State = StreetWorkerState.ToStation;
         }
 
@@ -1229,8 +1253,16 @@ namespace HayChoriYPaty
         {
             // Production stays on the grill side of the original prep row; delivery stays on
             // its counter side. Do not move furniture or route cooks through solid table bases.
-            Vector2 home = UsesActiveCooks && (role == StreetWorkerRole.Parrillero || role == StreetWorkerRole.ParrilleroPremium)
-                ? KitchenLayout.GrillWorkPosition(role == StreetWorkerRole.Parrillero ? 0 : 2, 0)
+            bool grillWorker = role == StreetWorkerRole.Parrillero || role == StreetWorkerRole.ParrilleroPremium;
+            int stationIndex = 0, stationCount = 1;
+            if (UsesActiveCooks && grillWorker)
+            {
+                foreach (StreetWorker existing in workers)
+                    if (existing.Role == role) stationIndex++;
+                stationCount += stationIndex;
+            }
+            Vector2 home = UsesActiveCooks && grillWorker
+                ? KitchenLayout.GrillWorkPosition(role == StreetWorkerRole.Parrillero ? 0 : 2, stationIndex, stationCount)
                 : WorkerHomePosition;
             workers.Add(new StreetWorker { Id = nextWorker++, Role = role, Product = -1,
                 Position = home, Target = home, State = StreetWorkerState.Idle });

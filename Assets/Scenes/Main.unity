@@ -590,6 +590,7 @@ MonoBehaviour:
       fernetTableCapacity: 45
       barrelCapacity: 12
       cookSeconds: 4
+      activeCookSeconds: 2
       burnAfterSeconds: 20
       discardBurnedAfterSeconds: 1
       drinkPrepareSeconds: 0.28

@@ -72,11 +72,17 @@ The scroll-only Mercado list shows current-goal ingredients first. One collapsed
 - [x] Focused pointer/expansion/stock gate and layout checks at 16:9, 19.5:9, 20:9.
 - [x] Real visual review for Nueva Chicago (2), Ferro (4), Camioneros (10).
 
-Existing dedicated crest assets cover levels 1–3 only; other levels use a clearly non-official palette/initials identity tile rather than inventing a club crest. No source art is modified. Bread icons reuse the bun-only crop from original sandwich sprites, because separate bread assets do not exist.
+Existing dedicated crest assets cover levels 1–3 only; other levels use a clearly non-official palette/initials identity tile rather than inventing a club crest. No source art is modified. Bread icons reuse the upper-bread crop from their corresponding original sandwich sprites because separate bread assets do not exist: Pan común uses the choripán roll and Pan Paty uses the patty bun.
 
 Validation before the unified-screen update: Unity6000.6.3f1 via MCP, **9/9 focused PlayMode** passed (job `3bd96811f4fe44cba75d56ef01f63585`), including purchase/stock gates, navigation and real Mercado/Heladera captures. Those historical Heladera captures do not represent the current UI. Capture fixtures use actual goals/prices and controlled stock/balance, restoring the prior test-project save. `git diff --check` passed.
 
 **Unified Mercado/stock UI update (2026-10-14):** The standalone Heladera screen, tab, button and view state were removed while StreetGame's inventory domain/persistence is untouched. A single expandable OTROS INGREDIENTES section lists only unlocked, non-required stock; All Boys still initially shows Chorizo and Pan común. Fixed Mercado footer now includes the missing-stock bulk purchase action and retains stock-gated play. Unity's focused test job failed before starting any tests and the editor MCP stopped responding; no updated visual captures are available. See `specs/status.md` for the validation limitation.
+
+## Product icon visual audit — 2026-10-16
+
+Manual review found Pan común was using the round sesame Pan Paty sprite, so it did not read as chori bread. It now uses the upper-bread crop from `sandwich-chori`; Pan Paty keeps the upper crop from `sandwich-paty`. The existing PlayMode capture test now also captures the bottom of the expanded optional-ingredient list, so all seven optional-ingredient illustrations can be inspected in one pass. No source art, recipes, or product catalog changed. This supersedes the 2026-10-14 note that both breads used the Paty bun crop.
+
+**Validation:** Unity 6000.6.3f1 MCP reconnected to the project. `CaptureUnifiedMarketLevelsAtPortraitGameViewSizes` passed **1/1**. Manually reviewed Mercado for Nueva Chicago (Level 2), Ferro (4), and Camioneros (10) at 540×960, 540×1170 and 540×1200, plus the expanded optional list scrolled to its last row. Product illustrations fit their cards and are not cut off; the Pan común icon now reads as a long roll. No device/APK validation was requested or run. Captures are temporary PlayMode outputs under `/var/folders/.../T/`.
 
 ## Level 1 opening kit correction (2026-10-14)
 

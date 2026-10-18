@@ -486,7 +486,7 @@ namespace HayChoriYPaty
             chicagoGrill = Resources.Load<Texture2D>(ChicagoGrillResource);
             servingTable = Resources.Load<Texture2D>("street-serving-table-v1");
             gameCoin = Resources.Load<Texture2D>("street-coin-gold-v2");
-            string[] marketArt = { "meat-chori/meat-chori_Raw", "sandwich-paty/sandwich-paty",
+            string[] marketArt = { "meat-chori/meat-chori_Raw", "sandwich-chori/sandwich-chori",
                 "meat-paty/meat-paty_Raw", "sandwich-paty/sandwich-paty", "meat-bondiola/meat-bondiola_Raw",
                 "meat-vacio/meat-vacio_Raw", "coca/coca", "beer/beer" };
             for (int i = 0; i < marketArt.Length; i++) marketIngredientSprites[i] = Resources.Load<Sprite>("ModularKitchen/Sprites/" + marketArt[i]);
@@ -2231,7 +2231,8 @@ namespace HayChoriYPaty
             if (sprite == null) { DrawProductIcon(bounds, id == 6 ? 4 : id == 7 ? 6 : id == 8 ? 5 : 0); return; }
             Rect source = sprite.rect;
             source.y = sprite.texture.height - source.yMax;
-            // Dedicated bread sprites do not exist: use the complete upper-bun area for both breads.
+            // Dedicated bread sprites do not exist: use each sandwich's own complete upper-bread area.
+            // Pan común for choripán must not reuse the round sesame burger bun.
             if (id == 1 || id == 3) source.height *= .45f;
             float scale = Mathf.Min(bounds.width / source.width, bounds.height / source.height);
             Rect fit = new Rect(bounds.center.x - source.width * scale * .5f, bounds.center.y - source.height * scale * .5f,
@@ -2473,7 +2474,15 @@ namespace HayChoriYPaty
             finally { layoutVerticalScale = previousScale; }
         }
 
-        private void DrawStandardButton(Rect bounds, int action, string caption, bool enabled = true, System.Action activated = null)
+        public void DrawGoogleAccountButton(Rect bounds, string caption, Texture2D googleMark, System.Action activated)
+        {
+            Styles(); float previousScale = layoutVerticalScale; layoutVerticalScale = 1f;
+            try { DrawStandardButton(bounds, int.MinValue, caption, true, activated, googleMark); }
+            finally { layoutVerticalScale = previousScale; }
+        }
+
+        private void DrawStandardButton(Rect bounds, int action, string caption, bool enabled = true,
+            System.Action activated = null, Texture2D leadingIcon = null)
         {
             bool interactive = enabled && GUI.enabled;
             bool pressed = interactive && pressedAction == action;
@@ -2486,13 +2495,23 @@ namespace HayChoriYPaty
                 GUI.color = StandardButtonTint(interactive, pressed);
                 DrawStandardButtonBackground(drawn);
                 GUI.color = Color.white;
-                int fontSize = FitStandardButtonFontSize(menuTitle, caption, bounds);
+                float iconInset = leadingIcon != null ? drawn.height * .64f : 0f;
+                Rect fitBounds = bounds;
+                fitBounds.width = Mathf.Max(1f, fitBounds.width - iconInset * 2f);
+                int fontSize = FitStandardButtonFontSize(menuTitle, caption, fitBounds);
                 var captionStyle = CreateStandardButtonLabelStyle(menuTitle, fontSize,
                     interactive ? Color.white : new Color(.80f, .87f, .94f));
                 var borderStyle = CreateStandardButtonLabelStyle(menuTitle, fontSize, new Color(.035f, .075f, .16f));
                 float textScale = bounds.height / 92f;
-                Rect letters = new Rect(drawn.x, drawn.y - 2f * textScale,
-                    drawn.width, drawn.height - 8f * textScale);
+                Rect letters = new Rect(drawn.x + iconInset, drawn.y - 2f * textScale,
+                    drawn.width - iconInset * 2f, drawn.height - 8f * textScale);
+                if (leadingIcon != null)
+                {
+                    float iconSize = Mathf.Min(drawn.height * .54f, drawn.width * .12f);
+                    float sideInset = drawn.width * .075f;
+                    GUI.DrawTexture(new Rect(drawn.x + sideInset, drawn.center.y - iconSize * .5f,
+                        iconSize, iconSize), leadingIcon, ScaleMode.ScaleToFit, true);
+                }
                 float outline = 2.2f * captionStyle.fontSize / 38f;
                 for (int y = -1; y <= 1; y++)
                 for (int x = -1; x <= 1; x++)

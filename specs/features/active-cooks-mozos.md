@@ -4,7 +4,7 @@
 
 LevelIndex >= 5 (Racing through Los Redondos) enables active sandwich production and Mozo delivery, centrally gated. Levels 1–5 retain their existing production, delivery, layout and costs. Stable role IDs append Mozo=4. Existing seven products, goals, duration, demand, stock reservations, speed limits and unlimited hiring remain unchanged.
 
-Normal/Premium cooks independently travel to their respective grill, cook one identified unit for 0.5 / WorkRate seconds, carry that same unit along a safe route and deposit it in a reserved available specialty table slot. No automatic sandwich transfer in active mode. Each cooking worker exposes real progress. Mozo claims available sandwich stock, fetches one unit from either table and serves the actual pending customer; only handoff consumes reserved ingredients and records revenue. Beverage roles retain existing behavior. Cancellations preserve edible physical stock; no duplicate IDs, claims, ingredients or sales. Tables bound both prepared and in-flight production. Pending products take precedence, with fair stock replenishment.
+Normal/Premium cooks independently travel to their respective grill, cook one identified unit for 2 / WorkRate seconds, carry that same unit along a safe route and deposit it in a reserved available specialty table slot. No automatic sandwich transfer in active mode. Each cooking worker exposes real progress. Mozo claims a cooked sandwich and routes to that reserved unit's actual product/slot on its table (Chori and Bondiola use their left product zones; Paty and Vacío use their right zones), then serves the actual pending customer; only handoff consumes reserved ingredients and records revenue. Beverage roles retain existing behavior. Cancellations preserve edible physical stock; no duplicate IDs, claims, ingredients or sales. Tables bound both prepared and in-flight production. Pending products take precedence, with fair stock replenishment.
 
 Mozo is hired only during play, not automatically; starts at zero. Per-level configurable base costs follow existing successive-hire curve, with River reference $60. Every fresh attempt still starts with one Parrillero and speed x1.00. Save compatibility retained; no persistent earnings/unlocks or new pre-match roster screen.
 
@@ -15,7 +15,9 @@ Reuse existing furniture, counter, mural, fans, HUD, art, fonts, wood/iron cards
 ## Validation / acceptance
 
 - [x] Active per-worker cooking, one real carried/deposited unit and speed scaling.
+- [x] Parrilleros del mismo rol usan puestos de parrilla separados al cocinar en paralelo; EditMode cubre separación y rutas seguras. Revisión visual de este ajuste sigue pendiente.
 - [x] Exclusive Mozo sandwich handoff and unchanged beverage/mixed-order flow.
+- [x] Mozo routes to the actual reserved table slot for Chori, Paty, Bondiola, and Vacío (focused EditMode suite passed 19/19 on2026-10-16; live visual route review remains pending).
 - [x] Concurrent claims, finite stock/capacity, cancellation and ingredient conservation.
 - [x] Role hiring/costs/save compatibility; earlier-level regressions.
 - [x] Unified expanded geometry, original assets, six responsive cards and circular progress.
@@ -24,6 +26,23 @@ Reuse existing furniture, counter, mural, fans, HUD, art, fonts, wood/iron cards
 - [x] Quantified throughput/balance assessment without changing goals/duration/economics.
 
 Task is not complete until runtime validation and real visual evidence are recorded.
+
+## Ajuste vigente de cocción activa — 2026-10-16
+
+A pedido del usuario, desde Racing+ Parrillero y Premium cocinan cada unidad en **2 / WorkRate segundos** (2 s a velocidad de trabajo ×1). El balance predeterminado y `Main.unity` guardan explícitamente 2 s. Niveles 1–5 conservan su `cookSeconds=4`; el ajuste previo de 1,3 s queda supersedido. La regresión de duración prueba el umbral de 2 s y el escalado por WorkRate; `StreetActiveCooksTests` pasó **19/19 EditMode** el2026-10-16. La APK0.2.42/code44 ya está instalada en Motorola Edge60Fusion; no se ejecutaron PlayMode ni revisión visual en vivo y el juego no se abrió. Detalle de build/firma en [android-prototype.md](android-prototype.md).
+
+### Ajuste previo supersedido — 2026-10-16
+
+El pedido anterior fijó temporalmente la cocción activa en 1,3 / WorkRate segundos. Fue reemplazado por el ajuste vigente de 2 / WorkRate segundos; no cambian los 4 s base de niveles 1–5.
+
+## Ajuste de proximidad de trabajadores — 2026-10-16
+
+A pedido del usuario, el Parrillero se ubica 8 puntos más cerca de la parrilla: `GrillWorkClearance` pasa de 14 a 6 puntos, manteniendo una separación segura para los pies y las filas interiores. El Cocacolero se acerca 2 puntos al frente de los barriles: `BarrelPickupClearance` pasa de 2 a 0; Coca y Cerveza comparten esta geometría y la prueba confirma tangencia sin superposición, además de rutas seguras. La suite focalizada de `StreetActiveCooksTests`, `StreetKitchenPresentationTests` y la ruta de bebidas pasó **42/42 EditMode** en copia aislada con Unity6000.6.3f1. No se hizo revisión visual en vivo, build ni instalación; la APK0.2.42 instalada aún conserva las posiciones anteriores.
+
+
+### Puestos de Parrilleros separados — 2026-10-16
+
+Cada Parrillero/Premium recibe un puesto estable, calculado por su orden dentro de su equipo y no por el slot del alimento. Los dos primeros ocupan extremos opuestos del frente de la parrilla; el tercero usa el centro, y los equipos mayores se escalonan en filas adicionales dentro del paso seguro. Así dos trabajadores no comparten el mismo ancla aun si preparan productos distintos que ocupan el mismo número de slot. La regresión del flujo simultáneo verifica más de 120 puntos entre los dos primeros. `StreetActiveCooksTests`, `StreetKitchenPresentationTests` y `StreetSpecialtyPresentationTests` pasaron **55/55 EditMode** en copia aislada con Unity6000.6.3f1. Unity MCP no conectó: QA visual en vivo sigue pendiente; no se generó ni instaló APK y la0.2.42 aún no incluye estos puestos.
 
 ## Resultado y validación — 2026-10-15
 

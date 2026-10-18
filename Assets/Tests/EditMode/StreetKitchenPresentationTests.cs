@@ -52,15 +52,44 @@ namespace HayChoriYPaty.Tests
             Vector2 start = (Vector2)Get(workers[0], "Position");
             foreach (int product in new[] { 0, 1, 2, 3 })
             {
-                Vector2 from = product < 2 ? start : (Vector2)Call(layout, "GrillWorkPosition", product, 0);
-                for (int slot = 0; slot < (product < 2 ? 18 : 4); slot++)
+                Vector2 from = product < 2 ? start : (Vector2)Call(layout, "GrillWorkPosition", product, 0, 1);
+                Vector2 deposit = (Vector2)Call(layout, "DepositPosition", product);
+                foreach (int workerCount in new[] { 1, 2, 3, 4, 6, 9 })
+                for (int workerIndex = 0; workerIndex < workerCount; workerIndex++)
                 {
-                    Vector2 work = (Vector2)Call(layout, "GrillWorkPosition", product, slot);
-                    Vector2 deposit = (Vector2)Call(layout, "DepositPosition", product);
+                    Vector2 work = (Vector2)Call(layout, "GrillWorkPosition", product, workerIndex, workerCount);
+                    Rect grill = (Rect)Call(layout, "GrillBoundsForProduct", product);
+                    Assert.Less(work.y, grill.yMin, "Each cook stands on the accessible side of the grill.");
+                    Rect table = RectProperty(layout, product < 2 ? "NormalTableBounds" : "PremiumTableBounds");
+                    Assert.Greater(work.y, table.yMax + 12f,
+                        "Each cook stays outside the expanded table-base route obstacle.");
                     foreach (Vector2[] journey in new[] { (Vector2[])Call(layout, "FindShortestSafeRoute", from, work),
                         (Vector2[])Call(layout, "FindShortestSafeRoute", work, deposit),
                         (Vector2[])Call(layout, "FindShortestSafeRoute", deposit, work) })
-                        Assert.IsNotNull(journey, "Every real cook slot must be accessible without crossing the prep row.");
+                        Assert.IsNotNull(journey, "Every Parrillero station remains reachable without crossing the prep row.");
+                }
+            }
+        }
+
+        [Test]
+        public void ParrillerosUseSeparateStationsAlongEachSharedGrill()
+        {
+            object sim = Simulation(5), layout = Layout(sim);
+            foreach (int product in new[] { 0, 2 })
+            foreach (int count in new[] { 2, 3, 4, 6 })
+            {
+                var stations = new HashSet<Vector2>();
+                for (int index = 0; index < count; index++)
+                {
+                    Vector2 station = (Vector2)Call(layout, "GrillWorkPosition", product, index, count);
+                    Assert.IsTrue(stations.Add(station), "Cooker " + index + " must not share a station on grill " + product + ".");
+                }
+                if (count == 2)
+                {
+                    Vector2 left = (Vector2)Call(layout, "GrillWorkPosition", product, 0, count);
+                    Vector2 right = (Vector2)Call(layout, "GrillWorkPosition", product, 1, count);
+                    Assert.Greater(Vector2.Distance(left, right), 120f,
+                        "The first two cooks should be visibly separated, not overlapping at the same grill slot.");
                 }
             }
         }
@@ -501,7 +530,7 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void BeveragePickupsStandCloseToBarrelFrontWithSafeFootClearanceAcrossCatalog()
+        public void BeveragePickupsReachBarrelFrontWithoutOverlappingAcrossCatalog()
         {
             float workerHalfWidth = (float)Runtime("StreetWorkstationLayout").GetField("WorkerHalfWidth").GetRawConstantValue();
             float sceneWidth = (float)Runtime("StreetSceneLayout").GetField("Width").GetRawConstantValue();
@@ -518,8 +547,8 @@ namespace HayChoriYPaty.Tests
                     Assert.AreEqual(safeCenterX, pickup.x, .001f, "L" + level + " P" + product + " centers the worker where its full sprite stays on screen.");
                     Assert.GreaterOrEqual(pickup.x - workerHalfWidth, 0f, "L" + level + " P" + product + " keeps the complete worker in the left screen bound.");
                     Assert.LessOrEqual(pickup.x + workerHalfWidth, sceneWidth, "L" + level + " P" + product + " keeps the complete worker in the right screen bound.");
-                    Assert.AreEqual(barrel.yMin - 2f, pickup.y, .001f, "L" + level + " P" + product + " uses the closer front anchor.");
-                    Assert.AreEqual(barrel.yMin - 2f, feet.yMax, .001f, "L" + level + " P" + product + " keeps a 2-unit collider clearance.");
+                    Assert.AreEqual(barrel.yMin, pickup.y, .001f, "L" + level + " P" + product + " stands two points closer, directly at the front edge.");
+                    Assert.AreEqual(barrel.yMin, feet.yMax, .001f, "L" + level + " P" + product + " touches but does not pass the barrel front.");
                     Assert.IsFalse(feet.Overlaps(barrel), "L" + level + " P" + product + " worker feet do not enter the barrel.");
                 }
             }

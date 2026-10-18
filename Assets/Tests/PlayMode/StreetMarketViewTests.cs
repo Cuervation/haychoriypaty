@@ -456,6 +456,11 @@ namespace HayChoriYPaty.Tests
                         viewType.GetField("marketOtherExpanded", Priv).SetValue(view, true);
                         yield return null; yield return new WaitForEndOfFrame();
                         SaveCurrentGameViewCapture($"mercado-otros-nivel-{level:00}-{width}x{height}");
+                        viewType.GetField("marketScroll", Priv).SetValue(view,
+                            viewType.GetMethod("MarketMaxScroll", Priv).Invoke(view, null));
+                        yield return null; yield return new WaitForEndOfFrame();
+                        SaveCurrentGameViewCapture($"mercado-otros-final-nivel-{level:00}-{width}x{height}");
+                        viewType.GetField("marketScroll", Priv).SetValue(view, 0f);
                         viewType.GetField("marketOtherExpanded", Priv).SetValue(view, false);
                     }
                     viewType.GetMethod("MarketRevealIngredient", Priv).Invoke(view, new object[] { 6 });
