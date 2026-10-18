@@ -102,7 +102,7 @@ namespace HayChoriYPaty.Cloud
                 if (auth == null) { auth = FirebaseAuth.GetAuth(app); auth.StateChanged += OnAuthChanged; }
                 firestore = FirebaseFirestore.GetInstance(app);
                 if (IsGoogleUser(auth.CurrentUser)) await ResolvePlayerAsync(ticket);
-                else { State = PlayerSessionState.LoginRequired; message = "Iniciá sesión para recuperar tu progreso."; }
+                else { State = PlayerSessionState.LoginRequired; message = ""; }
             }
             catch (Exception) { if (ticket == generation) Fail("No pudimos preparar el acceso. Tu progreso está protegido. Reintentá."); }
         }
@@ -120,6 +120,7 @@ namespace HayChoriYPaty.Cloud
                 if (ticket != generation) return;
                 if (!IsGoogleUser(auth.CurrentUser)) throw new InvalidOperationException("Google provider required");
                 await ResolvePlayerAsync(ticket);
+                if (ticket == generation && IsGoogleUser(auth.CurrentUser)) ContinueToGameAfterGoogleSignIn();
             }
             catch (Exception) { google.Cancel(); if (ticket == generation) { State = PlayerSessionState.LoginRequired; message = "No se pudo iniciar sesión. Podés volver a intentar."; } }
         }
@@ -175,6 +176,13 @@ namespace HayChoriYPaty.Cloud
             message = initialSyncWaiting ? "Confirmando la primera sincronización de tu progreso…" : "";
             offline = false; retryDelay = 2; retryAt = 0;
         }
+        private void ContinueToGameAfterGoogleSignIn()
+        {
+            if (game == null || !game.IsPlayerActive ||
+                (State != PlayerSessionState.Ready && State != PlayerSessionState.Recovering)) return;
+            FindAnyObjectByType<StreetView>()?.ContinueToGameAfterGoogleSignIn();
+        }
+
         public void ConfirmLegacyImport()
         {
             if (State != PlayerSessionState.LegacyConsent || !IsGoogleUser(auth.CurrentUser)) return;
@@ -182,7 +190,7 @@ namespace HayChoriYPaty.Cloud
             {
                 PlayerLocalRepository.ValidateSnapshot(legacyJson);
                 PlayerLocalRepository.ClaimLegacy(root, auth.CurrentUser.UserId);
-                local.SetLegacySource(legacyHash); Activate(legacyJson); SyncPending();
+                local.SetLegacySource(legacyHash); Activate(legacyJson); SyncPending(); ContinueToGameAfterGoogleSignIn();
             }
             catch (Exception) { Fail("No pudimos vincular la partida. La copia original sigue protegida."); }
         }
@@ -195,7 +203,7 @@ namespace HayChoriYPaty.Cloud
                 if (legacyJson != null && PlayerLocalRepository.CanClaimLegacy(root, local.State.uid))
                     PlayerLocalRepository.ClaimLegacy(root, local.State.uid);
                 local.AdoptRemote(conflictRemote.snapshot, conflictRemote.revision, true); Activate(local.State.snapshot);
-                conflictRemote = null;
+                conflictRemote = null; ContinueToGameAfterGoogleSignIn();
             }
             catch (Exception) { Fail("No pudimos cambiar de progreso con seguridad. Conservamos ambas copias."); }
         }

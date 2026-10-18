@@ -305,6 +305,42 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual("Playing", Phase, "Selecting the unlocked first location starts Floresta");
         }
 
+        [Test]
+        public void GoogleSignInContinuesToTheFormerJugarDestinationWithoutStartingAMatch()
+        {
+            Type viewType = view.GetType();
+            float duration = (float)viewType.GetField("IntroDuration", StaticPrivate).GetRawConstantValue();
+            viewType.GetField("introActive", PrivateInstance).SetValue(view, true);
+            viewType.GetField("introStarted", PrivateInstance).SetValue(view, Time.unscaledTime - duration - .1f);
+
+            viewType.GetMethod("ContinueToGameAfterGoogleSignIn", PublicInstance).Invoke(view, null);
+
+            Assert.IsFalse((bool)viewType.GetField("introActive", PrivateInstance).GetValue(view));
+            Assert.IsTrue((bool)viewType.GetField("levelSelectActive", PrivateInstance).GetValue(view),
+                "Google sign-in should continue to the same selector as the former JUGAR button");
+            Assert.AreEqual("Ready", Phase, "Continuing to play must not start a match before level/market selection");
+        }
+
+        [Test]
+        public void GoogleSignInWaitsForThePresentationHoldBeforeOpeningLevels()
+        {
+            Type viewType = view.GetType();
+            float duration = (float)viewType.GetField("IntroDuration", StaticPrivate).GetRawConstantValue();
+            viewType.GetField("introActive", PrivateInstance).SetValue(view, true);
+            viewType.GetField("introStarted", PrivateInstance).SetValue(view, Time.unscaledTime);
+
+            viewType.GetMethod("ContinueToGameAfterGoogleSignIn", PublicInstance).Invoke(view, null);
+            Assert.IsTrue((bool)viewType.GetField("introActive", PrivateInstance).GetValue(view));
+            Assert.IsTrue((bool)viewType.GetField("startGameAfterGoogleSignIn", PrivateInstance).GetValue(view));
+
+            viewType.GetField("introStarted", PrivateInstance).SetValue(view, Time.unscaledTime - duration - .1f);
+            viewType.GetMethod("Update", PrivateInstance).Invoke(view, null);
+
+            Assert.IsFalse((bool)viewType.GetField("introActive", PrivateInstance).GetValue(view));
+            Assert.IsTrue((bool)viewType.GetField("levelSelectActive", PrivateInstance).GetValue(view));
+            Assert.AreEqual("Ready", Phase);
+        }
+
         [UnityTest]
         public IEnumerator LockedLevelNeedsPreviousWinAndVictorySalirReturnsToSelector()
         {

@@ -359,11 +359,12 @@ namespace HayChoriYPaty
         private Texture2D premiumWorker, premiumDiagonal, fernetWorker, fernetWorkerLater;
         private Texture2D mozoWorker;
         private Texture2D victoryPopup;
-        private Texture2D coverArt, titleLogo, introGlow, menuButton, hudBarTexture, cutoutHudBarTexture, hudQuotaCardTexture, hudQuotaCardOutlineTexture, riotBackdrop, riotFanAtlas, riotImpactCloud;
+        private Texture2D coverArt, titleLogo, introGlow, menuButton, googleButtonSurface, hudBarTexture, cutoutHudBarTexture, hudQuotaCardTexture, hudQuotaCardOutlineTexture, riotBackdrop, riotFanAtlas, riotImpactCloud;
         private Font menuFont;
         private GUIStyle menuTitle, levelTitle;
         private bool introActive;
         private bool levelSelectActive;
+        private bool startGameAfterGoogleSignIn;
         private float introStarted;
         private bool riotScreenActive;
         private float riotStartedAt;
@@ -446,6 +447,8 @@ namespace HayChoriYPaty
         };
         // Threshold-alpha bounds from the transparent upgrade board and three-arrow icon.
         private static readonly Rect UpgradeWoodBounds = new Rect(13,148,1484,715);
+        // Clean board face from the existing upgrade-wood art; avoids its oval, plaque and metal frame.
+        private static readonly Rect FooterWoodSource = new Rect(680, 511, 650, 280);
         private static readonly Rect SpeedArrowBounds = new Rect(114,224,1174,662);
         private void OnEnable()
         {
@@ -500,6 +503,7 @@ namespace HayChoriYPaty
             titleLogo = Resources.Load<Texture2D>("street-logo");
             introGlow = CreateIntroGlow();
             menuButton = CreateMenuButton();
+            googleButtonSurface = CreateGoogleButtonSurface();
             hudBarTexture = CreateHudBar();
             cutoutHudBarTexture = CreateHudBarTexture(true);
             cachedHudBarRows = cachedHudCutoutRows = 2;
@@ -528,6 +532,8 @@ namespace HayChoriYPaty
             introGlow = null;
             if (menuButton != null) Destroy(menuButton);
             menuButton = null;
+            if (googleButtonSurface != null) Destroy(googleButtonSurface);
+            googleButtonSurface = null;
             if (hudBarTexture != null) Destroy(hudBarTexture);
             hudBarTexture = null;
             if (cutoutHudBarTexture != null) Destroy(cutoutHudBarTexture);
@@ -545,6 +551,7 @@ namespace HayChoriYPaty
         }
         private void Update()
         {
+            if (startGameAfterGoogleSignIn && introActive && MenuAvailable) OpenLevelSelectorFromIntro();
             if (introActive && !MenuAvailable) return;
 #if !(UNITY_ANDROID && !UNITY_EDITOR) && ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
             var touch = Touchscreen.current; var mouse = Mouse.current;
@@ -679,13 +686,7 @@ namespace HayChoriYPaty
             {
                 // Native Android and the desktop bridge share the same startup guard.
                 if (!MenuAvailable) return;
-                if (a == MenuPlayAction)
-                {
-                    introActive = false;
-                    levelSelectActive = true;
-                    levelSelectPage = game.Sim.LevelIndex / LevelSelectorPageSize;
-                    pressedAction = 0;
-                }
+                if (a == MenuPlayAction) OpenLevelSelectorFromIntro();
                 else if (a == MenuQuitAction) QuitGame();
                 return;
             }
@@ -1347,7 +1348,7 @@ namespace HayChoriYPaty
             {
                 if (game != null && game.Sim != null && game.Sim.UsesActiveCooks)
                 {
-                    // Continue the source street's own pavement into the cream footer, keeping the
+                    // Continue the source street's own pavement to the footer edge, keeping the
                     // original counter/mural untouched. The narrow crop avoids stretching scenery.
                     if (backdrop != null)
                     {
@@ -1365,26 +1366,20 @@ namespace HayChoriYPaty
                                 new Rect(0f, uvY, 1f, uvHeight * drawHeight / tileHeight), true);
                         }
                     }
-                    // Lower the existing cream footer with the expanded kitchen; paint over
-                    // the baked flags without changing the counter or mural above it.
-                    GUI.color = new Color32(255, 244, 224, 255);
-                    GUI.DrawTexture(new Rect(0f, game.Sim.KitchenLayout.PlayfieldBottom * verticalScale,
-                        W, Mathf.Max(0f, canvasHeight - game.Sim.KitchenLayout.PlayfieldBottom * verticalScale)),
-                        Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
+                    DrawFooterWood(new Rect(0f, game.Sim.KitchenLayout.PlayfieldBottom * verticalScale,
+                        W, Mathf.Max(0f, canvasHeight - game.Sim.KitchenLayout.PlayfieldBottom * verticalScale)), verticalScale);
                     return;
                 }
-                // Mask the Floresta pennants baked into the root plate before placing the adaptive row.
-                GUI.color = new Color32(255, 244, 224, 255);
-                float rootHeight = ClubPennantRenderer.LogicalHeight * verticalScale;
-                GUI.DrawTexture(new Rect(0f, canvasHeight - rootHeight, W, rootHeight),
-                    Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
+                // Replace the complete baked cream footer, including behind the transparent pennants.
+                float footerTop = game.Sim.KitchenLayout.PlayfieldBottom * verticalScale;
+                DrawFooterWood(new Rect(0f, footerTop, W, Mathf.Max(0f, canvasHeight - footerTop)), verticalScale);
 
                 if (safePennants.height <= 1f || safeViewport.width <= 0f) return;
                 if (clubPennantTexture == null || clubPennantThemeName != theme.ClubName ||
                     Mathf.Abs(clubPennantLogicalHeight - safePennants.height) > .25f)
                 {
                     if (clubPennantTexture != null) Destroy(clubPennantTexture);
-                    clubPennantTexture = ClubPennantRenderer.CreateAdaptiveTexture(theme, safePennants.height, false, true);
+                    clubPennantTexture = CreateFooterPennants(theme, safePennants.height);
                     clubPennantThemeName = theme.ClubName;
                     clubPennantLogicalHeight = safePennants.height;
                 }
@@ -1402,6 +1397,47 @@ namespace HayChoriYPaty
             {
                 GUI.color = previousColor;
             }
+        }
+
+        private static Texture2D CreateFooterPennants(ClubVisualTheme theme, float logicalHeight, bool keepReadable = false) =>
+            ClubPennantRenderer.CreateAdaptiveTexture(theme, logicalHeight, keepReadable, false);
+
+        private void DrawFooterWood(Rect bounds, float verticalScale)
+        {
+            if (bounds.width <= 0f || bounds.height <= 0f) return;
+            float scale = Mathf.Max(.01f, verticalScale);
+            float darkEdgeHeight = Mathf.Min(2f * scale, bounds.height);
+            float warmEdgeHeight = Mathf.Min(scale, Mathf.Max(0f, bounds.height - darkEdgeHeight));
+            Rect woodBounds = new Rect(bounds.x, bounds.y + darkEdgeHeight + warmEdgeHeight,
+                bounds.width, Mathf.Max(0f, bounds.height - darkEdgeHeight - warmEdgeHeight));
+            Color previous = GUI.color;
+            try
+            {
+                if (upgradeWood != null && woodBounds.height > 0f &&
+                    FooterWoodSource.xMin >= 0f && FooterWoodSource.yMin >= 0f &&
+                    FooterWoodSource.xMax <= upgradeWood.width && FooterWoodSource.yMax <= upgradeWood.height)
+                {
+                    // Cover-crop to each responsive footer aspect so the authored grain is not stretched.
+                    GUI.color = new Color(.72f, .63f, .53f, 1f);
+                    DrawRawCover(woodBounds, upgradeWood, FooterWoodSource);
+                }
+                else
+                {
+                    GUI.color = new Color(.18f, .075f, .027f, 1f);
+                    GUI.DrawTexture(woodBounds, Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
+                }
+
+                GUI.color = new Color(.075f, .035f, .016f, 1f);
+                GUI.DrawTexture(new Rect(bounds.x, bounds.y, bounds.width, darkEdgeHeight),
+                    Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
+                if (warmEdgeHeight > 0f)
+                {
+                    GUI.color = new Color(.39f, .19f, .065f, 1f);
+                    GUI.DrawTexture(new Rect(bounds.x, bounds.y + darkEdgeHeight, bounds.width, warmEdgeHeight),
+                        Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
+                }
+            }
+            finally { GUI.color = previous; }
         }
 
         private readonly System.Collections.Generic.List<Vector2> cookingRingCenters = new System.Collections.Generic.List<Vector2>();
@@ -2476,9 +2512,67 @@ namespace HayChoriYPaty
 
         public void DrawGoogleAccountButton(Rect bounds, string caption, Texture2D googleMark, System.Action activated)
         {
-            Styles(); float previousScale = layoutVerticalScale; layoutVerticalScale = 1f;
-            try { DrawStandardButton(bounds, int.MinValue, caption, true, activated, googleMark); }
-            finally { layoutVerticalScale = previousScale; }
+            Styles();
+            float previousScale = layoutVerticalScale;
+            Color previousColor = GUI.color;
+            bool previousEnabled = GUI.enabled;
+            layoutVerticalScale = 1f;
+            try
+            {
+                bool interactive = GUI.enabled;
+                bool pressed = interactive && pressedAction == int.MinValue;
+                Rect hitBounds = LayoutRect(bounds);
+                Rect drawn = StandardButtonVisualBounds(hitBounds, pressed);
+                GUI.color = interactive ? Color.white : new Color(.93f, .93f, .93f, 1f);
+                if (googleButtonSurface != null)
+                    GUI.DrawTexture(drawn, googleButtonSurface, ScaleMode.StretchToFill, true);
+                else
+                    GUI.DrawTexture(drawn, Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
+
+                GUI.color = Color.white;
+                float iconInset = googleMark != null ? drawn.height * .64f : 0f;
+                Rect fitBounds = new Rect(0f, 0f, Mathf.Max(1f, bounds.width - iconInset * 2f), bounds.height);
+                int fontSize = FitStandardButtonFontSize(menuTitle, caption, fitBounds);
+                var label = CreateStandardButtonLabelStyle(menuTitle, fontSize,
+                    interactive ? new Color(.06f, .06f, .06f) : new Color(.46f, .46f, .46f));
+                float textScale = bounds.height / 92f;
+                Rect letters = new Rect(drawn.x + iconInset, drawn.y - 2f * textScale,
+                    drawn.width - iconInset * 2f, drawn.height - 8f * textScale);
+
+                if (googleMark != null)
+                {
+                    float iconSize = Mathf.Min(drawn.height * .54f, drawn.width * .12f);
+                    float sideInset = drawn.width * .075f;
+                    GUI.DrawTexture(new Rect(drawn.x + sideInset, drawn.center.y - iconSize * .5f,
+                        iconSize, iconSize), googleMark, ScaleMode.ScaleToFit, true);
+                }
+                GUI.Label(letters, caption, label);
+                GUI.enabled = interactive;
+                if (GUI.Button(hitBounds, "", invisible)) activated?.Invoke();
+            }
+            finally
+            {
+                GUI.color = previousColor;
+                GUI.enabled = previousEnabled;
+                layoutVerticalScale = previousScale;
+            }
+        }
+
+        public void ContinueToGameAfterGoogleSignIn()
+        {
+            if (!introActive || game == null || !game.IsPlayerActive || game.Sim == null) return;
+            if (!MenuAvailable) { startGameAfterGoogleSignIn = true; return; }
+            OpenLevelSelectorFromIntro();
+        }
+
+        private void OpenLevelSelectorFromIntro()
+        {
+            if (!introActive || game == null || game.Sim == null) return;
+            startGameAfterGoogleSignIn = false;
+            introActive = false;
+            levelSelectActive = true;
+            levelSelectPage = game.Sim.LevelIndex / LevelSelectorPageSize;
+            pressedAction = 0;
         }
 
         private void DrawStandardButton(Rect bounds, int action, string caption, bool enabled = true,
@@ -2625,6 +2719,36 @@ namespace HayChoriYPaty
             texture.Apply(false, true);
             return texture;
         }
+        private static Texture2D CreateGoogleButtonSurface()
+        {
+            const int width = 512, height = 164;
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+            {
+                name = "White Google startup button capsule",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            var pixels = new Color[width * height];
+            Rect shadow = new Rect(8, 13, 496, 148), rim = new Rect(6, 3, 500, 149), face = new Rect(11, 7, 490, 137);
+            for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
+            {
+                float px = x + .5f, py = height - y - .5f;
+                float t = Mathf.Clamp01((py - face.y) / face.height);
+                Color color = new Color(.08f, .08f, .09f, .16f * RoundedCoverage(px, py, shadow, 70));
+                color = Over(color, new Color(.79f, .80f, .82f), RoundedCoverage(px, py, rim, 72));
+                float faceAlpha = RoundedCoverage(px, py, face, 67);
+                color = Over(color, Color.Lerp(new Color(1f, 1f, 1f), new Color(.965f, .965f, .965f), t), faceAlpha);
+                float gloss = .16f * (1f - IntroEase((t - .02f) / .48f));
+                color = Over(color, Color.white, faceAlpha * gloss);
+                pixels[y * width + x] = color;
+            }
+            texture.SetPixels(pixels);
+            texture.Apply(false, true);
+            return texture;
+        }
+
         private static float RoundedCoverage(float x, float y, Rect r, float radius)
         {
             float dx = Mathf.Abs(x - r.center.x) - (r.width * .5f - radius);
@@ -2660,7 +2784,7 @@ namespace HayChoriYPaty
                     StreetCustomer customer = sim.Customers[i];
                     if (Mathf.Clamp(Mathf.RoundToInt((StreetSimulation.FrontQueueY - customer.Position.y)
                         / StreetSimulation.QueueRowSpacing), 0, 4) != row) continue;
-                    DrawCustomer(customer);
+                    DrawCustomer(customer, ShouldDrawOrderBubble(row));
                 }
             }
             finally { GUI.EndGroup(); }
@@ -2683,14 +2807,16 @@ namespace HayChoriYPaty
             position.y += CustomerViewOffsetY(CustomerCounterTopY(), layoutVerticalScale);
             return position;
         }
-        private void DrawCustomer(StreetCustomer c)
+        private static bool ShouldDrawOrderBubble(int visualRow) => visualRow < 2;
+
+        private void DrawCustomer(StreetCustomer c, bool showOrderBubble)
         {
             Vector2 position = CustomerViewPosition(c.Position);
             bool walking=c.State==StreetCustomerState.Entering||c.State==StreetCustomerState.Leaving||c.State==StreetCustomerState.Advancing;
             DrawCustomerBody(c, walking);
             if(c.State==StreetCustomerState.Entering||c.State==StreetCustomerState.Leaving)return;
             int pendingLines = c.PendingOrderLineCount;
-            if (pendingLines > 0)
+            if (showOrderBubble && pendingLines > 0)
             {
                 int visibleLines = Mathf.Min(StreetCustomer.MaxVisibleOrderProducts, pendingLines);
                 float quantityWidth = 20f;
@@ -3144,7 +3270,7 @@ namespace HayChoriYPaty
 
         private void DrawWorker(StreetWorker w)
         {
-            if (StreetWorkerProjection.IsObscuredIdleWorker(game.Sim.Workers, w, layoutVerticalScale)) return;
+            if (StreetWorkerProjection.IsObscuredIdleWorker(game.Sim.Workers, w, layoutVerticalScale, game.Sim.UsesActiveCooks)) return;
             bool moving=w.State==StreetWorkerState.ToStation||w.State==StreetWorkerState.ToCounter||w.State==StreetWorkerState.ToGrill||w.State==StreetWorkerState.ToTable;
             int levelIndex = game.Sim.LevelIndex;
             Texture2D cocacoleroArt = CocacoleroArtForLevel(levelIndex);
@@ -3163,7 +3289,9 @@ namespace HayChoriYPaty
             // same vertically adapted logical position as the native kitchen projection.
             float stationOffset = 98f * (layoutVerticalScale - 1f) / Mathf.Max(.01f, layoutVerticalScale);
             bob += stationOffset;
-            Rect workerRect=new Rect(w.Position.x-45,w.Position.y-98+bob,90,98);
+            Vector2 displayPosition = StreetWorkerProjection.PresentationPosition(game.Sim, w);
+            float presentationScale = StreetWorkerProjection.PresentationScale(game.Sim, w);
+            Rect workerRect=new Rect(displayPosition.x-45*presentationScale,displayPosition.y-98*presentationScale+bob*presentationScale,90*presentationScale,98*presentationScale);
             if(isCocacolero)
             {
                 if(frame>=16)

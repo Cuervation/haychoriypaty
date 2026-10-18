@@ -1,4 +1,12 @@
-# Current Android delivery — 2026-10-17 (0.2.44/code46, Google sign-in button)
+# Current Android delivery — 2026-10-18 (0.2.45/code47, current changes)
+
+Unity 6000.6.3f1 Main-only Development IL2CPP/ARM64 Android build through the existing editor (build-4383fb3aa1): **Succeeded in 383.53s; 0 errors / 1 warning**. Focused current regressions: EditMode **9/9** (two-row order bubbles and responsive footer) and PlayMode **2/2** (Google sign-in navigation). Package com.haychoriypaty.game, min API26/target36, arm64-v8a. APK archive integrity passed; APK Signature Scheme v2 verified with the established Android Debug certificate SHA-256 d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e.
+
+Archive APK Builds/Android/Archive/HayChoriYPaty-0.2.45-code47-current-updates.apk; versioned and rolling aliases Builds/Android/HayChoriYPaty-0.2.45.apk and Builds/Android/HayChoriYPaty-street.apk: **487,958,557 bytes**, SHA-256 19c6ea2fc929c1b4724fe920d2304d7be8d259a1bf5148744001b62e7298e003 (aliases hard-linked to the archive). Development/debug-signed, not Play Store release-signed. Not installed/launched; no device login test. New official club crests beyond the existing levels 1–3 were **not** added because game-use rights remain unverified.
+
+---
+
+# Previous Android delivery — 2026-10-17 (0.2.44/code46, Google sign-in button)
 
 Unity6000.6.3f1 Main-only Development IL2CPP/ARM64 Android build through the existing editor: **Succeeded in288.21s;0 errors/2 warnings**. Warnings: Diagnostics Data recommends SymbolTable/Full crash symbols; generic “uncompiled code changes” post-processing/import notice. APK IL2CPP metadata includes `JUGAR CON GOOGLE` and `google-g`; Firebase App/Auth/Firestore native libraries are present. `StreetMarketViewTests` PlayMode passed **9/9**; no device Google-login validation.
 

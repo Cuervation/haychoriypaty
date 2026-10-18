@@ -102,6 +102,8 @@ namespace HayChoriYPaty.Tests
                                 Vector2 palm=(Vector2)Field(view,"Palm");
                                 Assert.AreEqual((palm.x-270f)*.01f,sr.bounds.center.x,.0002f);
                                 Assert.AreEqual((height*.5f-palm.y)*.01f,sr.bounds.min.y,.0002f,"The physical product bottom must touch its supporting hand");
+                                Assert.That(palm.y - (((Vector2)Get(worker, "Position")).y * scale), Is.InRange(-37f, -24f),
+                                    "Every carried sandwich stays around hand/waist height instead of the face.");
                                 Assert.AreEqual(30,item.layer);
                                 var torso=(SpriteRenderer)Field(view,"Torso");var left=(SpriteRenderer)Field(view,"LeftLeg");var right=(SpriteRenderer)Field(view,"RightLeg");
                                 Assert.Greater(torso.transform.localScale.x,0f);Assert.AreEqual(torso.transform.localScale.x,torso.transform.localScale.y,.0001f,"Never distort body proportions");
@@ -120,6 +122,72 @@ namespace HayChoriYPaty.Tests
                     }
                     // Stock is ample for one consumed unit of each product per portrait scale.
                 }
+            }
+            finally { UnityEngine.Object.Destroy(root); }
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator ActiveCookTeamsStayVisibleOnOneRowAndSpreadAfterDepositing()
+        {
+            var root = new GameObject("Active cook single-row projection test");
+            try
+            {
+                object sim = Activator.CreateInstance(T("StreetSimulation"), new object[] { Activator.CreateInstance(T("StreetBalance")), 5, 5f, 0, 1, 0 });
+                Call(sim, "StartRound"); Set(sim, "Coins", 100000);
+                Assert.IsTrue((bool)Get(sim, "UsesActiveCooks"));
+                for (int i = 0; i < 4; i++)
+                {
+                    Assert.IsTrue((bool)Call(sim, "TryHire", Enum.Parse(T("StreetWorkerRole"), "Parrillero")));
+                    Assert.IsTrue((bool)Call(sim, "TryHire", Enum.Parse(T("StreetWorkerRole"), "ParrilleroPremium")));
+                }
+                var workers = (IList)Get(sim, "Workers");
+                var renderer = root.AddComponent(T("StreetKitchenRenderer"));
+                Texture2D normal = Resources.Load<Texture2D>("street-parrillero");
+                Texture2D diagonal = Resources.Load<Texture2D>("street-parrillero-diagonal-v1");
+                Texture2D beverage = Resources.Load<Texture2D>("street-cocacolero-levels3-5-v1");
+                Call(renderer, "Prepare", sim, 1f, 960f);
+                Call(renderer, "PrepareWorkers", normal, diagonal, normal, diagonal, beverage, beverage, true);
+                object projection = Field(renderer, "workerProjection");
+                var views = (IDictionary)Field(projection, "workers");
+                var xPositions = new HashSet<float>();
+                var rowSortOrders = new Dictionary<string, HashSet<int>>();
+                float rowY = float.NaN;
+                foreach (object worker in workers)
+                {
+                    object view = views[(int)Get(worker, "Id")];
+                    Transform visual = (Transform)Field(view, "Root");
+                    Assert.IsTrue(visual.gameObject.activeSelf, "Overlapping bounding boxes must not hide a distinct active cooker.");
+                    Assert.IsTrue(xPositions.Add(visual.localPosition.x), "Cookers need distinct horizontal anchors.");
+                    string role = Get(worker, "Role").ToString();
+                    if (!rowSortOrders.ContainsKey(role)) rowSortOrders.Add(role, new HashSet<int>());
+                    var torso = (SpriteRenderer)Field(view, "Torso");
+                    Assert.IsTrue(rowSortOrders[role].Add(torso.sortingOrder), "Same-row cookers have stable distinct draw order within each team.");
+                    if (float.IsNaN(rowY)) rowY = visual.localPosition.y;
+                    Assert.AreEqual(rowY, visual.localPosition.y, .001f, "All active cooks stay on one horizontal line.");
+                }
+                Assert.AreEqual(workers.Count, xPositions.Count);
+                Assert.AreEqual(5, rowSortOrders["Parrillero"].Count);
+                Assert.AreEqual(4, rowSortOrders["ParrilleroPremium"].Count);
+
+                object layout = Get(sim, "KitchenLayout");
+                foreach (object worker in workers)
+                {
+                    int product = Get(worker, "Role").ToString() == "ParrilleroPremium" ? 2 : 0;
+                    Vector2 deposit = (Vector2)Call(layout, "DepositPosition", product);
+                    Set(worker, "State", Enum.Parse(T("StreetWorkerState"), "Idle"));
+                    Set(worker, "Position", deposit); Set(worker, "Target", deposit);
+                }
+                Call(renderer, "PrepareWorkers", normal, diagonal, normal, diagonal, beverage, beverage, true);
+                xPositions.Clear();
+                foreach (object worker in workers)
+                {
+                    object view = views[(int)Get(worker, "Id")];
+                    Transform visual = (Transform)Field(view, "Root");
+                    Assert.IsTrue(visual.gameObject.activeSelf, "Idle cooks sharing the table deposit must remain visible.");
+                    Assert.IsTrue(xPositions.Add(visual.localPosition.x), "Idle cooks sharing one deposit anchor are visually spread.");
+                }
+                Assert.AreEqual(workers.Count, xPositions.Count);
             }
             finally { UnityEngine.Object.Destroy(root); }
             yield return null;

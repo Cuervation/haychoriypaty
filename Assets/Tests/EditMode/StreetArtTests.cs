@@ -221,6 +221,54 @@ namespace HayChoriYPaty.Tests
             Assert.GreaterOrEqual(row.xMin, bubble.xMin); Assert.LessOrEqual(row.xMax, bubble.xMax);
         }
 
+        [TestCase(0, true)]
+        [TestCase(1, true)]
+        [TestCase(2, false)]
+        [TestCase(3, false)]
+        [TestCase(4, false)]
+        public void OnlyFirstTwoQueueRowsShowOrderBubbles(int visualRow, bool expected)
+        {
+            bool actual = (bool)View.GetMethod("ShouldDrawOrderBubble", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { visualRow });
+            Assert.AreEqual(expected, actual);
+        }
+
+        [TestCase(80f)]
+        [TestCase(110f)]
+        [TestCase(180f)]
+        public void FooterWoodCoverCropPreservesGrainAspectAcrossResponsiveHeights(float footerHeight)
+        {
+            Texture2D wood = Resources.Load<Texture2D>("street-upgrade-wood-v1");
+            Assert.NotNull(wood);
+            Rect source = (Rect)View.GetField("FooterWoodSource", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+            Assert.GreaterOrEqual(source.xMin, 0f); Assert.GreaterOrEqual(source.yMin, 0f);
+            Assert.LessOrEqual(source.xMax, wood.width); Assert.LessOrEqual(source.yMax, wood.height);
+            float aspect = 540f / footerHeight;
+            Rect crop = (Rect)View.GetMethod("CropSourceToAspect", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { source, aspect });
+            Assert.AreEqual(aspect, crop.width / crop.height, .01f);
+            Assert.GreaterOrEqual(crop.xMin, source.xMin); Assert.LessOrEqual(crop.xMax, source.xMax);
+            Assert.GreaterOrEqual(crop.yMin, source.yMin); Assert.LessOrEqual(crop.yMax, source.yMax);
+        }
+
+        [Test]
+        public void AdaptivePennantsRemainTransparentOverWoodFooter()
+        {
+            Type themes = Type.GetType("HayChoriYPaty.ClubVisualTheme, Assembly-CSharp", true);
+            object theme = themes.GetMethod("ForLevel").Invoke(null, new object[] { 0 });
+            Texture2D flags = (Texture2D)View.GetMethod("CreateFooterPennants", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { theme, 80f, true });
+            try
+            {
+                Assert.NotNull(flags);
+                Assert.AreEqual(0, flags.GetPixel(flags.width - 1, flags.height - 1).a,
+                    "Do not fill the wood backdrop with the old cream pennant-card color.");
+                Assert.IsTrue(flags.GetPixels32().Any(pixel => pixel.a > 0),
+                    "The existing pennants themselves must still render.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(flags); }
+        }
+
         [Test]
         public void OrderBubbleTwoRowsAndMoreFooterFitInsideAdaptiveCard()
         {

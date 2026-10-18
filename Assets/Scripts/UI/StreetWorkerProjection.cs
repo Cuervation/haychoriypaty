@@ -36,7 +36,6 @@ namespace HayChoriYPaty
         private readonly Dictionary<SpriteKey, Sprite> sprites = new Dictionary<SpriteKey, Sprite>();
         private readonly HashSet<int> liveIds = new HashSet<int>();
         private readonly List<int> stale = new List<int>();
-        private readonly HashSet<Vector2Int> idleFootprintCells = new HashSet<Vector2Int>();
         private readonly Texture2D extension, premiumExtension, fernetExtension;
         private Texture2D normal, diagonal, premium, premiumDiagonal, drink, fernet, mozo, mozoDiagonal, mozoExtension;
         private Texture2D mozoSource, mozoDiagonalSource;
@@ -82,44 +81,69 @@ namespace HayChoriYPaty
             mozo = mozoDiagonal = mozoExtension = null;
         }
         private static bool Beverage(StreetWorker w) => w.Role == StreetWorkerRole.Cocacolero || w.Role == StreetWorkerRole.Fernetero;
-        internal static bool IsObscuredIdleWorker(IReadOnlyList<StreetWorker> allWorkers, StreetWorker candidate, float verticalScale)
+        internal static bool IsObscuredIdleWorker(IReadOnlyList<StreetWorker> allWorkers, StreetWorker candidate, float verticalScale, bool activeCooks = false)
         {
             if (candidate == null || candidate.State != StreetWorkerState.Idle || candidate.Role == StreetWorkerRole.Mozo) return false;
-            Rect bounds = IdleBounds(candidate, verticalScale);
+            if (activeCooks && IsCook(candidate.Role)) return false;
+            // Only suppress genuine legacy duplicates sharing precisely one idle anchor.
+            // Bounding-box overlap is expected for a dense horizontal cook row and must not hide staff.
             for (int i = 0; i < allWorkers.Count; i++)
             {
                 StreetWorker other = allWorkers[i];
                 if (other == null || other == candidate || other.Id >= candidate.Id || other.State != StreetWorkerState.Idle) continue;
-                if (bounds.Overlaps(IdleBounds(other, verticalScale))) return true;
+                if (Vector2.Distance(other.Position, candidate.Position) <= .5f) return true;
             }
             return false;
         }
-        private static Rect IdleBounds(StreetWorker worker, float verticalScale)
+        private static bool IsCook(StreetWorkerRole role) => role == StreetWorkerRole.Parrillero || role == StreetWorkerRole.ParrilleroPremium;
+        internal static Vector2 PresentationPosition(StreetSimulation simulation, StreetWorker worker)
         {
-            float scale = Mathf.Max(.01f, verticalScale);
-            return new Rect(worker.Position.x - Width * .5f, (worker.Position.y - Height) * scale, Width, Height * scale);
+            if (simulation == null || worker == null || !simulation.UsesActiveCooks || !IsCook(worker.Role) || worker.State != StreetWorkerState.Idle)
+                return worker == null ? Vector2.zero : worker.Position;
+            int product = worker.Role == StreetWorkerRole.Parrillero ? 0 : 2;
+            Rect table = simulation.KitchenLayout.BoundsForProduct(product);
+            Rect grill = simulation.KitchenLayout.GrillBoundsForProduct(product);
+            Vector2 deposit = simulation.KitchenLayout.DepositPosition(product);
+            int index = 0, count = 0;
+            foreach (StreetWorker other in simulation.Workers)
+            {
+                if (other.Role != worker.Role) continue;
+                if (other.Id == worker.Id) index = count;
+                count++;
+            }
+            if (count <= 1) return worker.Position;
+            // Newly hired idle cooks may still hold the earlier team-size anchor. Reproject
+            // those parked at the grill onto the current single row without moving simulation state.
+            Vector2 singleCookAnchor = simulation.KitchenLayout.GrillWorkPosition(product, 0, 1);
+            if (Mathf.Abs(worker.Position.y - singleCookAnchor.y) <= 1f
+                && worker.Position.x >= grill.xMin - 1f && worker.Position.x <= grill.xMax + 1f)
+                return simulation.KitchenLayout.GrillWorkPosition(product, index, count);
+            if (Vector2.Distance(worker.Position, deposit) > 1f) return worker.Position;
+            float fraction = Mathf.Lerp(-.10f, 1.10f, index / (float)(count - 1));
+            return new Vector2(Mathf.Lerp(table.xMin, table.xMax, fraction), worker.Position.y);
         }
-        private static void IdleCellRange(Rect bounds, float verticalScale, out int minX, out int maxX, out int minY, out int maxY)
+        internal static float PresentationScale(StreetSimulation simulation, StreetWorker worker)
         {
-            float cellHeight = Height * Mathf.Max(.01f, verticalScale) * .5f;
-            minX = Mathf.FloorToInt(bounds.xMin / (Width * .5f));
-            maxX = Mathf.FloorToInt((bounds.xMax - .001f) / (Width * .5f));
-            minY = Mathf.FloorToInt(bounds.yMin / cellHeight);
-            maxY = Mathf.FloorToInt((bounds.yMax - .001f) / cellHeight);
+            if (simulation == null || worker == null || !simulation.UsesActiveCooks || !IsCook(worker.Role)) return 1f;
+            int count = 0;
+            foreach (StreetWorker other in simulation.Workers) if (other.Role == worker.Role) count++;
+            if (count <= 3) return 1f;
+            Rect grill = simulation.KitchenLayout.GrillBoundsForProduct(worker.Role == StreetWorkerRole.Parrillero ? 0 : 2);
+            float spacing = grill.width * .76f / Mathf.Max(1, count - 1);
+            return Mathf.Clamp(spacing / (Width * .72f), .42f, 1f);
         }
-        private bool HasVisibleIdleOverlap(Rect bounds, float verticalScale)
+        private static int RowSortBias(StreetSimulation simulation, StreetWorker worker, Vector2 displayPosition)
         {
-            IdleCellRange(bounds, verticalScale, out int minX, out int maxX, out int minY, out int maxY);
-            for (int x = minX; x <= maxX; x++)
-                for (int y = minY; y <= maxY; y++)
-                    if (idleFootprintCells.Contains(new Vector2Int(x, y))) return true;
-            return false;
-        }
-        private void OccupyIdleFootprint(Rect bounds, float verticalScale)
-        {
-            IdleCellRange(bounds, verticalScale, out int minX, out int maxX, out int minY, out int maxY);
-            for (int x = minX; x <= maxX; x++)
-                for (int y = minY; y <= maxY; y++) idleFootprintCells.Add(new Vector2Int(x, y));
+            if (simulation == null || worker == null || !simulation.UsesActiveCooks || !IsCook(worker.Role))
+                return Mathf.Clamp(Mathf.RoundToInt(displayPosition.x / StreetSceneLayout.Width * 4f), 0, 4);
+            int index = 0, count = 0;
+            foreach (StreetWorker other in simulation.Workers)
+            {
+                if (other.Role != worker.Role) continue;
+                if (other.Id == worker.Id) index = count;
+                count++;
+            }
+            return count <= 1 ? 0 : Mathf.RoundToInt(Mathf.Lerp(-4f, 4f, index / (float)(count - 1)));
         }
         private Texture2D BaseTexture(StreetWorker w) => w.Role == StreetWorkerRole.Mozo && mozo != null ? mozo : Beverage(w) ? (w.Role == StreetWorkerRole.Fernetero ? fernet : drink)
             : w.Role == StreetWorkerRole.ParrilleroPremium ? premium : normal;
@@ -158,25 +182,24 @@ namespace HayChoriYPaty
                 if (!Diagonal(facing))
                 {
                     Art a = Original(w, facing == StreetFacing.Down ? 12 : facing == StreetFacing.Up ? 13 : 7, facing == StreetFacing.Right);
-                    a.Palm = facing == StreetFacing.Down ? new Vector2(.5f,.58f) : facing == StreetFacing.Up ? new Vector2(.68f,.54f) : new Vector2(.23f,.57f);
-                    // New sandwich trips keep the real unit visible beside the rear
-                    // forearm instead of hiding it completely behind the worker's back.
+                    a.Palm = facing == StreetFacing.Down ? new Vector2(.5f,.68f) : facing == StreetFacing.Up ? new Vector2(.68f,.65f) : new Vector2(.23f,.67f);
+                    // Keep the real unit beside the hand/forearm at waist height, not near the face.
                     if (facing == StreetFacing.Up && (w.Role == StreetWorkerRole.Mozo || w.State == StreetWorkerState.ToTable))
-                        a.Palm = new Vector2(.98f, .58f);
+                        a.Palm = new Vector2(.98f, .65f);
                     return a;
                 }
                 int q = Quarter(facing), index = q < 2 ? 1 - q : q;
-                return Supplemental(w, index, false, new Vector2(q < 2 ? .36f : q == 2 ? .21f : .81f, q < 2 ? .66f : .57f));
+                return Supplemental(w, index, false, new Vector2(q < 2 ? .36f : q == 2 ? .21f : .81f, q < 2 ? .68f : .65f));
             }
             if (Diagonal(facing))
             {
                 int q = Quarter(facing);
-                Vector2 palm = new Vector2(q == 0 ? .75f : q == 1 ? .69f : q == 2 ? .22f : .81f, q < 2 ? .62f : .57f);
+                Vector2 palm = new Vector2(q == 0 ? .75f : q == 1 ? .69f : q == 2 ? .22f : .81f, q < 2 ? .68f : .65f);
                 return Supplemental(w, 16 + q, q == 0, palm);
             }
             int cell = facing == StreetFacing.Down ? 12 : facing == StreetFacing.Up ? 13 : facing == StreetFacing.Left ? 14 : 15;
             return Supplemental(w, cell, facing == StreetFacing.Left,
-                new Vector2(facing == StreetFacing.Down ? .25f : facing == StreetFacing.Up ? .83f : .80f, facing == StreetFacing.Up ? .5f : .6f));
+                new Vector2(facing == StreetFacing.Down ? .25f : facing == StreetFacing.Up ? .83f : .80f, facing == StreetFacing.Up ? .65f : .68f));
         }
         private Sprite Slice(Texture2D texture, Rect bounds)
         {
@@ -204,30 +227,29 @@ namespace HayChoriYPaty
             workers.Add(id,v); return v;
         }
         private float Scale(Art art) => Mathf.Min(Width / art.Bounds.width, Height / art.Bounds.height);
-        private void DrawPart(SpriteRenderer renderer, Art art, Rect source, Vector2 local, int order)
+        private void DrawPart(SpriteRenderer renderer, Art art, Rect source, Vector2 local, int order, float scaleMultiplier = 1f)
         {
             renderer.sprite = Slice(art.Texture, source); renderer.flipX = art.Flip;
             renderer.transform.localPosition = new Vector3(local.x*.01f, local.y*.01f,0);
-            renderer.transform.localScale = Vector3.one * Scale(art);
+            renderer.transform.localScale = Vector3.one * (Scale(art) * scaleMultiplier);
             renderer.sortingOrder = order; renderer.enabled = true;
         }
         public void Sync(StreetSimulation sim, float verticalScale, float canvasHeight)
         {
             if (!Ready) return;
             liveIds.Clear();
-            idleFootprintCells.Clear();
             foreach (StreetWorker w in sim.Workers)
             {
                 liveIds.Add(w.Id); Visual v;
                 if (!workers.TryGetValue(w.Id,out v)) v = Create(w.Id);
-                Rect idleBounds = w.State == StreetWorkerState.Idle ? IdleBounds(w, verticalScale) : default(Rect);
-                if (w.State == StreetWorkerState.Idle && w.Role != StreetWorkerRole.Mozo && HasVisibleIdleOverlap(idleBounds, verticalScale))
+                if (IsObscuredIdleWorker(sim.Workers, w, verticalScale, sim.UsesActiveCooks))
                 {
                     if (v.Root.gameObject.activeSelf) v.Root.gameObject.SetActive(false);
                     continue;
                 }
                 if (!v.Root.gameObject.activeSelf) v.Root.gameObject.SetActive(true);
-                if (w.State == StreetWorkerState.Idle) OccupyIdleFootprint(idleBounds, verticalScale);
+                Vector2 displayPosition = PresentationPosition(sim, w);
+                float presentationScale = PresentationScale(sim, w);
                 StreetWorkerPose pose = StreetWorkerAnimation.Sample(w);
                 int contact = pose.Frame >= 2 ? 1 : 0;
                 Art upper = pose.Carrying ? Carry(w,pose.Facing) : Walk(w,pose.Facing,contact,pose.Moving);
@@ -237,33 +259,34 @@ namespace HayChoriYPaty
                 bool passing = !pose.Moving || (pose.Frame & 1) == 1;
                 StreetFacing legFacing = Diagonal(pose.Facing) ? (pose.Facing == StreetFacing.UpLeft || pose.Facing == StreetFacing.UpRight ? StreetFacing.Up : StreetFacing.Down) : pose.Facing;
                 Art legs = passing ? Walk(w,legFacing,0,false) : Walk(w,pose.Facing,contact,true);
-                float upperScale = Scale(upper), legScale = Scale(legs);
+                float upperScale = Scale(upper) * presentationScale, legScale = Scale(legs) * presentationScale;
                 float split = upper.Bounds.height * Waist;
                 float reach = pose.PickingUp ? Mathf.Sin(pose.PickupProgress * Mathf.PI) * Height * .20f : 0f;
-                float upperBottom = upper.Bounds.height * (1f-Waist) * upperScale - pose.Bob - reach;
-                int depth = -5000 + Mathf.RoundToInt(w.Position.y * verticalScale);
-                v.Root.localPosition = new Vector3((w.Position.x-270f)*.01f, (canvasHeight*.5f-w.Position.y*verticalScale)*.01f,0);
-                DrawPart(v.Torso,upper,new Rect(upper.Bounds.x,upper.Bounds.y,upper.Bounds.width,split),new Vector2(0,upperBottom),depth+2);
+                float upperBottom = upper.Bounds.height * (1f-Waist) * upperScale - pose.Bob * presentationScale - reach * presentationScale;
+                // A tiny x-based tie-break makes same-row workers deterministic without overriding y-depth.
+                int depth = -5000 + Mathf.RoundToInt(displayPosition.y * verticalScale) + RowSortBias(sim, w, displayPosition);
+                v.Root.localPosition = new Vector3((displayPosition.x-270f)*.01f, (canvasHeight*.5f-displayPosition.y*verticalScale)*.01f,0);
+                DrawPart(v.Torso,upper,new Rect(upper.Bounds.x,upper.Bounds.y,upper.Bounds.width,split),new Vector2(0,upperBottom),depth+2,presentationScale);
                 float legHeight = legs.Bounds.height * (1f-Waist), half = legs.Bounds.width*.5f;
                 // Passing keyframes articulate alternate legs; at least one foot stays planted.
                 float leftLift = pose.Moving && pose.Frame == 1 ? 2f : 0f;
                 float rightLift = pose.Moving && pose.Frame == 3 ? 2f : 0f;
                 float quarterWidth = legs.Bounds.width * legScale * .25f;
                 if (legs.Flip) { float t=leftLift; leftLift=rightLift; rightLift=t; }
-                DrawPart(v.LeftLeg,legs,new Rect(legs.Bounds.x,legs.Bounds.yMax-legHeight,half,legHeight),new Vector2(legs.Flip ? quarterWidth : -quarterWidth,leftLift),depth);
-                DrawPart(v.RightLeg,legs,new Rect(legs.Bounds.x+half,legs.Bounds.yMax-legHeight,half,legHeight),new Vector2(legs.Flip ? -quarterWidth : quarterWidth,rightLift),depth+1);
+                DrawPart(v.LeftLeg,legs,new Rect(legs.Bounds.x,legs.Bounds.yMax-legHeight,half,legHeight),new Vector2(legs.Flip ? quarterWidth : -quarterWidth,leftLift),depth,presentationScale);
+                DrawPart(v.RightLeg,legs,new Rect(legs.Bounds.x+half,legs.Bounds.yMax-legHeight,half,legHeight),new Vector2(legs.Flip ? -quarterWidth : quarterWidth,rightLift),depth+1,presentationScale);
                 v.Fingers.enabled = pose.Carrying;
                 float handX = (upper.Palm.x-.5f)*upper.Bounds.width*upperScale;
                 if (upper.Flip) handX = -handX;
-                float handY = -(1f-upper.Palm.y)*upper.Bounds.height*upperScale + pose.Bob + (pose.PickingUp ? reach : 0f);
-                v.Palm = new Vector2(w.Position.x+handX,w.Position.y*verticalScale+handY);
+                float handY = -(1f-upper.Palm.y)*upper.Bounds.height*upperScale + pose.Bob * presentationScale + (pose.PickingUp ? reach * presentationScale : 0f);
+                v.Palm = new Vector2(displayPosition.x+handX,displayPosition.y*verticalScale+handY);
                 bool rear = pose.Facing == StreetFacing.Up || pose.Facing == StreetFacing.UpLeft || pose.Facing == StreetFacing.UpRight;
                 v.ProductOrder = rear ? depth-1 : depth+10000;
                 if (pose.Carrying)
                 {
                     Rect thumb = new Rect(upper.Bounds.x + upper.Bounds.width*(upper.Palm.x-.065f),
                         upper.Bounds.y + upper.Bounds.height*(upper.Palm.y-.065f), upper.Bounds.width*.13f,upper.Bounds.height*.065f);
-                    DrawPart(v.Fingers,upper,thumb,new Vector2(handX,-handY),v.ProductOrder+1);
+                    DrawPart(v.Fingers,upper,thumb,new Vector2(handX,-handY),v.ProductOrder+1,presentationScale);
                 }
             }
             stale.Clear(); foreach (int id in workers.Keys) if (!liveIds.Contains(id)) stale.Add(id);

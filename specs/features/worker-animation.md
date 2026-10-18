@@ -45,3 +45,7 @@ During an empty-handed Cocacolero barrel-pickup dwell, presentation now forces t
 ## Racing+ Mozo — 2026-10-15
 
 [Active cooks and Mozos](active-cooks-mozos.md) agrega Mozo4 con variante de delantal verde del atlas original y mantiene piel/cara/alpha/gait de80unidades. ToGrill/ToTable usan locomoción existente; Deposit reutiliza reach; cualquier transporte requiere CarriedItemId real. El agarre trasero de los nuevos viajes deja la unidad visible junto al antebrazo. Cocción muestra progreso real independiente y anillos separados. Render activo aplica profundidad coherente con muebles/pies; niveles1–5 conservan su proyección previa. Validación:71EditMode+7PlayMode y rechecks focalizados; capturas nativas en1080×1920/1440×2960/320×568.
+
+## Revisión visual de Parrilleros — 2026-10-18
+
+En Parrilleros/Premium, `Idle` y `Cooking` orientan al frente y usan un bob sutil de hasta 1,2 puntos; caminar conserva la orientación direccional. Las anclas de parrilla forman una única fila horizontal. La proyección recalcula visualmente los idle que conservan un ancla antigua o comparten el punto de depósito, y reduce el tamaño solo para equipos densos. Los ítems transportados siguen siendo unidades reales; se baja el punto de agarre frontal hacia la cintura. Las pruebas focalizadas de orientación/bob, agarre y proyección pasaron; la aceptación visual en vivo queda abierta hasta revisar una captura actual.

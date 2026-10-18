@@ -16,6 +16,8 @@ Reuse existing furniture, counter, mural, fans, HUD, art, fonts, wood/iron cards
 
 - [x] Active per-worker cooking, one real carried/deposited unit and speed scaling.
 - [x] Parrilleros del mismo rol usan puestos de parrilla separados al cocinar en paralelo; EditMode cubre separación y rutas seguras. Revisión visual de este ajuste sigue pendiente.
+- [x] Revisión 18/10: anchors 1–9 comparten una sola fila horizontal; separación, claridad idle/cocción, agarre y slots de cuatro sándwiches cubiertos por 11 EditMode + 14 PlayMode focalizados.
+- [ ] Captura actual del juego para cierre manual de la apariencia final; Unity MCP no expuso captura visual en esta sesión.
 - [x] Exclusive Mozo sandwich handoff and unchanged beverage/mixed-order flow.
 - [x] Mozo routes to the actual reserved table slot for Chori, Paty, Bondiola, and Vacío (focused EditMode suite passed 19/19 on2026-10-16; live visual route review remains pending).
 - [x] Concurrent claims, finite stock/capacity, cancellation and ingredient conservation.
@@ -37,12 +39,16 @@ El pedido anterior fijó temporalmente la cocción activa en 1,3 / WorkRate segu
 
 ## Ajuste de proximidad de trabajadores — 2026-10-16
 
-A pedido del usuario, el Parrillero se ubica 8 puntos más cerca de la parrilla: `GrillWorkClearance` pasa de 14 a 6 puntos, manteniendo una separación segura para los pies y las filas interiores. El Cocacolero se acerca 2 puntos al frente de los barriles: `BarrelPickupClearance` pasa de 2 a 0; Coca y Cerveza comparten esta geometría y la prueba confirma tangencia sin superposición, además de rutas seguras. La suite focalizada de `StreetActiveCooksTests`, `StreetKitchenPresentationTests` y la ruta de bebidas pasó **42/42 EditMode** en copia aislada con Unity6000.6.3f1. No se hizo revisión visual en vivo, build ni instalación; la APK0.2.42 instalada aún conserva las posiciones anteriores.
+A pedido del usuario, el Parrillero se ubica 8 puntos más cerca de la parrilla: `GrillWorkClearance` pasó de 14 a 6 puntos. En la revisión del 18/10/2026 se reduce a 2 puntos. La posición se interpola horizontalmente para cualquier tamaño de equipo en una única fila, sin filas interiores; la escala visual baja solo en equipos densos. El Cocacolero conserva el acercamiento de 2 puntos al frente de los barriles: `BarrelPickupClearance` pasa de 2 a 0; Coca y Cerveza comparten esta geometría y la prueba confirma tangencia sin superposición, además de rutas seguras.
 
 
 ### Puestos de Parrilleros separados — 2026-10-16
 
-Cada Parrillero/Premium recibe un puesto estable, calculado por su orden dentro de su equipo y no por el slot del alimento. Los dos primeros ocupan extremos opuestos del frente de la parrilla; el tercero usa el centro, y los equipos mayores se escalonan en filas adicionales dentro del paso seguro. Así dos trabajadores no comparten el mismo ancla aun si preparan productos distintos que ocupan el mismo número de slot. La regresión del flujo simultáneo verifica más de 120 puntos entre los dos primeros. `StreetActiveCooksTests`, `StreetKitchenPresentationTests` y `StreetSpecialtyPresentationTests` pasaron **55/55 EditMode** en copia aislada con Unity6000.6.3f1. Unity MCP no conectó: QA visual en vivo sigue pendiente; no se generó ni instaló APK y la0.2.42 aún no incluye estos puestos.
+Cada Parrillero/Premium recibe un puesto estable, calculado por su orden dentro de su equipo y no por el slot del alimento. La implementación inicial colocaba los dos primeros en extremos, el tercero al centro y escalonaba equipos mayores en filas adicionales. Ese patrón quedó reemplazado el 18/10/2026 por anchors interpolados en una sola fila horizontal; véase la revisión visual vigente abajo. La regresión histórica del flujo simultáneo verificó más de 120 puntos entre los dos primeros. `StreetActiveCooksTests`, `StreetKitchenPresentationTests` y `StreetSpecialtyPresentationTests` pasaron **55/55 EditMode** en copia aislada con Unity6000.6.3f1.
+
+## Legibilidad visual de cocineros — 2026-10-18
+
+La revisión visual mantiene los anchors de parrilla en una sola fila para equipos 1–9, a 2 puntos del borde de parrilla; el proyector adapta tamaño por densidad y agrega orden estable para el empate de profundidad. Normal y Premium idle en el grill se ven al frente con respiración leve; si un equipo está idle en la mesa de depósito, se separa visualmente allí sin alterar posición ni rutas de simulación. Los tamaños de slot completos quedan dentro de la banda superior de madera para Chori, Paty, Bondiola y Vacío, tanto con producto compañero como sin él. Validación focalizada: 11 EditMode + 14 PlayMode pasaron con Unity6000.6.3f1; la captura/revisión manual de gameplay no se pudo hacer en esta sesión.
 
 ## Resultado y validación — 2026-10-15
 

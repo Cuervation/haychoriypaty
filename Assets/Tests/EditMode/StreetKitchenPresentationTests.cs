@@ -76,19 +76,22 @@ namespace HayChoriYPaty.Tests
         {
             object sim = Simulation(5), layout = Layout(sim);
             foreach (int product in new[] { 0, 2 })
-            foreach (int count in new[] { 2, 3, 4, 6 })
+            foreach (int count in new[] { 1, 2, 3, 4, 5, 6, 9 })
             {
                 var stations = new HashSet<Vector2>();
+                Vector2 first = Vector2.zero;
                 for (int index = 0; index < count; index++)
                 {
                     Vector2 station = (Vector2)Call(layout, "GrillWorkPosition", product, index, count);
+                    if (index == 0) first = station;
                     Assert.IsTrue(stations.Add(station), "Cooker " + index + " must not share a station on grill " + product + ".");
+                    Assert.AreEqual(first.y, station.y, .001f, "Every team size remains in one horizontal row.");
                 }
+                Assert.AreEqual(2f, LayoutConstant("GrillWorkClearance"), .001f, "Cooks stand closer to the grill rim.");
                 if (count == 2)
                 {
-                    Vector2 left = (Vector2)Call(layout, "GrillWorkPosition", product, 0, count);
                     Vector2 right = (Vector2)Call(layout, "GrillWorkPosition", product, 1, count);
-                    Assert.Greater(Vector2.Distance(left, right), 120f,
+                    Assert.Greater(Vector2.Distance(first, right), 120f,
                         "The first two cooks should be visibly separated, not overlapping at the same grill slot.");
                 }
             }
@@ -657,6 +660,30 @@ namespace HayChoriYPaty.Tests
             Assert.IsTrue((bool)Get(nextLayout, "HasPremiumGrill"));
             Assert.IsTrue((bool)Get(nextLayout, "HasBeerBarrel"));
             Assert.IsFalse((bool)Get(nextLayout, "HasFernetTable"));
+        }
+
+        [Test]
+        public void TableServingFootprintsStayInsideTheWoodTopForEveryMeatSlotAndLayout()
+        {
+            object layout = FullLayout();
+            foreach (int product in new[] { 0, 1, 2, 3 })
+            foreach (bool companion in new[] { false, true })
+            {
+                Rect table = (Rect)Call(layout, "BoundsForProduct", product);
+                Rect woodTop = new Rect(table.x, table.y, table.width, table.height * .35f);
+                int capacity = product < 2 ? 24 : 18;
+                Vector2 size = (Vector2)Runtime("StreetKitchenLayout").GetMethod("TableServingSize", BindingFlags.Public | BindingFlags.Static)
+                    .Invoke(null, new object[] { product });
+                for (int slot = 0; slot < capacity; slot++)
+                {
+                    Vector2 center = (Vector2)Call(layout, "TableSlotPosition", product, slot, companion, capacity);
+                    Rect item = new Rect(center - size * .5f, size);
+                    Assert.GreaterOrEqual(item.xMin, woodTop.xMin, "Product " + product + " slot " + slot + " leaves the tabletop horizontally.");
+                    Assert.LessOrEqual(item.xMax, woodTop.xMax, "Product " + product + " slot " + slot + " leaves the tabletop horizontally.");
+                    Assert.GreaterOrEqual(item.yMin, woodTop.yMin, "Product " + product + " slot " + slot + " floats above the tabletop.");
+                    Assert.LessOrEqual(item.yMax, woodTop.yMax, "Product " + product + " slot " + slot + " falls off the tabletop.");
+                }
+            }
         }
 
         [Test]

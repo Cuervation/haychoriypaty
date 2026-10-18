@@ -25,8 +25,9 @@ namespace HayChoriYPaty
         // Cocacoleros step the final two points forward and meet the visible barrel front edge.
         public const float BarrelPickupClearance = 0f;
         public const float BarrelPickupY = BarrelY - BarrelPickupClearance;
-        // Leave a small foot gap while bringing cooks closer than the former 14-point stand-off.
-        public const float GrillWorkClearance = 6f;
+        // Keep cook feet just outside the visible grill rim.
+        public const float GrillWorkClearance = 2f;
+        public const float TableSandwichScale = 1.5f, PremiumTableSandwichScaleMultiplier = 1.10f;
         public const float GrillBottomLimit = TiledPlayfieldBottom - GrillBottomClearance;
         private const float GrillSurfaceTop = .115f, GrillSurfaceBottom = .46f;
         private const float GrillBackLeft = .145f, GrillBackRight = .855f;
@@ -208,24 +209,11 @@ namespace HayChoriYPaty
             if (grill.width <= 0f) return Vector2.zero;
             int count = Mathf.Max(1, workerCount);
             int safeIndex = Mathf.Clamp(workerIndex, 0, count - 1);
-            const int columns = 3;
-            int column = safeIndex % columns;
-            int row = safeIndex / columns;
-            float xFraction = column == 0 ? .18f : column == 1 ? .82f : .50f;
+            // Keep a single horizontal line for every team size; denser teams are scaled only
+            // by their visual projection so no worker is moved behind another row.
+            float xFraction = count == 1 ? .5f : Mathf.Lerp(.12f, .88f, safeIndex / (float)(count - 1));
             float x = Mathf.Clamp(grill.x + grill.width * xFraction, 54f, StreetSceneLayout.Width - 54f);
             float y = grill.yMin - GrillWorkClearance;
-
-            // Add a second depth row only when a team exceeds the three clear front-side lanes.
-            // Keep every feet anchor outside the expanded table-base route obstacle.
-            int rows = Mathf.Max(1, Mathf.CeilToInt(count / (float)columns));
-            if (rows > 1)
-            {
-                Rect table = BoundsForProduct(product);
-                float lowestSafeY = table.width > 0f ? table.yMax + 18f : 12f;
-                float availableDepth = Mathf.Max(0f, y - lowestSafeY);
-                float rowSpacing = Mathf.Min(40f, availableDepth / (rows - 1));
-                y -= row * rowSpacing;
-            }
             return new Vector2(x, y);
         }
 
@@ -411,6 +399,7 @@ namespace HayChoriYPaty
         public Vector2 TableSlotPosition(int product, int slot, bool companionAvailable, int capacity)
         {
             Rect r = BoundsForProduct(product);
+            if (r.width <= 0f) return Vector2.zero;
             int index = Mathf.Max(0, slot);
             float woodTopDepth = r.height * .35f;
             if (product == 5)
@@ -424,24 +413,41 @@ namespace HayChoriYPaty
                 return new Vector2(x + dx, baseY - 16f + dy);
             }
 
+            // Slot positions represent the complete visible sandwich footprint. Keep its
+            // center within the wood top, including the shared-table half and extra layers.
+            Vector2 itemSize = TableServingSize(product);
+            float halfWidth = itemSize.x * .5f + 1f;
+            float halfHeight = itemSize.y * .5f + 1f;
+            float halfTableWidth = companionAvailable ? r.width * .5f : r.width;
+            float sectionLeft = r.x + (companionAvailable && (product == 1 || product == 3) ? halfTableWidth : 0f);
+            float minX = sectionLeft + halfWidth;
+            float maxX = sectionLeft + halfTableWidth - halfWidth;
+            float minY = r.y + halfHeight;
+            float maxY = r.y + woodTopDepth - halfHeight;
+
             int columns = companionAvailable ? 3 : 6;
-            float left = r.x + 5f * Scale;
-            float usableWidth = r.width - 10f * Scale;
-            if (companionAvailable)
-            {
-                usableWidth *= .5f;
-                if (product == 1 || product == 3) left += usableWidth + 5f * Scale;
-            }
             int perLayer = companionAvailable ? (product < 2 ? 12 : 9) : Mathf.Max(columns, capacity / 2);
             int rows = Mathf.Max(1, Mathf.CeilToInt(perLayer / (float)columns));
             int layerIndex = index / perLayer, itemIndex = index % perLayer;
             int itemCol = itemIndex % columns, itemRow = itemIndex / columns;
-            float xStep = usableWidth / columns;
-            float xPosition = left + xStep * (itemCol + .5f);
-            float rowBase = woodTopDepth * (.15f + .75f * (itemRow + .5f) / rows);
+            float xFraction = (itemCol + .5f) / columns;
+            float yFraction = (itemRow + .5f) / rows;
             float layerX = layerIndex == 0 ? 0f : (product % 2 == 0 ? 1.5f : -1.5f) * layerIndex;
-            float layerY = layerIndex * 1.75f;
-            return new Vector2(xPosition + layerX, r.y + rowBase - 7f + layerY);
+            float layerY = layerIndex * 1.5f;
+            float itemX = Mathf.Clamp(Mathf.Lerp(minX, maxX, xFraction) + layerX, minX, maxX);
+            float y = Mathf.Clamp(Mathf.Lerp(minY, maxY, yFraction) + layerY, minY, maxY);
+            return new Vector2(itemX, y);
+        }
+
+        /// <summary>On-table serving footprint, shared by slot layout and the native renderer.</summary>
+        public static Vector2 TableServingSize(int product)
+        {
+            if (product <= 3 && product >= 0)
+            {
+                Vector2 baseSize = product == 0 ? new Vector2(26f, 14f) : new Vector2(20f, 14f);
+                return baseSize * (TableSandwichScale * (product >= 2 ? PremiumTableSandwichScaleMultiplier : 1f));
+            }
+            return product == 5 ? new Vector2(18f, 28f) : product == 4 || product == 6 ? new Vector2(9f, 20f) : Vector2.zero;
         }
 
         public Vector2 GrillSlotPosition(int product, int slot) => GrillSlotPosition(product, slot, true, product < 2 ? 12 : 4);

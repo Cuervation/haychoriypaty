@@ -132,6 +132,27 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(0f, (float)Field(pose, "Bob"));
         }
 
+        [TestCase("Parrillero")]
+        [TestCase("ParrilleroPremium")]
+        public void CooksFaceForwardAndBreatheSubtlyWhileWaitingOrCooking(string role)
+        {
+            object worker = Activator.CreateInstance(Runtime("StreetWorker"), true);
+            Set(worker, "Role", Enum.Parse(Runtime("StreetWorkerRole"), role));
+            Set(worker, "FacingVector", Vector2.right);
+            Set(worker, "AnimationTime", .7f);
+            foreach (string state in new[] { "Idle", "Cooking" })
+            {
+                Set(worker, "State", Enum.Parse(Runtime("StreetWorkerState"), state));
+                object pose = Call("Sample", worker);
+                Assert.AreEqual(Facing("Down"), Field(pose, "Facing"), role + " must face the player at the grill.");
+                Assert.That(Mathf.Abs((float)Field(pose, "Bob")), Is.GreaterThan(.001f), role + " should have a subtle idle/cooking breath.");
+                Assert.LessOrEqual(Mathf.Abs((float)Field(pose, "Bob")), 1.2f);
+            }
+            Set(worker, "State", Enum.Parse(Runtime("StreetWorkerState"), "ToGrill"));
+            object walking = Call("Sample", worker);
+            Assert.AreEqual(Facing("Right"), Field(walking, "Facing"), "Travel keeps its directional gait.");
+        }
+
         [Test]
         public void PickupAnimationIsProgressDrivenWithoutFakingACarriedItem()
         {

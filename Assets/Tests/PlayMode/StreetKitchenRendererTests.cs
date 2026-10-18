@@ -75,7 +75,8 @@ namespace HayChoriYPaty.Tests
                 var carried = (GameObject)objects[id];
                 Vector2 feet = (Vector2)Get(worker, "Position");
                 Assert.AreEqual((feet.x - 9.5f - 270f) * .01f, carried.transform.localPosition.x, .0001f);
-                Assert.AreEqual((height * .5f - (feet.y * verticalScale - 31.5f)) * .01f, carried.transform.localPosition.y, .0001f);
+                Assert.AreEqual((height * .5f - (feet.y * verticalScale - 23.5f)) * .01f, carried.transform.localPosition.y, .0001f,
+                    "The fallback carried item is drawn lower at the worker's hand height.");
                 Assert.AreEqual(31, carried.layer);
                 Assert.IsTrue((bool)Call(kitchen, "Consume", id, 0, workerId));
                 Call(renderer, "Prepare", sim, verticalScale, height);

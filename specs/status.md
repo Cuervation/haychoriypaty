@@ -1,3 +1,23 @@
+## 2026-10-18 — APK 0.2.45/code47
+
+Unity 6000.6.3f1 Main-only Development IL2CPP/ARM64 build-4383fb3aa1 succeeded in 383.53 s (0 errors, 1 warning). Se verificó paquete, versión, API, ABI, integridad ZIP y firma debug. Regresiones focalizadas: globos/footer EditMode 9/9; acceso Google PlayMode 2/2. APK generada, no instalada. Los escudos oficiales nuevos siguen pendientes por permisos de reutilización no verificados. Ver [android-prototype.md](features/android-prototype.md).
+
+## 2026-10-18 — Zócalo inferior de madera
+
+El fondo crema desde el límite inferior del piso hasta el borde de pantalla ahora reutiliza un recorte ilustrado del recurso de madera del puesto, con tintado marrón cálido y una línea superior oscura/acento. El recorte se adapta por cobertura para no deformar la veta; los banderines tradicionales se renderizan encima con fondo transparente. Unity 6000.6.3f1: compilación sin errores y 4/4 pruebas EditMode focalizadas pasaron (transparencia y alturas compacta/normal/alta). No se capturó Game View porque iniciar Main podía acceder al guardado real; no se generó APK ni se hizo commit/push.
+
+## 2026-10-18 — Globos solo en las dos filas delanteras
+
+`StreetView` dibuja globos únicamente en las filas visuales 0–1 usando el orden por posición ya existente. Los personajes y sus barras de paciencia siguen dibujándose en todas las filas; no se modifica la cola ni el estado de pedidos. La regresión EditMode focalizada pasó 5/5. La clase amplia (175 casos) tuvo 6 fallos en expectativas de banderines/footer, ajenos a este cambio. No se generó captura de Racing para evitar iniciar o alterar la partida persistida. Sin APK, commit ni push.
+
+## 2026-10-18 — Legibilidad visual de Parrilleros
+
+Parrilleros normales y Premium quedan en una fila frente a la parrilla, más cerca del borde; al cocinar/esperar miran al frente con un bob leve. La proyección escala equipos densos, asigna sorting de fila estable, no oculta workers solo por solapar sus rectángulos y separa visualmente los idle que comparten mesa. Se baja el ancla del producto transportado a la mano y se contienen los slots de chori/paty/bondiola/vacío en el tablero. Unity 6000.6.3f1 compiló sin errores; 11 EditMode + 14 PlayMode focalizados pasaron. No quedó una captura visual actual del gameplay, por lo que la revisión manual en pantalla sigue abierta. Sin cambios de economía, tiempos o mecánicas.
+
+## 2026-10-17 — Botón Google blanco y entrada al juego
+
+El acceso Google ahora reutiliza las proporciones/cápsula de JUGAR con cara blanca, borde gris sutil, G multicolor y letras negras en la fuente del menú. Al resolver inicio/perfil/conflictos, abre el selector de canchas como hacía JUGAR; no inicia un partido ni saltea la selección/mercado. Se añadieron dos regresiones PlayMode para la navegación inmediata y la espera de la presentación. Unity MCP informó sesión no lista (ping sin respuesta): compilación, pruebas y revisión visual quedan pendientes; no se generó APK ni se instaló.
+
 ## 2026-10-17 — APK0.2.44/code46 con botón “Jugar con Google”
 
 - Unity6000.6.3f1 Main-only Development IL2CPP/ARM64: **Succeeded288.21s,0 errores/2 warnings** (símbolos de diagnóstico y aviso genérico de postprocesamiento/cambios de código). APK420,716,301bytes; SHA-256 `dcadb2f7171665c62ec521f6cbf0a543573c62bcdf6bf1495d132a90e49244dc`; firma debug, paquete, code46, ARM64, recursos de login y librerías Firebase comprobados. `StreetMarketViewTests`9/9 PlayMode. Instalada en Motorola Edge 60 Fusion mediante adb install -r, conservando los datos; el juego no se abrió. Login real sigue pendiente. Detalle: [android-prototype.md](features/android-prototype.md).

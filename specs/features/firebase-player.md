@@ -8,7 +8,7 @@ Destino único `haychoriypaty`; Android con application ID/certificados reales. 
 
 Gate antes de inicializar `StreetGame`: inicializando → ingreso/recuperación → listo online/offline o error/conflicto. Mercado, navegación jugable y comandos requieren identidad válida, no solo ocultar botones. Primer login Google exige conexión real; sesión Firebase previamente recuperable habilita offline únicamente para su UID y cache. Sin invitado/anónimo; email no es clave. Cancelación/error tienen timeout y reintento; no bloquear hilo Unity.
 
-Pantalla de acceso: el ingreso obligatorio usa el mismo botón azul estándar “JUGAR” y tipografía de menú del juego, con la marca G multicolor a la izquierda y el texto “JUGAR CON GOOGLE”; tocarlo conserva el mismo flujo de autenticación y no inicia una partida.
+Pantalla de acceso: el ingreso obligatorio usa un botón Google blanco con borde gris sutil, marca G multicolor y tipografía habitual del menú en negro; texto “JUGAR CON GOOGLE”. Tras autenticación y resolución de perfil/consentimiento/conflicto, continúa al selector de canchas —el mismo destino del antiguo JUGAR— respetando la duración mínima de presentación. No inicia un partido automáticamente: mercado y acción JUGAR PARTIDO siguen siendo pasos separados.
 
 Logout explícito cierra sesión, bloquea acceso y conserva cache/outbox separados del UID. No reutilizar un bool propio como autenticación. Cambio de cuenta desmonta simulación/referencias anteriores; callbacks asíncronos verifican UID y generación de sesión. No transferir datos entre cuentas. Una ronda activa debe cerrarse explícitamente o esperarse antes de logout, no abandonarla silenciosamente.
 

@@ -34,12 +34,16 @@ namespace HayChoriYPaty
                  worker.State == StreetWorkerState.ToGrill || worker.State == StreetWorkerState.ToTable);
             int frame = WalkFrame(worker.TravelDistance);
             bool pickingUp = (worker.State == StreetWorkerState.Pickup || worker.State == StreetWorkerState.Deposit) && worker.CarriedItemId <= 0;
+            bool cook = worker.Role == StreetWorkerRole.Parrillero || worker.Role == StreetWorkerRole.ParrilleroPremium;
+            bool workingAtGrill = cook && (worker.State == StreetWorkerState.Cooking || worker.State == StreetWorkerState.Idle);
             StreetFacing facing = worker.Role == StreetWorkerRole.Cocacolero && pickingUp
-                ? StreetFacing.Down : ResolveFacing(worker.FacingVector, StreetFacing.Down);
+                ? StreetFacing.Down : workingAtGrill ? StreetFacing.Down : ResolveFacing(worker.FacingVector, StreetFacing.Down);
+            float bob = moving && (frame & 1) == 1 ? -.8f : 0f;
+            if (workingAtGrill)
+                bob = Mathf.Sin(worker.AnimationTime * 2.4f + worker.Id * .83f) * 1.2f;
             return new StreetWorkerPose { Facing = facing,
                 Frame = frame, Moving = moving, Carrying = worker.CarriedItemId > 0,
-                PickingUp = pickingUp, PickupProgress = pickingUp ? Mathf.Clamp01(worker.PickupProgress) : 0f,
-                Bob = moving && (frame & 1) == 1 ? -.8f : 0f };
+                PickingUp = pickingUp, PickupProgress = pickingUp ? Mathf.Clamp01(worker.PickupProgress) : 0f, Bob = bob };
         }
     }
 }

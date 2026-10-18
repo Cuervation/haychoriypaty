@@ -11,9 +11,8 @@ namespace HayChoriYPaty
     {
         private const int PropLayer = 30, CarryLayer = 31;
         private const int RenderScale = 2;
-        private const float TableSandwichScale = 1.5f, CarriedSandwichScale = 1.25f;
+        private const float CarriedSandwichScale = 1.25f;
         private const float BarrelDrinkScale = 1.35f * 1.08f;
-        private const float PremiumSandwichScaleMultiplier = 1.10f;
         private const float AmbientSmokeCycleSpeed = .32f, AmbientSmokeMaxAlpha = .18f;
         private static readonly Vector2 AmbientSmokeSize = new Vector2(12f, 26f);
         private const float FernetBottleHeightFraction = .25f, CocaBottleHeightFraction = .333f;
@@ -542,9 +541,6 @@ namespace HayChoriYPaty
                         ? fernetCupSprite : FirstSprite(key);
                     renderer.color = Color.white;
                 }
-                if (!carried && simulation.UsesActiveCooks)
-                    renderer.sortingOrder = StationDepth(isGrill ? simulation.KitchenLayout.GrillBoundsForProduct(unit.Product)
-                        : simulation.KitchenLayout.BoundsForProduct(unit.Product)) + 10;
                 Vector2 size = isGrill ? simulation.KitchenLayout.GrillMeatSize(unit.Product, grillCompanionAvailable)
                     : isBarrelDrink && !carried ? new Vector2(8f, 15f) * BarrelDrinkScale : ServingSize(unit.Product, carried);
                 SetDesiredSize(go.transform, renderer, size);
@@ -565,7 +561,14 @@ namespace HayChoriYPaty
                 : simulation.KitchenLayout.BoundsForProduct(unit.Product));
             float rotation = isBarrelDrink && !carried ? simulation.KitchenLayout.BarrelSlotRotation(unit.Slot) : 0f;
             go.transform.localRotation = Quaternion.Euler(0f, 0f, rotation);
-            SetSorting(go, 10 + unit.Slot);
+            int order = 10 + unit.Slot;
+            if (!carried && simulation.UsesActiveCooks)
+            {
+                Rect station = isGrill ? simulation.KitchenLayout.GrillBoundsForProduct(unit.Product)
+                    : simulation.KitchenLayout.BoundsForProduct(unit.Product);
+                order = StationDepth(station) + 10 + unit.Slot;
+            }
+            SetSorting(go, order);
         }
 
         private void SyncCookingEffect(StreetFoodUnit unit)
@@ -708,7 +711,7 @@ namespace HayChoriYPaty
                 UpdateFoodObject(unit, go, true);
                 float bob = (worker.State == StreetWorkerState.ToStation || worker.State == StreetWorkerState.ToCounter)
                     ? Mathf.Sin(worker.AnimationTime * 16f) * 1.5f : 0f;
-                Vector2 hand = new Vector2(worker.Position.x - 9.5f, worker.Position.y * verticalScale - 31.5f + bob);
+                Vector2 hand = new Vector2(worker.Position.x - 9.5f, worker.Position.y * verticalScale - 23.5f + bob);
                 int order;
                 if (WorkersReady && workerProjection.Grip(worker.Id, out hand, out order))
                 {
@@ -797,13 +800,11 @@ namespace HayChoriYPaty
 
         private static Vector2 ServingSize(int product, bool carried)
         {
+            if (!carried) return StreetKitchenLayout.TableServingSize(product);
             if (product <= 3)
             {
-                Vector2 baseSize = product == 0
-                    ? (carried ? new Vector2(31.2f, 18f) : new Vector2(26f, 14f))
-                    : (carried ? new Vector2(24f, 18f) : new Vector2(20f, 14f));
-                float scale = carried ? CarriedSandwichScale : TableSandwichScale;
-                if (product >= 2) scale *= PremiumSandwichScaleMultiplier;
+                Vector2 baseSize = product == 0 ? new Vector2(31.2f, 18f) : new Vector2(24f, 18f);
+                float scale = CarriedSandwichScale * (product >= 2 ? StreetKitchenLayout.PremiumTableSandwichScaleMultiplier : 1f);
                 return baseSize * scale;
             }
 
