@@ -677,6 +677,24 @@ namespace HayChoriYPaty.Tests
             Assert.GreaterOrEqual(android.maxTextureSize, Math.Max(width, height));
         }
 
+        [Test]
+        public void LevelCrestManifestMatchesAllLevelsAndOnlyLoadsVerifiedExistingCrests()
+        {
+            string[] resources = (string[])View.GetField("LevelCrestResourceNames", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+            Type simulation = Type.GetType("HayChoriYPaty.StreetSimulation, Assembly-CSharp", true);
+            string[] levels = (string[])simulation.GetField("LevelDisplayNames").GetValue(null);
+            Assert.AreEqual(levels.Length, resources.Length, "The crest manifest must stay aligned with the level catalog");
+
+            string[] existing = { "street-allboys-crest", "street-new-chicago-crest-v1", "street-velez-crest-v1" };
+            for (int i = 0; i < existing.Length; i++)
+            {
+                Assert.AreEqual(existing[i], resources[i]);
+                Assert.NotNull(Resources.Load<Texture2D>(resources[i]), "Existing level crest resource must resolve: " + resources[i]);
+            }
+            for (int i = existing.Length; i < resources.Length; i++)
+                Assert.IsNull(resources[i], "Do not draw an unverified or unlicensed mark as a crest for " + levels[i]);
+        }
+
         [TestCase("PlayingLevelBadge", true, 300f)]
         [TestCase("ReadyLevelBadge", true, 300f)]
         [TestCase("PlayingLevelBadge", false, 600f)]

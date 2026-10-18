@@ -1,3 +1,31 @@
+## 2026-10-18 — APK 0.2.46/code48 y validación focalizada
+
+En una copia aislada de Unity 6000.6.3f1 se compilaron los tests del proyecto y pasaron **17/17 EditMode**: dos filas de sándwiches, puntos de espera/acceso distintos, rotación de cuatro parrilleros por parrilla y entrega mixta de los siete productos. El caso mixto destapó un handoff de Coca-Cola bloqueado por personal estacionado; el selector ahora elige el punto libre más seguro. La grilla de espera usa seis columnas y filas escalonadas para no repetir anchors cercanos.
+
+La APK Main-only Development IL2CPP/ARM64 se generó correctamente (405,47 s, 0 errores, 1 warning clang) y se verificaron paquete/versión/API/ABI, integridad ZIP y firma v2. Metadatos, tamaño y hash en [android-prototype.md](features/android-prototype.md). Unity MCP siguió intermitente; no se ejecutaron PlayMode, captura Game View ni prueba en dispositivo. APK generada localmente, no instalada.
+
+## 2026-10-18 — Circulación y separación local de trabajadores
+
+Se corrigieron causas de amontonamiento en simulación: anclas repetidas de espera, depósito, recogida y handoff; `MoveWorker` ahora anticipa vecinos cercanos y se desvía lateralmente con rumbo estable, sin mover trabajadores parados ni crear búsquedas de ruta por frame. Los cocineros distribuyen depósitos por cuatro puntos en dos filas; sus cuatro puestos y la espera FIFO se conservan. Se agregaron cuatro regresiones focalizadas (cinco casos) en `StreetActiveCooksTests`.
+
+`git diff --check` pasó. El refresh inicial de Unity MCP devolvió `tests_running`; un reintento luego informó conexión recuperada/listo, pero el ping de estado/consola no respondió y la solicitud de tests se desconectó antes de informar ID o resultado. No se confirman compilación, tests ni capturas. La aceptación visual de cruces reales, muchos Mozos en una mesa, ambos equipos de cinco cocineros, bebidas y vista Racing/San Lorenzo queda pendiente. Sin APK ni cambios a GitHub.
+
+## 2026-10-18 — Cuatro puestos de Parrillero y cola rotativa
+
+La lógica local asigna como máximo cuatro puestos por parrilla, reserva por rol Normal/Premium y rotación FIFO al dejar/recuperar un producto real; los demás usan una zona de espera con bob leve y sin cocinar ni reservar fuera de puesto. Se retiró la reducción de escala por cantidad. Se agregaron regresiones para equipos1/2/3/4/5/6/8, exclusividad, escala, rutas y promoción del quinto. `git diff --check` pasó. Unity 6000.6.3f1 compiló los assemblies runtime y EditMode (Tundra build success); el test job del assembly EditMode se desconectó antes de reportar resultado y `TestResults.xml` no se actualizó, por lo que no se declara ningún test aprobado. Capturas solicitadas de cinco Parrilleros normales y cinco Premium pendientes. No APK, GitHub ni commit/push.
+
+## 2026-10-18 — Producción proporcional y velocidad diferenciada
+
+Racing+ ignora pedidos y stock preparado para priorizar; Parrilleros comparten un weighted virtual-finish por metas, omiten cuotas ya completas y siguen con la receta viable cuando faltan ingredientes o espacio. Los contadores se reinician por intento. Velocidad por mejora: Parrillero/Premium +5% (×1.45 a nueve); Coca/Fernet/Mozo +10% (×1.90). Niveles1–5 conservan producción automática; se separan sus tasas de cocción y bebidas sin tocar capacidades ni economía. Unity6000.6.3f1: `StreetActiveCooksTests` 28/28 EditMode pasó, incluyendo ritmo100:50,80:40 y7:3, concurrencia global, bloqueo/reanudación por capacidad e ingredientes, cuota completa, cero pedidos, stock preparado, bebida independiente y modo automático previo a Racing. Sin APK, cambio de UI, Git commit/push ni ejecución PlayMode.
+
+## 2026-10-18 — Contacto y animación de cocción
+
+Los Parrilleros Normal/Premium usan un atlas transparente de cuatro poses de brazos y pinzas; el ciclo se vincula al progreso real y la punta se alinea con la unidad/slot reservado, dibujando brazos delante del hierro sin mover pies, rutas ni tiempos. Idle frontal solo en el ancla real; anillos de progreso mayores y separados. Unity compiló durante los tests; 2/2 EditMode y la pasada final 1/1 PlayMode de captura pasaron. Se revisaron capturas reales 1080×1920 con tres/cuatro cocineros, dos fases y transición a transporte. Un intento intermedio no inicializó y no se cuenta. Sin suite global, APK ni Git push/commit.
+
+## 2026-10-18 — Auditoría y tabla central de escudos
+
+El pie de nivel y el encabezado del Mercado ahora consultan una tabla de recursos única alineada con los 11 niveles. All Boys, Nueva Chicago y Vélez conservan sus imágenes originales; no se agregaron escudos para Ferro, Independiente, Racing, San Lorenzo, River, Boca, el Sindicato de Camioneros ni Los Redondos: las fuentes revisadas no acreditan el permiso comercial requerido (River además exige autorización previa; Independiente somete el arte a aprobación). Los ocho slots quedan `null`, sin inventar marcas. Fuentes y condiciones: [auditoría visual](visual-reference.md). Se agregó una regresión focalizada para tabla/recursos; Unity MCP no respondió, por lo que aún no se ejecutan importación, compilación, pruebas ni captura visual.
+
 ## 2026-10-18 — APK 0.2.45/code47
 
 Unity 6000.6.3f1 Main-only Development IL2CPP/ARM64 build-4383fb3aa1 succeeded in 383.53 s (0 errors, 1 warning). Se verificó paquete, versión, API, ABI, integridad ZIP y firma debug. Regresiones focalizadas: globos/footer EditMode 9/9; acceso Google PlayMode 2/2. APK generada, no instalada. Los escudos oficiales nuevos siguen pendientes por permisos de reutilización no verificados. Ver [android-prototype.md](features/android-prototype.md).
@@ -1041,3 +1069,16 @@ Fernet otra vez alineado en su posición original, calle visible y sin mesa late
 ## Contenido centrado de botones — 2026-10-15
 
 Personajes y flechas centrados dentro de los óvalos existentes, sin deformación; ×1,00/+10% elevado para no tocar el precio.13/13 EditMode, capturas reales de cards compactas/amplias revisadas. Sin cambios de hit areas, escenario o mecánica; sin APK. Evidencia: `Logs/Acceptance/ButtonOvals-20261015/`.
+
+
+## Cocción visual permanente — 2026-10-18
+
+Racing+: los Parrilleros/Premium alternan automáticamente entre producción real y una cocción cosmética persistente. Ciclos de progreso/brazos usan el rate +5% y ponderan recetas por metas con contadores aparte; no crean comida ni modifican stock, ingredientes, ventas o cuotas. Si el worker quedó tras depositar, vuelve a su ancla de parrilla; cuando se abre una mesa o vuelve stock, retoma reserva real. Humo y calor/brasas ya existentes permanecen activos por parrilla. Niveles1–5 siguen con su producción automática original.
+
+**Validación:** Unity6000.6.3f1, StreetActiveCooksTests 31/31 EditMode; también se preservan las regresiones existentes de reparto/proporción/velocidad. git diff --check pasó. Captura manual intentada con una sesión de Play sin persistencia, pero el Game View quedó en la intro/login y no permitió revisar los brazos/progreso; validación visual real queda pendiente. Play detenido, Main sigue limpio, no APK, Git push ni dispositivo.
+
+## Dos filas de sándwiches en mesas — 2026-10-18
+
+`TableSlotPosition` coloca Chori, Paty, Bondiola y Vacío en dos filas de profundidad con cuatro anclajes compactos por zona; conserva sectores, tamaños de mueble y capacidades. El renderer dibuja la fila delantera sobre la trasera. El Mozo sigue el slot reservado y mantiene la corrección de seguridad del carril en X.
+
+**Validación:** en una copia temporal aislada con Unity 6000.6.3f1, el contrato EditMode focalizado pasó mediante un harness Editor: cuatro productos, mesa compartida/individual, footprint completo dentro de la madera, dos filas, sorting y anclajes Mozo. Para compilar esa copia se excluyó únicamente `StreetActiveCooksTests.cs`, que ya tiene referencias no resueltas a tipos ajenos a esta tarea; se corrigió un conflicto de nombre local detectado en `StreetKitchenLayout.cs`. `git diff --check` pasó. Unity MCP identificó el editor/proyecto correctos, pero persistieron cierres WebSocket y timeout del ping. La captura Game View disponible solo muestra cielo/piso de la escena Main sin gameplay; no es evidencia válida. Capturas de stock bajo/alto/máximo, recogidas en ambas filas y resoluciones compacta/alta quedan pendientes; no declarar aceptación visual. Sin APK ni Git.

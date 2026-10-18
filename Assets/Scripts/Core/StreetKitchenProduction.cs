@@ -239,12 +239,21 @@ namespace HayChoriYPaty
 
         public void Advance(float delta, float workRate, bool normalCook, bool premiumCook, bool cocaWorker, bool fernetero)
         {
+            // Retain the original shared-rate API for existing callers/tests.
+            Advance(delta, workRate, workRate, normalCook, premiumCook, cocaWorker, fernetero);
+        }
+
+        public void Advance(float delta, float cookWorkRate, float beverageWorkRate,
+            bool normalCook, bool premiumCook, bool cocaWorker, bool fernetero)
+        {
             if (delta <= 0f) return;
+            cookWorkRate = Mathf.Max(.01f, cookWorkRate);
+            beverageWorkRate = Mathf.Max(.01f, beverageWorkRate);
             for (int product = 4; product <= 6; product++)
             {
                 bool preparedByHiredRole = product == 5 ? fernetero : cocaWorker;
                 if (!preparedByHiredRole || tableCapacity[product] <= 0 || TableCount(product) >= tableCapacity[product]) continue;
-                drinkProgress[product] += delta * Mathf.Max(.01f, workRate);
+                drinkProgress[product] += delta * beverageWorkRate;
                 if (drinkProgress[product] >= Mathf.Max(.01f, balance.drinkPrepareSeconds))
                 {
                     drinkProgress[product] = 0f;
@@ -269,7 +278,7 @@ namespace HayChoriYPaty
                 if (unit.State == StreetFoodState.Cooking)
                 {
                     if (!cookingEnabled) continue;
-                    unit.Progress += delta * Mathf.Max(.01f, workRate) / Mathf.Max(.1f, balance.cookSeconds);
+                    unit.Progress += delta * cookWorkRate / Mathf.Max(.1f, balance.cookSeconds);
                     if (unit.Progress >= 1f)
                     {
                         unit.Progress = 1f;

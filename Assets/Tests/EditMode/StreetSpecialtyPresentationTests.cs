@@ -124,7 +124,7 @@ namespace HayChoriYPaty.Tests
             Vector2 normalHome=(Vector2)cooks[0].GetType().GetProperty("Position").GetValue(cooks[0]);
             Vector2 premiumHome=(Vector2)cooks[1].GetType().GetProperty("Position").GetValue(cooks[1]);
             for(int product=0;product<4;product++)
-            foreach(int workerCount in new[]{1,2,3,4,6,9})
+            foreach(int workerCount in new[]{1,2,3,4})
             for(int workerIndex=0;workerIndex<workerCount;workerIndex++)
             {
                 Vector2 grillFeet=(Vector2)work.Invoke(active,new object[]{product,workerIndex,workerCount});

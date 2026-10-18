@@ -48,4 +48,21 @@ During an empty-handed Cocacolero barrel-pickup dwell, presentation now forces t
 
 ## Revisión visual de Parrilleros — 2026-10-18
 
-En Parrilleros/Premium, `Idle` y `Cooking` orientan al frente y usan un bob sutil de hasta 1,2 puntos; caminar conserva la orientación direccional. Las anclas de parrilla forman una única fila horizontal. La proyección recalcula visualmente los idle que conservan un ancla antigua o comparten el punto de depósito, y reduce el tamaño solo para equipos densos. Los ítems transportados siguen siendo unidades reales; se baja el punto de agarre frontal hacia la cintura. Las pruebas focalizadas de orientación/bob, agarre y proyección pasaron; la aceptación visual en vivo queda abierta hasta revisar una captura actual.
+En Parrilleros/Premium, `Idle` y `Cooking` orientan al frente y usan un bob sutil de hasta 1,2 puntos; caminar conserva la orientación direccional. Los ítems transportados siguen siendo unidades reales; se baja el punto de agarre frontal hacia la cintura. Las pruebas focalizadas de orientación/bob, agarre y proyección pasaron; la aceptación visual en vivo quedó abierta hasta revisar una captura actual. El ajuste vigente de cuatro puestos y cola de espera abajo reemplaza el escalado en equipos densos.
+
+## Contacto y animación real de cocción — 2026-10-18
+
+Se agregó un atlas transparente de cuatro poses de brazos/pinzas, compartido por Parrillero y Premium. La pose avanza desde el `CookingProgress` real (dos ciclos por cocción, con fase individual por worker), y las puntas de las pinzas se alinean con la posición del producto reservado en la parrilla. El cuerpo conserva sus pies, escala, ruta y profundidad; solo los brazos se dibujan sobre el borde de hierro. La orientación/espera frontal se activa únicamente durante `Cooking` o cuando un cocinero `Idle` está realmente en su ancla. Los anillos conservan progreso real y ahora son mayores, con contraste y separación de 28 puntos.
+
+Validación focalizada: Unity compiló durante la pasada de tests; las dos pruebas EditMode nuevas pasaron 2/2 y la pasada final de la prueba PlayMode de captura pasó 1/1. Capturas reales de Game View a 1080×1920 revisadas para tres cocineros (Normal/Premium) en dos fases, cuatro cocineros y la transición a transporte. Hubo un intento intermedio que no inicializó el runner; no se cuenta como aprobado. No se ejecutó la suite global ni se generó APK.
+
+## Circulación local y esperas diferenciadas — 2026-10-18
+
+El amontonamiento real venía de compartir un único punto de depósito por producto, anclas comunes de recogida/barrel y el mismo `WorkerHomePosition`; además `MoveWorker` seguía cada waypoint sin observar a otros workers. La proyección ya dibuja todos los workers desde su posición real y los ordena por pies con desempate estable, por lo que no se alteró escala, ocultamiento ni renderer.
+
+Se reparten las recogidas concurrentes por la cara frontal de cada estación, los cuatro depósitos de Parrilleros por dos filas accesibles en el borde de mesa y hasta cinco handoffs por un pequeño abanico frente al cliente. Los trabajadores sin tarea regresan por la ruta segura a un punto propio en un banco compacto situado fuera de las huellas de barriles y mesas. Durante el movimiento se usa una previsión local corta con preferencia determinista por ID y leve desvío lateral; los anchors estacionarios nunca se mueven, los desvíos se validan contra las huellas existentes y no se busca una ruta nueva por frame. La orientación a producto, reservas, IDs físicos, tempos, economía y los cuatro puestos por parrilla no cambian.
+
+- [x] Implementación y cuatro regresiones EditMode añadidas (cinco casos, incluyendo retorno en All Boys y Racing) para accesos distintos, rodeo y puntos de espera.
+- [ ] Ejecutar esas regresiones en Unity y revisar visualmente los cruces y los casos de alta concurrencia; no se cuenta como validado aún.
+
+`git diff --check` pasó. El primer refresh de Unity MCP respondió `tests_running`; un reintento luego informó que recuperó la conexión y que el editor estaba listo, pero consola/estado siguieron sin responder al ping. El pedido de las pruebas focalizadas se desconectó mientras esperaba el resultado, sin ID ni reporte; por eso no se confirma compilación/tests ni se generaron capturas.

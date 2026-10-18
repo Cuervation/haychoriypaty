@@ -562,7 +562,12 @@ namespace HayChoriYPaty
             float rotation = isBarrelDrink && !carried ? simulation.KitchenLayout.BarrelSlotRotation(unit.Slot) : 0f;
             go.transform.localRotation = Quaternion.Euler(0f, 0f, rotation);
             int order = 10 + unit.Slot;
-            if (!carried && simulation.UsesActiveCooks)
+            if (!carried && !isGrill && unit.Product <= 3)
+            {
+                Rect station = simulation.KitchenLayout.BoundsForProduct(unit.Product);
+                order = StationDepth(station) + 10 + StreetKitchenLayout.TableSlotDepthOrder(unit.Slot);
+            }
+            else if (!carried && simulation.UsesActiveCooks)
             {
                 Rect station = isGrill ? simulation.KitchenLayout.GrillBoundsForProduct(unit.Product)
                     : simulation.KitchenLayout.BoundsForProduct(unit.Product);

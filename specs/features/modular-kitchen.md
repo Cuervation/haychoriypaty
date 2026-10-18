@@ -21,7 +21,7 @@ Both prerequisites above are explicitly authorized. Extend **only StreetSimulati
 
 ### Real item lifecycle / defaults
 
-`StreetKitchenProduction` is owned/stepped by the existing simulation. Stable food IDs move Grill→Table→Carried→consumed only at validated physical handoff. Order reservations are still demand, not stock. Meat states are Raw→Cooking→Cooked; cooked grill meat transfers to its specialty table when a slot is free, otherwise burns after20s, then is discarded after1s. Burned units cannot be served. Prepared table sandwiches never burn. Raw items cannot be taken. All production follows actual availability and the hired responsible specialty; WorkRate scales preparation. Existing pickup/handoff delays, economics and progression remain intact.
+`StreetKitchenProduction` is owned/stepped by the existing simulation. Stable food IDs move Grill→Table→Carried→consumed only at validated physical handoff. Order reservations are still demand, not stock. Meat states are Raw→Cooking→Cooked; cooked grill meat transfers to its specialty table when a slot is free, otherwise burns after20s, then is discarded after1s. Burned units cannot be served. Prepared table sandwiches never burn. Raw items cannot be taken. All production follows actual availability and the hired responsible specialty; levels1–5 automatic meat preparation uses CookWorkRate (+5% per speed upgrade), while beverages retain WorkRate (+10%). Existing pickup/handoff delays, economics and progression remain intact.
 
 Configurable defaults: cook4s; burn20s; discard1s; drinks preparation0.28s; normal table48total, Premium36total, Fernet45total, each barrel12. Fresh attempts begin with real prepared mise-en-place at these capacities, divided between currently available products; this preserves delivery throughput without inventing revenue. No prior storage capacity existed to override. Normal grill18slots (12Chori/6Paty), Premium7slots (4Bondiola/3Vacío); single-product catalogs use available meat only. Empty pickup waits; full table holds cooked grill items until room/burning. Cancellation returns an edible carried unit if room, otherwise discards without income. Reset/retry/select rebuild IDs/stock; no in-flight save added.
 
@@ -161,3 +161,11 @@ The shared proportional-scale correction from commit `a7937b2` was reverted afte
 ## Fernet table shelf bottles tripled — 2026-10-12
 
 At the user's request, the six decorative Fernet/Coca bottles below the Fernet table are exactly 3× their former proportional target heights: Fernet 75% and Coca 99.9% of table height. Sprites retain aspect ratio; positions are recomputed from rendered widths with even gaps to keep the row centered and prevent overlap. This is presentation-only; bottle art, table, cup, inventory, delivery and worker behavior do not change. Focused renderer PlayMode validation passed 1/1 in isolated Unity 6000.6.3f1.
+
+
+## Two-row sandwich presentation — 2026-10-18
+
+All four sandwich products render in two stable table-depth rows. Shared tables retain distinct left/right product zones; each product zone uses two compact pile anchors per row, with real units fanning by at most 6 logical units as stock accumulates. Table dimensions, inventory identities, and configured storage capacities (24 normal / 18 premium per product when both companions are available; full table capacity when alone) remain unchanged. On-table sandwich art is 80% of its former display target (still 1.2× the normal base size and 1.32× for premium) to reveal a rear row within the existing tabletop depth. `TableSlotPosition` drives both item rendering and `TableSlotPickupPosition`; front-row sorting is above the rear row, so reserved Mozo pickups remain aligned with the exact real slot.
+
+- [x] Two row anchors and the corresponding back-to-front sorting are covered for Chori, Paty, Bondiola, and Vacío across shared and single-product table layouts.
+- [ ] Full real-Unity Game View screenshots for low/high/max stock and front/rear Mozo pickups, at compact and tall portrait resolutions, remain required for visual sign-off.

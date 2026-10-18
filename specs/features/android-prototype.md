@@ -1,4 +1,12 @@
-# Current Android delivery — 2026-10-18 (0.2.45/code47, current changes)
+# Current Android delivery — 2026-10-18 (0.2.46/code48, two-row tables and worker fixes)
+
+Unity 6000.6.3f1 Main-only Development IL2CPP/ARM64 Android build from an isolated checkout after the Unity MCP editor ping stopped responding: **Succeeded in 405.47s; 0 errors / 1 warning** (clang `-Wunused-command-line-argument`). Focused EditMode regressions: **17/17** across two-row sandwich layout, worker access/wait spacing, four-post rotation and mixed-product delivery. No PlayMode, Game View or device test was run.
+
+Archive APK `Builds/Android/Archive/HayChoriYPaty-0.2.46-code48-current-updates.apk`; versioned and rolling aliases `Builds/Android/HayChoriYPaty-0.2.46.apk` and `Builds/Android/HayChoriYPaty-street.apk`: **422,271,063 bytes**, SHA-256 `f8acf6162a017f863e886d8cfd7300d6f7a49cca823a7f928ad4e282ea0e5e16` (all copies byte-identical). Package `com.haychoriypaty.game`, version0.2.46/code48, min API26/target36, `arm64-v8a`. `aapt` metadata, ZIP integrity and APK Signature Scheme v2 verified; Android Debug signer SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`. Development/debug-signed, not Play Store release-signed. Generated locally; not installed on a phone.
+
+---
+
+# Previous Android delivery — 2026-10-18 (0.2.45/code47, current changes)
 
 Unity 6000.6.3f1 Main-only Development IL2CPP/ARM64 Android build through the existing editor (build-4383fb3aa1): **Succeeded in 383.53s; 0 errors / 1 warning**. Focused current regressions: EditMode **9/9** (two-row order bubbles and responsive footer) and PlayMode **2/2** (Google sign-in navigation). Package com.haychoriypaty.game, min API26/target36, arm64-v8a. APK archive integrity passed; APK Signature Scheme v2 verified with the established Android Debug certificate SHA-256 d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e.
 

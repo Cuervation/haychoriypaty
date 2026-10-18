@@ -18,7 +18,7 @@ namespace HayChoriYPaty
         private sealed class Visual
         {
             public Transform Root;
-            public SpriteRenderer Torso, LeftLeg, RightLeg, Fingers;
+            public SpriteRenderer Torso, LeftLeg, RightLeg, Fingers, CookingArms;
             public Vector2 Palm;
             public int ProductOrder;
         }
@@ -37,15 +37,22 @@ namespace HayChoriYPaty
         private readonly HashSet<int> liveIds = new HashSet<int>();
         private readonly List<int> stale = new List<int>();
         private readonly Texture2D extension, premiumExtension, fernetExtension;
+        private readonly Texture2D cookingArms;
         private Texture2D normal, diagonal, premium, premiumDiagonal, drink, fernet, mozo, mozoDiagonal, mozoExtension;
         private Texture2D mozoSource, mozoDiagonalSource;
         private bool matched;
+        private static readonly Rect[] CookingArmBounds = {
+            new Rect(31,55,512,607), new Rect(548,33,506,617),
+            new Rect(1105,47,524,637), new Rect(1629,54,529,555)
+        };
+        private static readonly Vector2 CookingArmAtlasSize = new Vector2(2172f,724f);
         private static readonly Rect[] ExtensionBounds = { new Rect(28,11,206,279),new Rect(298,11,195,278),new Rect(562,11,213,277),new Rect(848,11,209,277),new Rect(34,299,226,280),new Rect(296,299,208,280),new Rect(557,299,217,280),new Rect(831,299,223,280),new Rect(41,588,218,281),new Rect(290,588,222,281),new Rect(564,588,217,281),new Rect(835,588,212,281),new Rect(38,876,173,272),new Rect(306,881,195,265),new Rect(598,883,176,268),new Rect(887,878,173,272),new Rect(37,1158,180,272),new Rect(326,1158,187,269),new Rect(567,1158,191,269),new Rect(866,1158,186,267) };
         public bool Ready => normal != null && diagonal != null && drink != null && extension != null;
         internal StreetWorkerProjection(Transform parent, Material material)
         {
             this.parent = parent; this.material = material;
             extension = Resources.Load<Texture2D>("street-worker-direction-extension-v1");
+            cookingArms = Resources.Load<Texture2D>("street-parrillero-cooking-arms-v1");
             if (extension != null)
             {
                 Rect[] food = new Rect[4], beverage = new Rect[16];
@@ -96,41 +103,58 @@ namespace HayChoriYPaty
             return false;
         }
         private static bool IsCook(StreetWorkerRole role) => role == StreetWorkerRole.Parrillero || role == StreetWorkerRole.ParrilleroPremium;
+        private static bool IsIdleAtGrill(StreetSimulation simulation, StreetWorker worker)
+        {
+            if (simulation == null || worker == null || worker.State != StreetWorkerState.Idle || !IsCook(worker.Role)) return false;
+            int product = worker.Role == StreetWorkerRole.Parrillero ? 0 : 2;
+            if (!simulation.UsesActiveCooks)
+            {
+                Rect legacyGrill = simulation.KitchenLayout.GrillBoundsForProduct(product);
+                Vector2 legacyAnchor = simulation.KitchenLayout.GrillWorkPosition(product, 0, 1);
+                return legacyGrill.width > 0f && Mathf.Abs(worker.Position.y - legacyAnchor.y) <= 1f &&
+                    worker.Position.x >= legacyGrill.xMin - 1f && worker.Position.x <= legacyGrill.xMax + 1f;
+            }
+            if (worker.CookStationIndex < 0) return false;
+            int count = Mathf.Min(StreetKitchenLayout.MaxCookStationsPerGrill, simulation.WorkerCount(worker.Role));
+            Vector2 anchor = simulation.KitchenLayout.GrillWorkPosition(product, worker.CookStationIndex, count);
+            return Vector2.Distance(worker.Position, anchor) <= 1f;
+        }
+        private static bool TryCookingPresentationTarget(StreetSimulation simulation, StreetWorker worker,
+            out int product, out int slot, out Vector2 target)
+        {
+            product = -1;
+            slot = 0;
+            target = Vector2.zero;
+            if (simulation == null || simulation.Kitchen == null || worker == null) return false;
+            if (worker.CookingItemId > 0)
+            {
+                StreetFoodUnit unit = simulation.Kitchen.Find(worker.CookingItemId);
+                if (unit == null || unit.Location != StreetFoodLocation.Grill || unit.Product < 0 || unit.Product > 3) return false;
+                product = unit.Product;
+                slot = unit.Slot;
+            }
+            else if (worker.VisualCooking && worker.VisualCookingProduct >= 0 && worker.VisualCookingProduct < 4)
+            {
+                product = worker.VisualCookingProduct;
+                int firstProduct = worker.Role == StreetWorkerRole.Parrillero ? 0 : 2;
+                if (product < firstProduct || product > firstProduct + 1) return false;
+            }
+            else return false;
+
+            bool companionAvailable = simulation.IsProductAvailable(product ^ 1);
+            target = simulation.KitchenLayout.GrillSlotPosition(product, slot, companionAvailable,
+                simulation.Kitchen.GrillCapacity(product));
+            return true;
+        }
         internal static Vector2 PresentationPosition(StreetSimulation simulation, StreetWorker worker)
         {
-            if (simulation == null || worker == null || !simulation.UsesActiveCooks || !IsCook(worker.Role) || worker.State != StreetWorkerState.Idle)
-                return worker == null ? Vector2.zero : worker.Position;
-            int product = worker.Role == StreetWorkerRole.Parrillero ? 0 : 2;
-            Rect table = simulation.KitchenLayout.BoundsForProduct(product);
-            Rect grill = simulation.KitchenLayout.GrillBoundsForProduct(product);
-            Vector2 deposit = simulation.KitchenLayout.DepositPosition(product);
-            int index = 0, count = 0;
-            foreach (StreetWorker other in simulation.Workers)
-            {
-                if (other.Role != worker.Role) continue;
-                if (other.Id == worker.Id) index = count;
-                count++;
-            }
-            if (count <= 1) return worker.Position;
-            // Newly hired idle cooks may still hold the earlier team-size anchor. Reproject
-            // those parked at the grill onto the current single row without moving simulation state.
-            Vector2 singleCookAnchor = simulation.KitchenLayout.GrillWorkPosition(product, 0, 1);
-            if (Mathf.Abs(worker.Position.y - singleCookAnchor.y) <= 1f
-                && worker.Position.x >= grill.xMin - 1f && worker.Position.x <= grill.xMax + 1f)
-                return simulation.KitchenLayout.GrillWorkPosition(product, index, count);
-            if (Vector2.Distance(worker.Position, deposit) > 1f) return worker.Position;
-            float fraction = Mathf.Lerp(-.10f, 1.10f, index / (float)(count - 1));
-            return new Vector2(Mathf.Lerp(table.xMin, table.xMax, fraction), worker.Position.y);
+            return worker == null ? Vector2.zero : worker.Position;
         }
         internal static float PresentationScale(StreetSimulation simulation, StreetWorker worker)
         {
-            if (simulation == null || worker == null || !simulation.UsesActiveCooks || !IsCook(worker.Role)) return 1f;
-            int count = 0;
-            foreach (StreetWorker other in simulation.Workers) if (other.Role == worker.Role) count++;
-            if (count <= 3) return 1f;
-            Rect grill = simulation.KitchenLayout.GrillBoundsForProduct(worker.Role == StreetWorkerRole.Parrillero ? 0 : 2);
-            float spacing = grill.width * .76f / Mathf.Max(1, count - 1);
-            return Mathf.Clamp(spacing / (Width * .72f), .42f, 1f);
+            // Staff density is solved by assigning only four cooks to physical posts; sprites
+            // retain their original responsive scale regardless of the waiting queue length.
+            return 1f;
         }
         private static int RowSortBias(StreetSimulation simulation, StreetWorker worker, Vector2 displayPosition)
         {
@@ -162,6 +186,13 @@ namespace HayChoriYPaty
         }
         private Art Supplemental(StreetWorker w, int index, bool flip, Vector2 palm)
             => new Art { Texture = Extension(w), Bounds = ExtensionBounds[index], Flip = flip, Palm = palm };
+        private Art CookArmsArt(int frame)
+        {
+            Rect source = CookingArmBounds[Mathf.Clamp(frame, 0, CookingArmBounds.Length - 1)];
+            Vector2 scale = new Vector2(cookingArms.width / CookingArmAtlasSize.x, cookingArms.height / CookingArmAtlasSize.y);
+            Rect bounds = new Rect(source.x * scale.x, source.y * scale.y, source.width * scale.x, source.height * scale.y);
+            return new Art { Texture = cookingArms, Bounds = bounds, Palm = new Vector2(.5f, 1f) };
+        }
         private Art Walk(StreetWorker w, StreetFacing facing, int contact, bool moving)
         {
             if (Diagonal(facing))
@@ -224,6 +255,7 @@ namespace HayChoriYPaty
             go.transform.SetParent(parent, false);
             var v = new Visual { Root = go.transform };
             v.Torso = Part(v.Root,"Torso"); v.LeftLeg = Part(v.Root,"LeftLeg"); v.RightLeg = Part(v.Root,"RightLeg"); v.Fingers = Part(v.Root,"GripFingers");
+            v.CookingArms = Part(v.Root,"CookingArms"); v.CookingArms.enabled = false;
             workers.Add(id,v); return v;
         }
         private float Scale(Art art) => Mathf.Min(Width / art.Bounds.width, Height / art.Bounds.height);
@@ -250,9 +282,10 @@ namespace HayChoriYPaty
                 if (!v.Root.gameObject.activeSelf) v.Root.gameObject.SetActive(true);
                 Vector2 displayPosition = PresentationPosition(sim, w);
                 float presentationScale = PresentationScale(sim, w);
-                StreetWorkerPose pose = StreetWorkerAnimation.Sample(w);
+                StreetWorkerPose pose = StreetWorkerAnimation.Sample(w, IsIdleAtGrill(sim, w));
                 int contact = pose.Frame >= 2 ? 1 : 0;
                 Art upper = pose.Carrying ? Carry(w,pose.Facing) : Walk(w,pose.Facing,contact,pose.Moving);
+                if (pose.Cooking) upper = Original(w, 0, false);
                 if (pose.PickingUp)
                     upper = Beverage(w) ? Carry(w,pose.Facing)
                         : Original(w,11, w.Position.x < sim.KitchenLayout.BoundsForProduct(w.Product).center.x);
@@ -276,6 +309,18 @@ namespace HayChoriYPaty
                 DrawPart(v.LeftLeg,legs,new Rect(legs.Bounds.x,legs.Bounds.yMax-legHeight,half,legHeight),new Vector2(legs.Flip ? quarterWidth : -quarterWidth,leftLift),depth,presentationScale);
                 DrawPart(v.RightLeg,legs,new Rect(legs.Bounds.x+half,legs.Bounds.yMax-legHeight,half,legHeight),new Vector2(legs.Flip ? -quarterWidth : quarterWidth,rightLift),depth+1,presentationScale);
                 v.Fingers.enabled = pose.Carrying;
+                v.CookingArms.enabled = false;
+                if (pose.Cooking && cookingArms != null &&
+                    TryCookingPresentationTarget(sim, w, out int cookingProduct, out int cookingSlot, out Vector2 cookingTarget))
+                {
+                    Art arms = CookArmsArt(pose.CookingFrame);
+                    Rect grill = sim.KitchenLayout.GrillBoundsForProduct(cookingProduct);
+                    int armsOrder = -5000 + Mathf.RoundToInt(grill.yMax * verticalScale) + 12 + Mathf.Max(0, cookingSlot);
+                    // Real cooks target their reserved unit; simulated cooks reuse the same overlay anchor without an item.
+                    Vector2 armsOffset = new Vector2(cookingTarget.x - displayPosition.x,
+                        (displayPosition.y - cookingTarget.y) * verticalScale);
+                    DrawPart(v.CookingArms, arms, arms.Bounds, armsOffset, armsOrder, presentationScale);
+                }
                 float handX = (upper.Palm.x-.5f)*upper.Bounds.width*upperScale;
                 if (upper.Flip) handX = -handX;
                 float handY = -(1f-upper.Palm.y)*upper.Bounds.height*upperScale + pose.Bob * presentationScale + (pose.PickingUp ? reach * presentationScale : 0f);

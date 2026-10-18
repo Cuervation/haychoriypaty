@@ -115,3 +115,7 @@ Blend head/jaw/chin/ears into target's broad thick neck and shoulders with anato
 Everything except head/face/neck must remain pixel-faithful: especially body pose, huge bare torso/arms, tongs/sausage, stained apron, grill, embers, cups/can, food, crowd, lights, scenery, framing, colors and details. Keep opaque full bleed, no cropping, no text/logo/UI/extra objects/people. Do not generate side-by-side concepts. Return one seamlessly integrated painted illustration.
 
 **Unity import/compile:** Unity6000.6.3f1 batch import and compilation succeeded for v4 (exit0); this was not a test or native visual review. User acceptance pending.
+
+## Active-cooking arms — 2026-10-18
+
+Built with the built-in image_gen tool from the gameplay Parrillero atlas as identity/style reference. Authoring constraints: a transparent, single-row four-pose cutout of both arms and tongs; retain the warm skin, tattoo and illustrated tong style; no torso, background, text or scene; vary the reach/pinch/turn/release action while keeping the front-facing grill direction. The runtime aligns the lower tong tips with the worker's actual reserved grill unit and reuses the same overlay for Normal/Premium; original worker atlases remain unchanged.

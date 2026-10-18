@@ -16,6 +16,11 @@ namespace HayChoriYPaty
         private const string ChicagoBackgroundResource = "street-background-chicago-v1";
         private const string VelezBackgroundResource = "street-background-velez-v1";
         private const string VelezCrestResource = "street-velez-crest-v1";
+        // Ordered by StreetSimulation.LevelDisplayNames. Unknown/unlicensed marks stay null.
+        private static readonly string[] LevelCrestResourceNames = {
+            AllBoysCrestResource, ChicagoCrestResource, VelezCrestResource,
+            null, null, null, null, null, null, null, null
+        };
         private const string VelezFrontFansResource = "street-velez-fans-front-v1";
         private const string VelezWalkingFansResource = "street-velez-fans-walk-v1";
         private const string VelezRiotFansResource = "street-velez-riot-fans-v1";
@@ -339,6 +344,7 @@ namespace HayChoriYPaty
         private StreetGame game;
         private int VisualLevelIndex => game != null && game.Sim != null ? game.Sim.LevelIndex : 0;
         private Texture2D backdrop, chicagoBackground, velezBackground, velezCrest, velezGrill, people, items, parrillero, parrilleroDiagonal, cocacolero, laterCocacolero, parrilleroIcon, upgradeWood, speedArrows, largeGrill, servingTable, gameCoin, muralArt, allBoysCrest, chicagoCrest, cocaBottle, beverageBarrel, chicagoGrill;
+        private Texture2D[] levelCrests;
         private Texture2D clubPennantTexture;
         private string clubPennantThemeName;
         private float clubPennantLogicalHeight = -1f;
@@ -450,16 +456,33 @@ namespace HayChoriYPaty
         // Clean board face from the existing upgrade-wood art; avoids its oval, plaque and metal frame.
         private static readonly Rect FooterWoodSource = new Rect(680, 511, 650, 280);
         private static readonly Rect SpeedArrowBounds = new Rect(114,224,1174,662);
+        private void LoadLevelCrests()
+        {
+            levelCrests = new Texture2D[LevelCrestResourceNames.Length];
+            for (int i = 0; i < LevelCrestResourceNames.Length; i++)
+            {
+                string resource = LevelCrestResourceNames[i];
+                if (!string.IsNullOrEmpty(resource)) levelCrests[i] = Resources.Load<Texture2D>(resource);
+            }
+            allBoysCrest = levelCrests[0];
+            chicagoCrest = levelCrests[1];
+            velezCrest = levelCrests[2];
+        }
+
+        private Texture2D LevelCrestForLevel(int levelIndex)
+        {
+            return levelCrests != null && levelIndex >= 0 && levelIndex < levelCrests.Length
+                ? levelCrests[levelIndex] : null;
+        }
+
         private void OnEnable()
         {
             game = GetComponent<StreetGame>();
             backdrop = Resources.Load<Texture2D>("street-background-open-street-v4");
             muralArt = Resources.Load<Texture2D>(MuralResource);
-            allBoysCrest = Resources.Load<Texture2D>(AllBoysCrestResource);
-            chicagoCrest = Resources.Load<Texture2D>(ChicagoCrestResource);
+            LoadLevelCrests();
             chicagoBackground = Resources.Load<Texture2D>(ChicagoBackgroundResource);
             velezBackground = Resources.Load<Texture2D>(VelezBackgroundResource);
-            velezCrest = Resources.Load<Texture2D>(VelezCrestResource);
             velezGrill = Resources.Load<Texture2D>(VelezGrillResource);
             ferroBackground = Resources.Load<Texture2D>(FerroBackgroundResource);
             independienteBackground = Resources.Load<Texture2D>(IndependienteBackgroundResource);
@@ -1448,18 +1471,19 @@ namespace HayChoriYPaty
             const int segments = 24;
             foreach (StreetWorker worker in sim.Workers)
             {
-                if (worker.State != StreetWorkerState.Cooking) continue;
-                float cx = Mathf.Clamp(worker.Position.x, 12f, W - 12f), cy = worker.Position.y * layoutVerticalScale - 108f;
+                if (worker.State != StreetWorkerState.Cooking && !worker.VisualCooking) continue;
+                Vector2 visualPosition = StreetWorkerProjection.PresentationPosition(sim, worker);
+                float cx = Mathf.Clamp(visualPosition.x, 14f, W - 14f), cy = visualPosition.y * layoutVerticalScale - 150f;
                 // Several real slots may share the same approach column. Stack only
                 // their progress rings, rather than overlapping independent clocks.
                 for (int attempt = 0; attempt <= sim.Workers.Count; attempt++)
                 {
                     bool overlaps = false;
                     for (int j = 0; j < cookingRingCenters.Count; j++)
-                        if ((cookingRingCenters[j] - new Vector2(cx, cy)).sqrMagnitude < 22f * 22f)
+                        if ((cookingRingCenters[j] - new Vector2(cx, cy)).sqrMagnitude < 28f * 28f)
                         { overlaps = true; break; }
                     if (!overlaps) break;
-                    cy -= 22f;
+                    cy -= 28f;
                 }
                 cookingRingCenters.Add(new Vector2(cx, cy));
                 int lit = Mathf.CeilToInt(Mathf.Clamp01(worker.CookingProgress) * segments);
@@ -1467,9 +1491,9 @@ namespace HayChoriYPaty
                 {
                     float a = i / (float)segments * Mathf.PI * 2f - Mathf.PI * .5f;
                     GUI.color = i < lit ? new Color(1f, .72f, .18f, 1f) : new Color(.12f, .07f, .035f, .85f);
-                    float radius = 8.5f;
+                    float radius = 10f;
                     GUI.DrawTexture(new Rect(cx + Mathf.Cos(a) * radius - 1.5f,
-                        cy + Mathf.Sin(a) * radius - 1.25f, 2.5f, 2.5f), Texture2D.whiteTexture);
+                        cy + Mathf.Sin(a) * radius - 1.5f, 3f, 3f), Texture2D.whiteTexture);
                 }
             }
             GUI.color = old;
@@ -1479,7 +1503,7 @@ namespace HayChoriYPaty
         {
             if (VisualLevelIndex == RiverVisualLevelIndex) levelIndex = RiverVisualLevelIndex;
             string caption = StreetSimulation.LevelDisplayNames[levelIndex].ToUpperInvariant();
-            Texture2D crest = levelIndex == 0 ? allBoysCrest : levelIndex == 1 ? chicagoCrest : levelIndex == 2 ? velezCrest : null;
+            Texture2D crest = LevelCrestForLevel(levelIndex);
             bool showCrest = crest != null;
             int originalSize = levelTitle.fontSize;
             float available = bounds.width - (showCrest ? Mathf.Min(32f, bounds.height) + 8f : 0f);
@@ -2162,7 +2186,7 @@ namespace HayChoriYPaty
         {
             DrawMarketWoodPanel(new Rect(12, 70, W - 24, 100), new Color(.10f, .055f, .025f, .97f));
             int level = game.Sim.LevelIndex;
-            Texture2D crest = level == 0 ? allBoysCrest : level == 1 ? chicagoCrest : level == 2 ? velezCrest : null;
+            Texture2D crest = LevelCrestForLevel(level);
             Rect badge = new Rect(28, 82, 76, 76);
             if (crest != null) GUI.DrawTexture(badge, crest, ScaleMode.ScaleToFit, true);
             else

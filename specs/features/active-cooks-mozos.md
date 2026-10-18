@@ -2,9 +2,11 @@
 
 ## Contract
 
-LevelIndex >= 5 (Racing through Los Redondos) enables active sandwich production and Mozo delivery, centrally gated. Levels 1–5 retain their existing production, delivery, layout and costs. Stable role IDs append Mozo=4. Existing seven products, goals, duration, demand, stock reservations, speed limits and unlimited hiring remain unchanged.
+LevelIndex >= 5 (Racing through Los Redondos) enables active sandwich production and Mozo delivery, centrally gated. Levels 1–5 retain their existing automatic production, delivery, layout and costs. Stable role IDs append Mozo=4. Existing seven products, goals, duration, demand, stock reservations, speed limits and unlimited hiring remain unchanged.
 
-Normal/Premium cooks independently travel to their respective grill, cook one identified unit for 2 / WorkRate seconds, carry that same unit along a safe route and deposit it in a reserved available specialty table slot. No automatic sandwich transfer in active mode. Each cooking worker exposes real progress. Mozo claims a cooked sandwich and routes to that reserved unit's actual product/slot on its table (Chori and Bondiola use their left product zones; Paty and Vacío use their right zones), then serves the actual pending customer; only handoff consumes reserved ingredients and records revenue. Beverage roles retain existing behavior. Cancellations preserve edible physical stock; no duplicate IDs, claims, ingredients or sales. Tables bound both prepared and in-flight production. Pending products take precedence, with fair stock replenishment.
+Normal/Premium cooks independently travel to their respective grill, cook one identified unit for 2 / CookWorkRate seconds, carry that same unit along a safe route and deposit it in a reserved available specialty table slot. No automatic sandwich transfer in active mode. Each cooking worker exposes real progress. Mozo claims a cooked sandwich and routes to that reserved unit's actual product/slot on its table (Chori and Bondiola use their left product zones; Paty and Vacío use their right zones), then serves the actual pending customer; only handoff consumes reserved ingredients and records revenue. Beverage roles retain existing behavior. Cancellations preserve edible physical stock; no duplicate IDs, claims, ingredients or sales. Tables bound both prepared and in-flight production.
+
+Active cooks produce continuously without checking customers, order lines or prepared-stock counts. Between each available Normal/Premium product pair, a deterministic weighted virtual-finish schedule uses the level's product goals; assignment counters are global to each grill type and reset for every fresh attempt. Completed quotas are skipped. Missing ingredients or a full grill/table slot make only that recipe temporarily ineligible, so the other feasible recipe can proceed and proportional scheduling resumes when capacity/resources return. Real ingredient reservations and physical capacities remain authoritative. Levels1–5 keep the existing automatic grill pipeline; their meat cooking uses the cook-specific speed rate, while beverage preparation and non-cook roles retain the original speed rate.
 
 Mozo is hired only during play, not automatically; starts at zero. Per-level configurable base costs follow existing successive-hire curve, with River reference $60. Every fresh attempt still starts with one Parrillero and speed x1.00. Save compatibility retained; no persistent earnings/unlocks or new pre-match roster screen.
 
@@ -15,9 +17,12 @@ Reuse existing furniture, counter, mural, fans, HUD, art, fonts, wood/iron cards
 ## Validation / acceptance
 
 - [x] Active per-worker cooking, one real carried/deposited unit and speed scaling.
+- [x] Continuous, request-independent active cooking with deterministic goal-weighted global scheduling; stock does not bias selection, completed quotas are skipped, and blocked recipes fall back/resume.
+- [x] One speed upgrade gives Parrilleros +5% and other roles +10%; nine upgrades cap at ×1.45/×1.90. Cooking, movement and worker operations use the role-specific rate; legacy automatic levels retain their flow and beverage timing.
 - [x] Parrilleros del mismo rol usan puestos de parrilla separados al cocinar en paralelo; EditMode cubre separación y rutas seguras. Revisión visual de este ajuste sigue pendiente.
-- [x] Revisión 18/10: anchors 1–9 comparten una sola fila horizontal; separación, claridad idle/cocción, agarre y slots de cuatro sándwiches cubiertos por 11 EditMode + 14 PlayMode focalizados.
-- [ ] Captura actual del juego para cierre manual de la apariencia final; Unity MCP no expuso captura visual en esta sesión.
+- [x] Los handoffs seleccionan un punto libre del mostrador que evita trabajadores estacionados o en ruta; la espera usa una grilla de seis columnas con filas escalonadas. Las regresiones focalizadas de dos filas, cuatro puestos/cola, acceso del Mozo y entrega mixta pasaron 17/17 EditMode el 18/10/2026.
+- [x] Revisión 18/10: anchors de cocción, separación, claridad idle/cocción, agarre y slots de cuatro sándwiches cubiertos por 11 EditMode + 14 PlayMode focalizados. La nueva regla de cuatro puestos/cola rotativa abajo reemplaza la fila escalada para equipos densos.
+- [x] Capturas actuales de Game View a 1080×1920: Normal/Premium, tres y cuatro cocineros en cocción, dos fases de brazos y transición de unidad real a transporte; contacto de pinzas y parrilla revisado visualmente el 18/10/2026.
 - [x] Exclusive Mozo sandwich handoff and unchanged beverage/mixed-order flow.
 - [x] Mozo routes to the actual reserved table slot for Chori, Paty, Bondiola, and Vacío (focused EditMode suite passed 19/19 on2026-10-16; live visual route review remains pending).
 - [x] Concurrent claims, finite stock/capacity, cancellation and ingredient conservation.
@@ -28,6 +33,9 @@ Reuse existing furniture, counter, mural, fans, HUD, art, fonts, wood/iron cards
 - [x] Quantified throughput/balance assessment without changing goals/duration/economics.
 
 Task is not complete until runtime validation and real visual evidence are recorded.
+
+- [x] Parrilleros normales/Premium siguen en un ciclo visual sin unidad real si no se puede reservar producción; regresiones focalizadas cubren metas completas, mesas/ingredientes bloqueados, inventario inalterado y reanudación automática.
+- [ ] Captura de gameplay con la cocción simulada visible y revisión manual de los brazos/progreso siguen pendientes.
 
 ## Ajuste vigente de cocción activa — 2026-10-16
 
@@ -103,3 +111,16 @@ Capturas nativas revisadas de River1080×1920 y Racing1440×2960, en `Logs/Accep
 ### Auditoría posterior a la restauración — 2026-10-16
 
 Nueva campaña real cash-only/lifecycle ganó1–9 sin alterar configuración; varias políticas perdieron10, mejor final13Chori pendientes a300s con saldo suficiente (no un bloqueo de Mercado).11ganó302,9/302,7s en dos pruebas separadas desde los desbloqueos existentes del JSON auténtico del teléfono; no acredita campaña fresca ganadora1–11ni QA humano. La aceptación final de balance sigue abierta, ahora concentrada en10y recorrido completo. Ver [status.md](../status.md) y `Logs/Acceptance/EconomyAudit-20261015/economy-audit.md`; no aplicar las duraciones hipotéticas históricas sin autorización.
+
+
+## Cocción visual permanente — 2026-10-18
+
+En Racing+ cuando no se puede reservar una receta por meta completa, falta de ingredientes o capacidad, cada Parrillero permanece junto a su parrilla en modo visual: los brazos reutilizan el mismo atlas, el anillo completa ciclos repetidos y la receta cosmética sigue los objetivos proporcionales mediante contadores separados. El modo no reserva ni crea StreetFoodUnit, no toca ingredientes/stock/ventas/metas, ni inicia viajes falsos. Al liberarse recursos vuelve a reservar producción real automáticamente. La fase de brazos se conserva al alternar modos. El humo y calor/brasas ambientales existentes ya se reciclan por parrilla y continúan activos; no se añaden efectos ni objetos por ciclo. Niveles1–5 conservan su pipeline automático y no entran a este modo activo.
+
+**Validación:** Unity6000.6.3f1, StreetActiveCooksTests focalizado **31/31 EditMode**, incluyendo stock en cero, objetivos completos, mesas de las cuatro recetas llenas, inventario/unidades sin cambios durante ciclos visuales y recuperación de stock/capacidad; git diff --check pasó. Intenté captura nativa Game View en una sesión temporal sin escritura de guardado, pero el editor mantuvo la portada «Jugar con Google» aun cuando la simulación estaba inyectada y introActive=false; no se obtuvo evidencia visual del gameplay y no se marca aceptada la captura.
+
+## Cuatro puestos y rotación de Parrilleros — 2026-10-18
+
+Cada parrilla normal/Premium administra cuatro puestos físicos independientes. Los primeros cuatro cocineros ocupan la fila a escala visual normal; los demás quedan en una zona de espera visible con idle leve y sin progreso/producto real. Al salir hacia su mesa un cocinero libera inmediatamente su puesto; el trabajador con el ticket de espera más antiguo camina hasta él. Al depositar, el primero vuelve al final de la cola. Las colas y los identificadores de puesto son independientes por tipo de parrilla; el quinto y siguientes nunca cocinan ni reservan unidades sin un puesto. `GrillWorkPosition` mantiene los cuatro anchors dentro de bounds reales, reservando el ancho visible del personaje para que Premium no cruce al grill normal. Parrillero/Premium ya no reducen escala cuando se contratan más; Mozos y roles de bebidas no cambian.
+
+**Validación de implementación:** se añadieron regresiones de 1/2/3/4/5/6/8 workers por cada tipo, límites y exclusividad de puestos, escala constante, rutas de cola→parrilla/mesa→cola y promoción de un quinto trabajador mientras se transporta una unidad real. Unity 6000.6.3f1 compiló runtime y EditMode (Tundra build success), pero el job EditMode se desconectó antes de reportar sus resultados y `TestResults.xml` conservó la fecha anterior; no se marca ningún test aprobado. Las capturas requeridas de cinco Parrilleros normales/Premium siguen pendientes por la desconexión del Editor.

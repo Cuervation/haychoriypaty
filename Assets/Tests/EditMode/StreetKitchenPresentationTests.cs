@@ -54,7 +54,7 @@ namespace HayChoriYPaty.Tests
             {
                 Vector2 from = product < 2 ? start : (Vector2)Call(layout, "GrillWorkPosition", product, 0, 1);
                 Vector2 deposit = (Vector2)Call(layout, "DepositPosition", product);
-                foreach (int workerCount in new[] { 1, 2, 3, 4, 6, 9 })
+                foreach (int workerCount in new[] { 1, 2, 3, 4 })
                 for (int workerIndex = 0; workerIndex < workerCount; workerIndex++)
                 {
                     Vector2 work = (Vector2)Call(layout, "GrillWorkPosition", product, workerIndex, workerCount);
@@ -76,7 +76,7 @@ namespace HayChoriYPaty.Tests
         {
             object sim = Simulation(5), layout = Layout(sim);
             foreach (int product in new[] { 0, 2 })
-            foreach (int count in new[] { 1, 2, 3, 4, 5, 6, 9 })
+            foreach (int count in new[] { 1, 2, 3, 4 })
             {
                 var stations = new HashSet<Vector2>();
                 Vector2 first = Vector2.zero;
@@ -93,6 +93,28 @@ namespace HayChoriYPaty.Tests
                     Vector2 right = (Vector2)Call(layout, "GrillWorkPosition", product, 1, count);
                     Assert.Greater(Vector2.Distance(first, right), 120f,
                         "The first two cooks should be visibly separated, not overlapping at the same grill slot.");
+                }
+            }
+        }
+
+        [TestCase(5)] [TestCase(6)] [TestCase(8)]
+        public void CookWaitersHaveTheirOwnVisibleQueueAndSafeRoutes(int teamSize)
+        {
+            object sim = Simulation(5), layout = Layout(sim);
+            int queued = teamSize - 4;
+            foreach (int product in new[] { 0, 2 })
+            {
+                var points = new HashSet<Vector2>();
+                Vector2 deposit = (Vector2)Call(layout, "DepositPosition", product);
+                Rect grill = (Rect)Call(layout, "GrillBoundsForProduct", product);
+                for (int index = 0; index < queued; index++)
+                {
+                    Vector2 waiting = (Vector2)Call(layout, "CookQueuePosition", product, index, queued);
+                    Assert.IsTrue(points.Add(waiting), "Every queued worker needs its own staging position.");
+                    Assert.IsFalse(grill.Contains(waiting), "The wait zone must not occupy the working grill.");
+                    Assert.IsNotNull(Call(layout, "FindShortestSafeRoute", deposit, waiting), "Table→queue route must be safe.");
+                    Assert.IsNotNull(Call(layout, "FindShortestSafeRoute", waiting,
+                        Call(layout, "GrillWorkPosition", product, 0, 4)), "Queue→grill route must be safe.");
                 }
             }
         }
@@ -682,6 +704,63 @@ namespace HayChoriYPaty.Tests
                     Assert.LessOrEqual(item.xMax, woodTop.xMax, "Product " + product + " slot " + slot + " leaves the tabletop horizontally.");
                     Assert.GreaterOrEqual(item.yMin, woodTop.yMin, "Product " + product + " slot " + slot + " floats above the tabletop.");
                     Assert.LessOrEqual(item.yMax, woodTop.yMax, "Product " + product + " slot " + slot + " falls off the tabletop.");
+                }
+            }
+        }
+
+        [Test]
+        public void SandwichTableSlotsUseTwoDepthRowsAndKeepFullCapacityInsideEachProductZone()
+        {
+            object layout = FullLayout();
+            Type layoutType = Runtime("StreetKitchenLayout");
+            MethodInfo sizeMethod = layoutType.GetMethod("TableServingSize", BindingFlags.Public | BindingFlags.Static);
+            MethodInfo depthOrder = layoutType.GetMethod("TableSlotDepthOrder", BindingFlags.Public | BindingFlags.Static);
+            float workerHalfWidth = (float)Runtime("StreetWorkstationLayout")
+                .GetField("WorkerHalfWidth", BindingFlags.Public | BindingFlags.Static).GetRawConstantValue();
+            float sceneWidth = (float)Runtime("StreetSceneLayout")
+                .GetField("Width", BindingFlags.Public | BindingFlags.Static).GetRawConstantValue();
+            Assert.NotNull(sizeMethod);
+            Assert.NotNull(depthOrder);
+
+            foreach (int product in new[] { 0, 1, 2, 3 })
+            foreach (bool companion in new[] { false, true })
+            {
+                Rect table = (Rect)Call(layout, "BoundsForProduct", product);
+                int capacity = companion ? (product < 2 ? 24 : 18) : (product < 2 ? 48 : 36);
+                Vector2 size = (Vector2)sizeMethod.Invoke(null, new object[] { product });
+                float sectionWidth = companion ? table.width * .5f : table.width;
+                float sectionLeft = table.x + (companion && (product == 1 || product == 3) ? sectionWidth : 0f);
+                Rect tabletop = new Rect(sectionLeft, table.y, sectionWidth, table.height * .35f);
+                Vector2 front = (Vector2)Call(layout, "TableSlotPosition", product, 0, companion, capacity);
+                Vector2 back = (Vector2)Call(layout, "TableSlotPosition", product, 1, companion, capacity);
+
+                Assert.Less(front.y, back.y, "Slot 0 is the foreground row for product " + product + ".");
+                Assert.GreaterOrEqual(back.y - front.y, size.y * .20f,
+                    "Both rows need a visible depth offset for product " + product + ".");
+                Assert.Greater((int)depthOrder.Invoke(null, new object[] { 0 }),
+                    (int)depthOrder.Invoke(null, new object[] { 1 }), "Front row must draw over the rear row.");
+                Assert.Greater((int)depthOrder.Invoke(null, new object[] { 2 }),
+                    (int)depthOrder.Invoke(null, new object[] { 3 }), "The second front stack must also draw over its rear partner.");
+
+                Vector2 frontPickup = (Vector2)Call(layout, "TableSlotPickupPosition", product, 0, companion, capacity);
+                Vector2 backPickup = (Vector2)Call(layout, "TableSlotPickupPosition", product, 1, companion, capacity);
+                Assert.AreEqual(Mathf.Clamp(front.x, workerHalfWidth, sceneWidth - workerHalfWidth), frontPickup.x, .001f,
+                    "Mozo front pickup tracks the slot while respecting the safe worker lane.");
+                Assert.AreEqual(Mathf.Clamp(back.x, workerHalfWidth, sceneWidth - workerHalfWidth), backPickup.x, .001f,
+                    "Mozo rear pickup tracks the slot while respecting the safe worker lane.");
+                Assert.AreEqual(back.y - front.y, backPickup.y - frontPickup.y, .001f,
+                    "Mozo pickup approach preserves the row depth offset.");
+
+                for (int slot = 0; slot < capacity; slot++)
+                {
+                    Vector2 center = (Vector2)Call(layout, "TableSlotPosition", product, slot, companion, capacity);
+                    Rect item = new Rect(center - size * .5f, size);
+                    Assert.GreaterOrEqual(item.xMin, tabletop.xMin, "Product " + product + " slot " + slot + " leaves its half of the table.");
+                    Assert.LessOrEqual(item.xMax, tabletop.xMax, "Product " + product + " slot " + slot + " crosses into its companion's zone.");
+                    Assert.GreaterOrEqual(item.yMin, tabletop.yMin, "Product " + product + " slot " + slot + " floats off the tabletop.");
+                    Assert.LessOrEqual(item.yMax, tabletop.yMax, "Product " + product + " slot " + slot + " falls off the tabletop.");
+                    Assert.AreEqual(slot % 4 % 2 == 0 ? front.y : back.y, center.y, .001f,
+                        "Stacking may fan horizontally but must remain in exactly two depth rows.");
                 }
             }
         }

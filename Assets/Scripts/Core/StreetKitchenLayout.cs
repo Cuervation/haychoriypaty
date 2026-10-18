@@ -20,6 +20,7 @@ namespace HayChoriYPaty
         // Align taller barrels to table bottoms so the complete row shares its grill clearance.
         public const float BarrelY = TableY + TableHeight - BarrelHeight;
         public const float WorkerLaneY = 450f;
+        public const int MaxCookStationsPerGrill = 4;
         public const float TablePickupY = TableY + 36f;
         public const float GrillPickupY = TableY + TableHeight + GrillVerticalGap + 14.4f;
         // Cocacoleros step the final two points forward and meet the visible barrel front edge.
@@ -28,6 +29,9 @@ namespace HayChoriYPaty
         // Keep cook feet just outside the visible grill rim.
         public const float GrillWorkClearance = 2f;
         public const float TableSandwichScale = 1.5f, PremiumTableSandwichScaleMultiplier = 1.10f;
+        private const float TableSandwichDisplayScale = .80f;
+        private const int TableSandwichStackClusterCount = 4;
+        private const float TableSandwichStackStep = .75f, TableSandwichMaxStackOffset = 6f;
         public const float GrillBottomLimit = TiledPlayfieldBottom - GrillBottomClearance;
         private const float GrillSurfaceTop = .115f, GrillSurfaceBottom = .46f;
         private const float GrillBackLeft = .145f, GrillBackRight = .855f;
@@ -181,6 +185,31 @@ namespace HayChoriYPaty
             return new Vector2(safeX, barrel.yMin - (BarrelY - BarrelPickupY));
         }
 
+        /// <summary>One of a few front-side access points for concurrent workers at the same station.</summary>
+        public Vector2 BarrelPickupPosition(int product, int accessIndex, int accessCount)
+        {
+            Rect barrel = product == 4 ? cocaBarrel : product == 6 ? beerBarrel : Rect.zero;
+            if (barrel.width <= 0f) return Vector2.zero;
+            int count = Mathf.Clamp(accessCount, 1, 3);
+            int index = Mathf.Clamp(accessIndex, 0, count - 1);
+            float inset = Mathf.Min(15f, barrel.width * .2f);
+            float left = Mathf.Clamp(barrel.xMin + inset, StreetWorkstationLayout.WorkerHalfWidth,
+                StreetSceneLayout.Width - StreetWorkstationLayout.WorkerHalfWidth);
+            float right = Mathf.Clamp(barrel.xMax - inset, StreetWorkstationLayout.WorkerHalfWidth,
+                StreetSceneLayout.Width - StreetWorkstationLayout.WorkerHalfWidth);
+            float minSpread = (count - 1) * 24f;
+            if (right - left < minSpread)
+            {
+                float center = Mathf.Clamp((left + right) * .5f,
+                    StreetWorkstationLayout.WorkerHalfWidth + minSpread * .5f,
+                    StreetSceneLayout.Width - StreetWorkstationLayout.WorkerHalfWidth - minSpread * .5f);
+                left = center - minSpread * .5f;
+                right = center + minSpread * .5f;
+            }
+            float x = count == 1 ? barrel.center.x : Mathf.Lerp(left, right, index / (float)(count - 1));
+            return new Vector2(x, barrel.yMin - (BarrelY - BarrelPickupY));
+        }
+
         public Vector2 PickupPosition(int product)
         {
             if (product == 4 || product == 6) return BarrelPickupPosition(product);
@@ -188,6 +217,24 @@ namespace HayChoriYPaty
             float y = product < 4 || product == 5 ? LayoutTableY + 36f : LayoutBarrelY - BarrelPickupClearance;
             float safeX = Mathf.Clamp(r.center.x, StreetWorkstationLayout.WorkerHalfWidth, StreetSceneLayout.Width - StreetWorkstationLayout.WorkerHalfWidth);
             return new Vector2(safeX, y);
+        }
+
+        /// <summary>Spreads simultaneous pickups across the accessible front edge of a shared station.</summary>
+        public Vector2 PickupPosition(int product, int accessIndex, int accessCount)
+        {
+            if (product == 4 || product == 6) return BarrelPickupPosition(product, accessIndex, accessCount);
+            Vector2 standard = PickupPosition(product);
+            Rect station = BoundsForProduct(product);
+            if (station.width <= 0f) return standard;
+            int count = Mathf.Clamp(accessCount, 1, 4);
+            int index = Mathf.Clamp(accessIndex, 0, count - 1);
+            float inset = Mathf.Min(24f, station.width * .2f);
+            float left = Mathf.Clamp(station.xMin + inset, StreetWorkstationLayout.WorkerHalfWidth,
+                StreetSceneLayout.Width - StreetWorkstationLayout.WorkerHalfWidth);
+            float right = Mathf.Clamp(station.xMax - inset, StreetWorkstationLayout.WorkerHalfWidth,
+                StreetSceneLayout.Width - StreetWorkstationLayout.WorkerHalfWidth);
+            float x = count == 1 ? standard.x : Mathf.Lerp(left, right, index / (float)(count - 1));
+            return new Vector2(x, standard.y);
         }
 
         /// <summary>Front-side pickup point aligned to the exact reserved sandwich slot.</summary>
@@ -207,14 +254,29 @@ namespace HayChoriYPaty
         {
             Rect grill = GrillBoundsForProduct(product);
             if (grill.width <= 0f) return Vector2.zero;
-            int count = Mathf.Max(1, workerCount);
+            int count = Mathf.Clamp(workerCount, 1, MaxCookStationsPerGrill);
             int safeIndex = Mathf.Clamp(workerIndex, 0, count - 1);
-            // Keep a single horizontal line for every team size; denser teams are scaled only
-            // by their visual projection so no worker is moved behind another row.
-            float xFraction = count == 1 ? .5f : Mathf.Lerp(.12f, .88f, safeIndex / (float)(count - 1));
-            float x = Mathf.Clamp(grill.x + grill.width * xFraction, 54f, StreetSceneLayout.Width - 54f);
+            // Reserve the measured visible body width at each real grill edge. Four workers
+            // fit one row with a small arm overlap, while the neighboring Premium grill stays clear.
+            const float visibleHalfWidth = 30f;
+            float left = Mathf.Clamp(grill.xMin + visibleHalfWidth, 54f, StreetSceneLayout.Width - 54f);
+            float right = Mathf.Clamp(grill.xMax - visibleHalfWidth, 54f, StreetSceneLayout.Width - 54f);
+            float x = count == 1 ? grill.center.x : Mathf.Lerp(left, right, safeIndex / (float)(count - 1));
             float y = grill.yMin - GrillWorkClearance;
             return new Vector2(x, y);
+        }
+
+        /// <summary>Compact, visible waiting row for cooks that do not currently own one of the four grill posts.</summary>
+        public Vector2 CookQueuePosition(int product, int queueIndex, int queueCount)
+        {
+            Rect grill = GrillBoundsForProduct(product);
+            if (grill.width <= 0f) return Vector2.zero;
+            int count = Mathf.Max(1, queueCount);
+            int columns = Mathf.Min(MaxCookStationsPerGrill, count);
+            int row = Mathf.Max(0, queueIndex) / columns;
+            int column = Mathf.Max(0, queueIndex) % columns;
+            Vector2 station = GrillWorkPosition(product, column, columns);
+            return new Vector2(station.x, Mathf.Max(18f, WorkerLaneY - row * 100f));
         }
 
         /// <summary>Reserved-item deposit side of the specialty table.</summary>
@@ -224,6 +286,32 @@ namespace HayChoriYPaty
             if (table.width <= 0f) return Vector2.zero;
             float x = Mathf.Clamp(table.center.x, StreetWorkstationLayout.WorkerHalfWidth, StreetSceneLayout.Width - StreetWorkstationLayout.WorkerHalfWidth);
             return new Vector2(x, table.yMax + 14f);
+        }
+
+        /// <summary>Distributes deposits across the table's service edge without moving the table or grill.</summary>
+        public Vector2 DepositPosition(int product, int accessIndex, int accessCount)
+        {
+            Rect table = BoundsForProduct(product);
+            if (table.width <= 0f) return Vector2.zero;
+            int count = Mathf.Clamp(accessCount, 1, MaxCookStationsPerGrill);
+            int index = Mathf.Clamp(accessIndex, 0, count - 1);
+            float inset = Mathf.Min(24f, table.width * .2f);
+            float left = Mathf.Clamp(table.xMin + inset, StreetWorkstationLayout.WorkerHalfWidth,
+                StreetSceneLayout.Width - StreetWorkstationLayout.WorkerHalfWidth);
+            float right = Mathf.Clamp(table.xMax - inset, StreetWorkstationLayout.WorkerHalfWidth,
+                StreetSceneLayout.Width - StreetWorkstationLayout.WorkerHalfWidth);
+            if (count == MaxCookStationsPerGrill)
+            {
+                // Four active cooks cannot fit side-by-side along a table narrower than their
+                // measured bodies. Two staggered depth rows preserve foot clearance.
+                int column = index % 2;
+                int row = index / 2;
+                float x = Mathf.Clamp(table.center.x + (column == 0 ? -24f : 24f),
+                    StreetWorkstationLayout.WorkerHalfWidth, StreetSceneLayout.Width - StreetWorkstationLayout.WorkerHalfWidth);
+                return new Vector2(x, table.yMax + 14f + row * 30f);
+            }
+            float accessX = count == 1 ? table.center.x : Mathf.Lerp(left, right, index / (float)(count - 1));
+            return new Vector2(accessX, table.yMax + 14f);
         }
 
         /// <summary>Shortest safe route from the initial counter position to this product's pickup.</summary>
@@ -400,7 +488,7 @@ namespace HayChoriYPaty
         {
             Rect r = BoundsForProduct(product);
             if (r.width <= 0f) return Vector2.zero;
-            int index = Mathf.Max(0, slot);
+            int index = Mathf.Clamp(slot, 0, Mathf.Max(0, capacity - 1));
             float woodTopDepth = r.height * .35f;
             if (product == 5)
             {
@@ -413,8 +501,9 @@ namespace HayChoriYPaty
                 return new Vector2(x + dx, baseY - 16f + dy);
             }
 
-            // Slot positions represent the complete visible sandwich footprint. Keep its
-            // center within the wood top, including the shared-table half and extra layers.
+            // Four repeatable stacks form two table-depth rows. Scaling the displayed
+            // sandwich modestly leaves enough top-surface depth for the rear row to peek
+            // naturally over the front row without changing furniture or real capacity.
             Vector2 itemSize = TableServingSize(product);
             float halfWidth = itemSize.x * .5f + 1f;
             float halfHeight = itemSize.y * .5f + 1f;
@@ -424,18 +513,15 @@ namespace HayChoriYPaty
             float maxX = sectionLeft + halfTableWidth - halfWidth;
             float minY = r.y + halfHeight;
             float maxY = r.y + woodTopDepth - halfHeight;
+            if (maxY < minY) minY = maxY = r.y + woodTopDepth * .5f;
 
-            int columns = companionAvailable ? 3 : 6;
-            int perLayer = companionAvailable ? (product < 2 ? 12 : 9) : Mathf.Max(columns, capacity / 2);
-            int rows = Mathf.Max(1, Mathf.CeilToInt(perLayer / (float)columns));
-            int layerIndex = index / perLayer, itemIndex = index % perLayer;
-            int itemCol = itemIndex % columns, itemRow = itemIndex / columns;
-            float xFraction = (itemCol + .5f) / columns;
-            float yFraction = (itemRow + .5f) / rows;
-            float layerX = layerIndex == 0 ? 0f : (product % 2 == 0 ? 1.5f : -1.5f) * layerIndex;
-            float layerY = layerIndex * 1.5f;
-            float itemX = Mathf.Clamp(Mathf.Lerp(minX, maxX, xFraction) + layerX, minX, maxX);
-            float y = Mathf.Clamp(Mathf.Lerp(minY, maxY, yFraction) + layerY, minY, maxY);
+            int cluster = index % TableSandwichStackClusterCount;
+            int stackLayer = index / TableSandwichStackClusterCount;
+            int sandwichRow = cluster % 2; // 0 front, 1 back
+            int column = cluster / 2;    // two compact piles per product section
+            float stackOffset = Mathf.Min(stackLayer * TableSandwichStackStep, TableSandwichMaxStackOffset);
+            float itemX = column == 0 ? minX + stackOffset : maxX - stackOffset;
+            float y = sandwichRow == 0 ? minY : maxY;
             return new Vector2(itemX, y);
         }
 
@@ -445,9 +531,20 @@ namespace HayChoriYPaty
             if (product <= 3 && product >= 0)
             {
                 Vector2 baseSize = product == 0 ? new Vector2(26f, 14f) : new Vector2(20f, 14f);
-                return baseSize * (TableSandwichScale * (product >= 2 ? PremiumTableSandwichScaleMultiplier : 1f));
+                return baseSize * (TableSandwichScale * (product >= 2 ? PremiumTableSandwichScaleMultiplier : 1f) * TableSandwichDisplayScale);
             }
             return product == 5 ? new Vector2(18f, 28f) : product == 4 || product == 6 ? new Vector2(9f, 20f) : Vector2.zero;
+        }
+
+        /// <summary>Stable back-to-front order for the two sandwich rows and their small stacks.</summary>
+        public static int TableSlotDepthOrder(int slot)
+        {
+            int index = Mathf.Max(0, slot);
+            int cluster = index % TableSandwichStackClusterCount;
+            int row = cluster % 2; // The front row (0) draws over the back row (1).
+            int column = cluster / 2;
+            int stackLayer = index / TableSandwichStackClusterCount;
+            return (row == 0 ? 100 : 0) + stackLayer * 2 + column;
         }
 
         public Vector2 GrillSlotPosition(int product, int slot) => GrillSlotPosition(product, slot, true, product < 2 ? 12 : 4);

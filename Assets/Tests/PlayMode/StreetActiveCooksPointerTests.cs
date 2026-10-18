@@ -1,5 +1,7 @@
 using System;
 using System.Collections;
+using System.IO;
+using System.Linq.Expressions;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
@@ -17,7 +19,7 @@ namespace HayChoriYPaty.Tests
         private const BindingFlags StaticPrivate = BindingFlags.NonPublic | BindingFlags.Static;
         private GameObject root;
         private Component game, view;
-        private Type gameType, viewType;
+        private Type gameType, viewType, roleType;
         private Mouse mouse;
         private bool hadSavedProgress;
         private string previousSavedProgress;
@@ -39,6 +41,7 @@ namespace HayChoriYPaty.Tests
             Application.runInBackground = true;
             gameType = Type.GetType("HayChoriYPaty.StreetGame, Assembly-CSharp", true);
             viewType = Type.GetType("HayChoriYPaty.StreetView, Assembly-CSharp", true);
+            roleType = Type.GetType("HayChoriYPaty.StreetWorkerRole, Assembly-CSharp", true);
             string key = (string)gameType.GetField("ProgressKey", BindingFlags.Public | BindingFlags.Static).GetValue(null);
             hadSavedProgress = PlayerPrefs.HasKey(key);
             previousSavedProgress = hadSavedProgress ? PlayerPrefs.GetString(key) : null;
@@ -93,6 +96,22 @@ namespace HayChoriYPaty.Tests
         }
         private object CallGame(string method, params object[] args) => Method(gameType, method, args.Length, PublicInstance).Invoke(game, args);
         private void SetSim(string property, object value) => Sim.GetType().GetProperty(property, PublicInstance).SetValue(Sim, value, null);
+        private static object Call(object target, string method, params object[] args)
+            => Method(target.GetType(), method, args.Length, PublicInstance).Invoke(target, args);
+        private static object EnumValue(Type type, string name) => Enum.Parse(type, name);
+        private void ActivateTestGameWithoutPersisting()
+        {
+            if (Sim != null) return;
+            MethodInfo activate = gameType.GetMethod("ActivatePlayer", PublicInstance);
+            Type callbackType = activate.GetParameters()[1].ParameterType;
+            ParameterExpression[] parameters = Array.ConvertAll(callbackType.GetMethod("Invoke").GetParameters(),
+                parameter => Expression.Parameter(parameter.ParameterType, parameter.Name));
+            Delegate callback = Expression.Lambda(callbackType, Expression.Constant(true), parameters).Compile();
+            string key = (string)gameType.GetField("ProgressKey", BindingFlags.Public | BindingFlags.Static).GetValue(null);
+            string savedJson = PlayerPrefs.HasKey(key) ? PlayerPrefs.GetString(key) : null;
+            Assert.IsTrue((bool)activate.Invoke(game, new object[] { savedJson, callback }),
+                "The temporary fixture must activate from its snapshot without writing PlayerPrefs.");
+        }
 
         private void StockSelectedLevel()
         {
@@ -146,6 +165,86 @@ namespace HayChoriYPaty.Tests
             InputSystem.QueueStateEvent(screen, new TouchState { touchId = id, phase = UnityEngine.InputSystem.TouchPhase.Ended, position = p });
             yield return null; yield return null;
         }
+
+        private int CookingWorkerCount(out bool allMidProgress)
+        {
+            int count = 0;
+            allMidProgress = true;
+            foreach (object worker in (System.Collections.IEnumerable)GetProperty(Sim, "Workers"))
+            {
+                if (GetProperty(worker, "State").ToString() != "Cooking") continue;
+                count++;
+                float progress = Convert.ToSingle(GetProperty(worker, "CookingProgress"));
+                allMidProgress &= progress >= .1f && progress <= .85f;
+            }
+            return count;
+        }
+
+        private IEnumerator WaitForCookingWorkers(int expected, int maxTicks, string label)
+        {
+            bool ready = false;
+            for (int i = 0; i < maxTicks; i++)
+            {
+                Call(Sim, "Step", .05f);
+                bool midProgress;
+                if (CookingWorkerCount(out midProgress) == expected && midProgress)
+                { ready = true; break; }
+                yield return null;
+            }
+            Assert.IsTrue(ready, label + " must show " + expected + " distinct workers in the real Cooking state.");
+            yield return null;
+            yield return new WaitForEndOfFrame();
+        }
+
+        private static void SaveCookingGameViewCapture(string name)
+        {
+            Texture2D capture = ScreenCapture.CaptureScreenshotAsTexture();
+            Assert.IsNotNull(capture, "Unity did not return a Game View capture for " + name + ".");
+            string path = Path.Combine(Path.GetTempPath(), "hay-chori-" + name + ".png");
+            File.WriteAllBytes(path, capture.EncodeToPNG());
+            Debug.Log("Parrillero cooking Game View capture saved to " + path + " (" + capture.width + "x" + capture.height + ")");
+            UnityEngine.Object.Destroy(capture);
+        }
+
+#if UNITY_EDITOR
+        [UnityTest]
+        public IEnumerator CaptureThreeAndFourRealCooksThenTheCookingToCarryTransition()
+        {
+            ActivateTestGameWithoutPersisting();
+            StartLevel(5);
+            SetSim("Coins", 100000);
+            Assert.IsTrue((bool)Call(Sim, "TryHire", EnumValue(roleType, "Parrillero")));
+            Assert.IsTrue((bool)Call(Sim, "TryHire", EnumValue(roleType, "ParrilleroPremium")));
+            for (int product = 0; product < 4; product++)
+                Assert.IsTrue((bool)Call(Sim, "SpawnCustomer", product, 50), "Seed demand for grill product " + product + ".");
+
+            yield return WaitForCookingWorkers(3, 160, "Normal and Premium three-cook capture");
+            SaveCookingGameViewCapture("parrillero-three-cooks-frame-a");
+            Call(Sim, "Step", .25f);
+            yield return null;
+            yield return new WaitForEndOfFrame();
+            SaveCookingGameViewCapture("parrillero-three-cooks-frame-b");
+
+            SetSim("Coins", 100000);
+            Assert.IsTrue((bool)Call(Sim, "TryHire", EnumValue(roleType, "ParrilleroPremium")));
+            yield return WaitForCookingWorkers(4, 20, "Four-cook capture");
+            SaveCookingGameViewCapture("parrillero-four-cooks");
+
+            bool sawCarry = false;
+            for (int i = 0; i < 60 && !sawCarry; i++)
+            {
+                Call(Sim, "Step", .05f);
+                foreach (object worker in (System.Collections.IEnumerable)GetProperty(Sim, "Workers"))
+                    sawCarry |= Convert.ToInt32(GetProperty(worker, "CarriedItemId")) > 0 &&
+                                GetProperty(worker, "State").ToString() == "ToTable";
+                if (!sawCarry) yield return null;
+            }
+            Assert.IsTrue(sawCarry, "A real cooking unit must transition to the worker's ToTable carry state.");
+            yield return null;
+            yield return new WaitForEndOfFrame();
+            SaveCookingGameViewCapture("parrillero-cooking-to-carry");
+        }
+#endif
 
         [UnityTest]
         public IEnumerator RacingMozoCardReceivesOneMouseClickAndChargesOnce()

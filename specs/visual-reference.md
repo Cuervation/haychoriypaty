@@ -397,3 +397,26 @@ Keep the camera/notch channel reserved for HUD layout, but fill it with the same
 Por pedido explícito, cada personaje y las flechas de velocidad se ajustan al interior del óvalo original de su card, con centro común y escala uniforme; ningún extremo sale del marco. La misma geometría sirve a las cards234×120/104 y156×120/100. En cards compactas, ×1,00/+10% sube a y29–56 con fuente12, separado del precio en y60; textos de equipo, precios, diseño y hit areas se conservan. Sin cambios de assets/escenario/mecánica.
 
 Validado en Unity6000.6.3f1:13/13 EditMode (`a1e42a77f4bd4ef68e7b9de92940d20a`), incluyendo cuatro tamaños y conservación de proporciones/centro/límite elíptico/separación del precio. Se corrigió un fixture heredado que suponía cocineros iniciando junto al mostrador: ahora lee sus posiciones reales de la restauración anterior, sin alterar runtime. Capturas nativas1080×1920 de River y Floresta revisadas en `Logs/Acceptance/ButtonOvals-20261015/`; progreso original restaurado, Main limpio/Play detenido. Sin APK ni prueba Android física.
+
+
+## Auditoría de emblemas de nivel y autorización — 2026-10-18
+
+La vista usa una única tabla ordenada por `StreetSimulation.LevelDisplayNames` para el pie y el encabezado del Mercado. Se conservan sin cambios los recursos existentes de All Boys (`street-allboys-crest`), Nueva Chicago (`street-new-chicago-crest-v1`) y Vélez Sarsfield (`street-velez-crest-v1`). Los niveles 4–11 quedan sin escudo hasta contar con autorización de uso comercial verificable; no se descargó ni agregó arte nuevo y no se sustituyen las marcas por emblemas inventados. El fondo/initials del Mercado sigue siendo su fallback visual existente, no un escudo.
+
+| Nivel | Estado visual | Fuente revisada / condición de uso |
+|---|---|---|
+| 1 — All Boys | Existente; preservado | Recurso existente; sin reemplazo. |
+| 2 — Nueva Chicago | Existente; preservado | Recurso existente; sin reemplazo. |
+| 3 — Vélez Sarsfield | Existente; preservado | Recurso existente; sin reemplazo. |
+| 4 — Ferro Carril Oeste | Pendiente | [Página oficial del escudo](https://www.ferrocarriloeste.org.ar/escudo/) ofrece PNG, pero el sitio reserva derechos; no equivale a permiso para videojuego. |
+| 5 — Independiente | Pendiente | [Identidad oficial](https://clubaindependiente.com/identidad/) somete el material gráfico a aprobación del club; no se obtuvo esa aprobación. |
+| 6 — Racing Club | Pendiente | [Historia/identidad oficial del escudo](https://www.racingclub.com.ar/escudo); la página revisada no otorga una licencia general de uso comercial. |
+| 7 — San Lorenzo de Almagro | Pendiente | [Recursos de identidad y contacto de marketing](https://sanlorenzo.com.ar/club/marketing/identidad); no se encontró licencia general para incorporarlo a un juego. |
+| 8 — River Plate | Pendiente | El [Código de Ética oficial](https://www.cariverplate.com.ar/imagenes/docs/codigo_etica_y_conducta.pdf) restringe copiar/usar la marca sin autorización previa. |
+| 9 — Boca Juniors | Pendiente | [Página oficial de identidad](https://www.bocajuniors.com.ar/identidad) identifica el escudo, pero no concede una licencia de videojuego comercial. |
+| 10 — Sindicato de Camioneros | Pendiente | [Sitio oficial del sindicato](https://www.camioneros.org.ar/) confirma que la identidad requerida es sindical, no la de un club; no publica permiso para este uso. |
+| 11 — Los Redondos | Pendiente | El [archivo revisado](https://commons.wikimedia.org/wiki/File:Los_Redondos_-_Oktubre.jpg) es arte/logo de una tapa de álbum aportado por terceros, no un escudo aislado verificado ni autorización de marca para un videojuego. |
+
+Una licencia de descarga, dominio público alegado para un logotipo simple o licencia de una reproducción concreta no se toma como autorización de marca/uso comercial. Los recursos nuevos permanecen pendientes hasta recibir permiso expreso o material cuya licencia cubra claramente ese uso.
+
+**Validación focalizada:** se añadió `LevelCrestManifestMatchesAllLevelsAndOnlyLoadsVerifiedExistingCrests`, que comprueba las 11 entradas, los tres recursos existentes y los ocho slots vacíos. La comprobación estática confirmó sus PNG/`.meta`, lookup compartido y `git diff --check` limpio. Unity MCP no respondió al ping; importación/compilación, ejecución EditMode y captura visual quedan sin ejecutar. No se capturó una pantalla porque no cambió arte visible.

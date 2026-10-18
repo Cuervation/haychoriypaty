@@ -2,6 +2,10 @@
 
 > Historical decisions, not a cumulative ruleset. Use [README](README.md)/[continuity](continuity.md) to find the current contract; later scoped replacements override only the affected rule. Old employee caps, uniform prices and pre-modular geometry remain history.
 
+## 2026-10-18 — Local worker circulation without NavMesh
+
+Supersede only the 2026-10-08 “no worker-vs-worker collision” restriction: preserve shortest safe station routes, but add a cheap local future-separation check during movement, stable right-of-way, and a validated small sidestep. Give simultaneous pickups, deposits, customer handoffs, and idle staff distinct nearby anchors. Never move an anchored cook, alter station geometry, invent service states, or run a route search every frame; verify the behavior with focused simulation tests and live crowd captures before closing acceptance.
+
 ## 2026-10-15 — Pay each actual victory, deduplicate attempts rather than levels
 
 The user confirmed50%fullsales+2×unspentattemptcash and explicitly chose payment on every real victory, including replays. Preserve per-attempt settlement IDs to prevent duplicate callbacks; do not let migration/per-level flags suppress a new win. Keep defeat behavior and all prices/quotas/timers/stock unchanged. Recover only the exact unpaid components of the latest valid settled legacy victory once; no arbitrary wallet grant or inventory reset. Phone evidence proves Level2 earned$3570 but got0. A sequential campaign must use StreetGame, real handoffs, paid hires including Mozo, actual restocking and save/reload—not injected cash or direct first-unlock calls.
@@ -273,3 +277,4 @@ From Racing only, append Mozo4 and separate production from delivery in the exis
 ## 2026-10-15 — Restaurar escenario, no revertir empleados
 
 Por confirmación explícita del usuario se restaura la fila original de muebles, incluido Fernet; los cocineros activos inician y permanecen del lado de las parrillas y los Mozos trabajan del lado del mostrador. Es una dependencia de geometría, no un cambio de rol/cocción/economía. Limitar el overlay del mural para no tapar calle; quitar la mesa lateral horneada reutilizando en render la mitad limpia del mostrador/piso original, sin redibujar assets. Conservar solo la ampliación inferior aprobada.
+| 2026-10-18 | Arrange table sandwiches in two front/back rows with four compact pile anchors per product section; scale on-table art to 80% of its former display target. | Existing tabletop depth cannot hold two full-size, non-overlapping rows; modestly reduce each sprite while preserving the furniture, inventory capacity, product zones, and slot-based Mozo pickup. |
