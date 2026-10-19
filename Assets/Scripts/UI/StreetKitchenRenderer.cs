@@ -16,7 +16,8 @@ namespace HayChoriYPaty
         private const float AmbientSmokeCycleSpeed = .32f, AmbientSmokeMaxAlpha = .18f;
         private static readonly Vector2 AmbientSmokeSize = new Vector2(12f, 26f);
         private const float FernetBottleHeightFraction = .25f, CocaBottleHeightFraction = .333f;
-        private const float FernetBottleScaleMultiplier = 3f, CocaBottleSizeMultiplier = .76f;
+        private const float FernetBottleScaleMultiplier = 3f;
+        private const float FernetBottleSizeMultiplier = .93f, CocaBottleSizeMultiplier = .76f * .95f;
         private const float FernetBottleBackRowDepthFraction = .03f, FernetBottleFrontRowDepthFraction = .32f;
         // The authored Coca sprite has a narrow transparent border below the visible bottle base.
         private const float CocaBottleVisibleBaseInsetFraction = .009f;
@@ -397,7 +398,7 @@ namespace HayChoriYPaty
             {
                 bool fernet = i % 2 == 1;
                 Sprite sprite = fernet ? fernetBottleSprite : colaSprite;
-                float sizeMultiplier = fernet ? 1f : CocaBottleSizeMultiplier;
+                float sizeMultiplier = fernet ? FernetBottleSizeMultiplier : CocaBottleSizeMultiplier;
                 float baseHeightFraction = fernet ? FernetBottleHeightFraction : CocaBottleHeightFraction;
                 float height = tableSize.y * baseHeightFraction * FernetBottleScaleMultiplier * sizeMultiplier;
                 float scale = height / sprite.bounds.size.y;

@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.IO;
+using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using NUnit.Framework;
@@ -213,6 +214,112 @@ namespace HayChoriYPaty.Tests
             Debug.Log("Parrillero cooking Game View capture saved to " + path + " (" + capture.width + "x" + capture.height + ")");
             UnityEngine.Object.Destroy(capture);
         }
+
+        private void AddReadyTableSandwich(object kitchen, int product, int slot)
+        {
+            Type state = Type.GetType("HayChoriYPaty.StreetFoodState, Assembly-CSharp", true);
+            Type location = Type.GetType("HayChoriYPaty.StreetFoodLocation, Assembly-CSharp", true);
+            MethodInfo add = Method(kitchen.GetType(), "Add", 4, PrivateInstance);
+            object unit = add.Invoke(kitchen, new[] { (object)product, EnumValue(state, "Cooked"), EnumValue(location, "Table"), slot });
+            Assert.IsNotNull(unit, "Visual fixture must seed real prepared units through the production inventory.");
+        }
+
+        private static void ClearFixtureFood(object kitchen)
+        {
+            ((System.Collections.IList)GetProperty(kitchen, "Units")).Clear();
+        }
+
+#if UNITY_EDITOR
+        private IEnumerator CaptureSandwichGameViewSize(int width, int height, string name)
+        {
+            Assembly editorAssembly = Type.GetType("UnityEditor.EditorWindow, UnityEditor", true).Assembly;
+            Type gameViewType = editorAssembly.GetType("UnityEditor.GameView");
+            Type windowType = editorAssembly.GetType("UnityEditor.EditorWindow");
+            MethodInfo getWindow = windowType.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+                .FirstOrDefault(m => m.Name == "GetWindow" && m.GetParameters().Length == 1 && m.GetParameters()[0].ParameterType == typeof(Type));
+            Assert.IsNotNull(getWindow);
+            object window = getWindow.Invoke(null, new object[] { gameViewType });
+            PropertyInfo selected = gameViewType.GetProperty("selectedSizeIndex", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            FieldInfo selectedField = gameViewType.GetField("selectedSizeIndex", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            int previous = selected != null ? Convert.ToInt32(selected.GetValue(window, null)) : Convert.ToInt32(selectedField.GetValue(window));
+            Type sizesType = editorAssembly.GetType("UnityEditor.GameViewSizes");
+            object registry = sizesType.GetProperty("instance", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.FlattenHierarchy).GetValue(null, null);
+            object groupKind = sizesType.GetProperty("currentGroupType", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).GetValue(registry, null);
+            object group = sizesType.GetMethod("GetGroup", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Invoke(registry, new[] { groupKind });
+            MethodInfo countMethod = group.GetType().GetMethod("GetTotalCount", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            MethodInfo getSize = group.GetType().GetMethod("GetGameViewSize", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            int count = Convert.ToInt32(countMethod.Invoke(group, null)), target = -1, addedIndex = -1;
+            for (int i = 0; i < count; i++)
+            {
+                object size = getSize.Invoke(group, new object[] { i });
+                int w = Convert.ToInt32(size.GetType().GetProperty("width").GetValue(size, null));
+                int h = Convert.ToInt32(size.GetType().GetProperty("height").GetValue(size, null));
+                PropertyInfo typeProperty = size.GetType().GetProperty("type");
+                if (w == width && h == height && typeProperty != null && typeProperty.GetValue(size, null).ToString() == "FixedResolution") { target = i; break; }
+            }
+            if (target < 0)
+            {
+                Type sizeType = editorAssembly.GetType("UnityEditor.GameViewSize");
+                object kind = Enum.Parse(editorAssembly.GetType("UnityEditor.GameViewSizeType"), "FixedResolution");
+                object newSize = Activator.CreateInstance(sizeType, new[] { kind, (object)width, height, "Temporary sandwich QA " + width + "x" + height });
+                group.GetType().GetMethod("AddCustomSize", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Invoke(group, new[] { newSize });
+                target = Convert.ToInt32(countMethod.Invoke(group, null)) - 1;
+                addedIndex = target;
+            }
+            try
+            {
+                if (selected != null) selected.SetValue(window, target, null); else selectedField.SetValue(window, target);
+                yield return null; yield return null;
+                Assert.AreEqual(width, Screen.width);
+                Assert.AreEqual(height, Screen.height);
+                yield return new WaitForEndOfFrame();
+                Texture2D capture = ScreenCapture.CaptureScreenshotAsTexture();
+                Assert.IsNotNull(capture);
+                string path = Path.Combine(Path.GetTempPath(), "hay-chori-sandwich-" + name + "-" + width + "x" + height + ".png");
+                File.WriteAllBytes(path, capture.EncodeToPNG());
+                Debug.Log("Sandwich Game View capture saved to " + path + " (" + capture.width + "x" + capture.height + ")");
+                UnityEngine.Object.Destroy(capture);
+            }
+            finally
+            {
+                int restore = Mathf.Clamp(previous, 0, count - 1);
+                if (selected != null) selected.SetValue(window, restore, null); else selectedField.SetValue(window, restore);
+                if (addedIndex >= 0)
+                    group.GetType().GetMethod("RemoveCustomSize", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Invoke(group, new object[] { addedIndex });
+            }
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator CaptureSandwichTableRowsAndMozoCarryAtPortraitSizes()
+        {
+            ActivateTestGameWithoutPersisting();
+            StartLevel(5);
+            object kitchen = GetProperty(Sim, "Kitchen");
+            ClearFixtureFood(kitchen);
+            for (int product = 0; product < 4; product++) AddReadyTableSandwich(kitchen, product, 0);
+            yield return CaptureSandwichGameViewSize(540, 960, "after-few-products");
+
+            for (int product = 0; product < 4; product++)
+                for (int slot = 1; slot < 4; slot++) AddReadyTableSandwich(kitchen, product, slot);
+            yield return CaptureSandwichGameViewSize(540, 960, "after-two-rows-compact");
+            yield return CaptureSandwichGameViewSize(540, 1200, "after-two-rows-tall");
+
+            Assert.IsTrue((bool)Call(Sim, "TryHire", EnumValue(roleType, "Mozo")));
+            Assert.IsTrue((bool)Call(Sim, "SpawnCustomer", 0, 1));
+            bool carrying = false;
+            for (int tick = 0; tick < 160 && !carrying; tick++)
+            {
+                Call(Sim, "Step", .05f);
+                foreach (object worker in (System.Collections.IEnumerable)GetProperty(Sim, "Workers"))
+                    if (GetProperty(worker, "Role").ToString() == "Mozo" && Convert.ToInt32(GetProperty(worker, "CarriedItemId")) > 0)
+                    { carrying = true; break; }
+                if (!carrying) yield return null;
+            }
+            Assert.IsTrue(carrying, "The capture needs a real Mozo carrying a real sandwich unit.");
+            yield return CaptureSandwichGameViewSize(540, 1200, "after-mozo-carrying");
+        }
+#endif
 
 #if UNITY_EDITOR
         [UnityTest]

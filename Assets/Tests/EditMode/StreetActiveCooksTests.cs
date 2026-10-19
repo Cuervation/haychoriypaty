@@ -725,6 +725,48 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(0, saveType.GetField("mozos").GetValue(restored));
         }
 
+        [TestCase(5, "Parrillero")]
+        [TestCase(5, "ParrilleroPremium")]
+        [TestCase(6, "Parrillero")]
+        [TestCase(6, "ParrilleroPremium")]
+        public void AvailableCookRoutesDirectlyToItsReservedGrillSlot(int level, string roleName)
+        {
+            object sim = MakeActiveSimulation(level, 1000000);
+            Call(sim, "StartRound");
+            SetArrivalFarFuture(sim);
+            if (roleName == "ParrilleroPremium")
+                Assert.IsTrue((bool)Call(sim, "TryHire", EnumValue(roleType, roleName)));
+
+            object worker = Workers(sim).Cast<object>().First(candidate => Get(candidate, "Role").ToString() == roleName);
+            object layout = Get(sim, "KitchenLayout");
+            int firstProduct = roleName == "Parrillero" ? 0 : 2;
+            Vector2 station = (Vector2)Call(layout, "GrillWorkPosition", firstProduct, 0, 1);
+            Vector2 start = station + (roleName == "Parrillero" ? Vector2.right : Vector2.left) * 160f;
+            SetWorker(worker, "Position", start);
+            SetWorker(worker, "Target", start);
+
+            Call(sim, "Step", .01f);
+
+            Assert.AreEqual("ToGrill", Get(worker, "State").ToString());
+            int cookId = (int)Get(worker, "CookingItemId");
+            Assert.Greater(cookId, 0, "A real unit is reserved before the first grill route starts.");
+            object kitchen = Get(sim, "Kitchen");
+            object unit = Call(kitchen, "Find", cookId);
+            Assert.IsNotNull(unit);
+            int product = (int)Get(unit, "Product"), slot = (int)Get(unit, "Slot");
+            int capacity = (int)Call(kitchen, "GrillCapacity", product);
+            Vector2 food = (Vector2)Call(layout, "GrillSlotPosition", product, slot, true, capacity);
+            Vector2 destination = (Vector2)Call(layout, "GrillSlotWorkPosition", product, food);
+            Assert.IsTrue((bool)Call(layout, "IsRouteSegmentClear", start, destination),
+                "This fixture uses an unobstructed safe apron segment; obstacle routing remains layout-owned.");
+            Vector2[] route = (Vector2[])worker.GetType().GetField("Route", PrivateInstance).GetValue(worker);
+            Assert.IsNotNull(route);
+            Assert.AreEqual(1, route.Length, "No general-post staging waypoint is inserted before the food-aligned destination.");
+            Assert.AreEqual(destination, route[0]);
+            Assert.AreEqual(destination, Get(worker, "Target"));
+            Assert.AreNotEqual(station, destination);
+        }
+
         [Test]
         public void CookTravelsCooksCarriesAndDepositsButCannotSellUntilMozoIsHired()
         {

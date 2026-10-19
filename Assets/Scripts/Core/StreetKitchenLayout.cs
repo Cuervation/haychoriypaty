@@ -36,6 +36,7 @@ namespace HayChoriYPaty
         private const float GrillArtworkAspect = 2131f / 606f;
         public const float TableSandwichScale = 1.5f, PremiumTableSandwichScaleMultiplier = 1.10f;
         private const float TableSandwichDisplayScale = .80f;
+        private const float TableSandwichWoodTopDepth = .42f;
         private const int TableSandwichStackClusterCount = 4;
         private const float TableSandwichStackStep = .75f, TableSandwichMaxStackOffset = 6f;
         public const float GrillBottomLimit = TiledPlayfieldBottom - GrillBottomClearance;
@@ -529,7 +530,9 @@ namespace HayChoriYPaty
             Rect r = BoundsForProduct(product);
             if (r.width <= 0f) return Vector2.zero;
             int index = Mathf.Clamp(slot, 0, Mathf.Max(0, capacity - 1));
-            float woodTopDepth = r.height * .35f;
+            // Only sandwich products use more tabletop depth; all beverage stations keep
+            // their established positions.
+            float woodTopDepth = r.height * (product >= 0 && product <= 3 ? TableSandwichWoodTopDepth : .35f);
             if (product == 5)
             {
                 int item = index % 15, layer = index / 15;
@@ -541,9 +544,8 @@ namespace HayChoriYPaty
                 return new Vector2(x + dx, baseY - 16f + dy);
             }
 
-            // Four repeatable stacks form two table-depth rows. Scaling the displayed
-            // sandwich modestly leaves enough top-surface depth for the rear row to peek
-            // naturally over the front row without changing furniture or real capacity.
+            // Four repeatable stacks form two table-depth rows with a clear visual gap.
+            // The expanded tabletop region changes presentation only, not furniture or capacity.
             Vector2 itemSize = TableServingSize(product);
             float halfWidth = itemSize.x * .5f + 1f;
             float halfHeight = itemSize.y * .5f + 1f;

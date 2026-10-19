@@ -12,6 +12,7 @@ namespace HayChoriYPaty
         // The lower cooking-atlas row has 24 transparent pixels below the feet; upper-row
         // frames reach the crop edge. Compensate per frame to keep one stable foot baseline.
         private static readonly float[] CookingPoseFootInsetPixels = { 0f, 0f, 24f, 24f };
+        private const float GrillContactTransitionDistance = 60f;
         private struct Art
         {
             public Texture2D Texture;
@@ -156,20 +157,83 @@ namespace HayChoriYPaty
                 simulation.Kitchen.GrillCapacity(product));
             return true;
         }
+        private static float RemainingRouteDistance(StreetWorker worker, Vector2 destination)
+        {
+            Vector2[] route = worker.Route;
+            if (route == null || route.Length == 0) return Vector2.Distance(worker.Position, destination);
+            int first = Mathf.Clamp(worker.RouteIndex, 0, route.Length);
+            Vector2 previous = worker.Position;
+            float distance = 0f;
+            for (int i = first; i < route.Length; i++)
+            {
+                distance += Vector2.Distance(previous, route[i]);
+                previous = route[i];
+            }
+            return distance;
+        }
+
+        private static float TravelledRouteDistance(StreetWorker worker, Vector2 start)
+        {
+            Vector2[] route = worker.Route;
+            if (route == null || route.Length == 0) return Vector2.Distance(start, worker.Position);
+            int completed = Mathf.Clamp(worker.RouteIndex, 0, route.Length);
+            Vector2 previous = start;
+            float distance = 0f;
+            for (int i = 0; i < completed; i++)
+            {
+                distance += Vector2.Distance(previous, route[i]);
+                previous = route[i];
+            }
+            return distance + Vector2.Distance(previous, worker.Position);
+        }
+
+        private static float GrillContactBlend(StreetSimulation simulation, StreetWorker worker, StreetWorkerPose pose)
+        {
+            bool cook = IsCook(worker.Role);
+            if (!cook) return 0f;
+            if (pose.WorkingAtGrill) return 1f;
+            if (!simulation.UsesActiveCooks) return 0f;
+
+            int firstProduct = worker.Role == StreetWorkerRole.Parrillero ? 0 : 2;
+            if (worker.State == StreetWorkerState.ToGrill)
+            {
+                Vector2 destination;
+                if (worker.CookingItemId > 0) destination = worker.CookingWorkPosition;
+                else if (worker.CookStationIndex >= 0)
+                {
+                    int count = Mathf.Max(1, Mathf.Min(StreetKitchenLayout.MaxCookStationsPerGrill,
+                        simulation.WorkerCount(worker.Role)));
+                    destination = simulation.KitchenLayout.GrillWorkPosition(firstProduct, worker.CookStationIndex, count);
+                }
+                else return 0f;
+
+                float remaining = RemainingRouteDistance(worker, destination);
+                float blend = 1f - Mathf.SmoothStep(0f, 1f, remaining / GrillContactTransitionDistance);
+                return Mathf.Max(worker.GrillContactBlendStart, blend);
+            }
+            if (worker.State == StreetWorkerState.ToTable && worker.CookingItemId > 0 && worker.CarriedItemId > 0)
+            {
+                float travelled = TravelledRouteDistance(worker, worker.CookingWorkPosition);
+                return 1f - Mathf.SmoothStep(0f, 1f, travelled / GrillContactTransitionDistance);
+            }
+            return 0f;
+        }
+
         internal static Vector2 PresentationPosition(StreetSimulation simulation, StreetWorker worker)
         {
             if (worker == null) return Vector2.zero;
             Vector2 position = worker.Position;
             if (simulation == null) return position;
 
-            // Keep one render-only anchor for both native SpriteRenderer workers and the
-            // legacy IMGUI fallback. Previously only Sync applied this offset, so a fallback
-            // draw silently put cooks back at the distant logical route post.
+            // Share the contact correction between native sprites and the legacy IMGUI fallback,
+            // fading it over the route so ToGrill/ToTable state changes cannot teleport the worker.
             StreetWorkerPose pose = StreetWorkerAnimation.Sample(worker, IsIdleAtGrill(simulation, worker));
-            if (!pose.WorkingAtGrill) return position;
+            float blend = GrillContactBlend(simulation, worker, pose);
+            if (blend <= 0f) return position;
             int product = worker.Role == StreetWorkerRole.Parrillero ? 0 : 2;
-            position.y += simulation.KitchenLayout.GrillVisibleTopInset(product);
-            position.y += simulation.KitchenLayout.GrillVisualContactOffset(product);
+            float contactOffset = simulation.KitchenLayout.GrillVisibleTopInset(product) +
+                simulation.KitchenLayout.GrillVisualContactOffset(product);
+            position.y += contactOffset * blend;
             return position;
         }
         internal static float PresentationScale(StreetSimulation simulation, StreetWorker worker)

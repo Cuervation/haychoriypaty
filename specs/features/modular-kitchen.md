@@ -170,6 +170,14 @@ All four sandwich products render in two stable table-depth rows. Shared tables 
 - [x] Two row anchors and the corresponding back-to-front sorting are covered for Chori, Paty, Bondiola, and Vacío across shared and single-product table layouts.
 - [ ] Full real-Unity Game View screenshots for low/high/max stock and front/rear Mozo pickups, at compact and tall portrait resolutions, remain required for visual sign-off.
 
+### 2026-10-19 — Sandwich artwork and row spacing follow-up
+
+Replaced the transparent art for Chori, Paty, Bondiola, and Vacío while keeping the existing illustrated food style and renderer targets. Chori keeps the longest silhouette; Paty is a low-profile single patty; Bondiola uses chunkier pork; Vacío uses flatter, distinct beef slices. Refreshed only the four Sprite `.asset` contents in place, preserving their GUIDs and prefab links; source `.meta` files remain unchanged. Sandwich-only tabletop depth in `TableSlotPosition` moved from35% to42% of its table bounds to widen the two row anchors; Fernet placement, item size, actual capacity, and sorting are unchanged.
+
+- [x] Focused EditMode checks passed for transparency, Paty/Chori aspect distinction, prefab-to-Sprite references, tabletop bounds, row gap, capacities, and pickup/sorting anchors (4/4).
+- [x] Real Unity Game View captures inspected at540×960 and540×1200: one-per-product sparse table, four-slot two-row normal+Premium display, and a real Mozo carrying a real sandwich. PlayerPrefs were restored by the fixture; no scene was saved.
+- [ ] The broader older sign-off (maximum table stock and Mozo pickups from both front and rear rows) remains open; this request's focused criteria are covered.
+
 ## 2026-10-19 — Parrillero visual contact with the grill
 
 The follow-up Racing screenshot still made the cooks look distant. The earlier72% anchor pushed the cooks deep into the fitted grill and hid too much of each body. The visible contact point is the rear/cook-side rim, not the forward edge: the first15% render-only inset still read as a gap in the full Racing screenshot, so the contact anchor is now30% into the fitted grill depth. This moves only the visual pose far enough to overlap the cook-side rim clearly; hands remain on the grate and the upper body stays readable. This scales with responsive grill geometry; `GrillWorkPosition`, `GrillSlotWorkPosition`, obstacle clearance, routes, food slots, and cooking behavior stay unchanged. Projection tests measure the visible foot position rather than the sprite pivot. A full Racing Game View capture remains pending; native Unity kitchen-camera captures have confirmed the projection.

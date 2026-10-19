@@ -10,10 +10,10 @@ Sprite:
   m_Name: sandwich-chori
   m_Rect:
     serializedVersion: 2
-    x: 27
-    y: 42
-    width: 1816
-    height: 788
+    x: 22
+    y: 34
+    width: 1824
+    height: 791
   m_Offset: {x: 0, y: 0}
   m_Border: {x: 0, y: 0, z: 0, w: 0}
   m_PixelsToUnits: 100
@@ -102,7 +102,7 @@ Sprite:
         format: 0
         dimension: 0
       m_DataSize: 80
-      _typelessdata: ae4711c1f6287c4000000000ae471141f6287c4000000000ae4711c1f6287cc000000000ae471141f6287cc0000000000000000000000000000000000000000000000000000000000000000000000000
+      _typelessdata: 85eb11c1b81e7d400000000085eb1141b81e7d400000000085eb11c1b81e7dc00000000085eb1141b81e7dc0000000000000000000000000000000000000000000000000000000000000000000000000
     m_Bindpose: []
     m_BlendShapes:
       vertices: []
@@ -111,14 +111,14 @@ Sprite:
       fullWeights: []
     textureRect:
       serializedVersion: 2
-      x: 27
-      y: 42
-      width: 1816
-      height: 788
+      x: 22
+      y: 34
+      width: 1824
+      height: 791
     textureRectOffset: {x: 0, y: 0}
     atlasRectOffset: {x: -1, y: -1}
     settingsRaw: 3072
-    uvTransform: {x: 100, y: 935, z: 100, w: 436}
+    uvTransform: {x: 100, y: 934, z: 100, w: 429.5}
     downscaleMultiplier: 1
   m_AtlasRD:
     serializedVersion: 4
@@ -198,7 +198,7 @@ Sprite:
         format: 0
         dimension: 0
       m_DataSize: 80
-      _typelessdata: ae4711c1f6287c4000000000ae471141f6287c4000000000ae4711c1f6287cc000000000ae471141f6287cc0000000000000000000000000000000000000000000000000000000000000000000000000
+      _typelessdata: 85eb11c1b81e7d400000000085eb1141b81e7d400000000085eb11c1b81e7dc00000000085eb1141b81e7dc0000000000000000000000000000000000000000000000000000000000000000000000000
     m_Bindpose: []
     m_BlendShapes:
       vertices: []
@@ -207,14 +207,14 @@ Sprite:
       fullWeights: []
     textureRect:
       serializedVersion: 2
-      x: 27
-      y: 42
-      width: 1816
-      height: 788
+      x: 22
+      y: 34
+      width: 1824
+      height: 791
     textureRectOffset: {x: 0, y: 0}
     atlasRectOffset: {x: -1, y: -1}
     settingsRaw: 3072
-    uvTransform: {x: 100, y: 935, z: 100, w: 436}
+    uvTransform: {x: 100, y: 934, z: 100, w: 429.5}
     downscaleMultiplier: 1
   m_PhysicsShape: []
   m_Bones: []

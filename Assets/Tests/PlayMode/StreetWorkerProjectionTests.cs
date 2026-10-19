@@ -236,6 +236,120 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
+        public IEnumerator GrillContactPresentationBlendsAcrossRealApproachAndTableDeparture()
+        {
+            var root = new GameObject("Cook contact transition projection test");
+            try
+            {
+                object balance = Activator.CreateInstance(T("StreetBalance"));
+                T("StreetBalance").GetField("customerArrivalSeconds", Instance).SetValue(balance, 10000f);
+                object sim = Activator.CreateInstance(T("StreetSimulation"), new object[] { balance, 5, 5f, 0, 1, 0 });
+                Call(sim, "StartRound");
+                Set(sim, "Coins", 100000);
+                IList workers = (IList)Get(sim, "Workers");
+                object worker = workers[0];
+                object layout = Get(sim, "KitchenLayout");
+                Vector2 post = (Vector2)Call(layout, "GrillWorkPosition", 0, 0, 1);
+                Vector2 start = post + Vector2.right * 160f;
+                Set(worker, "Position", start); Set(worker, "Target", start);
+
+                MethodInfo presentationPosition = T("StreetWorkerProjection").GetMethod("PresentationPosition",
+                    BindingFlags.Static | BindingFlags.NonPublic);
+                Assert.IsNotNull(presentationPosition);
+                Vector2 initialPresentation = (Vector2)presentationPosition.Invoke(null, new[] { sim, worker });
+                Assert.AreEqual(0f, initialPresentation.y - ((Vector2)Get(worker, "Position")).y, .01f,
+                    "A cook outside the grill approach does not receive the contact correction prematurely.");
+
+                var renderer = root.AddComponent(T("StreetKitchenRenderer"));
+                Texture2D normal = Resources.Load<Texture2D>("street-parrillero");
+                Texture2D diagonal = Resources.Load<Texture2D>("street-parrillero-diagonal-v1");
+                Texture2D beverage = Resources.Load<Texture2D>("street-cocacolero-levels3-5-v1");
+                float targetOffset = (float)Call(layout, "GrillVisibleTopInset", 0) +
+                    (float)Call(layout, "GrillVisualContactOffset", 0);
+                float previousOffset = 0f, largestOffsetStep = 0f;
+                bool sawApproach = false, capturedApproach = false, sawCooking = false, capturedCooking = false;
+                bool sawDeparture = false, capturedDeparture = false, sawFadedDeparture = false;
+
+                for (int tick = 0; tick < 700; tick++)
+                {
+                    Call(sim, "Step", .01f);
+                    string state = Get(worker, "State").ToString();
+                    Vector2 logical = (Vector2)Get(worker, "Position");
+                    Vector2 presented = (Vector2)presentationPosition.Invoke(null, new[] { sim, worker });
+                    float offset = presented.y - logical.y;
+
+                    if (state == "ToGrill" || state == "Cooking" || state == "ToTable" || state == "Deposit")
+                    {
+                        float offsetStep = Mathf.Abs(offset - previousOffset);
+                        largestOffsetStep = Mathf.Max(largestOffsetStep, offsetStep);
+                        Assert.That(offsetStep, Is.LessThanOrEqualTo(2.6f),
+                            "The grill-contact correction must change continuously at a 0.01-second simulation step.");
+                    }
+                    previousOffset = offset;
+
+                    if (state == "ToGrill" && (int)Get(worker, "CookingItemId") > 0)
+                    {
+                        sawApproach = true;
+                        Vector2 workPosition = (Vector2)Field(worker, "CookingWorkPosition");
+                        if (!capturedApproach && Vector2.Distance(logical, workPosition) <= 18f)
+                        {
+                            Call(renderer, "Prepare", sim, 1f, 960f);
+                            Call(renderer, "PrepareWorkers", normal, diagonal, normal, diagonal, beverage, beverage, true);
+                            yield return null; yield return null;
+                            SaveProjectionCapture(renderer, "cook-approach-after");
+                            capturedApproach = true;
+                        }
+                    }
+                    if (state == "Cooking")
+                    {
+                        sawCooking = true;
+                        Assert.AreEqual(targetOffset, offset, .05f, "Cooking retains the final grill-contact anchor.");
+                        if (!capturedCooking)
+                        {
+                            Call(renderer, "Prepare", sim, 1f, 960f);
+                            Call(renderer, "PrepareWorkers", normal, diagonal, normal, diagonal, beverage, beverage, true);
+                            yield return null; yield return null;
+                            SaveProjectionCapture(renderer, "cook-animation-after");
+                            capturedCooking = true;
+                        }
+                    }
+                    if (state == "ToTable")
+                    {
+                        sawDeparture = true;
+                        if (!capturedDeparture)
+                        {
+                            Assert.AreEqual(targetOffset, offset, .05f, "Leaving the cook pose starts from the same visible foot anchor.");
+                            Call(renderer, "Prepare", sim, 1f, 960f);
+                            Call(renderer, "PrepareWorkers", normal, diagonal, normal, diagonal, beverage, beverage, true);
+                            yield return null; yield return null;
+                            SaveProjectionCapture(renderer, "cook-table-departure-after");
+                            capturedDeparture = true;
+                        }
+                        if (offset < 1f) sawFadedDeparture = true;
+                    }
+                    if (state == "Deposit" && sawDeparture) break;
+                    yield return null;
+                }
+
+                Assert.IsTrue(sawApproach && capturedApproach, "The worker must approach the final slot and capture that transition.");
+                Assert.IsTrue(sawCooking && capturedCooking, "The worker must enter real cooking and capture its integrated pose.");
+                Assert.IsTrue(sawDeparture && capturedDeparture && sawFadedDeparture,
+                    "The worker must leave continuously, fade the contact offset, and reach the table.");
+                Assert.That(largestOffsetStep, Is.LessThanOrEqualTo(2.6f));
+
+                object kitchen = Get(sim, "Kitchen");
+                for (int tick = 0; tick < 100 && (int)Call(kitchen, "TableCount", 0) == 0; tick++)
+                {
+                    Call(sim, "Step", .01f);
+                    yield return null;
+                }
+                Assert.AreEqual(1, (int)Call(kitchen, "TableCount", 0), "The real cooked unit still deposits on its table.");
+            }
+            finally { UnityEngine.Object.Destroy(root); }
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator CookingPosesReplaceOriginalBodyAndStayAnchoredForOneToFourCooksAtTwoPortraitScales()
         {
             var root = new GameObject("Integrated cooking upper-pose projection test");

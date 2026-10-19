@@ -384,14 +384,15 @@ namespace HayChoriYPaty.Tests
                     {
                         fernetBottles++;
                         fernetByRow[row]++;
-                        Assert.AreEqual(tableHeight * .25f * 3f, height, .02f);
+                        Assert.AreEqual(tableHeight * .25f * 3f * .93f, height, .02f,
+                            "Fernet tabletop bottles are 7% smaller than their previous size.");
                     }
                     if (spriteRenderer.sprite.name == "coca-2500ml-display-v1")
                     {
                         cocaBottles++;
                         cocaByRow[row]++;
-                        Assert.AreEqual(tableHeight * .333f * 3f * .76f, height, .02f,
-                            "The tabletop Coca is 5% smaller than the previous .8 multiplier.");
+                        Assert.AreEqual(tableHeight * .333f * 3f * .76f * .95f, height, .02f,
+                            "The tabletop Coca is 5% smaller than its previous .76 multiplier.");
                     }
                 }
                 Assert.AreEqual(4, fernetBottles);
@@ -785,7 +786,9 @@ namespace HayChoriYPaty.Tests
             foreach (bool companion in new[] { false, true })
             {
                 Rect table = (Rect)Call(layout, "BoundsForProduct", product);
-                Rect woodTop = new Rect(table.x, table.y, table.width, table.height * .35f);
+                float tabletopDepth = (float)Runtime("StreetKitchenLayout")
+                    .GetField("TableSandwichWoodTopDepth", BindingFlags.NonPublic | BindingFlags.Static).GetRawConstantValue();
+                Rect woodTop = new Rect(table.x, table.y, table.width, table.height * tabletopDepth);
                 int capacity = product < 2 ? 24 : 18;
                 Vector2 size = (Vector2)Runtime("StreetKitchenLayout").GetMethod("TableServingSize", BindingFlags.Public | BindingFlags.Static)
                     .Invoke(null, new object[] { product });
@@ -823,13 +826,17 @@ namespace HayChoriYPaty.Tests
                 Vector2 size = (Vector2)sizeMethod.Invoke(null, new object[] { product });
                 float sectionWidth = companion ? table.width * .5f : table.width;
                 float sectionLeft = table.x + (companion && (product == 1 || product == 3) ? sectionWidth : 0f);
-                Rect tabletop = new Rect(sectionLeft, table.y, sectionWidth, table.height * .35f);
+                float tabletopDepth = (float)layoutType
+                    .GetField("TableSandwichWoodTopDepth", BindingFlags.NonPublic | BindingFlags.Static).GetRawConstantValue();
+                Rect tabletop = new Rect(sectionLeft, table.y, sectionWidth, table.height * tabletopDepth);
                 Vector2 front = (Vector2)Call(layout, "TableSlotPosition", product, 0, companion, capacity);
                 Vector2 back = (Vector2)Call(layout, "TableSlotPosition", product, 1, companion, capacity);
 
                 Assert.Less(front.y, back.y, "Slot 0 is the foreground row for product " + product + ".");
                 Assert.GreaterOrEqual(back.y - front.y, size.y * .20f,
                     "Both rows need a visible depth offset for product " + product + ".");
+                Assert.GreaterOrEqual(back.y - front.y, size.y * .4f,
+                    "The two rows need a wider separation than the former crowded layout for product " + product + ".");
                 Assert.Greater((int)depthOrder.Invoke(null, new object[] { 0 }),
                     (int)depthOrder.Invoke(null, new object[] { 1 }), "Front row must draw over the rear row.");
                 Assert.Greater((int)depthOrder.Invoke(null, new object[] { 2 }),
@@ -929,8 +936,11 @@ namespace HayChoriYPaty.Tests
                 Texture2D decoded = new Texture2D(2, 2, TextureFormat.RGBA32, false, true);
                 Assert.IsTrue(ImageConversion.LoadImage(decoded, File.ReadAllBytes(path)), path);
                 int cell = decoded.width / 4;
-                Assert.AreEqual(decoded.width, sprites[0].texture.width);
-                Assert.AreEqual(decoded.height, sprites[0].texture.height);
+                Texture2D importedTexture = sprites[0].texture;
+                Assert.LessOrEqual(importedTexture.width, importer.maxTextureSize, name + " imported texture respects its max-size setting.");
+                Assert.LessOrEqual(importedTexture.height, importer.maxTextureSize, name + " imported texture respects its max-size setting.");
+                Assert.AreEqual(decoded.width / (float)decoded.height, importedTexture.width / (float)importedTexture.height, .01f,
+                    name + " import downscaling must preserve source aspect ratio.");
                 for (int state = 0; state < 4; state++)
                 {
                     string expectedName = name + "_" + states[state];
@@ -979,6 +989,49 @@ namespace HayChoriYPaty.Tests
                     Assert.NotNull(renderers[i].sharedMaterial.shader, name + " missing sprite shader.");
                     Assert.IsTrue(renderers[i].sharedMaterial.shader.isSupported, name + " sprite shader is unsupported.");
                 }
+            }
+        }
+
+        [Test]
+        public void SandwichArtworkKeepsTransparencyAndPrefabSpriteLinks()
+        {
+            string[] artNames = { "sandwich-chori", "sandwich-paty", "sandwich-bondiola", "sandwich-vacio" };
+            string[] prefabNames = { "Sandwich_Chori", "Sandwich_Paty", "Sandwich_Bondiola", "Sandwich_Vacio" };
+            for (int i = 0; i < artNames.Length; i++)
+            {
+                string artPath = "Assets/Resources/ModularKitchen/Art/" + artNames[i] + ".png";
+                TextureImporter importer = AssetImporter.GetAtPath(artPath) as TextureImporter;
+                Assert.NotNull(importer, artPath);
+                Assert.IsTrue(importer.DoesSourceTextureHaveAlpha(), artPath);
+                Assert.AreEqual(TextureImporterType.Default, importer.textureType, artPath);
+                Assert.AreEqual(TextureImporterNPOTScale.None, importer.npotScale, artPath);
+
+                Texture2D decoded = new Texture2D(2, 2, TextureFormat.RGBA32, false, true);
+                Assert.IsTrue(ImageConversion.LoadImage(decoded, File.ReadAllBytes(artPath)), artPath);
+                Assert.Less(decoded.GetPixel(0, 0).a, .05f, artPath + " must retain a transparent corner.");
+                string spritePath = "Assets/Resources/ModularKitchen/Sprites/" + artNames[i] + "/" + artNames[i] + ".asset";
+                Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(spritePath);
+                Assert.NotNull(sprite, spritePath);
+                Assert.AreEqual(decoded.width, sprite.texture.width, spritePath);
+                Assert.AreEqual(decoded.height, sprite.texture.height, spritePath);
+                Assert.Greater(sprite.rect.width, 0f, spritePath);
+                Assert.Greater(sprite.rect.height, 0f, spritePath);
+                if (i == 1)
+                {
+                    Sprite chori = AssetDatabase.LoadAssetAtPath<Sprite>(
+                        "Assets/Resources/ModularKitchen/Sprites/sandwich-chori/sandwich-chori.asset");
+                    float patyAspect = sprite.rect.width / sprite.rect.height;
+                    Assert.Greater(patyAspect, 1.7f, "Paty stays low-profile and single-layer, not a tall double-decker.");
+                    Assert.Less(patyAspect, chori.rect.width / chori.rect.height,
+                        "Chori must read as the more elongated sandwich.");
+                }
+
+                GameObject prefab = Resources.Load<GameObject>("ModularKitchen/Prefabs/" + prefabNames[i]);
+                Assert.NotNull(prefab, prefabNames[i]);
+                SpriteRenderer renderer = prefab.GetComponent<SpriteRenderer>();
+                Assert.NotNull(renderer, prefabNames[i]);
+                Assert.AreSame(sprite, renderer.sprite, prefabNames[i] + " must keep its stable sprite reference.");
+                UnityEngine.Object.DestroyImmediate(decoded);
             }
         }
 

@@ -260,6 +260,10 @@ namespace HayChoriYPaty
         public bool VisualCooking { get; internal set; }
         public int VisualCookingProduct { get; internal set; } = -1;
         public int CookingItemId { get; internal set; }
+        // Stable logical anchor retained through grill approach, cooking, and table departure.
+        internal Vector2 CookingWorkPosition;
+        // Keeps an already-visible grill contact continuous when resuming real cooking.
+        internal float GrillContactBlendStart;
         // A cook only owns a physical grill station while its index is non-negative.
         public int CookStationIndex { get; internal set; } = -1;
         internal long CookQueueTicket = long.MaxValue;
@@ -1071,7 +1075,7 @@ namespace HayChoriYPaty
             if (stationCount == 0) stationCount = 1;
         }
 
-        private int NearestFreeGrillSlot(StreetWorker worker, int product)
+        private int NearestFreeGrillSlot(StreetWorker worker, int product, Vector2 referencePosition)
         {
             int capacity = Kitchen.GrillCapacity(product);
             bool companionAvailable = IsProductAvailable(product ^ 1);
@@ -1086,7 +1090,7 @@ namespace HayChoriYPaty
                 if (!Kitchen.IsGrillSlotFree(product, slot)) continue;
                 Vector2 foodPosition = KitchenLayout.GrillSlotPosition(product, slot, companionAvailable, capacity);
                 Vector2 workPosition = KitchenLayout.GrillSlotWorkPosition(product, foodPosition);
-                float distance = (foodPosition - worker.Position).sqrMagnitude;
+                float distance = (foodPosition - referencePosition).sqrMagnitude;
                 float minimumSeparation = float.PositiveInfinity;
                 foreach (StreetWorker other in workers)
                 {
@@ -1144,27 +1148,20 @@ namespace HayChoriYPaty
                 }
 
                 CookWorkerStation(worker, out int assignedStation, out int stationCount);
-                int firstProduct = worker.Role == StreetWorkerRole.Parrillero ? 0 : 2;
-                Vector2 stationPoint = KitchenLayout.GrillWorkPosition(firstProduct, assignedStation, stationCount);
-                if (worker.Position != stationPoint)
-                {
-                    worker.VisualCooking = false;
-                    worker.VisualCookingProduct = -1;
-                    if (SetWorkerRoute(worker, stationPoint)) worker.State = StreetWorkerState.ToGrill;
-                    return;
-                }
-
                 int first = worker.Role == StreetWorkerRole.Parrillero ? 0 : 2;
+                Vector2 stationPoint = KitchenLayout.GrillWorkPosition(first, assignedStation, stationCount);
+                bool wasVisuallyCooking = worker.VisualCooking;
                 int excludedProduct = -1;
                 bool reservedRealCook = false;
                 for (int attempt = 0; attempt < 2; attempt++)
                 {
                     int chosen = SelectCookProduct(first, excludedProduct);
                     if (chosen < 0) break;
-                    int preferredSlot = NearestFreeGrillSlot(worker, chosen);
+                    // Preserve the old slot preference relative to the worker's assigned post,
+                    // but route directly to the final food-aligned work point.
+                    int preferredSlot = NearestFreeGrillSlot(worker, chosen, stationPoint);
                     StreetFoodUnit unit = Kitchen.ReserveCook(chosen, worker.Id, preferredSlot);
                     if (unit == null) { excludedProduct = chosen; continue; }
-                    bool wasVisuallyCooking = worker.VisualCooking;
                     worker.Product = chosen; worker.CookingItemId = unit.Id;
                     worker.CookingProgress = 0f;
                     worker.VisualCooking = false;
@@ -1172,18 +1169,27 @@ namespace HayChoriYPaty
                     Vector2 foodPosition = KitchenLayout.GrillSlotPosition(chosen, unit.Slot,
                         IsProductAvailable(chosen ^ 1), Kitchen.GrillCapacity(chosen));
                     Vector2 cookingPosition = KitchenLayout.GrillSlotWorkPosition(chosen, foodPosition);
+                    worker.CookingWorkPosition = cookingPosition;
+                    worker.GrillContactBlendStart = wasVisuallyCooking || worker.Position == stationPoint ? 1f : 0f;
                     if (!SetWorkerRoute(worker, cookingPosition))
                     { Kitchen.CancelCook(worker.Id); ResetWorker(worker); return; }
                     productionAssignmentsByProduct[chosen]++;
                     worker.State = StreetWorkerState.ToGrill;
-                    // When recovering from a visual cycle at this exact anchor, enter the
-                    // real cook pose immediately instead of showing one idle frame.
-                    if (wasVisuallyCooking && worker.Position == worker.Target && AdvanceWorkerRoute(worker))
+                    if (worker.Position == worker.Target && AdvanceWorkerRoute(worker))
                         worker.State = StreetWorkerState.Cooking;
                     reservedRealCook = true;
                     break;
                 }
                 if (reservedRealCook) return;
+                if (worker.Position != stationPoint)
+                {
+                    worker.VisualCooking = false;
+                    worker.VisualCookingProduct = -1;
+                    worker.CookingWorkPosition = Vector2.zero;
+                    worker.GrillContactBlendStart = 0f;
+                    if (SetWorkerRoute(worker, stationPoint)) worker.State = StreetWorkerState.ToGrill;
+                    return;
+                }
                 AdvanceVisualCookWorker(worker, dt);
                 return;
             }
@@ -1637,7 +1643,7 @@ namespace HayChoriYPaty
                 Position = home, Target = home, WaitPosition = home, State = StreetWorkerState.Idle,
                 CookStationIndex = stationIndex, CookQueueTicket = queueTicket });
         }
-        private void ResetWorker(StreetWorker w) { w.CookingProgress = 0f; w.VisualCooking = false; w.VisualCookingProduct = -1; w.CookingItemId = 0; w.StepDistance = 0f; w.PickupProgress = 0f; w.PickupDuration = 0f; w.Customer = null; w.CustomerId = 0; w.Product = -1; w.CarriedItemId = 0; w.State = StreetWorkerState.Idle; w.Route = null; w.RouteIndex = 0; w.ReturningToWaitPosition = false; w.Target = w.Position; }
+        private void ResetWorker(StreetWorker w) { w.CookingProgress = 0f; w.VisualCooking = false; w.VisualCookingProduct = -1; w.CookingItemId = 0; w.CookingWorkPosition = Vector2.zero; w.GrillContactBlendStart = 0f; w.StepDistance = 0f; w.PickupProgress = 0f; w.PickupDuration = 0f; w.Customer = null; w.CustomerId = 0; w.Product = -1; w.CarriedItemId = 0; w.State = StreetWorkerState.Idle; w.Route = null; w.RouteIndex = 0; w.ReturningToWaitPosition = false; w.Target = w.Position; }
         private static Vector2 Move(Vector2 from, Vector2 to, float speed, float dt) { return Vector2.MoveTowards(from, to, speed * dt); }
     }
 }

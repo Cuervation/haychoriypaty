@@ -16,10 +16,10 @@ namespace HayChoriYPaty.Tests
         private static object CallExact(object value, string name, Type[] parameterTypes, params object[] args) =>
             value.GetType().GetMethod(name, Instance, null, parameterTypes, null).Invoke(value, args);
 
-        [TestCase(0, false, 39f, 21f)]
-        [TestCase(1, false, 30f, 21f)]
-        [TestCase(2, false, 33f, 23.1f)]
-        [TestCase(3, false, 33f, 23.1f)]
+        [TestCase(0, false, 31.2f, 16.8f)]
+        [TestCase(1, false, 24f, 16.8f)]
+        [TestCase(2, false, 26.4f, 18.48f)]
+        [TestCase(3, false, 26.4f, 18.48f)]
         [TestCase(0, true, 39f, 22.5f)]
         [TestCase(1, true, 30f, 22.5f)]
         [TestCase(2, true, 33f, 24.75f)]
@@ -300,7 +300,7 @@ namespace HayChoriYPaty.Tests
                     int row = bottle.name.Contains("Row0_") ? 0 : 1;
                     Assert.IsTrue(row == 0 || bottle.name.Contains("Row1_"), "Every stock bottle belongs to a known tabletop row.");
                     if (fernet) fernetByRow[row]++; else cocaByRow[row]++;
-                    float expectedHeight = tableHeight * (fernet ? .25f * 3f : .333f * 3f * .76f);
+                    float expectedHeight = tableHeight * (fernet ? .25f * 3f * .93f : .333f * 3f * .76f * .95f);
                     float height = bottleRenderer.sprite.bounds.size.y * bottle.localScale.y;
                     Assert.AreEqual(expectedHeight, height, .001f, "Fernet and Coca keep their requested relative visual sizes.");
                     Assert.AreEqual(bottle.localScale.x, bottle.localScale.y, .0001f,
