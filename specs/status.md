@@ -1,3 +1,7 @@
+## 2026-10-19 — APK 0.2.49/code51
+
+Development IL2CPP/ARM64 APK built from pushed commit `2c17fb9` with Unity 6000.6.3f1 in an isolated copy. Build succeeded (0 errors/1 non-blocking clang warning); package/version/ABI, ZIP integrity, alignment and v2 signature verified. APK: `Builds/Android/HayChoriYPaty-0.2.49.apk`, 346,733,372 bytes, SHA-256 `9bc5f44d0933edc268e17c8bf6f1cb62a6a49a19222ae9cceb126b6acf6e46ea`. Debug-signed, not installed; no new gameplay tests or full Game View QA during packaging.
+
 ## 2026-10-19 — Parrillero visual contact shared across render paths
 
 The source image looked unchanged because the fitted-grill render offset was applied only by the native worker projection; the IMGUI fallback still rendered at the safe logical post. `StreetWorkerProjection.PresentationPosition` now owns the render-only 30%-depth contact anchor, used by both paths. Simulation posts, obstacle clearance, routes, cooking, and slot alignment remain unchanged.

@@ -1,4 +1,14 @@
-# Current Android delivery — 2026-10-18 (0.2.48/code50, direct employee movement)
+# Current Android delivery — 2026-10-19 (0.2.49/code51, grill contact and presentation)
+
+Unity 6000.6.3f1 Main-only Development IL2CPP/ARM64 Android build from an isolated copy of commit `2c17fb9`: **Succeeded; 0 errors / 1 warning** (clang `-x c++` after the last input file has no effect). The live checkout/editor was not used for batch mode. The APK contains the pushed source at `codex/street-automation`; local Firebase Analytics, run-in-background and time-scale preferences were excluded by building the clean committed tree.
+
+Archive `Builds/Android/Archive/HayChoriYPaty-0.2.49-code51-grill-contact.apk`; versioned and rolling aliases `Builds/Android/HayChoriYPaty-0.2.49.apk` and `Builds/Android/HayChoriYPaty-street.apk`: **346,733,372 bytes**, SHA-256 `9bc5f44d0933edc268e17c8bf6f1cb62a6a49a19222ae9cceb126b6acf6e46ea`. Package `com.haychoriypaty.game`, version **0.2.49/code51**, min API26/target36, `arm64-v8a`. `aapt` metadata, `unzip -t`, `zipalign -c 4`, and APK Signature Scheme v2 verification passed; Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`.
+
+The APK is Development/debug-signed, not Play Store release-signed. No Unity tests were rerun during packaging; prior focused validations are recorded below. No full Game View review, phone install or on-device QA was performed. Build log: `Logs/Acceptance/AndroidBuild-20261019/build.log`.
+
+---
+
+# Previous Android delivery — 2026-10-18 (0.2.48/code50, direct employee movement)
 
 Unity 6000.6.3f1 Main-only Development IL2CPP/ARM64 Android build from an isolated project copy: **Succeeded in 446.11 s; 0 errors / 1 warning** (clang++ unused command-line argument). Unity MCP at 127.0.0.1:8080/mcp was unavailable; inspection found the live Editor on the correct checkout holding its lock, so it was not restarted or used for batch mode. The build ran in an isolated copy. It includes the current worker route/spacing changes and Android-only ETC2 overrides; the user's local Analytics preference was excluded from the build.
 
