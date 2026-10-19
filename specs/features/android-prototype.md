@@ -1,3 +1,13 @@
+# Current Android delivery — 2026-10-19 (0.2.50/code52, kitchen visuals and worker movement)
+
+Unity 6000.6.3f1 Main-only Development IL2CPP/ARM64 Android build from pushed commit `df00c91`: **Succeeded; 0 errors / 1 warning** (Unity Diagnostics Data recommends enabling SymbolTable/Full debug symbols). Built through Unity CLI in the isolated cached project because MCP editor-state ping did not answer; the live project was not restarted or modified. Local Firebase Analytics cookie/setting, `runInBackground`, `TimeManager` scale, temporary scenes, screenshots and recovery files were excluded from Git and the clean build.
+
+Archive `Builds/Android/Archive/HayChoriYPaty-0.2.50-code52-kitchen-visuals.apk`; versioned and rolling aliases `Builds/Android/HayChoriYPaty-0.2.50.apk` and `Builds/Android/HayChoriYPaty-street.apk`: **347,626,599 bytes**, SHA-256 `a93608239dd515cd107f52246c8fdfb0660831f7c3c55bdcf19e0a42e55d3f11` (all copies byte-identical). Package `com.haychoriypaty.game`, version **0.2.50/code52**, min API26/target36, `arm64-v8a`. `aapt` metadata, `unzip -t`, `zipalign -c 4`, and APK Signature Scheme v2 verification passed; Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`.
+
+Development/debug-signed, not Play Store release-signed. Focused visual/layout EditMode 4/4 and PlayMode 11/11 had passed before packaging; no tests were rerun during the build. No device install or post-build gameplay QA. Build log: `Logs/Acceptance/AndroidBuild-20261019/build-0.2.50.log`.
+
+---
+
 # Current Android delivery — 2026-10-19 (0.2.49/code51, grill contact and presentation)
 
 Unity 6000.6.3f1 Main-only Development IL2CPP/ARM64 Android build from an isolated copy of commit `2c17fb9`: **Succeeded; 0 errors / 1 warning** (clang `-x c++` after the last input file has no effect). The live checkout/editor was not used for batch mode. The APK contains the pushed source at `codex/street-automation`; local Firebase Analytics, run-in-background and time-scale preferences were excluded by building the clean committed tree.
