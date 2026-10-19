@@ -1,3 +1,9 @@
+## 2026-10-19 — Parrillero visual contact shared across render paths
+
+The source image looked unchanged because the fitted-grill render offset was applied only by the native worker projection; the IMGUI fallback still rendered at the safe logical post. `StreetWorkerProjection.PresentationPosition` now owns the render-only 30%-depth contact anchor, used by both paths. Simulation posts, obstacle clearance, routes, cooking, and slot alignment remain unchanged.
+
+**Validación:** Unity 6000.6.3f1: 4/4 EditMode cases (Racing/River geometry and native/fallback shared anchor) plus 1/1 focused PlayMode case passed. Actual native kitchen-camera captures were inspected at 1080×1920 and 1080×2400, including four cooks; this is not a full Game View screenshot. No APK, Git commit, or push.
+
 ## 2026-10-18 — APK 0.2.48/code50 y push
 Build Android Development Main-only IL2CPP/ARM64 desde copia aislada de Unity 6000.6.3f1: 446.11 s, 0 errores/1 warning. APK 348,924,731 bytes; SHA-256 e06e52d1fb3b433d33ad08834633bd5b02ef82e7e955de8c2f4fff91b3000e29. aapt, ZIP, zipalign y firma APK v2 verificados. Se incluye la restauración de rutas directas de trabajadores y cambios actuales de cocina, con ETC2 Android-only; debug-signed, no instalada. Unity MCP no respondió; el Editor activo del checkout quedó intacto. Los tests focalizados previos dieron 10/10 y no se repitieron en la entrega. Sin Game View ni QA en teléfono.
 
@@ -1091,6 +1097,10 @@ Personajes y flechas centrados dentro de los óvalos existentes, sin deformació
 Racing+: los Parrilleros/Premium alternan automáticamente entre producción real y una cocción cosmética persistente. Ciclos de progreso/brazos usan el rate +5% y ponderan recetas por metas con contadores aparte; no crean comida ni modifican stock, ingredientes, ventas o cuotas. Si el worker quedó tras depositar, vuelve a su ancla de parrilla; cuando se abre una mesa o vuelve stock, retoma reserva real. Humo y calor/brasas ya existentes permanecen activos por parrilla. Niveles1–5 siguen con su producción automática original.
 
 **Validación:** Unity6000.6.3f1, StreetActiveCooksTests 31/31 EditMode; también se preservan las regresiones existentes de reparto/proporción/velocidad. git diff --check pasó. Captura manual intentada con una sesión de Play sin persistencia, pero el Game View quedó en la intro/login y no permitió revisar los brazos/progreso; validación visual real queda pendiente. Play detenido, Main sigue limpio, no APK, Git push ni dispositivo.
+
+## Contacto visual de Parrilleros con la parrilla — 2026-10-19
+
+La nueva captura siguió mostrando a Parrilleros normales y Premium visualmente detrás de la parrilla. La causa fue medir el contacto al punto medio de toda la ilustración, incluyendo el frente/patas, en vez de al borde donde se cocina. Ahora la proyección ancla los pies visibles al72% de la profundidad del arte ajustado, con el frente de la parrilla solapando las piernas; el ajuste escala al tamaño responsive y no mueve los postes lógicos ni rutas. Unity compiló los assemblies de juego y tests sin errores; las aserciones focalizadas se actualizaron, pero sus ejecuciones y la captura Game View se interrumpieron cuando el plugin volvió a dejar de responder. Sin validación visual final.
 
 ## Dos filas de sándwiches en mesas — 2026-10-18
 

@@ -420,3 +420,12 @@ La vista usa una única tabla ordenada por `StreetSimulation.LevelDisplayNames` 
 Una licencia de descarga, dominio público alegado para un logotipo simple o licencia de una reproducción concreta no se toma como autorización de marca/uso comercial. Los recursos nuevos permanecen pendientes hasta recibir permiso expreso o material cuya licencia cubra claramente ese uso.
 
 **Validación focalizada:** se añadió `LevelCrestManifestMatchesAllLevelsAndOnlyLoadsVerifiedExistingCrests`, que comprueba las 11 entradas, los tres recursos existentes y los ocho slots vacíos. La comprobación estática confirmó sus PNG/`.meta`, lookup compartido y `git diff --check` limpio. Unity MCP no respondió al ping; importación/compilación, ejecución EditMode y captura visual quedan sin ejecutar. No se capturó una pantalla porque no cambió arte visible.
+
+
+## Recibo de liquidación en resultados — 2026-10-19
+
+El recibo debe reservar la columna izquierda para las ilustraciones de monedas/reloj. Las etiquetas de liquidación se alinean en la columna derecha; bono y reposición usan filas separadas para que el texto no cruce las ilustraciones ni se envuelva sobre ellas. Mantener visibles y completos ventas, 50%, bono por sobrante, reposición, ventas reconocidas, ingreso y saldo.
+
+**Causa observada:** `DrawMarketReceipt` usaba el ancho entero del recibo y un único renglón para bono más reposición, aunque el popup contiene arte de monedas/reloj en la mitad izquierda. Game View real 1080×1920 lo mostró superpuesto en victorias de Camioneros y Los Redondos. Separar las filas, limitar el texto a la columna derecha y ajustar el tamaño si una cifra excepcionalmente larga no entra; no altera economía.
+
+**Validación:** Unity `6000.6.3f1`, PlayMode `Level11_LosRedondos_MoreCooks_NativeGameTimeControl_Attempt05` Passed; victoria real en UI a `Time.timeScale=1`, capturas nuevas en `Logs/Acceptance/AutonomousCampaign-20261019/L11-A-attempt05-*.png`. Se revisó `L11-A-attempt05-result.png`: el texto queda a la derecha de monedas/reloj y conserva las seis cifras legibles.

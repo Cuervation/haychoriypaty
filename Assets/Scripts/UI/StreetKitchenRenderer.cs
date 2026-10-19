@@ -31,7 +31,18 @@ namespace HayChoriYPaty
         private readonly Dictionary<int, SpriteRenderer> foodRenderers = new Dictionary<int, SpriteRenderer>();
         private readonly Dictionary<int, GameObject> cookingEffects = new Dictionary<int, GameObject>();
         private readonly Dictionary<int, GameObject> heatEffects = new Dictionary<int, GameObject>();
+        private readonly Dictionary<int, AmbientGrillMeat> ambientGrillMeat = new Dictionary<int, AmbientGrillMeat>();
+        private readonly HashSet<int> occupiedGrillSlots = new HashSet<int>();
+        private readonly HashSet<int> activeAmbientGrillSlots = new HashSet<int>();
         private Sprite fernetCupSprite, fernetBottleSprite, cocaTableBottleSprite, fernetContactShadowSprite;
+        private static readonly string[] AmbientMeatStates = { "Raw", "Cooking", "Cooked" };
+        private sealed class AmbientGrillMeat
+        {
+            public int Product, Slot, StateIndex;
+            public float NextStateAt;
+            public GameObject Object;
+            public SpriteRenderer Renderer;
+        }
         private sealed class AmbientGrillEffects
         {
             public GameObject Heat, SmokeA, SmokeB;
@@ -473,10 +484,13 @@ namespace HayChoriYPaty
         {
             if (simulation == null || simulation.Kitchen == null) return;
             staleIds.Clear();
+            occupiedGrillSlots.Clear();
             foreach (int id in foodObjects.Keys) staleIds.Add(id);
             foreach (StreetFoodUnit unit in simulation.Kitchen.Units)
             {
                 if (unit == null || unit.Id <= 0) continue;
+                if (unit.Location == StreetFoodLocation.Grill && unit.Product >= 0 && unit.Product < 4)
+                    occupiedGrillSlots.Add(AmbientGrillSlotKey(unit.Product, unit.Slot));
                 if (unit.Location == StreetFoodLocation.Carried) { staleIds.Remove(unit.Id); SyncCookingEffect(unit); continue; }
                 GameObject go;
                 if (!foodObjects.TryGetValue(unit.Id, out go) || go == null)
@@ -502,7 +516,106 @@ namespace HayChoriYPaty
                 if (heatEffects.TryGetValue(id, out effect) && effect != null) Destroy(effect);
                 heatEffects.Remove(id);
             }
+            SyncAmbientGrillMeat(occupiedGrillSlots);
             SyncCarriedFood();
+        }
+
+        private void SyncAmbientGrillMeat(HashSet<int> occupiedSlots)
+        {
+            activeAmbientGrillSlots.Clear();
+            if (simulation == null || simulation.Kitchen == null || propsRoot == null) return;
+            if (!simulation.UsesActiveCooks)
+            {
+                foreach (AmbientGrillMeat pooled in ambientGrillMeat.Values)
+                    SetAmbientActive(pooled.Object, false);
+                return;
+            }
+
+            for (int product = 0; product < 4; product++)
+            {
+                int capacity = simulation.Kitchen.GrillCapacity(product);
+                if (capacity <= 0) continue;
+                bool companionAvailable = Available(product ^ 1);
+                for (int slot = 0; slot < capacity; slot++)
+                {
+                    int key = AmbientGrillSlotKey(product, slot);
+                    activeAmbientGrillSlots.Add(key);
+                    AmbientGrillMeat visual;
+                    if (!ambientGrillMeat.TryGetValue(key, out visual) || visual.Object == null)
+                    {
+                        visual = CreateAmbientGrillMeat(product, slot);
+                        if (visual == null) continue;
+                        ambientGrillMeat[key] = visual;
+                    }
+
+                    bool visible = !occupiedSlots.Contains(key);
+                    SetAmbientActive(visual.Object, visible);
+                    if (!visible) continue;
+                    if (visual.Object.transform.parent != propsRoot.transform)
+                    {
+                        visual.Object.transform.SetParent(propsRoot.transform, false);
+                        SetLayerRecursively(visual.Object, PropLayer);
+                    }
+
+                    if (Time.unscaledTime >= visual.NextStateAt)
+                    {
+                        visual.StateIndex = (visual.StateIndex + 1) % AmbientMeatStates.Length;
+                        visual.NextStateAt = Time.unscaledTime + AmbientMeatStateDuration(product, slot, visual.StateIndex);
+                    }
+                    if (visual.Renderer != null)
+                    {
+                        Sprite stateSprite = StateSprite(MeatArt(product), AmbientMeatStates[visual.StateIndex]);
+                        if (visual.Renderer.sprite != stateSprite) visual.Renderer.sprite = stateSprite;
+                        visual.Renderer.color = Color.white;
+                        SetDesiredSize(visual.Object.transform, visual.Renderer,
+                            simulation.KitchenLayout.GrillMeatSize(product, companionAvailable));
+                    }
+
+                    Vector2 position = simulation.KitchenLayout.GrillSlotPosition(product, slot,
+                        companionAvailable, capacity);
+                    SetItemTransform(visual.Object.transform, position,
+                        simulation.KitchenLayout.GrillBoundsForProduct(product));
+                    SetSorting(visual.Object, StationDepth(simulation.KitchenLayout.GrillBoundsForProduct(product)) + 10 + slot);
+                }
+            }
+
+            foreach (KeyValuePair<int, AmbientGrillMeat> pair in ambientGrillMeat)
+                if (!activeAmbientGrillSlots.Contains(pair.Key)) SetAmbientActive(pair.Value.Object, false);
+        }
+
+        private AmbientGrillMeat CreateAmbientGrillMeat(int product, int slot)
+        {
+            GameObject source = Prefab(MeatName(product));
+            if (source == null) return null;
+            GameObject go = Instantiate(source, propsRoot.transform);
+            go.name = "AmbientGrillMeat_P" + product + "_S" + slot;
+            SetLayerRecursively(go, PropLayer);
+            SpriteRenderer renderer = go.GetComponentInChildren<SpriteRenderer>(true);
+            if (renderer == null) { Destroy(go); return null; }
+
+            int state = (product * 2 + slot) % AmbientMeatStates.Length;
+            int phase = product * 23 + slot * 17;
+            AmbientGrillMeat visual = new AmbientGrillMeat
+            {
+                Product = product,
+                Slot = slot,
+                StateIndex = state,
+                NextStateAt = Time.unscaledTime + .35f + (phase % 60) * .01f,
+                Object = go,
+                Renderer = renderer
+            };
+            renderer.sprite = StateSprite(MeatArt(product), AmbientMeatStates[state]);
+            renderer.color = Color.white;
+            go.SetActive(false);
+            return visual;
+        }
+
+        private static int AmbientGrillSlotKey(int product, int slot) => product * 100 + slot;
+
+        private static float AmbientMeatStateDuration(int product, int slot, int state)
+        {
+            int phase = (product + 1) * 37 + (slot + 3) * 19 + state * 11;
+            return 1.2f + (phase % 80) * .01f;
         }
 
         private GameObject CreateFoodObject(StreetFoodUnit unit)

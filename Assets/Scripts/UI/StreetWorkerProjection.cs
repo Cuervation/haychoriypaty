@@ -9,6 +9,9 @@ namespace HayChoriYPaty
     {
         internal const float Height = 98f, Width = 90f, Waist = .76f;
         private const float WaistOverlap = .025f;
+        // The lower cooking-atlas row has 24 transparent pixels below the feet; upper-row
+        // frames reach the crop edge. Compensate per frame to keep one stable foot baseline.
+        private static readonly float[] CookingPoseFootInsetPixels = { 0f, 0f, 24f, 24f };
         private struct Art
         {
             public Texture2D Texture;
@@ -155,7 +158,19 @@ namespace HayChoriYPaty
         }
         internal static Vector2 PresentationPosition(StreetSimulation simulation, StreetWorker worker)
         {
-            return worker == null ? Vector2.zero : worker.Position;
+            if (worker == null) return Vector2.zero;
+            Vector2 position = worker.Position;
+            if (simulation == null) return position;
+
+            // Keep one render-only anchor for both native SpriteRenderer workers and the
+            // legacy IMGUI fallback. Previously only Sync applied this offset, so a fallback
+            // draw silently put cooks back at the distant logical route post.
+            StreetWorkerPose pose = StreetWorkerAnimation.Sample(worker, IsIdleAtGrill(simulation, worker));
+            if (!pose.WorkingAtGrill) return position;
+            int product = worker.Role == StreetWorkerRole.Parrillero ? 0 : 2;
+            position.y += simulation.KitchenLayout.GrillVisibleTopInset(product);
+            position.y += simulation.KitchenLayout.GrillVisualContactOffset(product);
+            return position;
         }
         internal static float PresentationScale(StreetSimulation simulation, StreetWorker worker)
         {
@@ -268,6 +283,12 @@ namespace HayChoriYPaty
             workers.Add(id,v); return v;
         }
         private float Scale(Art art) => Mathf.Min(Width / art.Bounds.width, Height / art.Bounds.height);
+        private static float CookingPoseFootInset(int frame)
+        {
+            int index = Mathf.Clamp(frame, 0, CookingPoseBounds.Length - 1);
+            Rect bounds = CookingPoseBounds[index];
+            return CookingPoseFootInsetPixels[index] * Mathf.Min(Width / bounds.width, Height / bounds.height);
+        }
         private void DrawPart(SpriteRenderer renderer, Art art, Rect source, Vector2 local, int order, float scaleMultiplier = 1f)
         {
             renderer.sprite = Slice(art.Texture, source); renderer.flipX = art.Flip;
@@ -295,6 +316,10 @@ namespace HayChoriYPaty
                 int contact = pose.Frame >= 2 ? 1 : 0;
                 bool hasCookingPose = pose.Cooking && cookingPoses != null &&
                     TryCookingPresentationTarget(sim, w, out _, out _, out _);
+                // The shared position already anchors either renderer at the fitted grill rim.
+                // Only the integrated cooking atlas needs its own transparent-foot crop correction.
+                if (pose.WorkingAtGrill && hasCookingPose)
+                    displayPosition.y += CookingPoseFootInset(pose.CookingFrame) / Mathf.Max(.01f, verticalScale);
                 Art upper = pose.Carrying ? Carry(w,pose.Facing) : Walk(w,pose.Facing,contact,pose.Moving);
                 if (pose.Cooking) upper = Original(w, 0, false);
                 if (pose.PickingUp)

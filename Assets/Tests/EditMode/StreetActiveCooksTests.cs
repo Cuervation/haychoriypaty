@@ -1215,5 +1215,55 @@ namespace HayChoriYPaty.Tests
             for (int i = 0; i < 120 && (Vector2)Get(worker, "Position") != wait; i++) Call(sim, "Step", .05f);
             Assert.AreEqual(wait, Get(worker, "Position"), "A worker without an assignment should clear its previous work point and return to its unique waiting spot.");
         }
+
+        [TestCase("Cocacolero", 4)]
+        [TestCase("Fernetero", 5)]
+        [TestCase("Mozo", 0)]
+        public void SameSpecialtyWorkersTakeParallelFrontRowOrdersAndReturnToStandby(string roleName, int product)
+        {
+            object sim = MakeActiveSimulation(5, 1000000);
+            Call(sim, "StartRound"); SetArrivalFarFuture(sim);
+            for (int i = 0; i < 2; i++)
+                Assert.IsTrue((bool)Call(sim, "TryHire", EnumValue(roleType, roleName)), "Hire " + roleName);
+            if (roleName == "Mozo") SeedCookedUnits(Get(sim, "Kitchen"), product, 3, 1000);
+            for (int i = 0; i < 3; i++) Assert.IsTrue((bool)Call(sim, "SpawnCustomer", product, 1));
+            IList customers = (IList)Get(sim, "Customers");
+            foreach (object customer in customers)
+            {
+                customer.GetType().GetProperty("Position", PublicInstance).GetSetMethod(true)
+                    .Invoke(customer, new object[] { Get(customer, "Target") });
+                customer.GetType().GetProperty("State", PublicInstance).GetSetMethod(true)
+                    .Invoke(customer, new[] { Enum.Parse(Get(customer, "State").GetType(), "Waiting") });
+            }
+            int[] roleIds = Workers(sim).Cast<object>().Where(w => Get(w, "Role").ToString() == roleName).Select(w => (int)Get(w, "Id")).ToArray();
+            Assert.AreEqual(2, roleIds.Length);
+            object[] assignedTogether = null;
+            for (int frame = 0; frame < 10; frame++)
+            {
+                Call(sim, "Step", .05f);
+                assignedTogether = Workers(sim).Cast<object>().Where(w => Get(w, "Role").ToString() == roleName && (int)Get(w, "CustomerId") != 0).ToArray();
+                if (assignedTogether.Length == 2) break;
+            }
+            Assert.AreEqual(2, assignedTogether.Length, "Both specialists should leave standby on distinct simultaneous eligible tickets.");
+            Assert.AreNotEqual(Get(assignedTogether[0], "CustomerId"), Get(assignedTogether[1], "CustomerId"), "Customer claims cannot be duplicated.");
+            foreach (object worker in assignedTogether)
+                Assert.IsTrue((Get(worker, "State").ToString() == "ToStation" || Get(worker, "State").ToString() == "Pickup"),
+                    "Assigned staff should be moving to, or collecting from, the actual product source.");
+
+            for (int frame = 0; frame < 4000 && (int)Get(sim, "Delivered") < 3; frame++) Call(sim, "Step", .05f);
+            Assert.AreEqual(3, Get(sim, "Delivered"), roleName + " delivered all front-row orders.");
+            Assert.AreEqual(3, Call(sim, "GetProductDelivered", product));
+            for (int frame = 0; frame < 200; frame++) Call(sim, "Step", .05f);
+            foreach (object worker in Workers(sim))
+            {
+                if (Get(worker, "Role").ToString() != roleName) continue;
+                Assert.AreEqual("Idle", Get(worker, "State").ToString(), "The specialist should release its assignment after handoff.");
+                Assert.AreEqual(0, Get(worker, "CustomerId"));
+                Assert.AreEqual(Get(worker, "WaitPosition"), Get(worker, "Position"), "Standby workers return to their own safe anchor.");
+                Assert.Greater((float)Get(worker, "TravelDistance"), 0f, "Every hired role actually moved on a real route.");
+            }
+            foreach (object customer in customers) Assert.AreEqual(0, Get(customer, "Reserved"));
+        }
+
     }
 }

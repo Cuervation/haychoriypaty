@@ -26,8 +26,14 @@ namespace HayChoriYPaty
         // Cocacoleros step the final two points forward and meet the visible barrel front edge.
         public const float BarrelPickupClearance = 0f;
         public const float BarrelPickupY = BarrelY - BarrelPickupClearance;
-        // Keep cook feet just outside the visible grill rim.
+        // Keep the logical post outside the grill; the renderer compensates for the remaining art gap.
         public const float GrillWorkClearance = 2f;
+        // Anchor the rendered cook near the fitted grill's rear/cook-side edge so the
+        // feet meet the cooking line while the upper body remains visible. Route post stays put.
+        public const float GrillVisualContactDepth = .30f;
+        // The imported empty-grill Sprite rect is 2131x606 px; FitStation preserves
+        // that 3.516:1 artwork inside the 3:1 logical bounds, leaving top/bottom padding.
+        private const float GrillArtworkAspect = 2131f / 606f;
         public const float TableSandwichScale = 1.5f, PremiumTableSandwichScaleMultiplier = 1.10f;
         private const float TableSandwichDisplayScale = .80f;
         private const int TableSandwichStackClusterCount = 4;
@@ -166,6 +172,26 @@ namespace HayChoriYPaty
 
         public Rect GrillBoundsForProduct(int product) => product < 2 ? normalGrill : product < 4 ? premiumGrill : Rect.zero;
 
+        /// <summary>Inset from the logical top edge to the aspect-fitted visible grill sprite.</summary>
+        public float GrillVisibleTopInset(int product)
+        {
+            Rect grill = GrillBoundsForProduct(product);
+            if (grill.width <= 0f || grill.height <= 0f) return 0f;
+            float fittedHeight = Mathf.Min(grill.height, grill.width / GrillArtworkAspect);
+            return Mathf.Max(0f, (grill.height - fittedHeight) * .5f);
+        }
+
+        /// <summary>Render-only offset from the safe post to the cook-side edge of fitted grill art.</summary>
+        public float GrillVisualContactOffset(int product)
+        {
+            Rect grill = GrillBoundsForProduct(product);
+            if (grill.width <= 0f || grill.height <= 0f) return 0f;
+            float visibleHeight = Mathf.Max(0f, grill.height - 2f * GrillVisibleTopInset(product));
+            return GrillWorkClearance + visibleHeight * GrillVisualContactDepth;
+        }
+
+        private static float GrillWorkY(Rect grill) => grill.yMin - GrillWorkClearance;
+
         /// <summary>Solid base/front collision only. The tabletop/food overhang remains reachable.</summary>
         public Rect FootprintForProduct(int product)
         {
@@ -262,7 +288,7 @@ namespace HayChoriYPaty
             float left = Mathf.Clamp(grill.xMin + visibleHalfWidth, 54f, StreetSceneLayout.Width - 54f);
             float right = Mathf.Clamp(grill.xMax - visibleHalfWidth, 54f, StreetSceneLayout.Width - 54f);
             float x = count == 1 ? grill.center.x : Mathf.Lerp(left, right, safeIndex / (float)(count - 1));
-            float y = grill.yMin - GrillWorkClearance;
+            float y = GrillWorkY(grill);
             return new Vector2(x, y);
         }
 
@@ -276,7 +302,7 @@ namespace HayChoriYPaty
             float right = Mathf.Clamp(grill.xMax - visibleHalfWidth, 54f, StreetSceneLayout.Width - 54f);
             float sideOffset = (product & 1) == 0 ? -16f : 16f;
             float x = Mathf.Clamp(slotPosition.x + sideOffset, left, right);
-            return new Vector2(x, grill.yMin - GrillWorkClearance);
+            return new Vector2(x, GrillWorkY(grill));
         }
 
         /// <summary>Compact, visible waiting row for cooks that do not currently own one of the four grill posts.</summary>

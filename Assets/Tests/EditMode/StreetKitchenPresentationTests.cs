@@ -36,6 +36,9 @@ namespace HayChoriYPaty.Tests
         }
 
         private static object Get(object target, string name) => target.GetType().GetProperty(name, BindingFlags.Public | BindingFlags.Instance).GetValue(target);
+        private static void Set(object target, string name, object value) => target.GetType()
+            .GetProperty(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+            .GetSetMethod(true).Invoke(target, new[] { value });
         private static Rect RectProperty(object layout, string name) => (Rect)Runtime("StreetKitchenLayout").GetProperty(name, BindingFlags.Public | BindingFlags.Instance).GetValue(layout);
         private static float LayoutConstant(string name) => (float)Runtime("StreetKitchenLayout").GetField(name, BindingFlags.Public | BindingFlags.Static).GetRawConstantValue();
         private static float SceneWidth() => (float)Runtime("StreetSceneLayout").GetField("Width", BindingFlags.Public | BindingFlags.Static).GetValue(null);
@@ -133,6 +136,96 @@ namespace HayChoriYPaty.Tests
             Rect replacement = (Rect)scene.GetMethod("ProjectSourceRect").Invoke(null, new object[] { oldTable, height });
             Assert.AreEqual(counter, replacement.y, .01f);
             Assert.LessOrEqual(source.xMax, oldTable.xMin, "The replacement source cannot include the unwanted side table.");
+        }
+
+        [TestCase(960f)] [TestCase(1110f)] [TestCase(1200f)]
+        public void ActiveFloorContinuationSamplesPavementInsteadOfCreamFooterAcrossAspectRatios(float height)
+        {
+            Type scene = Runtime("StreetSceneLayout");
+            float verticalScale = height / 960f;
+            Vector2 textureSize = new Vector2(940f, 1673f);
+            Rect source = (Rect)scene.GetMethod("PavementContinuationSource").Invoke(null,
+                new object[] { textureSize });
+            float tileHeight = (float)scene.GetMethod("PavementContinuationTileHeight").Invoke(null,
+                new object[] { height, textureSize });
+            float footerExtension = 70f * verticalScale;
+
+            Assert.AreEqual(0f, source.x, .001f);
+            Assert.AreEqual(935f, source.y, .01f, "Begin inside the clean tile interior, below the upper grout joint.");
+            Assert.AreEqual(120f, source.height, .01f);
+            Assert.Less(source.yMax, textureSize.y);
+            Assert.LessOrEqual(source.yMax, 1055f, "Keep the source below the next grout joint and its filtering footprint.");
+            Assert.AreEqual(footerExtension, tileHeight, .01f,
+                "The clean grout-free crop exactly spans the active-cook footer extension without repeating a joint.");
+        }
+
+        [TestCase(720f)] [TestCase(1080f)] [TestCase(1440f)]
+        public void PavementContinuationOverlapCoversCutAtResponsiveWidths(float screenWidth)
+        {
+            Type scene = Runtime("StreetSceneLayout");
+            float overlap = (float)scene.GetMethod("PavementContinuationOverlap").Invoke(null,
+                new object[] { screenWidth });
+            Assert.GreaterOrEqual(overlap, 4f,
+                "The seam bleed has a four-logical-unit minimum, even when Editor display pixels exceed Game View pixels.");
+            Assert.GreaterOrEqual(overlap * screenWidth / 540f, 4f,
+                "The seam bleed must cover at least four physical pixels at compact, standard, and high resolutions.");
+        }
+
+        [TestCase(5)] [TestCase(10)]
+        public void CookVisualInsetUsesFittedGrillEdgeWithoutMovingSafeLogicalPosts(int level)
+        {
+            object layout = Layout(Simulation(level));
+            const float spriteAspect = 2131f / 606f;
+            for (int product = 0; product < 4; product++)
+            {
+                Rect grill = (Rect)Call(layout, "GrillBoundsForProduct", product);
+                float fittedHeight = Mathf.Min(grill.height, grill.width / spriteAspect);
+                float expectedInset = (grill.height - fittedHeight) * .5f;
+                Assert.AreEqual(expectedInset, (float)Call(layout, "GrillVisibleTopInset", product), .001f,
+                    "Use the SpriteRenderer's aspect-fitted visible rim, not the full source PNG's transparent border.");
+                Assert.AreEqual(.30f, LayoutConstant("GrillVisualContactDepth"), .001f,
+                    "A 30% render-only inset makes the cooks visibly meet the grill instead of hovering behind it.");
+                float visibleHeight = grill.height - 2f * expectedInset;
+                Assert.AreEqual(LayoutConstant("GrillWorkClearance") + visibleHeight * .30f,
+                    (float)Call(layout, "GrillVisualContactOffset", product), .001f,
+                    "The render offset scales with the fitted grill depth while the logical post stays obstacle-safe.");
+
+                Vector2 work = (Vector2)Call(layout, "GrillWorkPosition", product, 0, 1);
+                Vector2 slotWork = (Vector2)Call(layout, "GrillSlotWorkPosition", product,
+                    (Vector2)Call(layout, "GrillSlotPosition", product, 0));
+                Assert.AreEqual(grill.yMin - LayoutConstant("GrillWorkClearance"), work.y, .001f,
+                    "The simulation post stays outside the grill's route obstacle.");
+                Assert.AreEqual(work.y, slotWork.y, .001f, "Slot-aligned cooking shares the same safe front edge.");
+                Assert.Less(work.y, grill.yMin);
+            }
+        }
+
+        [TestCase(5)] [TestCase(10)]
+        public void GrillContactPresentationPositionIsSharedByNativeAndFallbackWorkers(int level)
+        {
+            object sim = Simulation(level);
+            Call(sim, "StartRound");
+            var workers = (System.Collections.IList)Get(sim, "Workers");
+            object worker = workers[0];
+            Assert.AreEqual("Parrillero", Get(worker, "Role").ToString());
+            object layout = Layout(sim);
+            Vector2 post = (Vector2)Call(layout, "GrillWorkPosition", 0, 0, 1);
+            Set(worker, "Position", post);
+            Set(worker, "State", Enum.Parse(Runtime("StreetWorkerState"), "Cooking"));
+
+            MethodInfo presentationPosition = Runtime("StreetWorkerProjection").GetMethod(
+                "PresentationPosition", BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.NotNull(presentationPosition);
+            Vector2 visual = (Vector2)presentationPosition.Invoke(null, new[] { sim, worker });
+            float expectedY = post.y + (float)Call(layout, "GrillVisibleTopInset", 0)
+                + (float)Call(layout, "GrillVisualContactOffset", 0);
+
+            Assert.AreEqual(post.x, visual.x, .001f, "Grill contact changes depth only, not worker stations.");
+            Assert.AreEqual(expectedY, visual.y, .001f,
+                "The native camera and StreetView's fallback must use the same fitted-art foot anchor.");
+            Assert.Greater(visual.y, post.y, "The rendered feet must close the apparent gap to the grill rim.");
+            Assert.AreEqual(post, (Vector2)Get(worker, "Position"),
+                "A visual correction must not move the route/obstacle-safe simulation post.");
         }
 
         [Test]

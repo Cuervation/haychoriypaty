@@ -1371,22 +1371,35 @@ namespace HayChoriYPaty
             {
                 if (game != null && game.Sim != null && game.Sim.UsesActiveCooks)
                 {
-                    // Continue the source street's own pavement to the footer edge, keeping the
-                    // original counter/mural untouched. The narrow crop avoids stretching scenery.
+                    // Continue the tiled pavement over the baked cream footer. The source art
+                    // changes from tile to cream below row ~1150, so map a reusable tile band
+                    // instead of sampling deeper into the backdrop (which creates a white stripe).
                     if (backdrop != null)
                     {
-                        const float sourceTop = 900f, sourceBottom = 1150f;
-                        float uvY = Mathf.Clamp01((backdrop.height - sourceBottom) / backdrop.height);
-                        float uvHeight = Mathf.Clamp01((sourceBottom - sourceTop) / backdrop.height);
+                        Vector2 textureSize = new Vector2(backdrop.width, backdrop.height);
+                        Rect pavement = StreetSceneLayout.PavementContinuationSource(textureSize);
                         float floorTop = StreetKitchenLayout.TiledPlayfieldBottom * verticalScale;
-                        float tileHeight = (sourceBottom - sourceTop) * W / backdrop.width;
-                        GUI.color = Color.white;
                         float fieldBottom = game.Sim.KitchenLayout.PlayfieldBottom * verticalScale;
-                        for (float y = floorTop; y < fieldBottom; y += tileHeight)
+                        float overlap = StreetSceneLayout.PavementContinuationOverlap(Screen.width);
+                        float tileHeight = StreetSceneLayout.PavementContinuationTileHeight(canvasHeight, textureSize);
+                        if (pavement.width > 0f && pavement.height > 0f && tileHeight > 0f)
                         {
-                            float drawHeight = Mathf.Min(tileHeight, fieldBottom - y);
-                            GUI.DrawTextureWithTexCoords(new Rect(0f, y, W, drawHeight), backdrop,
-                                new Rect(0f, uvY, 1f, uvHeight * drawHeight / tileHeight), true);
+                            // Match the backdrop's scenery tint so the continuation does not
+                            // introduce a brighter horizontal band at its edge.
+                            GUI.color = theme.SceneryTint;
+                            for (float tileY = floorTop; tileY < fieldBottom; tileY += tileHeight)
+                            {
+                                // The clean source span avoids grout joints; overdraw closes raster gaps.
+                                float drawTop = Mathf.Max(0f, tileY - overlap);
+                                float drawBottom = Mathf.Min(fieldBottom, tileY + tileHeight + overlap);
+                                float drawnHeight = Mathf.Max(0f, drawBottom - drawTop);
+                                // Keep sampling inside the clean crop even when the screen-space bleed expands the destination.
+                                float sourceHeight = pavement.height * Mathf.Min(1f, drawnHeight / tileHeight);
+                                Rect uv = new Rect(pavement.x / backdrop.width,
+                                    1f - (pavement.y + sourceHeight) / backdrop.height,
+                                    pavement.width / backdrop.width, sourceHeight / backdrop.height);
+                                GUI.DrawTextureWithTexCoords(new Rect(0f, drawTop, W, drawnHeight), backdrop, uv, true);
+                            }
                         }
                     }
                     DrawFooterWood(new Rect(0f, game.Sim.KitchenLayout.PlayfieldBottom * verticalScale,
@@ -3637,17 +3650,31 @@ namespace HayChoriYPaty
             StreetMarketResult r=game.Market!=null?game.Market.LastResult:null;
             if(r==null)return;
             string line1="VENTAS "+FormatMarketMoney(r.grossSalesCents)+" → 50% "+FormatMarketMoney(r.halfSalesCents);
-            string line2=r.won?"BONO SOBRANTE: 2 × "+FormatMarketMoney(r.leftoverCents)+" = "+FormatMarketMoney(r.bonusCents)+" · REPOSICIÓN: "+FormatMarketMoney(r.progressionBonusCents):"DERROTA: sin bono por sobrante";
+            string line2=r.won?"BONO SOBRANTE: 2 × "+FormatMarketMoney(r.leftoverCents)+" = "+FormatMarketMoney(r.bonusCents):"DERROTA: sin bono por sobrante";
             string line3="VENTAS RECONOCIDAS: "+FormatMarketMoney(r.recognizedSalesCents);
-            string line4="INGRESO NUEVO: "+FormatMarketMoney(r.earnedCents);
-            string line5="SALDO ACTUAL: "+FormatMarketMoney(r.totalBalanceCents);
-            string[] lines={line1,line2,line3,line4,line5};
+            string line4="REPOSICIÓN: "+FormatMarketMoney(r.progressionBonusCents);
+            string line5="INGRESO NUEVO: "+FormatMarketMoney(r.earnedCents);
+            string line6="SALDO ACTUAL: "+FormatMarketMoney(r.totalBalanceCents);
+            string[] lines={line1,line2,line4,line3,line5,line6};
             int oldSize=small.fontSize;
-            small.fontSize=Mathf.Clamp(Mathf.FloorToInt(bounds.height/lines.Length),11,13);
+            TextAnchor oldAlignment=small.alignment;
+            bool oldWordWrap=small.wordWrap;
             float row=bounds.height/lines.Length;
             Color oldColor=small.normal.textColor;small.normal.textColor=new Color(.24f,.10f,.035f);
-            for(int i=0;i<lines.Length;i++) Label(new Rect(bounds.x+5,bounds.y+row*i,bounds.width-10,row),lines[i],small);
+            small.alignment=TextAnchor.MiddleLeft;
+            small.wordWrap=false;
+            float textX=bounds.x+bounds.width*.31f;
+            float textWidth=bounds.width*.66f;
+            for(int i=0;i<lines.Length;i++)
+            {
+                Rect lineBounds=new Rect(textX,bounds.y+row*i,textWidth,row);
+                small.fontSize=13;
+                while(small.fontSize>10 && small.CalcSize(new GUIContent(lines[i])).x>lineBounds.width) small.fontSize--;
+                Label(lineBounds,lines[i],small);
+            }
             small.normal.textColor=oldColor;
+            small.alignment=oldAlignment;
+            small.wordWrap=oldWordWrap;
             small.fontSize=oldSize;
         }
         private void Styles()

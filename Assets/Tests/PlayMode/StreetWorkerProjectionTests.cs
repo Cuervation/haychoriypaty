@@ -256,6 +256,10 @@ namespace HayChoriYPaty.Tests
                 Texture2D sourceCookingAtlas = Resources.Load<Texture2D>("street-parrillero-cooking-arms-v1");
                 Assert.IsNotNull(sourceCookingAtlas, "The integrated four-pose cooking atlas must load from Resources.");
                 object layout = Get(sim, "KitchenLayout");
+                MethodInfo cookingFrameForProgress = T("StreetWorkerAnimation")
+                    .GetMethod("CookingFrameForProgress", BindingFlags.Public | BindingFlags.Static);
+                MethodInfo cookingPoseFootInset = T("StreetWorkerProjection")
+                    .GetMethod("CookingPoseFootInset", BindingFlags.NonPublic | BindingFlags.Static);
 
                 foreach (float scale in new[] { 1f, 1.25f })
                 {
@@ -313,6 +317,22 @@ namespace HayChoriYPaty.Tests
                             Transform workerRoot = (Transform)Field(visual, "Root");
                             Assert.AreEqual((position.x - 270f) * .01f, workerRoot.localPosition.x, .0001f,
                                 "The cooking pose root follows the worker post rather than the reserved food slot.");
+                            int grillProduct = Get(worker, "Role").ToString() == "ParrilleroPremium" ? 2 : 0;
+                            int cookingFrame = (int)cookingFrameForProgress.Invoke(null,
+                                new object[] { (float)Get(worker, "CookingCycleProgress"), id });
+                            float grillInset = (float)Call(layout, "GrillVisibleTopInset", grillProduct);
+                            float footInset = (float)cookingPoseFootInset.Invoke(null, new object[] { cookingFrame });
+                            float contactOffset = (float)Call(layout, "GrillVisualContactOffset", grillProduct);
+                            float visualPositionY = position.y + grillInset + contactOffset + footInset / scale;
+                            Assert.AreEqual((canvasHeight * .5f - visualPositionY * scale) * .01f,
+                                workerRoot.localPosition.y, .0001f,
+                                "Aspect-fit grill padding and each cooking frame's transparent foot margin are compensated without moving the logical post.");
+                            Rect grillBounds = (Rect)Call(layout, "GrillBoundsForProduct", grillProduct);
+                            float visibleGrillHeight = grillBounds.height - 2f * grillInset;
+                            float visibleFootY = visualPositionY - footInset / scale;
+                            float footDepth = (visibleFootY - grillBounds.yMin - grillInset) / visibleGrillHeight;
+                            Assert.That(footDepth, Is.EqualTo(.30f).Within(.005f),
+                                "Normal and Premium visible feet align near the cook-side edge while remaining readable at every tested aspect ratio.");
                         }
 
                         yield return null;

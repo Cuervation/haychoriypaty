@@ -55,6 +55,24 @@ namespace HayChoriYPaty
             Vector2 size = ReferenceBackdropSize * scale;
             return new Rect((Width - size.x) * .5f, (canvasHeight - size.y) * .5f, size.x, size.y);
         }
+        /// <summary>Returns a reusable band of tiled pavement, excluding the baked cream footer.</summary>
+        public static Rect PavementContinuationSource(Vector2 textureSize)
+        {
+            float sy = textureSize.y / ReferenceBackdropSize.y;
+            // Use a grout-free interior (source rows 935–1055), clear of both nearby joints and their filter taps.
+            return new Rect(0f, 935f * sy, textureSize.x, 120f * sy);
+        }
+        public static float PavementContinuationTileHeight(float canvasHeight, Vector2 textureSize)
+        {
+            // Fit the clean crop to the active-cook extension, avoiding a second repeated grout joint.
+            float verticalScale = canvasHeight / Height;
+            return (StreetKitchenLayout.ActivePlayfieldBottom - StreetKitchenLayout.TiledPlayfieldBottom) * verticalScale;
+        }
+        /// <summary>Covers the baked edge with at least four logical units of floor overlap.</summary>
+        public static float PavementContinuationOverlap(float screenWidth)
+        {
+            return screenWidth > 0f ? Mathf.Max(4f, 4f * Width / screenWidth) : 0f;
+        }
         public static Rect CounterBounds(float canvasHeight)
         {
             Rect background = BackgroundBounds(canvasHeight);
