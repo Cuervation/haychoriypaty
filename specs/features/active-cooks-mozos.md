@@ -6,7 +6,7 @@ LevelIndex >= 5 (Racing through Los Redondos) enables active sandwich production
 
 Normal/Premium cooks independently travel to their respective grill, cook one identified unit for 2 / CookWorkRate seconds, carry that same unit along a safe route and deposit it in a reserved available specialty table slot. No automatic sandwich transfer in active mode. Each cooking worker exposes real progress. Mozo claims a cooked sandwich and routes to that reserved unit's actual product/slot on its table (Chori and Bondiola use their left product zones; Paty and Vacío use their right zones), then serves the actual pending customer; only handoff consumes reserved ingredients and records revenue. Beverage roles retain existing behavior. Cancellations preserve edible physical stock; no duplicate IDs, claims, ingredients or sales. Tables bound both prepared and in-flight production.
 
-Active cooks produce continuously without checking customers, order lines or prepared-stock counts. Between each available Normal/Premium product pair, a deterministic weighted virtual-finish schedule uses the level's product goals; assignment counters are global to each grill type and reset for every fresh attempt. Completed quotas are skipped. Missing ingredients or a full grill/table slot make only that recipe temporarily ineligible, so the other feasible recipe can proceed and proportional scheduling resumes when capacity/resources return. Real ingredient reservations and physical capacities remain authoritative. Levels1–5 keep the existing automatic grill pipeline; their meat cooking uses the cook-specific speed rate, while beverage preparation and non-cook roles retain the original speed rate.
+Active cooks produce continuously without checking customers, order lines or prepared-stock counts. Normal cooks use a fixed shared global turn sequence Chori (0) → Paty (1); Premium cooks independently use Bondiola (2) → Vacío (3). Each cursor is deterministic in worker iteration order and resets on a fresh attempt. If only one recipe in a specialty is enabled, it repeats alone. Goals, ingredient stock, orders, table/grill capacity and worker count do not choose or reorder turns. A scheduled recipe remains the worker's visual-only cycle if its goal is complete or real reservation is impossible; no alternate recipe is substituted during that turn. At the next boundary the cursor advances as usual, and real production resumes only if the scheduled product still needs units and authoritative ingredient/slot reservations succeed. Visual-only cycles never reserve ingredients/capacity, create food IDs, alter stock/sales/goals/currency, or start delivery. Levels1–5 keep the existing automatic grill pipeline; their meat cooking uses the cook-specific speed rate, while beverage preparation and non-cook roles retain the original speed rate.
 
 Mozo is hired only during play, not automatically; starts at zero. Per-level configurable base costs follow existing successive-hire curve, with River reference $60. Every fresh attempt still starts with one Parrillero and speed x1.00. Save compatibility retained; no persistent earnings/unlocks or new pre-match roster screen.
 
@@ -23,8 +23,8 @@ Focused Unity EditMode validation in an isolated copy (6000.6.3f1): 10/10 passed
 ## Validation / acceptance
 
 - [x] Active per-worker cooking, one real carried/deposited unit and speed scaling.
-- [x] Continuous, request-independent active cooking with deterministic goal-weighted global scheduling; stock does not bias selection, completed quotas are skipped, and blocked recipes fall back/resume.
-- [x] One speed upgrade gives Parrilleros +5% and other roles +10%; nine upgrades cap at ×1.45/×1.90. Cooking, movement and worker operations use the role-specific rate; legacy automatic levels retain their flow and beverage timing.
+- [x] Continuous, request-independent active cooking with fixed shared global 0→1 and 2→3 alternation; blocked/completed turns stay visual and never fall back to another recipe.
+- [x] Each speed upgrade gives Parrilleros +6% and other roles +10%; nine upgrades cap at ×1.54/×1.90. Cooking, movement and worker operations use the role-specific rate; legacy automatic levels retain their flow and beverage timing.
 - [x] Parrilleros del mismo rol usan puestos de parrilla separados al cocinar en paralelo; EditMode cubre separación y rutas seguras. Revisión visual de este ajuste sigue pendiente.
 - [x] Los handoffs seleccionan un punto libre del mostrador que evita trabajadores estacionados o en ruta; la espera usa una grilla de seis columnas con filas escalonadas. Las regresiones focalizadas de dos filas, cuatro puestos/cola, acceso del Mozo y entrega mixta pasaron 17/17 EditMode el 18/10/2026.
 - [x] Revisión 18/10: anchors de cocción, separación, claridad idle/cocción, agarre y slots de cuatro sándwiches cubiertos por 11 EditMode + 14 PlayMode focalizados. La nueva regla de cuatro puestos/cola rotativa abajo reemplaza la fila escalada para equipos densos.
@@ -41,7 +41,23 @@ Focused Unity EditMode validation in an isolated copy (6000.6.3f1): 10/10 passed
 Task is not complete until runtime validation and real visual evidence are recorded.
 
 - [x] Parrilleros normales/Premium siguen en un ciclo visual sin unidad real si no se puede reservar producción; regresiones focalizadas cubren metas completas, mesas/ingredientes bloqueados, inventario inalterado y reanudación automática.
-- [ ] Captura de gameplay con la cocción simulada visible y revisión manual de los brazos/progreso siguen pendientes.
+- [x] Captura de Game View con cocción simulada sin ingredientes, turnos visuales de los cuatro productos y cuatro cocineros simultáneos; progreso/brazos revisados visualmente (2026-10-19).
+
+## Alternancia fija de cocción — 2026-10-19
+
+Reemplaza el virtual-finish ponderado por metas: dos cursores por intento, uno normal (0↔1) y otro Premium (2↔3), compartidos por todos los trabajadores de la especialidad. Al asignar un turno se fija su receta; falta de stock/espacio o cuota completa conserva esa receta durante un ciclo visual y la siguiente receta se obtiene recién en el siguiente límite de ciclo. La producción real sigue condicionada por metas, ingredientes, reservas y capacidad; los niveles1–5 permanecen en su pipeline automático.
+
+**Validación Unity 6000.6.3f1:** 12/12 EditMode focalizados pasaron: secuencias con 1–5 workers (incluida cola), alta de trabajador durante la ronda, uso de receta configurada en niveles6–11, niveles1–5 sin modo activo, único producto habilitado, cuota terminada, mesa/stock sin capacidad, visual→real y ausencia de efectos en inventario/metas/ventas. PlayMode 2/2: captura existente de uno a cuatro cocineros en cocción/transporte y captura nueva sin stock que comprobó/capturó los cuatro turnos visuales y cuatro Parrilleros simultáneos; no cambió el guardado del jugador ni se guardó escena. Capturas reales a1080×1920 en `Logs/Acceptance/FixedCookAlternation-20261019/`. Las parrillas conservan su arte ambiental lleno y no identifican visualmente la receta individual; la asignación exacta se verificó con estado de simulación/test, no con una etiqueta añadida.
+
+**Compatibilidad de campaña:** la auditoría secuencial de save nuevo ganó niveles1–5, pero perdió Racing (nivel6) con las tres variantes existentes de política de contratación (factores1.2/1.5/2.0), dentro de255s. En el mejor de esos intentos, ventas/productos fueron Chori121/210, Paty121/145, Bondiola69/80, Vacío67/75, Coca140/175, Fernet72/75 y cerveza74/90; por tanto, esta regla muestra un riesgo de ganabilidad real bajo esa política. No demuestra imposibilidad con toda estrategia o equipo y no prueba niveles7–11 en una campaña fresca. No se modificaron balance, objetivos, precios, stock, tiempos ni economía; se debe conservar este límite explícito hasta una prueba de estrategia adicional/autorización de balance.
+
+El factor de abajo es la valoración de speed-up usada por la política adaptativa, **no** un multiplicador de velocidad del juego. Productos y faltantes están en IDs0–6 (Chori, Paty, Bondiola, Vacío, Coca, Fernet, cerveza):
+
+| Valoración de la política | Resultado Racing | Vendidos | Faltantes al vencer |
+|---|---|---|---|
+| 1.2 | Derrota, 255 s | 121, 121, 69, 67, 140, 72, 74 | 89, 24, 11, 8, 35, 3, 16 |
+| 1.5 | Derrota, 255 s | 112, 115, 69, 57, 136, 72, 73 | 98, 30, 11, 18, 39, 3, 17 |
+| 2.0 | Derrota, 255 s | 118, 120, 67, 61, 138, 68, 73 | 92, 25, 13, 14, 37, 7, 17 |
 
 ## Ajuste vigente de cocción activa — 2026-10-16
 

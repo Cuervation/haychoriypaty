@@ -47,11 +47,16 @@ namespace HayChoriYPaty.Tests
         {
             object early = Make(new[] { 0 });
             Assert.AreEqual(48, (int)Call(early, "TableCount", 0));
+            Assert.AreEqual(48, (int)Call(early, "TableCapacity", 0), "A solo normal product retains all48 actual table units.");
             Assert.AreEqual(18, (int)Call(early, "GrillCapacity", 0));
             Assert.AreEqual(0, (int)Call(early, "GrillCapacity", 1));
             object full = Make(new[] { 0, 1, 2, 3, 4, 5, 6 });
             Assert.AreEqual(24, (int)Call(full, "TableCount", 0));
             Assert.AreEqual(24, (int)Call(full, "TableCount", 1));
+            Assert.AreEqual(48, (int)Call(full, "TableCapacity", 0) + (int)Call(full, "TableCapacity", 1),
+                "The paired normal table retains48 actual units across Chori and Paty.");
+            Assert.AreEqual(36, (int)Call(full, "TableCapacity", 2) + (int)Call(full, "TableCapacity", 3),
+                "The paired Premium table retains36 actual units across Bondiola and Vacío.");
             Assert.AreEqual(12, (int)Call(full, "TableCount", 4));
             Assert.AreEqual(12, (int)Call(full, "TableCount", 6));
             Assert.AreEqual(12, (int)Call(full, "GrillCapacity", 0));

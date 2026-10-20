@@ -479,7 +479,7 @@ namespace HayChoriYPaty
         public bool CanHire { get { return CanHireParrillero; } }
         public bool CanUpgradeSpeed { get { return (Phase == RoundPhase.Ready || Phase == RoundPhase.Playing) && SpeedLevel < MaxSpeedLevel && Coins >= SpeedCost; } }
         public float WorkRate { get { return 1f + SpeedLevel * balance.speedIncrease; } }
-        public float CookWorkRate { get { return 1f + SpeedLevel * 0.05f; } }
+        public float CookWorkRate { get { return 1f + SpeedLevel * 0.06f; } }
         private float WorkRateFor(StreetWorkerRole role) =>
             role == StreetWorkerRole.Parrillero || role == StreetWorkerRole.ParrilleroPremium
                 ? CookWorkRate : WorkRate;
@@ -1003,11 +1003,10 @@ namespace HayChoriYPaty
             }
         }
 
-        // One shared virtual-finish count per recipe keeps simultaneous workers on the
-        // same deterministic, goal-weighted schedule for each grill type.
-        private readonly long[] productionAssignmentsByProduct = new long[4];
-        // Cosmetic-only cycles have their own counters and never affect real production scheduling.
-        private readonly long[] visualCookingAssignmentsByProduct = new long[4];
+        // Each specialty owns one shared cursor so real and visual cook turns use the same
+        // deterministic alternation, independent of goals, stock, orders, or worker count.
+        private int nextNormalCookProduct;
+        private int nextPremiumCookProduct = 2;
         private const int MaxCookStationsPerGrill = StreetKitchenLayout.MaxCookStationsPerGrill;
         private long nextCookQueueTicket;
 
@@ -1150,41 +1149,30 @@ namespace HayChoriYPaty
                 CookWorkerStation(worker, out int assignedStation, out int stationCount);
                 int first = worker.Role == StreetWorkerRole.Parrillero ? 0 : 2;
                 Vector2 stationPoint = KitchenLayout.GrillWorkPosition(first, assignedStation, stationCount);
-                bool wasVisuallyCooking = worker.VisualCooking;
-                int excludedProduct = -1;
-                bool reservedRealCook = false;
-                for (int attempt = 0; attempt < 2; attempt++)
+
+                // A visual turn must finish with its originally assigned recipe. Stock or table
+                // space returning mid-cycle only affects the next alternating turn.
+                if (worker.VisualCooking)
                 {
-                    int chosen = SelectCookProduct(first, excludedProduct);
-                    if (chosen < 0) break;
-                    // Preserve the old slot preference relative to the worker's assigned post,
-                    // but route directly to the final food-aligned work point.
-                    int preferredSlot = NearestFreeGrillSlot(worker, chosen, stationPoint);
-                    StreetFoodUnit unit = Kitchen.ReserveCook(chosen, worker.Id, preferredSlot);
-                    if (unit == null) { excludedProduct = chosen; continue; }
-                    worker.Product = chosen; worker.CookingItemId = unit.Id;
-                    worker.CookingProgress = 0f;
-                    worker.VisualCooking = false;
-                    worker.VisualCookingProduct = -1;
-                    Vector2 foodPosition = KitchenLayout.GrillSlotPosition(chosen, unit.Slot,
-                        IsProductAvailable(chosen ^ 1), Kitchen.GrillCapacity(chosen));
-                    Vector2 cookingPosition = KitchenLayout.GrillSlotWorkPosition(chosen, foodPosition);
-                    worker.CookingWorkPosition = cookingPosition;
-                    worker.GrillContactBlendStart = wasVisuallyCooking || worker.Position == stationPoint ? 1f : 0f;
-                    if (!SetWorkerRoute(worker, cookingPosition))
-                    { Kitchen.CancelCook(worker.Id); ResetWorker(worker); return; }
-                    productionAssignmentsByProduct[chosen]++;
-                    worker.State = StreetWorkerState.ToGrill;
-                    if (worker.Position == worker.Target && AdvanceWorkerRoute(worker))
-                        worker.State = StreetWorkerState.Cooking;
-                    reservedRealCook = true;
-                    break;
+                    AdvanceVisualCookWorker(worker, dt);
+                    return;
                 }
-                if (reservedRealCook) return;
+
+                int chosen = worker.VisualCookingProduct;
+                if (chosen < 0)
+                {
+                    chosen = SelectNextCookProduct(first);
+                    worker.VisualCookingProduct = chosen;
+                }
+                if (chosen < 0) return;
+
+                if (TryStartRealCook(worker, chosen, stationPoint, false, out bool routeFailed)) return;
+                if (routeFailed) return;
+
+                // Keep the scheduled product while approaching the grill so arrival cannot
+                // allocate a second turn or silently replace the one that was blocked.
                 if (worker.Position != stationPoint)
                 {
-                    worker.VisualCooking = false;
-                    worker.VisualCookingProduct = -1;
                     worker.CookingWorkPosition = Vector2.zero;
                     worker.GrillContactBlendStart = 0f;
                     if (SetWorkerRoute(worker, stationPoint)) worker.State = StreetWorkerState.ToGrill;
@@ -1242,7 +1230,8 @@ namespace HayChoriYPaty
 
         private void AdvanceVisualCookWorker(StreetWorker worker, float dt)
         {
-            // This mode has no food ID, inventory operation, ingredient reservation, or delivery route.
+            // Cosmetic cycles contain no food ID, inventory operation, ingredient reservation,
+            // capacity reservation, or delivery route.
             if (worker.CookingItemId > 0 || worker.CarriedItemId > 0) return;
             int first = worker.Role == StreetWorkerRole.Parrillero ? 0 : 2;
             if (worker.CookStationIndex < 0) return;
@@ -1250,65 +1239,98 @@ namespace HayChoriYPaty
             Vector2 grillPosition = KitchenLayout.GrillWorkPosition(first, stationIndex, stationCount);
             if (worker.Position != grillPosition)
             {
-                worker.VisualCooking = false;
-                worker.VisualCookingProduct = -1;
-                worker.CookingProgress = 0f;
-                if (!SetWorkerRoute(worker, grillPosition)) return;
-                worker.State = StreetWorkerState.ToGrill;
+                // Preserve a pending/current visual turn and its phase if a station anchor moves.
+                if (SetWorkerRoute(worker, grillPosition)) worker.State = StreetWorkerState.ToGrill;
                 return;
             }
 
+            if (worker.VisualCookingProduct < 0)
+                worker.VisualCookingProduct = SelectNextCookProduct(first);
+            if (worker.VisualCookingProduct < 0) return;
             if (!worker.VisualCooking)
             {
                 worker.VisualCooking = true;
-                worker.VisualCookingProduct = SelectVisualCookProduct(first);
                 worker.CookingProgress = 0f;
             }
+
             float cookStep = dt * CookWorkRate / Mathf.Max(.01f, Kitchen.Balance.activeCookSeconds);
             float nextProgress = worker.CookingProgress + cookStep;
             worker.CookingCycleProgress = Mathf.Repeat(worker.CookingCycleProgress + cookStep, 1f);
-            if (nextProgress >= 1f) worker.VisualCookingProduct = SelectVisualCookProduct(first);
+            if (nextProgress >= 1f)
+            {
+                int nextProduct = SelectNextCookProduct(first);
+                if (nextProduct < 0)
+                {
+                    worker.VisualCooking = false;
+                    worker.VisualCookingProduct = -1;
+                    worker.CookingProgress = 0f;
+                    return;
+                }
+
+                // Assign the next global turn once at the cycle boundary. If it is still needed
+                // and physically reservable, transition to real production without resetting the
+                // existing arm-animation phase. Otherwise keep cooking this exact recipe visually.
+                if (TryStartRealCook(worker, nextProduct, grillPosition, true, out bool routeFailed)) return;
+                if (routeFailed) return;
+                worker.VisualCookingProduct = nextProduct;
+            }
             worker.CookingProgress = Mathf.Repeat(nextProgress, 1f);
         }
 
-        private int SelectVisualCookProduct(int firstProduct)
+        private bool TryStartRealCook(StreetWorker worker, int product, Vector2 stationPoint,
+            bool wasVisuallyCooking, out bool routeFailed)
         {
-            int selected = -1;
-            double bestVirtualFinish = double.PositiveInfinity;
-            for (int product = firstProduct; product < firstProduct + 2; product++)
+            routeFailed = false;
+            int goal = GetProductGoal(product);
+            if (goal <= 0 || GetProductDelivered(product) >= goal || !Kitchen.CanReserveCook(product))
+                return false;
+
+            int preferredSlot = NearestFreeGrillSlot(worker, product, stationPoint);
+            StreetFoodUnit unit = Kitchen.ReserveCook(product, worker.Id, preferredSlot);
+            if (unit == null) return false;
+            worker.Product = product;
+            worker.CookingItemId = unit.Id;
+            worker.CookingProgress = 0f;
+            worker.VisualCooking = false;
+            worker.VisualCookingProduct = -1;
+            Vector2 foodPosition = KitchenLayout.GrillSlotPosition(product, unit.Slot,
+                IsProductAvailable(product ^ 1), Kitchen.GrillCapacity(product));
+            Vector2 cookingPosition = KitchenLayout.GrillSlotWorkPosition(product, foodPosition);
+            worker.CookingWorkPosition = cookingPosition;
+            worker.GrillContactBlendStart = wasVisuallyCooking || worker.Position == stationPoint ? 1f : 0f;
+            if (!SetWorkerRoute(worker, cookingPosition))
             {
-                if (!IsProductAvailable(product)) continue;
-                int goal = Mathf.Max(1, GetProductGoal(product));
-                double virtualFinish = (visualCookingAssignmentsByProduct[product] + 1d) / goal;
-                if (virtualFinish < bestVirtualFinish)
-                {
-                    bestVirtualFinish = virtualFinish;
-                    selected = product;
-                }
+                Kitchen.CancelCook(worker.Id);
+                ResetWorker(worker);
+                routeFailed = true;
+                return false;
             }
-            if (selected < 0) selected = firstProduct;
-            visualCookingAssignmentsByProduct[selected]++;
-            return selected;
+            worker.State = StreetWorkerState.ToGrill;
+            if (worker.Position == worker.Target && AdvanceWorkerRoute(worker))
+                worker.State = StreetWorkerState.Cooking;
+            return true;
         }
 
-        private int SelectCookProduct(int firstProduct, int excludedProduct)
+        private int SelectNextCookProduct(int firstProduct)
         {
-            int selected = -1;
-            double bestVirtualFinish = double.PositiveInfinity;
-            for (int product = firstProduct; product < firstProduct + 2; product++)
+            int secondProduct = firstProduct + 1;
+            bool firstAvailable = IsProductAvailable(firstProduct);
+            bool secondAvailable = IsProductAvailable(secondProduct);
+            if (firstAvailable && secondAvailable)
             {
-                if (product == excludedProduct || !IsProductAvailable(product)) continue;
-                int goal = GetProductGoal(product);
-                if (goal <= 0 || GetProductDelivered(product) >= goal || !Kitchen.CanReserveCook(product)) continue;
-                double virtualFinish = (productionAssignmentsByProduct[product] + 1d) / goal;
-                // Stable product order breaks exact ties (e.g. Chori, Chori, Paty for 2:1).
-                if (virtualFinish < bestVirtualFinish)
+                if (firstProduct == 0)
                 {
-                    bestVirtualFinish = virtualFinish;
-                    selected = product;
+                    int selected = nextNormalCookProduct;
+                    nextNormalCookProduct = selected == 0 ? 1 : 0;
+                    return selected;
                 }
+                int premiumSelected = nextPremiumCookProduct;
+                nextPremiumCookProduct = premiumSelected == 2 ? 3 : 2;
+                return premiumSelected;
             }
-            return selected;
+            if (firstAvailable) return firstProduct;
+            if (secondAvailable) return secondProduct;
+            return -1;
         }
 
         private void Assign(StreetWorker worker)
@@ -1594,8 +1616,8 @@ namespace HayChoriYPaty
         private static float LevelValue(float[] values, int index, float[] fallback) { return values != null && index < values.Length ? Mathf.Max(.01f, values[index]) : fallback[index]; }
         private void ResetTeamAndSpeed()
         {
-            Array.Clear(productionAssignmentsByProduct, 0, productionAssignmentsByProduct.Length);
-            Array.Clear(visualCookingAssignmentsByProduct, 0, visualCookingAssignmentsByProduct.Length);
+            nextNormalCookProduct = 0;
+            nextPremiumCookProduct = 2;
             nextCookQueueTicket = 0;
             Kitchen = new StreetKitchenProduction(balance.kitchen, availableProductsByLevel[LevelIndex], ingredientStock, UsesActiveCooks);
             workers.Clear();

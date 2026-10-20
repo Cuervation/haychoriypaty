@@ -378,6 +378,62 @@ namespace HayChoriYPaty.Tests
             yield return new WaitForEndOfFrame();
             SaveCookingGameViewCapture("parrillero-cooking-to-carry");
         }
+
+        [UnityTest]
+        public IEnumerator CaptureAllFourAlternatingVisualRecipesWithoutStock()
+        {
+            ActivateTestGameWithoutPersisting();
+            StartLevel(5);
+            SetSim("Coins", 100000);
+            Assert.IsTrue((bool)Call(Sim, "TryHire", EnumValue(roleType, "Parrillero")));
+            Assert.IsTrue((bool)Call(Sim, "TryHire", EnumValue(roleType, "ParrilleroPremium")));
+            Assert.IsTrue((bool)Call(Sim, "TryHire", EnumValue(roleType, "ParrilleroPremium")));
+
+            object market = Get("Market");
+            object marketData = GetProperty(market, "Data");
+            int[] stock = (int[])marketData.GetType().GetField("stockUnits").GetValue(marketData);
+            Array.Clear(stock, 0, stock.Length);
+
+            var capturedProducts = new System.Collections.Generic.HashSet<int>();
+            for (int tick = 0; tick < 2400 && capturedProducts.Count < 4; tick++)
+            {
+                Call(Sim, "Step", .05f);
+                yield return null;
+                foreach (object worker in (System.Collections.IEnumerable)GetProperty(Sim, "Workers"))
+                {
+                    if (!(bool)GetProperty(worker, "VisualCooking")) continue;
+                    int product = Convert.ToInt32(GetProperty(worker, "VisualCookingProduct"));
+                    if (product < 0 || !capturedProducts.Add(product)) continue;
+                    Assert.AreEqual(0, GetProperty(worker, "CookingItemId"), "A no-stock visual turn cannot reserve a real item.");
+                    Assert.AreEqual(0, GetProperty(worker, "CarriedItemId"), "A no-stock visual turn cannot carry a fake item.");
+                    yield return new WaitForEndOfFrame();
+                    SaveCookingGameViewCapture("fixed-alternation-no-stock-product-" + product);
+                }
+            }
+
+            CollectionAssert.AreEquivalent(new[] { 0, 1, 2, 3 }, capturedProducts,
+                "Normal and Premium cooks must keep displaying all enabled recipes when their stock is empty.");
+            CollectionAssert.AreEqual(new int[stock.Length], stock, "Visual cooking must not consume or create stock.");
+            object kitchen = GetProperty(Sim, "Kitchen");
+            foreach (object unit in (System.Collections.IEnumerable)GetProperty(kitchen, "Units"))
+                Assert.GreaterOrEqual(Convert.ToInt32(GetProperty(unit, "Product")), 4,
+                    "Visual cooking must not add transportable sandwiches to the real inventory.");
+
+            bool capturedFourAtOnce = false;
+            for (int tick = 0; tick < 400 && !capturedFourAtOnce; tick++)
+            {
+                Call(Sim, "Step", .05f);
+                yield return null;
+                int visualCooks = 0;
+                foreach (object worker in (System.Collections.IEnumerable)GetProperty(Sim, "Workers"))
+                    if ((bool)GetProperty(worker, "VisualCooking")) visualCooks++;
+                if (visualCooks < 4) continue;
+                yield return new WaitForEndOfFrame();
+                SaveCookingGameViewCapture("fixed-alternation-no-stock-four-cooks");
+                capturedFourAtOnce = true;
+            }
+            Assert.IsTrue(capturedFourAtOnce, "All four specialty cooks should visibly animate together without stock.");
+        }
 #endif
 
         [UnityTest]

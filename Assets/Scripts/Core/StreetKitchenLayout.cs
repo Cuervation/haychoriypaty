@@ -13,6 +13,9 @@ namespace HayChoriYPaty
         public const float GrillBottomClearance = 5f;
         public const float GrillVerticalGap = 4f;
         public const float TableWidth = 196f * Scale, TableHeight = 98f * Scale;
+        // Normal/Premium tables need three full sandwich rows without changing food size.
+        // Keep their service edge fixed and extend the prep surface toward the rear.
+        public const float SandwichTableHeight = 196f * Scale;
         public const float BarrelAuthoredWidth = 72f * 1.15f * 1.10f, BarrelAuthoredHeight = 117.6f;
         public const float BarrelWidth = BarrelAuthoredWidth * Scale, BarrelHeight = BarrelAuthoredHeight * Scale;
         public const float StandardGrillWidth = 352f * Scale, StandardGrillHeight = 117.3333f * Scale;
@@ -37,7 +40,6 @@ namespace HayChoriYPaty
         public const float TableSandwichScale = 1.5f, PremiumTableSandwichScaleMultiplier = 1.10f;
         private const float TableSandwichDisplayScale = .80f;
         private const float TableSandwichWoodTopDepth = .42f;
-        private const int TableSandwichStackClusterCount = 4;
         private const float TableSandwichStackStep = .75f, TableSandwichMaxStackOffset = 6f;
         public const float GrillBottomLimit = TiledPlayfieldBottom - GrillBottomClearance;
         private const float GrillSurfaceTop = .115f, GrillSurfaceBottom = .46f;
@@ -47,6 +49,7 @@ namespace HayChoriYPaty
         private readonly bool hasNormal, hasPremium, hasFernet, hasCoca, hasBeer;
         private readonly bool activeCooks;
         private float LayoutTableY => TableY;
+        private float LayoutSandwichTableY => LayoutTableY + TableHeight - SandwichTableHeight;
         private float LayoutBarrelY => LayoutTableY + TableHeight - BarrelHeight;
         public float PlayfieldBottom => activeCooks ? ActivePlayfieldBottom : TiledPlayfieldBottom;
         private float LayoutGrillGap => activeCooks ? 70f : GrillVerticalGap;
@@ -112,18 +115,18 @@ namespace HayChoriYPaty
                 + (hasCoca ? BarrelAuthoredWidth : 0f) + (hasBeer ? BarrelAuthoredWidth : 0f));
             float gap = count > 0 ? (SourceWidth - totalWidth) / (count + 1) : 0f;
             float x = gap;
-            normal = PlaceUpper(ref x, gap, hasNormal, 196f);
-            premium = PlaceUpper(ref x, gap, hasPremium, 196f);
-            fernet = PlaceUpper(ref x, gap, hasFernet, 196f);
-            coca = PlaceUpper(ref x, gap, hasCoca, BarrelAuthoredWidth);
-            beer = PlaceUpper(ref x, gap, hasBeer, BarrelAuthoredWidth);
+            normal = PlaceUpper(ref x, gap, hasNormal, 196f, LayoutSandwichTableY, SandwichTableHeight);
+            premium = PlaceUpper(ref x, gap, hasPremium, 196f, LayoutSandwichTableY, SandwichTableHeight);
+            fernet = PlaceUpper(ref x, gap, hasFernet, 196f, LayoutTableY, TableHeight);
+            coca = PlaceUpper(ref x, gap, hasCoca, BarrelAuthoredWidth, LayoutBarrelY, BarrelHeight);
+            beer = PlaceUpper(ref x, gap, hasBeer, BarrelAuthoredWidth, LayoutBarrelY, BarrelHeight);
         }
 
-        private Rect PlaceUpper(ref float x, float gap, bool active, float nativeWidth)
+        private Rect PlaceUpper(ref float x, float gap, bool active, float nativeWidth, float y, float height)
         {
             if (!active) return Rect.zero;
             float scaledWidth = nativeWidth * Scale;
-            Rect result = new Rect(x * Scale, nativeWidth == 196f ? LayoutTableY : LayoutBarrelY, scaledWidth, nativeWidth == 196f ? TableHeight : BarrelHeight);
+            Rect result = new Rect(x * Scale, y, scaledWidth, height);
             x += nativeWidth + gap;
             return result;
         }
@@ -268,12 +271,20 @@ namespace HayChoriYPaty
         public Vector2 TableSlotPickupPosition(int product, int slot, bool companionAvailable, int capacity)
         {
             Vector2 standard = PickupPosition(product);
-            if (product < 0 || product > 3 || BoundsForProduct(product).width <= 0f) return standard;
+            Rect table = BoundsForProduct(product);
+            if (product < 0 || product > 3 || table.width <= 0f) return standard;
             Vector2 firstItem = TableSlotPosition(product, 0, companionAvailable, capacity);
             Vector2 item = TableSlotPosition(product, slot, companionAvailable, capacity);
+            int basePositionCount = companionAvailable ? 6 : 12;
+            int lastBaseSlot = Mathf.Min(basePositionCount - 1, Mathf.Max(0, capacity - 1));
+            float maximumRowOffset = TableSlotPosition(product, lastBaseSlot, companionAvailable, capacity).y - firstItem.y;
+            // Keep every row's Mozo approach outside the table's solid front/base while
+            // still tracking the reserved item's depth; the front row sets the safe limit.
+            float safeFrontApproachY = table.yMax - 20f * Scale - 2f;
+            float pickupBaseY = Mathf.Min(standard.y, safeFrontApproachY - maximumRowOffset);
             float safeX = Mathf.Clamp(item.x, StreetWorkstationLayout.WorkerHalfWidth,
                 StreetSceneLayout.Width - StreetWorkstationLayout.WorkerHalfWidth);
-            return new Vector2(safeX, standard.y + item.y - firstItem.y);
+            return new Vector2(safeX, pickupBaseY + item.y - firstItem.y);
         }
 
         /// <summary>Stable grill-side station for one worker in a role-specific cook team.</summary>
@@ -544,8 +555,9 @@ namespace HayChoriYPaty
                 return new Vector2(x + dx, baseY - 16f + dy);
             }
 
-            // Four repeatable stacks form two table-depth rows with a clear visual gap.
-            // The expanded tabletop region changes presentation only, not furniture or capacity.
+            // Four-by-three repeatable base positions use two columns per product when paired,
+            // and four when alone. Extra real units stack over those positions without changing
+            // table capacity or the unchanged sandwich sprite dimensions.
             Vector2 itemSize = TableServingSize(product);
             float halfWidth = itemSize.x * .5f + 1f;
             float halfHeight = itemSize.y * .5f + 1f;
@@ -557,13 +569,16 @@ namespace HayChoriYPaty
             float maxY = r.y + woodTopDepth - halfHeight;
             if (maxY < minY) minY = maxY = r.y + woodTopDepth * .5f;
 
-            int cluster = index % TableSandwichStackClusterCount;
-            int stackLayer = index / TableSandwichStackClusterCount;
-            int sandwichRow = cluster % 2; // 0 front, 1 back
-            int column = cluster / 2;    // two compact piles per product section
+            int basePositionCount = companionAvailable ? 6 : 12;
+            int columnCount = companionAvailable ? 2 : 4;
+            int basePosition = index % basePositionCount;
+            int stackLayer = index / basePositionCount;
+            int sandwichRow = basePosition / columnCount; // 0 rear, 1 middle, 2 front
+            int column = basePosition % columnCount;
             float stackOffset = Mathf.Min(stackLayer * TableSandwichStackStep, TableSandwichMaxStackOffset);
-            float itemX = column == 0 ? minX + stackOffset : maxX - stackOffset;
-            float y = sandwichRow == 0 ? minY : maxY;
+            float itemX = Mathf.Lerp(minX, maxX, column / (float)(columnCount - 1));
+            itemX += column < columnCount * .5f ? stackOffset : -stackOffset;
+            float y = Mathf.Lerp(minY, maxY, sandwichRow / 2f);
             return new Vector2(itemX, y);
         }
 
@@ -578,16 +593,20 @@ namespace HayChoriYPaty
             return product == 5 ? new Vector2(18f, 28f) : product == 4 || product == 6 ? new Vector2(9f, 20f) : Vector2.zero;
         }
 
-        /// <summary>Stable back-to-front order for the two sandwich rows and their small stacks.</summary>
-        public static int TableSlotDepthOrder(int slot)
+        /// <summary>Stable back-to-front order for the three sandwich rows and their small stacks.</summary>
+        public static int TableSlotDepthOrder(int slot, bool companionAvailable)
         {
             int index = Mathf.Max(0, slot);
-            int cluster = index % TableSandwichStackClusterCount;
-            int row = cluster % 2; // The front row (0) draws over the back row (1).
-            int column = cluster / 2;
-            int stackLayer = index / TableSandwichStackClusterCount;
-            return (row == 0 ? 100 : 0) + stackLayer * 2 + column;
+            int basePositionCount = companionAvailable ? 6 : 12;
+            int columnCount = companionAvailable ? 2 : 4;
+            int basePosition = index % basePositionCount;
+            int row = basePosition / columnCount; // Rear, middle, then foreground.
+            int column = basePosition % columnCount;
+            int stackLayer = index / basePositionCount;
+            return row * 100 + stackLayer * 10 + column;
         }
+
+        public static int TableSlotDepthOrder(int slot) => TableSlotDepthOrder(slot, true);
 
         public Vector2 GrillSlotPosition(int product, int slot) => GrillSlotPosition(product, slot, true, product < 2 ? 12 : 4);
 

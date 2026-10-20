@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.IO;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
@@ -33,6 +34,123 @@ namespace HayChoriYPaty.Tests
             Vector2 size = (Vector2)method.Invoke(null, new object[] { product, carried });
             Assert.AreEqual(expectedWidth, size.x, .0001f);
             Assert.AreEqual(expectedHeight, size.y, .0001f);
+        }
+
+        [UnityTest]
+        public IEnumerator SandwichTablesRenderTheExpandedBackSurfaceAndKeepTheServiceEdge()
+        {
+            var root = new GameObject("Expanded sandwich table projection test");
+            try
+            {
+                Component renderer = root.AddComponent(GameType("StreetKitchenRenderer"));
+                object balance = Activator.CreateInstance(GameType("StreetBalance"));
+                object sim = Activator.CreateInstance(GameType("StreetSimulation"), new object[] { balance, 10, 5f, 0, 1, 0 });
+                Call(renderer, "Prepare", sim, 1f, 960f);
+
+                object layout = Get(sim, "KitchenLayout");
+                var propsRoot = (GameObject)renderer.GetType().GetField("propsRoot", Instance).GetValue(renderer);
+                Rect normalBounds = (Rect)Get(layout, "NormalTableBounds");
+                Rect premiumBounds = (Rect)Get(layout, "PremiumTableBounds");
+                Rect fernetBounds = (Rect)Get(layout, "FernetTableBounds");
+                Transform normal = propsRoot.transform.Find("station:Station_NormalTable");
+                Transform premium = propsRoot.transform.Find("station:Station_PremiumTable");
+                Transform fernet = propsRoot.transform.Find("station:Station_FernetTable");
+                Assert.IsNotNull(normal);
+                Assert.IsNotNull(premium);
+                Assert.IsNotNull(fernet);
+
+                SpriteRenderer normalSprite = normal.GetComponentInChildren<SpriteRenderer>(true);
+                SpriteRenderer premiumSprite = premium.GetComponentInChildren<SpriteRenderer>(true);
+                SpriteRenderer fernetSprite = fernet.GetComponentInChildren<SpriteRenderer>(true);
+                Assert.AreEqual(normalBounds.width * .01f, normalSprite.bounds.size.x, .001f);
+                Assert.AreEqual(normalBounds.height * .01f, normalSprite.bounds.size.y, .001f,
+                    "The normal station artwork fills the deeper surface bounds instead of leaving a visual gap.");
+                Assert.AreEqual(premiumBounds.width * .01f, premiumSprite.bounds.size.x, .001f);
+                Assert.AreEqual(premiumBounds.height * .01f, premiumSprite.bounds.size.y, .001f,
+                    "The Premium station artwork fills the deeper surface bounds without changing food art.");
+                Vector2 fernetSourceSize = fernetSprite.sprite.bounds.size;
+                float fernetAspectFitHeight = Mathf.Min(fernetBounds.width / fernetSourceSize.x,
+                    fernetBounds.height / fernetSourceSize.y) * fernetSourceSize.y * .01f;
+                Assert.AreEqual(fernetAspectFitHeight, fernetSprite.bounds.size.y, .001f,
+                    "The separate Fernet table keeps its original aspect-preserving dimensions.");
+                Assert.AreEqual(normalBounds.yMax, premiumBounds.yMax, .001f);
+                Assert.AreEqual(normalBounds.yMax, fernetBounds.yMax, .001f,
+                    "All service edges remain at their former shared position.");
+            }
+            finally { UnityEngine.Object.Destroy(root); }
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator CapturesSoloPairedAndFullCapacitySandwichTableLayouts()
+        {
+            var root = new GameObject("Sandwich table layout capture test");
+            try
+            {
+                Component renderer = root.AddComponent(GameType("StreetKitchenRenderer"));
+                object balance = Activator.CreateInstance(GameType("StreetBalance"));
+
+                object solo = Activator.CreateInstance(GameType("StreetSimulation"), new object[] { balance, 0, 5f, 0, 1, 0 });
+                Assert.IsTrue((bool)Call(solo, "IsProductAvailable", 0));
+                Assert.IsFalse((bool)Call(solo, "IsProductAvailable", 1));
+                ClearKitchenUnits(Get(solo, "Kitchen"));
+                AddTableFood(Get(solo, "Kitchen"), 0, 0, 12);
+                Call(renderer, "Prepare", solo, 1f, 960f);
+                yield return null;
+                CaptureKitchenTexture(renderer, "solo-chori-4x3-1080x1920.png");
+
+                object paired = Activator.CreateInstance(GameType("StreetSimulation"), new object[] { balance, 10, 5f, 0, 1, 0 });
+                object kitchen = Get(paired, "Kitchen");
+                ClearKitchenUnits(kitchen);
+                for (int product = 0; product < 4; product++) AddTableFood(kitchen, product, 0, 6);
+                Call(renderer, "Prepare", paired, 1f, 960f);
+                yield return null;
+                CaptureKitchenTexture(renderer, "paired-four-products-4x3-1080x1920.png");
+
+                Call(renderer, "Prepare", paired, 1.25f, 1200f);
+                yield return null;
+                CaptureKitchenTexture(renderer, "paired-four-products-4x3-1080x2400.png");
+
+                ClearKitchenUnits(kitchen);
+                for (int product = 0; product < 4; product++)
+                {
+                    int capacity = (int)Call(kitchen, "TableCapacity", product);
+                    AddTableFood(kitchen, product, 0, capacity);
+                }
+                Call(renderer, "Prepare", paired, 1f, 960f);
+                yield return null;
+                CaptureKitchenTexture(renderer, "paired-full-capacity-stacks-1080x1920.png");
+            }
+            finally { UnityEngine.Object.Destroy(root); }
+            yield return null;
+        }
+
+        private static void ClearKitchenUnits(object kitchen)
+        {
+            ((IList)kitchen.GetType().GetField("units", Instance).GetValue(kitchen)).Clear();
+        }
+
+        private static void AddTableFood(object kitchen, int product, int firstSlot, int count)
+        {
+            Type state = GameType("StreetFoodState"), location = GameType("StreetFoodLocation");
+            for (int slot = firstSlot; slot < firstSlot + count; slot++)
+                Call(kitchen, "Add", product, Enum.Parse(state, "Cooked"), Enum.Parse(location, "Table"), slot);
+        }
+
+        private static void CaptureKitchenTexture(Component renderer, string fileName)
+        {
+            RenderTexture target = (RenderTexture)Get(renderer, "BackgroundTexture");
+            RenderTexture previous = RenderTexture.active;
+            RenderTexture.active = target;
+            var image = new Texture2D(target.width, target.height, TextureFormat.RGBA32, false);
+            image.ReadPixels(new Rect(0f, 0f, target.width, target.height), 0, 0);
+            image.Apply();
+            string folder = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/SandwichTables-20261019"));
+            Directory.CreateDirectory(folder);
+            File.WriteAllBytes(Path.Combine(folder, fileName), ImageConversion.EncodeToPNG(image));
+            UnityEngine.Object.Destroy(image);
+            RenderTexture.active = previous;
+            TestContext.WriteLine("Native kitchen camera capture: " + Path.Combine(folder, fileName));
         }
 
         [UnityTest]
@@ -300,7 +418,7 @@ namespace HayChoriYPaty.Tests
                     int row = bottle.name.Contains("Row0_") ? 0 : 1;
                     Assert.IsTrue(row == 0 || bottle.name.Contains("Row1_"), "Every stock bottle belongs to a known tabletop row.");
                     if (fernet) fernetByRow[row]++; else cocaByRow[row]++;
-                    float expectedHeight = tableHeight * (fernet ? .25f * 3f * .93f : .333f * 3f * .76f * .95f);
+                    float expectedHeight = tableHeight * (fernet ? .25f * 3f * .93f * .90f : .333f * 3f * .76f * .95f);
                     float height = bottleRenderer.sprite.bounds.size.y * bottle.localScale.y;
                     Assert.AreEqual(expectedHeight, height, .001f, "Fernet and Coca keep their requested relative visual sizes.");
                     Assert.AreEqual(bottle.localScale.x, bottle.localScale.y, .0001f,

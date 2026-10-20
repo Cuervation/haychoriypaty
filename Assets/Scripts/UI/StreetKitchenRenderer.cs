@@ -17,7 +17,7 @@ namespace HayChoriYPaty
         private static readonly Vector2 AmbientSmokeSize = new Vector2(12f, 26f);
         private const float FernetBottleHeightFraction = .25f, CocaBottleHeightFraction = .333f;
         private const float FernetBottleScaleMultiplier = 3f;
-        private const float FernetBottleSizeMultiplier = .93f, CocaBottleSizeMultiplier = .76f * .95f;
+        private const float FernetBottleSizeMultiplier = .93f * .90f, CocaBottleSizeMultiplier = .76f * .95f;
         private const float FernetBottleBackRowDepthFraction = .03f, FernetBottleFrontRowDepthFraction = .32f;
         // The authored Coca sprite has a narrow transparent border below the visible bottle base.
         private const float CocaBottleVisibleBaseInsetFraction = .009f;
@@ -260,7 +260,7 @@ namespace HayChoriYPaty
                     GameObject existing = propsRoot.transform.GetChild(i).gameObject;
                     existing.SetActive(visible);
                     SetStationTransform(existing.transform, bounds);
-                    FitStation(existing, bounds, !IsBarrelStation(prefabName));
+                    FitStation(existing, bounds, PreserveStationAspect(prefabName));
                     ApplyStationDepth(existing, StationDepth(bounds));
                     if (prefabName == "Station_FernetTable") EnsureFernetTableDisplay(existing);
                     return;
@@ -271,7 +271,7 @@ namespace HayChoriYPaty
             instance.name = key;
             SetLayerRecursively(instance, PropLayer);
             SetStationTransform(instance.transform, bounds);
-            FitStation(instance, bounds, !IsBarrelStation(prefabName));
+            FitStation(instance, bounds, PreserveStationAspect(prefabName));
             SetSorting(instance, StationDepth(bounds));
             if (prefabName == "Station_FernetTable") EnsureFernetTableDisplay(instance);
             instance.SetActive(visible);
@@ -638,6 +638,7 @@ namespace HayChoriYPaty
             bool isGrill = unit.Location == StreetFoodLocation.Grill;
             bool isBarrelDrink = unit.Product == 4 || unit.Product == 6;
             bool grillCompanionAvailable = isGrill && Available(unit.Product == 0 ? 1 : unit.Product == 1 ? 0 : unit.Product == 2 ? 3 : 2);
+            bool sandwichCompanionAvailable = unit.Product <= 3 && Available(unit.Product ^ 1);
             string key = isGrill ? MeatArt(unit.Product) : unit.Product <= 3 ? SandwichArt(unit.Product) : DrinkArt(unit.Product);
             SpriteRenderer renderer;
             if (foodRenderers.TryGetValue(unit.Id, out renderer) && renderer != null)
@@ -665,7 +666,7 @@ namespace HayChoriYPaty
             else
             {
                 position = simulation.KitchenLayout.TableSlotPosition(unit.Product, unit.Slot,
-                    Available(unit.Product == 0 ? 1 : unit.Product == 1 ? 0 : unit.Product == 2 ? 3 : unit.Product == 3 ? 2 : -1),
+                    sandwichCompanionAvailable,
                     simulation.Kitchen.TableCapacity(unit.Product));
                 if (unit.Product == 5 && !carried)
                     position = FernetDrinkDisplayPosition(simulation.KitchenLayout, unit.Slot);
@@ -679,7 +680,7 @@ namespace HayChoriYPaty
             if (!carried && !isGrill && unit.Product <= 3)
             {
                 Rect station = simulation.KitchenLayout.BoundsForProduct(unit.Product);
-                order = StationDepth(station) + 10 + StreetKitchenLayout.TableSlotDepthOrder(unit.Slot);
+                order = StationDepth(station) + 10 + StreetKitchenLayout.TableSlotDepthOrder(unit.Slot, sandwichCompanionAvailable);
             }
             else if (!carried && simulation.UsesActiveCooks)
             {
@@ -959,6 +960,9 @@ namespace HayChoriYPaty
         }
 
         private static bool IsBarrelStation(string prefabName) => prefabName == "Station_BeerBarrel" || prefabName == "Station_CocaBarrel";
+
+        private static bool PreserveStationAspect(string prefabName) =>
+            !IsBarrelStation(prefabName) && prefabName != "Station_NormalTable" && prefabName != "Station_PremiumTable";
 
         private static void FitFirstSprite(GameObject instance, float width, float height, bool preserveAspect)
         {

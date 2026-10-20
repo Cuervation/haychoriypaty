@@ -384,8 +384,8 @@ namespace HayChoriYPaty.Tests
                     {
                         fernetBottles++;
                         fernetByRow[row]++;
-                        Assert.AreEqual(tableHeight * .25f * 3f * .93f, height, .02f,
-                            "Fernet tabletop bottles are 7% smaller than their previous size.");
+                        Assert.AreEqual(tableHeight * .25f * 3f * .93f * .90f, height, .02f,
+                            "Fernet tabletop bottles are 10% smaller than their previous size.");
                     }
                     if (spriteRenderer.sprite.name == "coca-2500ml-display-v1")
                     {
@@ -441,7 +441,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(5f, LayoutConstant("GrillBottomClearance"), .001f);
             Assert.AreEqual(5f, LayoutConstant("TiledPlayfieldBottom") - LayoutConstant("GrillBottomLimit"), .001f,
                 "The grill bounds must sit five logical points above the lower tiled-field frame.");
-            Rect? tableSize = null, barrelSize = null;
+            Rect? sandwichTableSize = null, fernetTableSize = null, barrelSize = null;
             for (int level = 0; level < 11; level++)
             {
                 object sim = Simulation(level), layout = Layout(sim);
@@ -450,6 +450,30 @@ namespace HayChoriYPaty.Tests
                 bool fernet = (bool)Call(sim, "IsProductAvailable", 5);
                 bool coca = (bool)Call(sim, "IsProductAvailable", 4);
                 bool beer = (bool)Call(sim, "IsProductAvailable", 6);
+                Rect normalTable = RectProperty(layout, "NormalTableBounds");
+                Rect premiumTable = RectProperty(layout, "PremiumTableBounds");
+                Rect fernetTable = RectProperty(layout, "FernetTableBounds");
+                float serviceEdgeY = LayoutConstant("TableY") + LayoutConstant("TableHeight");
+                if (normal)
+                {
+                    Assert.AreEqual(LayoutConstant("SandwichTableHeight"), normalTable.height, .001f);
+                    Assert.AreEqual(serviceEdgeY, normalTable.yMax, .02f,
+                        "The normal table gains depth toward the rear without moving its service edge.");
+                    Assert.AreEqual(serviceEdgeY - normalTable.height, normalTable.y, .02f);
+                }
+                if (premium)
+                {
+                    Assert.AreEqual(LayoutConstant("SandwichTableHeight"), premiumTable.height, .001f);
+                    Assert.AreEqual(serviceEdgeY, premiumTable.yMax, .02f,
+                        "The premium table gains depth toward the rear without moving its service edge.");
+                    Assert.AreEqual(serviceEdgeY - premiumTable.height, premiumTable.y, .02f);
+                }
+                if (fernet)
+                {
+                    Assert.AreEqual(LayoutConstant("TableHeight"), fernetTable.height, .001f,
+                        "Fernet's separate display table keeps its original dimensions.");
+                    Assert.AreEqual(serviceEdgeY, fernetTable.yMax, .02f);
+                }
                 Assert.AreEqual(normal, Get(layout, "HasNormalGrill"));
                 Assert.AreEqual(premium, Get(layout, "HasPremiumGrill"));
                 Assert.AreEqual(normal, Get(layout, "HasNormalTable"));
@@ -472,19 +496,32 @@ namespace HayChoriYPaty.Tests
                 Assert.AreEqual(gap, top[0].xMin, .02f, "First active prep station should use the responsive row margin.");
                 for (int i = 0; i < top.Count; i++)
                 {
-                    float expectedY = top[i].width > 100f ? LayoutConstant("TableY") : LayoutConstant("BarrelY");
-                    Assert.AreEqual(expectedY, top[i].y, .02f, "Tables and barrels align by their lower edges while keeping their authored heights.");
+                    Assert.AreEqual(serviceEdgeY, top[i].yMax, .02f,
+                        "The table/barrel service edges remain on one unchanged row.");
                     Assert.Greater(top[i].width, 0f);
                     if (i > 0) Assert.AreEqual(gap, top[i].xMin - top[i - 1].xMax, .02f, "Hidden stations must not leave row holes.");
                     if (top[i].width > 100f)
                     {
-                        if (!tableSize.HasValue) tableSize = top[i];
-                        Assert.AreEqual(tableSize.Value.size, top[i].size, "All active tables share one visual size.");
+                        if (top[i].height > LayoutConstant("TableHeight") + .1f)
+                        {
+                            if (!sandwichTableSize.HasValue) sandwichTableSize = top[i];
+                            Assert.AreEqual(sandwichTableSize.Value.size, top[i].size,
+                                "Normal and premium sandwich tables share the deeper presentation size.");
+                            Assert.AreEqual(serviceEdgeY - LayoutConstant("SandwichTableHeight"), top[i].y, .02f);
+                        }
+                        else
+                        {
+                            if (!fernetTableSize.HasValue) fernetTableSize = top[i];
+                            Assert.AreEqual(fernetTableSize.Value.size, top[i].size,
+                                "Fernet retains its original, independent table size.");
+                            Assert.AreEqual(LayoutConstant("TableY"), top[i].y, .02f);
+                        }
                     }
                     else
                     {
                         if (!barrelSize.HasValue) barrelSize = top[i];
                         Assert.AreEqual(barrelSize.Value.size, top[i].size, "All active barrels share one visual size.");
+                        Assert.AreEqual(LayoutConstant("BarrelY"), top[i].y, .02f);
                     }
                 }
                 Assert.AreEqual(gap, width - top[top.Count - 1].xMax, .02f);
@@ -521,8 +558,10 @@ namespace HayChoriYPaty.Tests
                 }
                 foreach (Rect item in top) foreach (Rect grill in grills) Assert.IsFalse(item.Overlaps(grill));
             }
-            Assert.AreEqual(196f * (width / (float)LayoutConstant("SourceWidth")), tableSize.Value.width, .02f);
-            Assert.AreEqual(98f * (width / (float)LayoutConstant("SourceWidth")), tableSize.Value.height, .02f);
+            Assert.AreEqual(196f * (width / (float)LayoutConstant("SourceWidth")), sandwichTableSize.Value.width, .02f);
+            Assert.AreEqual(LayoutConstant("SandwichTableHeight"), sandwichTableSize.Value.height, .02f);
+            Assert.AreEqual(196f * (width / (float)LayoutConstant("SourceWidth")), fernetTableSize.Value.width, .02f);
+            Assert.AreEqual(LayoutConstant("TableHeight"), fernetTableSize.Value.height, .02f);
             Assert.AreEqual(72f * 1.15f * 1.10f * (width / (float)LayoutConstant("SourceWidth")), barrelSize.Value.width, .02f);
             Assert.AreEqual(117.6f * (width / (float)LayoutConstant("SourceWidth")), barrelSize.Value.height, .02f);
             Assert.AreEqual(72f * 1.15f * 1.10f, LayoutConstant("BarrelAuthoredWidth"), .001f);
@@ -805,16 +844,18 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void SandwichTableSlotsUseTwoDepthRowsAndKeepFullCapacityInsideEachProductZone()
+        public void SandwichTableSlotsUseThreeDepthRowsAndKeepFullCapacityInsideEachProductZone()
         {
             object layout = FullLayout();
             Type layoutType = Runtime("StreetKitchenLayout");
             MethodInfo sizeMethod = layoutType.GetMethod("TableServingSize", BindingFlags.Public | BindingFlags.Static);
-            MethodInfo depthOrder = layoutType.GetMethod("TableSlotDepthOrder", BindingFlags.Public | BindingFlags.Static);
+            MethodInfo depthOrder = layoutType.GetMethod("TableSlotDepthOrder", BindingFlags.Public | BindingFlags.Static,
+                null, new[] { typeof(int), typeof(bool) }, null);
             float workerHalfWidth = (float)Runtime("StreetWorkstationLayout")
                 .GetField("WorkerHalfWidth", BindingFlags.Public | BindingFlags.Static).GetRawConstantValue();
             float sceneWidth = (float)Runtime("StreetSceneLayout")
                 .GetField("Width", BindingFlags.Public | BindingFlags.Static).GetRawConstantValue();
+            float routeSafetyMargin = 2f;
             Assert.NotNull(sizeMethod);
             Assert.NotNull(depthOrder);
 
@@ -823,34 +864,52 @@ namespace HayChoriYPaty.Tests
             {
                 Rect table = (Rect)Call(layout, "BoundsForProduct", product);
                 int capacity = companion ? (product < 2 ? 24 : 18) : (product < 2 ? 48 : 36);
+                int basePositionCount = companion ? 6 : 12;
+                int columnCount = companion ? 2 : 4;
                 Vector2 size = (Vector2)sizeMethod.Invoke(null, new object[] { product });
                 float sectionWidth = companion ? table.width * .5f : table.width;
                 float sectionLeft = table.x + (companion && (product == 1 || product == 3) ? sectionWidth : 0f);
                 float tabletopDepth = (float)layoutType
                     .GetField("TableSandwichWoodTopDepth", BindingFlags.NonPublic | BindingFlags.Static).GetRawConstantValue();
                 Rect tabletop = new Rect(sectionLeft, table.y, sectionWidth, table.height * tabletopDepth);
-                Vector2 front = (Vector2)Call(layout, "TableSlotPosition", product, 0, companion, capacity);
-                Vector2 back = (Vector2)Call(layout, "TableSlotPosition", product, 1, companion, capacity);
+                Vector2 rear = (Vector2)Call(layout, "TableSlotPosition", product, 0, companion, capacity);
+                Vector2 middle = (Vector2)Call(layout, "TableSlotPosition", product, columnCount, companion, capacity);
+                Vector2 front = (Vector2)Call(layout, "TableSlotPosition", product, columnCount * 2, companion, capacity);
+                Assert.Less(rear.y, middle.y, "The rear row stays behind the middle row for product " + product + ".");
+                Assert.Less(middle.y, front.y, "The middle row stays behind the foreground row for product " + product + ".");
+                Assert.GreaterOrEqual(middle.y - rear.y - size.y, .5f,
+                    "The rear and middle sandwich footprints need a visible clear gap.");
+                Assert.GreaterOrEqual(front.y - middle.y - size.y, .5f,
+                    "The middle and foreground sandwich footprints need a visible clear gap.");
+                Assert.Greater((int)depthOrder.Invoke(null, new object[] { columnCount * 2, companion }),
+                    (int)depthOrder.Invoke(null, new object[] { columnCount, companion }), "Foreground row draws over the middle row.");
+                Assert.Greater((int)depthOrder.Invoke(null, new object[] { columnCount, companion }),
+                    (int)depthOrder.Invoke(null, new object[] { 0, companion }), "Middle row draws over the rear row.");
 
-                Assert.Less(front.y, back.y, "Slot 0 is the foreground row for product " + product + ".");
-                Assert.GreaterOrEqual(back.y - front.y, size.y * .20f,
-                    "Both rows need a visible depth offset for product " + product + ".");
-                Assert.GreaterOrEqual(back.y - front.y, size.y * .4f,
-                    "The two rows need a wider separation than the former crowded layout for product " + product + ".");
-                Assert.Greater((int)depthOrder.Invoke(null, new object[] { 0 }),
-                    (int)depthOrder.Invoke(null, new object[] { 1 }), "Front row must draw over the rear row.");
-                Assert.Greater((int)depthOrder.Invoke(null, new object[] { 2 }),
-                    (int)depthOrder.Invoke(null, new object[] { 3 }), "The second front stack must also draw over its rear partner.");
-
-                Vector2 frontPickup = (Vector2)Call(layout, "TableSlotPickupPosition", product, 0, companion, capacity);
-                Vector2 backPickup = (Vector2)Call(layout, "TableSlotPickupPosition", product, 1, companion, capacity);
+                Vector2 rearPickup = (Vector2)Call(layout, "TableSlotPickupPosition", product, 0, companion, capacity);
+                Vector2 middlePickup = (Vector2)Call(layout, "TableSlotPickupPosition", product, columnCount, companion, capacity);
+                Vector2 frontPickup = (Vector2)Call(layout, "TableSlotPickupPosition", product, columnCount * 2, companion, capacity);
+                Rect baseFootprint = (Rect)Call(layout, "FootprintForProduct", product);
+                Assert.AreEqual(Mathf.Clamp(rear.x, workerHalfWidth, sceneWidth - workerHalfWidth), rearPickup.x, .001f,
+                    "Mozo rear pickup follows the reserved slot while respecting the safe worker lane.");
                 Assert.AreEqual(Mathf.Clamp(front.x, workerHalfWidth, sceneWidth - workerHalfWidth), frontPickup.x, .001f,
-                    "Mozo front pickup tracks the slot while respecting the safe worker lane.");
-                Assert.AreEqual(Mathf.Clamp(back.x, workerHalfWidth, sceneWidth - workerHalfWidth), backPickup.x, .001f,
-                    "Mozo rear pickup tracks the slot while respecting the safe worker lane.");
-                Assert.AreEqual(back.y - front.y, backPickup.y - frontPickup.y, .001f,
-                    "Mozo pickup approach preserves the row depth offset.");
+                    "Mozo foreground pickup follows the reserved slot while respecting the safe worker lane.");
+                Assert.AreEqual(middle.y - rear.y, middlePickup.y - rearPickup.y, .001f,
+                    "Mozo pickup approaches retain the middle-row offset.");
+                Assert.AreEqual(front.y - middle.y, frontPickup.y - middlePickup.y, .001f,
+                    "Mozo pickup approaches retain the foreground-row offset.");
+                Assert.LessOrEqual(frontPickup.y, baseFootprint.yMin - routeSafetyMargin + .001f,
+                    "The foreground Mozo point remains outside the solid table base.");
+                Vector2 home = new Vector2(433f, WorkerServiceY());
+                foreach (Vector2 target in new[] { rearPickup, middlePickup, frontPickup })
+                    Assert.IsNotNull(Call(layout, "FindShortestSafeRoute", home, target),
+                        "Each sandwich depth row remains reachable from the crowd lane.");
 
+                var basePositions = new HashSet<Vector2>();
+                for (int slot = 0; slot < basePositionCount; slot++)
+                    Assert.IsTrue(basePositions.Add((Vector2)Call(layout, "TableSlotPosition", product, slot, companion, capacity)),
+                        "Each 4×3 base position is unique for product " + product + ".");
+                Assert.AreEqual(basePositionCount, basePositions.Count);
                 for (int slot = 0; slot < capacity; slot++)
                 {
                     Vector2 center = (Vector2)Call(layout, "TableSlotPosition", product, slot, companion, capacity);
@@ -859,8 +918,15 @@ namespace HayChoriYPaty.Tests
                     Assert.LessOrEqual(item.xMax, tabletop.xMax, "Product " + product + " slot " + slot + " crosses into its companion's zone.");
                     Assert.GreaterOrEqual(item.yMin, tabletop.yMin, "Product " + product + " slot " + slot + " floats off the tabletop.");
                     Assert.LessOrEqual(item.yMax, tabletop.yMax, "Product " + product + " slot " + slot + " falls off the tabletop.");
-                    Assert.AreEqual(slot % 4 % 2 == 0 ? front.y : back.y, center.y, .001f,
-                        "Stacking may fan horizontally but must remain in exactly two depth rows.");
+                    int baseSlot = slot % basePositionCount;
+                    int row = baseSlot / columnCount;
+                    Vector2 expectedRow = row == 0 ? rear : row == 1 ? middle : front;
+                    Assert.AreEqual(expectedRow.y, center.y, .001f,
+                        "Capacity overflow stacks on one of the three base rows.");
+                    if (slot >= basePositionCount)
+                        Assert.GreaterOrEqual((int)depthOrder.Invoke(null, new object[] { slot, companion }),
+                            (int)depthOrder.Invoke(null, new object[] { baseSlot, companion }),
+                            "A stacked unit draws at or above its underlying base position.");
                 }
             }
         }

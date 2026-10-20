@@ -1476,6 +1476,17 @@ namespace HayChoriYPaty
             finally { GUI.color = previous; }
         }
 
+        private const float CookingRingRadius = 10f;
+        private const float CookingRingDotSize = 3f;
+        private const float CookingRingHeadGap = 4f;
+        internal static float CookingProgressRingCenterY(float workerFootY, float verticalScale)
+        {
+            float scale = Mathf.Max(.01f, verticalScale);
+            float renderedWorkerHeight = StreetWorkerProjection.Height * scale;
+            float ringOuterRadius = CookingRingRadius + CookingRingDotSize * .5f;
+            return workerFootY * scale - renderedWorkerHeight - CookingRingHeadGap - ringOuterRadius;
+        }
+
         private readonly System.Collections.Generic.List<Vector2> cookingRingCenters = new System.Collections.Generic.List<Vector2>();
         private void DrawCookingProgress(StreetSimulation sim)
         {
@@ -1486,7 +1497,8 @@ namespace HayChoriYPaty
             {
                 if (worker.State != StreetWorkerState.Cooking && !worker.VisualCooking) continue;
                 Vector2 visualPosition = StreetWorkerProjection.PresentationPosition(sim, worker);
-                float cx = Mathf.Clamp(visualPosition.x, 14f, W - 14f), cy = visualPosition.y * layoutVerticalScale - 150f;
+                float cx = Mathf.Clamp(visualPosition.x, 14f, W - 14f);
+                float cy = CookingProgressRingCenterY(visualPosition.y, layoutVerticalScale);
                 // Several real slots may share the same approach column. Stack only
                 // their progress rings, rather than overlapping independent clocks.
                 for (int attempt = 0; attempt <= sim.Workers.Count; attempt++)
@@ -1504,9 +1516,10 @@ namespace HayChoriYPaty
                 {
                     float a = i / (float)segments * Mathf.PI * 2f - Mathf.PI * .5f;
                     GUI.color = i < lit ? new Color(1f, .72f, .18f, 1f) : new Color(.12f, .07f, .035f, .85f);
-                    float radius = 10f;
+                    float radius = CookingRingRadius;
                     GUI.DrawTexture(new Rect(cx + Mathf.Cos(a) * radius - 1.5f,
-                        cy + Mathf.Sin(a) * radius - 1.5f, 3f, 3f), Texture2D.whiteTexture);
+                        cy + Mathf.Sin(a) * radius - CookingRingDotSize * .5f,
+                        CookingRingDotSize, CookingRingDotSize), Texture2D.whiteTexture);
                 }
             }
             GUI.color = old;

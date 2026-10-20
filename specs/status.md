@@ -1,6 +1,26 @@
+## 2026-10-20 — Anillo de progreso sobre la cabeza del Parrillero
+
+El centro del anillo ahora se calcula desde la altura visible del sprite y su escala vertical, dejando 4 puntos entre la cabeza y el borde exterior; tamaño, progreso y apilado quedan igual. Unity 6000.6.3f1: 3/3 EditMode (escalas verticales .8/1/1.25) y 1/1 PlayMode con captura Game View real a 1080×1920. Sin cambio a movimiento, cocción ni inventario.
+
+## 2026-10-19 — Parrilleros +6% de velocidad por mejora
+
+CookWorkRate ahora escala como `1 + SpeedLevel × 0.06`: ×1.00 inicial, ×1.06/×1.12 en las dos primeras compras y ×1.54 al máximo nueve. Normal y Premium comparten la tasa en movimiento y cocción; demás trabajadores conservan +10% por compra. Precios, límite y mejoras restantes sin cambios. Unity 6000.6.3f1: compilation completed, console reported 0 errors/warnings, and 4/4 focused EditMode tests passed (rate milestones/roles, automatic and active cooking, opposing-worker movement). Reconnected MCP by selecting the active Unity instance and refreshing scripts. No broad suite or APK.
+
+## 2026-10-19 — Alternancia fija de Parrilleros
+
+Racing+: el Parrillero sigue un turno global Chori→Paty y el Premium Bondiola→Vacío. La receta se asigna una sola vez por turno, independiente de metas, pedidos, stock o cantidad de trabajadores. Si no se puede reservar producción real (incluida meta completa), termina esa misma receta como ciclo visual; no consume stock ni crea unidades/ventas/metas y continúa la alternancia en el límite siguiente. Niveles1–5 siguen automáticos.
+
+**Validación real Unity 6000.6.3f1:** 12/12 EditMode focalizados; 2/2 PlayMode de captura: 1–4 cocineros real/transporte, más ciclos visuales sin stock de productos0–3 y cuatro cocineros simultáneos. Game View 1080×1920 inspeccionado; arte ambiental de parrilla sigue lleno, mientras el producto de cada turno se verificó en estado de simulación (sin agregar etiquetas ni sprites). Evidencia: `Logs/Acceptance/FixedCookAlternation-20261019/`. MCP se recuperó con telemetry ping tras un `ping not answered`; compilación limpia, consola 0 errores; escena temporal, partida y PlayerPrefs persistente intactos.
+
+**Balance observado, no modificado:** el audit de campaña desde save nuevo ganó1–5 y perdió nivel6 en las variantes de policy factor1.2,1.5 y2.0. Al mejor caso de esas tres le faltaron 89 Choris,24 Patys,11 Bondiolas,8 Vacíos,35 Coca,3 Fernets y16 cervezas dentro de255s. Esto documenta un riesgo para Racing bajo la política automática auditada, no una prueba de imposibilidad universal; niveles7–11 no se recorrieron en una campaña fresca. No se cambiaron tiempos, metas, economía ni precios.
+
+Jobs: EditMode `ab57e76949a447efae965beaa44ab5df` 12/12; PlayMode `67abf30458f84ba68de4a3c035dd540d` 1/1 y `b5e9cec8d59f4978863bf5ce6f60b135` 1/1. El fixture amplio previo a dos casos agregados fue60/62: solo repitió los dos fallos previamente conocidos de vuelta al punto seguro (Parrillero nivel0 y Mozo nivel5); no se reejecutó completo. Sin APK, Git commit/push ni instalación.
+
 ## 2026-10-19 — Fernet-table bottle sizing
 
 Reduced the display-only Coca-Cola bottles on the Fernet table by a further 5% (`.76` → `.722`) and Fernet bottles by 7% (`1.00` → `.93`). Their visible bases stay anchored to the same tabletop planes; bottle count, spacing logic, gameplay stock, and other Coca renders are unchanged. Focused EditMode/PlayMode renderer checks now assert the exact sizes.
+
+Follow-up: reduced only the Fernet tabletop display bottles by another 10% multiplicatively (`.93` → `.837`); Coca display bottles remain `.722`. Layout, tabletop contact, bottle count and gameplay stock are unchanged. Updated the focused EditMode/PlayMode exact-size assertions. Unity MCP reconnected via telemetry ping and script refresh, but the focused test runner timed out before starting; no visual capture was taken.
 
 ## 2026-10-19 — APK 0.2.49/code51
 
@@ -1131,3 +1151,9 @@ Actualizados los cuatro PNG transparentes de Chori, Paty, Bondiola y Vacío; se 
 ## Entrega Android 0.2.50 — 2026-10-19
 
 Commit `df00c91` publicado en `origin/codex/street-automation`. APK Main-only Development IL2CPP/ARM64 generada desde ese commit: versión 0.2.50/code52, 347,626,599 bytes; SHA-256 `a93608239dd515cd107f52246c8fdfb0660831f7c3c55bdcf19e0a42e55d3f11`. ZIP, package/version/API/ABI, alineación y firma v2 verificadas; build Unity 0 errores/1 advertencia de recomendación de símbolos diagnósticos. Sin instalación en dispositivo ni QA de juego posterior a la compilación. Detalle: [android-prototype](features/android-prototype.md).
+
+## Mesas de sándwiches 4×3 — 2026-10-19
+
+Normal/Premium se amplían hacia atrás de196×98 a196×196 unidades nativas, conservando el borde de servicio alineado y la mesa Fernet intacta. Una familia de producto ocupa2×3 anclajes y una familia única4×3; excedentes se apilan sobre anclajes, sin alterar capacidad48/36 ni tamaño/arte del sándwich. Los puntos de recogida siguen siendo alcanzables alrededor de la base, y no se modificaron rutas de depósito ni reglas de producción.
+
+Unity6000.6.3f1 MCP se recuperó tras dos desconexiones WebSocket; compilación limpia, consola final sin errores/advertencias. EditMode: 3/3 layout/sorting/pickup, 4/4 rutas de Mozo por producto, 1/1 producción/depósito y1/1 reserva de slot. PlayMode renderer: 1/1. Capturas reales del renderer Unity guardadas en `Logs/Acceptance/SandwichTables-20261019/`: mesa solo Chori, cuatro productos en ambas mesas, stock apilado y resolución1080×2400. No son Game View completa ni muestran Mozos; esa validación visual combinada queda pendiente. No se guardó la escena ni se tocaron PlayerPrefs. Sin APK ni commit/push.

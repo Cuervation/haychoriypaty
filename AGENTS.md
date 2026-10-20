@@ -6,9 +6,11 @@
 - Hacer el cambio mínimo autorizado. No implementar pendientes ni ampliar alcance; preservar trabajo local ajeno. Cambiar comportamiento exige actualizar su contrato; un retoque cosmético sin impacto contractual no exige reescribir SDD.
 
 ## Trabajo proporcional
-- SIMPLE: principal solo, sin plan extenso, subagentes ni suites globales. MEDIA: principal y delegación opcional con beneficio concreto. COMPLEJA: delegar únicamente tareas independientes; ver [token-optimization](.agents/skills/token-optimization/SKILL.md).
-- Conservar tres roles de `.codex/agents/`: `architecture`, `implementation`, `validation`. Usarlos solo cuando aporten; asignar archivos/responsabilidad exclusivos y advertir que hay otros trabajando. Límite configurado: dos subagentes simultáneos, además del principal.
-- Conservar modelos/esfuerzos de los TOML salvo decisión justificada y autorizada. No cambiar silenciosamente modelo/esfuerzo del chat principal. No instalar paquetes, servicios o dependencias ni modificar configuración global sin autorización específica; no introducir rutas API pagas.
+- SIMPLE: principal solo, criterio y comprobación local, sin plan extenso, agentes ni suites globales. MEDIA: validación independiente opcional si reduce un riesgo concreto. COMPLEJA: exigir validación independiente y delegar solo trabajo independiente; ver [token-optimization](.agents/skills/token-optimization/SKILL.md).
+- Antes de editar, formular criterios de aceptación verificables y marcar cuáles son obligatorios. Conservar los tres roles `.codex/agents/`; asignar responsabilidades/archivos exclusivos, avisar que hay otros trabajando y respetar dos subagentes simultáneos más el principal.
+- Para revisión independiente, validar cada criterio contra evidencia directa, no el reporte de quien implementó. Usar `PASS`, `FAIL`, `BLOCKED`, `NOT_RUN` o `NOT_APPLICABLE` (con motivo); no declarar validación completa si queda algún criterio obligatorio en `FAIL`, `BLOCKED` o `NOT_RUN`.
+- Ante `FAIL` demostrado, devolver al implementador el criterio y la evidencia concreta; corregir solo ese problema y repetir las comprobaciones afectadas. Máximo dos ciclos de corrección; si persiste, parar y reportar lo pendiente sin presentarlo como aprobado.
+- Conservar modelos/esfuerzos de los TOML y el modelo/esfuerzo del chat. No instalar paquetes, servicios o dependencias ni modificar configuración global, trust o seguridad sin autorización específica; no introducir rutas API pagas.
 - Activar solo skills relevantes: `sdd-workflow` para contratos, `unity-2d` para Unity, `targeted-testing` para comprobaciones, `token-optimization` para dimensionar trabajo. Buscar antes de leer y reutilizar evidencia; evitar barridos/handoffs/pruebas repetidos.
 
 ## Unity y producto
