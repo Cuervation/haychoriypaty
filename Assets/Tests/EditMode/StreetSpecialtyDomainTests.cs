@@ -189,10 +189,9 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void ExpirationReleasesAllFourRoleReservationsBeforeDelivery()
+        public void MixedSpecialtyCustomerKeepsReservationsDuringLongWait()
         {
             object balance = NewBalance();
-            Set(balance, "customerPatienceSeconds", .15f);
             Set(balance, "maxCustomers", 1);
             object sim = Make(10, balance: balance);
             Call(sim, "StartRound");
@@ -205,12 +204,20 @@ namespace HayChoriYPaty.Tests
             SetProperty(customer, "State", Enum.Parse(TypeOf("StreetCustomerState"), "Waiting"));
             SetProperty(customer, "Position", Get(customer, "Target"));
             Call(sim, "Step", .01f);
-            Assert.Greater((int)Get(customer, "Reserved"), 0);
-            Call(sim, "Step", .5f);
+            int reservedBeforeWait = (int)Get(customer, "Reserved");
+            Assert.Greater(reservedBeforeWait, 0);
+            System.Collections.IList orderLines = (System.Collections.IList)Get(customer, "OrderLines");
+            int[] ownersBeforeWait = new int[orderLines.Count];
+            for (int i = 0; i < orderLines.Count; i++) ownersBeforeWait[i] = (int)Get(orderLines[i], "OwnerWorkerId");
+            MethodInfo advance = sim.GetType().GetMethod("AdvanceCustomers", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(advance);
+            advance.Invoke(sim, new object[] { 100f });
+            Assert.AreEqual("Waiting", Get(customer, "State").ToString());
+            Assert.AreEqual(reservedBeforeWait, Get(customer, "Reserved"));
             Assert.AreEqual(0, Get(sim, "Delivered"));
-            Assert.AreEqual(0, Get(customer, "Reserved"));
-            for (int i = 0; i < ((System.Collections.IList)Get(customer, "OrderLines")).Count; i++)
-                Assert.AreEqual(0, Get(((System.Collections.IList)Get(customer, "OrderLines"))[i], "OwnerWorkerId"));
+            Assert.AreEqual(0, Get(sim, "CustomersLost"));
+            for (int i = 0; i < orderLines.Count; i++)
+                Assert.AreEqual(ownersBeforeWait[i], Get(orderLines[i], "OwnerWorkerId"), "A pending specialty line keeps its worker assignment.");
         }
 
         [Test]

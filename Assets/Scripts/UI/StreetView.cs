@@ -2898,8 +2898,6 @@ namespace HayChoriYPaty
                 if (!string.IsNullOrEmpty(hiddenOrderIndicator))
                     GUI.Label(OrderMoreBounds(bubble, contentScale), hiddenOrderIndicator, tiny);
             }
-            // A sprite-backed patience strip; no placeholder shape stands in for game art.
-            GUI.color=new Color(.32f,.7f,.32f);Item(new Rect(position.x-22,position.y-64,44*c.PatienceFraction,4),13,true);GUI.color=Color.white;
         }
         private const float OrderRowHeight = 25f;
         private const float OrderPaddingY = 8f;

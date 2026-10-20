@@ -573,7 +573,6 @@ MonoBehaviour:
     - 2.415765
     - 2.6573415
     pickupSeconds: 0.28
-    customerPatienceSeconds: 180
     minPrice: 0
     maxPrice: 60
     productPriceMultipliers:
@@ -597,7 +596,6 @@ MonoBehaviour:
     minOrderQuantity: 999
     maxOrderQuantity: 999
     initialPrice: 5
-    deliveryPatienceRefreshSeconds: 180
     levelProductCounts: 0100000002000000030000000500000007000000070000000700000007000000070000000700000007000000i
     levelProductIds:
     - 0

@@ -204,3 +204,17 @@ Supersedes only the 2026-10-19 Normal/Premium table dimensions/art fit. Each foo
 - [x] Real Parrillero simulation reached `Deposit` with a real food unit; the focused worker-projection test passed 1/1 and was rerun after the slot-order change (1/1), capturing the worker beside the new table.
 - [x] Native Unity kitchen-camera projections inspected at 918×1600, 1080×1920, and 1080×2400: sparse solo Chori, paired Normal/Premium, full stock, and real Parrillero deposit. Full Editor Game View captures also passed at 540×960 and 540×1200 with sparse stock, both product rows, and a real Mozo carrying a real sandwich. All captures are in `Logs/Acceptance/SandwichTables-20261020/`; no physical-device capture was made.
 - [x] Unity MCP initially timed out on `editor_state`/ping; a telemetry ping followed by an asset/script refresh restored readiness without restarting Unity. No scene was saved and PlayerPrefs were not modified.
+
+
+### 2026-10-20 — Approved folding tables, compact 4×3 stock and +10% sandwiches
+
+The user approved the real Unity compact-grid preview. Normal/Premium now use the approved horizontal plank and two four-leg folding trestles with restraint cords, in the same warm wood palette as Fernet. A shared source `food-table-folding-v2.png` is sliced into the plank and separate left/right supports; existing Sprite/meta identities are preserved. The focused builder rebuilds only these two food-table prefabs; Fernet is untouched.
+
+The visible food furniture matches Fernet's trimmed aspect (1727×740) while keeping the existing 80-unit logical bounds, route obstacles and service edges. Stock uses twelve base positions per table (three depth rows, four columns; two columns per product when paired), a 1.25-unit horizontal gap, and base-contact positioning with natural perspective overlap. Extra real stock keeps the existing 48/36 capacities and inward stack offsets. Layout footprints explicitly match the current food Sprite aspects, guarded by tests.
+
+One shared `SandwichVisualScaleMultiplier = 1.10` enlarges Chori, Paty, Bondiola and Vacío exactly once in both table and carry display contexts relative to the approved preview/current carry size. Existing premium differentiation remains; drink sizes, cooking, ingredients, prices, sales and capacities do not change.
+
+- [x] Focused Unity validation: 8/8 final EditMode cases (compact rows/pickup, six active-level route cases, prefab/resources) and 12/12 PlayMode cases (display targets, exact native +10% table/carry bounds at two vertical scales, furniture fit/Fernet). Native full-capacity cross-product geometry also passed 900 pair checks; capacities remain 48/36.
+- [x] Actual production-renderer Game Views reviewed at 1080×1920 and 1080×2400 with 24 table units and two physically carried sandwiches (normal/Premium), without visual proxy objects. Tall base-contact assertions passed for all 24 servings; console had zero errors. Captures: `Logs/Acceptance/FoldingTablesScale10-20261020/racing-plus10-table-and-carry.png` and `racing-plus10-1080x2400.png`. QA used an isolated, non-persistent scene; its objects/preset were removed and the original scene/view restored. No APK, push or device check.
+
+Artwork provenance: approved built-in ImageGen folding-table candidate, palette matched to the existing Fernet art; no generated image used as Unity evidence. Source PNG SHA-256: `39a640a9a02c27951591b571895f509479026419f4d5707690d7582bad9a3eb6`. Original table PNGs/metas are retained.

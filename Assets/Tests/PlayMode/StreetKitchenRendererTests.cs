@@ -17,14 +17,14 @@ namespace HayChoriYPaty.Tests
         private static object CallExact(object value, string name, Type[] parameterTypes, params object[] args) =>
             value.GetType().GetMethod(name, Instance, null, parameterTypes, null).Invoke(value, args);
 
-        [TestCase(0, false, 28.08f, 15.12f)]
-        [TestCase(1, false, 21.6f, 15.12f)]
-        [TestCase(2, false, 30.888f, 16.632f)]
-        [TestCase(3, false, 30.888f, 16.632f)]
-        [TestCase(0, true, 39f, 22.5f)]
-        [TestCase(1, true, 30f, 22.5f)]
-        [TestCase(2, true, 33f, 24.75f)]
-        [TestCase(3, true, 33f, 24.75f)]
+        [TestCase(0, false, 30.888f, 16.632f)]
+        [TestCase(1, false, 23.76f, 16.632f)]
+        [TestCase(2, false, 26.136f, 18.2952f)]
+        [TestCase(3, false, 26.136f, 18.2952f)]
+        [TestCase(0, true, 42.9f, 24.75f)]
+        [TestCase(1, true, 33f, 24.75f)]
+        [TestCase(2, true, 36.3f, 27.225f)]
+        [TestCase(3, true, 36.3f, 27.225f)]
         [TestCase(4, false, 9f, 20f)]
         [TestCase(5, false, 18f, 28f)]
         public void SandwichesUseLargerAspectPreservingDisplayTargetsWithoutScalingDrinks(
@@ -34,6 +34,54 @@ namespace HayChoriYPaty.Tests
             Vector2 size = (Vector2)method.Invoke(null, new object[] { product, carried });
             Assert.AreEqual(expectedWidth, size.x, .0001f);
             Assert.AreEqual(expectedHeight, size.y, .0001f);
+        }
+
+        [UnityTest]
+        public IEnumerator NativeSandwichSpritesIncreaseExactlyTenPercentOnTablesAndDuringCarry()
+        {
+            var root = new GameObject("Ten percent sandwich size validation");
+            try
+            {
+                Component renderer = root.AddComponent(GameType("StreetKitchenRenderer"));
+                object sim = Activator.CreateInstance(GameType("StreetSimulation"),
+                    new object[] { Activator.CreateInstance(GameType("StreetBalance")), 5, 5f, 0, 1, 0 });
+                object kitchen = Get(sim, "Kitchen");
+                ClearKitchenUnits(kitchen);
+                for (int p = 0; p < 4; p++) AddTableFood(kitchen, p, 0, 1);
+                foreach (float vertical in new[] { 1f, 1.25f })
+                {
+                    Call(renderer, "Prepare", sim, vertical, 960f * vertical);
+                    var objects = (IDictionary)renderer.GetType().GetField("foodObjects", Instance).GetValue(renderer);
+                    foreach (object unit in (IEnumerable)Get(kitchen, "Units"))
+                    {
+                        int product = (int)Get(unit, "Product");
+                        GameObject go = (GameObject)objects[(int)Get(unit, "Id")];
+                        SpriteRenderer sprite = go.GetComponentInChildren<SpriteRenderer>();
+                        foreach (bool carried in new[] { false, true })
+                        {
+                            Vector2 oldTarget = carried
+                                ? product == 0 ? new Vector2(39f, 22.5f)
+                                    : product == 1 ? new Vector2(30f, 22.5f) : new Vector2(33f, 24.75f)
+                                : product == 0 ? new Vector2(28.08f, 15.12f)
+                                    : product == 1 ? new Vector2(21.6f, 15.12f) : new Vector2(23.76f, 16.632f);
+                            Call(renderer, "UpdateFoodObject", unit, go, carried);
+                            Vector2 source = sprite.sprite.bounds.size;
+                            float oldScale = Mathf.Min(oldTarget.x / source.x, oldTarget.y / source.y);
+                            Assert.AreEqual(source.x * oldScale * 1.10f, sprite.bounds.size.x * 100f, .001f);
+                            Assert.AreEqual(source.y * oldScale * 1.10f, sprite.bounds.size.y * 100f, .001f);
+                            if (!carried)
+                            {
+                                Vector2 footprint = (Vector2)GameType("StreetKitchenLayout").GetMethod("TableServingFootprint")
+                                    .Invoke(null, new object[] { product });
+                                Assert.AreEqual(footprint.x, sprite.bounds.size.x * 100f, .001f);
+                                Assert.AreEqual(footprint.y, sprite.bounds.size.y * 100f, .001f);
+                            }
+                        }
+                    }
+                }
+            }
+            finally { UnityEngine.Object.Destroy(root); }
+            yield return null;
         }
 
         [UnityTest]
@@ -51,6 +99,9 @@ namespace HayChoriYPaty.Tests
                 var propsRoot = (GameObject)renderer.GetType().GetField("propsRoot", Instance).GetValue(renderer);
                 Rect normalBounds = (Rect)Get(layout, "NormalTableBounds");
                 Rect premiumBounds = (Rect)Get(layout, "PremiumTableBounds");
+                MethodInfo fit = GameType("StreetKitchenLayout").GetMethod("FoodTableVisualBounds", BindingFlags.Public | BindingFlags.Static);
+                Rect normalVisual = (Rect)fit.Invoke(null, new object[] { normalBounds });
+                Rect premiumVisual = (Rect)fit.Invoke(null, new object[] { premiumBounds });
                 Rect fernetBounds = (Rect)Get(layout, "FernetTableBounds");
                 Transform normal = propsRoot.transform.Find("station:Station_NormalTable");
                 Transform premium = propsRoot.transform.Find("station:Station_PremiumTable");
@@ -71,10 +122,10 @@ namespace HayChoriYPaty.Tests
                 float tableHeight = (float)GameType("StreetKitchenLayout")
                     .GetField("SandwichTableHeight", BindingFlags.Public | BindingFlags.Static).GetRawConstantValue();
                 Assert.AreEqual(normalBounds.width * .01f, normalSprite.bounds.size.x, .001f);
-                Assert.AreEqual(normalBounds.height * topDepthRatio * .01f, normalSprite.bounds.size.y, .001f,
+                Assert.AreEqual(normalVisual.height * topDepthRatio * .01f, normalSprite.bounds.size.y, .001f,
                     "The normal plank fills the usable three-row surface.");
                 Assert.AreEqual(premiumBounds.width * .01f, premiumSprite.bounds.size.x, .001f);
-                Assert.AreEqual(premiumBounds.height * topDepthRatio * .01f, premiumSprite.bounds.size.y, .001f);
+                Assert.AreEqual(premiumVisual.height * topDepthRatio * .01f, premiumSprite.bounds.size.y, .001f);
                 Assert.AreEqual(normalBounds.height * .01f, tableHeight * .01f, .001f,
                     "Normal and Premium bounds are exactly 80 logical pixels tall.");
                 Assert.AreEqual(normalLeft.bounds.size.x, normalRight.bounds.size.x, .001f);
@@ -92,6 +143,8 @@ namespace HayChoriYPaty.Tests
                     fernetBounds.height / fernetSourceSize.y) * fernetSourceSize.y * .01f;
                 Assert.AreEqual(fernetAspectFitHeight, fernetSprite.bounds.size.y, .001f,
                     "The separate Fernet table keeps its original aspect-preserving dimensions.");
+                Assert.AreEqual(fernetSprite.bounds.size.y, normalVisual.height * .01f, .001f,
+                    "Visible food-table height matches the original Fernet furniture.");
                 Assert.AreEqual(normalBounds.yMax, premiumBounds.yMax, .001f);
                 Assert.AreEqual(normalBounds.yMax, fernetBounds.yMax, .001f,
                     "All service edges remain at their former shared position.");

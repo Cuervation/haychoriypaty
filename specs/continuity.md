@@ -25,7 +25,7 @@ Juego Unity Android de 11 niveles. Escenario original restaurado con más circul
 
 ## 3. Funcionalidades implementadas
 
-- Once clubes con catálogo progresivo de siete productos, cuotas independientes, FIFO y paciencia por cliente; ingresos solo al entregar físicamente.
+- Once clubes con catálogo progresivo de siete productos, cuotas independientes y FIFO; los clientes no expiran por espera y los ingresos solo ocurren al entregar físicamente.
 - Contratación sin tope de gameplay, cinco roles disponibles según catálogo/modo, velocidad limitada, reinicio del equipo/velocidad en cada partida.
 - Cocina modular y stock físico; desde nivel 6 cocineros activos y Mozo exclusivo para sándwiches. Bebidas entregadas por sus roles.
 - Mercado/Heladera en una sola pantalla IMGUI, saldo e inventario persistentes, recetas/reservas y compras cash-only; restauración de stock al perder y liquidación por intento de cada victoria real. Recuperación exacta del último recibo antiguo válido, reparaciones legacy y premio acotado al primer desbloqueo.

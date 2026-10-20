@@ -39,11 +39,15 @@ namespace HayChoriYPaty
         private const float GrillArtworkAspect = 2131f / 606f;
         public const float TableSandwichScale = 1.5f, PremiumTableSandwichScaleMultiplier = 1.10f;
         private const float TableSandwichDisplayScale = .72f;
-        public const float SandwichTableTopDepthRatio = .67f;
+        public const float SandwichVisualScaleMultiplier = 1.10f;
+        public const float SandwichTableTopDepthRatio = .35f;
+        public const float CompactSandwichGap = 1.25f;
+        // Trimmed empty-table sprite is 1727 x 740; match Fernet visually, not its padded logical bounds.
+        private const float FernetArtworkAspect = 1727f / 740f;
         private const float TableSandwichWoodTopDepth = SandwichTableTopDepthRatio;
-        public const float SandwichTableSupportWidthFraction = .26f;
-        public const float SandwichTableSupportCenterFraction = .28f;
-        public const float SandwichTableSupportOverlap = 3f;
+        public const float SandwichTableSupportWidthFraction = .23f;
+        public const float SandwichTableSupportCenterFraction = .14f;
+        public const float SandwichTableSupportOverlap = .6f;
         private const float TableSandwichStackStep = .75f, TableSandwichMaxStackOffset = 6f;
         public const float GrillBottomLimit = TiledPlayfieldBottom - GrillBottomClearance;
         private const float GrillSurfaceTop = .115f, GrillSurfaceBottom = .46f;
@@ -559,35 +563,58 @@ namespace HayChoriYPaty
                 return new Vector2(x + dx, baseY - 16f + dy);
             }
 
-            // Four-by-three repeatable base positions use two columns per product when paired,
-            // and four when alone. Extra real units stack over those positions without changing
-            // table capacity or the unchanged sandwich sprite dimensions.
-            Vector2 itemSize = TableServingSize(product);
-            float halfWidth = itemSize.x * .5f + 1f;
-            float halfHeight = itemSize.y * .5f + 1f;
-            float halfTableWidth = companionAvailable ? r.width * .5f : r.width;
-            float sectionLeft = r.x + (companionAvailable && (product == 1 || product == 3) ? halfTableWidth : 0f);
-            float minX = sectionLeft + halfWidth;
-            float maxX = sectionLeft + halfTableWidth - halfWidth;
-            float minY = r.y + halfHeight;
-            float maxY = r.y + woodTopDepth - halfHeight;
-            if (maxY < minY) minY = maxY = r.y + woodTopDepth * .5f;
+            Rect visual = FoodTableVisualBounds(r);
+            Vector2 footprint = TableServingFootprint(product);
+            int baseCount = companionAvailable ? 6 : 12;
+            int columns = companionAvailable ? 2 : 4;
+            int baseSlot = index % baseCount;
+            int rowIndex = baseSlot / columns;
+            int localColumn = baseSlot % columns;
+            int column = companionAvailable ? localColumn
+                : (localColumn % 2 == 0 ? localColumn / 2 : columns - 1 - localColumn / 2);
+            float itemX;
+            if (companionAvailable)
+            {
+                int firstProduct = product & ~1;
+                float firstWidth = TableServingFootprint(firstProduct).x;
+                float secondWidth = TableServingFootprint(firstProduct + 1).x;
+                float clusterWidth = 2f * (firstWidth + secondWidth) + 3f * CompactSandwichGap;
+                float start = visual.center.x - clusterWidth * .5f;
+                itemX = product == firstProduct
+                    ? start + firstWidth * .5f + column * (firstWidth + CompactSandwichGap)
+                    : start + 2f * firstWidth + 2f * CompactSandwichGap + secondWidth * .5f
+                        + column * (secondWidth + CompactSandwichGap);
+            }
+            else
+            {
+                float clusterWidth = 4f * footprint.x + 3f * CompactSandwichGap;
+                itemX = visual.center.x - clusterWidth * .5f + footprint.x * .5f
+                    + column * (footprint.x + CompactSandwichGap);
+            }
+            // Extra real inventory fans inward within its own product group, never into its companion.
+            float stackOffset = Mathf.Min(index / baseCount * TableSandwichStackStep, TableSandwichMaxStackOffset);
+            itemX += column < columns * .5f ? stackOffset : -stackOffset;
+            float contactY = visual.y + visual.height * SandwichTableTopDepthRatio * (.14f + .28f * rowIndex);
+            // A food sprite rises above its supporting contact; its full rectangle is not a floor footprint.
+            return new Vector2(itemX, contactY - footprint.y * .5f);
+        }
 
-            int basePositionCount = companionAvailable ? 6 : 12;
-            int columnCount = companionAvailable ? 2 : 4;
-            int basePosition = index % basePositionCount;
-            int stackLayer = index / basePositionCount;
-            int sandwichRow = basePosition / columnCount; // 0 rear, 1 middle, 2 front
-            int baseColumn = basePosition % columnCount;
-            // With no paired product, place the first two units at opposite ends so a sparse
-            // solo stock uses the board's width instead of clustering in its left half.
-            int column = companionAvailable ? baseColumn
-                : (baseColumn % 2 == 0 ? baseColumn / 2 : columnCount - 1 - baseColumn / 2);
-            float stackOffset = Mathf.Min(stackLayer * TableSandwichStackStep, TableSandwichMaxStackOffset);
-            float itemX = Mathf.Lerp(minX, maxX, column / (float)(columnCount - 1));
-            itemX += column < columnCount * .5f ? stackOffset : -stackOffset;
-            float y = Mathf.Lerp(minY, maxY, sandwichRow / 2f);
-            return new Vector2(itemX, y);
+        /// <summary>Approved visible furniture fit; logical obstacles/service edges remain unchanged.</summary>
+        public static Rect FoodTableVisualBounds(Rect station)
+        {
+            float height = Mathf.Min(station.height, station.width / FernetArtworkAspect);
+            return new Rect(station.x, station.yMax - TableHeight * .5f - height * .5f, station.width, height);
+        }
+
+        /// <summary>Aspect-preserved food silhouette, matching the existing trimmed Sprite assets.</summary>
+        public static Vector2 TableServingFootprint(int product)
+        {
+            Vector2 target = TableServingSize(product);
+            if (product < 0 || product > 3) return target;
+            float aspect = product == 0 ? 1824f / 791f : product == 1 ? 1478f / 761f
+                : product == 2 ? 1704f / 787f : 1752f / 709f;
+            float width = Mathf.Min(target.x, target.y * aspect);
+            return new Vector2(width, width / aspect);
         }
 
         /// <summary>On-table serving footprint, shared by slot layout and the native renderer.</summary>
@@ -596,7 +623,7 @@ namespace HayChoriYPaty
             if (product <= 3 && product >= 0)
             {
                 Vector2 baseSize = product == 0 ? new Vector2(26f, 14f) : new Vector2(20f, 14f);
-                return baseSize * (TableSandwichScale * (product >= 2 ? PremiumTableSandwichScaleMultiplier : 1f) * TableSandwichDisplayScale);
+                return baseSize * (TableSandwichScale * (product >= 2 ? PremiumTableSandwichScaleMultiplier : 1f) * TableSandwichDisplayScale * SandwichVisualScaleMultiplier);
             }
             return product == 5 ? new Vector2(18f, 28f) : product == 4 || product == 6 ? new Vector2(9f, 20f) : Vector2.zero;
         }

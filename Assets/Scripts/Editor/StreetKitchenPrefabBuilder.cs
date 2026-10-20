@@ -54,11 +54,64 @@ namespace HayChoriYPaty.Editor
         private static void ConfigureAllSprites()
         {
             string[] files = {
-                "empty-grill", "empty-table", "food-table-plank", "food-table-trestle", "blue-barrel", "sandwich-chori", "sandwich-paty",
+                "empty-grill", "empty-table", "blue-barrel", "sandwich-chori", "sandwich-paty",
                 "sandwich-bondiola", "sandwich-vacio", "coca", "beer", "fernet", "ice", "smoke", "heat"
             };
             for (int i = 0; i < files.Length; i++) ConfigureTexture(files[i], false);
             for (int i = 0; i < MeatFiles.Length; i++) ConfigureTexture(MeatFiles[i], true);
+            ConfigureFoldingTableSprites();
+        }
+
+        [MenuItem("Hay Chori y Paty/Modular Kitchen/Build Approved Food Tables Only")]
+        public static void BuildApprovedFoodTables()
+        {
+            AssetDatabase.Refresh();
+            ConfigureFoldingTableSprites();
+            CreateFoodTablePrefab("Station_NormalTable");
+            CreateFoodTablePrefab("Station_PremiumTable");
+            AssetDatabase.SaveAssets();
+        }
+
+        private static void ConfigureFoldingTableSprites()
+        {
+            string path = ArtFolder + "/food-table-folding-v2.png";
+            var importer = AssetImporter.GetAtPath(path) as TextureImporter;
+            if (importer == null) throw new InvalidOperationException("Missing approved folding table: " + path);
+            importer.textureType = TextureImporterType.Default;
+            importer.isReadable = true;
+            importer.maxTextureSize = 2048;
+            importer.filterMode = FilterMode.Trilinear;
+            importer.textureCompression = TextureImporterCompression.Compressed;
+            importer.alphaIsTransparency = true;
+            importer.mipmapEnabled = true;
+            importer.npotScale = TextureImporterNPOTScale.None;
+            importer.wrapMode = TextureWrapMode.Clamp;
+            // Reuse this project's existing Android furniture compression rather than adding a new policy.
+            var baseline = AssetImporter.GetAtPath(ArtFolder + "/food-table-plank.png") as TextureImporter;
+            if (baseline != null) importer.SetPlatformTextureSettings(baseline.GetPlatformTextureSettings("Android"));
+            importer.SaveAndReimport();
+            var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            Color32[] pixels = texture.GetPixels32();
+            Rect full = AlphaBounds(pixels, texture.width, texture.height, 0, 0, texture.width, texture.height, 100);
+            int split = (int)full.yMax - 1;
+            for (int y = (int)full.yMin; y < full.yMax; y++)
+            {
+                int count = 0;
+                for (int x = (int)full.xMin; x < full.xMax; x++)
+                    if (pixels[y * texture.width + x].a >= 100) count++;
+                if (count > full.width * .8f) { split = y; break; }
+            }
+            SaveSpriteAsset("food-table-plank", "food-table-plank", texture,
+                new Rect(full.x, split, full.width, full.yMax - split));
+            int middle = (int)full.center.x;
+            SaveSpriteAsset("food-table-trestle", "food-table-trestle", texture,
+                AlphaBounds(pixels, texture.width, texture.height, (int)full.x, (int)full.y,
+                    middle - (int)full.x, split - (int)full.y, 100));
+            SaveSpriteAsset("food-table-trestle-right", "food-table-trestle-right", texture,
+                AlphaBounds(pixels, texture.width, texture.height, middle, (int)full.y,
+                    (int)full.xMax - middle, split - (int)full.y, 100));
+            importer.isReadable = false;
+            importer.SaveAndReimport();
         }
 
         private static void ConfigureTexture(string name, bool fourStates)
@@ -124,13 +177,13 @@ namespace HayChoriYPaty.Editor
         }
 
 
-        private static Rect AlphaBounds(Color32[] pixels, int textureWidth, int textureHeight, int x0, int y0, int width, int height)
+        private static Rect AlphaBounds(Color32[] pixels, int textureWidth, int textureHeight, int x0, int y0, int width, int height, byte threshold = 8)
         {
             int minX = width, minY = height, maxX = -1, maxY = -1;
             for (int y = 0; y < height; y++)
             for (int x = 0; x < width; x++)
             {
-                if (pixels[(y0 + y) * textureWidth + x0 + x].a < 8) continue;
+                if (pixels[(y0 + y) * textureWidth + x0 + x].a < threshold) continue;
                 if (x < minX) minX = x;
                 if (x > maxX) maxX = x;
                 if (y < minY) minY = y;
@@ -160,7 +213,7 @@ namespace HayChoriYPaty.Editor
             Sprite trestle = Sprite("food-table-trestle");
             Sprite plank = Sprite("food-table-plank");
             AddSpriteChild(root, "Trestle_Left", trestle, 0);
-            AddSpriteChild(root, "Trestle_Right", trestle, 0);
+            AddSpriteChild(root, "Trestle_Right", Sprite("food-table-trestle-right"), 0);
             AddSpriteChild(root, "Tabletop", plank, 2);
             SavePrefab(root, name);
         }

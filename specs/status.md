@@ -1,3 +1,7 @@
+## 2026-10-20 — Barra y expiración por paciencia eliminadas
+
+Se quitó el indicador verde del render y toda la cuenta regresiva individual en `StreetSimulation`; los hinchas ya no abandonan la cola por esperar y conservan pedidos/reservas hasta una salida normal. Se eliminaron los parámetros y datos serializados de paciencia de `StreetBalance`/Main; se preservó `CustomersLost` como estadística legacy que devuelve cero. Unity MCP respondió tras telemetry ping + refresh de scripts; compilación final limpia (consola: 0 errores/advertencias). 6/6 pruebas EditMode focalizadas pasaron (`507b4867f73b48d7a450818d86702f57`), cubriendo espera larga, reservas, ocupación FIFO y especialidades. No se capturó Game View ni se generó APK.
+
 ## 2026-10-20 — Anillo de progreso sobre la cabeza del Parrillero
 
 El centro del anillo ahora se calcula desde la altura visible del sprite y su escala vertical, dejando 4 puntos entre la cabeza y el borde exterior; tamaño, progreso y apilado quedan igual. Unity 6000.6.3f1: 3/3 EditMode (escalas verticales .8/1/1.25) y 1/1 PlayMode con captura Game View real a 1080×1920. Sin cambio a movimiento, cocción ni inventario.

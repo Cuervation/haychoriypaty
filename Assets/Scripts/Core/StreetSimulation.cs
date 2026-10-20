@@ -65,7 +65,6 @@ namespace HayChoriYPaty
         [Min(10f)] public float customerSpeed = 300f;
         public float[] levelDemandMultipliers = { 1f, 1.1f, 1.2f, 1.35f, 1.5f, 1.65f, 1.815f, 1.9965f, 2.19615f, 2.415765f, 2.6573415f };
         [Min(0.01f)] public float pickupSeconds = 0.28f;
-        [Min(0.1f)] public float customerPatienceSeconds = 180f;
         [Min(0f)] public float minPrice = 0f;
         [Min(0f)] public float maxPrice = 60f;
         public float[] productPriceMultipliers = { 1f, 1f, 1f, 1f, 1f, 1f, 1f };
@@ -74,7 +73,6 @@ namespace HayChoriYPaty
         [Min(1)] public int minOrderQuantity = 999;
         [Min(1)] public int maxOrderQuantity = 999;
         [Min(0f)] public float initialPrice = 5f;
-        [Min(0f)] public float deliveryPatienceRefreshSeconds = 180f;
         public int[] levelProductCounts = { 1, 2, 3, 5, 7, 7, 7, 7, 7, 7, 7 };
         [Tooltip("Comma-separated stable product IDs, in each level's display/order priority.")]
         public string[] levelProductIds = { "0", "0,4", "0,1,4", "0,1,2,4,6", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5" };
@@ -204,9 +202,7 @@ namespace HayChoriYPaty
         public Vector2 Position { get; internal set; }
         public Vector2 Target { get; internal set; }
         public StreetCustomerState State { get; internal set; }
-        public float PatienceFraction { get; internal set; }
         public float AnimationTime { get; internal set; }
-        internal float Patience;
         internal float ReceiveRemaining;
         internal int Slot;
         internal bool DeliverySoundPlayed;
@@ -329,7 +325,7 @@ namespace HayChoriYPaty
         private float arrival;
         private int nextCustomer = 1, nextWorker = 1, nextSale = 1;
         private readonly int[] deliveredByProduct = new int[7];
-        private int customersAttended, customersLost, ordersCompleted;
+        private int customersAttended, ordersCompleted;
         private float price;
         private System.Random random;
         private IStreetKitchenStock ingredientStock;
@@ -343,7 +339,8 @@ namespace HayChoriYPaty
         public int CoinsEarned { get; private set; }
         public int Delivered { get; private set; }
         public int CustomersAttended => customersAttended;
-        public int CustomersLost => customersLost;
+        // Kept for statistics/save compatibility; wait-time losses are no longer part of gameplay.
+        public int CustomersLost => 0;
         public int OrdersCompleted => ordersCompleted;
         public int ChoriDelivered { get { return GetProductDelivered(0); } }
         public int CocaDelivered { get { return GetProductDelivered(4); } }
@@ -567,7 +564,7 @@ namespace HayChoriYPaty
         {
             customers.Clear(); sales.Clear();
             Coins = balance.GetStartingCoins(LevelIndex); CoinsEarned = 0; // Opening balance is a configured attempt grant, not earned revenue.
-            Elapsed = 0f; Delivered = 0; customersAttended = customersLost = ordersCompleted = 0;
+            Elapsed = 0f; Delivered = 0; customersAttended = ordersCompleted = 0;
             Array.Clear(deliveredByProduct, 0, deliveredByProduct.Length);
             // Every round entry is a fresh attempt, regardless of selected club.
             ResetTeamAndSpeed();
@@ -617,7 +614,7 @@ namespace HayChoriYPaty
             RefreshKitchenLayout();
             ResetTeamAndSpeed();
             Coins = balance.GetStartingCoins(LevelIndex); CoinsEarned = 0;
-            customersAttended = customersLost = ordersCompleted = 0;
+            customersAttended = ordersCompleted = 0;
             Array.Clear(deliveredByProduct, 0, deliveredByProduct.Length); Delivered = 0;
             return true;
         }
@@ -628,7 +625,7 @@ namespace HayChoriYPaty
             RefreshKitchenLayout();
             ResetTeamAndSpeed();
             Coins = balance.GetStartingCoins(LevelIndex); CoinsEarned = 0;
-            customersAttended = customersLost = ordersCompleted = 0;
+            customersAttended = ordersCompleted = 0;
             Array.Clear(deliveredByProduct, 0, deliveredByProduct.Length); Delivered = 0;
             Phase = RoundPhase.Ready; return true;
         }
@@ -673,8 +670,7 @@ namespace HayChoriYPaty
             Vector2 target = QueuePosition(slot);
             bool left = (nextCustomer & 1) == 0;
             var customer = new StreetCustomer { Id = nextCustomer++, Position = new Vector2(left ? -40 : 580, target.y),
-                Target = target, State = StreetCustomerState.Entering, Patience = Mathf.Max(0.1f, balance.customerPatienceSeconds),
-                PatienceFraction = 1f, Slot = slot };
+                Target = target, State = StreetCustomerState.Entering, Slot = slot };
             customer.SetOrder(products, boundedQuantities);
             customers.Add(customer);
             return true;
@@ -871,12 +867,9 @@ namespace HayChoriYPaty
                     c.Position = Move(c.Position, c.Target, balance.customerSpeed, dt);
                     if (c.Position == c.Target && c.State != StreetCustomerState.Receiving) c.State = StreetCustomerState.Waiting;
                 }
-                if (c.State == StreetCustomerState.Waiting || c.State == StreetCustomerState.Advancing)
-                { c.Patience -= dt; c.PatienceFraction = Mathf.Clamp01(c.Patience / Mathf.Max(0.1f, balance.customerPatienceSeconds)); }
-                if (c.Patience <= 0f && c.State != StreetCustomerState.Leaving) SetLeaving(c, true);
                 // A sold-out extra ticket must not block FIFO lanes behind it. Preserve its pending
                 // quantities and normal departure/cancellation; never count it as a completed order.
-                if (c.State == StreetCustomerState.Waiting && IsAtCounter(c) && OnlySoldOutExtrasRemain(c)) SetLeaving(c, false);
+                if (c.State == StreetCustomerState.Waiting && IsAtCounter(c) && OnlySoldOutExtrasRemain(c)) SetLeaving(c);
                 if (c.State == StreetCustomerState.Leaving) { c.Position = Move(c.Position, c.Target, 180f, dt); if (c.Position == c.Target) RemoveCustomer(c); }
                 if(c.State==StreetCustomerState.Receiving) { c.ReceiveRemaining-=dt; if(c.ReceiveRemaining<=0f) { if(!HasOutstandingItems(c))SetLeaving(c);else c.State=c.Position==c.Target?StreetCustomerState.Waiting:StreetCustomerState.Advancing; } }
             }
@@ -1473,8 +1466,6 @@ namespace HayChoriYPaty
                 if (!customer.WasServed) { customer.WasServed = true; customersAttended++; }
                 int amount = Mathf.Max(0, Mathf.RoundToInt(GetProductPrice(worker.Product)));
                 Coins += amount; CoinsEarned += amount; sales.Add(new StreetSale { Id = nextSale++, Amount = amount, Position = new Vector2(customer.Target.x, 400) });
-                customer.Patience = Mathf.Max(0.1f, balance.deliveryPatienceRefreshSeconds);
-                customer.PatienceFraction = Mathf.Clamp01(customer.Patience / Mathf.Max(0.1f, balance.customerPatienceSeconds));
                 if (sales.Count > 40) sales.RemoveAt(0);
 
                 if (line.Remaining > 0 && Kitchen.HasSupply(worker.Product))
@@ -1525,11 +1516,9 @@ namespace HayChoriYPaty
             customers.Remove(c);
             if (column >= 0) CompactQueue(column);
         }
-        private void SetLeaving(StreetCustomer c) { SetLeaving(c, false); }
-        private void SetLeaving(StreetCustomer c, bool impatient)
+        private void SetLeaving(StreetCustomer c)
         {
             if (c.State == StreetCustomerState.Leaving) return;
-            if (impatient) customersLost++;
             int column = c.Slot % QueueColumns;
             c.State = StreetCustomerState.Leaving; c.Target = new Vector2(c.Position.x < 270 ? -50 : 590, c.Position.y);
             c.Slot = -1; // No longer in the queue, but still counted until the exit walk ends.

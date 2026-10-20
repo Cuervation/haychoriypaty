@@ -133,7 +133,7 @@ namespace HayChoriYPaty
                 "Drink_Coca", "Drink_Beer", "Drink_Fernet", "Effect_Smoke", "Effect_Heat", "Prop_Ice"
             };
             string[] singleArt = {
-                "empty-grill", "empty-table", "food-table-plank", "food-table-trestle", "blue-barrel", "sandwich-chori", "sandwich-paty",
+                "empty-grill", "empty-table", "food-table-plank", "food-table-trestle", "food-table-trestle-right", "blue-barrel", "sandwich-chori", "sandwich-paty",
                 "sandwich-bondiola", "sandwich-vacio", "coca", "beer", "fernet", "ice", "smoke", "heat"
             };
             var missing = new List<string>();
@@ -299,13 +299,14 @@ namespace HayChoriYPaty
             }
 
             instance.transform.localScale = Vector3.one;
-            float topDepth = bounds.height * StreetKitchenLayout.SandwichTableTopDepthRatio;
-            float supportHeight = bounds.height - topDepth + StreetKitchenLayout.SandwichTableSupportOverlap;
-            float supportCenterY = bounds.yMin + bounds.height - supportHeight * .5f;
-            float leftCenterX = bounds.xMin + bounds.width * StreetKitchenLayout.SandwichTableSupportCenterFraction;
-            float rightCenterX = bounds.xMax - bounds.width * StreetKitchenLayout.SandwichTableSupportCenterFraction;
+            Rect visual = StreetKitchenLayout.FoodTableVisualBounds(bounds);
+            float topDepth = visual.height * StreetKitchenLayout.SandwichTableTopDepthRatio;
+            float supportHeight = visual.height - topDepth + StreetKitchenLayout.SandwichTableSupportOverlap;
+            float supportCenterY = visual.yMax - supportHeight * .5f;
+            float leftCenterX = visual.xMin + visual.width * StreetKitchenLayout.SandwichTableSupportCenterFraction;
+            float rightCenterX = visual.xMax - visual.width * StreetKitchenLayout.SandwichTableSupportCenterFraction;
 
-            FitFoodTablePart(tabletop, bounds, bounds.center.x, bounds.yMin + topDepth * .5f,
+            FitFoodTablePart(tabletop, bounds, visual.center.x, visual.yMin + topDepth * .5f,
                 bounds.width, topDepth, -.01f);
             float supportWidth = bounds.width * StreetKitchenLayout.SandwichTableSupportWidthFraction;
             FitFoodTablePart(leftTrestle, bounds, leftCenterX, supportCenterY, supportWidth, supportHeight, 0f);
@@ -975,7 +976,7 @@ namespace HayChoriYPaty
             if (product <= 3)
             {
                 Vector2 baseSize = product == 0 ? new Vector2(31.2f, 18f) : new Vector2(24f, 18f);
-                float scale = CarriedSandwichScale * (product >= 2 ? StreetKitchenLayout.PremiumTableSandwichScaleMultiplier : 1f);
+                float scale = CarriedSandwichScale * StreetKitchenLayout.SandwichVisualScaleMultiplier * (product >= 2 ? StreetKitchenLayout.PremiumTableSandwichScaleMultiplier : 1f);
                 return baseSize * scale;
             }
 

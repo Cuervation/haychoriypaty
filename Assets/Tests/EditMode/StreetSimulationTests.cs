@@ -85,8 +85,8 @@ namespace HayChoriYPaty.Tests
             {
                 object balance = NewBalance();
                 Tune(balance, "randomSeed", seed);
-                Tune(balance, "customerPatienceSeconds", 600f);
-                Tune(balance, "deliveryPatienceRefreshSeconds", 600f);
+
+
                 Tune(balance, "customerArrivalSeconds", 10000f);
                 object sim = Make(level: level, balance: balance);
                 Start(sim);
@@ -179,7 +179,7 @@ namespace HayChoriYPaty.Tests
         public void StandardWorkstationRoutesReachEveryProductFromEveryCounterWithoutCrossingProps(int level)
         {
             object balance = NewBalance(); Tune(balance, "maxCustomers", 1); Tune(balance, "customerArrivalSeconds", 1000f);
-            Tune(balance, "customerPatienceSeconds", 10000f);
+
             object catalog = Make(level: level, balance: balance);
             foreach (int product in AvailableProducts(catalog))
             for (int column = 0; column < 7; column++)
@@ -286,8 +286,8 @@ namespace HayChoriYPaty.Tests
         {
             object balance = NewBalance();
             Tune(balance, "maxCustomers", 2);
-            Tune(balance, "customerPatienceSeconds", 600f);
-            Tune(balance, "deliveryPatienceRefreshSeconds", 600f);
+
+
             Tune(balance, "customerArrivalSeconds", 10000f);
             object sim = Make(level: 4, balance: balance);
             Start(sim);
@@ -551,23 +551,25 @@ object sim = Make(level: 2);
         }
 
         [Test]
-        public void VelezTimeoutReleasesAllParrilleroOwnershipWithoutCoinsOrDelivery()
+        public void VelezCustomersKeepParrilleroReservationsWithoutWaitTimeout()
         {
-            object balance = NewBalance(); Tune(balance, "maxCustomers", 1); Tune(balance, "customerPatienceSeconds", .25f);
+            object balance = NewBalance(); Tune(balance, "maxCustomers", 1);
             object sim = Make(level: 2, balance: balance); Start(sim);
             object customer = SpawnOrder(sim, new[] { 0, 1, 4 }, new[] { 2, 2, 1 }); SetWaiting(customer);
             object worker = ((IList)Get(sim, "Workers"))[0]; HiddenCall(sim, "Assign", worker);
             for (int i = 0; i < 2; i++) Assert.AreEqual(Get(worker, "Id"), Get(Call(customer, "GetOrderLine", i), "OwnerWorkerId"));
-            Assert.AreEqual(1, Get(Call(customer, "GetOrderLine", 0), "Reserved"));
-            SetField(customer, "Patience", 0f); HiddenCall(sim, "AdvanceCustomers", .01f);
-            for (int i = 0; i < 3; i++)
-            {
-                Assert.AreEqual(0, Get(Call(customer, "GetOrderLine", i), "OwnerWorkerId"));
-                Assert.AreEqual(0, Get(Call(customer, "GetOrderLine", i), "Reserved"));
-            }
-            Assert.AreEqual(0, Get(sim, "Delivered")); Assert.AreEqual(0, Get(sim, "Coins")); Assert.AreEqual(0, Get(sim, "CoinsEarned"));
-            HiddenCall(sim, "Deliver", worker);
+            int firstLineReserved = (int)Get(Call(customer, "GetOrderLine", 0), "Reserved");
+            int secondLineReserved = (int)Get(Call(customer, "GetOrderLine", 1), "Reserved");
+            Assert.AreEqual(1, firstLineReserved);
+            HiddenCall(sim, "AdvanceCustomers", 100f);
+            Assert.AreEqual("Waiting", Get(customer, "State").ToString());
+            Assert.AreEqual(1, Customers(sim).Count);
+            Assert.AreEqual(Get(worker, "Id"), Get(Call(customer, "GetOrderLine", 0), "OwnerWorkerId"));
+            Assert.AreEqual(Get(worker, "Id"), Get(Call(customer, "GetOrderLine", 1), "OwnerWorkerId"));
+            Assert.AreEqual(firstLineReserved, Get(Call(customer, "GetOrderLine", 0), "Reserved"));
+            Assert.AreEqual(secondLineReserved, Get(Call(customer, "GetOrderLine", 1), "Reserved"));
             Assert.AreEqual(0, Get(sim, "Delivered")); Assert.AreEqual(0, Get(sim, "Coins"));
+            Assert.AreEqual(0, Get(sim, "CoinsEarned")); Assert.AreEqual(0, Get(sim, "CustomersLost"));
         }
 
         [Test]
@@ -662,12 +664,20 @@ object sim = Make(level: 2);
         }
 
         [Test]
-        public void ExpiredCustomerCancelsReservationsBeforeHandoff()
+        public void LongWaitingCustomerKeepsItsReservationUntilRealHandoff()
         {
-            object balance = NewBalance(); Tune(balance, "maxCustomers", 1); Tune(balance, "customerPatienceSeconds", 0.25f);
-            object sim = Make(balance: balance); Start(sim); Spawn(sim, 0, 3); object expired=Customers(sim)[0]; Step(sim, 5f);
-            Assert.AreEqual(0, Get(sim, "Delivered"));
-            Assert.AreEqual(0, Get(expired, "Reserved"));
+            object balance = NewBalance(); Tune(balance, "maxCustomers", 1);
+            object sim = Make(balance: balance); Start(sim); Spawn(sim, 0, 3);
+            object customer = Customers(sim)[0]; SetWaiting(customer);
+            object worker = ((IList)Get(sim, "Workers"))[0]; HiddenCall(sim, "Assign", worker);
+            object line = Call(customer, "GetOrderLine", 0);
+            int ownerId = (int)Get(line, "OwnerWorkerId");
+            Assert.Greater(ownerId, 0); Assert.AreEqual(1, Get(line, "Reserved"));
+            HiddenCall(sim, "AdvanceCustomers", 120f);
+            Assert.AreEqual("Waiting", Get(customer, "State").ToString());
+            Assert.AreEqual(1, Customers(sim).Count);
+            Assert.AreEqual(ownerId, Get(line, "OwnerWorkerId")); Assert.AreEqual(1, Get(line, "Reserved"));
+            Assert.AreEqual(0, Get(sim, "Delivered")); Assert.AreEqual(0, Get(sim, "CustomersLost"));
         }
 
         [Test]
@@ -916,17 +926,16 @@ var sim = Make(level: 1); Start(sim); Set(sim, "Coins", 10000);
         }
 
         [Test]
-        public void FreedCrowdSlotCanBeOccupiedByALaterCustomer()
+        public void LongWaitingCustomerKeepsItsCrowdSlotReserved()
         {
-            object balance = NewBalance(); Tune(balance, "maxCustomers", 1); Tune(balance, "customerPatienceSeconds", 0.1f);
-            object sim = Make(balance: balance); Start(sim); Spawn(sim, 0, 999);
-            object originalTarget = Get(Customers(sim)[0], "Target");
-            Step(sim, 12f);
-            IList customers = Customers(sim);
-            bool foundReused = false;
-            for (int i = 0; i < customers.Count; i++)
-                if ((int)Get(customers[i], "Id") > 1 && Get(customers[i], "Target").Equals(originalTarget)) foundReused = true;
-            Assert.IsTrue(foundReused);
+            object balance = NewBalance(); Tune(balance, "maxCustomers", 1);
+            object sim = Make(balance: balance); Start(sim);
+            object original = SpawnOrder(sim, new[] { 0 }, new[] { 999 }); SetWaiting(original);
+            HiddenCall(sim, "AdvanceCustomers", 120f);
+            Assert.AreEqual("Waiting", Get(original, "State").ToString());
+            Assert.AreEqual(1, Customers(sim).Count);
+            Assert.IsFalse(Spawn(sim, 0, 1), "A replacement cannot enter while the original customer still occupies the lane.");
+            Assert.AreEqual(Get(original, "Id"), Get(Customers(sim)[0], "Id"));
         }
 
         [Test]
@@ -1113,7 +1122,7 @@ var sim = Make(level: 1); Start(sim); Set(sim, "Coins", 10000);
         public void ChicagoAutomaticOrdersIncludeThreeVariantsWithIndependentOneToFourQuantities()
         {
 object balance = NewBalance(); Tune(balance, "customerArrivalSeconds", .1f);
-            Tune(balance, "customerSpeed", 100000f); Tune(balance, "workerSpeed", 1f); Tune(balance, "customerPatienceSeconds", 1000f);
+            Tune(balance, "customerSpeed", 100000f); Tune(balance, "workerSpeed", 1f);
             object sim = Make(staff: 2, level: 1, balance: balance); Start(sim); Step(sim, 4f);
             bool choriOnly = false, cocaOnly = false, combined = false;
             foreach (object customer in Customers(sim))
@@ -1673,18 +1682,20 @@ public void LaterLevelPurchasesResumeAtTheNextTableTier()
         }
 
         [Test]
-        public void ExpiredSpecialtyAssignmentReleasesOwnerWithoutDeliveryOrCoins()
+        public void SpecialtyAssignmentPersistsDuringLongWait()
         {
-            object balance = NewBalance(); Tune(balance, "maxCustomers", 1); Tune(balance, "customerPatienceSeconds", .25f);
+            object balance = NewBalance(); Tune(balance, "maxCustomers", 1);
             object sim = Make(level: 1, balance: balance); Start(sim);
             object customer = SpawnOrder(sim, new[] { 0, 4 }, new[] { 2, 1 }); SetWaiting(customer);
             object worker = ((IList)Get(sim, "Workers"))[0]; HiddenCall(sim, "Assign", worker);
             object chori = Call(customer, "GetOrderLine", 0);
-            Assert.AreEqual(Get(worker, "Id"), Get(chori, "OwnerWorkerId")); Assert.AreEqual(1, Get(chori, "Reserved"));
-            SetField(customer, "Patience", 0f); HiddenCall(sim, "AdvanceCustomers", .01f);
-            Assert.AreEqual(0, Get(chori, "OwnerWorkerId")); Assert.AreEqual(0, Get(chori, "Reserved"));
-            State(worker, "Handoff"); SetField(worker, "Delay", 0f); HiddenCall(sim, "Deliver", worker);
-            Assert.AreEqual(0, Get(sim, "Delivered")); Assert.AreEqual(0, Get(sim, "Coins")); Assert.AreEqual(0, Get(sim, "CoinsEarned"));
+            int ownerId = (int)Get(chori, "OwnerWorkerId");
+            Assert.Greater(ownerId, 0); Assert.AreEqual(1, Get(chori, "Reserved"));
+            HiddenCall(sim, "AdvanceCustomers", 120f);
+            Assert.AreEqual("Waiting", Get(customer, "State").ToString());
+            Assert.AreEqual(ownerId, Get(chori, "OwnerWorkerId")); Assert.AreEqual(1, Get(chori, "Reserved"));
+            Assert.AreEqual(0, Get(sim, "Delivered")); Assert.AreEqual(0, Get(sim, "Coins"));
+            Assert.AreEqual(0, Get(sim, "CustomersLost"));
         }
 
         [Test]
@@ -1894,16 +1905,15 @@ string[] names = (string[])simType.GetField("LevelNames", BindingFlags.Public | 
             Assert.AreEqual(1f, Get(sim, "WorkRate")); Assert.AreEqual(0, Get(sim, "Coins"));
         }
 
-        [TestCase(false)]
-        [TestCase(true)]
-        public void DepartingFrontAdvancesExistingLaneAndAdmitsNewcomerOnlyAtTail(bool expires)
+        [Test]
+        public void ServedFrontAdvancesExistingLaneAndAdmitsNewcomerOnlyAtTail()
         {
             object sim = FullSettledQueue(); IList queue = Customers(sim);
             object front = queue[0], second = queue[7], third = queue[14];
             Vector2 secondFrom = (Vector2)Get(second, "Position"), thirdFrom = (Vector2)Get(third, "Position");
             int secondId = (int)Get(second, "Id"), thirdId = (int)Get(third, "Id");
-            if (expires) { SetField(front, "Patience", 0f); HiddenCall(sim, "AdvanceCustomers", .01f); }
-            else { Set(front, "Remaining", 0); State(front, "Receiving"); SetField(front, "ReceiveRemaining", 0f); HiddenCall(sim, "AdvanceCustomers", .01f); }
+            Set(front, "Remaining", 0); State(front, "Receiving"); SetField(front, "ReceiveRemaining", 0f);
+            HiddenCall(sim, "AdvanceCustomers", .01f);
             Assert.AreEqual("Leaving", Get(front, "State").ToString()); Assert.AreEqual(-1, Field(front, "Slot"));
             Assert.AreEqual(0, Field(second, "Slot")); Assert.AreEqual(7, Field(third, "Slot"));
             Assert.AreEqual("Advancing", Get(second, "State").ToString()); Assert.AreEqual("Advancing", Get(third, "State").ToString());

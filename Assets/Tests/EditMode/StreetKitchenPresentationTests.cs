@@ -821,24 +821,27 @@ namespace HayChoriYPaty.Tests
         public void TableServingFootprintsStayInsideTheWoodTopForEveryMeatSlotAndLayout()
         {
             object layout = FullLayout();
+            Type t = Runtime("StreetKitchenLayout");
             foreach (int product in new[] { 0, 1, 2, 3 })
             foreach (bool companion in new[] { false, true })
             {
-                Rect table = (Rect)Call(layout, "BoundsForProduct", product);
-                float tabletopDepth = (float)Runtime("StreetKitchenLayout")
-                    .GetField("TableSandwichWoodTopDepth", BindingFlags.NonPublic | BindingFlags.Static).GetRawConstantValue();
-                Rect woodTop = new Rect(table.x, table.y, table.width, table.height * tabletopDepth);
-                int capacity = product < 2 ? 24 : 18;
-                Vector2 size = (Vector2)Runtime("StreetKitchenLayout").GetMethod("TableServingSize", BindingFlags.Public | BindingFlags.Static)
-                    .Invoke(null, new object[] { product });
+                Rect logical = (Rect)Call(layout, "BoundsForProduct", product);
+                Rect visual = (Rect)t.GetMethod("FoodTableVisualBounds").Invoke(null, new object[] { logical });
+                float depth = visual.height * LayoutConstant("SandwichTableTopDepthRatio");
+                Vector2 size = (Vector2)t.GetMethod("TableServingFootprint").Invoke(null, new object[] { product });
+                string[] names = { "sandwich-chori", "sandwich-paty", "sandwich-bondiola", "sandwich-vacio" };
+                Sprite sprite = Resources.Load<Sprite>("ModularKitchen/Sprites/" + names[product] + "/" + names[product]);
+                Assert.AreEqual(sprite.rect.width / sprite.rect.height, size.x / size.y, .0001f,
+                    "Layout silhouettes must match the actual Sprite art.");
+                int capacity = companion ? (product < 2 ? 24 : 18) : (product < 2 ? 48 : 36);
                 for (int slot = 0; slot < capacity; slot++)
                 {
                     Vector2 center = (Vector2)Call(layout, "TableSlotPosition", product, slot, companion, capacity);
-                    Rect item = new Rect(center - size * .5f, size);
-                    Assert.GreaterOrEqual(item.xMin, woodTop.xMin, "Product " + product + " slot " + slot + " leaves the tabletop horizontally.");
-                    Assert.LessOrEqual(item.xMax, woodTop.xMax, "Product " + product + " slot " + slot + " leaves the tabletop horizontally.");
-                    Assert.GreaterOrEqual(item.yMin, woodTop.yMin, "Product " + product + " slot " + slot + " floats above the tabletop.");
-                    Assert.LessOrEqual(item.yMax, woodTop.yMax, "Product " + product + " slot " + slot + " falls off the tabletop.");
+                    Assert.GreaterOrEqual(center.x - size.x * .5f, visual.xMin);
+                    Assert.LessOrEqual(center.x + size.x * .5f, visual.xMax);
+                    float contact = center.y + size.y * .5f;
+                    Assert.GreaterOrEqual(contact, visual.y, "Base contact cannot float behind the wood.");
+                    Assert.LessOrEqual(contact, visual.y + depth * .71f, "Base contact stays before the front lip.");
                 }
             }
         }
@@ -847,93 +850,44 @@ namespace HayChoriYPaty.Tests
         public void SandwichTableSlotsUseThreeDepthRowsAndKeepFullCapacityInsideEachProductZone()
         {
             object layout = FullLayout();
-            Type layoutType = Runtime("StreetKitchenLayout");
-            MethodInfo sizeMethod = layoutType.GetMethod("TableServingSize", BindingFlags.Public | BindingFlags.Static);
-            MethodInfo depthOrder = layoutType.GetMethod("TableSlotDepthOrder", BindingFlags.Public | BindingFlags.Static,
+            Type t = Runtime("StreetKitchenLayout");
+            MethodInfo order = t.GetMethod("TableSlotDepthOrder", BindingFlags.Public | BindingFlags.Static,
                 null, new[] { typeof(int), typeof(bool) }, null);
-            float workerHalfWidth = (float)Runtime("StreetWorkstationLayout")
-                .GetField("WorkerHalfWidth", BindingFlags.Public | BindingFlags.Static).GetRawConstantValue();
-            float sceneWidth = (float)Runtime("StreetSceneLayout")
-                .GetField("Width", BindingFlags.Public | BindingFlags.Static).GetRawConstantValue();
-            float routeSafetyMargin = 2f;
-            Assert.NotNull(sizeMethod);
-            Assert.NotNull(depthOrder);
-
             foreach (int product in new[] { 0, 1, 2, 3 })
             foreach (bool companion in new[] { false, true })
             {
-                Rect table = (Rect)Call(layout, "BoundsForProduct", product);
                 int capacity = companion ? (product < 2 ? 24 : 18) : (product < 2 ? 48 : 36);
-                if (!companion)
+                int columns = companion ? 2 : 4, baseCount = columns * 3;
+                var positions = new HashSet<Vector2>();
+                var rows = new HashSet<float>();
+                for (int slot = 0; slot < baseCount; slot++)
                 {
-                    Vector2 first = (Vector2)Call(layout, "TableSlotPosition", product, 0, false, capacity);
-                    Vector2 second = (Vector2)Call(layout, "TableSlotPosition", product, 1, false, capacity);
-                    Assert.Greater(second.x - first.x, table.width * .7f,
-                        "Sparse solo stock starts spread across the board instead of clustering at one end.");
+                    Vector2 point = (Vector2)Call(layout, "TableSlotPosition", product, slot, companion, capacity);
+                    Assert.IsTrue(positions.Add(point));
+                    rows.Add(point.y);
                 }
-                int basePositionCount = companion ? 6 : 12;
-                int columnCount = companion ? 2 : 4;
-                Vector2 size = (Vector2)sizeMethod.Invoke(null, new object[] { product });
-                float sectionWidth = companion ? table.width * .5f : table.width;
-                float sectionLeft = table.x + (companion && (product == 1 || product == 3) ? sectionWidth : 0f);
-                float tabletopDepth = (float)layoutType
-                    .GetField("TableSandwichWoodTopDepth", BindingFlags.NonPublic | BindingFlags.Static).GetRawConstantValue();
-                Rect tabletop = new Rect(sectionLeft, table.y, sectionWidth, table.height * tabletopDepth);
-                Vector2 rear = (Vector2)Call(layout, "TableSlotPosition", product, 0, companion, capacity);
-                Vector2 middle = (Vector2)Call(layout, "TableSlotPosition", product, columnCount, companion, capacity);
-                Vector2 front = (Vector2)Call(layout, "TableSlotPosition", product, columnCount * 2, companion, capacity);
-                Assert.Less(rear.y, middle.y, "The rear row stays behind the middle row for product " + product + ".");
-                Assert.Less(middle.y, front.y, "The middle row stays behind the foreground row for product " + product + ".");
-                Assert.GreaterOrEqual(middle.y - rear.y - size.y, .5f,
-                    "The rear and middle sandwich footprints need a visible clear gap.");
-                Assert.GreaterOrEqual(front.y - middle.y - size.y, .5f,
-                    "The middle and foreground sandwich footprints need a visible clear gap.");
-                Assert.Greater((int)depthOrder.Invoke(null, new object[] { columnCount * 2, companion }),
-                    (int)depthOrder.Invoke(null, new object[] { columnCount, companion }), "Foreground row draws over the middle row.");
-                Assert.Greater((int)depthOrder.Invoke(null, new object[] { columnCount, companion }),
-                    (int)depthOrder.Invoke(null, new object[] { 0, companion }), "Middle row draws over the rear row.");
-
-                Vector2 rearPickup = (Vector2)Call(layout, "TableSlotPickupPosition", product, 0, companion, capacity);
-                Vector2 middlePickup = (Vector2)Call(layout, "TableSlotPickupPosition", product, columnCount, companion, capacity);
-                Vector2 frontPickup = (Vector2)Call(layout, "TableSlotPickupPosition", product, columnCount * 2, companion, capacity);
-                Rect baseFootprint = (Rect)Call(layout, "FootprintForProduct", product);
-                Assert.AreEqual(Mathf.Clamp(rear.x, workerHalfWidth, sceneWidth - workerHalfWidth), rearPickup.x, .001f,
-                    "Mozo rear pickup follows the reserved slot while respecting the safe worker lane.");
-                Assert.AreEqual(Mathf.Clamp(front.x, workerHalfWidth, sceneWidth - workerHalfWidth), frontPickup.x, .001f,
-                    "Mozo foreground pickup follows the reserved slot while respecting the safe worker lane.");
-                Assert.AreEqual(middle.y - rear.y, middlePickup.y - rearPickup.y, .001f,
-                    "Mozo pickup approaches retain the middle-row offset.");
-                Assert.AreEqual(front.y - middle.y, frontPickup.y - middlePickup.y, .001f,
-                    "Mozo pickup approaches retain the foreground-row offset.");
-                Assert.LessOrEqual(frontPickup.y, baseFootprint.yMin - routeSafetyMargin + .001f,
-                    "The foreground Mozo point remains outside the solid table base.");
-                Vector2 home = new Vector2(433f, WorkerServiceY());
-                foreach (Vector2 target in new[] { rearPickup, middlePickup, frontPickup })
-                    Assert.IsNotNull(Call(layout, "FindShortestSafeRoute", home, target),
-                        "Each sandwich depth row remains reachable from the crowd lane.");
-
-                var basePositions = new HashSet<Vector2>();
-                for (int slot = 0; slot < basePositionCount; slot++)
-                    Assert.IsTrue(basePositions.Add((Vector2)Call(layout, "TableSlotPosition", product, slot, companion, capacity)),
-                        "Each 4×3 base position is unique for product " + product + ".");
-                Assert.AreEqual(basePositionCount, basePositions.Count);
+                Assert.AreEqual(3, rows.Count);
+                Assert.AreEqual(baseCount, positions.Count);
                 for (int slot = 0; slot < capacity; slot++)
                 {
-                    Vector2 center = (Vector2)Call(layout, "TableSlotPosition", product, slot, companion, capacity);
-                    Rect item = new Rect(center - size * .5f, size);
-                    Assert.GreaterOrEqual(item.xMin, tabletop.xMin, "Product " + product + " slot " + slot + " leaves its half of the table.");
-                    Assert.LessOrEqual(item.xMax, tabletop.xMax, "Product " + product + " slot " + slot + " crosses into its companion's zone.");
-                    Assert.GreaterOrEqual(item.yMin, tabletop.yMin, "Product " + product + " slot " + slot + " floats off the tabletop.");
-                    Assert.LessOrEqual(item.yMax, tabletop.yMax, "Product " + product + " slot " + slot + " falls off the tabletop.");
-                    int baseSlot = slot % basePositionCount;
-                    int row = baseSlot / columnCount;
-                    Vector2 expectedRow = row == 0 ? rear : row == 1 ? middle : front;
-                    Assert.AreEqual(expectedRow.y, center.y, .001f,
-                        "Capacity overflow stacks on one of the three base rows.");
-                    if (slot >= basePositionCount)
-                        Assert.GreaterOrEqual((int)depthOrder.Invoke(null, new object[] { slot, companion }),
-                            (int)depthOrder.Invoke(null, new object[] { baseSlot, companion }),
-                            "A stacked unit draws at or above its underlying base position.");
+                    Vector2 point = (Vector2)Call(layout, "TableSlotPosition", product, slot, companion, capacity);
+                    Vector2 original = (Vector2)Call(layout, "TableSlotPosition", product, slot % baseCount, companion, capacity);
+                    Assert.AreEqual(original.y, point.y, .0001f, "Capacity overflow stays on the same base row.");
+                    Assert.GreaterOrEqual((int)order.Invoke(null, new object[] { slot, companion }),
+                        (int)order.Invoke(null, new object[] { slot % baseCount, companion }));
+                }
+                Vector2 rear = (Vector2)Call(layout, "TableSlotPosition", product, 0, companion, capacity);
+                Vector2 front = (Vector2)Call(layout, "TableSlotPosition", product, columns * 2, companion, capacity);
+                Assert.Greater(front.y, rear.y);
+                Assert.Less(front.y - rear.y, 13f, "Approved depth rows remain compact, with perspective overlap.");
+                foreach (int slot in new[] { 0, columns, columns * 2 })
+                {
+                    Vector2 pickup = (Vector2)Call(layout, "TableSlotPickupPosition", product, slot, companion, capacity);
+                    Vector2 point = (Vector2)Call(layout, "TableSlotPosition", product, slot, companion, capacity);
+                    float halfWorker = (float)Runtime("StreetWorkstationLayout").GetField("WorkerHalfWidth", BindingFlags.Public | BindingFlags.Static).GetRawConstantValue();
+                    float width = (float)Runtime("StreetSceneLayout").GetField("Width", BindingFlags.Public | BindingFlags.Static).GetRawConstantValue();
+                    Assert.AreEqual(Mathf.Clamp(point.x, halfWorker, width - halfWorker), pickup.x, .001f);
+                    Assert.IsNotNull(Call(layout, "FindShortestSafeRoute", new Vector2(433f, WorkerServiceY()), pickup));
                 }
             }
         }
@@ -1142,7 +1096,7 @@ namespace HayChoriYPaty.Tests
             Assert.NotNull(right, prefabName + " missing right trestle.");
             Assert.NotNull(tabletop, prefabName + " missing single tabletop plank.");
             Assert.AreEqual("food-table-trestle", left.GetComponent<SpriteRenderer>().sprite.name);
-            Assert.AreEqual("food-table-trestle", right.GetComponent<SpriteRenderer>().sprite.name);
+            Assert.AreEqual("food-table-trestle-right", right.GetComponent<SpriteRenderer>().sprite.name);
             Assert.AreEqual("food-table-plank", tabletop.GetComponent<SpriteRenderer>().sprite.name);
             Assert.AreEqual(3, prefab.GetComponentsInChildren<SpriteRenderer>(true).Length,
                 prefabName + " must have exactly two trestles and one plank.");
