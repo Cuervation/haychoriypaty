@@ -619,6 +619,76 @@ namespace HayChoriYPaty.Tests
             yield return null;
         }
 
+        [UnityTest]
+        public IEnumerator ActiveCarryDepthKeepsRealFoodInFrontOfItsOwnBodyButBehindTheWorkerAhead()
+        {
+            var root = new GameObject("Active sandwich carry depth ordering");
+            try
+            {
+                object sim = Activator.CreateInstance(T("StreetSimulation"), new object[]
+                    { Activator.CreateInstance(T("StreetBalance")), 5, 5f, 0, 1, 0 });
+                Call(sim, "StartRound");
+                Set(sim, "Coins", 100000);
+                Assert.IsTrue((bool)Get(sim, "UsesActiveCooks"), "Level 6 is the first active-cook layout.");
+                Assert.IsTrue((bool)Call(sim, "TryHire", Enum.Parse(T("StreetWorkerRole"), "Parrillero")));
+                IList workers = (IList)Get(sim, "Workers");
+                object rearWorker = workers[0], frontWorker = workers[1];
+                int rearId = (int)Get(rearWorker, "Id"), frontId = (int)Get(frontWorker, "Id");
+                object kitchen = Get(sim, "Kitchen");
+                object unit = Call(kitchen, "ReserveCook", 0, rearId);
+                Assert.IsNotNull(unit, "Create a real production unit reserved to the rear worker.");
+                int unitId = (int)Get(unit, "Id");
+                Assert.IsTrue((bool)Call(kitchen, "AdvanceCook", unitId, rearId, 10f, 1f));
+                Assert.IsTrue((bool)Call(kitchen, "TakeCooked", unitId, rearId),
+                    "A Parrillero carries its own finished unit directly from grill to table.");
+
+                Set(rearWorker, "Product", 0);
+                Set(rearWorker, "CarriedItemId", unitId);
+                Set(rearWorker, "State", Enum.Parse(T("StreetWorkerState"), "ToTable"));
+                Set(rearWorker, "FacingVector", new Vector2(0f, 1f));
+                Set(rearWorker, "Position", new Vector2(235f, 400f));
+                Set(rearWorker, "Target", new Vector2(220f, 500f));
+                Set(frontWorker, "State", Enum.Parse(T("StreetWorkerState"), "ToTable"));
+                Set(frontWorker, "FacingVector", new Vector2(0f, 1f));
+                Set(frontWorker, "Position", new Vector2(350f, 420f));
+                Set(frontWorker, "Target", new Vector2(360f, 500f));
+
+                var renderer = root.AddComponent(T("StreetKitchenRenderer"));
+                Texture2D normal = Resources.Load<Texture2D>("street-parrillero");
+                Texture2D diagonal = Resources.Load<Texture2D>("street-parrillero-diagonal-v1");
+                Texture2D beverage = Resources.Load<Texture2D>("street-cocacolero-levels3-5-v1");
+                Call(renderer, "Prepare", sim, 1f, 960f);
+                Call(renderer, "PrepareWorkers", normal, diagonal, normal, diagonal, beverage, beverage, true);
+
+                IDictionary views = (IDictionary)Field(Field(renderer, "workerProjection"), "workers");
+                var rearView = views[rearId];
+                var frontView = views[frontId];
+                var rearTorso = (SpriteRenderer)Field(rearView, "Torso");
+                var rearFingers = (SpriteRenderer)Field(rearView, "Fingers");
+                var frontTorso = (SpriteRenderer)Field(frontView, "Torso");
+                IDictionary foodObjects = (IDictionary)Field(renderer, "foodObjects");
+                var physicalFood = (GameObject)foodObjects[unitId];
+                Assert.IsNotNull(physicalFood, "Renderer must project the real carried unit.");
+                var foodRenderer = physicalFood.GetComponentInChildren<SpriteRenderer>(true);
+                Assert.IsNotNull(foodRenderer);
+
+                Assert.Greater(foodRenderer.sortingOrder, rearTorso.sortingOrder,
+                    "Facing down, the carried sandwich must layer in front of its own torso.");
+                Assert.Greater(rearFingers.sortingOrder, foodRenderer.sortingOrder,
+                    "The supporting fingers remain in front of the carried sandwich.");
+                Assert.Less(foodRenderer.sortingOrder, frontTorso.sortingOrder,
+                    "The rear worker's carried sandwich must not draw over a worker 20 canvas points ahead.");
+                foreach (int order in new[] { rearTorso.sortingOrder, rearFingers.sortingOrder,
+                    foodRenderer.sortingOrder, frontTorso.sortingOrder })
+                    Assert.That(order, Is.InRange(short.MinValue, short.MaxValue),
+                        "Sorting orders use Unity's signed 16-bit range.");
+
+                yield return null;
+            }
+            finally { UnityEngine.Object.Destroy(root); }
+            yield return null;
+        }
+
         private static int CountActive(IDictionary views)
         {
             int count = 0;

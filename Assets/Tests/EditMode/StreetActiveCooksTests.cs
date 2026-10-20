@@ -738,6 +738,113 @@ namespace HayChoriYPaty.Tests
             Assert.IsFalse((bool)Call(kitchen, "IsGrillSlotFree", 0, (int)Get(second, "Slot")));
         }
 
+        private object DepositTestSandwich(object kitchen, int product, int cookId)
+        {
+            object unit = Call(kitchen, "ReserveCook", product, cookId);
+            Assert.NotNull(unit);
+            FinishTestSandwich(kitchen, unit, cookId);
+            return unit;
+        }
+
+        private void FinishTestSandwich(object kitchen, object unit, int cookId)
+        {
+            int id = (int)Get(unit, "Id");
+            Assert.IsTrue((bool)Call(kitchen, "AdvanceCook", id, cookId, 10f, 1f));
+            Assert.IsTrue((bool)Call(kitchen, "TakeCooked", id, cookId));
+            Assert.IsTrue((bool)Call(kitchen, "DepositCooked", id, cookId));
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        public void MozoReservesLastDepositedProductNotLastCreatedAndKeepsItsClaim(int product)
+        {
+            object kitchen = Make(new[] { product }, true);
+            object createdFirst = Call(kitchen, "ReserveCook", product, 11);
+            object createdSecond = Call(kitchen, "ReserveCook", product, 12);
+            FinishTestSandwich(kitchen, createdSecond, 12);
+            FinishTestSandwich(kitchen, createdFirst, 11); // Earlier-created cook arrives last.
+            Assert.AreSame(createdFirst, Call(kitchen, "ReserveTableUnit", product, 100));
+            object evenNewer = DepositTestSandwich(kitchen, product, 13);
+            Assert.AreSame(createdFirst, Call(kitchen, "ReserveTableUnit", product, 100), "Do not redirect a Mozo already walking to a claimed slot.");
+            Assert.AreSame(evenNewer, Call(kitchen, "ReserveTableUnit", product, 101));
+            Assert.AreSame(createdSecond, Call(kitchen, "ReserveTableUnit", product, 102));
+            Assert.IsNull(Call(kitchen, "ReserveTableUnit", product, 103), "No duplicate claim or fictitious unit.");
+            Assert.AreSame(createdFirst, Call(kitchen, "TryTake", product, EnumValue(roleType, "Mozo"), 100));
+            int id = (int)Get(createdFirst, "Id");
+            Assert.IsTrue((bool)Call(kitchen, "Consume", id, product, 100));
+            Assert.IsFalse((bool)Call(kitchen, "Consume", id, product, 100));
+            Assert.AreEqual(2, (int)Call(kitchen, "TableCount", product));
+        }
+
+        [Test]
+        public void ReleasingAClaimDoesNotChangeDepositOrderButReturningFoodIsANewDeposit()
+        {
+            object kitchen = Make(new[] { 0 }, true);
+            object older = DepositTestSandwich(kitchen, 0, 11);
+            object newer = DepositTestSandwich(kitchen, 0, 12);
+            Assert.AreSame(newer, Call(kitchen, "ReserveTableUnit", 0, 100));
+            Assert.AreSame(older, Call(kitchen, "ReserveTableUnit", 0, 101));
+            Call(kitchen, "ReleaseTableReservation", 100);
+            Call(kitchen, "ReleaseTableReservation", 101);
+            Assert.AreSame(newer, Call(kitchen, "ReserveTableUnit", 0, 102), "Releasing the older claim must not make its food newest.");
+            Call(kitchen, "ReleaseTableReservation", 102);
+            // Take the newest while a different cook deposits, then return it physically to the table.
+            Call(kitchen, "ReserveTableUnit", 0, 103);
+            Call(kitchen, "TryTake", 0, EnumValue(roleType, "Mozo"), 103);
+            DepositTestSandwich(kitchen, 0, 13);
+            Call(kitchen, "ReturnCarried", (int)Get(newer, "Id"), 103);
+            Assert.AreSame(newer, Call(kitchen, "ReserveTableUnit", 0, 104));
+            Assert.AreEqual(3, (int)Call(kitchen, "TableCount", 0));
+        }
+
+        [TestCase(false, 0, "Parrillero")]
+        [TestCase(false, 4, "Cocacolero")]
+        [TestCase(true, 4, "Cocacolero")]
+        public void LatestDepositPolicyDoesNotChangeLegacyOrDrinkPickup(bool active, int product, string role)
+        {
+            object kitchen = Make(new[] { product }, active);
+            object first = Units(kitchen).Cast<object>().First(x => (int)Get(x, "Product") == product && Get(x, "Location").ToString() == "Table");
+            Assert.AreSame(first, Call(kitchen, "TryTake", product, EnumValue(roleType, role), 100));
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        public void MozoWalksToAndCarriesTheLatestDepositedSandwich(int product)
+        {
+            object sim = MakeActiveSimulation(5, 1000);
+            Call(sim, "StartRound");
+            SetArrivalFarFuture(sim);
+            object kitchen = Get(sim, "Kitchen");
+            DepositTestSandwich(kitchen, product, 777);
+            object latest = DepositTestSandwich(kitchen, product, 778);
+            Assert.IsTrue((bool)Call(sim, "SpawnCustomer", product, 1));
+            Assert.IsTrue((bool)Call(sim, "TryHire", EnumValue(roleType, "Mozo")));
+            object mozo = Workers(sim).Cast<object>().First(x => Get(x, "Role").ToString() == "Mozo");
+            object layout = Get(sim, "KitchenLayout");
+            Vector2 expected = (Vector2)Call(layout, "TableSlotPickupPosition", product, (int)Get(latest, "Slot"),
+                (bool)Call(sim, "IsProductAvailable", product ^ 1), (int)Call(kitchen, "TableCapacity", product));
+            bool reached = false, carried = false;
+            for (int i = 0; i < 600 && !carried; i++)
+            {
+                Call(sim, "Step", .05f);
+                reached |= Vector2.Distance((Vector2)Get(mozo, "Position"), expected) < .001f;
+                if ((int)Get(mozo, "CarriedItemId") > 0)
+                {
+                    Assert.AreEqual((int)Get(latest, "Id"), (int)Get(mozo, "CarriedItemId"));
+                    carried = true;
+                }
+            }
+            Assert.IsTrue(reached, "The Mozo must reach the latest unit's real slot.");
+            Assert.IsTrue(carried);
+            for (int i = 0; i < 600 && (int)Call(sim, "GetProductDelivered", product) == 0; i++) Call(sim, "Step", .05f);
+            Assert.AreEqual(1, (int)Call(sim, "GetProductDelivered", product));
+            Assert.IsNull(Call(kitchen, "Find", (int)Get(latest, "Id")), "The reserved unit is consumed once at handoff.");
+        }
+
         [Test]
         public void CookedUnitMustBeClaimedAndDepositedIntoItsReservedTableSlot()
         {
@@ -1034,16 +1141,16 @@ namespace HayChoriYPaty.Tests
                 Rect baseFootprint = (Rect)Call(layout, "FootprintForProduct", product);
                 float safeFrontApproachY = baseFootprint.yMin - 2f;
                 float pickupBaseY = Mathf.Min(standard.y, safeFrontApproachY - (lastBaseItem.y - firstItem.y));
-                HashSet<int> slots = new HashSet<int> { 0, 1, 3, capacity / 2, capacity - 1 };
-
-                foreach (int slot in slots)
+                for (int slot = 0; slot < capacity; slot++)
                 {
                     Vector2 item = (Vector2)Call(layout, "TableSlotPosition", product, slot, companionAvailable, capacity);
+                    Vector2 baseItem = (Vector2)Call(layout, "TableSlotPosition", product,
+                        slot % basePositionCount, companionAvailable, capacity);
                     Vector2 target = (Vector2)Call(layout, "TableSlotPickupPosition", product, slot, companionAvailable, capacity);
                     Assert.AreEqual(Mathf.Clamp(item.x, workerHalfWidth, sceneWidth - workerHalfWidth), target.x,
                         "Product " + product + " slot " + slot + " keeps the full Mozo on screen while following the food's X position.");
-                    Assert.AreEqual(pickupBaseY + item.y - firstItem.y, target.y, .001f,
-                        "Product " + product + " slot " + slot + " follows its row/depth without entering the solid table base.");
+                    Assert.AreEqual(pickupBaseY + baseItem.y - firstItem.y, target.y, .001f,
+                        "Product " + product + " slot " + slot + " follows its base row, not cosmetic stack height, without entering the solid table base.");
                     Assert.LessOrEqual(target.y, safeFrontApproachY + .001f,
                         "Product " + product + " slot " + slot + " remains accessible from outside the table base.");
                     Vector2[] route = (Vector2[])Call(layout, "FindShortestSafeRoute", home, target);

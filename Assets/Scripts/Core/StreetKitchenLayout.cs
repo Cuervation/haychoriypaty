@@ -284,6 +284,8 @@ namespace HayChoriYPaty
             Vector2 firstItem = TableSlotPosition(product, 0, companionAvailable, capacity);
             Vector2 item = TableSlotPosition(product, slot, companionAvailable, capacity);
             int basePositionCount = companionAvailable ? 6 : 12;
+            int baseSlot = Mathf.Clamp(slot, 0, Mathf.Max(0, capacity - 1)) % basePositionCount;
+            Vector2 baseItem = TableSlotPosition(product, baseSlot, companionAvailable, capacity);
             int lastBaseSlot = Mathf.Min(basePositionCount - 1, Mathf.Max(0, capacity - 1));
             float maximumRowOffset = TableSlotPosition(product, lastBaseSlot, companionAvailable, capacity).y - firstItem.y;
             // Keep every row's Mozo approach outside the table's solid front/base while
@@ -292,7 +294,8 @@ namespace HayChoriYPaty
             float pickupBaseY = Mathf.Min(standard.y, safeFrontApproachY - maximumRowOffset);
             float safeX = Mathf.Clamp(item.x, StreetWorkstationLayout.WorkerHalfWidth,
                 StreetSceneLayout.Width - StreetWorkstationLayout.WorkerHalfWidth);
-            return new Vector2(safeX, pickupBaseY + item.y - firstItem.y);
+            // Stack height/scatter is cosmetic: feet approach the base row, not an upper layer.
+            return new Vector2(safeX, pickupBaseY + baseItem.y - firstItem.y);
         }
 
         /// <summary>Stable grill-side station for one worker in a role-specific cook team.</summary>
@@ -605,9 +608,9 @@ namespace HayChoriYPaty
             if (pairedInnerColumn) scatterXOffset = ((product & 1) == 0 ? -1f : 1f) * Mathf.Abs(scatterXOffset);
             itemX += (column < columns * .5f ? stackOffset : -stackOffset) + scatterXOffset;
             float contactY = visual.y + visual.height * SandwichTableTopDepthRatio * (.14f + .28f * rowIndex);
-            // A wider rise exposes more of each lower sandwich, rather than leaving only a thin edge.
+            // Canvas Y points down: upper sandwiches rise above their supporting layer.
             float stackRise = stackLayer * footprint.y * .62f;
-            return new Vector2(itemX, contactY - footprint.y * .5f + stackRise + scatterYOffset);
+            return new Vector2(itemX, contactY - footprint.y * .5f - stackRise + scatterYOffset);
         }
 
         /// <summary>Small repeatable in-plane rotation for the loose upper sandwiches on a table.</summary>

@@ -54,7 +54,6 @@ namespace HayChoriYPaty
         private const string FourZoneGrillResource = "street-grill-four-zones-v1";
         private const string BeerBarrelResource = "street-beer-barrel-v1";
         private const string FernetTableResource = "street-fernet-table-v1";
-        private const string ReadySandwichesTableResource = "street-ready-sandwiches-table-v1";
         private const int VelezFanVariantCount = 9;
         private const int VelezFanAtlasColumns = 3;
         private const int TeamFanVariantCount = 9;
@@ -343,7 +342,7 @@ namespace HayChoriYPaty
         private static readonly Rect RiotReturnButton = new Rect(88, 858, 364, 66);
         private StreetGame game;
         private int VisualLevelIndex => game != null && game.Sim != null ? game.Sim.LevelIndex : 0;
-        private Texture2D backdrop, chicagoBackground, velezBackground, velezCrest, velezGrill, people, items, parrillero, parrilleroDiagonal, cocacolero, laterCocacolero, parrilleroIcon, upgradeWood, speedArrows, largeGrill, servingTable, gameCoin, muralArt, allBoysCrest, chicagoCrest, cocaBottle, beverageBarrel, chicagoGrill;
+        private Texture2D backdrop, chicagoBackground, velezBackground, velezCrest, velezGrill, people, items, parrillero, parrilleroDiagonal, cocacolero, laterCocacolero, parrilleroIcon, upgradeWood, speedArrows, largeGrill, gameCoin, muralArt, allBoysCrest, chicagoCrest, cocaBottle, beverageBarrel, chicagoGrill;
         private Texture2D[] levelCrests;
         private Texture2D clubPennantTexture;
         private string clubPennantThemeName;
@@ -361,7 +360,7 @@ namespace HayChoriYPaty
         private Texture2D riverMural, riverHeaderExtension, riverFans, riverRiotFans;
         private Texture2D camionerosBackground;
         private Texture2D losRedondosBackground, losRedondosFrontFans, losRedondosWalkingFans;
-        private Texture2D fourZoneGrill, premiumGrill, beerBarrel, fernetTable, readySandwichesTable;
+        private Texture2D fourZoneGrill, premiumGrill, beerBarrel, fernetTable;
         private Texture2D premiumWorker, premiumDiagonal, fernetWorker, fernetWorkerLater;
         private Texture2D mozoWorker;
         private Texture2D victoryPopup;
@@ -496,7 +495,6 @@ namespace HayChoriYPaty
             fourZoneGrill = Resources.Load<Texture2D>(FourZoneGrillResource);
             beerBarrel = Resources.Load<Texture2D>(BeerBarrelResource);
             fernetTable = Resources.Load<Texture2D>(FernetTableResource);
-            readySandwichesTable = Resources.Load<Texture2D>(ReadySandwichesTableResource);
             cocaBottle = Resources.Load<Texture2D>(CocaBottleResource);
             beverageBarrel = Resources.Load<Texture2D>(BeverageBarrelResource);
             people = Resources.Load<Texture2D>("street-characters");
@@ -510,7 +508,6 @@ namespace HayChoriYPaty
             speedArrows = Resources.Load<Texture2D>("street-speed-arrows-v1");
             largeGrill = Resources.Load<Texture2D>("street-parrilla-large-v2");
             chicagoGrill = Resources.Load<Texture2D>(ChicagoGrillResource);
-            servingTable = Resources.Load<Texture2D>("street-serving-table-v1");
             gameCoin = Resources.Load<Texture2D>("street-coin-gold-v2");
             string[] marketArt = { "meat-chori/meat-chori_Raw", "sandwich-chori/sandwich-chori",
                 "meat-paty/meat-paty_Raw", "sandwich-paty/sandwich-paty", "meat-bondiola/meat-bondiola_Raw",
@@ -3435,13 +3432,6 @@ namespace HayChoriYPaty
             Rect drawn = StreetWorkstationLayout.FitArtwork(LayoutRect(bounds), new Vector2(art.width,art.height));
             GUI.DrawTexture(drawn,art,ScaleMode.StretchToFill,true);
             return drawn;
-        }
-        private void DrawServingTable()
-        {
-            // Reuse Floresta's actual table art, so its aspect, silhouette and legs stay identical in every club.
-            if (servingTable != null && game.Sim.HasRole(StreetWorkerRole.Parrillero))
-                Draw(StreetWorkstationLayout.TableBounds(game.Sim.HasParrilleroPremium), servingTable,
-                    new Rect(0, 0, servingTable.width, servingTable.height), false, false);
         }
         private static string StationLabelForProduct(int product)
         {

@@ -1777,6 +1777,95 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
             Assert.NotNull(Resources.Load<Texture2D>("street-items"), "The existing distinct Paty sandwich icon is reused.");
         }
 
+        [TestCase("food-table-plank.png", "ModularKitchen/Art/food-table-plank", "4c6fac694e5d7c0b364a1eac649f0d9357e84e3bb04ba7a45e00d8eca2e31b29", "1ecc3f9a7984f7921b9f46c6e0b7d704ab45e059e39f47fb3e34f68af3b96a9b", "ba31aede125064fd8857b2227d07992e")]
+        [TestCase("food-table-trestle.png", "ModularKitchen/Art/food-table-trestle", "1f69a2f12cdb975ede6a118684c6c79dd10cbccf6bd04b5f46f55dd49512f315", "f89ecb575450c341147ad3364d67afe7207d44b128a2ee3c8ba7a273981badbc", "00ac52b88645b4b9d943757fe4beefcf")]
+        [TestCase("street-ready-sandwiches-table-v1.png", "street-ready-sandwiches-table-v1", "c799a8a7345a827ee0c2b792ec7a99e47dcebbb3190cd06a551a7d04563217f9", "15539eb9ad4c4a1770df5cdc62dd9b6c63ea60977b9c994a34c864ae3197bf22", "4d07362ad5b74f948a14cb751a35874c")]
+        [TestCase("street-serving-table-v1.png", "street-serving-table-v1", "a44bc943193943c549fe792d6dc90141508bdc940c893e0d0cd1c4807c9da4d1", "5ed655df74573ab57419b321da35a4c3143166b314c84212fcffdd96b84210d4", "262c70b1a7b14d359409cefc28e1de95")]
+        public void LegacyFoodArtIsPreservedByteForByteButNotShippedInResources(
+            string filename, string resource, string pngHash, string metaHash, string guid)
+        {
+            string path = "Assets/Art/Editor/LegacyKitchen/" + filename;
+            Assert.AreEqual(guid, AssetDatabase.AssetPathToGUID(path));
+            using (var sha = System.Security.Cryptography.SHA256.Create())
+            {
+                Assert.AreEqual(pngHash, BitConverter.ToString(sha.ComputeHash(System.IO.File.ReadAllBytes(path))).Replace("-", "").ToLowerInvariant());
+                Assert.AreEqual(metaHash, BitConverter.ToString(sha.ComputeHash(System.IO.File.ReadAllBytes(path + ".meta"))).Replace("-", "").ToLowerInvariant());
+            }
+            Assert.IsNull(Resources.Load<Texture2D>(resource), "Archived source art must not be packaged or loaded at runtime.");
+        }
+
+        [TestCase(true)]
+        [TestCase(false)]
+        public void AndroidLegacyArtCleanupTouchesOnlyKnownGeneratedFiles(bool legacyPresent)
+        {
+            string root = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "hcyp-staging-test-" + Guid.NewGuid().ToString("N"));
+            string gradle = System.IO.Path.Combine(root, "Library/Bee/Android/Prj/IL2CPP/Gradle");
+            string[] folders = {
+                "unityLibrary/src/main/assets/bin/Data",
+                "unityLibrary/build/intermediates/assets/debug/mergeDebugAssets/bin/Data",
+                "launcher/build/intermediates/assets/debug/mergeDebugAssets/bin/Data"
+            };
+            string[] guids = { "ba31aede125064fd8857b2227d07992e", "00ac52b88645b4b9d943757fe4beefcf",
+                "4d07362ad5b74f948a14cb751a35874c", "262c70b1a7b14d359409cefc28e1de95" };
+            string source = System.IO.Path.Combine(root, "Assets", guids[0]);
+            try
+            {
+                foreach (string folder in folders)
+                {
+                    string data = System.IO.Path.Combine(gradle, folder);
+                    System.IO.Directory.CreateDirectory(data);
+                    if (legacyPresent)
+                        foreach (string guid in guids) System.IO.File.WriteAllText(System.IO.Path.Combine(data, guid), "obsolete copy");
+                    System.IO.File.WriteAllText(System.IO.Path.Combine(data, "keep-live-texture"), "live");
+                }
+                System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(source));
+                System.IO.File.WriteAllText(source, "original source");
+                foreach (string variant in new[] { "Debug", "Release" })
+                {
+                    string cache = System.IO.Path.Combine(gradle, "launcher/build/intermediates/incremental/package" + variant);
+                    string apkFolder = System.IO.Path.Combine(gradle, "launcher/build/outputs/apk/" + variant.ToLowerInvariant());
+                    System.IO.Directory.CreateDirectory(cache);
+                    System.IO.Directory.CreateDirectory(apkFolder);
+                    System.IO.File.WriteAllText(System.IO.Path.Combine(cache, "state"), "cache");
+                    System.IO.File.WriteAllText(System.IO.Path.Combine(apkFolder, "launcher-" + variant.ToLowerInvariant() + ".apk"), "APK");
+                }
+                Type cleanup = Type.GetType("HayChoriYPaty.Editor.AndroidLegacyArtStagingCleanup, Assembly-CSharp-Editor", true);
+                cleanup.GetMethod("RemoveArchivedCopies").Invoke(null, new object[] { root });
+                foreach (string folder in folders)
+                {
+                    string data = System.IO.Path.Combine(gradle, folder);
+                    foreach (string guid in guids) Assert.IsFalse(System.IO.File.Exists(System.IO.Path.Combine(data, guid)));
+                    Assert.AreEqual("live", System.IO.File.ReadAllText(System.IO.Path.Combine(data, "keep-live-texture")));
+                }
+                foreach (string variant in new[] { "Debug", "Release" })
+                {
+                    string cache = System.IO.Path.Combine(gradle, "launcher/build/intermediates/incremental/package" + variant);
+                    string apk = System.IO.Path.Combine(gradle, "launcher/build/outputs/apk/" + variant.ToLowerInvariant(), "launcher-" + variant.ToLowerInvariant() + ".apk");
+                    Assert.AreEqual(!legacyPresent, System.IO.Directory.Exists(cache));
+                    Assert.AreEqual(!legacyPresent, System.IO.File.Exists(apk));
+                }
+                Assert.AreEqual("original source", System.IO.File.ReadAllText(source));
+            }
+            finally { if (System.IO.Directory.Exists(root)) System.IO.Directory.Delete(root, true); }
+        }
+
+        [Test]
+        public void LiveTablesUseTheApprovedTextureAndNoArchivedFoodArtwork()
+        {
+            foreach (string station in new[] { "Station_NormalTable", "Station_PremiumTable" })
+            {
+                string path = "Assets/Resources/ModularKitchen/Prefabs/" + station + ".prefab";
+                string[] dependencies = AssetDatabase.GetDependencies(path, true);
+                CollectionAssert.Contains(dependencies, "Assets/Resources/ModularKitchen/Art/food-table-folding-v2.png");
+                Assert.IsFalse(dependencies.Any(x => x.StartsWith("Assets/Art/Editor/LegacyKitchen/", StringComparison.Ordinal)));
+                Assert.NotNull(Resources.Load<GameObject>("ModularKitchen/Prefabs/" + station));
+            }
+            Assert.NotNull(Resources.Load<Texture2D>("ModularKitchen/Art/empty-table"), "Fernet art remains unchanged.");
+            Assert.IsNull(View.GetField("readySandwichesTable", BindingFlags.NonPublic | BindingFlags.Instance));
+            Assert.IsNull(View.GetField("servingTable", BindingFlags.NonPublic | BindingFlags.Instance));
+            Assert.IsNull(View.GetMethod("DrawServingTable", BindingFlags.NonPublic | BindingFlags.Instance));
+        }
+
         [Test]
         public void VelezKitchenKeepsStandardStationsAndHidesFoodZoneCaptions()
         {
@@ -1792,7 +1881,7 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
             Assert.AreEqual(new Vector2(282, 94), grill.size);
             Assert.AreEqual(table, velezTable, "Vélez uses the same always-present ready-product table frame as the other levels.");
             Assert.AreEqual(new Vector2(80f * 2f / 3f, 80), barrel.size);
-            Assert.NotNull(Resources.Load<Texture2D>("street-serving-table-v1"), "The shared tabletop art is available to DrawServingTable.");
+            Assert.NotNull(Resources.Load<GameObject>("ModularKitchen/Prefabs/Station_NormalTable"), "The current modular table supplies the tabletop in every club.");
 
             MethodInfo label = View.GetMethod("StationLabelForProduct", BindingFlags.Static | BindingFlags.NonPublic);
             Assert.NotNull(label);
@@ -1807,7 +1896,7 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
             string[] resources = {
                 "street-background-ferro-v1", "street-ferro-fans-front-v1", "street-ferro-fans-walk-v1", "street-ferro-riot-fans-v1",
                 "street-background-independiente-v1", "street-independiente-fans-front-v1", "street-independiente-fans-walk-v1", "street-independiente-riot-fans-v1",
-                "street-grill-four-zones-v1", "street-ready-sandwiches-table-v1", "street-beer-barrel-v1", "street-fernet-table-v1", "street-coca-bottle-v1"
+                "street-grill-four-zones-v1", "street-beer-barrel-v1", "street-fernet-table-v1", "street-coca-bottle-v1"
             };
             foreach (string resource in resources) Assert.NotNull(Resources.Load<Texture2D>(resource), "Missing Resources asset: " + resource);
 

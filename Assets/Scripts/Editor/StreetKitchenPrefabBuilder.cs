@@ -87,7 +87,7 @@ namespace HayChoriYPaty.Editor
             importer.npotScale = TextureImporterNPOTScale.None;
             importer.wrapMode = TextureWrapMode.Clamp;
             // Reuse this project's existing Android furniture compression rather than adding a new policy.
-            var baseline = AssetImporter.GetAtPath(ArtFolder + "/food-table-plank.png") as TextureImporter;
+            var baseline = AssetImporter.GetAtPath("Assets/Art/Editor/LegacyKitchen/food-table-plank.png") as TextureImporter;
             if (baseline != null) importer.SetPlatformTextureSettings(baseline.GetPlatformTextureSettings("Android"));
             importer.SaveAndReimport();
             var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(path);

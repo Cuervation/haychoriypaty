@@ -9,6 +9,11 @@ namespace HayChoriYPaty
     {
         internal const float Height = 98f, Width = 90f, Waist = .76f;
         private const float WaistOverlap = .025f;
+        // Shared active-kitchen depth: keep food's local stack ordering within a small
+        // foot-depth band instead of letting it outrank characters across the whole aisle.
+        internal static int SceneDepth(float canvasY) =>
+            Mathf.Clamp(Mathf.RoundToInt(canvasY * 32f) - 24000, -32000, 32000);
+
         // The lower cooking-atlas row has 24 transparent pixels below the feet; upper-row
         // frames reach the crop edge. Compensate per frame to keep one stable foot baseline.
         private static readonly float[] CookingPoseFootInsetPixels = { 0f, 0f, 24f, 24f };
@@ -410,7 +415,8 @@ namespace HayChoriYPaty
                 float reach = pose.PickingUp ? Mathf.Sin(pose.PickupProgress * Mathf.PI) * Height * .20f : 0f;
                 float upperBottom = upper.Bounds.height * (1f-Waist-WaistOverlap) * upperScale - pose.Bob * presentationScale - reach * presentationScale;
                 // A tiny x-based tie-break makes same-row workers deterministic without overriding y-depth.
-                int depth = -5000 + Mathf.RoundToInt(displayPosition.y * verticalScale) + RowSortBias(sim, w, displayPosition);
+                int depth = (sim.UsesActiveCooks ? SceneDepth(displayPosition.y * verticalScale)
+                    : -5000 + Mathf.RoundToInt(displayPosition.y * verticalScale)) + RowSortBias(sim, w, displayPosition);
                 v.Root.localPosition = new Vector3((displayPosition.x-270f)*.01f, (canvasHeight*.5f-displayPosition.y*verticalScale)*.01f,0);
                 if (hasCookingPose)
                 {
@@ -444,7 +450,8 @@ namespace HayChoriYPaty
                 float handY = -(1f-upper.Palm.y)*upper.Bounds.height*upperScale + pose.Bob * presentationScale + (pose.PickingUp ? reach * presentationScale : 0f);
                 v.Palm = new Vector2(displayPosition.x+handX,displayPosition.y*verticalScale+handY);
                 bool rear = pose.Facing == StreetFacing.Up || pose.Facing == StreetFacing.UpLeft || pose.Facing == StreetFacing.UpRight;
-                v.ProductOrder = rear ? depth-1 : depth+10000;
+                // Foreground carry belongs just above its owner, not above every worker.
+                v.ProductOrder = rear ? depth-1 : depth + (sim.UsesActiveCooks ? 3 : 10000);
                 if (pose.Carrying)
                 {
                     Rect thumb = new Rect(upper.Bounds.x + upper.Bounds.width*(upper.Palm.x-.065f),

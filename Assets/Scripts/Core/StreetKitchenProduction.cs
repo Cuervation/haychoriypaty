@@ -33,6 +33,7 @@ namespace HayChoriYPaty
         public int WorkerId { get; internal set; }
         public float Progress { get; internal set; }
         internal int ReservedTableSlot = -1;
+        internal long TableDepositSequence;
         internal float CookedAge;
         internal float BurnedAge;
     }
@@ -47,6 +48,7 @@ namespace HayChoriYPaty
         private readonly int[] grillCapacity = new int[7];
         private readonly float[] drinkProgress = new float[7];
         private int nextId = 1;
+        private long nextTableDepositSequence;
         public bool ActiveCooks { get; private set; }
 
         public IReadOnlyList<StreetFoodUnit> Units { get { return units; } }
@@ -127,11 +129,14 @@ namespace HayChoriYPaty
             foreach (StreetFoodUnit unit in units)
                 if (unit.WorkerId == workerId)
                     return unit.Location == StreetFoodLocation.Table && unit.Product == product ? unit : null;
+            // Cook creation order can differ from arrival order: claim the last actual deposit.
+            StreetFoodUnit latest = null;
             foreach (StreetFoodUnit unit in units)
                 if (unit.Location == StreetFoodLocation.Table && unit.Product == product &&
-                    unit.State == StreetFoodState.Cooked && unit.WorkerId == 0)
-                { unit.WorkerId = workerId; return unit; }
-            return null;
+                    unit.State == StreetFoodState.Cooked && unit.WorkerId == 0 &&
+                    (latest == null || unit.TableDepositSequence > latest.TableDepositSequence)) latest = unit;
+            if (latest != null) latest.WorkerId = workerId;
+            return latest;
         }
         public void ReleaseTableReservation(int workerId)
         {
@@ -191,6 +196,7 @@ namespace HayChoriYPaty
             if (!ActiveCooks || unit == null || unit.Location != StreetFoodLocation.Carried ||
                 unit.State != StreetFoodState.Cooked || unit.WorkerId != workerId || unit.ReservedTableSlot < 0) return false;
             unit.Location = StreetFoodLocation.Table; unit.Slot = unit.ReservedTableSlot; unit.WorkerId = 0;
+            unit.TableDepositSequence = ++nextTableDepositSequence;
             return true;
         }
         public void CancelCook(int workerId)
@@ -201,7 +207,10 @@ namespace HayChoriYPaty
                 StreetFoodUnit unit = units[i];
                 if (unit.WorkerId != workerId) continue;
                 if (unit.State == StreetFoodState.Cooked)
-                { unit.Location = StreetFoodLocation.Table; unit.Slot = unit.ReservedTableSlot; unit.WorkerId = 0; }
+                {
+                    if (unit.Location != StreetFoodLocation.Table) unit.TableDepositSequence = ++nextTableDepositSequence;
+                    unit.Location = StreetFoodLocation.Table; unit.Slot = unit.ReservedTableSlot; unit.WorkerId = 0;
+                }
                 else { ingredientStock?.ReleaseFood(unit.Id); units.RemoveAt(i); }
             }
         }
@@ -228,6 +237,7 @@ namespace HayChoriYPaty
                 // Every in-flight sandwich retains its table slot, including a waiter's trip.
                 unit.Location = StreetFoodLocation.Table;
                 unit.Slot = unit.ReservedTableSlot;
+                unit.TableDepositSequence = ++nextTableDepositSequence;
                 return;
             }
             if (TableCount(unit.Product) < tableCapacity[unit.Product])
@@ -414,6 +424,8 @@ namespace HayChoriYPaty
                 ingredientStock != null && !ingredientStock.TryReserveFood(nextId, product)) return null;
             var unit = new StreetFoodUnit { Id = nextId++, Product = product, State = state, Location = location,
                 Slot = slot, ReservedTableSlot = location == StreetFoodLocation.Table ? slot : -1 };
+            if (ActiveCooks && product < 4 && location == StreetFoodLocation.Table)
+                unit.TableDepositSequence = ++nextTableDepositSequence;
             units.Add(unit);
             return unit;
         }

@@ -282,7 +282,7 @@ namespace HayChoriYPaty
         }
 
         private int StationDepth(Rect bounds) => simulation != null && simulation.UsesActiveCooks
-            ? -5000 + Mathf.RoundToInt(bounds.yMax * verticalScale) : 0;
+            ? StreetWorkerProjection.SceneDepth(bounds.yMax * verticalScale) : 0;
 
         private static bool IsFoodTableStation(string prefabName) =>
             prefabName == "Station_NormalTable" || prefabName == "Station_PremiumTable";

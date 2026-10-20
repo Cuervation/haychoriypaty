@@ -906,6 +906,7 @@ namespace HayChoriYPaty.Tests
                         Rect support = new Rect(below.x - footprint.x * .5f, below.y - footprint.y * .5f, footprint.x, footprint.y);
                         Assert.IsTrue(thisSandwich.Overlaps(support), "Product " + product + " slot " + slot + " overlaps its supporting layer; it cannot float.");
                         float visibleLayerStep = Mathf.Abs(point.y - below.y) / footprint.y;
+                        Assert.Less(point.y, below.y, "Canvas Y decreases upward; every added stack layer must rise above its support.");
                         Assert.GreaterOrEqual(visibleLayerStep, .30f, "Lower sandwiches retain a substantial visible face.");
                         Assert.LessOrEqual(visibleLayerStep, .70f, "Every upper sandwich remains closely supported by the layer below.");
                         float horizontalSupport = Mathf.Min(thisSandwich.xMax, support.xMax) - Mathf.Max(thisSandwich.xMin, support.xMin);
@@ -918,14 +919,35 @@ namespace HayChoriYPaty.Tests
                 Vector2 front = (Vector2)Call(layout, "TableSlotPosition", product, columns * 2, companion, capacity);
                 Assert.Greater(front.y, rear.y);
                 Assert.Less(front.y - rear.y, 13f, "Approved depth rows remain compact, with perspective overlap.");
-                foreach (int slot in new[] { 0, columns, columns * 2 })
+                for (int slot = 0; slot < capacity; slot++)
                 {
                     Vector2 pickup = (Vector2)Call(layout, "TableSlotPickupPosition", product, slot, companion, capacity);
                     Vector2 point = (Vector2)Call(layout, "TableSlotPosition", product, slot, companion, capacity);
+                    int baseSlot = slot % baseCount;
+                    Vector2 basePoint = (Vector2)Call(layout, "TableSlotPosition", product, baseSlot, companion, capacity);
+                    Vector2 basePickup = (Vector2)Call(layout, "TableSlotPickupPosition", product, baseSlot, companion, capacity);
                     float halfWorker = (float)Runtime("StreetWorkstationLayout").GetField("WorkerHalfWidth", BindingFlags.Public | BindingFlags.Static).GetRawConstantValue();
                     float width = (float)Runtime("StreetSceneLayout").GetField("Width", BindingFlags.Public | BindingFlags.Static).GetRawConstantValue();
-                    Assert.AreEqual(Mathf.Clamp(point.x, halfWorker, width - halfWorker), pickup.x, .001f);
-                    Assert.IsNotNull(Call(layout, "FindShortestSafeRoute", new Vector2(433f, WorkerServiceY()), pickup));
+                    Assert.AreEqual(Mathf.Clamp(point.x, halfWorker, width - halfWorker), pickup.x, .001f,
+                        "Pickup X follows the actual item, including its stable stack jitter.");
+                    Assert.AreEqual(basePickup.y, pickup.y, .001f,
+                        "Pickup Y follows the base row's worker-feet anchor rather than the cosmetic stack height.");
+                    Assert.IsNotNull(Call(layout, "FindShortestSafeRoute", new Vector2(433f, WorkerServiceY()), pickup),
+                        "Every product/paired-mode/slot pickup remains reachable from the service aisle.");
+                }
+                Rect visual = (Rect)t.GetMethod("FoodTableVisualBounds").Invoke(null,
+                    new object[] { (Rect)Call(layout, "BoundsForProduct", product) });
+                Vector2 footprintSize = (Vector2)t.GetMethod("TableServingFootprint", BindingFlags.Public | BindingFlags.Static)
+                    .Invoke(null, new object[] { product });
+                for (int slot = 0; slot < capacity; slot++)
+                {
+                    Vector2 point = (Vector2)Call(layout, "TableSlotPosition", product, slot, companion, capacity);
+                    Rect itemRect = new Rect(point.x - footprintSize.x * .5f, point.y - footprintSize.y * .5f,
+                        footprintSize.x, footprintSize.y);
+                    Vector2 basePoint = (Vector2)Call(layout, "TableSlotPosition", product, slot % baseCount, companion, capacity);
+                    float baseContactY = basePoint.y + footprintSize.y * .5f;
+                    Assert.LessOrEqual(itemRect.yMax, baseContactY + .001f,
+                        "No item, including an upper layer, may hang down below its wood-supported base row; upward layers remain allowed.");
                 }
             }
         }

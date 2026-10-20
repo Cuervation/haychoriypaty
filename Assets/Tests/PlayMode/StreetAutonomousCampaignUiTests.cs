@@ -90,6 +90,13 @@ namespace HayChoriYPaty.Tests
             if (resumeFromLevel6Checkpoint)
                 Assert.IsTrue(File.Exists(ModeBLevel6CheckpointPath), "Resume requires a checkpoint written after a genuine Level 5 UI victory.");
             object balance = Get(game, "Balance");
+            if (TestContext.CurrentContext.Test.Name.EndsWith("VisualReview_20261020", StringComparison.Ordinal))
+            {
+                string config = Path.GetFullPath("Audits/GameplayBalance-20261020/configuration.json");
+                balance = JsonUtility.FromJson(File.ReadAllText(config), balance.GetType());
+                GameType.GetField("balance", PrivateInstance).SetValue(game, balance);
+            }
+
             Array levels = (Array)balance.GetType().GetField("levelBalances", PublicInstance).GetValue(balance);
             if (!realEconomyMode)
                 foreach (object level in levels)
@@ -318,6 +325,20 @@ namespace HayChoriYPaty.Tests
         public IEnumerator ModeB_ResumeFromLevel6Checkpoint_Attempt17_OneFernFiveNormal_ActualUiOnly()
         {
             yield return RunRealEconomyProgression(true, false, 17);
+        }
+
+        [UnityTest]
+        [Timeout(600000)]
+        public IEnumerator ModeB_ResumeFromLevel6Checkpoint_VisualReview_20261020()
+        {
+            yield return RunRealEconomyProgression(true, false, 20);
+        }
+
+        [UnityTest]
+        [Timeout(1200000)]
+        public IEnumerator ModeB_ResumeFromLevel6Checkpoint_AfterCorrections_VisualReview_20261020()
+        {
+            yield return RunRealEconomyProgression(true, false, 22);
         }
 
         private IEnumerator RunUnrestrictedAttempt(int levelIndex, int attempt = 1)
@@ -607,7 +628,9 @@ namespace HayChoriYPaty.Tests
                     float nextDecision = gameStart + 1f;
                     float nextObservation = 30f;
                     bool capturedActivity = false;
-                    float resultDeadline = wallStart + (float)Get(sim, "TimeRemaining") + 120f;
+                    // Allow bounded editor/render slowdown for this diagnostic only; game duration and timeScale stay unchanged.
+                    float reviewSlack = TestContext.CurrentContext.Test.Name.Contains("AfterCorrections_VisualReview") ? 600f : 120f;
+                    float resultDeadline = wallStart + (float)Get(sim, "TimeRemaining") + reviewSlack;
                     while (Get(sim, "Phase").ToString() == "Playing" && Time.realtimeSinceStartup < resultDeadline)
                     {
                         float elapsed = (float)Get(sim, "Elapsed");
@@ -628,6 +651,9 @@ namespace HayChoriYPaty.Tests
                         if (elapsed >= nextObservation)
                         {
                             observations.Add(CaptureObservation(sim));
+                            if (TestContext.CurrentContext.Test.Name.EndsWith("VisualReview_20261020", StringComparison.Ordinal))
+                                yield return Capture(prefix + "visual-" + ((int)elapsed).ToString("000") + "s.png");
+
                             nextObservation += 30f;
                         }
                         if (!capturedActivity && elapsed >= 30f)
@@ -649,6 +675,12 @@ namespace HayChoriYPaty.Tests
                         staffCoinsStarting, marketCentsStarting, purchaseSpendBefore, 1f);
                     WriteProgress(report);
                     TestContext.WriteLine(JsonUtility.ToJson(report, true));
+
+                    if (TestContext.CurrentContext.Test.Name.EndsWith("VisualReview_20261020", StringComparison.Ordinal))
+                    {
+                        stopCampaign = true; // Focused review ends after this single Racing attempt, win or loss.
+                        break;
+                    }
 
                     if (Get(sim, "Phase").ToString() == "Won")
                     {
