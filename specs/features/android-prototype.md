@@ -1,4 +1,14 @@
-# Current Android delivery — 2026-10-20 (0.2.52/code54, continuous active cooking + kitchen visuals)
+# Current Android delivery — 2026-10-20 (0.2.53/code55, patience removal + folding-table presentation)
+
+Unity 6000.6.3f1 Main-only Development IL2CPP/ARM64 APK built from pushed source commit `4e8af36`: **Succeeded in 284.34 s; 0 errors / 1 warning** (temporary build helper uses the obsolete `PlayerSettings.SetScriptingBackend(BuildTargetGroup, ...)` overload). Built in an isolated project snapshot via Unity batch mode; only the ignored `Library` cache was reused, and the live Editor/scene were not touched. Local Firebase Analytics, `runInBackground`, time-scale, temporary scenes, screenshots and recovery files were excluded.
+
+Archive `Builds/Android/Archive/HayChoriYPatY-0.2.53-code55-customer-waiting-and-folding-tables.apk`; versioned and rolling aliases `Builds/Android/HayChoriYPatY-0.2.53.apk` and `Builds/Android/HayChoriYPatY-street.apk`: **355,234,955 bytes**, SHA-256 `9c4ff8d133a2f48fe05eab73c2424d8926236f035bb1988ab022d645d7fd1f65` (all hard-linked, byte-identical). Package `com.haychoriypaty.game`, version **0.2.53/code55**, min API26/target36, `arm64-v8a`. `aapt` metadata, `unzip -t`, `zipalign -c -v 4`, and APK Signature Scheme v2 verification passed; Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`.
+
+Focused implementation validation passed before packaging: patience/queue EditMode **6/6**; table presentation EditMode **8/8**, PlayMode **12/12**. These were not rerun during packaging. Development/debug-signed, not Play Store release-signed. No device install or on-device gameplay QA. Build log: `Logs/Acceptance/AndroidBuild-20261020/build-0.2.53.log`.
+
+---
+
+# Previous Android delivery — 2026-10-20 (0.2.52/code54, continuous active cooking + kitchen visuals)
 
 Unity 6000.6.3f1 Main-only Development IL2CPP/ARM64 APK built from clean isolated commit `b431f90`: **Succeeded in 415.01 s; 0 errors / 1 warning** (clang++ `-x c++` after the last input file has no effect). Used the installed Unity editor in batch mode; the live checkout/editor was not opened or modified. The user-authorized commit includes continuous active cooking for sandwiches 0–3 independent of quotas/Market ingredients, the caballete food-table presentation, and cooking-ring placement/color changes. Local Firebase Analytics, `runInBackground`, time-scale, temporary scenes, screenshots and recovery files were excluded from the build/commit.
 
