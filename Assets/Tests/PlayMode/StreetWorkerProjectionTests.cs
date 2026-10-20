@@ -269,6 +269,7 @@ namespace HayChoriYPaty.Tests
                 float previousOffset = 0f, largestOffsetStep = 0f;
                 bool sawApproach = false, capturedApproach = false, sawCooking = false, capturedCooking = false;
                 bool sawDeparture = false, capturedDeparture = false, sawFadedDeparture = false;
+                bool capturedTableInteraction = false;
 
                 for (int tick = 0; tick < 700; tick++)
                 {
@@ -327,7 +328,15 @@ namespace HayChoriYPaty.Tests
                         }
                         if (offset < 1f) sawFadedDeparture = true;
                     }
-                    if (state == "Deposit" && sawDeparture) break;
+                    if (state == "Deposit" && sawDeparture)
+                    {
+                        Call(renderer, "Prepare", sim, 1f, 960f);
+                        Call(renderer, "PrepareWorkers", normal, diagonal, normal, diagonal, beverage, beverage, true);
+                        yield return null; yield return null;
+                        SaveProjectionCapture(renderer, "food-table-worker-deposit-20261020");
+                        capturedTableInteraction = true;
+                        break;
+                    }
                     yield return null;
                 }
 
@@ -335,6 +344,8 @@ namespace HayChoriYPaty.Tests
                 Assert.IsTrue(sawCooking && capturedCooking, "The worker must enter real cooking and capture its integrated pose.");
                 Assert.IsTrue(sawDeparture && capturedDeparture && sawFadedDeparture,
                     "The worker must leave continuously, fade the contact offset, and reach the table.");
+                Assert.IsTrue(capturedTableInteraction,
+                    "Capture the compact food table with the real cook arriving to deposit a real item.");
                 Assert.That(largestOffsetStep, Is.LessThanOrEqualTo(2.6f));
 
                 object kitchen = Get(sim, "Kitchen");

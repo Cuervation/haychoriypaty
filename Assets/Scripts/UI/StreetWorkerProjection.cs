@@ -53,6 +53,9 @@ namespace HayChoriYPaty
             new Rect(112,29,454,632), new Rect(587,29,518,633),
             new Rect(73,669,493,662), new Rect(587,669,518,662)
         };
+        // Alpha-tight top inset of the hair inside each reviewed source crop, in source pixels.
+        // Measured from street-parrillero-cooking-arms-v1.png (alpha > 0); palette variants keep alpha.
+        private static readonly float[] CookingPoseHairTopInsetPixels = { 0f, 0f, 6f, 5f };
         private static readonly Vector2 CookingPoseAtlasSize = new Vector2(1175f,1338f);
         private static readonly Rect[] ExtensionBounds = { new Rect(28,11,206,279),new Rect(298,11,195,278),new Rect(562,11,213,277),new Rect(848,11,209,277),new Rect(34,299,226,280),new Rect(296,299,208,280),new Rect(557,299,217,280),new Rect(831,299,223,280),new Rect(41,588,218,281),new Rect(290,588,222,281),new Rect(564,588,217,281),new Rect(835,588,212,281),new Rect(38,876,173,272),new Rect(306,881,195,265),new Rect(598,883,176,268),new Rect(887,878,173,272),new Rect(37,1158,180,272),new Rect(326,1158,187,269),new Rect(567,1158,191,269),new Rect(866,1158,186,267) };
         public bool Ready => normal != null && diagonal != null && drink != null && extension != null;
@@ -347,12 +350,20 @@ namespace HayChoriYPaty
             workers.Add(id,v); return v;
         }
         private float Scale(Art art) => Mathf.Min(Width / art.Bounds.width, Height / art.Bounds.height);
-        private static float CookingPoseFootInset(int frame)
+        internal static float CookingPoseFootInset(int frame)
         {
             int index = Mathf.Clamp(frame, 0, CookingPoseBounds.Length - 1);
             Rect bounds = CookingPoseBounds[index];
             return CookingPoseFootInsetPixels[index] * Mathf.Min(Width / bounds.width, Height / bounds.height);
         }
+        internal static float CookingPoseVisibleHairHeight(int frame)
+        {
+            int index = Mathf.Clamp(frame, 0, CookingPoseBounds.Length - 1);
+            Rect bounds = CookingPoseBounds[index];
+            float spriteScale = Mathf.Min(Width / bounds.width, Height / bounds.height);
+            return (bounds.height - CookingPoseHairTopInsetPixels[index]) * spriteScale;
+        }
+        internal bool CookingPoseAvailable => cookingPoses != null;
         private void DrawPart(SpriteRenderer renderer, Art art, Rect source, Vector2 local, int order, float scaleMultiplier = 1f)
         {
             renderer.sprite = Slice(art.Texture, source); renderer.flipX = art.Flip;

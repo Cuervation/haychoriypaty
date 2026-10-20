@@ -65,6 +65,7 @@ namespace HayChoriYPaty
         public Texture BackgroundTexture => propsTexture;
         public Texture ForegroundTexture => null;
         public bool WorkersReady => workerProjection != null && workerProjection.Ready;
+        public bool CookingPoseAvailable => workerProjection != null && workerProjection.CookingPoseAvailable;
         public Texture CarriedTexture => WorkersReady ? null : carryTexture;
 
         /// <summary>Called by StreetView. Native SpriteRenderer objects always reflect live sim IDs and states.</summary>
@@ -132,7 +133,7 @@ namespace HayChoriYPaty
                 "Drink_Coca", "Drink_Beer", "Drink_Fernet", "Effect_Smoke", "Effect_Heat", "Prop_Ice"
             };
             string[] singleArt = {
-                "empty-grill", "empty-table", "blue-barrel", "sandwich-chori", "sandwich-paty",
+                "empty-grill", "empty-table", "food-table-plank", "food-table-trestle", "blue-barrel", "sandwich-chori", "sandwich-paty",
                 "sandwich-bondiola", "sandwich-vacio", "coca", "beer", "fernet", "ice", "smoke", "heat"
             };
             var missing = new List<string>();
@@ -260,7 +261,8 @@ namespace HayChoriYPaty
                     GameObject existing = propsRoot.transform.GetChild(i).gameObject;
                     existing.SetActive(visible);
                     SetStationTransform(existing.transform, bounds);
-                    FitStation(existing, bounds, PreserveStationAspect(prefabName));
+                    if (IsFoodTableStation(prefabName)) FitFoodTable(existing, bounds);
+                    else FitStation(existing, bounds, PreserveStationAspect(prefabName));
                     ApplyStationDepth(existing, StationDepth(bounds));
                     if (prefabName == "Station_FernetTable") EnsureFernetTableDisplay(existing);
                     return;
@@ -271,14 +273,63 @@ namespace HayChoriYPaty
             instance.name = key;
             SetLayerRecursively(instance, PropLayer);
             SetStationTransform(instance.transform, bounds);
-            FitStation(instance, bounds, PreserveStationAspect(prefabName));
-            SetSorting(instance, StationDepth(bounds));
+            if (IsFoodTableStation(prefabName)) FitFoodTable(instance, bounds);
+            else FitStation(instance, bounds, PreserveStationAspect(prefabName));
+            if (IsFoodTableStation(prefabName)) SetFoodTableDepth(instance, StationDepth(bounds));
+            else SetSorting(instance, StationDepth(bounds));
             if (prefabName == "Station_FernetTable") EnsureFernetTableDisplay(instance);
             instance.SetActive(visible);
         }
 
         private int StationDepth(Rect bounds) => simulation != null && simulation.UsesActiveCooks
             ? -5000 + Mathf.RoundToInt(bounds.yMax * verticalScale) : 0;
+
+        private static bool IsFoodTableStation(string prefabName) =>
+            prefabName == "Station_NormalTable" || prefabName == "Station_PremiumTable";
+
+        private void FitFoodTable(GameObject instance, Rect bounds)
+        {
+            Transform tabletop = instance.transform.Find("Tabletop");
+            Transform leftTrestle = instance.transform.Find("Trestle_Left");
+            Transform rightTrestle = instance.transform.Find("Trestle_Right");
+            if (tabletop == null || leftTrestle == null || rightTrestle == null)
+            {
+                FitStation(instance, bounds, false);
+                return;
+            }
+
+            instance.transform.localScale = Vector3.one;
+            float topDepth = bounds.height * StreetKitchenLayout.SandwichTableTopDepthRatio;
+            float supportHeight = bounds.height - topDepth + StreetKitchenLayout.SandwichTableSupportOverlap;
+            float supportCenterY = bounds.yMin + bounds.height - supportHeight * .5f;
+            float leftCenterX = bounds.xMin + bounds.width * StreetKitchenLayout.SandwichTableSupportCenterFraction;
+            float rightCenterX = bounds.xMax - bounds.width * StreetKitchenLayout.SandwichTableSupportCenterFraction;
+
+            FitFoodTablePart(tabletop, bounds, bounds.center.x, bounds.yMin + topDepth * .5f,
+                bounds.width, topDepth, -.01f);
+            float supportWidth = bounds.width * StreetKitchenLayout.SandwichTableSupportWidthFraction;
+            FitFoodTablePart(leftTrestle, bounds, leftCenterX, supportCenterY, supportWidth, supportHeight, 0f);
+            FitFoodTablePart(rightTrestle, bounds, rightCenterX, supportCenterY, supportWidth, supportHeight, 0f);
+        }
+
+        private void FitFoodTablePart(Transform part, Rect station, float centerX, float centerY,
+            float width, float height, float z)
+        {
+            SpriteRenderer spriteRenderer = part.GetComponent<SpriteRenderer>();
+            if (spriteRenderer == null || spriteRenderer.sprite == null) return;
+            Vector2 source = spriteRenderer.sprite.bounds.size;
+            if (source.x <= 0f || source.y <= 0f) return;
+            part.localPosition = new Vector3((centerX - station.center.x) * .01f,
+                (station.center.y - centerY) * verticalScale * .01f, z);
+            part.localScale = new Vector3(width * .01f / source.x,
+                height * verticalScale * .01f / source.y, 1f);
+        }
+
+        private static void SetFoodTableDepth(GameObject station, int depth)
+        {
+            foreach (SpriteRenderer renderer in station.GetComponentsInChildren<SpriteRenderer>(true))
+                renderer.sortingOrder = renderer.transform.name == "Tabletop" ? depth + 2 : depth;
+        }
 
         private static void ApplyStationDepth(GameObject station, int depth)
         {

@@ -72,8 +72,10 @@ namespace HayChoriYPaty.Tests
                     Call(sim, "Step", .25f); purchase.Invoke(strategy, new[] { sim, "D" });
                 }
                 int[] consumed = new int[10];
+                bool activeCooks = (bool)Get(sim, "UsesActiveCooks");
                 for (int product = 0; product < 7; product++)
                 {
+                    if (activeCooks && product < 4) continue; // Racing+ sandwich recipes bypass Market stock.
                     int delivered = (int)Call(sim, "GetProductDelivered", product);
                     int[] recipe = (int[])Runtime("StreetIngredientCatalog").GetMethod("Recipe").Invoke(null, new object[] { product });
                     foreach (int ingredient in recipe) consumed[ingredient] += delivered;

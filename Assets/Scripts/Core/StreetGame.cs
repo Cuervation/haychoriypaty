@@ -461,8 +461,9 @@ namespace HayChoriYPaty
             {
                 long delivered = sim.GetProductDelivered(product);
                 record.salesByProduct[product] = delivered;
-                foreach (int ingredient in StreetIngredientCatalog.Recipe(product))
-                    record.stockConsumed[ingredient] += delivered;
+                if (!(sim.UsesActiveCooks && product < 4))
+                    foreach (int ingredient in StreetIngredientCatalog.Recipe(product))
+                        record.stockConsumed[ingredient] += delivered;
             }
             for (int i = 0; i < 10; i++) record.stockRemaining[i] = market.Units(i);
             return record;

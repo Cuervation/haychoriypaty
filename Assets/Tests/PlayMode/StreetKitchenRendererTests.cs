@@ -17,10 +17,10 @@ namespace HayChoriYPaty.Tests
         private static object CallExact(object value, string name, Type[] parameterTypes, params object[] args) =>
             value.GetType().GetMethod(name, Instance, null, parameterTypes, null).Invoke(value, args);
 
-        [TestCase(0, false, 31.2f, 16.8f)]
-        [TestCase(1, false, 24f, 16.8f)]
-        [TestCase(2, false, 26.4f, 18.48f)]
-        [TestCase(3, false, 26.4f, 18.48f)]
+        [TestCase(0, false, 28.08f, 15.12f)]
+        [TestCase(1, false, 21.6f, 15.12f)]
+        [TestCase(2, false, 30.888f, 16.632f)]
+        [TestCase(3, false, 30.888f, 16.632f)]
         [TestCase(0, true, 39f, 22.5f)]
         [TestCase(1, true, 30f, 22.5f)]
         [TestCase(2, true, 33f, 24.75f)]
@@ -37,7 +37,7 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
-        public IEnumerator SandwichTablesRenderTheExpandedBackSurfaceAndKeepTheServiceEdge()
+        public IEnumerator SandwichTablesUseTwoTrestlesAndOnePlankAt80PixelsAndKeepTheServiceEdge()
         {
             var root = new GameObject("Expanded sandwich table projection test");
             try
@@ -59,15 +59,34 @@ namespace HayChoriYPaty.Tests
                 Assert.IsNotNull(premium);
                 Assert.IsNotNull(fernet);
 
-                SpriteRenderer normalSprite = normal.GetComponentInChildren<SpriteRenderer>(true);
-                SpriteRenderer premiumSprite = premium.GetComponentInChildren<SpriteRenderer>(true);
+                SpriteRenderer normalSprite = normal.Find("Tabletop").GetComponent<SpriteRenderer>();
+                SpriteRenderer premiumSprite = premium.Find("Tabletop").GetComponent<SpriteRenderer>();
+                SpriteRenderer normalLeft = normal.Find("Trestle_Left").GetComponent<SpriteRenderer>();
+                SpriteRenderer normalRight = normal.Find("Trestle_Right").GetComponent<SpriteRenderer>();
+                SpriteRenderer premiumLeft = premium.Find("Trestle_Left").GetComponent<SpriteRenderer>();
+                SpriteRenderer premiumRight = premium.Find("Trestle_Right").GetComponent<SpriteRenderer>();
                 SpriteRenderer fernetSprite = fernet.GetComponentInChildren<SpriteRenderer>(true);
+                float topDepthRatio = (float)GameType("StreetKitchenLayout")
+                    .GetField("SandwichTableTopDepthRatio", BindingFlags.Public | BindingFlags.Static).GetRawConstantValue();
+                float tableHeight = (float)GameType("StreetKitchenLayout")
+                    .GetField("SandwichTableHeight", BindingFlags.Public | BindingFlags.Static).GetRawConstantValue();
                 Assert.AreEqual(normalBounds.width * .01f, normalSprite.bounds.size.x, .001f);
-                Assert.AreEqual(normalBounds.height * .01f, normalSprite.bounds.size.y, .001f,
-                    "The normal station artwork fills the deeper surface bounds instead of leaving a visual gap.");
+                Assert.AreEqual(normalBounds.height * topDepthRatio * .01f, normalSprite.bounds.size.y, .001f,
+                    "The normal plank fills the usable three-row surface.");
                 Assert.AreEqual(premiumBounds.width * .01f, premiumSprite.bounds.size.x, .001f);
-                Assert.AreEqual(premiumBounds.height * .01f, premiumSprite.bounds.size.y, .001f,
-                    "The Premium station artwork fills the deeper surface bounds without changing food art.");
+                Assert.AreEqual(premiumBounds.height * topDepthRatio * .01f, premiumSprite.bounds.size.y, .001f);
+                Assert.AreEqual(normalBounds.height * .01f, tableHeight * .01f, .001f,
+                    "Normal and Premium bounds are exactly 80 logical pixels tall.");
+                Assert.AreEqual(normalLeft.bounds.size.x, normalRight.bounds.size.x, .001f);
+                Assert.AreEqual(normalLeft.bounds.size.y, normalRight.bounds.size.y, .001f);
+                Assert.AreEqual(normalLeft.bounds.size.x, premiumLeft.bounds.size.x, .001f);
+                Assert.AreEqual(normalLeft.sortingOrder, normalRight.sortingOrder);
+                Assert.Greater(normalSprite.sortingOrder, normalLeft.sortingOrder,
+                    "The plank draws over the two trestles.");
+                Assert.Less(normal.Find("Trestle_Left").localPosition.x, 0f);
+                Assert.Greater(normal.Find("Trestle_Right").localPosition.x, 0f);
+                Assert.AreEqual("empty-table", fernetSprite.sprite.name,
+                    "The Fernet furniture keeps its original independent artwork.");
                 Vector2 fernetSourceSize = fernetSprite.sprite.bounds.size;
                 float fernetAspectFitHeight = Mathf.Min(fernetBounds.width / fernetSourceSize.x,
                     fernetBounds.height / fernetSourceSize.y) * fernetSourceSize.y * .01f;
@@ -94,6 +113,12 @@ namespace HayChoriYPaty.Tests
                 Assert.IsTrue((bool)Call(solo, "IsProductAvailable", 0));
                 Assert.IsFalse((bool)Call(solo, "IsProductAvailable", 1));
                 ClearKitchenUnits(Get(solo, "Kitchen"));
+                AddTableFood(Get(solo, "Kitchen"), 0, 0, 2);
+                Call(renderer, "Prepare", solo, 1f, 960f);
+                yield return null;
+                CaptureKitchenTexture(renderer, "solo-chori-sparse-two-items-1080x1920.png");
+
+                ClearKitchenUnits(Get(solo, "Kitchen"));
                 AddTableFood(Get(solo, "Kitchen"), 0, 0, 12);
                 Call(renderer, "Prepare", solo, 1f, 960f);
                 yield return null;
@@ -110,6 +135,10 @@ namespace HayChoriYPaty.Tests
                 Call(renderer, "Prepare", paired, 1.25f, 1200f);
                 yield return null;
                 CaptureKitchenTexture(renderer, "paired-four-products-4x3-1080x2400.png");
+
+                Call(renderer, "Prepare", paired, .85f, 800f);
+                yield return null;
+                CaptureKitchenTexture(renderer, "paired-four-products-4x3-918x1600.png");
 
                 ClearKitchenUnits(kitchen);
                 for (int product = 0; product < 4; product++)
@@ -145,7 +174,7 @@ namespace HayChoriYPaty.Tests
             var image = new Texture2D(target.width, target.height, TextureFormat.RGBA32, false);
             image.ReadPixels(new Rect(0f, 0f, target.width, target.height), 0, 0);
             image.Apply();
-            string folder = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/SandwichTables-20261019"));
+            string folder = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/SandwichTables-20261020"));
             Directory.CreateDirectory(folder);
             File.WriteAllBytes(Path.Combine(folder, fileName), ImageConversion.EncodeToPNG(image));
             UnityEngine.Object.Destroy(image);

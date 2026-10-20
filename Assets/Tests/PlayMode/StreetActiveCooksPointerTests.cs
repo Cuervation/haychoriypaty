@@ -229,6 +229,47 @@ namespace HayChoriYPaty.Tests
             ((System.Collections.IList)GetProperty(kitchen, "Units")).Clear();
         }
 
+        private int ConfigureVisualCookersForRingCapture(int normalCount, int premiumCount, float cycleProgress)
+        {
+            object layout = GetProperty(Sim, "KitchenLayout");
+            int normalIndex = 0, premiumIndex = 0, active = 0;
+            foreach (object worker in (System.Collections.IEnumerable)GetProperty(Sim, "Workers"))
+            {
+                string role = GetProperty(worker, "Role").ToString();
+                bool premium = role == "ParrilleroPremium";
+                if (!premium && role != "Parrillero") continue;
+                int index = premium ? premiumIndex++ : normalIndex++;
+                int requested = premium ? premiumCount : normalCount;
+                int teamCount = requested;
+                bool cooking = index < requested;
+                SetWorkerProperty(worker, "State", EnumValue(worker.GetType().Assembly.GetType("HayChoriYPaty.StreetWorkerState"), "Idle"));
+                SetWorkerProperty(worker, "VisualCooking", cooking);
+                SetWorkerProperty(worker, "VisualCookingProduct", cooking ? (premium ? 2 : 0) : -1);
+                SetWorkerProperty(worker, "CookingProgress", cooking ? .57f : 0f);
+                SetWorkerProperty(worker, "CookingCycleProgress", cycleProgress);
+                if (!cooking) continue;
+
+                int product = premium ? 2 : 0;
+                Vector2 post = (Vector2)Call(layout, "GrillWorkPosition", product, index, teamCount);
+                SetWorkerProperty(worker, "CookStationIndex", index);
+                SetWorkerProperty(worker, "Position", post);
+                SetWorkerProperty(worker, "Target", post);
+                SetWorkerProperty(worker, "StepDistance", 0f);
+                active++;
+            }
+            return active;
+        }
+
+        private void AssertCookingRingCentersDoNotOverlap(int expected)
+        {
+            IList centers = (IList)viewType.GetField("cookingRingCenters", PrivateInstance).GetValue(view);
+            Assert.AreEqual(expected, centers.Count, "Each visible cooking worker must have one rendered progress ring.");
+            for (int i = 0; i < centers.Count; i++)
+            for (int j = i + 1; j < centers.Count; j++)
+                Assert.GreaterOrEqual(((Vector2)centers[i] - (Vector2)centers[j]).sqrMagnitude,
+                    28f * 28f - .01f, "Cooking rings must not overlap one another.");
+        }
+
 #if UNITY_EDITOR
         private IEnumerator CaptureSandwichGameViewSize(int width, int height, string name)
         {
@@ -377,6 +418,44 @@ namespace HayChoriYPaty.Tests
             yield return null;
             yield return new WaitForEndOfFrame();
             SaveCookingGameViewCapture("parrillero-cooking-to-carry");
+        }
+
+        [UnityTest]
+        public IEnumerator CaptureCookingRingsForBothRolesAndFourCookTeamsAtResponsivePortraitSizes()
+        {
+            ActivateTestGameWithoutPersisting();
+            StartLevel(5);
+            SetSim("Coins", 1000000);
+            for (int i = 1; i < 4; i++)
+                Assert.IsTrue((bool)Call(Sim, "TryHire", EnumValue(roleType, "Parrillero")), "Four normal cooks are required for the capture set.");
+            for (int i = 0; i < 4; i++)
+                Assert.IsTrue((bool)Call(Sim, "TryHire", EnumValue(roleType, "ParrilleroPremium")), "Four Premium cooks are required for the capture set.");
+
+            Assert.AreEqual(1, ConfigureVisualCookersForRingCapture(1, 0, .31f));
+            yield return CaptureSandwichGameViewSize(540, 960, "cooking-ring-single-normal");
+            AssertCookingRingCentersDoNotOverlap(1);
+
+            Assert.AreEqual(1, ConfigureVisualCookersForRingCapture(0, 1, .31f));
+            yield return CaptureSandwichGameViewSize(540, 960, "cooking-ring-single-premium");
+            AssertCookingRingCentersDoNotOverlap(1);
+
+            Assert.AreEqual(4, ConfigureVisualCookersForRingCapture(4, 0, .31f));
+            yield return CaptureSandwichGameViewSize(540, 960, "cooking-ring-four-normal-reference");
+            AssertCookingRingCentersDoNotOverlap(4);
+            yield return CaptureSandwichGameViewSize(540, 1200, "cooking-ring-four-normal-tall");
+            AssertCookingRingCentersDoNotOverlap(4);
+
+            Assert.AreEqual(4, ConfigureVisualCookersForRingCapture(0, 4, .31f));
+            yield return CaptureSandwichGameViewSize(540, 960, "cooking-ring-four-premium-reference");
+            AssertCookingRingCentersDoNotOverlap(4);
+            yield return CaptureSandwichGameViewSize(540, 1200, "cooking-ring-four-premium-tall");
+            AssertCookingRingCentersDoNotOverlap(4);
+
+            Assert.AreEqual(4, ConfigureVisualCookersForRingCapture(2, 2, .31f));
+            yield return CaptureSandwichGameViewSize(540, 960, "cooking-ring-mixed-reference");
+            AssertCookingRingCentersDoNotOverlap(4);
+            yield return CaptureSandwichGameViewSize(540, 1200, "cooking-ring-mixed-tall");
+            AssertCookingRingCentersDoNotOverlap(4);
         }
 
         [UnityTest]

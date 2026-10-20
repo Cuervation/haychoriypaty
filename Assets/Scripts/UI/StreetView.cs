@@ -1479,13 +1479,18 @@ namespace HayChoriYPaty
         private const float CookingRingRadius = 10f;
         private const float CookingRingDotSize = 3f;
         private const float CookingRingHeadGap = 4f;
-        internal static float CookingProgressRingCenterY(float workerFootY, float verticalScale)
+        internal static float CookingProgressRingCenterY(float workerFootY, float verticalScale,
+            float visibleHairHeight, float spriteRootOffset)
         {
             float scale = Mathf.Max(.01f, verticalScale);
-            float renderedWorkerHeight = StreetWorkerProjection.Height * scale;
             float ringOuterRadius = CookingRingRadius + CookingRingDotSize * .5f;
-            return workerFootY * scale - renderedWorkerHeight - CookingRingHeadGap - ringOuterRadius;
+            float visibleHairTopY = workerFootY * scale + spriteRootOffset - visibleHairHeight;
+            return visibleHairTopY - CookingRingHeadGap - ringOuterRadius;
         }
+        internal static Color CookingRingProgressColor(StreetWorkerRole role) =>
+            role == StreetWorkerRole.ParrilleroPremium
+                ? (Color)new Color32(0x16, 0x8B, 0xFF, 0xFF)
+                : Color.white;
 
         private readonly System.Collections.Generic.List<Vector2> cookingRingCenters = new System.Collections.Generic.List<Vector2>();
         private void DrawCookingProgress(StreetSimulation sim)
@@ -1498,7 +1503,17 @@ namespace HayChoriYPaty
                 if (worker.State != StreetWorkerState.Cooking && !worker.VisualCooking) continue;
                 Vector2 visualPosition = StreetWorkerProjection.PresentationPosition(sim, worker);
                 float cx = Mathf.Clamp(visualPosition.x, 14f, W - 14f);
-                float cy = CookingProgressRingCenterY(visualPosition.y, layoutVerticalScale);
+                StreetWorkerPose pose = StreetWorkerAnimation.Sample(worker);
+                bool nativeCookingPose = kitchenRenderer != null && kitchenRenderer.WorkersReady &&
+                    kitchenRenderer.CookingPoseAvailable;
+                float hairHeight = nativeCookingPose
+                    ? StreetWorkerProjection.CookingPoseVisibleHairHeight(pose.CookingFrame)
+                    : StreetWorkerProjection.Height;
+                float spriteRootOffset = nativeCookingPose
+                    ? StreetWorkerProjection.CookingPoseFootInset(pose.CookingFrame)
+                    : 0f;
+                float cy = CookingProgressRingCenterY(visualPosition.y, layoutVerticalScale,
+                    hairHeight, spriteRootOffset);
                 // Several real slots may share the same approach column. Stack only
                 // their progress rings, rather than overlapping independent clocks.
                 for (int attempt = 0; attempt <= sim.Workers.Count; attempt++)
@@ -1515,7 +1530,7 @@ namespace HayChoriYPaty
                 for (int i = 0; i < segments; i++)
                 {
                     float a = i / (float)segments * Mathf.PI * 2f - Mathf.PI * .5f;
-                    GUI.color = i < lit ? new Color(1f, .72f, .18f, 1f) : new Color(.12f, .07f, .035f, .85f);
+                    GUI.color = i < lit ? CookingRingProgressColor(worker.Role) : new Color(.12f, .07f, .035f, .85f);
                     float radius = CookingRingRadius;
                     GUI.DrawTexture(new Rect(cx + Mathf.Cos(a) * radius - 1.5f,
                         cy + Mathf.Sin(a) * radius - CookingRingDotSize * .5f,

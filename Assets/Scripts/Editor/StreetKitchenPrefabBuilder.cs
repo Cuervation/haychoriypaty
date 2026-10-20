@@ -38,8 +38,8 @@ namespace HayChoriYPaty.Editor
 
             CreatePrefab("Station_NormalGrill", Sprite("empty-grill"));
             CreatePrefab("Station_PremiumGrill", Sprite("empty-grill"));
-            CreatePrefab("Station_NormalTable", Sprite("empty-table"));
-            CreatePrefab("Station_PremiumTable", Sprite("empty-table"));
+            CreateFoodTablePrefab("Station_NormalTable");
+            CreateFoodTablePrefab("Station_PremiumTable");
             CreatePrefab("Station_FernetTable", Sprite("empty-table"));
             CreateBarrel("Station_BeerBarrel");
             CreateBarrel("Station_CocaBarrel");
@@ -54,7 +54,7 @@ namespace HayChoriYPaty.Editor
         private static void ConfigureAllSprites()
         {
             string[] files = {
-                "empty-grill", "empty-table", "blue-barrel", "sandwich-chori", "sandwich-paty",
+                "empty-grill", "empty-table", "food-table-plank", "food-table-trestle", "blue-barrel", "sandwich-chori", "sandwich-paty",
                 "sandwich-bondiola", "sandwich-vacio", "coca", "beer", "fernet", "ice", "smoke", "heat"
             };
             for (int i = 0; i < files.Length; i++) ConfigureTexture(files[i], false);
@@ -152,6 +152,27 @@ namespace HayChoriYPaty.Editor
             child.transform.localPosition = new Vector3(0, barrelSize.y * .30f, -.01f);
             child.transform.localScale = new Vector3(barrelSize.x * .58f / iceSize.x, barrelSize.y * .19f / iceSize.y, 1f);
             SavePrefab(root, name);
+        }
+
+        private static void CreateFoodTablePrefab(string name)
+        {
+            var root = new GameObject(name);
+            Sprite trestle = Sprite("food-table-trestle");
+            Sprite plank = Sprite("food-table-plank");
+            AddSpriteChild(root, "Trestle_Left", trestle, 0);
+            AddSpriteChild(root, "Trestle_Right", trestle, 0);
+            AddSpriteChild(root, "Tabletop", plank, 2);
+            SavePrefab(root, name);
+        }
+
+        private static GameObject AddSpriteChild(GameObject root, string name, Sprite sprite, int sortingOrder)
+        {
+            var child = new GameObject(name);
+            child.transform.SetParent(root.transform, false);
+            SpriteRenderer sr = child.AddComponent<SpriteRenderer>();
+            sr.sprite = sprite;
+            sr.sortingOrder = sortingOrder;
+            return child;
         }
 
         private static void CreatePrefab(string name, Sprite sprite)

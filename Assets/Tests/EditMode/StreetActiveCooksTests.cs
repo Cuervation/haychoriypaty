@@ -35,23 +35,52 @@ namespace HayChoriYPaty.Tests
         [TestCase(.8f)]
         [TestCase(1f)]
         [TestCase(1.25f)]
-        public void CookingProgressRingSitsFourPointsAboveEachCookHead(float verticalScale)
+        public void CookingProgressRingTracksAlphaTrimmedHairThroughEveryCookPose(float verticalScale)
         {
             Type viewType = Type.GetType("HayChoriYPaty.StreetView, Assembly-CSharp", true);
             MethodInfo centerMethod = viewType.GetMethod("CookingProgressRingCenterY", BindingFlags.Static | BindingFlags.NonPublic);
             Assert.IsNotNull(centerMethod);
-            float workerHeight = Convert.ToSingle(Type.GetType("HayChoriYPaty.StreetWorkerProjection, Assembly-CSharp", true)
-                .GetField("Height", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue());
+            Type projectionType = Type.GetType("HayChoriYPaty.StreetWorkerProjection, Assembly-CSharp", true);
+            MethodInfo hairHeightMethod = projectionType.GetMethod("CookingPoseVisibleHairHeight", BindingFlags.Static | BindingFlags.NonPublic);
+            MethodInfo rootOffsetMethod = projectionType.GetMethod("CookingPoseFootInset", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.IsNotNull(hairHeightMethod);
+            Assert.IsNotNull(rootOffsetMethod);
             const float ringOuterRadius = 11.5f; // Existing 10-point radius plus half of the 3-point marker.
+            float previousHairTop = 0f, previousRingTop = 0f;
 
             foreach (float workerFeetY in new[] { 270f, 412f, 560f })
             {
-                float centerY = Convert.ToSingle(centerMethod.Invoke(null, new object[] { workerFeetY, verticalScale }));
-                float headTopY = workerFeetY * verticalScale - workerHeight * verticalScale;
-                float ringBottomY = centerY + ringOuterRadius;
-                Assert.That(headTopY - ringBottomY, Is.EqualTo(4f).Within(.001f),
-                    "The ring should follow each cook and stay a small, resolution-independent distance above the head.");
+                for (int frame = 0; frame < 4; frame++)
+                {
+                    float visibleHairHeight = Convert.ToSingle(hairHeightMethod.Invoke(null, new object[] { frame }));
+                    float spriteRootOffset = Convert.ToSingle(rootOffsetMethod.Invoke(null, new object[] { frame }));
+                    float ringCenterY = Convert.ToSingle(centerMethod.Invoke(null,
+                        new object[] { workerFeetY, verticalScale, visibleHairHeight, spriteRootOffset }));
+                    float hairTopY = workerFeetY * verticalScale + spriteRootOffset - visibleHairHeight;
+                    float ringBottomY = ringCenterY + ringOuterRadius;
+                    Assert.That(hairTopY - ringBottomY, Is.EqualTo(4f).Within(.001f),
+                        "The ring must stay exactly four logical pixels above the alpha-visible hair in each animation frame.");
+                    if (frame > 0)
+                    {
+                        Assert.That(ringCenterY - previousRingTop, Is.EqualTo(hairTopY - previousHairTop).Within(.001f),
+                            "The ring must follow the same head-top displacement across cooking-pose transitions.");
+                    }
+                    previousHairTop = hairTopY;
+                    previousRingTop = ringCenterY;
+                }
             }
+        }
+
+        [Test]
+        public void CookingProgressRingUsesPureWhiteForNormalAndExactBlueForPremium()
+        {
+            Type viewType = Type.GetType("HayChoriYPaty.StreetView, Assembly-CSharp", true);
+            MethodInfo colorMethod = viewType.GetMethod("CookingRingProgressColor", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.IsNotNull(colorMethod);
+            Color normal = (Color)colorMethod.Invoke(null, new[] { EnumValue(roleType, "Parrillero") });
+            Color premium = (Color)colorMethod.Invoke(null, new[] { EnumValue(roleType, "ParrilleroPremium") });
+            Assert.AreEqual(Color.white, normal);
+            Assert.AreEqual(new Color32(0x16, 0x8B, 0xFF, 0xFF), (Color32)premium);
         }
 
         private object Make(int[] products, bool active, Action<object> configure = null)
@@ -360,7 +389,7 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void CompletedQuotaStillConsumesItsScheduledVisualTurn()
+        public void CompletedQuotaDoesNotBlockRealProductionOrGlobalAlternation()
         {
             int[] goals = { 100, 50, 80, 40, 1000, 1000, 1000 };
             object sim = MakeActiveSimulation(5, 100000, goals);
@@ -368,17 +397,11 @@ namespace HayChoriYPaty.Tests
             SetArrivalFarFuture(sim);
             ((int[])simulationType.GetField("deliveredByProduct", PrivateInstance).GetValue(sim))[0] = goals[0];
 
-            Step(sim, 1);
-            object cook = Workers(sim)[0];
-            Assert.IsTrue((bool)Get(cook, "VisualCooking"));
-            Assert.AreEqual(0, Get(cook, "VisualCookingProduct"),
-                "A completed Chori quota does not skip the assigned Chori turn.");
-            Assert.AreEqual(0, Get(cook, "CookingItemId"));
-
-            Step(sim, 40);
-            Assert.Greater((int)Get(cook, "CookingItemId"), 0,
-                "The next scheduled Paty turn can resume real production at the visual-cycle boundary.");
-            Assert.AreEqual(1, Get(cook, "Product"));
+            List<int> sequence = CollectRealCookAssignments(sim, "Parrillero", 4);
+            CollectionAssert.AreEqual(new[] { 0, 1, 0, 1 }, sequence,
+                "A completed Chori quota must still produce real units in the shared alternating sequence.");
+            Assert.AreEqual("Playing", Get(sim, "Phase").ToString(),
+                "Unfinished beverage goals keep the level active while completed sandwich goals continue producing.");
         }
 
         [Test]
@@ -417,7 +440,111 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void IngredientShortageKeepsTheScheduledTurnAndResumesInOrder()
+        public void ActiveProductsProduceRealUnitsAtZeroStockAfterTheirGoalsAreComplete()
+        {
+            int[] goals = { 8, 8, 8, 8, 1000, 1000, 1000 };
+            object balance = MakeActiveBalance(5, 100000, goals);
+            object sim = Activator.CreateInstance(simulationType, new object[] { balance, 5, 5f, 0, 1, 0 });
+            object data = Activator.CreateInstance(marketDataType);
+            int[] stocked = Enumerable.Repeat(10000, 10).ToArray();
+            marketDataType.GetField("stockUnits", PublicInstance).SetValue(data, stocked);
+            object market = Activator.CreateInstance(marketType, new[] { data, balance });
+            Assert.IsTrue((bool)Call(market, "BeginAttempt", sim));
+            Call(sim, "BindIngredientStock", market);
+            Call(sim, "StartRound");
+            SetArrivalFarFuture(sim);
+            Assert.IsTrue((bool)Call(sim, "TryHire", EnumValue(roleType, "ParrilleroPremium")));
+
+            stocked = (int[])marketDataType.GetField("stockUnits", PublicInstance).GetValue(Get(market, "Data"));
+            Array.Clear(stocked, 0, stocked.Length);
+            int[] delivered = (int[])simulationType.GetField("deliveredByProduct", PrivateInstance).GetValue(sim);
+            for (int product = 0; product < 4; product++) delivered[product] = goals[product];
+            Assert.IsFalse((bool)Get(sim, "GoalReached"), "Outstanding beverage quotas keep the level active.");
+
+            Step(sim, 400);
+            object kitchen = Get(sim, "Kitchen");
+            var ids = new HashSet<int>();
+            foreach (object unit in Units(kitchen))
+                Assert.IsTrue(ids.Add((int)Get(unit, "Id")), "Every real sandwich has one unique physical ID.");
+            for (int product = 0; product < 4; product++)
+            {
+                Assert.IsFalse((bool)Call(market, "CanPrepareFood", product), "The Market really has no recipe stock.");
+                Assert.IsTrue((bool)Call(kitchen, "HasSupply", product), "Active sandwich demand remains supply-eligible without stock.");
+                Assert.Greater(Units(kitchen).Cast<object>().Count(unit => (int)Get(unit, "Product") == product &&
+                    Get(unit, "State").ToString() != "Burned"), 0,
+                    "Product " + product + " must have real units after its goal is complete and stock is zero.");
+            }
+            CollectionAssert.AreEqual(new int[10], stocked, "Active cooking cannot debit, reserve, or drive ingredient stock negative.");
+            Assert.AreEqual("Playing", Get(sim, "Phase").ToString());
+        }
+
+        [Test]
+        public void SalesContinueAfterFourSandwichGoalsAtZeroIngredients()
+        {
+            int[] goals = { 1, 1, 1, 1, 1000, 1000, 1000 };
+            object balance = MakeActiveBalance(5, 100000, goals);
+            object sim = Activator.CreateInstance(simulationType, new object[] { balance, 5, 5f, 0, 1, 0 });
+            object data = Activator.CreateInstance(marketDataType);
+            int[] stocked = Enumerable.Repeat(10000, 10).ToArray();
+            marketDataType.GetField("stockUnits", PublicInstance).SetValue(data, stocked);
+            object market = Activator.CreateInstance(marketType, new[] { data, balance });
+            Assert.IsTrue((bool)Call(market, "BeginAttempt", sim));
+            Call(sim, "BindIngredientStock", market);
+            Call(sim, "StartRound");
+            SetArrivalFarFuture(sim);
+            Assert.IsTrue((bool)Call(sim, "TryHire", EnumValue(roleType, "ParrilleroPremium")));
+            Assert.IsTrue((bool)Call(sim, "TryHire", EnumValue(roleType, "Mozo")));
+            Assert.IsTrue((bool)Call(sim, "TryHire", EnumValue(roleType, "Mozo")));
+
+            int[] delivered = (int[])simulationType.GetField("deliveredByProduct", PrivateInstance).GetValue(sim);
+            for (int product = 0; product < 4; product++) delivered[product] = goals[product];
+            Assert.IsFalse((bool)Get(sim, "GoalReached"), "The level remains active because beverage goals are unfinished.");
+            stocked = (int[])marketDataType.GetField("stockUnits", PublicInstance).GetValue(Get(market, "Data"));
+            Array.Clear(stocked, 0, stocked.Length);
+            for (int product = 0; product < 4; product++)
+            {
+                Assert.IsTrue((bool)Call(sim, "IsProductAvailable", product));
+                Assert.IsFalse((bool)Call(market, "CanPrepareFood", product));
+                Assert.IsTrue((bool)Call(sim, "SpawnCustomer", product, 1), "Spawn post-goal extra order for product " + product);
+            }
+
+            int coinsBeforeSales = (int)Get(sim, "Coins");
+            int expectedRevenue = 0;
+            for (int product = 0; product < 4; product++)
+                expectedRevenue += Mathf.RoundToInt((float)Call(sim, "GetProductPrice", product));
+            object kitchen = Get(sim, "Kitchen");
+            var productsSeenOnTable = new HashSet<int>();
+            for (int tick = 0; tick < 4000; tick++)
+            {
+                Call(sim, "Step", .05f);
+                var ids = new HashSet<int>();
+                foreach (object unit in Units(kitchen))
+                {
+                    Assert.IsTrue(ids.Add((int)Get(unit, "Id")), "Live physical units cannot share IDs.");
+                    int product = (int)Get(unit, "Product");
+                    if (product < 4 && Get(unit, "Location").ToString() == "Table") productsSeenOnTable.Add(product);
+                }
+                bool allExtrasSold = true;
+                for (int product = 0; product < 4; product++)
+                    allExtrasSold &= (int)Call(sim, "GetProductDelivered", product) == goals[product] + 1;
+                if (allExtrasSold) break;
+            }
+
+            for (int product = 0; product < 4; product++)
+            {
+                Assert.AreEqual(goals[product] + 1, Call(sim, "GetProductDelivered", product),
+                    "Each product receives exactly one real extra sale after its goal.");
+                Assert.IsTrue(productsSeenOnTable.Contains(product), "Product " + product + " must be physically deposited before Mozo delivery.");
+            }
+            Assert.AreEqual(4, Get(sim, "Delivered"), "Each post-goal order is handed off exactly once.");
+            Assert.AreEqual(coinsBeforeSales + expectedRevenue, Get(sim, "Coins"), "Extra sales register revenue exactly once.");
+            Assert.AreEqual(expectedRevenue, Get(sim, "CoinsEarned"));
+            Assert.AreEqual("Playing", Get(sim, "Phase").ToString(), "No victory condition is changed by extra sales.");
+            CollectionAssert.AreEqual(new int[10], stocked, "No sandwich sale consumes or overdraws Market ingredients.");
+        }
+
+        [Test]
+        public void ActiveSandwichTransactionsDoNotDependOnMarketStock()
         {
             object balance = MakeActiveBalance(5, 100000);
             object sim = Activator.CreateInstance(simulationType, new object[] { balance, 5, 5f, 0, 1, 0 });
@@ -430,146 +557,27 @@ namespace HayChoriYPaty.Tests
             Call(sim, "StartRound");
             SetArrivalFarFuture(sim);
             stocked = (int[])marketDataType.GetField("stockUnits", PublicInstance).GetValue(Get(market, "Data"));
-            for (int i = 0; i < stocked.Length; i++) stocked[i] = 0;
+            Array.Clear(stocked, 0, stocked.Length);
 
-            Step(sim, 1);
-            object cook = Workers(sim)[0];
-            object kitchen = Get(sim, "Kitchen");
-            Assert.IsTrue((bool)Get(cook, "VisualCooking"));
-            Assert.AreEqual(0, Get(cook, "VisualCookingProduct"));
-            Assert.AreEqual(0, Units(kitchen).Cast<object>().Count(unit => (int)Get(unit, "Product") < 4), "Missing ingredients cannot create a fake sandwich unit.");
-            CollectionAssert.AreEqual(new int[stocked.Length], stocked, "Visual cooking never consumes or makes stock negative.");
-
-            for (int i = 0; i < stocked.Length; i++) stocked[i] = 10000;
-            Step(sim, 40);
-            Assert.Greater((int)Get(cook, "CookingItemId"), 0);
-            Assert.AreEqual(1, Get(cook, "Product"),
-                "Restocked ingredients are used only for the next scheduled Paty turn; the original Chori visual cycle completes.");
-            Step(sim, 60);
-            Assert.Greater((int)Get(cook, "CookingItemId"), 0,
-                "The following Chori turn automatically resumes real production.");
-            Assert.AreEqual(0, Get(cook, "Product"));
-        }
-
-        [Test]
-        public void ParrillerosKeepAlternatingVisualCyclesAfterTheirQuotasWithoutChangingGameState()
-        {
-            int[] goals = { 8, 4, 6, 3, 1000, 1000, 1000 };
-            object sim = MakeActiveSimulation(5, 100000, goals);
-            Call(sim, "StartRound");
-            SetArrivalFarFuture(sim);
-            Assert.IsTrue((bool)Call(sim, "TryHire", EnumValue(roleType, "ParrilleroPremium")));
-
-            int coinsBefore = (int)Get(sim, "Coins");
-            int[] deliveredByProduct = (int[])simulationType.GetField("deliveredByProduct", PrivateInstance).GetValue(sim);
-            for (int product = 0; product < 4; product++) deliveredByProduct[product] = goals[product];
-            object kitchen = Get(sim, "Kitchen");
-            int sandwichUnitsBefore = Units(kitchen).Cast<object>().Count(unit => (int)Get(unit, "Product") < 4);
-
-            var normalSequence = CaptureVisualProductChanges(sim, "Parrillero", 245);
-            var premiumSequence = CaptureVisualProductChanges(sim, "ParrilleroPremium", 245);
-            CollectionAssert.AreEqual(new[] { 0, 1, 0, 1, 0, 1, 0 }, normalSequence,
-                "Normal visual turns must alternate 1:1 even after their goals are complete.");
-            CollectionAssert.AreEqual(new[] { 2, 3, 2, 3, 2, 3, 2 }, premiumSequence,
-                "Premium visual turns must alternate 1:1 even after their goals are complete.");
-
-            Assert.AreEqual("Playing", Get(sim, "Phase").ToString(),
-                "Outstanding beverage goals keep the match running after sandwich quotas are complete.");
-            foreach (object worker in Workers(sim))
+            for (int roleIndex = 0; roleIndex < 2; roleIndex++)
             {
-                string role = Get(worker, "Role").ToString();
-                if (role != "Parrillero" && role != "ParrilleroPremium") continue;
-                Assert.IsTrue((bool)Get(worker, "VisualCooking"), role + " must stay visually active at its grill.");
-                Assert.AreEqual("Idle", Get(worker, "State").ToString(), "Cosmetic cooking never enters a transport state.");
-                Assert.AreEqual(0, Get(worker, "CookingItemId"));
-                Assert.AreEqual(0, Get(worker, "CarriedItemId"));
-                Assert.That((float)Get(worker, "CookingProgress"), Is.GreaterThan(0f).And.LessThan(1f));
-                object pose = AnimationCall("Sample", worker, false);
-                Assert.IsTrue((bool)GetField(pose, "Cooking"), "The existing arms pose loop must remain active.");
-                Assert.IsTrue((bool)GetField(pose, "WorkingAtGrill"));
+                string roleName = roleIndex == 0 ? "Parrillero" : "ParrilleroPremium";
+                if (roleIndex == 1) Assert.IsTrue((bool)Call(sim, "TryHire", EnumValue(roleType, roleName)));
+                bool sawRealUnit = false;
+                object kitchen = Get(sim, "Kitchen");
+                for (int tick = 0; tick < 80; tick++)
+                {
+                    Step(sim, 1);
+                    object worker = Workers(sim).Cast<object>().First(candidate => Get(candidate, "Role").ToString() == roleName);
+                    int itemId = (int)Get(worker, "CookingItemId");
+                    if (itemId <= 0) continue;
+                    Assert.IsFalse((bool)Get(worker, "VisualCooking"), roleName + " must not use a cosmetic cycle while capacity is available.");
+                    Assert.IsNotNull(Call(kitchen, "Find", itemId));
+                    sawRealUnit = true;
+                }
+                Assert.IsTrue(sawRealUnit, roleName + " must own real units despite zero ingredient stock.");
             }
-
-            Assert.AreEqual(sandwichUnitsBefore, Units(kitchen).Cast<object>().Count(unit => (int)Get(unit, "Product") < 4),
-                "No physical sandwich units are created by repeated cosmetic cycles.");
-            Assert.AreEqual(coinsBefore, Get(sim, "Coins"));
-            Assert.AreEqual(0, Get(sim, "Delivered"));
-            Assert.AreEqual(0, ((IEnumerable)Get(sim, "Sales")).Cast<object>().Count());
-        }
-
-        [Test]
-        public void VisualCookingUsesNoIngredientsAndResumesAtTheNextAlternatingTurn()
-        {
-            object balance = MakeActiveBalance(5, 100000);
-            object sim = Activator.CreateInstance(simulationType, new object[] { balance, 5, 5f, 0, 1, 0 });
-            object data = Activator.CreateInstance(marketDataType);
-            int[] stocked = Enumerable.Repeat(10000, 10).ToArray();
-            marketDataType.GetField("stockUnits", PublicInstance).SetValue(data, stocked);
-            object market = Activator.CreateInstance(marketType, new[] { data, balance });
-            Assert.IsTrue((bool)Call(market, "BeginAttempt", sim));
-            Call(sim, "BindIngredientStock", market);
-            Call(sim, "StartRound");
-            SetArrivalFarFuture(sim);
-            Assert.IsTrue((bool)Call(sim, "TryHire", EnumValue(roleType, "ParrilleroPremium")));
-            stocked = (int[])marketDataType.GetField("stockUnits", PublicInstance).GetValue(Get(market, "Data"));
-            for (int i = 0; i < stocked.Length; i++) stocked[i] = 0;
-            int[] stockBefore = (int[])stocked.Clone();
-
-            Step(sim, 1);
-            object kitchen = Get(sim, "Kitchen");
-            var visualTargets = new Dictionary<int, int>();
-            var visualPhases = new Dictionary<int, float>();
-            foreach (object worker in Workers(sim))
-            {
-                string role = Get(worker, "Role").ToString();
-                if (role != "Parrillero" && role != "ParrilleroPremium") continue;
-                Assert.IsTrue((bool)Get(worker, "VisualCooking"), role + " must visually complete its assigned recipe while stock is absent.");
-                int expected = role == "Parrillero" ? 0 : 2;
-                Assert.AreEqual(expected, Get(worker, "VisualCookingProduct"));
-                Assert.AreEqual(0, Get(worker, "CookingItemId"));
-                Assert.AreEqual(0, Get(worker, "CarriedItemId"));
-                visualTargets[(int)Get(worker, "Id")] = expected;
-                visualPhases[(int)Get(worker, "Id")] = (float)Get(worker, "CookingCycleProgress");
-            }
-            CollectionAssert.AreEqual(stockBefore, stocked, "Visual-only cooking must not reserve or consume ingredients.");
-            Assert.AreEqual(0, Units(kitchen).Cast<object>().Count(unit => (int)Get(unit, "Product") < 4));
-
-            for (int i = 0; i < stocked.Length; i++) stocked[i] = 10000;
-            Step(sim, 1);
-            foreach (object worker in Workers(sim))
-            {
-                string role = Get(worker, "Role").ToString();
-                if (role != "Parrillero" && role != "ParrilleroPremium") continue;
-                Assert.IsTrue((bool)Get(worker, "VisualCooking"));
-                Assert.AreEqual(visualTargets[(int)Get(worker, "Id")], Get(worker, "VisualCookingProduct"));
-                Assert.That((float)Get(worker, "CookingCycleProgress"),
-                    Is.EqualTo(Mathf.Repeat(visualPhases[(int)Get(worker, "Id")] + .025f, 1f)).Within(.001f));
-            }
-
-            Step(sim, 39); // Allow for a zero-delta frame when the worker first reaches the grill.
-            foreach (object worker in Workers(sim))
-            {
-                string role = Get(worker, "Role").ToString();
-                if (role != "Parrillero" && role != "ParrilleroPremium") continue;
-                int expectedNext = role == "Parrillero" ? 1 : 3;
-                Assert.Greater((int)Get(worker, "CookingItemId"), 0, role + " should reserve the next real turn at the visual-cycle boundary. state=" +
-                    Get(worker, "State") + ", visual=" + Get(worker, "VisualCooking") + ", target=" +
-                    Get(worker, "VisualCookingProduct") + ", cycle=" + Get(worker, "CookingCycleProgress") +
-                    ", progress=" + Get(worker, "CookingProgress") + ", role target=" + expectedNext);
-                Assert.AreEqual(expectedNext, Get(worker, "Product"),
-                    "The resumed real recipe is the next product in the same global sequence.");
-                Assert.IsFalse((bool)Get(worker, "VisualCooking"));
-            }
-            Step(sim, 10);
-            foreach (object worker in Workers(sim))
-            {
-                string role = Get(worker, "Role").ToString();
-                if (role != "Parrillero" && role != "ParrilleroPremium") continue;
-                Assert.AreNotEqual(0f, Get(worker, "CookingCycleProgress"),
-                    "Real production continues the visual hand-animation phase after its natural cycle wrap.");
-                object unit = Call(kitchen, "Find", Get(worker, "CookingItemId"));
-                Assert.IsNotNull(unit);
-                Assert.That((float)Get(unit, "Progress"), Is.GreaterThan(0f));
-            }
+            CollectionAssert.AreEqual(new int[10], stocked);
         }
 
         [Test]

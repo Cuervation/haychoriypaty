@@ -69,7 +69,7 @@ namespace HayChoriYPaty
 
         public bool HasSupply(int product)
         {
-            if (ingredientStock == null) return true;
+            if (ingredientStock == null || (ActiveCooks && product >= 0 && product < 4)) return true;
             for (int i = 0; i < units.Count; i++)
                 if (units[i].Product == product && units[i].State != StreetFoodState.Burned) return true;
             return ingredientStock.CanPrepareFood(product);
@@ -152,7 +152,6 @@ namespace HayChoriYPaty
             return -1;
         }
         public bool CanReserveCook(int product) => ActiveCooks && product >= 0 && product < 4 &&
-            (ingredientStock == null || ingredientStock.CanPrepareFood(product)) &&
             FirstFreeTableSlot(product) >= 0 && FreeGrillSlot(product) >= 0;
 
         public StreetFoodUnit ReserveCook(int product, int workerId) => ReserveCook(product, workerId, -1);
@@ -211,7 +210,10 @@ namespace HayChoriYPaty
         {
             StreetFoodUnit unit = Find(id);
             if (unit == null || unit.Product != product || unit.Location != StreetFoodLocation.Carried || unit.WorkerId != workerId || unit.State != StreetFoodState.Cooked) return false;
-            if (ingredientStock != null && !ingredientStock.ConsumeReservedFood(id, product)) return false;
+            // Active sandwich products (0–3) are not backed by Market/Fridge ingredients.
+            // Other products and legacy automatic levels retain their reserved-stock transaction.
+            if (!(ActiveCooks && product >= 0 && product < 4) &&
+                ingredientStock != null && !ingredientStock.ConsumeReservedFood(id, product)) return false;
             units.Remove(unit);
             return true;
         }
@@ -399,7 +401,9 @@ namespace HayChoriYPaty
         private StreetFoodUnit Add(int product, StreetFoodState state, StreetFoodLocation location, int slot)
         {
             if (slot < 0 && location == StreetFoodLocation.Table) return null;
-            if (ingredientStock != null && !ingredientStock.TryReserveFood(nextId, product)) return null;
+            // Racing+ real sandwiches intentionally bypass ingredient reservations; drinks keep theirs.
+            if (!(ActiveCooks && product >= 0 && product < 4) &&
+                ingredientStock != null && !ingredientStock.TryReserveFood(nextId, product)) return null;
             var unit = new StreetFoodUnit { Id = nextId++, Product = product, State = state, Location = location,
                 Slot = slot, ReservedTableSlot = location == StreetFoodLocation.Table ? slot : -1 };
             units.Add(unit);

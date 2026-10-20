@@ -13,9 +13,9 @@ namespace HayChoriYPaty
         public const float GrillBottomClearance = 5f;
         public const float GrillVerticalGap = 4f;
         public const float TableWidth = 196f * Scale, TableHeight = 98f * Scale;
-        // Normal/Premium tables need three full sandwich rows without changing food size.
-        // Keep their service edge fixed and extend the prep surface toward the rear.
-        public const float SandwichTableHeight = 196f * Scale;
+        // Food tables use a compact, separate board-and-trestle composition while keeping
+        // the same front/service edge used by workers and deposits.
+        public const float SandwichTableHeight = 80f;
         public const float BarrelAuthoredWidth = 72f * 1.15f * 1.10f, BarrelAuthoredHeight = 117.6f;
         public const float BarrelWidth = BarrelAuthoredWidth * Scale, BarrelHeight = BarrelAuthoredHeight * Scale;
         public const float StandardGrillWidth = 352f * Scale, StandardGrillHeight = 117.3333f * Scale;
@@ -38,8 +38,12 @@ namespace HayChoriYPaty
         // that 3.516:1 artwork inside the 3:1 logical bounds, leaving top/bottom padding.
         private const float GrillArtworkAspect = 2131f / 606f;
         public const float TableSandwichScale = 1.5f, PremiumTableSandwichScaleMultiplier = 1.10f;
-        private const float TableSandwichDisplayScale = .80f;
-        private const float TableSandwichWoodTopDepth = .42f;
+        private const float TableSandwichDisplayScale = .72f;
+        public const float SandwichTableTopDepthRatio = .67f;
+        private const float TableSandwichWoodTopDepth = SandwichTableTopDepthRatio;
+        public const float SandwichTableSupportWidthFraction = .26f;
+        public const float SandwichTableSupportCenterFraction = .28f;
+        public const float SandwichTableSupportOverlap = 3f;
         private const float TableSandwichStackStep = .75f, TableSandwichMaxStackOffset = 6f;
         public const float GrillBottomLimit = TiledPlayfieldBottom - GrillBottomClearance;
         private const float GrillSurfaceTop = .115f, GrillSurfaceBottom = .46f;
@@ -574,7 +578,11 @@ namespace HayChoriYPaty
             int basePosition = index % basePositionCount;
             int stackLayer = index / basePositionCount;
             int sandwichRow = basePosition / columnCount; // 0 rear, 1 middle, 2 front
-            int column = basePosition % columnCount;
+            int baseColumn = basePosition % columnCount;
+            // With no paired product, place the first two units at opposite ends so a sparse
+            // solo stock uses the board's width instead of clustering in its left half.
+            int column = companionAvailable ? baseColumn
+                : (baseColumn % 2 == 0 ? baseColumn / 2 : columnCount - 1 - baseColumn / 2);
             float stackOffset = Mathf.Min(stackLayer * TableSandwichStackStep, TableSandwichMaxStackOffset);
             float itemX = Mathf.Lerp(minX, maxX, column / (float)(columnCount - 1));
             itemX += column < columnCount * .5f ? stackOffset : -stackOffset;

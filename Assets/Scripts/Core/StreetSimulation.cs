@@ -1150,8 +1150,8 @@ namespace HayChoriYPaty
                 int first = worker.Role == StreetWorkerRole.Parrillero ? 0 : 2;
                 Vector2 stationPoint = KitchenLayout.GrillWorkPosition(first, assignedStation, stationCount);
 
-                // A visual turn must finish with its originally assigned recipe. Stock or table
-                // space returning mid-cycle only affects the next alternating turn.
+                // A visual turn keeps its assigned recipe. Only physical slot capacity can prevent
+                // a real unit; objective progress and ingredient stock never gate active cooking.
                 if (worker.VisualCooking)
                 {
                     AdvanceVisualCookWorker(worker, dt);
@@ -1267,9 +1267,9 @@ namespace HayChoriYPaty
                     return;
                 }
 
-                // Assign the next global turn once at the cycle boundary. If it is still needed
-                // and physically reservable, transition to real production without resetting the
-                // existing arm-animation phase. Otherwise keep cooking this exact recipe visually.
+                // Assign the next global turn once at the cycle boundary. If physical capacity permits,
+                // transition to real production without resetting the arm-animation phase. Otherwise
+                // keep the exact scheduled recipe visual until its next alternating turn.
                 if (TryStartRealCook(worker, nextProduct, grillPosition, true, out bool routeFailed)) return;
                 if (routeFailed) return;
                 worker.VisualCookingProduct = nextProduct;
@@ -1281,9 +1281,7 @@ namespace HayChoriYPaty
             bool wasVisuallyCooking, out bool routeFailed)
         {
             routeFailed = false;
-            int goal = GetProductGoal(product);
-            if (goal <= 0 || GetProductDelivered(product) >= goal || !Kitchen.CanReserveCook(product))
-                return false;
+            if (!IsProductAvailable(product) || !Kitchen.CanReserveCook(product)) return false;
 
             int preferredSlot = NearestFreeGrillSlot(worker, product, stationPoint);
             StreetFoodUnit unit = Kitchen.ReserveCook(product, worker.Id, preferredSlot);

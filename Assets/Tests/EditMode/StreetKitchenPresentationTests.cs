@@ -864,6 +864,13 @@ namespace HayChoriYPaty.Tests
             {
                 Rect table = (Rect)Call(layout, "BoundsForProduct", product);
                 int capacity = companion ? (product < 2 ? 24 : 18) : (product < 2 ? 48 : 36);
+                if (!companion)
+                {
+                    Vector2 first = (Vector2)Call(layout, "TableSlotPosition", product, 0, false, capacity);
+                    Vector2 second = (Vector2)Call(layout, "TableSlotPosition", product, 1, false, capacity);
+                    Assert.Greater(second.x - first.x, table.width * .7f,
+                        "Sparse solo stock starts spread across the board instead of clustering at one end.");
+                }
                 int basePositionCount = companion ? 6 : 12;
                 int columnCount = companion ? 2 : 4;
                 Vector2 size = (Vector2)sizeMethod.Invoke(null, new object[] { product });
@@ -1024,12 +1031,12 @@ namespace HayChoriYPaty.Tests
 
             AssertPrefab("Station_NormalGrill", "empty-grill", 1);
             AssertPrefab("Station_PremiumGrill", "empty-grill", 1);
-            AssertPrefab("Station_NormalTable", "empty-table", 1);
-            AssertPrefab("Station_PremiumTable", "empty-table", 1);
+            AssertFoodTablePrefab("Station_NormalTable");
+            AssertFoodTablePrefab("Station_PremiumTable");
             AssertPrefab("Station_FernetTable", "empty-table", 1);
             AssertPrefab("Station_BeerBarrel", "blue-barrel", 2);
             AssertPrefab("Station_CocaBarrel", "blue-barrel", 2);
-            string[] singles = { "empty-grill", "empty-table", "blue-barrel", "sandwich-chori", "sandwich-paty", "sandwich-bondiola", "sandwich-vacio", "coca", "beer", "fernet", "ice", "smoke", "heat" };
+            string[] singles = { "empty-grill", "empty-table", "food-table-plank", "food-table-trestle", "blue-barrel", "sandwich-chori", "sandwich-paty", "sandwich-bondiola", "sandwich-vacio", "coca", "beer", "fernet", "ice", "smoke", "heat" };
             foreach (string name in singles)
             {
                 string path = "Assets/Resources/ModularKitchen/Art/" + name + ".png";
@@ -1120,6 +1127,34 @@ namespace HayChoriYPaty.Tests
                 Assert.NotNull(renderers[i].sharedMaterial, prefabName + " missing default sprite material.");
                 Assert.NotNull(renderers[i].sharedMaterial.shader, prefabName + " missing sprite shader.");
                 Assert.IsTrue(renderers[i].sharedMaterial.shader.isSupported, prefabName + " sprite shader is unsupported by the active render pipeline.");
+            }
+        }
+
+        private static void AssertFoodTablePrefab(string prefabName)
+        {
+            GameObject prefab = Resources.Load<GameObject>("ModularKitchen/Prefabs/" + prefabName);
+            Assert.NotNull(prefab, prefabName);
+            Assert.IsNull(prefab.GetComponent<SpriteRenderer>(), prefabName + " should be a composed station root.");
+            Transform left = prefab.transform.Find("Trestle_Left");
+            Transform right = prefab.transform.Find("Trestle_Right");
+            Transform tabletop = prefab.transform.Find("Tabletop");
+            Assert.NotNull(left, prefabName + " missing left trestle.");
+            Assert.NotNull(right, prefabName + " missing right trestle.");
+            Assert.NotNull(tabletop, prefabName + " missing single tabletop plank.");
+            Assert.AreEqual("food-table-trestle", left.GetComponent<SpriteRenderer>().sprite.name);
+            Assert.AreEqual("food-table-trestle", right.GetComponent<SpriteRenderer>().sprite.name);
+            Assert.AreEqual("food-table-plank", tabletop.GetComponent<SpriteRenderer>().sprite.name);
+            Assert.AreEqual(3, prefab.GetComponentsInChildren<SpriteRenderer>(true).Length,
+                prefabName + " must have exactly two trestles and one plank.");
+            Assert.AreEqual(0, left.GetComponent<SpriteRenderer>().sortingOrder);
+            Assert.AreEqual(0, right.GetComponent<SpriteRenderer>().sortingOrder);
+            Assert.AreEqual(2, tabletop.GetComponent<SpriteRenderer>().sortingOrder,
+                "The tabletop plank draws in front of both support trestles.");
+            foreach (SpriteRenderer renderer in prefab.GetComponentsInChildren<SpriteRenderer>(true))
+            {
+                Assert.NotNull(renderer.sharedMaterial, prefabName + " missing default sprite material.");
+                Assert.NotNull(renderer.sharedMaterial.shader, prefabName + " missing sprite shader.");
+                Assert.IsTrue(renderer.sharedMaterial.shader.isSupported, prefabName + " sprite shader is unsupported.");
             }
         }
     }
