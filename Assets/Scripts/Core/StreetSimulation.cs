@@ -1157,10 +1157,9 @@ namespace HayChoriYPaty
                     chosen = SelectNextCookProduct(first);
                     worker.VisualCookingProduct = chosen;
                 }
-                if (chosen < 0) return;
-
-                if (TryStartRealCook(worker, chosen, stationPoint, false, out bool routeFailed)) return;
-                if (routeFailed) return;
+                bool routeFailed = false;
+                if (chosen >= 0 && TryStartRealCook(worker, chosen, stationPoint, false, out routeFailed)) return;
+                if (chosen >= 0 && routeFailed) return;
 
                 // Keep the scheduled product while approaching the grill so arrival cannot
                 // allocate a second turn or silently replace the one that was blocked.
@@ -1238,8 +1237,18 @@ namespace HayChoriYPaty
             }
 
             if (worker.VisualCookingProduct < 0)
-                worker.VisualCookingProduct = SelectNextCookProduct(first);
-            if (worker.VisualCookingProduct < 0) return;
+            {
+                int newlyEligible = SelectNextCookProduct(first);
+                if (newlyEligible >= 0)
+                {
+                    if (TryStartRealCook(worker, newlyEligible, grillPosition, true, out bool routeFailed)) return;
+                    if (routeFailed) return;
+                    // A concurrent cook may have claimed the last reservation after selection.
+                    worker.VisualCookingProduct = SelectNextCookProduct(first);
+                }
+            }
+            // If both tables are full, keep the Parrillero visibly busy with a generic
+            // simulated cycle (product -1) that cannot create or represent real inventory.
             if (!worker.VisualCooking)
             {
                 worker.VisualCooking = true;
@@ -1252,19 +1261,15 @@ namespace HayChoriYPaty
             if (nextProgress >= 1f)
             {
                 int nextProduct = SelectNextCookProduct(first);
-                if (nextProduct < 0)
+                // Assign the next eligible global turn once at the cycle boundary. Capacity
+                // reservations are rechecked by TryStartRealCook; if another cook just took
+                // the final slot, reselect rather than showing a capped product cosmetically.
+                if (nextProduct >= 0)
                 {
-                    worker.VisualCooking = false;
-                    worker.VisualCookingProduct = -1;
-                    worker.CookingProgress = 0f;
-                    return;
+                    if (TryStartRealCook(worker, nextProduct, grillPosition, true, out bool routeFailed)) return;
+                    if (routeFailed) return;
+                    nextProduct = SelectNextCookProduct(first);
                 }
-
-                // Assign the next global turn once at the cycle boundary. If physical capacity permits,
-                // transition to real production without resetting the arm-animation phase. Otherwise
-                // keep the exact scheduled recipe visual until its next alternating turn.
-                if (TryStartRealCook(worker, nextProduct, grillPosition, true, out bool routeFailed)) return;
-                if (routeFailed) return;
                 worker.VisualCookingProduct = nextProduct;
             }
             worker.CookingProgress = Mathf.Repeat(nextProgress, 1f);
@@ -1305,23 +1310,20 @@ namespace HayChoriYPaty
         private int SelectNextCookProduct(int firstProduct)
         {
             int secondProduct = firstProduct + 1;
-            bool firstAvailable = IsProductAvailable(firstProduct);
-            bool secondAvailable = IsProductAvailable(secondProduct);
-            if (firstAvailable && secondAvailable)
-            {
-                if (firstProduct == 0)
-                {
-                    int selected = nextNormalCookProduct;
-                    nextNormalCookProduct = selected == 0 ? 1 : 0;
-                    return selected;
-                }
-                int premiumSelected = nextPremiumCookProduct;
-                nextPremiumCookProduct = premiumSelected == 2 ? 3 : 2;
-                return premiumSelected;
-            }
-            if (firstAvailable) return firstProduct;
-            if (secondAvailable) return secondProduct;
-            return -1;
+            bool firstAvailable = IsProductAvailable(firstProduct) && Kitchen.CanReserveCook(firstProduct);
+            bool secondAvailable = IsProductAvailable(secondProduct) && Kitchen.CanReserveCook(secondProduct);
+            int preferred = firstProduct == 0 ? nextNormalCookProduct : nextPremiumCookProduct;
+            bool preferredAvailable = preferred == firstProduct ? firstAvailable : secondAvailable;
+            bool alternateAvailable = preferred == firstProduct ? secondAvailable : firstAvailable;
+            int selected = preferredAvailable ? preferred
+                : alternateAvailable ? (preferred == firstProduct ? secondProduct : firstProduct) : -1;
+            if (selected < 0) return -1;
+
+            // When one product is full, keep its place in the shared sequence so it resumes
+            // on the next turn after a Mozo frees table capacity.
+            if (firstProduct == 0) nextNormalCookProduct = selected == firstProduct ? secondProduct : firstProduct;
+            else nextPremiumCookProduct = selected == firstProduct ? secondProduct : firstProduct;
+            return selected;
         }
 
         private void Assign(StreetWorker worker)

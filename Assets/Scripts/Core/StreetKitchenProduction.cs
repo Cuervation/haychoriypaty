@@ -351,8 +351,15 @@ namespace HayChoriYPaty
         {
             bool[] available = new bool[7];
             for (int i = 0; i < products.Length; i++) if (products[i] >= 0 && products[i] < 7) available[products[i]] = true;
+            // The serialized normal/Premium balances still divide Levels 1-5 starting stock
+            // across available products. Physical sandwich table capacity is now 48 per product
+            // in every level; Racing+ still starts with no prepared sandwich inventory.
             SetGroupCapacities(available, 0, 1, Mathf.Max(1, balance.normalTableCapacity));
             SetGroupCapacities(available, 2, 3, Mathf.Max(1, balance.premiumTableCapacity));
+            int[] initialSandwichStock = new int[4];
+            Array.Copy(tableCapacity, initialSandwichStock, initialSandwichStock.Length);
+            for (int product = 0; product < 4; product++)
+                tableCapacity[product] = available[product] ? 48 : 0;
             tableCapacity[5] = available[5] ? Mathf.Max(1, balance.fernetTableCapacity) : 0;
             tableCapacity[4] = available[4] ? Mathf.Max(1, balance.barrelCapacity) : 0;
             tableCapacity[6] = available[6] ? Mathf.Max(1, balance.barrelCapacity) : 0;
@@ -363,7 +370,8 @@ namespace HayChoriYPaty
                 int capacity = tableCapacity[product];
                 if (capacity <= 0 || (ActiveCooks && product < 4)) continue;
                 if (product == 4 || product == 6) capacity = Mathf.Min(capacity, Mathf.Max(1, balance.barrelCapacity));
-                for (int slot = 0; slot < capacity; slot++) Add(product, StreetFoodState.Cooked, StreetFoodLocation.Table, slot);
+                int initialStock = product < 4 ? Mathf.Min(initialSandwichStock[product], capacity) : capacity;
+                for (int slot = 0; slot < initialStock; slot++) Add(product, StreetFoodState.Cooked, StreetFoodLocation.Table, slot);
             }
             if (!ActiveCooks)
                 for (int product = 0; product < 4; product++)

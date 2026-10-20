@@ -592,11 +592,50 @@ namespace HayChoriYPaty
                     + column * (footprint.x + CompactSandwichGap);
             }
             // Extra real inventory fans inward within its own product group, never into its companion.
-            float stackOffset = Mathf.Min(index / baseCount * TableSandwichStackStep, TableSandwichMaxStackOffset);
-            itemX += column < columns * .5f ? stackOffset : -stackOffset;
+            int stackLayer = index / baseCount;
+            float stackOffset = Mathf.Min(stackLayer * TableSandwichStackStep, TableSandwichMaxStackOffset);
+            // Stable pseudo-random offsets make extra servings look casually hand-stacked,
+            // without per-frame randomness or moving a sandwich off its supporting layer.
+            float scatterXOffset = stackLayer == 0 ? 0f
+                : StableStackJitter(baseSlot, stackLayer, product, 0xA511E9B3u) * footprint.x * .22f;
+            float scatterYOffset = stackLayer == 0 ? 0f
+                : StableStackJitter(baseSlot, stackLayer, product, 0x63D83595u) * footprint.y * .038f;
+            bool pairedInnerColumn = companionAvailable &&
+                ((product & 1) == 0 ? localColumn == columns - 1 : localColumn == 0);
+            if (pairedInnerColumn) scatterXOffset = ((product & 1) == 0 ? -1f : 1f) * Mathf.Abs(scatterXOffset);
+            itemX += (column < columns * .5f ? stackOffset : -stackOffset) + scatterXOffset;
             float contactY = visual.y + visual.height * SandwichTableTopDepthRatio * (.14f + .28f * rowIndex);
-            // A food sprite rises above its supporting contact; its full rectangle is not a floor footprint.
-            return new Vector2(itemX, contactY - footprint.y * .5f);
+            // A wider rise exposes more of each lower sandwich, rather than leaving only a thin edge.
+            float stackRise = stackLayer * footprint.y * .62f;
+            return new Vector2(itemX, contactY - footprint.y * .5f + stackRise + scatterYOffset);
+        }
+
+        /// <summary>Small repeatable in-plane rotation for the loose upper sandwiches on a table.</summary>
+        public static float TableSlotRotation(int product, int slot, bool companionAvailable)
+        {
+            if (product < 0 || product > 3) return 0f;
+            int baseCount = companionAvailable ? 6 : 12;
+            int baseSlot = Mathf.Max(0, slot) % baseCount;
+            int stackLayer = Mathf.Max(0, slot) / baseCount;
+            float amount = stackLayer == 0 ? 5f : 16f;
+            return StableStackJitter(baseSlot, stackLayer, product, 0xB5297A4Du) * amount;
+        }
+
+        private static float StableStackJitter(int baseSlot, int stackLayer, int product, uint salt)
+        {
+            unchecked
+            {
+                uint hash = (uint)(baseSlot + 1) * 0x9E3779B9u;
+                hash ^= (uint)(stackLayer + 1) * 0x85EBCA6Bu;
+                hash ^= (uint)(product + 1) * 0xC2B2AE35u;
+                hash ^= salt;
+                hash ^= hash >> 16;
+                hash *= 0x7FEB352Du;
+                hash ^= hash >> 15;
+                hash *= 0x846CA68Bu;
+                hash ^= hash >> 16;
+                return (hash & 0x00FFFFFFu) / 8388607.5f - 1f;
+            }
         }
 
         /// <summary>Approved visible furniture fit; logical obstacles/service edges remain unchanged.</summary>

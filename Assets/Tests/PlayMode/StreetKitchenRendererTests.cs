@@ -194,6 +194,12 @@ namespace HayChoriYPaty.Tests
                 CaptureKitchenTexture(renderer, "paired-four-products-4x3-918x1600.png");
 
                 ClearKitchenUnits(kitchen);
+                for (int product = 0; product < 4; product++) AddTableFood(kitchen, product, 0, 8);
+                Call(renderer, "Prepare", paired, 1f, 960f);
+                yield return null;
+                CaptureKitchenTexture(renderer, "paired-eight-each-stacks-1080x1920.png");
+
+                ClearKitchenUnits(kitchen);
                 for (int product = 0; product < 4; product++)
                 {
                     int capacity = (int)Call(kitchen, "TableCapacity", product);

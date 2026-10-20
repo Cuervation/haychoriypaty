@@ -833,15 +833,18 @@ namespace HayChoriYPaty.Tests
                 Sprite sprite = Resources.Load<Sprite>("ModularKitchen/Sprites/" + names[product] + "/" + names[product]);
                 Assert.AreEqual(sprite.rect.width / sprite.rect.height, size.x / size.y, .0001f,
                     "Layout silhouettes must match the actual Sprite art.");
-                int capacity = companion ? (product < 2 ? 24 : 18) : (product < 2 ? 48 : 36);
+                int capacity = 48;
                 for (int slot = 0; slot < capacity; slot++)
                 {
                     Vector2 center = (Vector2)Call(layout, "TableSlotPosition", product, slot, companion, capacity);
                     Assert.GreaterOrEqual(center.x - size.x * .5f, visual.xMin);
                     Assert.LessOrEqual(center.x + size.x * .5f, visual.xMax);
-                    float contact = center.y + size.y * .5f;
-                    Assert.GreaterOrEqual(contact, visual.y, "Base contact cannot float behind the wood.");
-                    Assert.LessOrEqual(contact, visual.y + depth * .71f, "Base contact stays before the front lip.");
+                    if (slot < (companion ? 6 : 12))
+                    {
+                        float contact = center.y + size.y * .5f;
+                        Assert.GreaterOrEqual(contact, visual.y, "Base contact cannot float behind the wood.");
+                        Assert.LessOrEqual(contact, visual.y + depth * .71f, "Base contact stays before the front lip.");
+                    }
                 }
             }
         }
@@ -853,10 +856,11 @@ namespace HayChoriYPaty.Tests
             Type t = Runtime("StreetKitchenLayout");
             MethodInfo order = t.GetMethod("TableSlotDepthOrder", BindingFlags.Public | BindingFlags.Static,
                 null, new[] { typeof(int), typeof(bool) }, null);
+            MethodInfo rotation = t.GetMethod("TableSlotRotation", BindingFlags.Public | BindingFlags.Static);
             foreach (int product in new[] { 0, 1, 2, 3 })
             foreach (bool companion in new[] { false, true })
             {
-                int capacity = companion ? (product < 2 ? 24 : 18) : (product < 2 ? 48 : 36);
+                int capacity = 48;
                 int columns = companion ? 2 : 4, baseCount = columns * 3;
                 var positions = new HashSet<Vector2>();
                 var rows = new HashSet<float>();
@@ -868,11 +872,45 @@ namespace HayChoriYPaty.Tests
                 }
                 Assert.AreEqual(3, rows.Count);
                 Assert.AreEqual(baseCount, positions.Count);
+                var secondLayerOffsets = new HashSet<Vector2>();
+                for (int baseSlot = 0; baseSlot < baseCount; baseSlot++)
+                {
+                    Vector2 basePoint = (Vector2)Call(layout, "TableSlotPosition", product, baseSlot, companion, capacity);
+                    Vector2 secondLayerPoint = (Vector2)Call(layout, "TableSlotPosition", product, baseCount + baseSlot, companion, capacity);
+                    secondLayerOffsets.Add(secondLayerPoint - basePoint);
+                }
+                Assert.GreaterOrEqual(secondLayerOffsets.Count, Mathf.Min(5, baseCount),
+                    "Upper servings use visibly varied, stable hand-stacked offsets rather than a repeated grid.");
+                var variedRotations = new HashSet<float>();
+                for (int slot = 0; slot < capacity; slot++)
+                {
+                    float angle = (float)rotation.Invoke(null, new object[] { product, slot, companion });
+                    Assert.LessOrEqual(Mathf.Abs(angle), slot < baseCount ? 5f : 16f);
+                    Assert.AreEqual(angle, (float)rotation.Invoke(null, new object[] { product, slot, companion }), .0001f,
+                        "Scatter and tilt are deterministic across renders.");
+                    if (slot >= baseCount) variedRotations.Add(angle);
+                }
+                Assert.GreaterOrEqual(variedRotations.Count, Mathf.Min(5, baseCount),
+                    "Upper servings have different subtle tilts, not a repeated aligned stack.");
                 for (int slot = 0; slot < capacity; slot++)
                 {
                     Vector2 point = (Vector2)Call(layout, "TableSlotPosition", product, slot, companion, capacity);
                     Vector2 original = (Vector2)Call(layout, "TableSlotPosition", product, slot % baseCount, companion, capacity);
-                    Assert.AreEqual(original.y, point.y, .0001f, "Capacity overflow stays on the same base row.");
+                    int layer = slot / baseCount;
+                    if (layer == 0) Assert.AreEqual(original.y, point.y, .0001f);
+                    else
+                    {
+                        Vector2 below = (Vector2)Call(layout, "TableSlotPosition", product, slot - baseCount, companion, capacity);
+                        Vector2 footprint = (Vector2)t.GetMethod("TableServingFootprint", BindingFlags.Public | BindingFlags.Static).Invoke(null, new object[] { product });
+                        Rect thisSandwich = new Rect(point.x - footprint.x * .5f, point.y - footprint.y * .5f, footprint.x, footprint.y);
+                        Rect support = new Rect(below.x - footprint.x * .5f, below.y - footprint.y * .5f, footprint.x, footprint.y);
+                        Assert.IsTrue(thisSandwich.Overlaps(support), "Product " + product + " slot " + slot + " overlaps its supporting layer; it cannot float.");
+                        float visibleLayerStep = Mathf.Abs(point.y - below.y) / footprint.y;
+                        Assert.GreaterOrEqual(visibleLayerStep, .30f, "Lower sandwiches retain a substantial visible face.");
+                        Assert.LessOrEqual(visibleLayerStep, .70f, "Every upper sandwich remains closely supported by the layer below.");
+                        float horizontalSupport = Mathf.Min(thisSandwich.xMax, support.xMax) - Mathf.Max(thisSandwich.xMin, support.xMin);
+                        Assert.Greater(horizontalSupport, footprint.x * .5f, "Upper sandwiches keep at least half their width on the support below.");
+                    }
                     Assert.GreaterOrEqual((int)order.Invoke(null, new object[] { slot, companion }),
                         (int)order.Invoke(null, new object[] { slot % baseCount, companion }));
                 }
@@ -896,8 +934,13 @@ namespace HayChoriYPaty.Tests
         public void TableAndGrillSlotsDoNotMixTheTwoMeatFamilies()
         {
             object layout = FullLayout();
-            AssertSlotsSeparated(layout, 0, 1, 24, new Vector2(20f, 14f), new Vector2(20f, 14f));
-            AssertSlotsSeparated(layout, 2, 3, 18, new Vector2(20f, 14f), new Vector2(20f, 14f));
+            Type layoutType = Runtime("StreetKitchenLayout");
+            Vector2 chori = (Vector2)layoutType.GetMethod("TableServingFootprint", BindingFlags.Public | BindingFlags.Static).Invoke(null, new object[] { 0 });
+            Vector2 paty = (Vector2)layoutType.GetMethod("TableServingFootprint", BindingFlags.Public | BindingFlags.Static).Invoke(null, new object[] { 1 });
+            Vector2 bondiola = (Vector2)layoutType.GetMethod("TableServingFootprint", BindingFlags.Public | BindingFlags.Static).Invoke(null, new object[] { 2 });
+            Vector2 vacio = (Vector2)layoutType.GetMethod("TableServingFootprint", BindingFlags.Public | BindingFlags.Static).Invoke(null, new object[] { 3 });
+            AssertSlotsSeparated(layout, 0, 1, 48, chori, paty);
+            AssertSlotsSeparated(layout, 2, 3, 48, bondiola, vacio);
             AssertSlotsSeparated(layout, 0, 1, 18, new Vector2(36.4f, 14f), new Vector2(34f, 20f), true);
             AssertSlotsSeparated(layout, 2, 3, 7, new Vector2(34f, 38f), new Vector2(90f, 14f), true);
         }

@@ -404,39 +404,39 @@ namespace HayChoriYPaty.Tests
                 "Unfinished beverage goals keep the level active while completed sandwich goals continue producing.");
         }
 
-        [Test]
-        public void FullSpecialtyTableKeepsItsAssignedVisualTurnThenAlternates()
+        [TestCase(0, "Parrillero", 1)]
+        [TestCase(2, "ParrilleroPremium", 3)]
+        public void FullProductIsSkippedUntilItsTableSlotIsFreed(int fullProduct, string role, int alternateProduct)
         {
             object sim = MakeActiveSimulation(5, 100000, new[] { 100, 50, 80, 40, 1000, 1000, 1000 });
             Call(sim, "StartRound");
             SetArrivalFarFuture(sim);
+            if (fullProduct == 2) Assert.IsTrue((bool)Call(sim, "TryHire", EnumValue(roleType, "ParrilleroPremium")));
             object kitchen = Get(sim, "Kitchen");
-            SeedCookedUnits(kitchen, 0, (int)Call(kitchen, "TableCapacity", 0), 2000);
-            int initialCount = Units(kitchen).Count;
+            SeedCookedUnits(kitchen, fullProduct, 48, 2000 + fullProduct * 100);
 
-            Step(sim, 1);
-            object cook = Workers(sim)[0];
-            Assert.IsTrue((bool)Get(cook, "VisualCooking"));
-            Assert.AreEqual(0, Get(cook, "VisualCookingProduct"),
-                "A full Chori table makes this scheduled Chori turn visual; it must not fall back to Paty.");
-            Assert.AreEqual(0, Get(cook, "CookingItemId"));
-            Assert.AreEqual(initialCount, Units(kitchen).Count, "Visual cycles add no physical food.");
+            List<int> firstAssignment = CollectRealCookAssignments(sim, role, 1);
+            CollectionAssert.AreEqual(new[] { alternateProduct }, firstAssignment,
+                "A full product is not cooked cosmetically or physically while its specialty partner has room.");
+            object worker = Workers(sim).Cast<object>().First(candidate => Get(candidate, "Role").ToString() == role);
+            int firstUnitId = (int)Get(worker, "CookingItemId");
+            Assert.Greater(firstUnitId, 0);
 
-            int owner = 9000;
-            object reserved = Call(kitchen, "ReserveTableUnit", 0, owner);
-            Assert.IsNotNull(reserved);
-            object carried = Call(kitchen, "TryTake", 0, EnumValue(roleType, "Mozo"), owner);
+            int waiter = 9000 + fullProduct;
+            Assert.IsNotNull(Call(kitchen, "ReserveTableUnit", fullProduct, waiter));
+            object carried = Call(kitchen, "TryTake", fullProduct, EnumValue(roleType, "Mozo"), waiter);
             Assert.IsNotNull(carried);
-            Assert.IsTrue((bool)Call(kitchen, "Consume", Get(carried, "Id"), 0, owner));
+            Assert.IsTrue((bool)Call(kitchen, "Consume", Get(carried, "Id"), fullProduct, waiter));
 
-            // Freeing capacity does not interrupt the Chori visual cycle. Its next fixed turn is Paty.
-            Step(sim, 40);
-            Assert.Greater((int)Get(cook, "CookingItemId"), 0);
-            Assert.AreEqual(1, Get(cook, "Product"));
-            Step(sim, 80);
-            Assert.Greater((int)Get(cook, "CookingItemId"), 0,
-                "After the Paty turn, the now-available Chori turn resumes real production.");
-            Assert.AreEqual(0, Get(cook, "Product"));
+            int resumedProduct = -1;
+            for (int tick = 0; tick < 3000 && resumedProduct < 0; tick++)
+            {
+                Step(sim, 1);
+                int id = (int)Get(worker, "CookingItemId");
+                if (id > 0 && id != firstUnitId) resumedProduct = (int)Get(worker, "Product");
+            }
+            Assert.AreEqual(fullProduct, resumedProduct,
+                "After a Mozo sells one sandwich, the full product returns on its next shared alternating turn.");
         }
 
         [Test]
@@ -597,8 +597,8 @@ namespace HayChoriYPaty.Tests
             {
                 string role = Get(worker, "Role").ToString();
                 if (role != "Parrillero" && role != "ParrilleroPremium") continue;
-                Assert.IsTrue((bool)Get(worker, "VisualCooking"), role + " must keep its assigned recipe visual while tables are full.");
-                Assert.AreEqual(role == "Parrillero" ? 0 : 2, Get(worker, "VisualCookingProduct"));
+                Assert.IsTrue((bool)Get(worker, "VisualCooking"), role + " keeps a product-neutral simulated cycle while tables are full.");
+                Assert.AreEqual(-1, Get(worker, "VisualCookingProduct"), "No capped product is represented as being cooked.");
                 Assert.AreEqual(0, Get(worker, "CookingItemId"));
                 Assert.AreEqual(0, Get(worker, "CarriedItemId"));
             }
@@ -615,6 +615,8 @@ namespace HayChoriYPaty.Tests
                 Assert.IsTrue((bool)Call(kitchen, "Consume", Get(carried, "Id"), product, owner));
             }
             Assert.AreEqual(fullUnitCount - 2, Units(kitchen).Count);
+            foreach (int product in new[] { 0, 2 })
+                Assert.IsTrue((bool)Call(kitchen, "CanReserveCook", product), "Product " + product + " should have one freed reserved slot.");
 
             Step(sim, 61);
             foreach (object worker in Workers(sim))
@@ -622,10 +624,12 @@ namespace HayChoriYPaty.Tests
                 string role = Get(worker, "Role").ToString();
                 if (role != "Parrillero" && role != "ParrilleroPremium") continue;
                 int expectedProduct = role == "Parrillero" ? 0 : 2;
-                Assert.Greater((int)Get(worker, "CookingItemId"), 0,
-                    role + " should resume real production when its next assigned table slot opens.");
-                Assert.AreEqual(expectedProduct, Get(worker, "Product"));
-                Assert.IsFalse((bool)Get(worker, "VisualCooking"));
+                Assert.AreEqual(48, (int)Call(kitchen, "TableCount", expectedProduct),
+                    role + " must resume real production after its product's slot is freed, then stop at 48 again.");
+                Assert.AreEqual(0, Get(worker, "CookingItemId"), role + " must not leave a 49th unit in progress at the cap.");
+                Assert.AreEqual(0, Get(worker, "CarriedItemId"));
+                Assert.IsTrue((bool)Get(worker, "VisualCooking"), role + " remains visibly active in the product-neutral full-table cycle.");
+                Assert.AreEqual(-1, Get(worker, "VisualCookingProduct"), "No capped sandwich is represented as cooking.");
             }
             Assert.AreEqual(fullUnitCount, Units(kitchen).Count,
                 "Exactly two real units replace the two consumed table units; visual cycles add none.");
