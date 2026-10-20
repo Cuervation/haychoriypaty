@@ -1,4 +1,24 @@
-# Current Android delivery — 2026-10-19 (0.2.50/code52, kitchen visuals and worker movement)
+# Current Android delivery — 2026-10-20 (0.2.52/code54, continuous active cooking + kitchen visuals)
+
+Unity 6000.6.3f1 Main-only Development IL2CPP/ARM64 APK built from clean isolated commit `b431f90`: **Succeeded in 415.01 s; 0 errors / 1 warning** (clang++ `-x c++` after the last input file has no effect). Used the installed Unity editor in batch mode; the live checkout/editor was not opened or modified. The user-authorized commit includes continuous active cooking for sandwiches 0–3 independent of quotas/Market ingredients, the caballete food-table presentation, and cooking-ring placement/color changes. Local Firebase Analytics, `runInBackground`, time-scale, temporary scenes, screenshots and recovery files were excluded from the build/commit.
+
+Archive `Builds/Android/Archive/HayChoriYPatY-0.2.52-code54-active-cooks-tables-ring.apk`; versioned and rolling aliases `Builds/Android/HayChoriYPatY-0.2.52.apk` and `Builds/Android/HayChoriYPatY-street.apk`: **351,354,696 bytes**, SHA-256 `6927007f11678787d695981e76e66b23ad5144d839749d4ef8073a847b2f241e` (all hard-linked, byte-identical). Package `com.haychoriypaty.game`, version **0.2.52/code54**, min API26/target36, `arm64-v8a`. `aapt` metadata, `unzip -t`, `zipalign -c 4`, and APK Signature Scheme v2 verification passed; Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`.
+
+Focused gameplay/presentation validation from the implementation run passed **5/5 EditMode + 1/1 Racing strategy**; not rerun during packaging. Development/debug-signed, not Play Store release-signed. No device installation or gameplay-on-phone QA was requested or performed. Build log: `Logs/Acceptance/AndroidBuild-20261020/build-0.2.52.log`.
+
+---
+
+# Previous Android delivery — 2026-10-20 (0.2.51/code53, active cooks, tables and cooking ring)
+
+Unity 6000.6.3f1 Main-only Development IL2CPP/ARM64 Android build from an isolated snapshot of the then-staged `codex/street-automation` source: **Succeeded in 531.43 s; 0 errors / 4 warnings**. The sandboxed attempt could not open Unity Package Manager's local IPC socket; retrying outside the restricted socket sandbox succeeded without touching the active editor or scene. This predecessor artifact is superseded by 0.2.52/code54, which was built from pushed commit `b431f90`.
+
+Archive `Builds/Android/Archive/HayChoriYPatY-0.2.51-code53-active-cooks-tables-ring.apk`; versioned and rolling aliases `Builds/Android/HayChoriYPatY-0.2.51.apk` and `Builds/Android/HayChoriYPatY-street.apk`: **345,921,182 bytes**, SHA-256 `03c716afc5b4db4eb427f31f923b1537d95bb0f4ea6f3e2cab260cf8efd57183` (hard-linked, byte-identical). Package `com.haychoriypaty.game`, version **0.2.51/code53**, min API26/target36, `arm64-v8a`. `aapt` metadata, `unzip -t`, `zipalign -c 4`, and APK Signature Scheme v2 verification passed; Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`.
+
+Development/debug-signed, not Play Store release-signed. The ring placement had passed 3/3 focused EditMode and 1/1 PlayMode capture tests before that packaging run; no tests were rerun for packaging. No device installation or gameplay-on-phone QA.
+
+---
+
+# Previous Android delivery — 2026-10-19 (0.2.50/code52, kitchen visuals and worker movement)
 
 Unity 6000.6.3f1 Main-only Development IL2CPP/ARM64 Android build from pushed commit `df00c91`: **Succeeded; 0 errors / 1 warning** (Unity Diagnostics Data recommends enabling SymbolTable/Full debug symbols). Built through Unity CLI in the isolated cached project because MCP editor-state ping did not answer; the live project was not restarted or modified. Local Firebase Analytics cookie/setting, `runInBackground`, `TimeManager` scale, temporary scenes, screenshots and recovery files were excluded from Git and the clean build.
 
