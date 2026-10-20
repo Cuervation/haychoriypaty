@@ -1,4 +1,47 @@
-# Current Android delivery — 2026-10-20 (0.2.54/code56, capped sandwich piles)
+# Current Android delivery — 2026-10-20 (0.2.57/code59, Mozo LIFO + lossless legacy-art exclusion)
+
+This APK includes the Mozo pickup rule: for active-cook levels, a newly assigned Mozo claims the most recently deposited available sandwich of the requested product. Existing claims remain stable en route; legacy levels and beverages keep FIFO. Source commit: `70ce8b0` (delivery documentation follows in a docs-only commit).
+
+Unity 6000.6.3f1 isolated Development IL2CPP/ARM64 build: **Succeeded in 85.22 s; 0 errors / 1 BuildReport warning**. APK **344,965,727 bytes (328.98 MiB)**, package `com.haychoriypaty.game`, version **0.2.57/code59**, min API26/target36, ARM64. SHA-256 `c406c8bce490fc34430970782e854f3766e25063d08153a7a9c110c7742eadf6`. `aapt` metadata, `unzip -t`, `zipalign -c -v 4`, and APK Signature Scheme v2 verification passed; signer is the established Android Debug certificate `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`.
+
+Archive `Builds/Android/Archive/HayChoriYPatY-0.2.57-code59-mozo-lifo-lossless.apk`; versioned and rolling aliases `Builds/Android/HayChoriYPatY-0.2.57.apk` and `Builds/Android/HayChoriYPatY-street.apk` are byte-identical. Compared with 0.2.55/code57, the APK is **10,271,000 bytes / 2.89% smaller**. Four unused archived legacy-texture entries are absent; the other **140 mapped Texture2D payloads are byte-identical** and all archived source/meta hashes are unchanged.
+
+The focused Mozo LIFO EditMode job passed **14/14** before packaging (`0272fc59af224c089f88aa616041f48d`); it was not rerun in this packaging turn. The Android build itself compiled successfully. No PlayMode/Game View run, phone installation, or on-device test was performed. The Unity MCP project-info endpoint identified the correct 6000.6.3f1 project, but its editor-state query timed out; the build therefore used a warm, isolated snapshot via Unity CLI without restarting or modifying the live Editor.
+
+Build log `Logs/Acceptance/AndroidBuild-20261020/build-0.2.57.log`; source/verification summary `source-0.2.57.json`. Firebase Analytics, runInBackground, TimeManager preferences, temporary scenes, and audit tools were excluded from the build/commit. Development/debug-signed, not Play Store release-signed.
+
+---
+
+# Previous Android delivery — 2026-10-20 (0.2.56/code58, lossless legacy-art exclusion)
+
+> Esta versión previa no incluía el retiro LIFO del Mozo; el cambio se incorpora en la APK 0.2.57 de arriba.
+
+**Lossless-only policy:** archive four superseded table PNG/meta sources under `Assets/Art/Editor/LegacyKitchen`, preserving original bytes/GUIDs. Keep the prototype resources and all live texture import/compression/mip settings unchanged. Remove only two unused StreetView loads/fields and the uncalled old table draw method; preserve the editor table-builder baseline via its updated archive path. No gameplay, dependency or Firebase changes.
+
+Unity6000.6.3f1 isolated Development IL2CPP/ARM64 build: **Succeeded, 40.48s, 0 errors / 1 BuildReport warning** in the final verification. APK **344,964,983 bytes (328.98 MiB)**, versus355,236,727: **10,271,744 bytes / 2.89% smaller**. Package `com.haychoriypaty.game`, min26/target36,0.2.56/code58. SHA-256 `d7fb4859a44cb7175513e566d5e3fa6d933ebf7622968033ea7347fe3c20a81d`. Metadata,ZIP integrity,alignment and Debug signature verified. Archive `Builds/Android/Archive/HayChoriYPatY-0.2.56-code58-lossless-cleanup.apk`; aliases `HayChoriYPatY-0.2.56.apk` and `HayChoriYPatY-street.apk` (at that delivery).
+
+**Actual artifact equality:** all140retained mapped Texture2D objects are byte-identical to0.2.55; four archived entries absent. All182other PNGs/metas unchanged. Native renderer table/Fernet region1080px wide,rows0–1199 has zero changed color bytes; full frames differ because grill smoke is animated. This is renderer/projection evidence, not complete-match or device performance certification.
+
+Focused Editor6/6 and native renderer PlayMode1/1 passed; separate staging-cleanup matrix/no-op tests recorded in `Audits/LosslessApk-20261020-0256/INFORME.md`. Independent static review checked archive integrity, prefab dependencies and removal-only runtime changes.
+
+The first build incorrectly retained orphan Gradle asset files; the second excluded them but retained10.4MB ZIP holes. Neither was released. Added Editor-only `AndroidLegacyArtStagingCleanup` prebuild hook: delete only known archived-GUID copies in generated Gradle staging and reset only incremental APK packaging caches/outputs when needed. Final warm-cache regression seeded old copies in the isolated staging, then verified hook execution and actual APK reduction. Native caches/source files untouched.
+
+Build log `Logs/Acceptance/AndroidBuild-20261020/build-0.2.56.log`; exact overlay/source and asset hashes in `source-0.2.56.json` beside it. Local Firebase Analytics, runInBackground and TimeManager preferences excluded from build and preserved in the live checkout. No push/install. No phone cold-start/FPS benchmark; do not claim identical wall-time or a globally certified performance pass. The earlier150–200MBtarget required format/resolution tradeoffs and is not claimed with pixel-identical restrictions.
+---
+
+# Previous Android delivery — 2026-10-20 (0.2.55/code57, supported stacks and reachable pickups)
+
+Unity 6000.6.3f1 Main-only Development IL2CPP/ARM64 APK built in an isolated snapshot of base `251d236` plus the three current runtime corrections (StreetKitchenLayout, StreetKitchenRenderer, StreetWorkerProjection) and version fields: **Succeeded in 778.39 s; 0 errors / 1 BuildReport warning**. Build log also contains the temporary helper's obsolete API notice and clang unused-argument notices. Local preferences, Firebase Analytics settings, TimeManager, temporary scenes, audit tooling and editor tests were excluded. No push or installation performed.
+
+Archive `Builds/Android/Archive/HayChoriYPatY-0.2.55-code57-stack-pickup-fix.apk`; versioned and rolling aliases `Builds/Android/HayChoriYPatY-0.2.55.apk` and `Builds/Android/HayChoriYPatY-street.apk`: **355,236,727 bytes (338.78 MiB)**; SHA-256 `f3c0b11bb20dae11ca7ed7ea684e4a0fcf8f81556954ce0a740991ebbb6a8a0f`. Package `com.haychoriypaty.game`, **0.2.55/code57**, min API26/target36, ARM64. `aapt`, `unzip -t`, `zipalign -c 4`, and `apksigner verify --print-certs` passed. Development/debug-signed with unchanged certificate; not Play Store release signing. No physical-device test claimed.
+
+Source overlay hashes and exclusions: `Logs/Acceptance/AndroidBuild-20261020/source-0.2.55.json`; full log `build-0.2.55.log` alongside it. BuildReport total output bytes includes symbols/other build artifacts; the APK size above is measured directly.
+
+Focused validation: final EditMode **7/7 passed** (job `a31295694f4d4039876b74007ba81f40`), native renderer capture **1/1 passed**. Final PlayMode **2/2 passed** (job `98c27dbd63854ef7994653dfa37c9665`): carried-food depth regression and full real255s Racing match. Sales continued after150s; matchLost, not a victory/balance certification. Captures and limitations are recorded in the focused correction entry in `modular-kitchen.md`.
+
+---
+
+# Previous Android delivery — 2026-10-20 (0.2.54/code56, capped sandwich piles)
 
 Source commits `e13f1d0` (feature) and `b5485bb` (Android version) were pushed to `origin/codex/street-automation`. Unity 6000.6.3f1 Main-only Development IL2CPP/ARM64 APK built in an isolated snapshot of `b5485bb`: **Succeeded in 473.83 s; 0 errors / 1 warning**. Only the ignored `Library` cache was reused; the live Editor/scene, local Firebase Analytics, `runInBackground`, time-scale, temporary scenes, screenshots and recovery files were excluded.
 
