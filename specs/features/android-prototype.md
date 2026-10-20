@@ -1,4 +1,14 @@
-# Current Android delivery — 2026-10-20 (0.2.53/code55, patience removal + folding-table presentation)
+# Current Android delivery — 2026-10-20 (0.2.54/code56, capped sandwich piles)
+
+Source commits `e13f1d0` (feature) and `b5485bb` (Android version) were pushed to `origin/codex/street-automation`. Unity 6000.6.3f1 Main-only Development IL2CPP/ARM64 APK built in an isolated snapshot of `b5485bb`: **Succeeded in 473.83 s; 0 errors / 1 warning**. Only the ignored `Library` cache was reused; the live Editor/scene, local Firebase Analytics, `runInBackground`, time-scale, temporary scenes, screenshots and recovery files were excluded.
+
+Archive `Builds/Android/Archive/HayChoriYPatY-0.2.54-code56-sandwich-piles.apk`; versioned and rolling aliases `Builds/Android/HayChoriYPatY-0.2.54.apk` and `Builds/Android/HayChoriYPatY-street.apk`: **355,235,135 bytes**, SHA-256 `fd87ffa72e0038f7a0d56894c2efd9387d9eebbfa3591b8623bb5ff3cb8e04cb` (all hard-linked, byte-identical). Package `com.haychoriypaty.game`, version **0.2.54/code56**, min API26/target36, `arm64-v8a`. `aapt` metadata, `unzip -t`, `zipalign -c -v 4`, and APK Signature Scheme v2 verification passed; Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`.
+
+Focused validation for this release passed **7/7 EditMode + 1/1 PlayMode** (per-product 48-unit reservations/stop-resume, supported/randomized pile layout and renderer capture). Unity MCP initially failed to initialize a combined test job; refresh/retry succeeded and the focused runs passed. Development/debug-signed, not Play Store release-signed. No phone install or on-device gameplay QA. Build log: `/private/tmp/hcyp-release-0.2.54-code56-20261020/build.log`.
+
+---
+
+# Previous Android delivery — 2026-10-20 (0.2.53/code55, patience removal + folding-table presentation)
 
 Unity 6000.6.3f1 Main-only Development IL2CPP/ARM64 APK built from pushed source commit `4e8af36`: **Succeeded in 284.34 s; 0 errors / 1 warning** (temporary build helper uses the obsolete `PlayerSettings.SetScriptingBackend(BuildTargetGroup, ...)` overload). Built in an isolated project snapshot via Unity batch mode; only the ignored `Library` cache was reused, and the live Editor/scene were not touched. Local Firebase Analytics, `runInBackground`, time-scale, temporary scenes, screenshots and recovery files were excluded.
 
