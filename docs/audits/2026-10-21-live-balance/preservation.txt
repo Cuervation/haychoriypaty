@@ -1,0 +1,3 @@
+Production C# hash equality: True; beforefiles=28; afterfiles=28
+Main scene hash equality: True
+Git status exact equality: True

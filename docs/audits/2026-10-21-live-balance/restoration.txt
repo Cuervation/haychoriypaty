@@ -1,0 +1,1 @@
+playing=False; paused=False; scene=Assets/InitTestScenee16e6289-69f9-4473-8d22-310334403ecf.unity; dirty=False; prefsExact=True; originalLength=3439; scale=0; testInit=False; background=True
