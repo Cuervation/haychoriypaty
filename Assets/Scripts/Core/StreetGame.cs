@@ -15,6 +15,7 @@ namespace HayChoriYPaty
         private OrderDeliverySound deliverySound;
         private SaveData save;
         private bool resultSaved;
+        private bool resumedChulengoResult;
         private StreetMarket market;
         private bool playerActive;
         private bool suspensionRequested;
@@ -49,6 +50,7 @@ namespace HayChoriYPaty
             // Checkpoint for cumulative metrics of a live attempt. It is snapshot-only, never history/outbox.
             public StreetMatchRecord activeAttemptSummary;
             public StreetMatchRecord pendingMatch;
+            public StreetMatchRecord pendingVictoryMatch;
         }
 
         public StreetSimulation Sim { get { return playerActive ? sim : null; } }
@@ -58,7 +60,16 @@ namespace HayChoriYPaty
         public StreetMarket Market => playerActive ? market : null;
         public bool IsPlayerActive => playerActive;
         public string ActiveSaveJson => save == null ? null : JsonUtility.ToJson(save);
-        public bool CanStartRound => playerActive && sim != null && sim.Phase == RoundPhase.Ready &&
+        public bool HasPendingChulengo => save != null && save.pendingVictoryMatch != null;
+        public bool ShowChulengoResult => HasPendingChulengo || (playerActive && (resumedChulengoResult ||
+            (sim != null && sim.Phase == RoundPhase.Won && market?.LastResult != null && market.LastResult.chulengoManaged)));
+        public bool ChulengoChoiceLocked => market?.LastResult != null && market.LastResult.chulengoChoiceLocked;
+        public int ChulengoSelectedSector => market?.LastResult == null ? -1 : market.LastResult.chulengoSector;
+        public float ChulengoSelectedPosition => market?.LastResult != null && market.LastResult.chulengoHasNeedlePosition
+            ? market.LastResult.chulengoNeedlePosition : (ChulengoSelectedSector + .5f) / StreetChulengo.SectorCount;
+        public long ChulengoBaseRewardCents => market?.LastResult == null ? 0L : market.LastResult.chulengoBaseRewardCents;
+        public long ChulengoFinalRewardCents => market?.LastResult == null ? 0L : market.LastResult.earnedCents;
+        public bool CanStartRound => !HasPendingChulengo && !resumedChulengoResult && playerActive && sim != null && sim.Phase == RoundPhase.Ready &&
             market != null && !market.Data.attemptActive && market.CanMeetRequiredStockWithLevelOneFloor(sim);
 
         private void OnEnable()
@@ -123,6 +134,8 @@ namespace HayChoriYPaty
             }
             market.RecoverLegacyVictoryPayout();
             market.RecoverLegacyZeroPayoutTransition();
+            resumedChulengoResult = save.pendingVictoryMatch != null;
+            if (resumedChulengoResult && market.LastResult != null) selectedLevel = market.LastResult.level;
             selectedLevel = Mathf.Clamp(selectedLevel, 0, save.unlockedLevel);
             sim = new StreetSimulation(balance, selectedLevel, save.price);
             if(save.prices!=null && save.prices.Length==7)for(int i=0;i<7;i++)sim.SetProductPrice(i,save.prices[i]);
@@ -160,6 +173,11 @@ namespace HayChoriYPaty
 
         public bool ProcessRoundResult()
         {
+            if (save != null && save.pendingVictoryMatch != null)
+            {
+                // Persist the pending victory once; a chosen outcome can only retry without changing it.
+                return resultSaved || (resultSaved = Save());
+            }
             if ((!playerActive && !suspensionRequested) || sim == null || save == null || resultSaved ||
                 (sim.Phase != RoundPhase.Won && sim.Phase != RoundPhase.Lost)) return false;
             StreetMarketResult receipt = market?.SettleAttempt(sim);
@@ -179,6 +197,15 @@ namespace HayChoriYPaty
                 }
                 save.unlockedLevel = Mathf.Max(save.unlockedLevel, Mathf.Min(StreetSimulation.LevelNames.Length - 1, sim.LevelIndex + 1));
             }
+            if (receipt.won && !receipt.chulengoManaged)
+            {
+                StreetMatchRecord victoryMatch = BuildMatchRecord(receipt);
+                if (!market.PrepareChulengo()) return false;
+                save.pendingVictoryMatch = victoryMatch;
+                save.activeAttemptSummary = null;
+                resultSaved = Save(); // No final match/history/statistics before the player chooses.
+                return resultSaved;
+            }
             if (save.pendingMatch == null)
             {
                 save.pendingMatch = BuildMatchRecord(receipt);
@@ -190,14 +217,59 @@ namespace HayChoriYPaty
             return resultSaved;
         }
 
-        private bool EnsureResultSaved() => resultSaved ||
-            (sim.Phase != RoundPhase.Won && sim.Phase != RoundPhase.Lost) || ProcessRoundResult();
+        public bool TryCollectVictoryReward() => playerActive && ResolveVictoryChoice(-1);
+        public bool TryMultiplyVictoryReward(int sector)
+        {
+            if (!playerActive || sector < 0 || sector >= StreetChulengo.SectorCount) return false;
+            return ResolveVictoryChoice(sector);
+        }
+
+        public bool TryMultiplyVictoryRewardAtPosition(float position)
+        {
+            if (!playerActive || float.IsNaN(position) || float.IsInfinity(position) || position < 0f || position > 1f) return false;
+            return ResolveVictoryChoice(StreetChulengo.SectorAtPosition(position), position);
+        }
+
+        private bool ResolveVictoryChoice(int sector, float exactPosition = -1f)
+        {
+            if ((!playerActive && !suspensionRequested) || !HasPendingChulengo || market == null || market.LastResult == null) return false;
+            StreetMarketResult receipt = market.LastResult;
+            // A failed durable write cannot become a second spin: retry only the frozen choice.
+            if (receipt.chulengoChoiceLocked && receipt.chulengoSector != sector) return false;
+            if (!receipt.chulengoChoiceLocked)
+            {
+                if (!market.LockChulengoChoice(sector)) return false;
+                if (sector >= 0 && exactPosition >= 0f)
+                {
+                    receipt.chulengoHasNeedlePosition = true;
+                    receipt.chulengoNeedlePosition = exactPosition;
+                }
+            }
+            if (receipt.chulengoPending && !Save()) return false; // durable outcome before credit
+            if (!market.ResolveChulengo()) return false;
+            StreetMatchRecord record = save.pendingVictoryMatch;
+            record.halfSalesRewardCents = receipt.recognizedSalesCents;
+            record.leftoverBonusCents = receipt.bonusCents;
+            record.progressionBonusCents = receipt.progressionBonusCents;
+            record.rewardCents = receipt.earnedCents;
+            save.pendingMatch = record;
+            save.statistics.ApplyMatch(record);
+            save.pendingVictoryMatch = null;
+            resultSaved = SaveWithMatch(record);
+            if (!resultSaved) { save.pendingVictoryMatch = record; return false; }
+            ResetAttemptMetrics(); activeAttemptId = null; save.activeAttemptId = null;
+            return true;
+        }
+
+        private bool EnsureResultSaved() => !HasPendingChulengo && (resultSaved ||
+            (sim.Phase != RoundPhase.Won && sim.Phase != RoundPhase.Lost) || ProcessRoundResult());
 
         public bool SelectLevel(int level)
         {
             if (!playerActive || sim == null || sim.Phase == RoundPhase.Playing || level < 0 ||
                 level >= StreetSimulation.LevelNames.Length || level > UnlockedLevel) return false;
             if (!EnsureResultSaved()) return false;
+            resumedChulengoResult = false;
             selectedLevel = level;
             ResetAttemptMetrics();
             sim = NewReadySimulation(level); resultSaved = false;
@@ -243,7 +315,7 @@ namespace HayChoriYPaty
         }
         public bool TryBuyIngredient(int ingredient, int packs, long operationId = 0)
         {
-            if (!playerActive || market == null || sim == null || sim.Phase != RoundPhase.Ready || UnlockedLevel == 0) return false;
+            if (!playerActive || HasPendingChulengo || resumedChulengoResult || market == null || sim == null || sim.Phase != RoundPhase.Ready || UnlockedLevel == 0) return false;
             string before = JsonUtility.ToJson(market.Data);
             if (!market.TryBuy(sim, ingredient, packs, UnlockedLevel,
                 operationId == 0 ? market.NextPurchaseId : operationId)) return false;
@@ -303,8 +375,9 @@ namespace HayChoriYPaty
         }
         public bool NextLevel()
         {
-            if (!playerActive || sim == null || sim.Phase != RoundPhase.Won || sim.LevelIndex + 1 >= StreetSimulation.LevelNames.Length) return false;
+            if (!playerActive || sim == null || (sim.Phase != RoundPhase.Won && !resumedChulengoResult) || sim.LevelIndex + 1 >= StreetSimulation.LevelNames.Length) return false;
             if (!EnsureResultSaved()) return false;
+            resumedChulengoResult = false;
             selectedLevel = sim.LevelIndex + 1; save.unlockedLevel = Mathf.Max(save.unlockedLevel, selectedLevel);
             ResetAttemptMetrics();
             sim = NewReadySimulation(selectedLevel); InitializeDeliverySound(); Save(); return true;
@@ -329,6 +402,7 @@ namespace HayChoriYPaty
             }
             else market.AbortAttempt();
             ResetAttemptMetrics();
+            resumedChulengoResult = false;
             resultSaved = false; sim = NewReadySimulation(selectedLevel); InitializeDeliverySound(); Save(); return true;
         }
 
@@ -336,7 +410,7 @@ namespace HayChoriYPaty
         public bool SuspendPlayer()
         {
             if (!playerActive && !suspensionRequested) return true;
-            if (sim != null && (sim.Phase == RoundPhase.Won || sim.Phase == RoundPhase.Lost) && !EnsureResultSaved())
+            if (!HasPendingChulengo && sim != null && (sim.Phase == RoundPhase.Won || sim.Phase == RoundPhase.Lost) && !EnsureResultSaved())
             { playerActive = false; suspensionRequested = true; return false; }
             // Block simulation and all public gameplay commands even if durable save must be retried.
             playerActive = false; suspensionRequested = true;
@@ -380,6 +454,7 @@ namespace HayChoriYPaty
                 data = MigrateSaveData(JsonUtility.FromJson<SaveData>(json));
                 // Unity serializes inline null DTOs as empty objects; never interpret them as results.
                 if (data != null && StreetMatchRecord.IsAbsent(data.pendingMatch)) data.pendingMatch = null;
+                if (data != null && StreetMatchRecord.IsAbsent(data.pendingVictoryMatch)) data.pendingVictoryMatch = null;
                 if (data != null && StreetMatchRecord.IsAbsent(data.activeAttemptSummary)) data.activeAttemptSummary = null;
                 if (data == null || data.version != 4) { data = null; return false; }
                 data.unlockedLevel = Mathf.Clamp(data.unlockedLevel, 0, StreetSimulation.LevelNames.Length - 1);
@@ -471,7 +546,16 @@ namespace HayChoriYPaty
 
         private static long At(int[] values, int index) => values != null && index >= 0 && index < values.Length ? Math.Max(0, values[index]) : 0;
 
-        private bool Save() => SaveWithMatch(null);
+        private bool Save()
+        {
+            if (save != null && save.pendingVictoryMatch != null && market?.LastResult != null &&
+                market.LastResult.chulengoChoiceLocked && !market.LastResult.chulengoPending)
+            {
+                // Final-credit write failed earlier: retry full atomic finalization on shutdown/pause.
+                return ResolveVictoryChoice(market.LastResult.chulengoSector);
+            }
+            return SaveWithMatch(null);
+        }
 
         private bool SaveWithMatch(StreetMatchRecord match)
         {
@@ -490,7 +574,7 @@ namespace HayChoriYPaty
             string activeAttemptToRestore = null;
             try
             {
-                StreetMatchRecord outputMatch = match ?? save.pendingMatch;
+                StreetMatchRecord outputMatch = match ?? (HasPendingChulengo ? null : save.pendingMatch);
                 if (outputMatch != null && ReferenceEquals(save.pendingMatch, outputMatch))
                 {
                     // Outbox owns the match separately; the committed v4 snapshot must not requeue it.

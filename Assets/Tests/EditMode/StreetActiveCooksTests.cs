@@ -411,7 +411,6 @@ namespace HayChoriYPaty.Tests
             object sim = MakeActiveSimulation(5, 100000, new[] { 100, 50, 80, 40, 1000, 1000, 1000 });
             Call(sim, "StartRound");
             SetArrivalFarFuture(sim);
-            if (fullProduct == 2) Assert.IsTrue((bool)Call(sim, "TryHire", EnumValue(roleType, "ParrilleroPremium")));
             object kitchen = Get(sim, "Kitchen");
             SeedCookedUnits(kitchen, fullProduct, 48, 2000 + fullProduct * 100);
 
@@ -967,7 +966,6 @@ namespace HayChoriYPaty.Tests
             object premium = Activator.CreateInstance(simulationType, new object[] { premiumBalance, 5, 5f, 0, 1, 0 });
             Call(premium, "StartRound");
             SetArrivalFarFuture(premium);
-            Assert.IsTrue((bool)Call(premium, "TryHire", EnumValue(roleType, "ParrilleroPremium")));
             int[] premiumDelivered = (int[])simulationType.GetField("deliveredByProduct", PrivateInstance).GetValue(premium);
             premiumDelivered[3] = (int)Call(premium, "GetProductGoal", 3);
             Step(premium, 81);
@@ -1254,7 +1252,6 @@ namespace HayChoriYPaty.Tests
             object sim = MakeActiveSimulation(5, 3000);
             Call(sim, "StartRound");
             SetArrivalFarFuture(sim);
-            Assert.IsTrue((bool)Call(sim, "TryHire", EnumValue(roleType, "ParrilleroPremium")));
             Assert.IsTrue((bool)Call(sim, "TryHire", EnumValue(roleType, "Cocacolero")));
             Assert.IsTrue((bool)Call(sim, "TryHire", EnumValue(roleType, "Fernetero")));
             Assert.IsTrue((bool)Call(sim, "TryHire", EnumValue(roleType, "Mozo")));
@@ -1270,6 +1267,32 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(0, Get(sim, "SpeedLevel"), "A fresh attempt remains at x1.00 until speed is purchased.");
             Assert.AreEqual(1f, Get(sim, "WorkRate"));
             Assert.AreEqual(1, Get(sim, "ParrilleroCount"), "A fresh attempt starts with exactly one Parrillero.");
+            Assert.AreEqual(1, Get(sim, "ParrilleroPremiumCount"), "Racing opens with one free Premium Parrillero.");
+        }
+
+        [Test]
+        public void OnlyRacingStartsWithFreePremiumAndItsNextHireUsesBaseCostAcrossRetries()
+        {
+            object previousLevel = MakeActiveSimulation(4, 100000);
+            Assert.AreEqual(0, Get(previousLevel, "ParrilleroPremiumCount"));
+            Call(previousLevel, "StartRound");
+            Assert.AreEqual(0, Get(previousLevel, "ParrilleroPremiumCount"));
+
+            object racing = MakeActiveSimulation(5, 100000);
+            Assert.AreEqual(1, Get(racing, "ParrilleroCount"));
+            Assert.AreEqual(1, Get(racing, "ParrilleroPremiumCount"));
+            int firstPremiumCost = (int)Call(racing, "HireCostForRole", EnumValue(roleType, "ParrilleroPremium"));
+            object balance = simulationType.GetField("balance", PrivateInstance).GetValue(racing);
+            int premiumBaseCost = (int)Call(balance, "GetHireBaseCost", 5, EnumValue(roleType, "ParrilleroPremium"));
+            Assert.AreEqual(premiumBaseCost, firstPremiumCost, "The free starter must not consume the first paid hire tier.");
+
+            Call(racing, "StartRound");
+            Assert.AreEqual(1, Get(racing, "ParrilleroPremiumCount"), "Every Racing retry resets to exactly one free Premium cook.");
+            Assert.AreEqual(0, Get(racing, "SpeedLevel"));
+            Assert.AreEqual(premiumBaseCost, Call(racing, "HireCostForRole", EnumValue(roleType, "ParrilleroPremium")));
+
+            object nextLevel = MakeActiveSimulation(6, 100000);
+            Assert.AreEqual(0, Get(nextLevel, "ParrilleroPremiumCount"), "The grant must not spill into San Lorenzo.");
         }
 
         [TestCase("Parrillero", 1)] [TestCase("Parrillero", 2)] [TestCase("Parrillero", 3)]
@@ -1281,7 +1304,7 @@ namespace HayChoriYPaty.Tests
             object sim = MakeActiveSimulation(5, 1000000);
             Call(sim, "StartRound");
             SetArrivalFarFuture(sim);
-            int hired = roleName == "Parrillero" ? 1 : 0;
+            int hired = roleName == "Parrillero" || roleName == "ParrilleroPremium" ? 1 : 0;
             while (hired < teamSize)
             {
                 Assert.IsTrue((bool)Call(sim, "TryHire", EnumValue(roleType, roleName)), "Hire " + roleName + " #" + (hired + 1));
@@ -1348,7 +1371,7 @@ namespace HayChoriYPaty.Tests
             object sim = MakeActiveSimulation(5, 1000000);
             Call(sim, "StartRound");
             SetArrivalFarFuture(sim);
-            int hired = roleName == "Parrillero" ? 1 : 0;
+            int hired = roleName == "Parrillero" || roleName == "ParrilleroPremium" ? 1 : 0;
             while (hired < 5)
             {
                 Assert.IsTrue((bool)Call(sim, "TryHire", EnumValue(roleType, roleName)));

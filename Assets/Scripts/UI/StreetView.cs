@@ -311,6 +311,7 @@ namespace HayChoriYPaty
         private const int MarketBuyAction = 140, MarketMissingAction = 150, MarketPlayAction = 160;
         private const int MarketRowMissingAction = 170, MarketExpandAction = 180;
         private const int MarketCloseAction = 161, ResultLevelsAction = 163;
+        private const int ChulengoMultiplyAction = 164, ChulengoCollectAction = 165;
         private static readonly Rect ReadyLevelSelector = new Rect(161, 905, 218, 44);
         private static readonly Rect LevelSelectPrevious = new Rect(28, 666, 112, 48);
         private static readonly Rect LevelSelectNext = new Rect(400, 666, 112, 48);
@@ -364,6 +365,7 @@ namespace HayChoriYPaty
         private Texture2D premiumWorker, premiumDiagonal, fernetWorker, fernetWorkerLater;
         private Texture2D mozoWorker;
         private Texture2D victoryPopup;
+        private Texture2D chulengoMeter;
         private Texture2D coverArt, titleLogo, introGlow, menuButton, googleButtonSurface, hudBarTexture, cutoutHudBarTexture, hudQuotaCardTexture, hudQuotaCardOutlineTexture, riotBackdrop, riotFanAtlas, riotImpactCloud;
         private Font menuFont;
         private GUIStyle menuTitle, levelTitle;
@@ -522,6 +524,7 @@ namespace HayChoriYPaty
             riotImpactCloud = Resources.Load<Texture2D>(RiotImpactCloudResource);
             titleLogo = Resources.Load<Texture2D>("street-logo");
             introGlow = CreateIntroGlow();
+            chulengoMeter = CreateChulengoMeterTexture();
             menuButton = CreateMenuButton();
             googleButtonSurface = CreateGoogleButtonSurface();
             hudBarTexture = CreateHudBar();
@@ -550,6 +553,8 @@ namespace HayChoriYPaty
             if (kitchenRenderer != null) kitchenRenderer.ReleaseWorkers();
             if (introGlow != null) Destroy(introGlow);
             introGlow = null;
+            if (chulengoMeter != null) Destroy(chulengoMeter);
+            chulengoMeter = null;
             if (menuButton != null) Destroy(menuButton);
             menuButton = null;
             if (googleButtonSurface != null) Destroy(googleButtonSurface);
@@ -572,7 +577,7 @@ namespace HayChoriYPaty
         private void Update()
         {
             if (startGameAfterGoogleSignIn && introActive && MenuAvailable) OpenLevelSelectorFromIntro();
-            if (introActive && !MenuAvailable) return;
+            if (introActive && !MenuAvailable && (game == null || !game.ShowChulengoResult)) return;
 #if !(UNITY_ANDROID && !UNITY_EDITOR) && ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
             var touch = Touchscreen.current; var mouse = Mouse.current;
             if (touch != null && (touch.primaryTouch.press.isPressed || touch.primaryTouch.press.wasReleasedThisFrame))
@@ -638,7 +643,7 @@ namespace HayChoriYPaty
             logicalCanvasHeight = CanvasLogicalHeight(v);
             layoutVerticalScale = logicalCanvasHeight / H;
             Vector2 p = ScreenToLayoutPoint(pixel, new Vector2(Screen.width, Screen.height), v);
-            if (marketActive)
+            if (marketActive && !game.ShowChulengoResult)
             {
                 p.y *= layoutVerticalScale; // Market geometry uses the full logical safe-area height.
                 if (down) { marketPointerHeld=true; marketPointerDownY = p.y; marketPointerDownScroll = marketScroll; marketDragging = false; pressedAction = HitMarketAction(p); }
@@ -663,6 +668,17 @@ namespace HayChoriYPaty
         }
         private int HitAction(Vector2 p)
         {
+            if (game.ShowChulengoResult)
+            {
+                Vector2 resultPoint = new Vector2(p.x, p.y * layoutVerticalScale);
+                if (game.HasPendingChulengo && game.ChulengoChoiceLocked)
+                    return ChulengoMultiplyBounds().Contains(resultPoint) ? ChulengoMultiplyAction : 0;
+                if (game.HasPendingChulengo)
+                    return ChulengoMultiplyBounds().Contains(resultPoint) ? ChulengoMultiplyAction
+                        : VictoryExitBounds().Contains(resultPoint) ? ChulengoCollectAction : 0;
+                return game.Sim.LevelIndex < StreetSimulation.LevelNames.Length - 1 && VictoryExitBounds().Contains(resultPoint)
+                    ? VictoryExitAction : ResultLevelsBounds().Contains(resultPoint) ? ResultLevelsAction : 0;
+            }
             if (marketActive) { p.y *= layoutVerticalScale; return HitMarketAction(p); }
             if (introActive)
                 return !MenuAvailable ? 0 : PointerHitBounds(MenuPlay).Contains(p) ? MenuPlayAction
@@ -702,6 +718,22 @@ namespace HayChoriYPaty
         }
         private void DispatchAction(int a)
         {
+            if (game.ShowChulengoResult)
+            {
+                bool lockedRetry = game.HasPendingChulengo && game.ChulengoChoiceLocked;
+                bool chulengoOk = a == ChulengoMultiplyAction ? (lockedRetry
+                        ? game.ChulengoSelectedSector < 0 ? game.TryCollectVictoryReward()
+                            : game.TryMultiplyVictoryReward(game.ChulengoSelectedSector)
+                        : game.TryMultiplyVictoryRewardAtPosition(StreetChulengo.PositionAtTime(Time.unscaledTime)))
+                    : a == ChulengoCollectAction ? game.TryCollectVictoryReward()
+                    : a == VictoryExitAction && !game.HasPendingChulengo ? game.NextLevel()
+                    : a == ResultLevelsAction && !game.HasPendingChulengo ? game.ReturnToLevels() : false;
+                if (chulengoOk && a == VictoryExitAction) { marketActive = true; marketFromSelector = true; marketOtherExpanded = false; marketMessage = ""; }
+                if (chulengoOk && a == ResultLevelsAction) { marketActive = false; levelSelectActive = true; levelSelectPage = game.Sim.LevelIndex / LevelSelectorPageSize; }
+                if (a == ChulengoMultiplyAction || a == ChulengoCollectAction || a == VictoryExitAction || a == ResultLevelsAction)
+                { lastAction = a; feedbackUntil = Time.unscaledTime + .22f; feedbackScale = chulengoOk ? 1.04f : .97f; }
+                return;
+            }
             if (introActive)
             {
                 // Native Android and the desktop bridge share the same startup guard.
@@ -850,21 +882,22 @@ namespace HayChoriYPaty
             projectedCounterTopY = StreetSceneLayout.CounterTopInViewport(Screen.width, Screen.height, v);
             Matrix4x4 m=GUI.matrix; Color old=GUI.color;
             var sim=game.Sim;
-            if (!introActive && sim.Phase != RoundPhase.Lost) DrawGameplayScreenFill();
+            bool chulengoResult = game.ShowChulengoResult;
+            if ((!introActive || chulengoResult) && sim.Phase != RoundPhase.Lost) DrawGameplayScreenFill();
             GUI.matrix=Matrix4x4.TRS(new Vector3(v.x,v.y),Quaternion.identity,new Vector3(v.width/W,v.width/W,1)); GUI.color=Color.white;
-            if (introActive)
+            if (introActive && !chulengoResult)
             {
                 DrawIntro(Time.unscaledTime - introStarted);
                 GUI.color = old; GUI.matrix = m;
                 return; // Do not create hidden gameplay GUI controls behind the startup menu.
             }
-            if (levelSelectActive)
+            if (levelSelectActive && !chulengoResult)
             {
                 DrawLevelSelector();
                 GUI.color=old; GUI.matrix=m;
                 return; // Keep the locked/unlocked selector as the only interactive layer.
             }
-            if (marketActive)
+            if (marketActive && !chulengoResult)
             {
                 float marketScale = layoutVerticalScale;
                 layoutVerticalScale = 1f;
@@ -882,6 +915,12 @@ namespace HayChoriYPaty
                 return;
             }
             riotScreenActive = false;
+            if (chulengoResult)
+            {
+                ResultPanel();
+                GUI.color=old;GUI.matrix=m;
+                return;
+            }
             ResponsiveFooterLayout footer = CurrentResponsiveFooter(sim, logicalCanvasHeight);
             // The baked counter is rendered once by the full-bleed backdrop; queue clipping uses that same projection.
             DrawWaitingCrowd(sim);
@@ -3574,6 +3613,78 @@ namespace HayChoriYPaty
         private static Rect VictorySlot(Rect frame, Rect normalized) => new Rect(
             frame.x + normalized.x * frame.width, frame.y + normalized.y * frame.height,
             normalized.width * frame.width, normalized.height * frame.height);
+        private Rect ChulengoMultiplyBounds() => VictorySlot(VictoryPopupBounds(logicalCanvasHeight), new Rect(.10f, .715f, .80f, .105f));
+        // Public for focused geometry checks; pointer and visible control share this normalized frame.
+        public static Rect ChulengoMultiplyBoundsForFrame(Rect frame) => VictorySlot(frame, new Rect(.10f, .715f, .80f, .105f));
+        public static int ChulengoSectorAtPosition(float position) => StreetChulengo.SectorAtPosition(position);
+        private static readonly string[] ChulengoLabels = { "×0", "×1,5", "×1", "×2", "×1", "×1,5", "×0" };
+        private static readonly Color[] ChulengoColors = {
+            new Color(.76f, .12f, .055f), new Color(.94f, .78f, .15f), new Color(.12f, .46f, .82f),
+            new Color(.96f, .64f, .08f), new Color(.12f, .46f, .82f), new Color(.94f, .78f, .15f),
+            new Color(.76f, .12f, .055f)
+        };
+        private static Texture2D CreateChulengoMeterTexture()
+        {
+            const int width = 512, height = 256;
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false) { name = "Chulengo seven-sector meter", filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+            Color clear = new Color(0, 0, 0, 0), ink = new Color(.16f, .07f, .025f, 1);
+            var pixels = new Color[width * height];
+            for (int i = 0; i < pixels.Length; i++) pixels[i] = clear;
+            const float cx = 256f, cy = 18f, outer = 220f, inner = 160f;
+            for (int y = 0; y < height; y++)
+                for (int x = 0; x < width; x++)
+                {
+                    float dx = x + .5f - cx, dy = y + .5f - cy;
+                    float radius = Mathf.Sqrt(dx * dx + dy * dy);
+                    if (radius < inner || radius > outer || dy < 0) continue;
+                    float position = Mathf.Clamp01(1f - Mathf.Atan2(dy, dx) / Mathf.PI);
+                    int sector = Mathf.Min(6, Mathf.FloorToInt(position * 7f));
+                    float edge = Mathf.Min(position * 7f - sector, sector + 1f - position * 7f);
+                    pixels[y * width + x] = edge < .018f || radius > outer - 8f || radius < inner + 8f ? ink : ChulengoColors[sector];
+                }
+            texture.SetPixels(pixels); texture.Apply(false, true); return texture;
+        }
+        private static Rect FitChulengoMeter(Rect container)
+        {
+            float height = Mathf.Min(container.height, container.width * .5f);
+            float width = height * 2f;
+            return new Rect(container.center.x - width * .5f, container.center.y - height * .5f, width, height);
+        }
+        private void DrawChulengoMeter(Rect container, bool locked, int selectedSector, int labelFontSize)
+        {
+            Rect bounds = FitChulengoMeter(container);
+            if (chulengoMeter != null) GUI.DrawTexture(bounds, chulengoMeter, ScaleMode.StretchToFill, true);
+            if (!locked || selectedSector >= 0)
+            {
+                float position = locked ? game.ChulengoSelectedPosition : StreetChulengo.PositionAtTime(Time.unscaledTime);
+                Vector2 center = new Vector2(bounds.center.x, bounds.yMax - bounds.height * (18f / 256f));
+                float length = bounds.height * (220f / 256f);
+                // GUI local Y grows downward: negative Z rotation points the needle up at center.
+                float rotation = 180f * position - 180f;
+                Color old = GUI.color;
+                GUI.color = new Color(.68f, .055f, .045f, 1f);
+                Matrix4x4 matrix = GUI.matrix;
+                // Rotate in this local canvas before the outer viewport scale is applied.
+                // GUIUtility.RotateAroundPivot applies a screen-space pivot here and can send
+                // the needle far outside the popup on scaled portrait Game Views.
+                GUI.matrix = matrix * Matrix4x4.Translate(new Vector3(center.x, center.y, 0f))
+                    * Matrix4x4.Rotate(Quaternion.Euler(0f, 0f, rotation))
+                    * Matrix4x4.Translate(new Vector3(-center.x, -center.y, 0f));
+                GUI.DrawTexture(new Rect(center.x, center.y - 3f, length, 6f), Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
+                GUI.matrix = matrix;
+                GUI.color = old;
+            }
+            for (int i = 0; i < ChulengoLabels.Length; i++)
+            {
+                float position = (i + .5f) / ChulengoLabels.Length;
+                float angle = Mathf.PI * (1f - position);
+                float labelRadius = bounds.height * (190f / 256f);
+                float xRadius = bounds.width * (190f / 512f);
+                Vector2 center = new Vector2(bounds.center.x, bounds.yMax - bounds.height * (18f / 256f));
+                Vector2 label = new Vector2(center.x + xRadius * Mathf.Cos(angle), center.y - labelRadius * Mathf.Sin(angle));
+                VictoryText(new Rect(label.x - 21f, label.y - 12f, 42f, 24f), ChulengoLabels[i], labelFontSize, new Color(1f, .94f, .78f), TextAnchor.MiddleCenter);
+            }
+        }
         private Rect VictoryExitBounds() => VictorySlot(VictoryPopupBounds(logicalCanvasHeight), VictoryExit);
         private static string FormatVictoryTime(float remaining)
         {
@@ -3649,6 +3760,55 @@ namespace HayChoriYPaty
                     "¡TURNO\nCOMPLETADO!", Mathf.RoundToInt(50f * fontScale), gold, TextAnchor.MiddleCenter);
 
                 bool victory = game.Sim.Phase == RoundPhase.Won;
+                if (game.ShowChulengoResult)
+                {
+                    FillRect(VictorySlot(frame, new Rect(.07f, .34f, .86f, .48f)), new Color(.18f, .055f, .02f, .98f));
+                    FillRect(VictorySlot(frame, new Rect(.079f, .35f, .842f, .46f)), new Color(1f, .91f, .71f, 1f));
+                    bool lockedRetry = game.HasPendingChulengo && game.ChulengoChoiceLocked;
+                    bool pending = game.HasPendingChulengo && !lockedRetry;
+                    bool locked = game.ChulengoChoiceLocked;
+                    int sector = game.ChulengoSelectedSector;
+                    VictoryText(VictorySlot(frame, new Rect(.26f, .345f, .63f, .055f)), "CHULENGO", Mathf.RoundToInt(29f * fontScale), brown, TextAnchor.MiddleCenter);
+                    if (parrilleroIcon != null)
+                    {
+                        Rect icon = VictorySlot(frame, new Rect(.16f, .34f, .085f, .065f));
+                        GUI.DrawTexture(icon, parrilleroIcon, ScaleMode.ScaleToFit, true);
+                    }
+                    Rect rewardLine = VictorySlot(frame, new Rect(.10f, .405f, .80f, .055f));
+                    if (pending || lockedRetry)
+                    {
+                        if (lockedRetry && sector >= 0)
+                            VictoryText(rewardLine, "RESULTADO FIJO: " + ChulengoLabels[Mathf.Clamp(sector, 0, 6)], Mathf.RoundToInt(19f * fontScale), brown, TextAnchor.MiddleCenter);
+                        else
+                            VictoryText(rewardLine, (lockedRetry ? "COBRO PENDIENTE: " : "PREMIO EN JUEGO: ") + FormatMarketMoney(game.ChulengoBaseRewardCents), Mathf.RoundToInt(19f * fontScale), brown, TextAnchor.MiddleCenter);
+                        DrawChulengoMeter(VictorySlot(frame, new Rect(.13f, .455f, .74f, .225f)), lockedRetry, sector, Mathf.RoundToInt(14f * fontScale));
+                        VictoryText(VictorySlot(frame, new Rect(.10f, .678f, .80f, .035f)), lockedRetry
+                                ? "RESULTADO FIJADO · NO SE PUEDE CAMBIAR"
+                                : "×0: PERDÉS TODO EL PREMIO DE ESTE TURNO",
+                            Mathf.RoundToInt(14f * fontScale), lockedRetry ? brown : new Color(.73f, .08f, .035f), TextAnchor.MiddleCenter);
+                        DrawStandardButton(ChulengoMultiplyBounds(), ChulengoMultiplyAction, lockedRetry
+                            ? sector < 0 ? "REINTENTAR COBRO" : "REINTENTAR RESULTADO"
+                            : "MULTIPLICAR");
+                        if (!lockedRetry)
+                            DrawStandardButton(VictorySlot(frame, VictoryExit), ChulengoCollectAction,
+                                "COBRAR " + FormatMarketMoney(game.ChulengoBaseRewardCents));
+                    }
+                    else
+                    {
+                        string outcome = !locked || sector < 0 ? "PREMIO COBRADO"
+                            : "CHULENGO " + ChulengoLabels[Mathf.Clamp(sector, 0, 6)];
+                        Color outcomeColor = locked && sector == 0 || locked && sector == 6 ? new Color(.73f, .08f, .035f) : brown;
+                        VictoryText(rewardLine, outcome, Mathf.RoundToInt(20f * fontScale), outcomeColor, TextAnchor.MiddleCenter);
+                        DrawChulengoMeter(VictorySlot(frame, new Rect(.13f, .455f, .74f, .225f)), true, sector, Mathf.RoundToInt(14f * fontScale));
+                        VictoryText(VictorySlot(frame, new Rect(.10f, .685f, .80f, .055f)),
+                            "PREMIO FINAL: " + FormatMarketMoney(game.ChulengoFinalRewardCents), Mathf.RoundToInt(21f * fontScale), brown, TextAnchor.MiddleCenter);
+                        bool canAdvanceChulengo = game.Sim.LevelIndex < StreetSimulation.LevelNames.Length - 1;
+                        DrawStandardButton(VictorySlot(frame, VictoryExit), VictoryExitAction,
+                            canAdvanceChulengo ? "SIGUIENTE PARTIDO" : "ÚLTIMO NIVEL", canAdvanceChulengo);
+                        DrawStandardButton(ResultLevelsBounds(), ResultLevelsAction, "NIVELES");
+                    }
+                    return;
+                }
                 VictoryText(VictorySlot(frame, new Rect(.10f, .345f, .80f, .055f)),
                     victory ? "VENTAS COMPLETADAS" : "FALTAN", Mathf.RoundToInt(23f * fontScale), brown, TextAnchor.MiddleCenter);
                 string sales = FormatQuotaSummary(game.Sim, !victory);

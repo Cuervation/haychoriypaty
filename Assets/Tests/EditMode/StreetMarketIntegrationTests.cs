@@ -173,6 +173,7 @@ namespace HayChoriYPaty.Tests
                 Set(sim, "Phase", Enum.Parse(Runtime("RoundPhase"), "Won"));
 
                 Assert.IsTrue((bool)Call(game, "ProcessRoundResult"));
+                if ((bool)Get(game, "HasPendingChulengo")) Assert.IsTrue((bool)Call(game, "TryCollectVictoryReward"), "Explicit normal reward claim preserves legacy payout assertions.");
                 market = Get(game, "Market");
                 Assert.AreEqual(1, Get(game, "UnlockedLevel"));
                 Assert.AreEqual(78750L, Get(market, "BalanceCents"), "Exact remaining Level 2 stock cost must be available before Mercado is shown.");
@@ -262,6 +263,7 @@ namespace HayChoriYPaty.Tests
                 Set(sim, "CoinsEarned", 1000); Set(sim, "Coins", 0);
                 Set(sim, "Phase", Enum.Parse(Runtime("RoundPhase"), "Won"));
                 Assert.IsTrue((bool)Call(game, "ProcessRoundResult"));
+                if ((bool)Get(game, "HasPendingChulengo")) Assert.IsTrue((bool)Call(game, "TryCollectVictoryReward"), "Explicit normal reward claim preserves legacy payout assertions.");
                 market = Get(game, "Market");
                 object next = NewSim(balance, 1);
                 long nextCost = (long)Call(market, "MinimumPurchaseCostCents", next);
@@ -277,6 +279,7 @@ namespace HayChoriYPaty.Tests
                 Set(sim, "CoinsEarned", 1000); Set(sim, "Coins", 0);
                 Set(sim, "Phase", Enum.Parse(Runtime("RoundPhase"), "Won"));
                 Assert.IsTrue((bool)Call(game, "ProcessRoundResult"));
+                if ((bool)Get(game, "HasPendingChulengo")) Assert.IsTrue((bool)Call(game, "TryCollectVictoryReward"), "Explicit normal reward claim preserves legacy payout assertions.");
                 Assert.AreEqual(firstUnlockBalance + 50000L, Get(Get(game, "Market"), "BalanceCents"), "Replay earns its full victory sales reward, but cannot claim the progression reward again.");
                 Assert.AreEqual(0L, Get(Get(game, "Market"), "LastResult").GetType().GetField("progressionBonusCents").GetValue(Get(Get(game, "Market"), "LastResult")));
             }
@@ -363,6 +366,7 @@ namespace HayChoriYPaty.Tests
                 Assert.AreEqual(200, snapshot[0]); Assert.AreEqual(435, snapshot[1]);
                 object sim = Get(game, "Sim"); Set(sim, "Phase", Enum.Parse(Runtime("RoundPhase"), "Lost"));
                 Assert.IsTrue((bool)Call(game, "ProcessRoundResult"));
+                if ((bool)Get(game, "HasPendingChulengo")) Assert.IsTrue((bool)Call(game, "TryCollectVictoryReward"), "Explicit normal reward claim preserves legacy payout assertions.");
                 Assert.AreEqual(200, Call(Get(game, "Market"), "Units", 0)); Assert.AreEqual(435, Call(Get(game, "Market"), "Units", 1));
                 Assert.IsTrue((bool)Call(game, "SelectLevel", 0));
                 market = Get(game, "Market"); int[] current = (int[])market.GetType().GetProperty("Data", Public).GetValue(market).GetType().GetField("stockUnits").GetValue(market.GetType().GetProperty("Data", Public).GetValue(market));
@@ -406,6 +410,7 @@ namespace HayChoriYPaty.Tests
                 int gross = (int)Get(sim, "CoinsEarned"); Assert.Greater(gross, 0);
                 Set(sim, "Phase", Enum.Parse(Runtime("RoundPhase"), "Lost"));
                 Assert.IsTrue((bool)Call(game, "ProcessRoundResult"));
+                if ((bool)Get(game, "HasPendingChulengo")) Assert.IsTrue((bool)Call(game, "TryCollectVictoryReward"), "Explicit normal reward claim preserves legacy payout assertions.");
                 Assert.AreEqual((long)gross * 50L, Get(market, "BalanceCents")); Assert.AreEqual(200, Call(market, "Units", 0)); Assert.AreEqual(200, Call(market, "Units", 1));
                 Assert.IsFalse((bool)Call(game, "ProcessRoundResult")); Assert.IsFalse((bool)Call(game, "Retry"));
                 Assert.AreEqual(0, Get(game, "UnlockedLevel")); Assert.IsTrue((bool)Call(game, "ReturnToLevels"));

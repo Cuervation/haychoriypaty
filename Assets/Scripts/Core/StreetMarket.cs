@@ -27,6 +27,12 @@ namespace HayChoriYPaty
         public int level;
         public long grossSalesCents, leftoverCents, halfSalesCents, recognizedSalesCents, bonusCents, progressionBonusCents, earnedCents, totalBalanceCents;
         public int[] consumedUnits, remainingUnits;
+        // Additive v4 fields: absent on legacy receipts, which retain their original payout policy.
+        public bool chulengoManaged, chulengoPending, chulengoChoiceLocked;
+        public int chulengoSector = -1, chulengoMultiplierNumerator = 2;
+        public long chulengoBaseRewardCents;
+        public bool chulengoHasNeedlePosition;
+        public float chulengoNeedlePosition;
     }
 
     [Serializable]
@@ -81,7 +87,7 @@ namespace HayChoriYPaty
             Data.cumulativePurchaseUnits = Math.Max(0L, Data.cumulativePurchaseUnits);
             Data.cumulativePurchaseSpendCents = Math.Max(0L, Data.cumulativePurchaseSpendCents);
             Data.nextPurchaseId = Math.Max(1L, Data.nextPurchaseId); Data.nextAttemptId = Math.Max(1L, Data.nextAttemptId);
-            if (Data.lastResult != null && Data.lastResult.earnedCents == 0)
+            if (Data.lastResult != null && !Data.lastResult.chulengoManaged && Data.lastResult.earnedCents == 0)
                 Data.lastResult.earnedCents = Math.Max(0L, Data.lastResult.recognizedSalesCents) + Math.Max(0L, Data.lastResult.bonusCents) + Math.Max(0L, Data.lastResult.progressionBonusCents);
         }
 
@@ -230,7 +236,7 @@ namespace HayChoriYPaty
         /// </summary>
         public long ReconcileLegacyProgressionBalance(StreetSimulation nextLevelSimulation, int unlockedLevel)
         {
-            if (Data.legacyTransitionRepairApplied || nextLevelSimulation == null || unlockedLevel <= 0 ||
+            if ((LastResult != null && LastResult.chulengoManaged) || Data.legacyTransitionRepairApplied || nextLevelSimulation == null || unlockedLevel <= 0 ||
                 unlockedLevel >= StreetSimulation.LevelNames.Length || nextLevelSimulation.LevelIndex != unlockedLevel ||
                 Data.attemptActive || BalanceCents != 0 || Data.cumulativePurchaseSpendCents != 0) return 0L;
 
@@ -261,7 +267,7 @@ namespace HayChoriYPaty
         /// <summary>One-time reward on a first level unlock that ensures the next match's minimum stock is affordable.</summary>
         public long GrantFirstUnlockStockBonus(StreetSimulation nextLevelSimulation, bool firstTimeUnlock)
         {
-            if (!firstTimeUnlock || nextLevelSimulation == null || Data.attemptActive ||
+            if ((LastResult != null && LastResult.chulengoManaged) || !firstTimeUnlock || nextLevelSimulation == null || Data.attemptActive ||
                 nextLevelSimulation.LevelIndex <= 0 || nextLevelSimulation.LevelIndex >= StreetSimulation.LevelNames.Length) return 0L;
             long required = MinimumPurchaseCostCents(nextLevelSimulation);
             if (required <= BalanceCents || required == long.MaxValue) return 0L;
@@ -278,7 +284,7 @@ namespace HayChoriYPaty
         public long RecoverLegacyZeroPayoutTransition()
         {
             StreetMarketResult result = Data.lastResult;
-            if (Data.legacyZeroBalanceRecoveryApplied || !Data.legacyTransitionRepairApplied || Data.attemptActive ||
+            if ((result != null && result.chulengoManaged) || Data.legacyZeroBalanceRecoveryApplied || !Data.legacyTransitionRepairApplied || Data.attemptActive ||
                 BalanceCents != 0 || result == null || !result.won || result.earnedCents != 0 ||
                 result.totalBalanceCents != 0 || result.halfSalesCents <= 0 || result.recognizedSalesCents != 0 || result.bonusCents != 0 ||
                 result.level < 0 || result.level >= Data.highestRecognizedSalesByLevel.Length ||
@@ -302,7 +308,7 @@ namespace HayChoriYPaty
         /// </summary>
         public long RecoverLegacyVictoryPayout()
         {
-            if (Data.victoryPayoutVersion >= 1 || Data.attemptActive) return 0L;
+            if ((LastResult != null && LastResult.chulengoManaged) || Data.victoryPayoutVersion >= 1 || Data.attemptActive) return 0L;
             StreetMarketResult result = Data.lastResult;
             if (result == null || !result.won) { Data.victoryPayoutVersion = 1; return 0L; }
             if (Data.attemptId <= 0 || Data.settledAttemptId != Data.attemptId ||
@@ -354,7 +360,7 @@ namespace HayChoriYPaty
 
         public bool TryBuy(StreetSimulation sim, int id, int packs, int unlocked, long operationId)
         {
-            if (sim == null || sim.Phase != RoundPhase.Ready || Data.attemptActive || id < 0 || id >= 10 || packs <= 0 ||
+            if ((LastResult != null && LastResult.chulengoPending) || sim == null || sim.Phase != RoundPhase.Ready || Data.attemptActive || id < 0 || id >= 10 || packs <= 0 ||
                 !IsIngredientUnlocked(id, unlocked) || operationId <= Data.lastPurchaseId || operationId != Data.nextPurchaseId) return false;
             long unitCount = (long)packs * StreetIngredientCatalog.PackUnits[id];
             long cost = (long)packs * PackPriceCents(id);
@@ -370,7 +376,7 @@ namespace HayChoriYPaty
 
         public bool BeginAttempt(StreetSimulation sim)
         {
-            if (sim == null || sim.Phase != RoundPhase.Ready || Data.attemptActive || !HasRequiredStock(sim) || Data.nextAttemptId == long.MaxValue) return false;
+            if ((LastResult != null && LastResult.chulengoPending) || sim == null || sim.Phase != RoundPhase.Ready || Data.attemptActive || !HasRequiredStock(sim) || Data.nextAttemptId == long.MaxValue) return false;
             Data.attemptId = Data.nextAttemptId++; Data.attemptLevel = sim.LevelIndex; Data.attemptStock = (int[])Data.stockUnits.Clone(); Data.attemptActive = true;
             attemptSimulation = sim; Array.Clear(attemptConsumed, 0, 10); Array.Clear(consumedProducts, 0, 7); reservations.Clear(); return true;
         }
@@ -398,6 +404,65 @@ namespace HayChoriYPaty
                 halfSalesCents = half, recognizedSalesCents = recognized, bonusCents = bonus, earnedCents = earned,
                 totalBalanceCents = Data.balanceCents, consumedUnits = (int[])attemptConsumed.Clone(), remainingUnits = (int[])Data.stockUnits.Clone() };
             Data.settledAttemptId = Data.attemptId; Data.attemptActive = false; reservations.Clear(); attemptSimulation = null; return Data.lastResult;
+        }
+
+        /// <summary>Escrow the complete computed victory payout before any new snapshot is persisted.</summary>
+        public bool PrepareChulengo()
+        {
+            StreetMarketResult r = LastResult;
+            if (r == null || !r.won || Data.attemptActive || r.chulengoManaged || r.earnedCents < 0 ||
+                Data.settledAttemptId != Data.attemptId || r.earnedCents > BalanceCents) return false;
+            long sum;
+            if (!TryAdd(r.recognizedSalesCents, r.bonusCents, out sum) ||
+                !TryAdd(sum, r.progressionBonusCents, out sum) || sum != r.earnedCents) return false;
+            r.chulengoManaged = r.chulengoPending = true;
+            r.chulengoBaseRewardCents = r.earnedCents;
+            Data.balanceCents -= r.earnedCents;
+            r.earnedCents = 0; r.totalBalanceCents = BalanceCents;
+            Data.victoryPayoutVersion = 1;
+            return true;
+        }
+
+        public bool LockChulengoChoice(int sector)
+        {
+            StreetMarketResult r = LastResult;
+            if (r == null || !r.won || !r.chulengoManaged || !r.chulengoPending ||
+                sector < -1 || sector >= StreetChulengo.SectorCount) return false;
+            if (r.chulengoChoiceLocked) return r.chulengoSector == sector;
+            int numerator = sector < 0 ? 2 : StreetChulengo.MultiplierNumerator(sector);
+            try
+            {
+                long amount = StreetChulengo.ScaleCents(r.chulengoBaseRewardCents, numerator);
+                if (amount > long.MaxValue - BalanceCents) return false;
+            }
+            catch (OverflowException) { return false; }
+            r.chulengoSector = sector; r.chulengoMultiplierNumerator = numerator;
+            r.chulengoHasNeedlePosition = sector >= 0;
+            r.chulengoNeedlePosition = sector >= 0 ? (sector + .5f) / StreetChulengo.SectorCount : 0f;
+            r.chulengoChoiceLocked = true;
+            return true;
+        }
+
+        /// <summary>Idempotent in-memory credit; StreetGame commits snapshot + final match together.</summary>
+        public bool ResolveChulengo()
+        {
+            StreetMarketResult r = LastResult;
+            if (r == null || !r.won || !r.chulengoManaged || !r.chulengoChoiceLocked) return false;
+            if (!r.chulengoPending) return true;
+            try
+            {
+                long total = StreetChulengo.ScaleCents(r.chulengoBaseRewardCents, r.chulengoMultiplierNumerator);
+                if (total > long.MaxValue - BalanceCents) return false;
+                long sales = StreetChulengo.ScaleCents(r.recognizedSalesCents, r.chulengoMultiplierNumerator);
+                // Prefix rounding keeps final components summing to the once-rounded total.
+                long salesAndBonus = StreetChulengo.ScaleCents(checked(r.recognizedSalesCents + r.bonusCents), r.chulengoMultiplierNumerator);
+                r.recognizedSalesCents = sales; r.bonusCents = salesAndBonus - sales;
+                r.progressionBonusCents = total - salesAndBonus;
+                r.earnedCents = total; Data.balanceCents += total;
+                r.totalBalanceCents = BalanceCents; r.chulengoPending = false;
+                return true;
+            }
+            catch (OverflowException) { return false; }
         }
 
         public void AbortAttempt() { if (Data.attemptActive) RestoreSnapshot(); Data.attemptActive = false; reservations.Clear(); attemptSimulation = null; }

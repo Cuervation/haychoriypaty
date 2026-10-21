@@ -1,3 +1,7 @@
+## 2026-10-21 — Última entrega vigente (supersede el estado de entrega del 18/10)
+
+APK Android Development **0.2.58/code60**, Main-only IL2CPP/ARM64, Unity6000.6.3f1: 0 errores/1 advertencia, 344.979.035bytes, SHA-256 `e695784e59eb3de0945616e93249fa79e866efd3fbeacb51dc827a5aebeeb9e9`. Incluye Chulengo y el Premium gratis inicial únicamente en Racing. Se instaló con `adb install -r` en Motorola Edge60Fusion (PackageManager confirma code60); datos preservados, no se abrió. Firma debug, no PlayStore. La build aislada partió de base70ce8b0 y aplicó los cinco archivos de runtime actuales listados en [android-prototype.md](features/android-prototype.md); el overlay de código y los contratos están ahora en Git. La APK permanece fuera del repo en `/private/tmp/HayChoriYPaty-0.2.58-code60.apk` porque `Builds/` está ignorado y la APK pesa329MiB. Evidencia completa en [android-prototype.md](features/android-prototype.md).
+
 ## 2026-10-18 — Último estado de entrega (supersede las versiones anteriores abajo)
 
 Android Development APK actual: **0.2.48/code50**, Main-only IL2CPP/ARM64, built from an isolated copy with Unity 6000.6.3f1. Build succeeded (0 errors/1 warning); APK is **348,924,731 bytes**, SHA-256 e06e52d1fb3b433d33ad08834633bd5b02ef82e7e955de8c2f4fff91b3000e29. Direct employee movement and current worker/kitchen updates are included alongside ETC2 Android texture compression. Debug-signed, not Play Store release-signed; not installed. Prior focused movement tests: 10/10; full fixture: 52/54 with two known safe-wait-point failures. No Game View, PlayMode or phone QA. Unity MCP endpoint was unavailable; the live Editor was left open and the batch build isolated. Details in specs/features/android-prototype.md. Source pushed on codex/street-automation.
@@ -72,3 +76,13 @@ Usar [README.md](README.md) para elegir un contrato; [status.md](status.md) y [d
 ## 10. Próximos pasos autorizados
 
 La solicitud vigente de APK0.2.42/code44 y su instalación quedó completada; no se hizo commit/push. Falta revisión visual/PlayMode del pickup y duración2s; también resolver/aceptar el balance de10y repetir una campaña fresca ganadora1–11. No cambiar tiempos/precios ni campaña pendiente para forzar11/11.
+
+
+## Chulengo — 2026-10-21 follow-up
+
+Implemented optional post-victory CHULENGO with MULTIPLICAR and COBRAR, original sprites and deterministic unscaled needle. Exact sectors ×0/×1.5/×1/×2/×1/×1.5/×0; zero loses the captured whole turn reward (including its once-calculated stock grant), never prior bank/unlock. New victories escrow until one durable claim; legacy receipts retain old behavior. Final immutable match/statistics are emitted once after claim through existing owner-specific persistence. See [market-fridge.md](features/market-fridge.md#chulengo--authorized-2026-10-21) for updated contract/acceptance.37 unique focused EditMode cases passed; actual ×1 Level1 win, GameView portrait review and pointer ×0/reload verified. Original save/editor restored. Android/Firebase end-to-end/full automated PlayMode NOT_RUN; no APK/install/commit/push. Existing unrelated local settings/assets preserved.
+
+
+## Premium inicial gratuito en Racing — 2026-10-21
+
+Se implementó localmente, solo en nivel6, un Parrillero Premium gratis en cada partida/reintento junto al Normal; no consume el tier de primer hire pagado. No afecta niveles1–5 ni7–11. Cinco rondas reales en Main a ×1, seed1337, acciones por StreetView: todas perdidas. Mejor resultado197Chori, faltante13, frente al máximo anterior191/faltante19; déficit promedio24,4 frente a51,04 previo. No es victoria ni prueba de imposibilidad; compras variaron adaptativamente y se usó el perfilQA legado, no campaña nueva. `OnlyRacingStartsWithFreePremiumAndItsNextHireUsesBaseCostAcrossRetries` y guardia `RacingWithoutMozoCanCookButCannotSellOrWin`:2/2. La suite `StreetActiveCooksTests` ejecutó82,78 pasaron/4 fallaron en expectativas separadas. Perfil PlayerPrefs restaurado exactamente3439 caracteres; Editor parado, escena init original limpia, scale0, testInitfalse. Sin APK/instalación/commit/push. Informe y ledgers locales: `/Users/celestino/.codex/visualizations/2026/10/21/01a15bdf-e29b-7253-8456-9b392d7045a3/racing-default-premium/INFORME.md`.

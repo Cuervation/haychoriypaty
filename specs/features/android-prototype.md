@@ -1,3 +1,13 @@
+# Current Android delivery — 2026-10-21 (0.2.58/code60, Chulengo + Racing Premium)
+
+Includes the new post-victory Chulengo claim/multiplier and one free Premium Parrillero on each fresh Racing attempt. Built with Unity 6000.6.3f1 in a warm isolated copy: baseline source commit `70ce8b0` plus the current runtime overlay (`StreetGame.cs`, `StreetMarket.cs`, `StreetSimulation.cs`, `StreetView.cs`, and new `StreetChulengo.cs` + meta), with Android version/name set to0.2.58/code60. The local Firebase Analytics cookie/setting, Editor runInBackground/time-scale values, temporary scenes, screenshots, recovery data, audit tooling and Editor-only tests were excluded. The source overlay is now tracked on `codex/street-automation`; the APK itself remains a local ignored artifact, not a Git blob.
+
+Unity Main-only Development IL2CPP/ARM64 build: **Succeeded in 524.18s; 0 errors / 1 BuildReport warning**. APK **344,979,035 bytes (328.99 MiB)**, package `com.haychoriypaty.game`, version **0.2.58/code60**, min API26/target36, ARM64. SHA-256 `e695784e59eb3de0945616e93249fa79e866efd3fbeacb51dc827a5aebeeb9e9`. `aapt`, ZIP integrity, `zipalign -c -v 4`, and APK Signature Scheme v2 verification passed; signer is the established Android Debug certificate `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`.
+
+The verified artifact is `/private/tmp/HayChoriYPaty-0.2.58-code60.apk`; full build log: `/private/tmp/hcyp-release-0.2.57-code59-20261020/build-0.2.58.log`. Focused pre-package validation: Chulengo **37/37** unique checks and Racing starter **2/2**. The broader `StreetActiveCooksTests` run had **78/82 passed, 4 failed** in other existing assertions; that suite is not claimed green. Unity compilation/build succeeded. Motorola Edge 60 Fusion install via `adb install -r` returned **Success**; PackageManager verified code60/min26/target36. App was not launched after installation; no device gameplay test. Development/debug-signed, not Play Store release-signed.
+
+---
+
 # Current Android delivery — 2026-10-20 (0.2.57/code59, Mozo LIFO + lossless legacy-art exclusion)
 
 This APK includes the Mozo pickup rule: for active-cook levels, a newly assigned Mozo claims the most recently deposited available sandwich of the requested product. Existing claims remain stable en route; legacy levels and beverages keep FIFO. Source commit: `70ce8b0` (delivery documentation follows in a docs-only commit).

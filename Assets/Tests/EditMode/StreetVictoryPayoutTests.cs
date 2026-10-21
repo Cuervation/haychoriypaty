@@ -220,6 +220,7 @@ namespace HayChoriYPaty.Tests
                             ", remaining=" + Call(sim, "GetProductRemaining", product));
 
                 Assert.IsTrue((bool)Call(game, "ProcessRoundResult"), "Settle this real terminal gameplay result through StreetGame.");
+                if ((bool)Get(game, "HasPendingChulengo")) Assert.IsTrue((bool)Call(game, "TryCollectVictoryReward"), "Explicit normal reward claim preserves legacy payout assertions.");
                 Assert.AreEqual("Won", Get(sim, "Phase").ToString(),
                     "This is an audit of existing phone progress, not proof that a fresh campaign reached Level 11; preserve a real loss as a failure.");
             }
@@ -351,6 +352,7 @@ namespace HayChoriYPaty.Tests
                 ", time=" + ((float)Get(sim, "Elapsed")).ToString("F1") + "s");
             Assert.AreEqual("Won", Get(sim, "Phase").ToString(), "A real D-policy playthrough must win without forcing phase, quota or time.");
             Assert.IsTrue((bool)Call(game, "ProcessRoundResult"));
+                if ((bool)Get(game, "HasPendingChulengo")) Assert.IsTrue((bool)Call(game, "TryCollectVictoryReward"), "Explicit normal reward claim preserves legacy payout assertions.");
             Assert.AreEqual(attempt, Get(Get(Get(game, "Market"), "Data"), "settledAttemptId"));
             return attempt;
         }

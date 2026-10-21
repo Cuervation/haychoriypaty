@@ -418,7 +418,9 @@ namespace HayChoriYPaty
             if (!HasRole(role)) return 0;
             long paidNumber = role == StreetWorkerRole.Parrillero
                 ? Math.Max(1, WorkerCount(role)) // The opening Parrillero is free.
-                : (long)WorkerCount(role) + 1;
+                : role == StreetWorkerRole.ParrilleroPremium && LevelIndex == 5
+                    ? Math.Max(1, WorkerCount(role)) // Racing's opening Premium Parrillero is free.
+                    : (long)WorkerCount(role) + 1;
             int baseCost = balance.GetHireBaseCost(LevelIndex, role);
             if (baseCost <= 0) return 0;
 
@@ -1613,6 +1615,7 @@ namespace HayChoriYPaty
             nextWorker = 1;
             SpeedLevel = 0; // Zero purchased upgrades means the displayed speed is x1.00.
             AddWorker();
+            if (LevelIndex == 5 && HasRole(StreetWorkerRole.ParrilleroPremium)) AddWorker(StreetWorkerRole.ParrilleroPremium);
         }
         private void AddWorker() { AddWorker(StreetWorkerRole.Parrillero); }
         private void AddWorker(StreetWorkerRole role)
