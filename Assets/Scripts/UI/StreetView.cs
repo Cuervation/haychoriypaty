@@ -330,6 +330,7 @@ namespace HayChoriYPaty
         private static readonly Rect LevelSelectHint = new Rect(48, 718, 444, 28);
         private static readonly Rect LevelSelectBack = new Rect(126, 854, 288, 72);
         private const string VictoryPopupResource = "street-victory-popup-wood-v1";
+        private const string ChulengoBowlResource = "street-chulengo-bowl-v1";
         private static readonly Vector2 VictoryPopupArtSize = new Vector2(1122, 1402);
         // Normalized slots in the transparent artwork; text and pointer bounds use the same frame.
         private static readonly Rect VictoryExit = new Rect(.195f, .839f, .62f, .151f);
@@ -365,7 +366,7 @@ namespace HayChoriYPaty
         private Texture2D premiumWorker, premiumDiagonal, fernetWorker, fernetWorkerLater;
         private Texture2D mozoWorker;
         private Texture2D victoryPopup;
-        private Texture2D chulengoMeter;
+        private Texture2D chulengoMeter, chulengoNeedle, chulengoHub, chulengoParchment, chulengoBowl;
         private Texture2D coverArt, titleLogo, introGlow, menuButton, googleButtonSurface, hudBarTexture, cutoutHudBarTexture, hudQuotaCardTexture, hudQuotaCardOutlineTexture, riotBackdrop, riotFanAtlas, riotImpactCloud;
         private Font menuFont;
         private GUIStyle menuTitle, levelTitle;
@@ -525,6 +526,10 @@ namespace HayChoriYPaty
             titleLogo = Resources.Load<Texture2D>("street-logo");
             introGlow = CreateIntroGlow();
             chulengoMeter = CreateChulengoMeterTexture();
+            chulengoNeedle = CreateChulengoNeedleTexture();
+            chulengoHub = CreateChulengoHubTexture();
+            chulengoParchment = CreateChulengoParchmentTexture();
+            chulengoBowl = Resources.Load<Texture2D>(ChulengoBowlResource);
             menuButton = CreateMenuButton();
             googleButtonSurface = CreateGoogleButtonSurface();
             hudBarTexture = CreateHudBar();
@@ -555,6 +560,12 @@ namespace HayChoriYPaty
             introGlow = null;
             if (chulengoMeter != null) Destroy(chulengoMeter);
             chulengoMeter = null;
+            if (chulengoNeedle != null) Destroy(chulengoNeedle);
+            chulengoNeedle = null;
+            if (chulengoHub != null) Destroy(chulengoHub);
+            chulengoHub = null;
+            if (chulengoParchment != null) Destroy(chulengoParchment);
+            chulengoParchment = null;
             if (menuButton != null) Destroy(menuButton);
             menuButton = null;
             if (googleButtonSurface != null) Destroy(googleButtonSurface);
@@ -675,9 +686,9 @@ namespace HayChoriYPaty
                     return ChulengoMultiplyBounds().Contains(resultPoint) ? ChulengoMultiplyAction : 0;
                 if (game.HasPendingChulengo)
                     return ChulengoMultiplyBounds().Contains(resultPoint) ? ChulengoMultiplyAction
-                        : VictoryExitBounds().Contains(resultPoint) ? ChulengoCollectAction : 0;
+                        : ChulengoCollectBounds().Contains(resultPoint) ? ChulengoCollectAction : 0;
                 return game.Sim.LevelIndex < StreetSimulation.LevelNames.Length - 1 && VictoryExitBounds().Contains(resultPoint)
-                    ? VictoryExitAction : ResultLevelsBounds().Contains(resultPoint) ? ResultLevelsAction : 0;
+                    ? VictoryExitAction : ChulengoLevelsBounds().Contains(resultPoint) ? ResultLevelsAction : 0;
             }
             if (marketActive) { p.y *= layoutVerticalScale; return HitMarketAction(p); }
             if (introActive)
@@ -1209,6 +1220,23 @@ namespace HayChoriYPaty
             return bounds;
         }
         private Rect ResultLevelsBounds() => new Rect(150, logicalCanvasHeight - 72f, 240, 52);
+        private Rect ChulengoCollectBounds()
+        {
+            Rect frame = VictoryPopupBounds(logicalCanvasHeight, true);
+            return ChulengoCollectBoundsForFrame(frame, logicalCanvasHeight);
+        }
+        public static Rect ChulengoCollectBoundsForFrame(Rect frame, float canvasHeight)
+        {
+            float multiplyBottom = ChulengoMultiplyBoundsForFrame(frame).yMax;
+            return new Rect(150, Mathf.Max(canvasHeight - 130f, multiplyBottom + 8f), 240, 44f);
+        }
+        private Rect ChulengoLevelsBounds() => ChulengoLevelsBoundsForFrame(
+            VictoryPopupBounds(logicalCanvasHeight, true), logicalCanvasHeight);
+        public static Rect ChulengoLevelsBoundsForFrame(Rect frame, float canvasHeight)
+        {
+            Rect collect = ChulengoCollectBoundsForFrame(frame, canvasHeight);
+            return new Rect(150, Mathf.Max(canvasHeight - 72f, collect.yMax + 14f), 240, 52f);
+        }
 
         private static Rect RiotGameOverBounds(float canvasHeight)
         {
@@ -3597,13 +3625,13 @@ namespace HayChoriYPaty
             DrawStandardButton(footer.ReadySelector, ReadyLevelSelectorAction, "CANCHAS");
         }
         private static Rect LevelButton(int i){return new Rect(108+i*67,912,57,35);}
-        private static Rect VictoryPopupBounds(float canvasHeight)
+        private static Rect VictoryPopupBounds(float canvasHeight, bool chulengo = false)
         {
-            const float topHudReserve = 110f;
+            float topHudReserve = chulengo ? 160f : 110f;
             const float screenInset = 16f;
-            const float resultButtonTopInset = 72f;
+            float resultButtonTopInset = chulengo ? 123f : 72f;
             const float resultButtonGap = 8f;
-            // Keep the external NIVELES button below, not behind, the artwork's next-level action.
+            // Chulengo reserves space for three lower actions and keeps the status HUD visible above the crest.
             float availableHeight = Mathf.Max(1f, canvasHeight - topHudReserve - screenInset - resultButtonTopInset - resultButtonGap);
             float scale = Mathf.Min((W - 24f) / VictoryPopupArtSize.x, availableHeight / VictoryPopupArtSize.y);
             Vector2 size = VictoryPopupArtSize * scale;
@@ -3613,9 +3641,9 @@ namespace HayChoriYPaty
         private static Rect VictorySlot(Rect frame, Rect normalized) => new Rect(
             frame.x + normalized.x * frame.width, frame.y + normalized.y * frame.height,
             normalized.width * frame.width, normalized.height * frame.height);
-        private Rect ChulengoMultiplyBounds() => VictorySlot(VictoryPopupBounds(logicalCanvasHeight), new Rect(.10f, .715f, .80f, .105f));
+        private Rect ChulengoMultiplyBounds() => ChulengoMultiplyBoundsForFrame(VictoryPopupBounds(logicalCanvasHeight, true));
         // Public for focused geometry checks; pointer and visible control share this normalized frame.
-        public static Rect ChulengoMultiplyBoundsForFrame(Rect frame) => VictorySlot(frame, new Rect(.10f, .715f, .80f, .105f));
+        public static Rect ChulengoMultiplyBoundsForFrame(Rect frame) => VictorySlot(frame, new Rect(.20f, .89f, .60f, .112f));
         public static int ChulengoSectorAtPosition(float position) => StreetChulengo.SectorAtPosition(position);
         private static readonly string[] ChulengoLabels = { "×0", "×1,5", "×1", "×2", "×1", "×1,5", "×0" };
         private static readonly Color[] ChulengoColors = {
@@ -3625,67 +3653,205 @@ namespace HayChoriYPaty
         };
         private static Texture2D CreateChulengoMeterTexture()
         {
-            const int width = 512, height = 256;
-            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false) { name = "Chulengo seven-sector meter", filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
-            Color clear = new Color(0, 0, 0, 0), ink = new Color(.16f, .07f, .025f, 1);
+            const int width = 1152, height = 384;
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false) { name = "Chulengo forged ember meter", filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+            Color clear = new Color(0, 0, 0, 0);
             var pixels = new Color[width * height];
             for (int i = 0; i < pixels.Length; i++) pixels[i] = clear;
-            const float cx = 256f, cy = 18f, outer = 220f, inner = 160f;
+            const float cx = 576f, cy = 30f, outerX = 554f, outerY = 326f;
             for (int y = 0; y < height; y++)
                 for (int x = 0; x < width; x++)
                 {
                     float dx = x + .5f - cx, dy = y + .5f - cy;
+                    if (dy < 0f) continue;
+                    float outerRadius = Mathf.Sqrt(dx * dx / (outerX * outerX) + dy * dy / (outerY * outerY));
+                    if (outerRadius > 1f) continue;
+
+                    Color pixel;
+                    if (outerRadius < .695f)
+                    {
+                        // The transparent inner bowl reveals the authored coal-and-choripan art beneath the live sectors.
+                        pixel = clear;
+                    }
+                    else if (outerRadius < .735f || outerRadius > .947f)
+                    {
+                        float shine = .5f + .5f * Mathf.Sin(dy * .047f + dx * .011f);
+                        if (outerRadius > .947f)
+                        {
+                            // A dark forged outer rim reads like the charcoal steel bezel in the reference.
+                            float highlight = Mathf.Clamp01(.14f + shine * .32f);
+                            pixel = Color.Lerp(new Color(.055f, .052f, .048f), new Color(.50f, .42f, .29f), highlight);
+                        }
+                        else
+                        {
+                            float rim = Mathf.InverseLerp(.695f, .735f, outerRadius);
+                            pixel = Color.Lerp(new Color(.12f, .09f, .075f), new Color(.83f, .68f, .38f), Mathf.Clamp01(.23f + shine * .62f));
+                            if (rim > .55f && (x % 19 == 0 || y % 19 == 0)) pixel = Color.Lerp(pixel, new Color(.98f, .84f, .56f), .34f);
+                        }
+                    }
+                    else
+                    {
+                        // Equal angular slices keep the visible pointer angle identical to gameplay's sector math.
+                        float angle = Mathf.Atan2(dy, dx);
+                        float position = Mathf.Clamp01(1f - angle / Mathf.PI);
+                        int sector = Mathf.Min(6, Mathf.FloorToInt(position * 7f));
+                        float edge = Mathf.Min(position * 7f - sector, sector + 1f - position * 7f);
+                        if (edge < .022f) pixel = new Color(.08f, .045f, .025f);
+                        else
+                        {
+                            float radialLight = .72f + .24f * Mathf.Sin((outerRadius - .735f) / .212f * Mathf.PI);
+                            float grainNoise = Mathf.PerlinNoise(x * .018f, y * .033f);
+                            pixel = ChulengoColors[sector] * Mathf.Clamp(radialLight + (grainNoise - .5f) * .15f, .58f, 1.08f);
+                            if (outerRadius > .91f) pixel = Color.Lerp(pixel, new Color(.13f, .07f, .04f), Mathf.InverseLerp(.91f, .947f, outerRadius) * .7f);
+                        }
+                    }
+
+                    // Six small brass rivets lock the two forged rims together.
+                    float angleAtRivet = Mathf.Atan2(dy / outerY, dx / outerX);
+                    float rivetPosition = Mathf.Clamp01(1f - angleAtRivet / Mathf.PI);
+                    int rivet = Mathf.RoundToInt(rivetPosition * 6f);
+                    float rivetAngle = Mathf.PI * (1f - rivet / 6f);
+                    float boltX = cx + Mathf.Cos(rivetAngle) * outerX * .972f;
+                    float boltY = cy + Mathf.Sin(rivetAngle) * outerY * .972f;
+                    float bolt = Mathf.Sqrt((x + .5f - boltX) * (x + .5f - boltX) + (y + .5f - boltY) * (y + .5f - boltY));
+                    if (bolt < 13f && outerRadius >= .695f) pixel = bolt < 8.1f ? new Color(.95f, .67f, .19f) : new Color(.10f, .065f, .04f);
+                    pixels[y * width + x] = pixel;
+                }
+            texture.SetPixels(pixels); texture.Apply(false, true); return texture;
+        }
+        private static Texture2D CreateChulengoNeedleTexture()
+        {
+            const int width = 512, height = 64, tip = 494;
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false) { name = "Chulengo red pointer", filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+            var pixels = new Color[width * height];
+            for (int y = 0; y < height; y++)
+                for (int x = 0; x < width; x++)
+                {
+                    float t = Mathf.Clamp01((x - 8f) / (tip - 8f));
+                    float half = 18f * (1f - t) + 1.2f;
+                    float distance = Mathf.Abs(y + .5f - height * .5f);
+                    if (x < 8 || x > tip || distance > half + 2f) pixels[y * width + x] = new Color(0, 0, 0, 0);
+                    else if (distance > half) pixels[y * width + x] = new Color(.09f, .035f, .025f, 1f);
+                    else if (distance < half * .26f) pixels[y * width + x] = new Color(1f, .55f, .36f, 1f);
+                    else pixels[y * width + x] = new Color(.83f, .08f, .045f, 1f);
+                }
+            texture.SetPixels(pixels); texture.Apply(false, true); return texture;
+        }
+        private static Texture2D CreateChulengoHubTexture()
+        {
+            const int size = 128;
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false) { name = "Chulengo steel pivot", filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+            var pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = (x + .5f - size * .5f) / (size * .5f), dy = (y + .5f - size * .5f) / (size * .5f);
                     float radius = Mathf.Sqrt(dx * dx + dy * dy);
-                    if (radius < inner || radius > outer || dy < 0) continue;
-                    float position = Mathf.Clamp01(1f - Mathf.Atan2(dy, dx) / Mathf.PI);
-                    int sector = Mathf.Min(6, Mathf.FloorToInt(position * 7f));
-                    float edge = Mathf.Min(position * 7f - sector, sector + 1f - position * 7f);
-                    pixels[y * width + x] = edge < .018f || radius > outer - 8f || radius < inner + 8f ? ink : ChulengoColors[sector];
+                    Color pixel = new Color(0, 0, 0, 0);
+                    if (radius <= 1f)
+                    {
+                        if (radius > .84f) pixel = new Color(.10f, .065f, .035f);
+                        else if (radius > .68f) pixel = Color.Lerp(new Color(.95f, .71f, .23f), new Color(.44f, .24f, .055f), radius);
+                        else
+                        {
+                            float light = Mathf.Clamp01(.62f + .28f * (-dy) + .16f * Mathf.Sin((dx + dy) * 8f));
+                            pixel = Color.Lerp(new Color(.20f, .23f, .25f), new Color(.88f, .91f, .90f), light);
+                        }
+                    }
+                    pixels[y * size + x] = pixel;
+                }
+            texture.SetPixels(pixels); texture.Apply(false, true); return texture;
+        }
+        private static Texture2D CreateChulengoParchmentTexture()
+        {
+            const int width = 512, height = 384;
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false) { name = "Chulengo textured parchment panel", filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+            var pixels = new Color[width * height];
+            for (int y = 0; y < height; y++)
+                for (int x = 0; x < width; x++)
+                {
+                    float edge = Mathf.Min(Mathf.Min(x, width - 1 - x), Mathf.Min(y, height - 1 - y));
+                    float cornerX = Mathf.Max(0f, 16f - Mathf.Min(x, width - 1 - x));
+                    float cornerY = Mathf.Max(0f, 16f - Mathf.Min(y, height - 1 - y));
+                    bool roundedCorner = cornerX * cornerX + cornerY * cornerY > 16f * 16f;
+                    if (roundedCorner) { pixels[y * width + x] = new Color(0, 0, 0, 0); continue; }
+                    float mottling = Mathf.PerlinNoise(x * .026f, y * .031f);
+                    float cloudy = Mathf.PerlinNoise(x * .008f, y * .012f);
+                    float fineGrain = Mathf.PerlinNoise(x * .14f, y * .16f);
+                    float fibers = Mathf.Sin(x * 1.71f + y * .91f) * Mathf.Sin(x * .17f - y * .27f) * .038f;
+                    float shade = Mathf.Clamp01(.56f + (mottling - .5f) * .84f + (cloudy - .5f) * .92f + (fineGrain - .5f) * .22f + fibers);
+                    Color paper = Color.Lerp(new Color(.76f, .53f, .28f), new Color(1f, .95f, .78f), shade);
+                    if (fineGrain > .78f && mottling < .48f) paper = Color.Lerp(paper, new Color(.64f, .37f, .18f), .17f);
+                    if (edge < 3f) paper = new Color(.20f, .075f, .025f);
+                    else if (edge < 6f) paper = new Color(.71f, .39f, .12f);
+                    else if (edge < 9f) paper = new Color(.99f, .84f, .54f);
+                    pixels[y * width + x] = paper;
                 }
             texture.SetPixels(pixels); texture.Apply(false, true); return texture;
         }
         private static Rect FitChulengoMeter(Rect container)
         {
-            float height = Mathf.Min(container.height, container.width * .5f);
-            float width = height * 2f;
+            const float aspect = 3f;
+            float height = Mathf.Min(container.height, container.width / aspect);
+            float width = height * aspect;
             return new Rect(container.center.x - width * .5f, container.center.y - height * .5f, width, height);
         }
         private void DrawChulengoMeter(Rect container, bool locked, int selectedSector, int labelFontSize)
         {
             Rect bounds = FitChulengoMeter(container);
+            float pivotY = bounds.yMax - bounds.height * (30f / 384f);
+            if (chulengoBowl != null)
+            {
+                float bowlWidth = bounds.width * .69f;
+                float bowlHeight = bounds.height * .69f;
+                Rect bowl = new Rect(bounds.center.x - bowlWidth * .5f, pivotY - bowlHeight, bowlWidth, bowlHeight);
+                GUI.DrawTexture(bowl, chulengoBowl, ScaleMode.StretchToFill, true);
+            }
             if (chulengoMeter != null) GUI.DrawTexture(bounds, chulengoMeter, ScaleMode.StretchToFill, true);
             if (!locked || selectedSector >= 0)
             {
                 float position = locked ? game.ChulengoSelectedPosition : StreetChulengo.PositionAtTime(Time.unscaledTime);
-                Vector2 center = new Vector2(bounds.center.x, bounds.yMax - bounds.height * (18f / 256f));
-                float length = bounds.height * (220f / 256f);
-                // GUI local Y grows downward: negative Z rotation points the needle up at center.
+                Vector2 center = new Vector2(bounds.center.x, bounds.yMax - bounds.height * (30f / 384f));
                 float rotation = 180f * position - 180f;
                 Color old = GUI.color;
-                GUI.color = new Color(.68f, .055f, .045f, 1f);
+                GUI.color = Color.white;
                 Matrix4x4 matrix = GUI.matrix;
-                // Rotate in this local canvas before the outer viewport scale is applied.
-                // GUIUtility.RotateAroundPivot applies a screen-space pivot here and can send
-                // the needle far outside the popup on scaled portrait Game Views.
-                GUI.matrix = matrix * Matrix4x4.Translate(new Vector3(center.x, center.y, 0f))
-                    * Matrix4x4.Rotate(Quaternion.Euler(0f, 0f, rotation))
-                    * Matrix4x4.Translate(new Vector3(-center.x, -center.y, 0f));
-                GUI.DrawTexture(new Rect(center.x, center.y - 3f, length, 6f), Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
-                GUI.matrix = matrix;
-                GUI.color = old;
+                try
+                {
+                    // Rotate in this local canvas before the outer viewport scale is applied.
+                    // The artwork's pointed ray is anchored at the exact saved needle position.
+                    GUI.matrix = matrix * Matrix4x4.Translate(new Vector3(center.x, center.y, 0f))
+                        * Matrix4x4.Rotate(Quaternion.Euler(0f, 0f, rotation))
+                        * Matrix4x4.Translate(new Vector3(-center.x, -center.y, 0f));
+                    // Follow the elliptical rim so the pointer reaches the same visual distance
+                    // at the center and at either end of the seven-sector arc.
+                    float angle = Mathf.PI * (1f - position);
+                    float outerX = bounds.width * (554f / 1152f);
+                    float outerY = bounds.height * (326f / 384f);
+                    float length = .96f / Mathf.Sqrt(Mathf.Cos(angle) * Mathf.Cos(angle) / (outerX * outerX)
+                        + Mathf.Sin(angle) * Mathf.Sin(angle) / (outerY * outerY));
+                    float needleHeight = Mathf.Max(10f, bounds.height * .16f);
+                    Rect needle = new Rect(center.x, center.y - needleHeight * .5f, length, needleHeight);
+                    if (chulengoNeedle != null) GUI.DrawTexture(needle, chulengoNeedle, ScaleMode.StretchToFill, true);
+                }
+                finally { GUI.matrix = matrix; GUI.color = old; }
             }
+            Vector2 pivot = new Vector2(bounds.center.x, pivotY);
+            float hubSize = Mathf.Max(28f, bounds.height * .31f);
+            if (chulengoHub != null)
+                GUI.DrawTexture(new Rect(pivot.x - hubSize * .5f, pivot.y - hubSize * .5f, hubSize, hubSize), chulengoHub, ScaleMode.StretchToFill, true);
             for (int i = 0; i < ChulengoLabels.Length; i++)
             {
                 float position = (i + .5f) / ChulengoLabels.Length;
                 float angle = Mathf.PI * (1f - position);
-                float labelRadius = bounds.height * (190f / 256f);
-                float xRadius = bounds.width * (190f / 512f);
-                Vector2 center = new Vector2(bounds.center.x, bounds.yMax - bounds.height * (18f / 256f));
-                Vector2 label = new Vector2(center.x + xRadius * Mathf.Cos(angle), center.y - labelRadius * Mathf.Sin(angle));
-                VictoryText(new Rect(label.x - 21f, label.y - 12f, 42f, 24f), ChulengoLabels[i], labelFontSize, new Color(1f, .94f, .78f), TextAnchor.MiddleCenter);
+                float outerX = bounds.width * (554f / 1152f), outerY = bounds.height * (326f / 384f);
+                float rayLength = .84f / Mathf.Sqrt(Mathf.Cos(angle) * Mathf.Cos(angle) / (outerX * outerX)
+                    + Mathf.Sin(angle) * Mathf.Sin(angle) / (outerY * outerY));
+                Vector2 label = new Vector2(pivot.x + rayLength * Mathf.Cos(angle), pivot.y - rayLength * Mathf.Sin(angle));
+                VictoryText(new Rect(label.x - 36f, label.y - 21f, 72f, 42f), ChulengoLabels[i], labelFontSize, new Color(1f, .97f, .86f), TextAnchor.MiddleCenter);
             }
         }
-        private Rect VictoryExitBounds() => VictorySlot(VictoryPopupBounds(logicalCanvasHeight), VictoryExit);
+        private Rect VictoryExitBounds() => VictorySlot(VictoryPopupBounds(logicalCanvasHeight, game != null && game.ShowChulengoResult), VictoryExit);
         private static string FormatVictoryTime(float remaining)
         {
             int seconds = Mathf.Max(0, Mathf.CeilToInt(remaining));
@@ -3715,6 +3881,107 @@ namespace HayChoriYPaty
                     Label(new Rect(bounds.x + x * offset, bounds.y + y * offset, bounds.width, bounds.height), value, borderStyle);
             Label(bounds, value, captionStyle);
         }
+
+        private static string FormatChulengoMoney(long cents)
+        {
+            long whole = cents / 100L;
+            string grouped = whole.ToString("#,##0", System.Globalization.CultureInfo.InvariantCulture).Replace(',', '.');
+            string amount = "$" + grouped;
+            long remainder = cents % 100L;
+            return remainder == 0L ? amount : amount + "," + remainder.ToString("00");
+        }
+
+        private void DrawChulengoPaper(Rect frame)
+        {
+            // Keep the original bolt plates visible while expanding the authored parchment into the reference's reward-card hierarchy.
+            Rect paper = VictorySlot(frame, new Rect(.07f, .31f, .86f, .60f));
+            if (chulengoParchment != null) GUI.DrawTexture(paper, chulengoParchment, ScaleMode.StretchToFill, true);
+            else FillRect(paper, new Color(.98f, .89f, .68f));
+        }
+
+        private void DrawChulengoHero(Rect frame, bool pending, bool lockedRetry, int sector)
+        {
+            Color brown = new Color(.20f, .055f, .02f);
+            float fontScale = frame.width / 516f;
+            VictoryText(VictorySlot(frame, new Rect(.31f, .305f, .64f, .115f)), "CHULENGO",
+                Mathf.RoundToInt(92f * fontScale), brown, TextAnchor.MiddleCenter);
+
+            Rect cook = VictorySlot(frame, new Rect(.08f, .32f, .34f, .245f));
+            if (parrilleroIcon != null) GUI.DrawTexture(cook, parrilleroIcon, ScaleMode.ScaleToFit, true);
+
+            string label;
+            long reward;
+            if (pending)
+            {
+                label = "PREMIO DEL TURNO";
+                reward = game.ChulengoBaseRewardCents;
+            }
+            else if (lockedRetry && sector >= 0)
+            {
+                label = "RESULTADO FIJO: " + ChulengoLabels[Mathf.Clamp(sector, 0, 6)];
+                reward = game.ChulengoFinalRewardCents;
+            }
+            else if (lockedRetry)
+            {
+                label = "COBRO PENDIENTE";
+                reward = game.ChulengoBaseRewardCents;
+            }
+            else if (sector >= 0)
+            {
+                label = "CHULENGO " + ChulengoLabels[Mathf.Clamp(sector, 0, 6)];
+                reward = game.ChulengoFinalRewardCents;
+            }
+            else
+            {
+                label = "PREMIO COBRADO";
+                reward = game.ChulengoFinalRewardCents;
+            }
+
+            Color resultColor = sector == 0 || sector == 6 ? new Color(.75f, .075f, .035f) : brown;
+            if (pending || lockedRetry && sector < 0) resultColor = brown;
+            VictoryText(VictorySlot(frame, new Rect(.46f, .39f, .46f, .06f)), label,
+                Mathf.RoundToInt(20f * fontScale), resultColor, TextAnchor.MiddleCenter);
+            if (gameCoin != null)
+            {
+                GUI.DrawTexture(VictorySlot(frame, new Rect(.405f, .405f, .075f, .082f)), gameCoin, ScaleMode.ScaleToFit, true);
+                GUI.DrawTexture(VictorySlot(frame, new Rect(.435f, .390f, .085f, .094f)), gameCoin, ScaleMode.ScaleToFit, true);
+                GUI.DrawTexture(VictorySlot(frame, new Rect(.445f, .415f, .090f, .096f)), gameCoin, ScaleMode.ScaleToFit, true);
+            }
+            VictoryText(VictorySlot(frame, new Rect(.44f, .415f, .51f, .105f)), FormatChulengoMoney(reward),
+                Mathf.RoundToInt(84f * fontScale), sector == 0 || sector == 6 ? new Color(.75f, .075f, .035f) : new Color(1f, .69f, .14f), TextAnchor.MiddleCenter);
+        }
+
+        private void DrawChulengoFooter(Rect frame, bool pending, bool lockedRetry, int sector)
+        {
+            float fontScale = frame.width / 516f;
+            Color brown = new Color(.20f, .055f, .02f);
+            if (pending)
+            {
+                long baseReward = game.ChulengoBaseRewardCents;
+                long maximum = baseReward <= long.MaxValue / 2L ? baseReward * 2L : long.MaxValue;
+                VictoryText(VictorySlot(frame, new Rect(.12f, .75f, .76f, .048f)),
+                    "FRENÁ LA AGUJA EN LA ZONA DORADA", Mathf.RoundToInt(22f * fontScale), brown, TextAnchor.MiddleCenter);
+                VictoryText(VictorySlot(frame, new Rect(.15f, .78f, .36f, .070f)),
+                    "HASTA ×2:", Mathf.RoundToInt(44f * fontScale), brown, TextAnchor.MiddleRight);
+                VictoryText(VictorySlot(frame, new Rect(.525f, .765f, .38f, .095f)),
+                    FormatChulengoMoney(maximum), Mathf.RoundToInt(68f * fontScale), new Color(1f, .69f, .14f), TextAnchor.MiddleLeft);
+                VictoryText(VictorySlot(frame, new Rect(.10f, .825f, .80f, .046f)),
+                    "¡EN ×0 PERDÉS TODO EL PREMIO DEL TURNO!", Mathf.RoundToInt(22f * fontScale),
+                    new Color(.78f, .07f, .035f), TextAnchor.MiddleCenter);
+            }
+            else if (lockedRetry)
+            {
+                VictoryText(VictorySlot(frame, new Rect(.15f, .75f, .70f, .043f)),
+                    sector < 0 ? "EL COBRO SE REINTENTA SIN PERDER EL PREMIO" : "RESULTADO GUARDADO · NO SE VUELVE A MULTIPLICAR",
+                    Mathf.RoundToInt(13f * fontScale), new Color(.68f, .10f, .035f), TextAnchor.MiddleCenter);
+            }
+            else
+            {
+                VictoryText(VictorySlot(frame, new Rect(.15f, .75f, .70f, .043f)),
+                    "PREMIO FINAL: " + FormatMarketMoney(game.ChulengoFinalRewardCents),
+                    Mathf.RoundToInt(20f * fontScale), brown, TextAnchor.MiddleCenter);
+            }
+        }
         private static readonly string[] ProductShortNames = { "CHO", "PAT", "BON", "VAC", "COC", "FER", "CER" };
 
         private static string FormatQuotaSummary(StreetSimulation sim, bool pendingOnly)
@@ -3741,7 +4008,9 @@ namespace HayChoriYPaty
         {
             // Physical-screen dimmer covers the HUD and safe-area insets too.
             DrawIntroScreen(Texture2D.whiteTexture, new Color(0f, 0f, 0f, .63f), ScaleMode.StretchToFill);
-            Rect frame = VictoryPopupBounds(logicalCanvasHeight);
+            // Keep the status HUD crisp above the dimmed playfield, as in the in-game reference.
+            if (game.ShowChulengoResult) DrawCounters(game.Sim);
+            Rect frame = VictoryPopupBounds(logicalCanvasHeight, game.ShowChulengoResult);
             float previousVertical = layoutVerticalScale;
             try
             {
@@ -3762,50 +4031,30 @@ namespace HayChoriYPaty
                 bool victory = game.Sim.Phase == RoundPhase.Won;
                 if (game.ShowChulengoResult)
                 {
-                    FillRect(VictorySlot(frame, new Rect(.07f, .34f, .86f, .48f)), new Color(.18f, .055f, .02f, .98f));
-                    FillRect(VictorySlot(frame, new Rect(.079f, .35f, .842f, .46f)), new Color(1f, .91f, .71f, 1f));
                     bool lockedRetry = game.HasPendingChulengo && game.ChulengoChoiceLocked;
                     bool pending = game.HasPendingChulengo && !lockedRetry;
-                    bool locked = game.ChulengoChoiceLocked;
                     int sector = game.ChulengoSelectedSector;
-                    VictoryText(VictorySlot(frame, new Rect(.26f, .345f, .63f, .055f)), "CHULENGO", Mathf.RoundToInt(29f * fontScale), brown, TextAnchor.MiddleCenter);
-                    if (parrilleroIcon != null)
-                    {
-                        Rect icon = VictorySlot(frame, new Rect(.16f, .34f, .085f, .065f));
-                        GUI.DrawTexture(icon, parrilleroIcon, ScaleMode.ScaleToFit, true);
-                    }
-                    Rect rewardLine = VictorySlot(frame, new Rect(.10f, .405f, .80f, .055f));
+                    DrawChulengoPaper(frame);
+                    DrawChulengoHero(frame, pending, lockedRetry, sector);
+                    DrawChulengoMeter(VictorySlot(frame, new Rect(.0625f, .465f, .875f, .30f)),
+                        !pending, sector, Mathf.RoundToInt(29f * fontScale));
+                    DrawChulengoFooter(frame, pending, lockedRetry, sector);
                     if (pending || lockedRetry)
                     {
-                        if (lockedRetry && sector >= 0)
-                            VictoryText(rewardLine, "RESULTADO FIJO: " + ChulengoLabels[Mathf.Clamp(sector, 0, 6)], Mathf.RoundToInt(19f * fontScale), brown, TextAnchor.MiddleCenter);
-                        else
-                            VictoryText(rewardLine, (lockedRetry ? "COBRO PENDIENTE: " : "PREMIO EN JUEGO: ") + FormatMarketMoney(game.ChulengoBaseRewardCents), Mathf.RoundToInt(19f * fontScale), brown, TextAnchor.MiddleCenter);
-                        DrawChulengoMeter(VictorySlot(frame, new Rect(.13f, .455f, .74f, .225f)), lockedRetry, sector, Mathf.RoundToInt(14f * fontScale));
-                        VictoryText(VictorySlot(frame, new Rect(.10f, .678f, .80f, .035f)), lockedRetry
-                                ? "RESULTADO FIJADO · NO SE PUEDE CAMBIAR"
-                                : "×0: PERDÉS TODO EL PREMIO DE ESTE TURNO",
-                            Mathf.RoundToInt(14f * fontScale), lockedRetry ? brown : new Color(.73f, .08f, .035f), TextAnchor.MiddleCenter);
                         DrawStandardButton(ChulengoMultiplyBounds(), ChulengoMultiplyAction, lockedRetry
                             ? sector < 0 ? "REINTENTAR COBRO" : "REINTENTAR RESULTADO"
                             : "MULTIPLICAR");
-                        if (!lockedRetry)
-                            DrawStandardButton(VictorySlot(frame, VictoryExit), ChulengoCollectAction,
-                                "COBRAR " + FormatMarketMoney(game.ChulengoBaseRewardCents));
+                        if (pending)
+                            DrawStandardButton(ChulengoCollectBounds(), ChulengoCollectAction,
+                                "COBRAR " + FormatChulengoMoney(game.ChulengoBaseRewardCents));
+                        DrawStandardButton(ChulengoLevelsBounds(), ResultLevelsAction, "NIVELES", false);
                     }
                     else
                     {
-                        string outcome = !locked || sector < 0 ? "PREMIO COBRADO"
-                            : "CHULENGO " + ChulengoLabels[Mathf.Clamp(sector, 0, 6)];
-                        Color outcomeColor = locked && sector == 0 || locked && sector == 6 ? new Color(.73f, .08f, .035f) : brown;
-                        VictoryText(rewardLine, outcome, Mathf.RoundToInt(20f * fontScale), outcomeColor, TextAnchor.MiddleCenter);
-                        DrawChulengoMeter(VictorySlot(frame, new Rect(.13f, .455f, .74f, .225f)), true, sector, Mathf.RoundToInt(14f * fontScale));
-                        VictoryText(VictorySlot(frame, new Rect(.10f, .685f, .80f, .055f)),
-                            "PREMIO FINAL: " + FormatMarketMoney(game.ChulengoFinalRewardCents), Mathf.RoundToInt(21f * fontScale), brown, TextAnchor.MiddleCenter);
                         bool canAdvanceChulengo = game.Sim.LevelIndex < StreetSimulation.LevelNames.Length - 1;
                         DrawStandardButton(VictorySlot(frame, VictoryExit), VictoryExitAction,
                             canAdvanceChulengo ? "SIGUIENTE PARTIDO" : "ÚLTIMO NIVEL", canAdvanceChulengo);
-                        DrawStandardButton(ResultLevelsBounds(), ResultLevelsAction, "NIVELES");
+                        DrawStandardButton(ChulengoLevelsBounds(), ResultLevelsAction, "NIVELES");
                     }
                     return;
                 }

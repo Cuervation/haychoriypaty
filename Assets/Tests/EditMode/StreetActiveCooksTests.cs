@@ -92,6 +92,8 @@ namespace HayChoriYPaty.Tests
 
         private static object Get(object value, string name) => value.GetType().GetProperty(name, PublicInstance).GetValue(value);
         private static object GetField(object value, string name) => value.GetType().GetField(name, PublicInstance).GetValue(value);
+        private static object GetInternalField(object value, string name) =>
+            value.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).GetValue(value);
         private static object Call(object value, string name, params object[] args)
         {
             MethodInfo[] candidates = value.GetType().GetMethods(PublicInstance);
@@ -845,7 +847,147 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void CookedUnitMustBeClaimedAndDepositedIntoItsReservedTableSlot()
+        public void MozoRouteTracksTheSameClaimedSandwichWhenCompactionMovesItsSlot()
+        {
+            object sim = MakeActiveSimulation(5, 100000);
+            Call(sim, "StartRound");
+            SetArrivalFarFuture(sim);
+            Assert.IsTrue((bool)Call(sim, "TryHire", EnumValue(roleType, "Mozo")));
+            Assert.IsTrue((bool)Call(sim, "TryHire", EnumValue(roleType, "Mozo")));
+            object[] mozos = Workers(sim).Cast<object>()
+                .Where(worker => Get(worker, "Role").ToString() == "Mozo").ToArray();
+            Assert.AreEqual(2, mozos.Length);
+            object firstMozo = mozos[0], movingMozo = mozos[1];
+            int firstMozoId = (int)Get(firstMozo, "Id"), movingMozoId = (int)Get(movingMozo, "Id");
+            object kitchen = Get(sim, "Kitchen");
+            ((int[])GetInternalField(kitchen, "tableCapacity"))[0] = 4;
+            DepositTestSandwich(kitchen, 0, 11); // slot 0
+            object pickedFirst = DepositTestSandwich(kitchen, 0, 12); // slot 1
+            Assert.AreSame(pickedFirst, Call(kitchen, "ReserveTableUnit", 0, firstMozoId));
+            DepositTestSandwich(kitchen, 0, 13); // slot 2
+            object claimedToMove = DepositTestSandwich(kitchen, 0, 14); // slot 3
+            Assert.AreSame(claimedToMove, Call(kitchen, "ReserveTableUnit", 0, movingMozoId));
+
+            SetWorker(movingMozo, "Product", 0);
+            SetWorker(movingMozo, "State", EnumValue(stateType, "ToStation"));
+            object layout = Get(sim, "KitchenLayout");
+            bool companionAvailable = (bool)Call(sim, "IsProductAvailable", 1);
+            int capacity = (int)Call(kitchen, "TableCapacity", 0);
+            Vector2 oldTarget = (Vector2)Call(layout, "TableSlotPickupPosition", 0,
+                (int)Get(claimedToMove, "Slot"), companionAvailable, capacity);
+            MethodInfo setRoute = simulationType.GetMethod("SetWorkerRoute", PrivateInstance);
+            MethodInfo refreshRoute = simulationType.GetMethod("RefreshMozoPickupRoute", PrivateInstance);
+            Assert.IsNotNull(setRoute);
+            Assert.IsNotNull(refreshRoute);
+            Assert.IsTrue((bool)setRoute.Invoke(sim, new object[] { movingMozo, oldTarget }));
+
+            Assert.AreSame(pickedFirst, Call(kitchen, "TryTake", 0, EnumValue(roleType, "Mozo"), firstMozoId));
+            Assert.AreEqual(2, (int)Get(claimedToMove, "Slot"), "Removing a middle sandwich compacts later entries.");
+            Vector2 newTarget = (Vector2)Call(layout, "TableSlotPickupPosition", 0,
+                (int)Get(claimedToMove, "Slot"), companionAvailable, capacity);
+            Assert.AreNotEqual(oldTarget, newTarget);
+
+            Assert.IsTrue((bool)refreshRoute.Invoke(sim, new object[] { movingMozo }));
+            Vector2[] refreshedRoute = (Vector2[])GetInternalField(movingMozo, "Route");
+            Assert.AreEqual(newTarget, refreshedRoute[refreshedRoute.Length - 1]);
+            Assert.AreEqual(movingMozoId, (int)Get(claimedToMove, "WorkerId"), "The unit claim survives its slot change.");
+            Assert.AreSame(claimedToMove, Call(kitchen, "ReserveTableUnit", 0, movingMozoId));
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        public void MozoPickupReleasesItsTableCellAndTheNextDepositUsesTheCompactedSlot(int product)
+        {
+            object kitchen = Make(new[] { product }, true);
+            object sandwich = DepositTestSandwich(kitchen, product, 11);
+            int tableSlot = (int)Get(sandwich, "Slot");
+            Assert.AreSame(sandwich, Call(kitchen, "ReserveTableUnit", product, 100));
+
+            Assert.AreSame(sandwich, Call(kitchen, "TryTake", product, EnumValue(roleType, "Mozo"), 100));
+            Assert.AreEqual(-1, (int)Get(sandwich, "Slot"),
+                "Picking up must release the physical table slot immediately.");
+            Assert.AreEqual(100, (int)Get(sandwich, "WorkerId"), "The Mozo's exclusive claim to the carried unit remains.");
+            Assert.IsNull(Call(kitchen, "TryTake", product, EnumValue(roleType, "Mozo"), 101),
+                "Another Mozo cannot take the already-carried sandwich.");
+
+            object nextCook = Call(kitchen, "ReserveCook", product, 12);
+            Assert.NotNull(nextCook);
+            Assert.IsTrue((bool)GetInternalField(nextCook, "ReservedTableCapacity"),
+                "Capacity remains reserved when cooking starts, but no visual cell is assigned yet.");
+            Assert.AreEqual("Grill", Get(nextCook, "Location").ToString(),
+                "An in-flight cook reserves capacity, not a physical tabletop coordinate.");
+            FinishTestSandwich(kitchen, nextCook, 12);
+            Assert.AreEqual(tableSlot, (int)Get(nextCook, "Slot"),
+                "The newly deposited sandwich fills the first compacted table cell.");
+        }
+
+        [TestCase(0)] [TestCase(1)] [TestCase(2)] [TestCase(3)]
+        public void PickingUpAMiddleSandwichCompactsTheTableAndPreservesOtherMozoClaims(int product)
+        {
+            object kitchen = Make(new[] { product }, true);
+            ((int[])GetInternalField(kitchen, "tableCapacity"))[product] = 4;
+            object first = DepositTestSandwich(kitchen, product, 11);
+            object middle = DepositTestSandwich(kitchen, product, 12);
+            Assert.AreSame(middle, Call(kitchen, "ReserveTableUnit", product, 100));
+            object later = DepositTestSandwich(kitchen, product, 13);
+            Assert.AreSame(later, Call(kitchen, "ReserveTableUnit", product, 101));
+            object tail = DepositTestSandwich(kitchen, product, 14);
+            Assert.AreEqual(3, (int)Get(tail, "Slot"));
+
+            Assert.AreSame(middle, Call(kitchen, "TryTake", product, EnumValue(roleType, "Mozo"), 100));
+            Assert.AreEqual(-1, (int)Get(middle, "Slot"));
+            Assert.AreEqual(0, (int)Get(first, "Slot"));
+            Assert.AreEqual(1, (int)Get(later, "Slot"), "The later claimed sandwich must slide into the vacated cell.");
+            Assert.AreEqual(2, (int)Get(tail, "Slot"), "The table stays densely packed from its first slot.");
+            Assert.AreEqual(101, (int)Get(later, "WorkerId"), "Compaction cannot steal another Mozo's item claim.");
+            Assert.AreSame(later, Call(kitchen, "ReserveTableUnit", product, 101));
+
+            object next = DepositTestSandwich(kitchen, product, 15);
+            Assert.AreEqual(3, (int)Get(next, "Slot"), "New deposits append after the compacted table.");
+            Assert.AreEqual(4, (int)Call(kitchen, "TableCount", product));
+            Assert.IsFalse((bool)Call(kitchen, "CanReserveCook", product), "The physical table capacity stays bounded.");
+        }
+
+        [Test]
+        public void CanceledMozoTripReturnsFoodToANewSlotWithoutCollidingWithAnInFlightCook()
+        {
+            object kitchen = Make(new[] { 0 }, true);
+            ((int[])GetInternalField(kitchen, "tableCapacity"))[0] = 1;
+            object original = DepositTestSandwich(kitchen, 0, 11);
+            Assert.AreSame(original, Call(kitchen, "ReserveTableUnit", 0, 100));
+            Assert.AreSame(original, Call(kitchen, "TryTake", 0, EnumValue(roleType, "Mozo"), 100));
+
+            object replacementCook = Call(kitchen, "ReserveCook", 0, 12);
+            Assert.NotNull(replacementCook, "The just-freed slot can immediately be used by the next cook.");
+            Assert.IsTrue((bool)GetInternalField(replacementCook, "ReservedTableCapacity"));
+            Assert.AreEqual("Grill", Get(replacementCook, "Location").ToString(),
+                "A production reservation is not a visual table cell.");
+            Call(kitchen, "ReturnCarried", (int)Get(original, "Id"), 100);
+            Assert.AreEqual("Carried", Get(original, "Location").ToString());
+            Assert.IsTrue((bool)GetInternalField(original, "PendingTableReturn"),
+                "Canceled food remains real and waits off-table rather than colliding with the cook's reserved slot.");
+            Assert.IsFalse((bool)Call(kitchen, "CanReserveCook", 0),
+                "A pending return has priority over further production.");
+
+            FinishTestSandwich(kitchen, replacementCook, 12);
+            Assert.AreEqual(1, (int)Call(kitchen, "TableCount", 0));
+            object deliveredReplacement = Call(kitchen, "ReserveTableUnit", 0, 101);
+            Assert.AreSame(replacementCook, deliveredReplacement);
+            Assert.AreSame(replacementCook, Call(kitchen, "TryTake", 0, EnumValue(roleType, "Mozo"), 101));
+            Assert.IsTrue((bool)Call(kitchen, "Consume", (int)Get(replacementCook, "Id"), 0, 101));
+
+            Call(kitchen, "Advance", .05f, 1f, 1f, false, false, false, false);
+            Assert.AreEqual(1, (int)Call(kitchen, "TableCount", 0));
+            Assert.IsFalse((bool)GetInternalField(original, "PendingTableReturn"));
+            Assert.AreEqual("Table", Get(original, "Location").ToString());
+            Assert.AreEqual(0, (int)Get(original, "Slot"));
+            Assert.AreSame(original, Call(kitchen, "ReserveTableUnit", 0, 102));
+        }
+
+        [Test]
+        public void CookedUnitReservesCapacityAndGetsAContiguousVisualCellOnlyAtDeposit()
         {
             object kitchen = Make(new[] { 0 }, true);
             object unit = Call(kitchen, "ReserveCook", 0, 7);
@@ -856,8 +998,12 @@ namespace HayChoriYPaty.Tests
             Assert.IsFalse((bool)Call(kitchen, "TakeCooked", id, 8));
             Assert.IsTrue((bool)Call(kitchen, "TakeCooked", id, 7));
             Assert.AreEqual("Carried", Get(unit, "Location").ToString());
+            Assert.IsTrue((bool)GetInternalField(unit, "ReservedTableCapacity"));
+            Assert.AreEqual(-1, (int)Get(unit, "Slot"), "The cook's in-flight item has no tabletop coordinate yet.");
             Assert.IsTrue((bool)Call(kitchen, "DepositCooked", id, 7));
             Assert.AreEqual("Table", Get(unit, "Location").ToString());
+            Assert.AreEqual(0, (int)Get(unit, "Slot"));
+            Assert.IsFalse((bool)GetInternalField(unit, "ReservedTableCapacity"));
             Assert.AreEqual(1, (int)Call(kitchen, "TableCount", 0));
         }
 
@@ -866,10 +1012,12 @@ namespace HayChoriYPaty.Tests
         {
             object kitchen = Make(new[] { 0 }, true, balance =>
                 balanceType.GetField("normalTableCapacity", PublicInstance).SetValue(balance, 1));
+            ((int[])GetInternalField(kitchen, "tableCapacity"))[0] = 1;
             object unit = Call(kitchen, "ReserveCook", 0, 11);
             int id = (int)Get(unit, "Id");
-            Assert.IsNull(Call(kitchen, "ReserveTableUnit", 0, 11), "The in-flight item owns its destination slot directly.");
+            Assert.IsNull(Call(kitchen, "ReserveTableUnit", 0, 11), "An in-flight item is not a tabletop pickup target.");
             Assert.IsNull(Call(kitchen, "ReserveTableUnit", 0, 12), "In-flight items consume finite table capacity.");
+            Assert.IsFalse((bool)Call(kitchen, "CanReserveCook", 0), "A reserved in-flight capacity token cannot be overbooked.");
             Call(kitchen, "CancelCook", 11);
             Call(kitchen, "ReleaseTableReservation", 11);
             Assert.AreEqual(0, (int)Call(kitchen, "TableCount", 0));
@@ -1246,28 +1394,51 @@ namespace HayChoriYPaty.Tests
             Assert.Fail("Two cooks never made simultaneous, independently progressing reservations; route/capacity may be blocking.");
         }
 
-        [Test]
-        public void FourSandwichRolesAndMixedBeveragesAllCompleteRealDeliveriesWithoutRouteBlocking()
+        [TestCase(5)]
+        [TestCase(6)]
+        public void MixedProductDeliveriesEndAtEachAssignedCustomerColumn(int level)
         {
-            object sim = MakeActiveSimulation(5, 3000);
+            object sim = MakeActiveSimulation(level, 100000);
             Call(sim, "StartRound");
             SetArrivalFarFuture(sim);
+            int startingPremiumCount = (int)Get(sim, "ParrilleroPremiumCount");
+            Assert.AreEqual(level == 5 ? 1 : 0, startingPremiumCount,
+                "Only Racing starts with a free Premium Parrillero.");
+            if (startingPremiumCount == 0)
+                Assert.IsTrue((bool)Call(sim, "TryHire", EnumValue(roleType, "ParrilleroPremium")));
             Assert.IsTrue((bool)Call(sim, "TryHire", EnumValue(roleType, "Cocacolero")));
             Assert.IsTrue((bool)Call(sim, "TryHire", EnumValue(roleType, "Fernetero")));
             Assert.IsTrue((bool)Call(sim, "TryHire", EnumValue(roleType, "Mozo")));
             for (int product = 0; product < 7; product++)
-                Assert.IsTrue((bool)Call(sim, "SpawnCustomer", product, 1), "Expected valid level-6 order product " + product);
+                Assert.IsTrue((bool)Call(sim, "SpawnCustomer", product, 1),
+                    "Expected valid level " + (level + 1) + " order product " + product);
 
-            for (int i = 0; i < 1200 && (int)Get(sim, "Delivered") < 7; i++) Call(sim, "Step", .05f);
+            var alignedHandoffProducts = new HashSet<int>();
+            for (int i = 0; i < 1200 && (int)Get(sim, "Delivered") < 7; i++)
+            {
+                Call(sim, "Step", .05f);
+                foreach (object worker in Workers(sim))
+                {
+                    if (Get(worker, "State").ToString() != "Handoff") continue;
+                    object assignedCustomer = GetInternalField(worker, "Customer");
+                    Vector2 customerTarget = (Vector2)Get(assignedCustomer, "Target");
+                    Vector2 workerPosition = (Vector2)Get(worker, "Position");
+                    Assert.AreEqual(customerTarget.x, workerPosition.x,
+                        "Every actual handoff in level " + (level + 1) + " must align with its assigned customer's column.");
+                    alignedHandoffProducts.Add((int)Get(worker, "Product"));
+                }
+            }
             string deliveredByProduct = string.Join(",", Enumerable.Range(0, 7).Select(product => product + "=" + Call(sim, "GetProductDelivered", product)));
             string workerStates = string.Join(" | ", Workers(sim).Cast<object>().Select(worker => Get(worker, "Id") + ":" + Get(worker, "Role") + ":" + Get(worker, "State") + " product=" + Get(worker, "Product") + " pos=" + Get(worker, "Position") + " target=" + Get(worker, "Target")));
             string supplies = string.Join(",", Enumerable.Range(0, 7).Select(product => product + "=" + Call(Get(sim, "Kitchen"), "SupplyCount", product)));
             Assert.AreEqual(7, Get(sim, "Delivered"), "Safe worker routes should make every sandwich and beverage handoff reachable. Delivered by product: " + deliveredByProduct + "; supplies: " + supplies + "; workers: " + workerStates);
+            CollectionAssert.AreEquivalent(Enumerable.Range(0, 7).ToArray(), alignedHandoffProducts,
+                "Every product must be observed at least once in the Handoff state.");
             for (int product = 0; product < 7; product++) Assert.AreEqual(1, Call(sim, "GetProductDelivered", product), "Incorrect count for product " + product);
             Assert.AreEqual(0, Get(sim, "SpeedLevel"), "A fresh attempt remains at x1.00 until speed is purchased.");
             Assert.AreEqual(1f, Get(sim, "WorkRate"));
             Assert.AreEqual(1, Get(sim, "ParrilleroCount"), "A fresh attempt starts with exactly one Parrillero.");
-            Assert.AreEqual(1, Get(sim, "ParrilleroPremiumCount"), "Racing opens with one free Premium Parrillero.");
+            Assert.AreEqual(1, Get(sim, "ParrilleroPremiumCount"), "One Premium Parrillero must support products 2 and 3.");
         }
 
         [Test]

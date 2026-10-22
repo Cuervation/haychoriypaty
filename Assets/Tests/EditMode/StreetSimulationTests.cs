@@ -176,6 +176,30 @@ namespace HayChoriYPaty.Tests
         }
 
         [TestCase(0)] [TestCase(1)] [TestCase(2)] [TestCase(3)] [TestCase(4)]
+        [TestCase(5)] [TestCase(6)] [TestCase(7)] [TestCase(8)] [TestCase(9)] [TestCase(10)]
+        public void FinalHandoffPointMatchesCustomerColumnAcrossEveryLevel(int level)
+        {
+            object sim = Make(level: level);
+            Start(sim);
+            Assert.IsTrue(Spawn(sim, 0, 1), "Chori is available throughout the campaign.");
+            object customer = Customers(sim)[0];
+            PropertyInfo targetProperty = customer.GetType().GetProperty("Target", BindingFlags.Instance | BindingFlags.Public);
+            MethodInfo handoffPosition = simType.GetMethod("CounterHandoffPosition", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.IsNotNull(targetProperty);
+            Assert.IsNotNull(handoffPosition);
+
+            for (int column = 0; column < 7; column++)
+            {
+                Vector2 target = (Vector2)Get(customer, "Target");
+                target.x = 58 + column * 70;
+                targetProperty.GetSetMethod(true).Invoke(customer, new object[] { target });
+                Vector2 actual = (Vector2)handoffPosition.Invoke(null, new[] { customer });
+                Assert.AreEqual(new Vector2(target.x, WorkerServiceY), actual,
+                    "Level " + (level + 1) + ", customer column " + column + " must be the exact final delivery point.");
+            }
+        }
+
+        [TestCase(0)] [TestCase(1)] [TestCase(2)] [TestCase(3)] [TestCase(4)]
         public void StandardWorkstationRoutesReachEveryProductFromEveryCounterWithoutCrossingProps(int level)
         {
             object balance = NewBalance(); Tune(balance, "maxCustomers", 1); Tune(balance, "customerArrivalSeconds", 1000f);
@@ -1336,6 +1360,29 @@ object b = NewBalance(); TuneAllProductGoals(b, level, 1);
             Assert.AreEqual(15, Get(sim, "CocacoleroCount"));
             Assert.AreEqual(ExpectedHireCost(baseCost, 16), Get(sim, "CocacoleroHireCost"));
             Assert.AreEqual(int.MaxValue, Call(sim, "MaxWorkersForRole", Role("Cocacolero")));
+        }
+
+        [Test]
+        public void RacingFerneteroStartsAtTwoHundredAndRetainsTheRoleLocalHireCurve()
+        {
+            object sim = Make(level: 5); Start(sim);
+            Assert.AreEqual(250, Get(sim, "Coins"), "Racing's opening balance makes the first hire immediately affordable.");
+            int[] expected = { 200, 500, 1000, 1800, 2800 };
+            for (int hire = 0; hire < expected.Length; hire++)
+            {
+                Assert.AreEqual(expected[hire], Get(sim, "FerneteroHireCost"), "Racing Fernetero hire " + (hire + 1));
+                Assert.IsTrue((bool)Call(sim, "TryHire", Role("Fernetero")));
+                if (hire == 0)
+                {
+                    Assert.AreEqual(50, Get(sim, "Coins"), "The first $200 Fernetero leaves $50 from the opening balance.");
+                    Set(sim, "Coins", 1000000);
+                }
+            }
+            Assert.AreEqual(expected.Length, Get(sim, "FerneteroCount"));
+            Assert.AreEqual(ExpectedHireCost(40, 1), Get(Make(level: 4), "FerneteroHireCost"),
+                "Independiente's base remains unchanged.");
+            Assert.AreEqual(ExpectedHireCost(50, 1), Get(Make(level: 6), "FerneteroHireCost"),
+                "San Lorenzo's base remains unchanged.");
         }
 
         [Test]

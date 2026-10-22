@@ -32,8 +32,9 @@ namespace HayChoriYPaty
         public int Slot { get; internal set; }
         public int WorkerId { get; internal set; }
         public float Progress { get; internal set; }
-        internal int ReservedTableSlot = -1;
+        internal bool ReservedTableCapacity;
         internal long TableDepositSequence;
+        internal bool PendingTableReturn;
         internal float CookedAge;
         internal float BurnedAge;
     }
@@ -102,6 +103,14 @@ namespace HayChoriYPaty
                     (ActiveCooks && product < 4 && unit.WorkerId != workerId)) continue;
                 unit.Location = StreetFoodLocation.Carried;
                 unit.WorkerId = workerId;
+                if (ActiveCooks && product < 4)
+                {
+                    // The sandwich no longer occupies a physical table cell once the Mozo lifts it.
+                    // Keep WorkerId as the exclusive item claim, but make its old slot reusable.
+                    unit.Slot = -1;
+                    unit.ReservedTableCapacity = false;
+                    CompactTableSlots(product);
+                }
                 return unit;
             }
             return null;
@@ -157,7 +166,8 @@ namespace HayChoriYPaty
             return -1;
         }
         public bool CanReserveCook(int product) => ActiveCooks && product >= 0 && product < 4 &&
-            FirstFreeTableSlot(product) >= 0 && FreeGrillSlot(product) >= 0;
+            !HasPendingTableReturn(product) && TableCapacityInUse(product) < tableCapacity[product] &&
+            FreeGrillSlot(product) >= 0;
 
         public StreetFoodUnit ReserveCook(int product, int workerId) => ReserveCook(product, workerId, -1);
         public StreetFoodUnit ReserveCook(int product, int workerId, int preferredGrillSlot)
@@ -165,10 +175,13 @@ namespace HayChoriYPaty
             if (workerId <= 0 || !CanReserveCook(product)) return null;
             foreach (StreetFoodUnit unit in units)
                 if (unit.WorkerId == workerId) return null;
-            int slot = FirstFreeTableSlot(product);
             int grillSlot = IsGrillSlotFree(product, preferredGrillSlot) ? preferredGrillSlot : FreeGrillSlot(product);
             StreetFoodUnit created = Add(product, StreetFoodState.Raw, StreetFoodLocation.Grill, grillSlot);
-            if (created != null) { created.WorkerId = workerId; created.ReservedTableSlot = slot; }
+            if (created != null)
+            {
+                created.WorkerId = workerId;
+                created.ReservedTableCapacity = true;
+            }
             return created;
         }
         public bool AdvanceCook(int id, int workerId, float delta, float workRate)
@@ -188,14 +201,21 @@ namespace HayChoriYPaty
             if (!ActiveCooks || unit == null || unit.Location != StreetFoodLocation.Grill ||
                 unit.State != StreetFoodState.Cooked || unit.WorkerId != workerId) return false;
             unit.Location = StreetFoodLocation.Carried;
+            unit.Slot = -1;
             return true;
         }
         public bool DepositCooked(int id, int workerId)
         {
             StreetFoodUnit unit = Find(id);
             if (!ActiveCooks || unit == null || unit.Location != StreetFoodLocation.Carried ||
-                unit.State != StreetFoodState.Cooked || unit.WorkerId != workerId || unit.ReservedTableSlot < 0) return false;
-            unit.Location = StreetFoodLocation.Table; unit.Slot = unit.ReservedTableSlot; unit.WorkerId = 0;
+                unit.State != StreetFoodState.Cooked || unit.WorkerId != workerId || !unit.ReservedTableCapacity) return false;
+            CompactTableSlots(unit.Product);
+            int slot = FirstFreeTableSlot(unit.Product);
+            if (slot < 0) return false;
+            unit.Location = StreetFoodLocation.Table;
+            unit.Slot = slot;
+            unit.ReservedTableCapacity = false;
+            unit.WorkerId = 0;
             unit.TableDepositSequence = ++nextTableDepositSequence;
             return true;
         }
@@ -208,8 +228,24 @@ namespace HayChoriYPaty
                 if (unit.WorkerId != workerId) continue;
                 if (unit.State == StreetFoodState.Cooked)
                 {
-                    if (unit.Location != StreetFoodLocation.Table) unit.TableDepositSequence = ++nextTableDepositSequence;
-                    unit.Location = StreetFoodLocation.Table; unit.Slot = unit.ReservedTableSlot; unit.WorkerId = 0;
+                    if (unit.Location != StreetFoodLocation.Table)
+                    {
+                        CompactTableSlots(unit.Product);
+                        int capacityUsedWithoutThisUnit = TableCapacityInUse(unit.Product) -
+                            (unit.ReservedTableCapacity ? 1 : 0);
+                        int slot = capacityUsedWithoutThisUnit < tableCapacity[unit.Product]
+                            ? FirstFreeTableSlot(unit.Product) : -1;
+                        if (slot >= 0) PlaceReturnedSandwich(unit, slot);
+                        else
+                        {
+                            unit.Location = StreetFoodLocation.Carried;
+                            unit.Slot = -1;
+                            unit.ReservedTableCapacity = false;
+                            unit.PendingTableReturn = true;
+                        }
+                    }
+                    else unit.ReservedTableCapacity = false;
+                    unit.WorkerId = 0;
                 }
                 else { ingredientStock?.ReleaseFood(unit.Id); units.RemoveAt(i); }
             }
@@ -234,10 +270,19 @@ namespace HayChoriYPaty
             unit.WorkerId = 0;
             if (ActiveCooks && unit.Product < 4)
             {
-                // Every in-flight sandwich retains its table slot, including a waiter's trip.
-                unit.Location = StreetFoodLocation.Table;
-                unit.Slot = unit.ReservedTableSlot;
-                unit.TableDepositSequence = ++nextTableDepositSequence;
+                CompactTableSlots(unit.Product);
+                int slot = TableCapacityInUse(unit.Product) < tableCapacity[unit.Product]
+                    ? FirstFreeTableSlot(unit.Product) : -1;
+                if (slot >= 0) PlaceReturnedSandwich(unit, slot);
+                else
+                {
+                    // Preserve canceled food without colliding with a slot now used by another cook.
+                    // Pending returns take priority over starting more cooks until a cell opens.
+                    unit.Location = StreetFoodLocation.Carried;
+                    unit.Slot = -1;
+                    unit.ReservedTableCapacity = false;
+                    unit.PendingTableReturn = true;
+                }
                 return;
             }
             if (TableCount(unit.Product) < tableCapacity[unit.Product])
@@ -264,6 +309,9 @@ namespace HayChoriYPaty
             if (delta <= 0f) return;
             cookWorkRate = Mathf.Max(.01f, cookWorkRate);
             beverageWorkRate = Mathf.Max(.01f, beverageWorkRate);
+            if (ActiveCooks)
+                for (int product = 0; product < 4; product++) RestorePendingTableReturns(product);
+
             for (int product = 4; product <= 6; product++)
             {
                 bool preparedByHiredRole = product == 5 ? fernetero : cocaWorker;
@@ -411,10 +459,66 @@ namespace HayChoriYPaty
             {
                 bool occupied = false;
                 for (int i = 0; i < units.Count; i++) if (units[i].Product == product &&
-                    (ActiveCooks && product < 4 ? units[i].ReservedTableSlot == slot : units[i].Location == StreetFoodLocation.Table && units[i].Slot == slot)) { occupied = true; break; }
+                    units[i].Location == StreetFoodLocation.Table && units[i].Slot == slot) { occupied = true; break; }
                 if (!occupied) return slot;
             }
             return -1;
+        }
+        private bool HasPendingTableReturn(int product)
+        {
+            foreach (StreetFoodUnit unit in units)
+                if (unit.Product == product && unit.PendingTableReturn) return true;
+            return false;
+        }
+        private void RestorePendingTableReturns(int product)
+        {
+            CompactTableSlots(product);
+            for (int i = 0; i < units.Count; i++)
+            {
+                StreetFoodUnit unit = units[i];
+                if (unit.Product != product || !unit.PendingTableReturn) continue;
+                if (TableCapacityInUse(product) >= tableCapacity[product]) return;
+                int slot = FirstFreeTableSlot(product);
+                if (slot < 0) return;
+                PlaceReturnedSandwich(unit, slot);
+            }
+        }
+        private void PlaceReturnedSandwich(StreetFoodUnit unit, int slot)
+        {
+            unit.Location = StreetFoodLocation.Table;
+            unit.Slot = slot;
+            unit.ReservedTableCapacity = false;
+            unit.PendingTableReturn = false;
+            unit.TableDepositSequence = ++nextTableDepositSequence;
+        }
+
+        private int TableCapacityInUse(int product)
+        {
+            int count = TableCount(product);
+            if (!ActiveCooks || product < 0 || product > 3) return count;
+            for (int i = 0; i < units.Count; i++)
+                if (units[i].Product == product && units[i].ReservedTableCapacity) count++;
+            return count;
+        }
+
+        private void CompactTableSlots(int product)
+        {
+            if (!ActiveCooks || product < 0 || product > 3) return;
+            List<StreetFoodUnit> tableItems = new List<StreetFoodUnit>();
+            for (int i = 0; i < units.Count; i++)
+            {
+                StreetFoodUnit unit = units[i];
+                if (unit.Product == product && unit.Location == StreetFoodLocation.Table &&
+                    unit.State == StreetFoodState.Cooked) tableItems.Add(unit);
+            }
+            tableItems.Sort((a, b) =>
+            {
+                int slotOrder = a.Slot.CompareTo(b.Slot);
+                if (slotOrder != 0) return slotOrder;
+                int depositOrder = a.TableDepositSequence.CompareTo(b.TableDepositSequence);
+                return depositOrder != 0 ? depositOrder : a.Id.CompareTo(b.Id);
+            });
+            for (int slot = 0; slot < tableItems.Count; slot++) tableItems[slot].Slot = slot;
         }
         private StreetFoodUnit Add(int product, StreetFoodState state, StreetFoodLocation location, int slot)
         {
@@ -423,10 +527,11 @@ namespace HayChoriYPaty
             if (!(ActiveCooks && product >= 0 && product < 4) &&
                 ingredientStock != null && !ingredientStock.TryReserveFood(nextId, product)) return null;
             var unit = new StreetFoodUnit { Id = nextId++, Product = product, State = state, Location = location,
-                Slot = slot, ReservedTableSlot = location == StreetFoodLocation.Table ? slot : -1 };
+                Slot = slot };
             if (ActiveCooks && product < 4 && location == StreetFoodLocation.Table)
                 unit.TableDepositSequence = ++nextTableDepositSequence;
             units.Add(unit);
+            CompactTableSlots(product);
             return unit;
         }
     }

@@ -1,4 +1,24 @@
-# Current Android delivery — 2026-10-21 (0.2.58/code60, Chulengo + Racing Premium)
+# Current Android delivery — 2026-10-22 (0.2.60/code62, Chulengo + Racing $200 Fernetero + table-slot fixes)
+
+Built from an isolated copy with Unity 6000.6.3f1; Main-only Development IL2CPP/ARM64. The live Unity Editor was left untouched. Build **succeeded in 601.17 s; 0 errors / 2 warnings**. Racing Fernetero's first hire is $200; later hires retain the $500/$1,000/$1,800/$2,800 progression. This build includes the revised Chulengo layout, exact customer-column final handoffs, and active-sandwich table-cell release/compaction/reflow.
+
+APK `/private/tmp/HayChoriYPaty-0.2.60-code62.apk`: **345,499,705 bytes (329.49 MiB)**, package `com.haychoriypaty.game`, version **0.2.60/code62**, min API26/target36, ARM64. SHA-256 `5f866d282f501d3a4cb14a1dbfd3e9a3a9e351145d7556a12abc765d7ce756fb`. `aapt` package/version metadata, ZIP integrity, `zipalign -c -v 4`, APK Signature Scheme v2 verification, and the manifest's Firebase Analytics-off / Google Analytics ad-ID-off metadata all passed; signer is the established Android Debug certificate `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`.
+
+Focused Unity 6000.6.3f1 validation in the isolated copy: **35/35 EditMode + 19/19 PlayMode**. Tests cover table compaction/claims/return, customer-column handoffs and the affected Chulengo, Racing-cost and renderer behavior. No full suite, live Game View/reference similarity score, or physical-device QA was performed; the requested ≥90% Chulengo visual match is still unverified. Development/debug-signed, not Play Store release-signed; not installed. The APK remains a local `/private/tmp` artifact and is not a Git blob. Build log: `/private/tmp/hcyp-apk-release-0.2.60-code62-20261022/build.log`.
+
+---
+
+# Previous Android delivery — 2026-10-21 (0.2.59/code61, Chulengo + Racing Fernetero)
+
+Includes the current Chulengo victory-reward/multiplier UI and Racing Fernetero starting price of $300. Built through the already-open Unity 6000.6.3f1 Editor, Main-only Development IL2CPP/ARM64; the live Editor was left open. Build **succeeded in 408.29 s; 0 errors / 2 warnings** (Diagnostics Data recommends debug symbols; Unity also reported uncompiled post-processing/import changes). Firebase analytics collection is explicitly deactivated in the APK manifest and Google Analytics ad-ID collection is disabled. The local Editor runInBackground/time-scale values were restored afterward.
+
+APK `/private/tmp/HayChoriYPaty-0.2.59-code61.apk`: **344,988,019 bytes (329.01 MiB)**, package `com.haychoriypaty.game`, version **0.2.59/code61**, min API26/target36, ARM64. SHA-256 `391a607817f7a97fa9c20bb6b2bd211c43ee576dbb0b5128787513bd57a83755`. `aapt` metadata, ZIP integrity, `zipalign -c -v 4`, and APK Signature Scheme v2 verification passed; signer is the established Android Debug certificate `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`.
+
+Focused EditMode validation passed **8/8**: seven Chulengo regressions and Racing Fernetero starting-price/curve. No PlayMode/Game View or physical-device QA was run; APK was not installed. The APK remains a local `/private/tmp` artifact and was not committed.
+
+---
+
+# Previous Android delivery — 2026-10-21 (0.2.58/code60, Chulengo + Racing Premium)
 
 Includes the new post-victory Chulengo claim/multiplier and one free Premium Parrillero on each fresh Racing attempt. Built with Unity 6000.6.3f1 in a warm isolated copy: baseline source commit `70ce8b0` plus the current runtime overlay (`StreetGame.cs`, `StreetMarket.cs`, `StreetSimulation.cs`, `StreetView.cs`, and new `StreetChulengo.cs` + meta), with Android version/name set to0.2.58/code60. The local Firebase Analytics cookie/setting, Editor runInBackground/time-scale values, temporary scenes, screenshots, recovery data, audit tooling and Editor-only tests were excluded. The source overlay is now tracked on `codex/street-automation`; the APK itself remains a local ignored artifact, not a Git blob.
 

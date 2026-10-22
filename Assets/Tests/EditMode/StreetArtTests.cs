@@ -1656,7 +1656,7 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
         public void VictoryPopupAndExitUseOneUniformPortraitFrame(float canvasHeight)
         {
             Rect frame = (Rect)View.GetMethod("VictoryPopupBounds", BindingFlags.Static | BindingFlags.NonPublic)
-                .Invoke(null, new object[] { canvasHeight });
+                .Invoke(null, new object[] { canvasHeight, false });
             Rect exitSlot = (Rect)View.GetField("VictoryExit", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
             Rect exit = (Rect)View.GetMethod("VictorySlot", BindingFlags.Static | BindingFlags.NonPublic)
                 .Invoke(null, new object[] { frame, exitSlot });
@@ -1665,6 +1665,26 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
             Assert.AreEqual(1122f / 1402f, frame.width / frame.height, .001f);
             Assert.IsTrue(frame.Contains(exit.min)); Assert.IsTrue(frame.Contains(exit.max));
             Assert.Greater(exit.yMin, frame.center.y, "Only the green bottom button is interactive");
+        }
+
+        [TestCase(700f)]
+        [TestCase(960f)]
+        [TestCase(1200f)]
+        public void ChulengoVictoryButtonsStayStackedWithoutOverlap(float canvasHeight)
+        {
+            Rect frame = (Rect)View.GetMethod("VictoryPopupBounds", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { canvasHeight, true });
+            Rect multiply = (Rect)View.GetMethod("ChulengoMultiplyBoundsForFrame", BindingFlags.Static | BindingFlags.Public)
+                .Invoke(null, new object[] { frame });
+            Rect collect = (Rect)View.GetMethod("ChulengoCollectBoundsForFrame", BindingFlags.Static | BindingFlags.Public)
+                .Invoke(null, new object[] { frame, canvasHeight });
+            Rect levels = (Rect)View.GetMethod("ChulengoLevelsBoundsForFrame", BindingFlags.Static | BindingFlags.Public)
+                .Invoke(null, new object[] { frame, canvasHeight });
+
+            Assert.Greater(multiply.yMax, frame.yMax, "The main action intentionally overlaps the wood's lower edge.");
+            Assert.GreaterOrEqual(collect.yMin, multiply.yMax + 7f);
+            Assert.GreaterOrEqual(levels.yMin, collect.yMax + 13f);
+            Assert.LessOrEqual(levels.yMax, canvasHeight - 4f);
         }
 
         [TestCase("200/200", 40)]

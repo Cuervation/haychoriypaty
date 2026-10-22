@@ -91,7 +91,7 @@ namespace HayChoriYPaty
                 new StreetLevelBalance(new[] {180,120,0,0,150,0,0}, new[] {25,25,0,0}, 2.25f),
                 new StreetLevelBalance(new[] {185,125,60,0,155,0,75}, new[] {30,30,35,0}, 3.25f),
                 new StreetLevelBalance(new[] {190,130,70,65,160,65,80}, new[] {35,35,45,40}, 4.50f),
-                new StreetLevelBalance(new[] {210,145,80,75,175,75,90}, new[] {40,40,50,45,50}, 6.00f, 250),
+                new StreetLevelBalance(new[] {210,145,80,75,175,75,90}, new[] {40,40,50,200,50}, 6.00f, 250),
                 new StreetLevelBalance(new[] {230,165,100,85,195,80,105}, new[] {45,45,55,50,55}, 8.00f, 250),
                 new StreetLevelBalance(new[] {250,180,110,95,210,90,115}, new[] {50,50,65,55,60}, 10.50f, 250),
                 new StreetLevelBalance(new[] {275,195,120,110,225,100,125}, new[] {55,55,70,65,65}, 13.50f, 250),
@@ -699,59 +699,11 @@ namespace HayChoriYPaty
             return new Vector2(x, y);
         }
 
-        private Vector2 CounterHandoffPosition(StreetCustomer customer, StreetWorker worker)
+        private static Vector2 CounterHandoffPosition(StreetCustomer customer)
         {
-            const int accessPoints = 5;
-            const float spacing = 32f;
-            float groupWidth = (accessPoints - 1) * spacing;
-            float left = Mathf.Clamp(customer.Target.x - groupWidth * .5f,
-                StreetWorkstationLayout.WorkerHalfWidth, StreetSceneLayout.Width - StreetWorkstationLayout.WorkerHalfWidth - groupWidth);
-            int accessIndex = 0;
-            foreach (StreetWorker other in workers)
-                if (other != worker && other.Customer == customer &&
-                    (other.State == StreetWorkerState.ToCounter || other.State == StreetWorkerState.Handoff)) accessIndex++;
-            Vector2 best = Vector2.zero;
-            float bestClearance = -1f;
-            float bestCustomerDistance = float.PositiveInfinity;
-            bool foundFreePoint = false;
-            for (int slot = 0; slot < accessPoints; slot++)
-            {
-                Vector2 candidate = new Vector2(left + slot * spacing, StreetSceneLayout.WorkerServiceY);
-                bool alreadyReserved = false;
-                float clearance = float.PositiveInfinity;
-                foreach (StreetWorker other in workers)
-                {
-                    if (other == worker) continue;
-                    bool sameCustomerAtCounter = other.Customer == customer &&
-                        (other.State == StreetWorkerState.ToCounter || other.State == StreetWorkerState.Handoff);
-                    if (sameCustomerAtCounter)
-                    {
-                        Vector2 reservedPoint = other.State == StreetWorkerState.Handoff ? other.Position
-                            : other.Route != null && other.Route.Length > 0 ? other.Route[other.Route.Length - 1] : other.Target;
-                        if ((candidate - reservedPoint).sqrMagnitude < .01f) alreadyReserved = true;
-                    }
-
-                    clearance = Mathf.Min(clearance, Vector2.Distance(candidate, other.Position));
-                    if (IsWorkerTravelling(other) && other.Position != other.Target)
-                    {
-                        clearance = Mathf.Min(clearance, Vector2.Distance(candidate, other.Target));
-                        if (other.Route != null && other.Route.Length > 0)
-                            clearance = Mathf.Min(clearance, Vector2.Distance(candidate, other.Route[other.Route.Length - 1]));
-                    }
-                }
-                if (alreadyReserved) continue;
-                float customerDistance = Mathf.Abs(candidate.x - customer.Target.x);
-                if (!foundFreePoint || clearance > bestClearance + .001f ||
-                    (Mathf.Abs(clearance - bestClearance) <= .001f && customerDistance < bestCustomerDistance))
-                {
-                    best = candidate;
-                    bestClearance = clearance;
-                    bestCustomerDistance = customerDistance;
-                    foundFreePoint = true;
-                }
-            }
-            if (foundFreePoint) return best;
-            return new Vector2(left + Mathf.Min(accessIndex, accessPoints - 1) * spacing, StreetSceneLayout.WorkerServiceY);
+            // The final waypoint belongs in the assigned customer's exact column.
+            // Furniture avoidance remains the responsibility of the layout route.
+            return new Vector2(customer.Target.x, StreetSceneLayout.WorkerServiceY);
         }
 
         private int WorkerAccessIndex(StreetWorker worker, int accessCount)
@@ -944,6 +896,7 @@ namespace HayChoriYPaty
                     continue;
                 }
                 if (!IsAtCounter(w.Customer) || !customers.Contains(w.Customer)) { CancelAssignment(w); continue; }
+                if (!RefreshMozoPickupRoute(w)) continue;
                 if (w.State == StreetWorkerState.ToStation)
                 {
                     MoveWorker(w, dt);
@@ -972,7 +925,7 @@ namespace HayChoriYPaty
                         }
                         w.CarriedItemId = item.Id;
                         w.State = StreetWorkerState.ToCounter;
-                        if (!SetWorkerRoute(w, CounterHandoffPosition(w.Customer, w))) { CancelAssignment(w); continue; }
+                        if (!SetWorkerRoute(w, CounterHandoffPosition(w.Customer))) { CancelAssignment(w); continue; }
                     }
                 }
                 else if (w.State == StreetWorkerState.ToCounter)
@@ -1420,6 +1373,31 @@ namespace HayChoriYPaty
             }
             if (!SetWorkerRoute(worker, pickup)) { CancelAssignment(worker); return; }
             worker.State = StreetWorkerState.ToStation;
+        }
+
+        private bool RefreshMozoPickupRoute(StreetWorker worker)
+        {
+            if (!UsesActiveCooks || worker.Role != StreetWorkerRole.Mozo || worker.Product < 0 || worker.Product > 3 ||
+                (worker.State != StreetWorkerState.ToStation && worker.State != StreetWorkerState.Pickup)) return true;
+
+            StreetFoodUnit reserved = Kitchen.ReserveTableUnit(worker.Product, worker.Id);
+            if (reserved == null) { CancelAssignment(worker); return false; }
+            Vector2 destination = KitchenLayout.TableSlotPickupPosition(worker.Product, reserved.Slot,
+                IsProductAvailable(worker.Product ^ 1), Kitchen.TableCapacity(worker.Product));
+            Vector2 currentDestination = worker.Route != null && worker.Route.Length > 0
+                ? worker.Route[worker.Route.Length - 1] : worker.Target;
+            if ((destination - currentDestination).sqrMagnitude <= .0001f) return true;
+            if (!SetWorkerRoute(worker, destination)) { CancelAssignment(worker); return false; }
+            if (worker.State == StreetWorkerState.Pickup)
+            {
+                // A compacted unit moved while this Mozo was reaching for it. Re-approach
+                // the same claimed ID instead of completing pickup at its former coordinate.
+                worker.State = StreetWorkerState.ToStation;
+                worker.Delay = 0f;
+                worker.PickupDuration = 0f;
+                worker.PickupProgress = 0f;
+            }
+            return true;
         }
 
         private bool SetWorkerRoute(StreetWorker worker, Vector2 destination)

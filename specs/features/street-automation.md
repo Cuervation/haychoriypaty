@@ -75,7 +75,7 @@ A real completed handoff alone increments that product's delivered count and awa
 | 3 | 25 | 25 | — | — | — | 2.25 | 0 |
 | 4 | 30 | 30 | 35 | — | — | 3.25 | 0 |
 | 5 | 35 | 35 | 45 | 40 | — | 4.50 | 0 |
-| 6 | 40 | 40 | 50 | 45 | 50 | 6.00 | 250 |
+| 6 | 40 | 40 | 50 | 200 | 50 | 6.00 | 250 |
 | 7 | 45 | 45 | 55 | 50 | 55 | 8.00 | 250 |
 | 8 | 50 | 50 | 65 | 55 | 60 | 10.50 | 250 |
 | 9 | 55 | 55 | 70 | 65 | 65 | 13.50 | 250 |
@@ -83,6 +83,8 @@ A real completed handoff alone increments that product's delivered count and awa
 | 11 | 70 | 70 | 90 | 80 | 80 | 21.00 | 2000 |
 
 The first Parrillero is free. All five roles (Mozo only from Racing, during play) can be hired without a worker-count cap whenever that role is enabled in the level and the next hire is affordable; each role has its own count-based price progression. For paid hire n, preserve multipliers ×1, ×2.5 and ×5 for n=1–3, then use n×(n+1)/2−1 from n=4 onward (×9, ×14, ×20, ×27, ×35, ×44, ×54 at n=4–10), rounded up to a $5 multiple. Saturate only at the largest representable positive $5 price; this is numeric overflow protection, not a gameplay cap. Each speed upgrade gives Parrilleros +6% (×1.54 at nine upgrades) and other roles +10% (×1.90); cooking, movement and work delays use the role-specific rate. The button's nine prices remain $5/$10/$15/$20/$30/$45/$65/$90/$125, multiplied by the exact level factor above and rounded up to $5. Attempt opening coins are a disclosed balance adjustment: levels 1–5 begin at $0; levels 6–9 at $250, level 10 at $500, and level 11 at $2,000. They are not earned revenue, never carry over and reset on a fresh attempt. The final level lasts 315 seconds (5:15) to retain a small completion buffer; all product quotas, prices, hire and speed-cost curves remain unchanged.
+
+For Racing (level 6), the first Fernetero hire costs **$200**; later hires continue through the unchanged role-local multipliers (×2.5, ×5, then triangular progression), yielding $500, $1,000, $1,800 and $2,800 for hires 2–5. The opening attempt balance stays $250, so the first Fernetero is immediately affordable with $50 remaining. Other level rows and roles are unchanged.
 
 Quota-aware demand retains random 1–4 quantities and mixed tickets (up to five unlocked products), weighting every product in the level catalog by outstanding goal deficit/time independently of hired staff. A missing specialist does not suppress demand: those order lines wait without a patience timeout and become serviceable if the responsible worker is hired later. Delivery/revenue still requires that responsible worker and a real handoff; no synthetic delivery is allowed. Completed quotas stay visible and may still sell for real revenue. Role responsibilities, stations, routes, stock and handoff accounting remain unchanged. Victory requires every unlocked product quota.
 

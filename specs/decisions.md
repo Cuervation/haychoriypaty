@@ -1,5 +1,13 @@
 # Technical decision log
 
+## 2026-10-22 — Compactar sándwiches al retirar
+
+Desde Racing, distinguir la reserva de capacidad de cocina de la celda visual: reservar una unidad de capacidad mientras el producto está en grill/transporte, elegir su slot al depositar y compactar slots ocupados al retirar. Mantener ID, orden de depósito y claim del Mozo; recalcular la ruta del mismo Mozo si su unidad se mueve y deslizar el render en vez de saltar. Bebidas y niveles 1–5 permanecen sin cambio.
+
+## 2026-10-22 — Handoff final alineado con la columna del cliente
+
+En todos los niveles, terminar cada entrega en la X exacta del cliente asignado; la heurística de despeje no desplaza el punto final. Se prioriza que el producto se vea entregado a la persona correcta. La ruta conserva la evasión de muebles y el movimiento directo vigente; si coinciden roles distintos ante un pedido múltiple, puede haber solapamiento breve, sin introducir una nueva mecánica de espera/separación.
+
 ## 2026-10-20 — Bounded independent verification, no mandatory agent pipeline
 
 Keep the three existing roles, four skills, models/efforts and two-subagent cap. Define acceptance criteria and criterion-level evidence statuses; simple tasks stay primary-only, medium tasks use validation when risk justifies it, and complex tasks require independent validation. Permit at most two focused correction cycles, then report unresolved checks. Unity MCP recovery is read-only and bounded to three evidence-based retries; never restart Editors or change global trust/config as a workaround. This decision changes agent instructions only, not gameplay.

@@ -13,7 +13,21 @@ namespace HayChoriYPaty.Tests
         private const BindingFlags Instance = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
         private static Type GameType(string name) => Type.GetType("HayChoriYPaty." + name + ", Assembly-CSharp", true);
         private static object Get(object value, string name) => value.GetType().GetProperty(name, Instance).GetValue(value);
-        private static object Call(object value, string name, params object[] args) => value.GetType().GetMethod(name, Instance).Invoke(value, args);
+        private static object GetInternalField(object value, string name) => value.GetType().GetField(name, Instance).GetValue(value);
+        private static object Call(object value, string name, params object[] args)
+        {
+            foreach (MethodInfo candidate in value.GetType().GetMethods(Instance))
+            {
+                if (candidate.Name != name) continue;
+                ParameterInfo[] parameters = candidate.GetParameters();
+                if (parameters.Length != args.Length) continue;
+                bool matches = true;
+                for (int i = 0; i < parameters.Length; i++)
+                    if (args[i] != null && !parameters[i].ParameterType.IsInstanceOfType(args[i])) { matches = false; break; }
+                if (matches) return candidate.Invoke(value, args);
+            }
+            throw new MissingMethodException(value.GetType().FullName, name);
+        }
         private static object CallExact(object value, string name, Type[] parameterTypes, params object[] args) =>
             value.GetType().GetMethod(name, Instance, null, parameterTypes, null).Invoke(value, args);
 
@@ -34,6 +48,122 @@ namespace HayChoriYPaty.Tests
             Vector2 size = (Vector2)method.Invoke(null, new object[] { product, carried });
             Assert.AreEqual(expectedWidth, size.x, .0001f);
             Assert.AreEqual(expectedHeight, size.y, .0001f);
+        }
+
+        [UnityTest]
+        public IEnumerator ActiveSandwichesSlideIntoCompactedTableSlotsAfterPickup()
+        {
+            var root = new GameObject("Active sandwich table compaction animation test");
+            try
+            {
+                Component renderer = root.AddComponent(GameType("StreetKitchenRenderer"));
+                object balance = Activator.CreateInstance(GameType("StreetBalance"));
+                object sim = Activator.CreateInstance(GameType("StreetSimulation"), new object[] { balance, 5, 5f, 0, 1, 0 });
+                object kitchen = Get(sim, "Kitchen");
+                ClearKitchenUnits(kitchen);
+                ((int[])kitchen.GetType().GetField("tableCapacity", Instance).GetValue(kitchen))[0] = 4;
+
+                AddActiveSandwich(kitchen, 0, 11);
+                object pickedFirst = AddActiveSandwich(kitchen, 0, 12);
+                Assert.AreSame(pickedFirst, Call(kitchen, "ReserveTableUnit", 0, 100));
+                AddActiveSandwich(kitchen, 0, 13);
+                object moved = AddActiveSandwich(kitchen, 0, 14);
+                Assert.AreSame(moved, Call(kitchen, "ReserveTableUnit", 0, 101));
+                Call(renderer, "Prepare", sim, 1f, 960f);
+
+                var objects = (IDictionary)renderer.GetType().GetField("foodObjects", Instance).GetValue(renderer);
+                GameObject movedObject = (GameObject)objects[(int)Get(moved, "Id")];
+                Vector2 start = movedObject.transform.localPosition;
+                Type role = GameType("StreetWorkerRole");
+                Assert.AreSame(pickedFirst, Call(kitchen, "TryTake", 0, Enum.Parse(role, "Mozo"), 100));
+                Assert.AreEqual(2, (int)Get(moved, "Slot"));
+
+                object layout = Get(sim, "KitchenLayout");
+                bool companion = (bool)Call(sim, "IsProductAvailable", 1);
+                Vector2 logicalTarget = (Vector2)CallExact(layout, "TableSlotPosition",
+                    new[] { typeof(int), typeof(int), typeof(bool), typeof(int) }, 0, 2, companion, 4);
+                Vector2 expected = new Vector2((logicalTarget.x - 270f) * .01f, (480f - logicalTarget.y) * .01f);
+
+                float elapsed = 0f;
+                while (elapsed < .06f)
+                {
+                    yield return null;
+                    Call(renderer, "Prepare", sim, 1f, 960f);
+                    elapsed += Time.unscaledDeltaTime;
+                }
+                Vector2 halfway = movedObject.transform.localPosition;
+                Assert.Less(Vector2.Distance(halfway, expected), Vector2.Distance(start, expected),
+                    "Remaining sandwiches should visibly slide toward their compacted positions.");
+                elapsed = 0f;
+                while (elapsed < .25f)
+                {
+                    yield return null;
+                    Call(renderer, "Prepare", sim, 1f, 960f);
+                    elapsed += Time.unscaledDeltaTime;
+                }
+                Vector2 final = movedObject.transform.localPosition;
+                Assert.AreEqual(expected.x, final.x, .001f);
+                Assert.AreEqual(expected.y, final.y, .001f);
+            }
+            finally { UnityEngine.Object.Destroy(root); }
+        }
+
+        [UnityTest]
+        public IEnumerator PendingCanceledSandwichIsHiddenUntilItCanReturnToTheCompactedTable()
+        {
+            var root = new GameObject("Pending sandwich return visual test");
+            try
+            {
+                Component renderer = root.AddComponent(GameType("StreetKitchenRenderer"));
+                object balance = Activator.CreateInstance(GameType("StreetBalance"));
+                object sim = Activator.CreateInstance(GameType("StreetSimulation"), new object[] { balance, 5, 5f, 0, 1, 0 });
+                object kitchen = Get(sim, "Kitchen");
+                ClearKitchenUnits(kitchen);
+                ((int[])kitchen.GetType().GetField("tableCapacity", Instance).GetValue(kitchen))[0] = 1;
+
+                object original = AddActiveSandwich(kitchen, 0, 11);
+                int originalId = (int)Get(original, "Id");
+                Call(renderer, "Prepare", sim, 1f, 960f);
+                var objects = (IDictionary)renderer.GetType().GetField("foodObjects", Instance).GetValue(renderer);
+                GameObject originalObject = (GameObject)objects[originalId];
+                Assert.IsTrue(originalObject.activeSelf);
+
+                Assert.AreSame(original, Call(kitchen, "ReserveTableUnit", 0, 100));
+                Type role = GameType("StreetWorkerRole");
+                Assert.AreSame(original, Call(kitchen, "TryTake", 0, Enum.Parse(role, "Mozo"), 100));
+                object replacementCook = Call(kitchen, "ReserveCook", 0, 12);
+                Assert.IsNotNull(replacementCook);
+                Call(kitchen, "ReturnCarried", originalId, 100);
+                Assert.IsTrue((bool)GetInternalField(original, "PendingTableReturn"));
+                Call(renderer, "Prepare", sim, 1f, 960f);
+                Assert.IsFalse(originalObject.activeSelf,
+                    "Food waiting for table capacity must not remain drawn over a compacted sandwich.");
+
+                int replacementId = (int)Get(replacementCook, "Id");
+                Assert.IsTrue((bool)Call(kitchen, "AdvanceCook", replacementId, 12, 2f, 1f));
+                Assert.IsTrue((bool)Call(kitchen, "TakeCooked", replacementId, 12));
+                Assert.IsTrue((bool)Call(kitchen, "DepositCooked", replacementId, 12));
+                Assert.AreSame(replacementCook, Call(kitchen, "ReserveTableUnit", 0, 101));
+                Assert.AreSame(replacementCook, Call(kitchen, "TryTake", 0, Enum.Parse(role, "Mozo"), 101));
+                Assert.IsTrue((bool)Call(kitchen, "Consume", replacementId, 0, 101));
+                Call(kitchen, "Advance", .05f, 1f, 1f, false, false, false, false);
+                Assert.AreEqual("Table", Get(original, "Location").ToString());
+                Call(renderer, "Prepare", sim, 1f, 960f);
+                Assert.IsTrue(originalObject.activeSelf, "The same unit becomes visible when its return is restored.");
+            }
+            finally { UnityEngine.Object.Destroy(root); }
+            yield return null;
+        }
+
+        private static object AddActiveSandwich(object kitchen, int product, int cookId)
+        {
+            object unit = Call(kitchen, "ReserveCook", product, cookId);
+            Assert.IsNotNull(unit);
+            int id = (int)Get(unit, "Id");
+            Assert.IsTrue((bool)Call(kitchen, "AdvanceCook", id, cookId, 2f, 1f));
+            Assert.IsTrue((bool)Call(kitchen, "TakeCooked", id, cookId));
+            Assert.IsTrue((bool)Call(kitchen, "DepositCooked", id, cookId));
+            return unit;
         }
 
         [UnityTest]
@@ -67,14 +197,18 @@ namespace HayChoriYPaty.Tests
                             Call(renderer, "UpdateFoodObject", unit, go, carried);
                             Vector2 source = sprite.sprite.bounds.size;
                             float oldScale = Mathf.Min(oldTarget.x / source.x, oldTarget.y / source.y);
-                            Assert.AreEqual(source.x * oldScale * 1.10f, sprite.bounds.size.x * 100f, .001f);
-                            Assert.AreEqual(source.y * oldScale * 1.10f, sprite.bounds.size.y * 100f, .001f);
+                            // SpriteRenderer.bounds is world-space and includes the screen-fit scale
+                            // of its parent. Check the authored local footprint instead so this
+                            // visual-size invariant is independent of the editor's Game View size.
+                            Vector2 localSize = source * go.transform.localScale.x * 100f;
+                            Assert.AreEqual(source.x * oldScale * 1.10f, localSize.x, .001f);
+                            Assert.AreEqual(source.y * oldScale * 1.10f, localSize.y, .001f);
                             if (!carried)
                             {
                                 Vector2 footprint = (Vector2)GameType("StreetKitchenLayout").GetMethod("TableServingFootprint")
                                     .Invoke(null, new object[] { product });
-                                Assert.AreEqual(footprint.x, sprite.bounds.size.x * 100f, .001f);
-                                Assert.AreEqual(footprint.y, sprite.bounds.size.y * 100f, .001f);
+                                Assert.AreEqual(footprint.x, localSize.x, .001f);
+                                Assert.AreEqual(footprint.y, localSize.y, .001f);
                             }
                         }
                     }
@@ -354,7 +488,7 @@ namespace HayChoriYPaty.Tests
                 Call(noStock, "BindIngredientStock", market);
                 Call(noStock, "StartRound");
                 object noStockKitchen = Get(noStock, "Kitchen");
-                Assert.IsFalse((bool)Call(noStockKitchen, "CanReserveCook", 0));
+                Assert.IsTrue((bool)Call(noStockKitchen, "CanReserveCook", 0), "Active sandwiches can reserve physical cooking capacity without market ingredients.");
                 int noStockUnits = ((IList)Get(noStockKitchen, "Units")).Count;
                 Call(renderer, "Prepare", noStock, 1f, 960f);
                 Assert.AreEqual(25, ambient.Count, "No ingredient stock does not make the grill look empty.");
@@ -506,7 +640,9 @@ namespace HayChoriYPaty.Tests
                     int row = bottle.name.Contains("Row0_") ? 0 : 1;
                     Assert.IsTrue(row == 0 || bottle.name.Contains("Row1_"), "Every stock bottle belongs to a known tabletop row.");
                     if (fernet) fernetByRow[row]++; else cocaByRow[row]++;
-                    float expectedHeight = tableHeight * (fernet ? .25f * 3f * .93f * .90f : .333f * 3f * .76f * .95f);
+                    float expectedHeight = tableHeight * (fernet
+                        ? .25f * 3f * .93f * .90f * .95f
+                        : .333f * 3f * .76f * .95f * .97f);
                     float height = bottleRenderer.sprite.bounds.size.y * bottle.localScale.y;
                     Assert.AreEqual(expectedHeight, height, .001f, "Fernet and Coca keep their requested relative visual sizes.");
                     Assert.AreEqual(bottle.localScale.x, bottle.localScale.y, .0001f,

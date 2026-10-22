@@ -12,12 +12,15 @@ namespace HayChoriYPaty
         private const int PropLayer = 30, CarryLayer = 31;
         private const int RenderScale = 2;
         private const float CarriedSandwichScale = 1.25f;
+        private const float SandwichTableReflowSeconds = .18f;
         private const float BarrelDrinkScale = 1.35f * 1.08f;
         private const float AmbientSmokeCycleSpeed = .32f, AmbientSmokeMaxAlpha = .18f;
         private static readonly Vector2 AmbientSmokeSize = new Vector2(12f, 26f);
         private const float FernetBottleHeightFraction = .25f, CocaBottleHeightFraction = .333f;
         private const float FernetBottleScaleMultiplier = 3f;
-        private const float FernetBottleSizeMultiplier = .93f * .90f, CocaBottleSizeMultiplier = .76f * .95f;
+        private const float FernetBottleTableSizeAdjustment = .95f, CocaBottleTableSizeAdjustment = .97f;
+        private const float FernetBottleSizeMultiplier = .93f * .90f * FernetBottleTableSizeAdjustment,
+            CocaBottleSizeMultiplier = .76f * .95f * CocaBottleTableSizeAdjustment;
         private const float FernetBottleBackRowDepthFraction = .03f, FernetBottleFrontRowDepthFraction = .32f;
         // The authored Coca sprite has a narrow transparent border below the visible bottle base.
         private const float CocaBottleVisibleBaseInsetFraction = .009f;
@@ -49,7 +52,14 @@ namespace HayChoriYPaty
             public GameObject Heat, SmokeA, SmokeB;
             public SpriteRenderer HeatRenderer, SmokeARenderer, SmokeBRenderer;
         }
+        private sealed class SandwichTableSlide
+        {
+            public Vector2 Position, Start, Target;
+            public float Elapsed;
+            public int LastAdvancedFrame = -1;
+        }
         private readonly AmbientGrillEffects[] ambientGrills = new AmbientGrillEffects[2];
+        private readonly Dictionary<int, SandwichTableSlide> sandwichTableSlides = new Dictionary<int, SandwichTableSlide>();
         private readonly List<int> staleIds = new List<int>();
         private readonly HashSet<int> liveCarriedIds = new HashSet<int>();
         private GameObject propsRoot, carryRoot;
@@ -542,9 +552,22 @@ namespace HayChoriYPaty
             foreach (StreetFoodUnit unit in simulation.Kitchen.Units)
             {
                 if (unit == null || unit.Id <= 0) continue;
+                if (unit.Location != StreetFoodLocation.Table || unit.Product < 0 || unit.Product > 3 || !simulation.UsesActiveCooks)
+                    sandwichTableSlides.Remove(unit.Id);
                 if (unit.Location == StreetFoodLocation.Grill && unit.Product >= 0 && unit.Product < 4)
                     occupiedGrillSlots.Add(AmbientGrillSlotKey(unit.Product, unit.Slot));
-                if (unit.Location == StreetFoodLocation.Carried) { staleIds.Remove(unit.Id); SyncCookingEffect(unit); continue; }
+                if (unit.Location == StreetFoodLocation.Carried)
+                {
+                    staleIds.Remove(unit.Id);
+                    // A canceled Mozo return can wait off-table until capacity opens. Keep its
+                    // identity alive but hide the old tabletop sprite so it cannot overlap a
+                    // sandwich that has compacted into that newly free cell.
+                    GameObject unassignedCarry;
+                    if (FindWorker(unit.WorkerId) == null && foodObjects.TryGetValue(unit.Id, out unassignedCarry) &&
+                        unassignedCarry != null) unassignedCarry.SetActive(false);
+                    SyncCookingEffect(unit);
+                    continue;
+                }
                 GameObject go;
                 if (!foodObjects.TryGetValue(unit.Id, out go) || go == null)
                 {
@@ -564,6 +587,7 @@ namespace HayChoriYPaty
                 if (foodObjects.TryGetValue(id, out old) && old != null) Destroy(old);
                 foodObjects.Remove(id);
                 foodRenderers.Remove(id);
+                sandwichTableSlides.Remove(id);
                 GameObject effect; if (cookingEffects.TryGetValue(id, out effect) && effect != null) Destroy(effect);
                 cookingEffects.Remove(id);
                 if (heatEffects.TryGetValue(id, out effect) && effect != null) Destroy(effect);
@@ -687,6 +711,7 @@ namespace HayChoriYPaty
 
         private void UpdateFoodObject(StreetFoodUnit unit, GameObject go, bool carried)
         {
+            if (go != null && !go.activeSelf) go.SetActive(true);
             bool isGrill = unit.Location == StreetFoodLocation.Grill;
             bool isBarrelDrink = unit.Product == 4 || unit.Product == 6;
             bool grillCompanionAvailable = isGrill && Available(unit.Product == 0 ? 1 : unit.Product == 1 ? 0 : unit.Product == 2 ? 3 : 2);
@@ -723,6 +748,9 @@ namespace HayChoriYPaty
                 if (unit.Product == 5 && !carried)
                     position = FernetDrinkDisplayPosition(simulation.KitchenLayout, unit.Slot);
             }
+            if (!isGrill && !carried && unit.Location == StreetFoodLocation.Table &&
+                unit.Product >= 0 && unit.Product <= 3 && simulation.UsesActiveCooks)
+                position = AnimateCompactedSandwich(unit.Id, position);
             SetItemTransform(go.transform, position, isGrill
                 ? simulation.KitchenLayout.GrillBoundsForProduct(unit.Product)
                 : simulation.KitchenLayout.BoundsForProduct(unit.Product));
@@ -744,6 +772,33 @@ namespace HayChoriYPaty
                 order = StationDepth(station) + 10 + unit.Slot;
             }
             SetSorting(go, order);
+        }
+
+        private Vector2 AnimateCompactedSandwich(int id, Vector2 target)
+        {
+            SandwichTableSlide slide;
+            if (!sandwichTableSlides.TryGetValue(id, out slide))
+            {
+                slide = new SandwichTableSlide { Position = target, Start = target, Target = target };
+                sandwichTableSlides[id] = slide;
+                return target;
+            }
+            if (slide.Target != target)
+            {
+                slide.Start = slide.Position;
+                slide.Target = target;
+                slide.Elapsed = 0f;
+                slide.LastAdvancedFrame = -1;
+            }
+            if (slide.Elapsed < SandwichTableReflowSeconds && slide.LastAdvancedFrame != Time.frameCount)
+            {
+                slide.LastAdvancedFrame = Time.frameCount;
+                slide.Elapsed = Mathf.Min(SandwichTableReflowSeconds,
+                    slide.Elapsed + Mathf.Max(0f, Time.unscaledDeltaTime));
+                float progress = Mathf.Clamp01(slide.Elapsed / SandwichTableReflowSeconds);
+                slide.Position = Vector2.Lerp(slide.Start, slide.Target, Mathf.SmoothStep(0f, 1f, progress));
+            }
+            return slide.Position;
         }
 
         private void SyncCookingEffect(StreetFoodUnit unit)

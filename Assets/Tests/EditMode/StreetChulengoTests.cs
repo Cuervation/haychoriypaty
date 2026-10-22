@@ -117,6 +117,22 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
+        public void NeedleCompletesRoundTripAtTwiceItsPreviousSpeed()
+        {
+            Type chulengo = Runtime("StreetChulengo");
+            MethodInfo atTime = chulengo.GetMethod("PositionAtTime", StaticPublic);
+
+            Assert.AreEqual(0f, atTime.Invoke(null, new object[] { 0f }));
+            Assert.AreEqual(.5f, (float)atTime.Invoke(null, new object[] { .7f }), .0001f,
+                "The needle reaches the center in half the old time.");
+            Assert.AreEqual(1f, (float)atTime.Invoke(null, new object[] { 1.4f }), .0001f,
+                "The left-to-right sweep takes 1.4 seconds instead of 2.8.");
+            Assert.AreEqual(.5f, (float)atTime.Invoke(null, new object[] { 2.1f }), .0001f);
+            Assert.AreEqual(0f, (float)atTime.Invoke(null, new object[] { 2.8f }), .0001f,
+                "The full left-right-left cycle is 2.8 seconds, exactly half its former duration.");
+        }
+
+        [Test]
         public void VictoryEscrowsRewardUntilCollectAndCannotAdvanceOrBuyDuringChoice()
         {
             object game = NewGame();

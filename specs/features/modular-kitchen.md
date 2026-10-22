@@ -163,6 +163,10 @@ The shared proportional-scale correction from commit `a7937b2` was reverted afte
 
 At the user's request, the six decorative Fernet/Coca bottles below the Fernet table are exactly 3× their former proportional target heights: Fernet 75% and Coca 99.9% of table height. Sprites retain aspect ratio; positions are recomputed from rendered widths with even gaps to keep the row centered and prevent overlap. This is presentation-only; bottle art, table, cup, inventory, delivery and worker behavior do not change. Focused renderer PlayMode validation passed 1/1 in isolated Unity 6000.6.3f1.
 
+## 2026-10-21 — Fernet-table display bottle scale trim
+
+At the user's request, shrink the decorative 1 L Fernet bottles on the Fernet table by 5% and the decorative Coca-Cola bottles beside them by 3%, relative to the prior rendered size. Keep their source sprites/aspect ratios, two-row order/depth, table, served-drink icons and barrels unchanged. The renderer recomputes row spacing and centers from each resized sprite footprint. In the current size formula these targets are respectively 0.5963625 and 0.69963966 of table height; gameplay, inventory, worker movement, service props and delivery are unaffected. The focused PlayMode renderer regression asserts both new heights and retained row clearance.
+
 
 ## Two-row sandwich presentation — 2026-10-18
 
