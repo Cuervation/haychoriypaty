@@ -166,3 +166,13 @@ export PATH=/Users/celestino/.cache/codex-runtimes/codex-primary-runtime/depende
 ```
 
 La autenticación oficial por localhost se completó con consentimiento explícito. No usar `login:ci`, no copiar tokens/códigos de callback al chat, no imprimir `signIn.hashConfig` de las APIs administrativas. No conceder regiones/billing a partir de mensajes de error de la consola. La prueba IAM solo utilizó un documento nuevo UUID, borrado condicionalmente tras validar ownership/updateTime; ningún usuario ni progreso existente fue alterado.
+
+
+### Auditoría iOS — 2026-10-22
+
+- Configuración derivada de la app Android existente: Bundle Identifier iOS `com.haychoriypaty.game`, versión de producto `0.2.60`, build inicial iOS `1`, orientación vertical y mínimo iOS `15.0`. El cambio de `ProjectSettings.asset` debe conservar cualquier ajuste local ajeno.
+- **No hay una app/configuración iOS Firebase comprobada**: falta `Assets/GoogleService-Info.plist` y no hay Firebase CLI disponible en esta sesión para consultar/registrar apps remotas. No fabricar el plist ni asumir que una app iOS está registrada.
+- Firebase Unity App/Auth/Firestore 14.0.0 incluye dependencias iOS; el proveedor de credenciales Google del juego es, sin embargo, Android-only y lanza `PlatformNotSupportedException` fuera de Android. Hace falta integración nativa iOS Google Sign-In, URL scheme de cliente OAuth y validación del token con Firebase Auth; el requisito Google obligatorio sigue vigente.
+- Estado de host 2026-10-22: macOS 26.7.1 x86_64, Unity 6000.6.3f1 y Hub presentes; iOS Build Support se instaló para x86_64 y `unity editors verify 6000.6.3f1` devolvió `ios ok` (payload 2.7G). Xcode/iPhoneOS SDK/simctl, CocoaPods y `dotnet` siguen sin estar instalados; `xcode-select` apunta a Command Line Tools. No se encontró identidad de firma válida ni perfil, Team ID o dispositivo iOS verificable. Una consulta de solo lectura a Unity MCP expiró tras la instalación; no reinicié ni refresqué el Editor.
+- **No se ha generado proyecto Xcode, archive ni IPA**; no se cambió Android, economía ni gameplay. Para continuar se requiere full Xcode compatible instalado/seleccionado y una identidad Apple autorizada para firmar; después completar instalación del módulo Unity iOS, registrar/verificar la app Firebase y configurar/probar el proveedor nativo antes de declarar una IPA funcional.
+- Criterio iOS adicional de aceptación: [ ] login Google real en iPhone → Firebase Auth/UID, persistencia remota/local sin pérdida, y flujo de build → Xcode archive → IPA firmada verificada. Build/instalación/login requieren evidencias independientes; configuración presente no equivale a aceptación.
