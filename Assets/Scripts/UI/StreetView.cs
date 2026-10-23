@@ -2188,9 +2188,11 @@ namespace HayChoriYPaty
                 MarketText(new Rect(textColumn.x, textColumn.y, textColumn.width, 16), "CANCHA " + (i + 1), 12, MarketInk, TextAnchor.MiddleLeft);
                 var clubStyle = new GUIStyle(menuTitle) { fontSize = 14, wordWrap = true,
                     alignment = TextAnchor.MiddleLeft, padding = new RectOffset(),
-                    normal = { textColor = MarketInk }, resizeTextForBestFit = true,
-                    resizeTextMinSize = 10, resizeTextMaxSize = 14 };
-                GUI.Label(new Rect(textColumn.x, textColumn.y + 16, textColumn.width, card.height - 54), club, clubStyle);
+                    normal = { textColor = MarketInk } };
+                Rect clubBounds = new Rect(textColumn.x, textColumn.y + 16, textColumn.width, card.height - 54);
+                while (clubStyle.fontSize > 10 && clubStyle.CalcHeight(new GUIContent(club), clubBounds.width) > clubBounds.height)
+                    clubStyle.fontSize--;
+                GUI.Label(clubBounds, club, clubStyle);
                 string status = earned ? "CONSEGUIDA" : i == game.UnlockedLevel ? "PRÓXIMO RETO" : "BLOQUEADA";
                 MarketText(new Rect(textColumn.x, card.yMax - 25, textColumn.width, 18), status, 12,
                     earned ? new Color(.03f, .28f, .05f) : MarketInk, TextAnchor.MiddleLeft);
