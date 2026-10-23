@@ -50,3 +50,7 @@ Aceptación de este delta (obligatoria):
 - [ ] Firebase remoto real de este delta: no aprobado sin roundtrip remoto autenticado (evidencia local no lo sustituye).
 
 Evidencia local final: `/private/tmp/hcyp-sales-badges/persisted/` (XML, logs y captura de insignias). No hubo APK nueva, instalación, push ni escrituras remotas de prueba; la APK0.2.64 instalada previamente no contiene este delta. Los cambios locales ajenos se preservaron.
+
+### Empaquetado del delta — 2026-10-23
+
+APK0.2.65/code67 generada: Main-only Development IL2CPP/ARM64,0errores/1warning,447,19s; ZIP/alineación/firma/bindingsMain verificados y revisión independiente PASS. Fuente197c3a3 publicada,32+1tests reutilizados sin cambios. Artefacto `/private/tmp/HayChoriYPaty-0.2.65-code67-insignias.apk`,354.357.269bytes,SHA256 `98ca84f89eeb6e12635c6ad034234e907309642f7b3f9d1172c232e9b11170b0`. No instalada, sin roundtripFirebase real nuevo. Esto actualiza el estado de empaquetado indicado en la evidencia local anterior.

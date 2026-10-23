@@ -1,3 +1,11 @@
+# Entrega Android — 2026-10-23: insignias 0.2.65/code67
+
+Incluye21insignias de ventas500/2500/5000 para los7productos, con contadores y flags obtenidos persistidos en el snapshotFirebase porUID. Fuente197c3a3,67archivos runtime/escena comparados sin diferencias; trabajo local ajeno excluido/preservado. Se reutiliza evidencia sin cambios:32/32EditMode+1/1PlayMode y captura real1080×1920 con datosQA, ya revisados independientemente. Firebase remoto real: **NOT_RUN**, no confundir transporte snapshot probado localmente con roundtrip autenticado real.
+
+Unity6000.6.3f1, Main-only Development IL2CPP/ARM64, copia aislada con ruta constante para preservar bindings. **Build Succeeded,447,19s,0errores/1warning**. APK `/private/tmp/HayChoriYPaty-0.2.65-code67-insignias.apk`, **354.357.269bytes**, SHA-256 `98ca84f89eeb6e12635c6ad034234e907309642f7b3f9d1172c232e9b11170b0`. Paquete `com.haychoriypaty.game`, min26/target36. ZIP,zipalign,firmaAPKv2 AndroidDebug existente,metadatos,Analytics/ad-IDoff y parser directo de Main **PASS** (StreetGame/View/KitchenRenderer activos y resueltos). Revisión independiente PASS. No es firma releasePlayStore y **no se instaló**; la0.2.64/code66 instalada se conserva. APK/logs fuera de Git, recibos en `/private/tmp/hcyp-sales-badges-0.2.65-code67/`.
+
+---
+
 # Entrega Android — 2026-10-23: hub 0.2.64/code66
 
 Portada automática con barra compacta, hub de partido, Insignias legibles y nivel6 de260s. Fuente runtime/escena del commit7d44f62(65archivos comparados sin diferencias), sin incluir trabajo ajeno de gameplay. Unity6000.6.3f1, copia aislada, Main-only Development IL2CPP/ARM64. **Build Succeeded,257,59s,0errores/1warning**. Pruebas enfocadas finales **20/20EditMode +10/10PlayMode** y capturas reales1080×1920 revisadas independientemente. La corrida amplia previa no está verde:173/184, con una expectativa de import corregida y10fallas ajenas de rutas/plantilla/balance; no se alteró el balance para hacerlas pasar.
