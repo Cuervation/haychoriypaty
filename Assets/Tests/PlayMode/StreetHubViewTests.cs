@@ -117,6 +117,18 @@ namespace HayChoriYPaty.Tests
             yield return Capture("hub-playmode-1080x1920");
             Assert.IsTrue((bool)vt.GetProperty("HubAccountActionRendered").GetValue(view));
             ClickAction(202); Assert.IsTrue((bool)Field("badgesActive"));
+            object save = gt.GetField("save", P).GetValue(game);
+            object statistics = save.GetType().GetField("statistics").GetValue(save);
+            statistics.GetType().GetField("deliveredByProduct").SetValue(statistics, new long[] { 499, 500, 2499, 2500, 4999, 5000, 0 });
+            statistics.GetType().GetMethod("Normalize").Invoke(statistics, null);
+            MethodInfo rows = vt.GetMethod("SalesBadgeRowBounds", BindingFlags.NonPublic | BindingFlags.Static);
+            foreach (float height in new[] { 900f, 960f, 1200f })
+            for (int product = 0; product < 7; product++)
+            {
+                Rect row = (Rect)rows.Invoke(null, new object[] { product, height });
+                Assert.GreaterOrEqual(row.yMin, 160); Assert.Less(row.yMax, height - 109f);
+                Assert.AreEqual(500f, row.width);
+            }
             yield return Capture("badges-playmode-1080x1920");
             Dispatch(205); Assert.IsTrue((bool)Field("hubActive"));
             ClickAction(203); Assert.IsTrue((bool)Field("rankingActive"));

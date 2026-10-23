@@ -14,6 +14,9 @@ namespace HayChoriYPaty
         public long[] purchaseSpendCentsByIngredient = new long[10];
         public long[] consumedUnitsByIngredient = new long[10];
         public long[] deliveredByProduct = new long[7];
+        // Stable product-major index: productId * 3 + tier (500/2500/5000).
+        // Additive v1 field; obtained medals are durable, not just a render-time projection.
+        public bool[] earnedProductSalesBadges = new bool[StreetSalesBadges.BadgeCount];
         public long[] paidHiresByRole = new long[5];
         public long[] hireSpendCentsByRole = new long[5];
         public long grossSalesCents, totalMarketRewardsCents, ingredientSpendTotalCents;
@@ -34,6 +37,7 @@ namespace HayChoriYPaty
             purchaseSpendCentsByIngredient = Normalize(purchaseSpendCentsByIngredient, 10);
             consumedUnitsByIngredient = Normalize(consumedUnitsByIngredient, 10);
             deliveredByProduct = Normalize(deliveredByProduct, 7);
+            AwardProductSalesBadges();
             paidHiresByRole = Normalize(paidHiresByRole, 5);
             hireSpendCentsByRole = Normalize(hireSpendCentsByRole, 5);
             winsByLevel = Normalize(winsByLevel, 11); lossesByLevel = Normalize(lossesByLevel, 11);
@@ -86,6 +90,7 @@ namespace HayChoriYPaty
             }
             else if (!record.abandoned) { losses = Add(losses, 1); lossesByLevel[level] = Add(lossesByLevel[level], 1); }
             record.recordsReached = newRecords;
+            AwardProductSalesBadges();
             lastAppliedAttemptId = record.attemptId;
             return true;
         }
@@ -110,8 +115,23 @@ namespace HayChoriYPaty
             customersLost = Add(customersLost, summary.customersLost);
             ordersCompleted = Add(ordersCompleted, summary.ordersCompleted);
             completedProducts = Add(completedProducts, units);
+            AwardProductSalesBadges();
             lastRecoveredAttemptId = summary.attemptId;
             return true;
+        }
+
+        private void AwardProductSalesBadges()
+        {
+            if (earnedProductSalesBadges == null || earnedProductSalesBadges.Length != StreetSalesBadges.BadgeCount)
+            {
+                var previous = earnedProductSalesBadges;
+                earnedProductSalesBadges = new bool[StreetSalesBadges.BadgeCount];
+                if (previous != null) Array.Copy(previous, earnedProductSalesBadges, Math.Min(previous.Length, earnedProductSalesBadges.Length));
+            }
+            for (int product = 0; product < StreetSalesBadges.ProductCount; product++)
+            for (int tier = 0; tier < StreetSalesBadges.TierCount; tier++)
+                if (StreetSalesBadges.IsEarned(At(deliveredByProduct, product), tier))
+                    earnedProductSalesBadges[product * StreetSalesBadges.TierCount + tier] = true;
         }
 
         private static long[] Normalize(long[] values, int length)

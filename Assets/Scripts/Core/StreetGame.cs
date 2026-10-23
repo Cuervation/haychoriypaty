@@ -63,6 +63,22 @@ namespace HayChoriYPaty
                 save.statistics.winsByLevel == null || levelIndex >= save.statistics.winsByLevel.Length) return false;
             return save.statistics.winsByLevel[levelIndex] > 0;
         }
+        /// <summary>Consolidated real deliveries, already persisted in the UID's v4 cloud snapshot.
+        /// Pending Chulengo/live-attempt metrics are not added a second time.</summary>
+        public long GetCumulativeProductSales(int product)
+        {
+            var totals = playerActive ? save?.statistics?.deliveredByProduct : null;
+            return product < 0 || product >= StreetSalesBadges.ProductCount || totals == null || product >= totals.Length
+                ? 0L : Math.Max(0L, totals[product]);
+        }
+        public bool HasProductSalesBadge(int product, int tier)
+        {
+            var badges = playerActive ? save?.statistics?.earnedProductSalesBadges : null;
+            if (product < 0 || product >= StreetSalesBadges.ProductCount || tier < 0 || tier >= StreetSalesBadges.TierCount || badges == null) return false;
+            int index = product * StreetSalesBadges.TierCount + tier;
+            return index < badges.Length && badges[index];
+        }
+        public bool HasIncompleteSalesHistory => playerActive && save?.statistics != null && save.statistics.legacyCoverageIncomplete;
         public StreetMarket Market => playerActive ? market : null;
         public bool IsPlayerActive => playerActive;
         public string ActiveSaveJson => save == null ? null : JsonUtility.ToJson(save);

@@ -2142,23 +2142,29 @@ namespace HayChoriYPaty
         }
         private static Rect BadgeBackBounds(float height) => new Rect(110, height - 80, 320, 60);
         private static Rect RankingBackBounds(float height) => new Rect(110, height - 80, 320, 60);
-        private void DrawBadgePatch(Rect bounds, int level, bool earned)
+        private static Rect SalesBadgeRowBounds(int product, float height)
         {
-            Color rim = earned ? new Color(1f, .69f, .16f) : new Color(.30f, .28f, .25f);
-            FillRect(bounds, new Color(.16f, .07f, .025f));
-            FillRect(new Rect(bounds.x + 2, bounds.y + 2, bounds.width - 4, bounds.height - 4), rim);
-            Rect face = new Rect(bounds.x + 5, bounds.y + 5, bounds.width - 10, bounds.height - 10);
-            FillRect(face, ClubVisualTheme.ForLevel(level).PrimaryColor);
-            string club = StreetSimulation.LevelDisplayNames[level].Split('/')[0].Trim();
-            string initials = club.Length <= 2 ? club.ToUpperInvariant() : club.Substring(0, 2).ToUpperInvariant();
-            Texture2D crest = LevelCrestForLevel(level);
-            if (crest != null)
-            {
-                Color previous = GUI.color; GUI.color = earned ? Color.white : new Color(.55f, .55f, .55f, .85f);
-                GUI.DrawTexture(new Rect(bounds.x + 7, bounds.y + 7, bounds.height - 14, bounds.height - 14), crest, ScaleMode.ScaleToFit, true);
-                GUI.color = previous;
-            }
-            else MarketText(new Rect(face.x, face.y + 1, face.width, face.height - 2), initials, 29, earned ? Color.white : new Color(.65f, .64f, .62f));
+            float rowHeight = Mathf.Min(108f, (height - 280f) / StreetSalesBadges.ProductCount - 6f);
+            return new Rect(20, 169f + product * (rowHeight + 6f), W - 40, rowHeight);
+        }
+        private void DrawSalesMedal(Rect bounds, long sales, int tier, bool earned)
+        {
+            long target = StreetSalesBadges.Threshold(tier);
+            Color metal = tier == 0 ? new Color(.84f, .49f, .24f) : tier == 1
+                ? new Color(.75f, .82f, .88f) : new Color(1f, .77f, .18f);
+            FillRect(bounds, earned ? metal : new Color(.66f, .64f, .59f));
+            Rect face = new Rect(bounds.x + 2, bounds.y + 2, bounds.width - 4, bounds.height - 4);
+            FillRect(face, earned ? new Color(.98f, .92f, .72f) : new Color(.85f, .83f, .77f));
+            string name = tier == 0 ? "BRONCE" : tier == 1 ? "PLATA" : "ORO";
+            MarketText(new Rect(face.x, face.y + 1, face.width, 18), name, 13, MarketInk);
+            MarketText(new Rect(face.x, face.y + 20, face.width, 20), target.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("es-AR")), 18, MarketInk);
+            float trackY = face.yMax - 25;
+            Rect track = new Rect(face.x + 6, trackY, face.width - 12, 4);
+            FillRect(track, new Color(.36f, .31f, .24f));
+            float progress = earned ? 1f : (float)System.Math.Min(1d, System.Math.Max(0d, (double)sales / target));
+            FillRect(new Rect(track.x, track.y, track.width * progress, track.height), earned ? new Color(.07f, .48f, .16f) : metal);
+            MarketText(new Rect(face.x, face.yMax - 20, face.width, 18), earned ? "CONSEGUIDA" : "EN PROGRESO", 12,
+                earned ? new Color(.03f, .29f, .08f) : MarketInk);
         }
         private void DrawBadgesScreen()
         {
@@ -2166,37 +2172,31 @@ namespace HayChoriYPaty
             DrawIntroScreen(Texture2D.whiteTexture, new Color(.025f, .018f, .012f, .68f), ScaleMode.StretchToFill);
             float height = logicalCanvasHeight;
             DrawMarketWoodPanel(new Rect(14, 14, W - 28, height - 28), new Color(.11f, .065f, .036f, .96f));
-            MarketText(new Rect(28, 28, W - 56, 44), "INSIGNIAS DE LA HINCHADA", 31, new Color(1f, .84f, .38f));
-            MarketText(new Rect(30, 72, W - 60, 24), "Se ganan al conquistar cada cancha", 17, Color.white);
-            int badgesEarned = 0;
-            for (int i = 0; i < StreetSimulation.LevelNames.Length; i++)
-                if (i < game.UnlockedLevel || game.HasWonLevel(i)) badgesEarned++;
-            MarketText(new Rect(30, 103, W - 60, 24), badgesEarned + " / " + StreetSimulation.LevelNames.Length + " INSIGNIAS CONSEGUIDAS", 17, new Color(.52f, 1f, .47f));
-            float cardTop = 143f, gapY = 8f, backTop = height - 80f;
-            float cardHeight = Mathf.Clamp((backTop - cardTop - 20f - 5f * gapY) / 6f, 72f, 104f);
-            float cardWidth = (W - 72f) * .5f;
-            for (int i = 0; i < StreetSimulation.LevelNames.Length; i++)
+            MarketText(new Rect(28, 28, W - 56, 40), "INSIGNIAS DE LA PARRILLA", 29, new Color(1f, .84f, .38f));
+            MarketText(new Rect(28, 69, W - 56, 24), "Vendé 500, 2.500 y 5.000 de cada producto", 17, Color.white);
+            int earned = 0;
+            for (int product = 0; product < StreetSalesBadges.ProductCount; product++)
+                for (int tier = 0; tier < StreetSalesBadges.TierCount; tier++)
+                    if (game.HasProductSalesBadge(product, tier)) earned++;
+            MarketText(new Rect(28, 97, W - 56, 24), earned + " / " + StreetSalesBadges.BadgeCount + " INSIGNIAS CONSEGUIDAS", 17, new Color(.52f, 1f, .47f));
+            string sync = Cloud.FirebasePlayerSession.Instance != null
+                ? Cloud.FirebasePlayerSession.Instance.ProgressSyncStatus : "Progreso local de prueba";
+            MarketText(new Rect(28, 126, W - 56, 22), sync, 14, Color.white);
+            string[] names = { "CHORI", "PATY", "BONDIOLA", "VACÍO", "COCA", "FERNET", "CERVEZA" };
+            for (int product = 0; product < StreetSalesBadges.ProductCount; product++)
             {
-                int col = i % 2, row = i / 2;
-                Rect card = new Rect(24 + col * (cardWidth + 24f), cardTop + row * (cardHeight + gapY), cardWidth, cardHeight);
-                bool earned = i < game.UnlockedLevel || game.HasWonLevel(i);
-                DrawMarketWoodPanel(card, earned ? new Color(.97f, .82f, .51f) : new Color(.76f, .73f, .65f));
-                DrawBadgePatch(new Rect(card.x + 8, card.y + 8, cardHeight - 16, cardHeight - 16), i, earned);
-                string[] clubParts = StreetSimulation.LevelDisplayNames[i].Split('/');
-                string club = clubParts[0].Trim().ToUpperInvariant();
-                Rect textColumn = new Rect(card.x + cardHeight, card.y + 8, card.width - cardHeight - 12, card.height - 16);
-                MarketText(new Rect(textColumn.x, textColumn.y, textColumn.width, 16), "CANCHA " + (i + 1), 12, MarketInk, TextAnchor.MiddleLeft);
-                var clubStyle = new GUIStyle(menuTitle) { fontSize = 14, wordWrap = true,
-                    alignment = TextAnchor.MiddleLeft, padding = new RectOffset(),
-                    normal = { textColor = MarketInk } };
-                Rect clubBounds = new Rect(textColumn.x, textColumn.y + 16, textColumn.width, card.height - 54);
-                while (clubStyle.fontSize > 10 && clubStyle.CalcHeight(new GUIContent(club), clubBounds.width) > clubBounds.height)
-                    clubStyle.fontSize--;
-                GUI.Label(clubBounds, club, clubStyle);
-                string status = earned ? "CONSEGUIDA" : i == game.UnlockedLevel ? "PRÓXIMO RETO" : "BLOQUEADA";
-                MarketText(new Rect(textColumn.x, card.yMax - 25, textColumn.width, 18), status, 12,
-                    earned ? new Color(.03f, .28f, .05f) : MarketInk, TextAnchor.MiddleLeft);
+                long sales = game.GetCumulativeProductSales(product);
+                Rect row = SalesBadgeRowBounds(product, height);
+                DrawMarketWoodPanel(row, new Color(.93f, .86f, .68f));
+                DrawProductIcon(new Rect(row.x + 10, row.y + 8, 46, row.height - 16), product);
+                MarketText(new Rect(row.x + 58, row.y + 12, 120, 22), names[product], 17, MarketInk, TextAnchor.MiddleLeft);
+                MarketText(new Rect(row.x + 58, row.y + 37, 120, 20), sales.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("es-AR")) + " vendidas", 13, MarketInk, TextAnchor.MiddleLeft);
+                for (int tier = 0; tier < StreetSalesBadges.TierCount; tier++)
+                    DrawSalesMedal(new Rect(row.x + 185 + tier * 100, row.y + 7, 94, row.height - 14), sales, tier, game.HasProductSalesBadge(product, tier));
             }
+            string coverage = game.HasIncompleteSalesHistory ? "Historial antiguo parcial: contamos las ventas registradas."
+                : "Ventas acumuladas al cerrar cada resultado.";
+            MarketText(new Rect(28, height - 109, W - 56, 22), coverage, 13, Color.white);
             DrawStandardButton(BadgeBackBounds(height), BadgeBackAction, "VOLVER AL BARRIO");
         }
         private void DrawRankingScreen()

@@ -28,6 +28,17 @@ namespace HayChoriYPaty.Cloud
                 return State != PlayerSessionState.Ready || accountOpen;
             }
         }
+        public string ProgressSyncStatus
+        {
+            get
+            {
+                if (State != PlayerSessionState.Ready) return "Esperando sesión de Google";
+                if (offline) return "Sin conexión · progreso pendiente";
+                if (syncing || local == null || local.State.pending.Count > 0 || local.State.acknowledgedRevision < 1)
+                    return "Pendiente de sincronizar con Firebase";
+                return "Sincronizado con Firebase";
+            }
+        }
         private string message = "Inicializando…", root, legacyJson, legacyHash;
         private PlayerFirebaseConfig config;
         private FirebaseApp app;

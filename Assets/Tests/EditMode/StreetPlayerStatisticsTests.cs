@@ -328,6 +328,118 @@ namespace HayChoriYPaty.Tests
             }
         }
 
+        [TestCase(0)] [TestCase(1)] [TestCase(2)] [TestCase(3)] [TestCase(4)] [TestCase(5)] [TestCase(6)]
+        public void ProductSalesBadgesUseInclusiveIndependentCumulativeThresholds(int product)
+        {
+            Type catalog = RuntimeType("StreetSalesBadges");
+            var go = new GameObject("sales-badge-boundary-test");
+            bool prior = (bool)gameType.GetField("AllowEditorTestInitialization", StaticPublic).GetValue(null);
+            try
+            {
+                SetEditorTestInitialization(gameType, false);
+                object game = NewGame(go); Assert.IsTrue(Activate(game, null, (json, record) => true));
+                long[] totals = LongArray(ReadField(ReadField(game, "save"), "statistics"), "deliveredByProduct");
+                long[] boundaries = { 499L, 500L, 2499L, 2500L, 4999L, 5000L, long.MaxValue };
+                int[] expected = { 0, 1, 1, 2, 2, 3, 3 };
+                for (int n = 0; n < boundaries.Length; n++)
+                {
+                    totals[product] = boundaries[n];
+                    for (int p = 0; p < 7; p++)
+                    {
+                        long value = (long)Invoke(game, "GetCumulativeProductSales", p);
+                        Assert.AreEqual(p == product ? boundaries[n] : 0L, value);
+                        Assert.AreEqual(p == product ? expected[n] : 0,
+                            catalog.GetMethod("EarnedCount").Invoke(null, new object[] { value }));
+                    }
+                }
+                totals[product] = -1; Assert.AreEqual(0L, Invoke(game, "GetCumulativeProductSales", product));
+                Assert.AreEqual(0L, Invoke(game, "GetCumulativeProductSales", -1));
+                Assert.AreEqual(0L, Invoke(game, "GetCumulativeProductSales", 7));
+                Assert.AreEqual(500L, catalog.GetMethod("Threshold").Invoke(null, new object[] { 0 }));
+                Assert.AreEqual(2500L, catalog.GetMethod("Threshold").Invoke(null, new object[] { 1 }));
+                Assert.AreEqual(5000L, catalog.GetMethod("Threshold").Invoke(null, new object[] { 2 }));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(go); SetEditorTestInitialization(gameType, prior); }
+        }
+
+        [Test]
+        public void EarnedSalesBadgesAreDurableAndAwardedOnceFromSettledAndRecoveredSales()
+        {
+            object stats = NewStatistics();
+            var totals = LongArray(stats, "deliveredByProduct"); totals[0] = 499;
+            statisticsType.GetMethod("Normalize").Invoke(stats, null);
+            Assert.IsFalse(((bool[])ReadField(stats, "earnedProductSalesBadges"))[0]);
+            object record = NewRecord(); WriteField(record, "attemptId", "badge-terminal");
+            WriteField(record, "salesByProduct", new long[] { 1, 0, 0, 0, 0, 0, 0 });
+            Assert.IsTrue(Apply(stats, record)); Assert.IsFalse(Apply(stats, record));
+            Assert.IsTrue(((bool[])ReadField(stats, "earnedProductSalesBadges"))[0]);
+            Assert.AreEqual(500L, LongArray(stats, "deliveredByProduct")[0]);
+            object checkpoint = NewRecord(); WriteField(checkpoint, "attemptId", "badge-checkpoint");
+            WriteField(checkpoint, "salesByProduct", new long[] { 0, 0, 0, 0, 0, 0, 5000 });
+            Assert.IsTrue(ApplyRecovered(stats, checkpoint)); Assert.IsFalse(ApplyRecovered(stats, checkpoint));
+            bool[] flags = (bool[])ReadField(stats, "earnedProductSalesBadges");
+            Assert.AreEqual(21, flags.Length);
+            Assert.IsTrue(flags[18]); Assert.IsTrue(flags[19]); Assert.IsTrue(flags[20]);
+            Assert.IsFalse(flags[3], "A Chori medal never awards a Paty medal.");
+            object restored = Deserialize(statisticsType, JsonUtility.ToJson(stats));
+            LongArray(restored, "deliveredByProduct")[0] = 0;
+            statisticsType.GetMethod("Normalize").Invoke(restored, null);
+            Assert.IsTrue(((bool[])ReadField(restored, "earnedProductSalesBadges"))[0], "Persisted achievements stay obtained, not recomputed away.");
+            object legacy = Deserialize(statisticsType, "{\"deliveredByProduct\":[5000]}");
+            statisticsType.GetMethod("Normalize").Invoke(legacy, null);
+            bool[] migrated = (bool[])ReadField(legacy, "earnedProductSalesBadges");
+            Assert.IsTrue(migrated[0]); Assert.IsTrue(migrated[1]); Assert.IsTrue(migrated[2]);
+            for (int i = 3; i < 21; i++) Assert.IsFalse(migrated[i]);
+        }
+
+        [Test]
+        public void ProductSalesBadgesSurviveUidSnapshotOutboxAckAndReactivation()
+        {
+            string root = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "sales-badge-uid-" + Guid.NewGuid().ToString("N"));
+            Type repository = Type.GetType("HayChoriYPaty.Cloud.PlayerLocalRepository, Assembly-CSharp", true);
+            dynamic repo = Activator.CreateInstance(repository, root, "badge-owner");
+            var go = new GameObject("sales-badge-persistence-test");
+            var reload = new GameObject("sales-badge-restored-test");
+            bool prior = (bool)gameType.GetField("AllowEditorTestInitialization", StaticPublic).GetValue(null);
+            try
+            {
+                SetEditorTestInitialization(gameType, false);
+                object seed = Activator.CreateInstance(saveDataType);
+                object stats = ReadField(seed, "statistics");
+                long[] expected = { 499L, 500L, 2499L, 2500L, 4999L, 5000L, 16000L };
+                WriteField(stats, "deliveredByProduct", expected);
+                WriteField(stats, "instrumentationStartedAtUtc", "2026-10-23T00:00:00Z");
+                object game = NewGame(go);
+                Assert.IsTrue(Activate(game, JsonUtility.ToJson(seed), (json, record) => repo.Commit(json, (dynamic)record)));
+                repo = Activator.CreateInstance(repository, root, "badge-owner");
+                string snapshot = repo.State.snapshot;
+                Assert.That(snapshot, Does.Contain("earnedProductSalesBadges"), "Obtained flags themselves must be in the Firebase-bound JSON, not only sales totals.");
+                Assert.AreEqual(snapshot, (string)repo.State.pending[0].snapshot, "Cloud outbox transports the full badge source snapshot.");
+                string id = repo.State.pending[0].id;
+                Assert.IsTrue(repo.Commit(snapshot, null)); Assert.AreEqual(1, (int)repo.State.pending.Count, "Reads/retries cannot create duplicate badge operations.");
+                repo.Acknowledge(id, 1L); repo = Activator.CreateInstance(repository, root, "badge-owner");
+                Assert.AreEqual(0, (int)repo.State.pending.Count);
+                object restored = NewGame(reload);
+                Assert.IsTrue(Activate(restored, (string)repo.State.snapshot, (json, record) => true));
+                for (int p = 0; p < 7; p++)
+                {
+                    Assert.AreEqual(expected[p], Invoke(restored, "GetCumulativeProductSales", p));
+                    for (int tier = 0; tier < 3; tier++)
+                        Assert.AreEqual(expected[p] >= (tier == 0 ? 500 : tier == 1 ? 2500 : 5000), Invoke(restored, "HasProductSalesBadge", p, tier));
+                }
+                Assert.IsFalse((bool)Invoke(restored, "HasProductSalesBadge", -1, 0));
+                Assert.IsFalse((bool)Invoke(restored, "HasProductSalesBadge", 0, 3));
+                dynamic other = Activator.CreateInstance(repository, root, "other-owner");
+                Assert.IsNull((string)other.State.snapshot, "Another UID cannot inherit this collection.");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(go); UnityEngine.Object.DestroyImmediate(reload);
+                SetEditorTestInitialization(gameType, prior);
+                if (System.IO.Directory.Exists(root)) System.IO.Directory.Delete(root, true);
+            }
+        }
+
         [Test]
         public void PerClubBadgeProgressCanReadExistingWinsIncludingTheFinalLevel()
         {
