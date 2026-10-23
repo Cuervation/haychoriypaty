@@ -644,8 +644,11 @@ namespace HayChoriYPaty.Tests
             }
 
             float duration = (float)View.GetField("IntroDuration", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue();
-            Assert.GreaterOrEqual(duration, 8f);
-            Assert.LessOrEqual(duration, 9f);
+            Assert.GreaterOrEqual(duration, 3.9f);
+            Assert.LessOrEqual(duration, 4.1f);
+            Rect progress = (Rect)View.GetMethod("IntroProgressBounds", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, null);
+            Assert.LessOrEqual(progress.width, 120f);
+            Assert.LessOrEqual(progress.height, 8f);
             Assert.NotNull(Resources.Load<Font>("Menu/LuckiestGuy-Regular"));
         }
 
@@ -660,7 +663,46 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(new Rect(0, 0, width, height), screen);
         }
 
+        [TestCase(1080, 1920)]
+        [TestCase(1080, 2400)]
+        [TestCase(1200, 2670)]
+        public void HubArtworkHotspotsFollowScaleCropAndStayTappableInSafeArea(int width, int height)
+        {
+            MethodInfo map = View.GetMethod("HubArtworkRectToLayout", BindingFlags.Static | BindingFlags.NonPublic);
+            MethodInfo canvasViewport = View.GetMethod("CanvasViewport", BindingFlags.Static | BindingFlags.NonPublic);
+            Vector2 screen = new Vector2(width, height);
+            Rect safe = new Rect(24, 41, width - 48, height - 117); // asymmetric bottom/top insets expose top-origin mapping regressions
+            Rect viewport = (Rect)canvasViewport.Invoke(null, new object[] { screen, safe });
+            foreach (Rect source in new[] { new Rect(12, 5, 230, 160), new Rect(523, 150, 322, 160),
+                new Rect(112, 610, 352, 174), new Rect(105, 1034, 355, 183), new Rect(535, 1032, 385, 188) })
+            {
+                Rect hit = (Rect)map.Invoke(null, new object[] { source, new Vector2(941, 1672), screen, safe });
+                Assert.Greater(hit.width, 0f);
+                Assert.Greater(hit.height, 0f);
+                Assert.GreaterOrEqual(hit.xMin, 0f); Assert.LessOrEqual(hit.xMax, 540f);
+                Assert.GreaterOrEqual(hit.yMin, 0f); Assert.LessOrEqual(hit.yMax, 960f);
+
+                // Project GUI-space hit bounds back to physical top-origin pixels. They must
+                // match the visible artwork intersected with the safe viewport, even when
+                // the top and bottom insets differ (Unity Screen.safeArea itself is bottom-origin).
+                float artScale = Mathf.Max(screen.x / 941f, screen.y / 1672f);
+                float imageWidth = 941f * artScale, imageHeight = 1672f * artScale;
+                Rect artworkOnScreen = new Rect((screen.x - imageWidth) * .5f + source.x * artScale,
+                    (screen.y - imageHeight) * .5f + source.y * artScale,
+                    source.width * artScale, source.height * artScale);
+                float expectedLeft = Mathf.Max(artworkOnScreen.xMin, viewport.xMin);
+                float expectedRight = Mathf.Min(artworkOnScreen.xMax, viewport.xMax);
+                float expectedTop = Mathf.Max(artworkOnScreen.yMin, viewport.yMin);
+                float expectedBottom = Mathf.Min(artworkOnScreen.yMax, viewport.yMax);
+                Assert.AreEqual(expectedLeft, viewport.xMin + hit.xMin * viewport.width / 540f, .02f);
+                Assert.AreEqual(expectedRight, viewport.xMin + hit.xMax * viewport.width / 540f, .02f);
+                Assert.AreEqual(expectedTop, viewport.yMin + hit.yMin * viewport.height / 960f, .02f);
+                Assert.AreEqual(expectedBottom, viewport.yMin + hit.yMax * viewport.height / 960f, .02f);
+            }
+        }
+
         [TestCase("street-background-open-street-v4", 940, 1673, false)]
+        [TestCase("street-hub-stadium-v1", 941, 1672, false)]
         [TestCase("street-victory-popup-wood-v1", 1122, 1402, true)]
         [TestCase("street-mural-real-v5", 940, 1673, false)]
         [TestCase("street-coin-gold-v2", 1254, 1254, true)]

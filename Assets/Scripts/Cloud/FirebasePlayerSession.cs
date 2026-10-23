@@ -38,7 +38,7 @@ namespace HayChoriYPaty.Cloud
         private FirestorePlayerRepository remote;
         private RemotePlayerState conflictRemote;
         private StreetGame game;
-        private Texture2D backdrop, logo, googleButton;
+        private Texture2D backdrop, googleButton;
         private int generation;
         private bool syncing, offline, accountOpen, initialSyncWaiting;
         private float retryAt, retryDelay = 2;
@@ -58,7 +58,7 @@ namespace HayChoriYPaty.Cloud
             Instance = this;
             root = Path.Combine(Application.persistentDataPath, "PlayerCloud");
             google = gameObject.AddComponent<GoogleCredentialProvider>();
-            backdrop = Resources.Load<Texture2D>("street-cover-user-v5"); logo = Resources.Load<Texture2D>("street-logo");
+            backdrop = Resources.Load<Texture2D>("street-cover-loading-v1");
             googleButton = Resources.Load<Texture2D>("Google/google-g");
         }
         private async void Start() { await BootstrapAsync(); }
@@ -268,6 +268,10 @@ namespace HayChoriYPaty.Cloud
             }
             return error.InnerException != null && IsTransient(error.InnerException);
         }
+        public void OpenAccountMenu()
+        {
+            if (State == PlayerSessionState.Ready) accountOpen = true;
+        }
         public void SignOut()
         {
             if (game != null && !game.SuspendPlayer()) { Fail("No pudimos guardar. No cerramos tu sesión para proteger la partida."); return; }
@@ -295,7 +299,8 @@ namespace HayChoriYPaty.Cloud
             if (State == PlayerSessionState.Ready && !accountOpen)
             {
                 var view = FindAnyObjectByType<StreetView>();
-                if (view != null && view.AccountMenuVisible) AccountButton(new Rect(Screen.width - 126, 16, 110, 32), "CUENTA", () => accountOpen = true);
+                if (view != null && view.AccountMenuVisible && !view.HubAccountActionRendered)
+                    AccountButton(new Rect(Screen.width - 126, 16, 110, 32), "CUENTA", OpenAccountMenu);
                 return;
             }
             var old = GUI.matrix; var color = GUI.color;
@@ -305,7 +310,6 @@ namespace HayChoriYPaty.Cloud
             GUI.color = new Color(0, 0, 0, .58f); GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture); GUI.color = Color.white;
             float scale = Mathf.Min(Screen.width / 540f, Screen.height / 960f);
             GUI.matrix = Matrix4x4.TRS(new Vector3((Screen.width - 540 * scale) * .5f, (Screen.height - 960 * scale) * .5f), Quaternion.identity, Vector3.one * scale);
-            if (logo != null) GUI.DrawTexture(new Rect(110, 100, 320, 280), logo, ScaleMode.ScaleToFit);
             var text = new GUIStyle(GUI.skin.label) { fontSize = 23, alignment = TextAnchor.MiddleCenter, wordWrap = true };
             string shown = accountOpen ? (offline ? "Sesión Google guardada. Jugando sin conexión." : "Tu progreso está vinculado a Google.") : message;
             GUI.Label(new Rect(38, 385, 464, 180), shown, text);

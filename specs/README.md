@@ -14,6 +14,7 @@
 | Firebase/Google obligatorio, perfiles UID, outbox y estado de integración | [firebase-player.md](features/firebase-player.md) (implementación local, aceptación real pendiente) |
 | Workers, gait y agarre físico | [worker-animation.md](features/worker-animation.md) |
 | Arte/UI y composición | [visual-reference.md](visual-reference.md) (solo si se modifica presentación) |
+| Portada y hub de día de partido | [home-hub.md](features/home-hub.md) |
 | Límites de código/render/persistencia | [architecture.md](architecture.md) |
 | APK/instalaciones y comprobaciones de entrega | [android-prototype.md](features/android-prototype.md) (consultar encabezado reciente) |
 | Evidencia histórica de avances y pruebas | [status.md](status.md) (buscar fecha/sistema) |

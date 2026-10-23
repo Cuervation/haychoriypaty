@@ -57,6 +57,12 @@ namespace HayChoriYPaty
         public StreetBalance Balance { get { return balance; } }
         public int SelectedLevel { get { return selectedLevel; } }
         public int UnlockedLevel { get { return save == null ? 0 : save.unlockedLevel; } }
+        public bool HasWonLevel(int levelIndex)
+        {
+            if (save == null || save.statistics == null || levelIndex < 0 || levelIndex >= StreetSimulation.LevelNames.Length ||
+                save.statistics.winsByLevel == null || levelIndex >= save.statistics.winsByLevel.Length) return false;
+            return save.statistics.winsByLevel[levelIndex] > 0;
+        }
         public StreetMarket Market => playerActive ? market : null;
         public bool IsPlayerActive => playerActive;
         public string ActiveSaveJson => save == null ? null : JsonUtility.ToJson(save);

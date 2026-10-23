@@ -329,6 +329,31 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
+        public void PerClubBadgeProgressCanReadExistingWinsIncludingTheFinalLevel()
+        {
+            bool prior = (bool)gameType.GetField("AllowEditorTestInitialization", StaticPublic).GetValue(null);
+            var go = new GameObject("per-club-badge-progress-test");
+            try
+            {
+                SetEditorTestInitialization(gameType, false);
+                object game = NewGame(go);
+                Assert.IsTrue(Activate(game, null, (json, match) => true));
+                Assert.IsFalse((bool)Invoke(game, "HasWonLevel", 10), "A new profile has no final-club badge.");
+                object save = ReadField(game, "save");
+                object statistics = ReadField(save, "statistics");
+                LongArray(statistics, "winsByLevel")[10] = 1;
+                Assert.IsTrue((bool)Invoke(game, "HasWonLevel", 10), "The existing per-level win statistic grants the final-club badge.");
+                Assert.IsFalse((bool)Invoke(game, "HasWonLevel", -1));
+                Assert.IsFalse((bool)Invoke(game, "HasWonLevel", 11));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(go);
+                SetEditorTestInitialization(gameType, prior);
+            }
+        }
+
+        [Test]
         public void StreetGameWaitsForAuthorizedJsonAndFailsClosedOnInvalidSave()
         {
             bool prior = (bool)gameType.GetField("AllowEditorTestInitialization", StaticPublic).GetValue(null);

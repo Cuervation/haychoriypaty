@@ -45,7 +45,7 @@ This table supersedes the historical aggregate-goal and shared-economy sections 
 | 3 Vélez | 180 | 120 | 150 | — | — | — | — | 180 |
 | 4 Ferro | 185 | 125 | 155 | 75 | 60 | — | — | 210 |
 | 5 Independiente | 190 | 130 | 160 | 80 | 70 | 65 | 65 | 240 |
-| 6 Racing | 210 | 145 | 175 | 90 | 80 | 75 | 75 | 255 |
+| 6 Racing | 210 | 145 | 175 | 90 | 80 | 75 | 75 | 260 |
 | 7 San Lorenzo | 230 | 165 | 195 | 105 | 100 | 85 | 80 | 270 |
 | 8 River | 250 | 180 | 210 | 115 | 110 | 95 | 90 | 295* |
 | 9 Boca | 275 | 195 | 225 | 125 | 120 | 110 | 100 | 300 |

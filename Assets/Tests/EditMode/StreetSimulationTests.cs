@@ -2065,7 +2065,7 @@ string[] names = (string[])simType.GetField("LevelNames", BindingFlags.Public | 
         {
 string[] expectedNames = { "Racing Club / Avellaneda", "San Lorenzo / Boedo", "River Plate / Núñez", "Boca Juniors / La Boca", "Sindicato de Camioneros / Plaza de Mayo", "Los Redondos / Tandil" };
             int[] expectedGoals = { 850, 960, 1050, 1150, 1300, 1450 };
-            float[] expectedDurations = { 255f, 270f, 295f, 300f, 300f, 315f };
+            float[] expectedDurations = { 260f, 270f, 295f, 300f, 300f, 315f };
             float[] expectedDemand = { 1.65f, 1.815f, 1.9965f, 2.19615f, 2.415765f, 2.6573415f };
             string[] names = (string[])simType.GetField("LevelNames", BindingFlags.Public | BindingFlags.Static).GetValue(null);
             object balance = NewBalance();
@@ -2104,7 +2104,7 @@ StrategyRun run = SimulateStrategy(10, 1337, "D");
             Tune(balance, "levelProductIds", new[] { "0", "0,4", "0,1,4", "0,1,2,4,6", "0,1,2,3,4,6,5" });
             object sim = Make(level: level, balance: balance);
             Assert.AreEqual(goal, Get(sim, "Goal"));
-            Assert.AreEqual(level == 5 ? 255f : level == 6 ? 270f : level == 7 ? 295f : level == 10 ? 315f : 300f, Get(sim, "TimeRemaining"));
+            Assert.AreEqual(level == 5 ? 260f : level == 6 ? 270f : level == 7 ? 295f : level == 10 ? 315f : 300f, Get(sim, "TimeRemaining"));
             Assert.AreEqual(7, Get(sim, "ProductCount"));
             Start(sim); Assert.DoesNotThrow(() => Step(sim, 1f));
         }
@@ -2133,7 +2133,7 @@ object sim = Make(level: level);
                 new[] {210,145,80,75,175,75,90}, new[] {230,165,100,85,195,80,105},
                 new[] {250,180,110,95,210,90,115}, new[] {275,195,120,110,225,100,125},
                 new[] {310,220,135,125,255,110,145}, new[] {345,245,150,140,285,120,165} };
-            float[] durations = {120f,180f,180f,210f,240f,255f,270f,295f,300f,300f,315f};
+            float[] durations = {120f,180f,180f,210f,240f,260f,270f,295f,300f,300f,315f};
             int[] openingCoins = {0,0,0,0,0,250,250,250,250,500,2000};
             for (int level = 0; level < 11; level++)
             {
