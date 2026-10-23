@@ -1425,6 +1425,15 @@ namespace HayChoriYPaty.Tests
                     Vector2 workerPosition = (Vector2)Get(worker, "Position");
                     Assert.AreEqual(customerTarget.x, workerPosition.x,
                         "Every actual handoff in level " + (level + 1) + " must align with its assigned customer's column.");
+                    float expectedY = Mathf.Lerp(customerTarget.y, LayoutConstant(sceneLayoutType, "WorkerServiceY"), .5f);
+                    Assert.AreEqual(expectedY, workerPosition.y, "The handoff halves the former vertical gap.");
+                    Vector2 towardCustomer = customerTarget - workerPosition;
+                    Vector2 facing = (Vector2)Get(worker, "FacingVector");
+                    Assert.That(Vector2.Dot(facing.normalized, towardCustomer.normalized), Is.GreaterThan(.99f),
+                        "The worker turns toward the assigned customer before handing over the real item.");
+                    object pose = AnimationCall("Sample", worker, false);
+                    Assert.AreEqual("Up", GetField(pose, "Facing").ToString(),
+                        "The worker projection uses its face-to-customer direction during the handoff pause.");
                     alignedHandoffProducts.Add((int)Get(worker, "Product"));
                 }
             }

@@ -1687,6 +1687,70 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
             Assert.LessOrEqual(levels.yMax, canvasHeight - 4f);
         }
 
+        [Test]
+        public void ChulengoFlagsUseTheActiveLevelPrimaryAndSecondaryColors()
+        {
+            Type themes = Type.GetType("HayChoriYPaty.ClubVisualTheme, Assembly-CSharp", true);
+            MethodInfo mapBand = View.GetMethod("ChulengoFlagBandColor", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.IsNotNull(mapBand);
+            Type simulation = Type.GetType("HayChoriYPaty.StreetSimulation, Assembly-CSharp", true);
+            int levelCount = ((string[])simulation.GetField("LevelNames").GetValue(null)).Length;
+            for (int level = 0; level < levelCount; level++)
+            {
+                object theme = themes.GetMethod("ForLevel").Invoke(null, new object[] { level });
+                Color32 primary = (Color32)(Color)themes.GetProperty("PrimaryColor").GetValue(theme);
+                Color32 secondary = (Color32)(Color)themes.GetProperty("SecondaryColor").GetValue(theme);
+                float primaryLuminance = primary.r * .299f + primary.g * .587f + primary.b * .114f;
+                float secondaryLuminance = secondary.r * .299f + secondary.g * .587f + secondary.b * .114f;
+                bool mapPrimaryToDark = Mathf.Abs(primaryLuminance - secondaryLuminance) < 8f || primaryLuminance < secondaryLuminance;
+                Color32 expectedDark = mapPrimaryToDark ? primary : secondary;
+                Color32 expectedLight = mapPrimaryToDark ? secondary : primary;
+                Assert.AreEqual(expectedDark, mapBand.Invoke(null, new object[] { .05f, primary, secondary }), "dark stripe, level " + level);
+                Assert.AreEqual(expectedLight, mapBand.Invoke(null, new object[] { .96f, primary, secondary }), "light stripe, level " + level);
+            }
+        }
+
+        [Test]
+        public void ChulengoPopupColorizesOnlyTheTwoFlagClothAreas()
+        {
+            const string resource = "street-victory-popup-wood-v1";
+            Texture2D source = Resources.Load<Texture2D>(resource);
+            Assert.NotNull(source);
+            Assert.IsTrue(source.isReadable, "The runtime recolor requires the imported authored texture to be CPU-readable.");
+            Type themes = Type.GetType("HayChoriYPaty.ClubVisualTheme, Assembly-CSharp", true);
+            object racing = themes.GetMethod("ForLevel").Invoke(null, new object[] { 5 });
+            MethodInfo create = View.GetMethod("CreateClubColoredVictoryPopup", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.IsNotNull(create);
+            Texture2D colored = (Texture2D)create.Invoke(null, new[] { (object)source, racing, true });
+            Assert.NotNull(colored);
+            try
+            {
+                Color32[] original = source.GetPixels32();
+                Color32[] result = colored.GetPixels32();
+                int changedFlags = 0, changedElsewhere = 0, racingBluePixels = 0;
+                for (int y = 0; y < source.height; y++)
+                for (int x = 0; x < source.width; x++)
+                {
+                    int index = y * source.width + x;
+                    Color32 a = original[index], b = result[index];
+                    bool changed = a.r != b.r || a.g != b.g || a.b != b.b || a.a != b.a;
+                    bool flagRegion = (y + .5f) / source.height >= .87f && (y + .5f) / source.height <= .992f &&
+                        ((x + .5f) / source.width >= .15f && (x + .5f) / source.width <= .305f ||
+                         (x + .5f) / source.width >= .695f && (x + .5f) / source.width <= .85f);
+                    if (flagRegion)
+                    {
+                        if (changed) changedFlags++;
+                        if (b.b > b.r + 24 && b.g > b.r + 18) racingBluePixels++;
+                    }
+                    else if (changed) changedElsewhere++;
+                }
+                Assert.Greater(changedFlags, 1000, "Both authored flag fabrics should be recolored.");
+                Assert.Greater(racingBluePixels, 1000, "Racing's sky-blue stripe should be visible in the flags.");
+                Assert.AreEqual(0, changedElsewhere, "The board, crest, poles and all other artwork remain pixel-identical.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(colored); }
+        }
+
         [TestCase("200/200", 40)]
         [TestCase("2147483647", 42)]
         [TestCase("CHORI 200/200\nCOCA 200/200", 27)]

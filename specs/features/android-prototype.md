@@ -1,3 +1,23 @@
+# Current Android delivery — 2026-10-23 (0.2.62/code64, Chulengo + handoff updates)
+
+Generated from an isolated copy with Unity 6000.6.3f1; Main-only Development IL2CPP/ARM64. `BuildPipeline` **Succeeded in 89.67 s; 0 errors / 6 warnings**. The final build includes the current Chulengo parchment extension that covers the legacy green CTA edge. Package `com.haychoriypaty.game`, version **0.2.62/code64**, min API26/target36, ARM64.
+
+APK `/private/tmp/HayChoriYPaty-0.2.62-code64.apk`: **345,505,605 bytes (329.50 MiB)**, SHA-256 `74b9700a5693cf5e228e534adbdf5443842b614eb45f402b1a3b0493bc9271e8`. `aapt` metadata, ZIP integrity, `zipalign -c -v 4`, APK Signature Scheme v2, Firebase Analytics deactivation, and Google Analytics ad-ID disabled were verified. Signer: Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`.
+
+Focused validation before packaging: **40 EditMode + 4 PlayMode** cases for Chulengo, handoff/Mozo and sandwich-table compaction, plus **12/12 Chulengo EditMode** regressions in the isolated copy. The final parchment-extent adjustment was compiled in the APK build; those tests were not rerun for this packaging pass. No physical-device install/QA was done. Chulengo resemblance ≥95% remains **uncertified**; no complete screenshot comparison was claimed. Development/debug-signed, not Play Store release-signed. The APK remains in `/private/tmp` and is not committed to Git. Build log/report: `/private/tmp/hcyp-apk-release-0.2.62-code64-20261023/`.
+
+---
+
+# Current Android delivery — 2026-10-23 (0.2.61/code63, Chulengo club-colored pennants)
+
+Generated in a copy-on-write isolated project with Unity 6000.6.3f1; build scene `Assets/Scenes/Main.unity` only, Development IL2CPP/ARM64. `BuildPipeline` result **Succeeded, 0 errors / 1 warning, 448.59 s** (Unity Diagnostics Data recommends debug symbols). The APK includes the current Chulengo flag recoloring and popup/layout edits plus the current gameplay checkout; local Editor run-in-background/time-scale and Firebase Analytics settings, generated test scenes, screenshots/recovery data, and balance-audit helpers were omitted from the staging copy. Android metadata: package `com.haychoriypaty.game`, **0.2.61/code63**, min API26/target36, ARM64.
+
+APK `/private/tmp/HayChoriYPaty-0.2.61-code63.apk`: **345,506,161 bytes (329.50 MiB)**, SHA-256 `31e2f830b814dfd7399d8ba821bd4e3be81035a17632b311af9abbc859b938ec`. `aapt` metadata, ZIP integrity, `zipalign -c -v 4`, APK v2 signature, and Firebase Analytics-deactivated / Google Analytics ad-ID-disabled manifest flags passed. Signer: existing Android Debug certificate SHA-256 `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`.
+
+Focused Chulengo EditMode checks in the isolated copy: **12/12 passed** after correcting the test's reflection unboxing from boxed `Color` to `Color32`. No full Game View/reference-image similarity review or physical-device QA was run; the requested 95% visual match is **not certified**. Development/debug-signed (not Play Store release-signed), not installed. Build log and test results: `/private/tmp/hcyp-apk-release-0.2.61-code63-20261023/`.
+
+---
+
 # Current Android delivery — 2026-10-22 (0.2.60/code62, Chulengo + Racing $200 Fernetero + table-slot fixes)
 
 Built from an isolated copy with Unity 6000.6.3f1; Main-only Development IL2CPP/ARM64. The live Unity Editor was left untouched. Build **succeeded in 601.17 s; 0 errors / 2 warnings**. Racing Fernetero's first hire is $200; later hires retain the $500/$1,000/$1,800/$2,800 progression. This build includes the revised Chulengo layout, exact customer-column final handoffs, and active-sandwich table-cell release/compaction/reflow.

@@ -683,7 +683,7 @@ namespace HayChoriYPaty
         public static Vector2 StationApproachPoint() => StreetWorkstationLayout.ApproachPosition(0);
         public static Vector2 StationApproachPointForLevel(int product, int levelIndex) => StreetWorkstationLayout.ApproachPosition(product);
         public static Vector2 StationPositionForProductCount(int product, int productCount) => StationPosition(product);
-        public static float CounterHandoffYForLevel(int levelIndex) => StreetSceneLayout.WorkerServiceY;
+        public static float CounterHandoffYForLevel(int levelIndex) => Mathf.Lerp(FrontQueueY, StreetSceneLayout.WorkerServiceY, .5f);
         private Vector2 WorkerWaitPosition(int workerId)
         {
             // Stagger rows across the counter-side aisle: six columns fit without clipping,
@@ -701,9 +701,17 @@ namespace HayChoriYPaty
 
         private static Vector2 CounterHandoffPosition(StreetCustomer customer)
         {
-            // The final waypoint belongs in the assigned customer's exact column.
-            // Furniture avoidance remains the responsibility of the layout route.
-            return new Vector2(customer.Target.x, StreetSceneLayout.WorkerServiceY);
+            // Keep the customer's exact column, but halve the old vertical service gap.
+            // Canvas Y grows downward, so this leaves the worker between the street edge and customer.
+            return new Vector2(customer.Target.x,
+                Mathf.Lerp(customer.Target.y, StreetSceneLayout.WorkerServiceY, .5f));
+        }
+
+        private static void FaceCustomerAtHandoff(StreetWorker worker)
+        {
+            if (worker == null || worker.Customer == null) return;
+            Vector2 towardCustomer = worker.Customer.Target - worker.Position;
+            if (towardCustomer.sqrMagnitude > .0001f) worker.FacingVector = towardCustomer;
         }
 
         private int WorkerAccessIndex(StreetWorker worker, int accessCount)
@@ -932,7 +940,12 @@ namespace HayChoriYPaty
                 {
                     MoveWorker(w, dt);
                     if (w.Position == w.Target && AdvanceWorkerRoute(w))
-                    { w.State = StreetWorkerState.Handoff; w.Delay = balance.pickupSeconds / workRate; }
+                    {
+                        // Stop first, turn toward the assigned customer, then use the existing handoff dwell.
+                        FaceCustomerAtHandoff(w);
+                        w.State = StreetWorkerState.Handoff;
+                        w.Delay = balance.pickupSeconds / workRate;
+                    }
                 }
                 else if (w.State == StreetWorkerState.Handoff)
                 {
@@ -1447,7 +1460,7 @@ namespace HayChoriYPaty
                 deliveredByProduct[worker.Product]++;
                 if (!customer.WasServed) { customer.WasServed = true; customersAttended++; }
                 int amount = Mathf.Max(0, Mathf.RoundToInt(GetProductPrice(worker.Product)));
-                Coins += amount; CoinsEarned += amount; sales.Add(new StreetSale { Id = nextSale++, Amount = amount, Position = new Vector2(customer.Target.x, 400) });
+                Coins += amount; CoinsEarned += amount; sales.Add(new StreetSale { Id = nextSale++, Amount = amount, Position = worker.Position });
                 if (sales.Count > 40) sales.RemoveAt(0);
 
                 if (line.Remaining > 0 && Kitchen.HasSupply(worker.Product))

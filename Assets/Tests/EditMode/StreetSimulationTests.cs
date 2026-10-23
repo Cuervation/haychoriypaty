@@ -115,6 +115,9 @@ namespace HayChoriYPaty.Tests
         private static Type KitchenLayout => Type.GetType("HayChoriYPaty.StreetKitchenLayout, Assembly-CSharp", true);
         private static float WorkerServiceY => (float)Type.GetType("HayChoriYPaty.StreetSceneLayout, Assembly-CSharp", true)
             .GetField("WorkerServiceY", BindingFlags.Public | BindingFlags.Static).GetValue(null);
+        private static float FrontQueueY => (float)Type.GetType("HayChoriYPaty.StreetSimulation, Assembly-CSharp", true)
+            .GetField("FrontQueueY", BindingFlags.Public | BindingFlags.Static).GetRawConstantValue();
+        private static float ExpectedHandoffY(float customerY) => Mathf.Lerp(customerY, WorkerServiceY, .5f);
         private static Rect WorkBounds(string name) => (Rect)Workstations.GetProperty(name).GetValue(null, null);
         private static Rect ProductBounds(int product, bool premium = false) => (Rect)(premium
             ? Workstations.GetMethod("BoundsForProduct", new[] { typeof(int), typeof(bool) }).Invoke(null, new object[] { product, true })
@@ -185,8 +188,11 @@ namespace HayChoriYPaty.Tests
             object customer = Customers(sim)[0];
             PropertyInfo targetProperty = customer.GetType().GetProperty("Target", BindingFlags.Instance | BindingFlags.Public);
             MethodInfo handoffPosition = simType.GetMethod("CounterHandoffPosition", BindingFlags.Static | BindingFlags.NonPublic);
+            MethodInfo handoffYForLevel = simType.GetMethod("CounterHandoffYForLevel", BindingFlags.Public | BindingFlags.Static);
             Assert.IsNotNull(targetProperty);
             Assert.IsNotNull(handoffPosition);
+            Assert.AreEqual(ExpectedHandoffY(FrontQueueY), (float)handoffYForLevel.Invoke(null, new object[] { level }),
+                "Level " + (level + 1) + " halves the original front-row service gap.");
 
             for (int column = 0; column < 7; column++)
             {
@@ -194,8 +200,11 @@ namespace HayChoriYPaty.Tests
                 target.x = 58 + column * 70;
                 targetProperty.GetSetMethod(true).Invoke(customer, new object[] { target });
                 Vector2 actual = (Vector2)handoffPosition.Invoke(null, new[] { customer });
-                Assert.AreEqual(new Vector2(target.x, WorkerServiceY), actual,
-                    "Level " + (level + 1) + ", customer column " + column + " must be the exact final delivery point.");
+                float expectedY = ExpectedHandoffY(target.y);
+                Assert.AreEqual(new Vector2(target.x, expectedY), actual,
+                    "Level " + (level + 1) + ", customer column " + column + " must keep exact X and halve the vertical gap.");
+                Assert.AreEqual((WorkerServiceY - target.y) * .5f, actual.y - target.y, .001f,
+                    "The handoff anchor is exactly halfway to the former service line.");
             }
         }
 
@@ -251,7 +260,7 @@ namespace HayChoriYPaty.Tests
                         {
                             firstDeliveryPosition = feet;
                             firstDeliveryAtHandoff = true;
-                            Assert.AreEqual(new Vector2(target.x, WorkerServiceY), feet, "The next unit starts where the first was handed to this customer.");
+                            Assert.AreEqual(new Vector2(target.x, ExpectedHandoffY(target.y)), feet, "The next unit starts where the first was handed to this customer.");
                             Vector2[] nextTrip = KitchenShortestRoute(kitchenLayout, firstDeliveryPosition, KitchenPickupPosition(kitchenLayout, product));
                             Assert.Greater(nextTrip.Length, 0);
                             Assert.AreEqual(nextTrip[0], Get(worker, "Target"), "A successive unit starts from the prior handoff position.");
@@ -281,7 +290,7 @@ namespace HayChoriYPaty.Tests
                             Assert.NotNull(carriedUnit);
                             Assert.AreEqual("Carried", Get(carriedUnit, "Location").ToString());
                             Assert.AreEqual(workerId, Get(carriedUnit, "WorkerId"));
-                            Vector2[] independentReturn = KitchenShortestRoute(kitchenLayout, KitchenPickupPosition(kitchenLayout, product), new Vector2(target.x, WorkerServiceY));
+                            Vector2[] independentReturn = KitchenShortestRoute(kitchenLayout, KitchenPickupPosition(kitchenLayout, product), new Vector2(target.x, ExpectedHandoffY(target.y)));
                             Assert.Greater(independentReturn.Length, 0);
                             Vector2[] activeReturn = (Vector2[])Get(worker, "Route");
                             CollectionAssert.AreEqual(independentReturn, activeReturn, "The return trip is recalculated from pickup to this customer's handoff.");
@@ -291,8 +300,11 @@ namespace HayChoriYPaty.Tests
                         if (state == "Handoff")
                         {
                             handed = true;
-                            Assert.AreEqual(WorkerServiceY, feet.y, "Every real handoff remains at the player side of the service edge.");
+                            Assert.AreEqual(ExpectedHandoffY(target.y), feet.y, "Every real handoff is halfway across the former gap.");
                             Assert.AreEqual(target.x, feet.x, "Every handoff remains aligned to its front-row customer.");
+                            Vector2 facing = (Vector2)Get(worker, "FacingVector");
+                            Assert.That(Vector2.Dot(facing.normalized, (target - feet).normalized), Is.GreaterThan(.99f),
+                                "The worker stops and faces the assigned customer before completing delivery.");
                         }
                     }
                 }
@@ -639,10 +651,12 @@ object sim = Make(level: 2);
             Set(sim, "Coins", 1000);
             Assert.IsTrue((bool)Call(sim, "TryHire", Role("Cocacolero")));
             IList workers = (IList)Get(sim, "Workers");
-            float handoffY = (float)simType.GetField("ChicagoCounterServiceY", BindingFlags.Public | BindingFlags.Static).GetValue(null);
-            Assert.AreEqual(WorkerServiceY, handoffY);
+            float homeY = WorkerServiceY;
+            float handoffY = ExpectedHandoffY(FrontQueueY);
+            float chicagoHomeY = (float)simType.GetField("ChicagoCounterServiceY", BindingFlags.Public | BindingFlags.Static).GetValue(null);
+            Assert.AreEqual(homeY, chicagoHomeY, "The existing worker home row stays unchanged.");
             foreach (object worker in workers)
-                Assert.AreEqual(handoffY, ((Vector2)Get(worker, "Position")).y, "Chicago staff start in front of, not inside, the counter");
+                Assert.AreEqual(homeY, ((Vector2)Get(worker, "Position")).y, "Chicago staff start in front of, not inside, the counter");
 
             Assert.IsTrue((bool)Call(sim, "SpawnCustomer", 0, 1, 4, 1));
             bool sawHandoff = false;
@@ -652,10 +666,13 @@ object sim = Make(level: 2);
                 foreach (object worker in workers)
                 {
                     Vector2 position = (Vector2)Get(worker, "Position");
-                    Assert.That(position.y, Is.GreaterThanOrEqualTo(handoffY - .001f), "A worker must not cross the counter service boundary");
+                    Assert.That(position.y, Is.GreaterThanOrEqualTo(handoffY - .001f), "A worker must not walk past the handoff point toward the customer.");
                     if (Get(worker, "State").ToString() == "Handoff")
                     {
                         Assert.AreEqual(handoffY, position.y);
+                        Vector2 facing = (Vector2)Get(worker, "FacingVector");
+                        Assert.That(facing.y, Is.LessThan(0f), "The worker faces up toward the customer during handoff.");
+                        Assert.That(Mathf.Abs(facing.x), Is.LessThan(.001f), "The worker faces squarely toward the customer in the same column.");
                         sawHandoff = true;
                     }
                 }
@@ -776,7 +793,13 @@ object sim = Make(level: 2);
                         Assert.AreEqual(role == 0 ? 0 : 4, Get(worker, "Product"));
                     }
                     if (state == "ToCounter") carried[role] = true;
-                    if (state == "Handoff") { handed[role] = true; Assert.AreEqual(WorkerServiceY, position.y); }
+                    if (state == "Handoff")
+                    {
+                        handed[role] = true;
+                        Assert.AreEqual(ExpectedHandoffY(FrontQueueY), position.y);
+                        Vector2 facing = (Vector2)Get(worker, "FacingVector");
+                        Assert.That(facing.y, Is.LessThan(0f), "A handoff turns toward the customer.");
+                    }
                 }
             }
             Assert.AreEqual(4, Get(sim, "Delivered")); Assert.AreEqual(20, Get(sim, "Coins"));

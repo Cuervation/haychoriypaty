@@ -365,7 +365,8 @@ namespace HayChoriYPaty
         private Texture2D fourZoneGrill, premiumGrill, beerBarrel, fernetTable;
         private Texture2D premiumWorker, premiumDiagonal, fernetWorker, fernetWorkerLater;
         private Texture2D mozoWorker;
-        private Texture2D victoryPopup;
+        private Texture2D victoryPopup, clubColoredVictoryPopup;
+        private int clubColoredVictoryPopupLevel = int.MinValue;
         private Texture2D chulengoMeter, chulengoNeedle, chulengoHub, chulengoParchment, chulengoBowl;
         private Texture2D coverArt, titleLogo, introGlow, menuButton, googleButtonSurface, hudBarTexture, cutoutHudBarTexture, hudQuotaCardTexture, hudQuotaCardOutlineTexture, riotBackdrop, riotFanAtlas, riotImpactCloud;
         private Font menuFont;
@@ -556,6 +557,9 @@ namespace HayChoriYPaty
         {
             // Release cached sprites before destroying their palette textures.
             if (kitchenRenderer != null) kitchenRenderer.ReleaseWorkers();
+            if (clubColoredVictoryPopup != null) Destroy(clubColoredVictoryPopup);
+            clubColoredVictoryPopup = null;
+            clubColoredVictoryPopupLevel = int.MinValue;
             if (introGlow != null) Destroy(introGlow);
             introGlow = null;
             if (chulengoMeter != null) Destroy(chulengoMeter);
@@ -1228,14 +1232,21 @@ namespace HayChoriYPaty
         public static Rect ChulengoCollectBoundsForFrame(Rect frame, float canvasHeight)
         {
             float multiplyBottom = ChulengoMultiplyBoundsForFrame(frame).yMax;
-            return new Rect(150, Mathf.Max(canvasHeight - 130f, multiplyBottom + 8f), 240, 44f);
+            float responsiveScale = Mathf.Clamp(canvasHeight / 1200f, .65f, 1f);
+            float height = 44f * responsiveScale;
+            return new Rect(150, Mathf.Max(canvasHeight - 130f * responsiveScale, multiplyBottom + 8f),
+                240f * responsiveScale, height);
         }
         private Rect ChulengoLevelsBounds() => ChulengoLevelsBoundsForFrame(
             VictoryPopupBounds(logicalCanvasHeight, true), logicalCanvasHeight);
         public static Rect ChulengoLevelsBoundsForFrame(Rect frame, float canvasHeight)
         {
             Rect collect = ChulengoCollectBoundsForFrame(frame, canvasHeight);
-            return new Rect(150, Mathf.Max(canvasHeight - 72f, collect.yMax + 14f), 240, 52f);
+            float responsiveScale = Mathf.Clamp(canvasHeight / 1200f, .65f, 1f);
+            float height = 52f * responsiveScale;
+            float lastSafeTop = canvasHeight - 4f - height;
+            float preferredTop = Mathf.Max(canvasHeight - 72f * responsiveScale, collect.yMax + 14f);
+            return new Rect(150, Mathf.Min(lastSafeTop, preferredTop), 240f * responsiveScale, height);
         }
 
         private static Rect RiotGameOverBounds(float canvasHeight)
@@ -3627,13 +3638,14 @@ namespace HayChoriYPaty
         private static Rect LevelButton(int i){return new Rect(108+i*67,912,57,35);}
         private static Rect VictoryPopupBounds(float canvasHeight, bool chulengo = false)
         {
-            float topHudReserve = chulengo ? 160f : 110f;
+            float topHudReserve = chulengo ? 224f : 110f;
             const float screenInset = 16f;
             float resultButtonTopInset = chulengo ? 123f : 72f;
             const float resultButtonGap = 8f;
             // Chulengo reserves space for three lower actions and keeps the status HUD visible above the crest.
             float availableHeight = Mathf.Max(1f, canvasHeight - topHudReserve - screenInset - resultButtonTopInset - resultButtonGap);
-            float scale = Mathf.Min((W - 24f) / VictoryPopupArtSize.x, availableHeight / VictoryPopupArtSize.y);
+            float horizontalInset = chulengo ? 32f : 24f;
+            float scale = Mathf.Min((W - horizontalInset) / VictoryPopupArtSize.x, availableHeight / VictoryPopupArtSize.y);
             Vector2 size = VictoryPopupArtSize * scale;
             float y = topHudReserve + screenInset + (availableHeight - size.y) * .5f;
             return new Rect((W - size.x) * .5f, y, size.x, size.y);
@@ -3641,9 +3653,88 @@ namespace HayChoriYPaty
         private static Rect VictorySlot(Rect frame, Rect normalized) => new Rect(
             frame.x + normalized.x * frame.width, frame.y + normalized.y * frame.height,
             normalized.width * frame.width, normalized.height * frame.height);
+
+        private Texture2D ClubColoredVictoryPopup(int levelIndex)
+        {
+            if (victoryPopup == null) return null;
+            if (clubColoredVictoryPopupLevel == levelIndex)
+                return clubColoredVictoryPopup != null ? clubColoredVictoryPopup : victoryPopup;
+
+            if (clubColoredVictoryPopup != null) Destroy(clubColoredVictoryPopup);
+            clubColoredVictoryPopup = CreateClubColoredVictoryPopup(victoryPopup, ClubVisualTheme.ForLevel(levelIndex));
+            clubColoredVictoryPopupLevel = levelIndex;
+            return clubColoredVictoryPopup != null ? clubColoredVictoryPopup : victoryPopup;
+        }
+
+        private static Texture2D CreateClubColoredVictoryPopup(Texture2D source, ClubVisualTheme theme, bool keepReadable = false)
+        {
+            if (source == null || theme == null || !source.isReadable) return null;
+
+            Color32[] pixels;
+            try { pixels = source.GetPixels32(); }
+            catch (UnityException) { return null; }
+
+            int width = source.width, height = source.height;
+            Color32 primary = theme.PrimaryColor, secondary = theme.SecondaryColor;
+            int changed = 0;
+            for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
+            {
+                if (!IsChulengoFlagPixel(x, y, width, height)) continue;
+                int index = y * width + x;
+                Color32 sourcePixel = pixels[index];
+                if (sourcePixel.a < 48) continue;
+
+                int min = Mathf.Min(sourcePixel.r, Mathf.Min(sourcePixel.g, sourcePixel.b));
+                int max = Mathf.Max(sourcePixel.r, Mathf.Max(sourcePixel.g, sourcePixel.b));
+                // The poles and gold finials are warm-colored, while the two cloth flags are grayscale.
+                if (max - min > 48) continue;
+
+                float luminance = (sourcePixel.r * .299f + sourcePixel.g * .587f + sourcePixel.b * .114f) / 255f;
+                Color32 band = ChulengoFlagBandColor(luminance, primary, secondary);
+                float shade = luminance < .5f
+                    ? Mathf.Lerp(.72f, .96f, Mathf.Clamp01(luminance * 2f))
+                    : Mathf.Lerp(.90f, 1f, Mathf.Clamp01((luminance - .5f) * 2f));
+                pixels[index] = new Color32(
+                    (byte)Mathf.Clamp(Mathf.RoundToInt(band.r * shade), 0, 255),
+                    (byte)Mathf.Clamp(Mathf.RoundToInt(band.g * shade), 0, 255),
+                    (byte)Mathf.Clamp(Mathf.RoundToInt(band.b * shade), 0, 255), sourcePixel.a);
+                changed++;
+            }
+
+            if (changed == 0) return null;
+            var result = new Texture2D(width, height, TextureFormat.RGBA32, false)
+            {
+                name = "Chulengo victory popup - " + theme.ClubName,
+                filterMode = source.filterMode,
+                wrapMode = source.wrapMode
+            };
+            result.SetPixels32(pixels);
+            result.Apply(false, !keepReadable);
+            return result;
+        }
+
+        private static bool IsChulengoFlagPixel(int x, int y, int width, int height)
+        {
+            if (width <= 0 || height <= 0) return false;
+            float u = (x + .5f) / width, v = (y + .5f) / height;
+            if (v < .87f || v > .992f) return false;
+            return u >= .15f && u <= .305f || u >= .695f && u <= .85f;
+        }
+
+        private static Color32 ChulengoFlagBandColor(float luminance, Color32 primary, Color32 secondary)
+        {
+            float primaryLuminance = primary.r * .299f + primary.g * .587f + primary.b * .114f;
+            float secondaryLuminance = secondary.r * .299f + secondary.g * .587f + secondary.b * .114f;
+            bool primaryIsDarker = primaryLuminance <= secondaryLuminance;
+            bool sourceIsLightStripe = luminance >= .5f;
+            if (Mathf.Abs(primaryLuminance - secondaryLuminance) < 8f)
+                return sourceIsLightStripe ? secondary : primary;
+            return sourceIsLightStripe == primaryIsDarker ? secondary : primary;
+        }
         private Rect ChulengoMultiplyBounds() => ChulengoMultiplyBoundsForFrame(VictoryPopupBounds(logicalCanvasHeight, true));
         // Public for focused geometry checks; pointer and visible control share this normalized frame.
-        public static Rect ChulengoMultiplyBoundsForFrame(Rect frame) => VictorySlot(frame, new Rect(.20f, .89f, .60f, .112f));
+        public static Rect ChulengoMultiplyBoundsForFrame(Rect frame) => VictorySlot(frame, new Rect(.20f, .935f, .60f, .095f));
         public static int ChulengoSectorAtPosition(float position) => StreetChulengo.SectorAtPosition(position);
         private static readonly string[] ChulengoLabels = { "×0", "×1,5", "×1", "×2", "×1", "×1,5", "×0" };
         private static readonly Color[] ChulengoColors = {
@@ -3894,19 +3985,20 @@ namespace HayChoriYPaty
         private void DrawChulengoPaper(Rect frame)
         {
             // Keep the original bolt plates visible while expanding the authored parchment into the reference's reward-card hierarchy.
-            Rect paper = VictorySlot(frame, new Rect(.07f, .31f, .86f, .60f));
+            // The legacy popup has a baked green CTA at the bottom; extend the paper behind the replacement blue action to hide its exposed edge.
+            Rect paper = VictorySlot(frame, new Rect(.07f, .31f, .86f, .64f));
             if (chulengoParchment != null) GUI.DrawTexture(paper, chulengoParchment, ScaleMode.StretchToFill, true);
             else FillRect(paper, new Color(.98f, .89f, .68f));
         }
 
         private void DrawChulengoHero(Rect frame, bool pending, bool lockedRetry, int sector)
         {
-            Color brown = new Color(.20f, .055f, .02f);
+            Color cream = new Color(1f, .94f, .78f);
             float fontScale = frame.width / 516f;
-            VictoryText(VictorySlot(frame, new Rect(.31f, .305f, .64f, .115f)), "CHULENGO",
-                Mathf.RoundToInt(92f * fontScale), brown, TextAnchor.MiddleCenter);
+            VictoryText(VictorySlot(frame, new Rect(.39f, .315f, .54f, .086f)), "CHULENGO",
+                Mathf.RoundToInt(82f * fontScale), cream, TextAnchor.MiddleCenter);
 
-            Rect cook = VictorySlot(frame, new Rect(.08f, .32f, .34f, .245f));
+            Rect cook = VictorySlot(frame, new Rect(.075f, .345f, .31f, .255f));
             if (parrilleroIcon != null) GUI.DrawTexture(cook, parrilleroIcon, ScaleMode.ScaleToFit, true);
 
             string label;
@@ -3937,35 +4029,36 @@ namespace HayChoriYPaty
                 reward = game.ChulengoFinalRewardCents;
             }
 
-            Color resultColor = sector == 0 || sector == 6 ? new Color(.75f, .075f, .035f) : brown;
-            if (pending || lockedRetry && sector < 0) resultColor = brown;
-            VictoryText(VictorySlot(frame, new Rect(.46f, .39f, .46f, .06f)), label,
+            Color resultColor = sector == 0 || sector == 6 ? new Color(.75f, .075f, .035f) : cream;
+            if (pending || lockedRetry && sector < 0) resultColor = cream;
+            VictoryText(VictorySlot(frame, new Rect(.535f, .405f, .385f, .047f)), label,
                 Mathf.RoundToInt(20f * fontScale), resultColor, TextAnchor.MiddleCenter);
             if (gameCoin != null)
             {
-                GUI.DrawTexture(VictorySlot(frame, new Rect(.405f, .405f, .075f, .082f)), gameCoin, ScaleMode.ScaleToFit, true);
-                GUI.DrawTexture(VictorySlot(frame, new Rect(.435f, .390f, .085f, .094f)), gameCoin, ScaleMode.ScaleToFit, true);
-                GUI.DrawTexture(VictorySlot(frame, new Rect(.445f, .415f, .090f, .096f)), gameCoin, ScaleMode.ScaleToFit, true);
+                GUI.DrawTexture(VictorySlot(frame, new Rect(.405f, .435f, .075f, .075f)), gameCoin, ScaleMode.ScaleToFit, true);
+                GUI.DrawTexture(VictorySlot(frame, new Rect(.435f, .415f, .085f, .088f)), gameCoin, ScaleMode.ScaleToFit, true);
+                GUI.DrawTexture(VictorySlot(frame, new Rect(.455f, .445f, .075f, .077f)), gameCoin, ScaleMode.ScaleToFit, true);
             }
-            VictoryText(VictorySlot(frame, new Rect(.44f, .415f, .51f, .105f)), FormatChulengoMoney(reward),
-                Mathf.RoundToInt(84f * fontScale), sector == 0 || sector == 6 ? new Color(.75f, .075f, .035f) : new Color(1f, .69f, .14f), TextAnchor.MiddleCenter);
+            VictoryText(VictorySlot(frame, new Rect(.56f, .455f, .37f, .088f)), FormatChulengoMoney(reward),
+                Mathf.RoundToInt(80f * fontScale), sector == 0 || sector == 6 ? new Color(.75f, .075f, .035f) : new Color(1f, .69f, .14f), TextAnchor.MiddleCenter);
         }
 
         private void DrawChulengoFooter(Rect frame, bool pending, bool lockedRetry, int sector)
         {
             float fontScale = frame.width / 516f;
             Color brown = new Color(.20f, .055f, .02f);
+            Color cream = new Color(1f, .94f, .78f);
             if (pending)
             {
                 long baseReward = game.ChulengoBaseRewardCents;
                 long maximum = baseReward <= long.MaxValue / 2L ? baseReward * 2L : long.MaxValue;
-                VictoryText(VictorySlot(frame, new Rect(.12f, .75f, .76f, .048f)),
-                    "FRENÁ LA AGUJA EN LA ZONA DORADA", Mathf.RoundToInt(22f * fontScale), brown, TextAnchor.MiddleCenter);
-                VictoryText(VictorySlot(frame, new Rect(.15f, .78f, .36f, .070f)),
-                    "HASTA ×2:", Mathf.RoundToInt(44f * fontScale), brown, TextAnchor.MiddleRight);
-                VictoryText(VictorySlot(frame, new Rect(.525f, .765f, .38f, .095f)),
+                VictoryText(VictorySlot(frame, new Rect(.12f, .748f, .76f, .039f)),
+                    "FRENÁ LA AGUJA EN LA ZONA DORADA", Mathf.RoundToInt(22f * fontScale), cream, TextAnchor.MiddleCenter);
+                VictoryText(VictorySlot(frame, new Rect(.14f, .792f, .36f, .064f)),
+                    "HASTA ×2:", Mathf.RoundToInt(44f * fontScale), cream, TextAnchor.MiddleRight);
+                VictoryText(VictorySlot(frame, new Rect(.535f, .788f, .38f, .072f)),
                     FormatChulengoMoney(maximum), Mathf.RoundToInt(68f * fontScale), new Color(1f, .69f, .14f), TextAnchor.MiddleLeft);
-                VictoryText(VictorySlot(frame, new Rect(.10f, .825f, .80f, .046f)),
+                VictoryText(VictorySlot(frame, new Rect(.10f, .87f, .80f, .037f)),
                     "¡EN ×0 PERDÉS TODO EL PREMIO DEL TURNO!", Mathf.RoundToInt(22f * fontScale),
                     new Color(.78f, .07f, .035f), TextAnchor.MiddleCenter);
             }
@@ -4016,7 +4109,8 @@ namespace HayChoriYPaty
             {
                 // Uniform popup coordinates: never stretch its artwork, type or hit area vertically.
                 layoutVerticalScale = 1f;
-                if (victoryPopup != null) GUI.DrawTexture(frame, victoryPopup, ScaleMode.StretchToFill, true);
+                Texture2D popup = game.ShowChulengoResult ? ClubColoredVictoryPopup(game.Sim.LevelIndex) : victoryPopup;
+                if (popup != null) GUI.DrawTexture(frame, popup, ScaleMode.StretchToFill, true);
                 else
                 {
                     FillRect(frame, new Color(.19f, .07f, .025f));
@@ -4036,7 +4130,7 @@ namespace HayChoriYPaty
                     int sector = game.ChulengoSelectedSector;
                     DrawChulengoPaper(frame);
                     DrawChulengoHero(frame, pending, lockedRetry, sector);
-                    DrawChulengoMeter(VictorySlot(frame, new Rect(.0625f, .465f, .875f, .30f)),
+                    DrawChulengoMeter(VictorySlot(frame, new Rect(.0625f, .47f, .875f, .275f)),
                         !pending, sector, Mathf.RoundToInt(29f * fontScale));
                     DrawChulengoFooter(frame, pending, lockedRetry, sector);
                     if (pending || lockedRetry)

@@ -379,7 +379,11 @@ namespace HayChoriYPaty.Tests
             Type viewType = view.GetType();
             viewType.GetField("introActive", PrivateInstance).SetValue(view, false);
             viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, false);
+            object save = gameType.GetField("save", PrivateInstance).GetValue(game);
+            save.GetType().GetField("unlockedLevel").SetValue(save, 5);
+            Assert.IsTrue((bool)CallGame("SelectLevel", 5), "The visual regression uses Racing to verify its Chulengo club flags.");
             Invoke(game, "StartRound");
+            Assert.AreEqual(5, Get("Sim").GetType().GetProperty("LevelIndex", PublicInstance).GetValue(Get("Sim"), null));
             SetSim("Phase", Enum.Parse(Sim.GetType().GetProperty("Phase", PublicInstance).PropertyType, "Won"));
             yield return null;
             Rect viewport = (Rect)viewType.GetMethod("CanvasViewport", StaticPrivate)
@@ -399,11 +403,35 @@ namespace HayChoriYPaty.Tests
             }
             logicalHeightField.SetValue(view, canvasHeight);
             verticalScaleField.SetValue(view, verticalScale);
-            Rect exit = (Rect)resultBounds.Invoke(view, null);
             MethodInfo hit = viewType.GetMethod("HitAction", PrivateInstance);
             Assert.AreEqual(0, hit.Invoke(view, new object[] { new Vector2(35, 715) }), "The modal blocks the upgrade behind it");
-            Assert.AreEqual(163, hit.Invoke(view, new object[] { new Vector2(exit.center.x, exit.center.y / verticalScale) }));
-            yield return Click(exit.center.x, exit.center.y / verticalScale);
+            Assert.IsTrue((bool)Get("HasPendingChulengo"), "A new victory must be claimed before leaving the result.");
+            yield return new WaitForEndOfFrame();
+            Texture2D chulengoCapture = ScreenCapture.CaptureScreenshotAsTexture();
+            Assert.IsNotNull(chulengoCapture);
+            string chulengoCapturePath = System.IO.Path.Combine(System.IO.Path.GetTempPath(),
+                "hay-chori-chulengo-pending-" + Screen.width + "x" + Screen.height + ".png");
+            try
+            {
+                System.IO.File.WriteAllBytes(chulengoCapturePath, chulengoCapture.EncodeToPNG());
+                Debug.Log("Chulengo Game View capture saved to " + chulengoCapturePath + " (" + chulengoCapture.width + "x" + chulengoCapture.height + ")");
+            }
+            finally { UnityEngine.Object.Destroy(chulengoCapture); }
+            MethodInfo collectBounds = viewType.GetMethod("ChulengoCollectBounds", PrivateInstance);
+            MethodInfo levelsBounds = viewType.GetMethod("ChulengoLevelsBounds", PrivateInstance);
+            Rect collect = (Rect)collectBounds.Invoke(view, null);
+            Rect chulengoLevels = (Rect)levelsBounds.Invoke(view, null);
+            int collectAction = (int)viewType.GetField("ChulengoCollectAction", StaticPrivate).GetRawConstantValue();
+            int levelsAction = (int)viewType.GetField("ResultLevelsAction", StaticPrivate).GetRawConstantValue();
+            Assert.AreEqual(0, hit.Invoke(view, new object[] { new Vector2(chulengoLevels.center.x, chulengoLevels.center.y / verticalScale) }),
+                "The level selector remains locked while the Chulengo reward is pending.");
+            Assert.AreEqual(collectAction, hit.Invoke(view, new object[] { new Vector2(collect.center.x, collect.center.y / verticalScale) }),
+                "COBRAR is the available way to settle the ordinary turn reward.");
+            yield return Click(collect.center.x, collect.center.y / verticalScale);
+            Assert.IsFalse((bool)Get("HasPendingChulengo"));
+            chulengoLevels = (Rect)levelsBounds.Invoke(view, null);
+            Assert.AreEqual(levelsAction, hit.Invoke(view, new object[] { new Vector2(chulengoLevels.center.x, chulengoLevels.center.y / verticalScale) }));
+            yield return Click(chulengoLevels.center.x, chulengoLevels.center.y / verticalScale);
             Assert.AreEqual("Ready", Phase);
             Assert.IsTrue((bool)viewType.GetField("levelSelectActive", PrivateInstance).GetValue(view));
         }

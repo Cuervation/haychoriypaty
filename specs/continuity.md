@@ -1,3 +1,27 @@
+## 2026-10-23 — APK Android 0.2.62/code64
+
+Se generó en copia aislada con Unity 6000.6.3f1, Main-only Development IL2CPP/ARM64: **Succeeded, 0 errores/6 warnings, 89,67 s**. Incluye la extensión final del pergamino Chulengo que tapa el borde verde del CTA legado. APK `/private/tmp/HayChoriYPaty-0.2.62-code64.apk`, paquete `com.haychoriypaty.game`, versión0.2.62/code64, 345.505.605 bytes, SHA-256 `74b9700a5693cf5e228e534adbdf5443842b614eb45f402b1a3b0493bc9271e8`. Metadatos, integridad ZIP, alineación, firma v2 y flags Firebase Analytics desactivado/GA AD ID desactivado comprobados. Firma Android Debug, no Play Store. No se instaló ni se hizo QA físico; similitud ≥95% de Chulengo no certificada. La APK queda fuera de Git; el contrato completo está en [android-prototype.md](features/android-prototype.md).
+
+## 2026-10-23 — Reanudación de validación en Unity
+
+Se confirmó por Unity MCP que la única instancia activa es `HayChoriYPaty` en `/Users/celestino/HayChoriYPaty`, Unity 6000.6.3f1. El ping de `editor/state` quedó sin respuesta, aunque los jobs focalizados del Test Runner sí terminaron. Pasaron **40 casos EditMode únicos** y **4 casos PlayMode únicos** focalizados para Chulengo, geometría/handoff y compactación de sándwiches/Mozo. PlayMode incluyó capturas Unity del estado Chulengo de Racing y de mesas compactas/transporte del Mozo, en `/var/folders/bf/q6_2cmvn6ls9pc5h5g7thj8r0000gn/T/`.
+
+Se corrigió un test táctil de victoria que esperaba navegación directa obsoleta: ahora cobra el premio pendiente antes de abrir niveles. La primera captura Game View reveló una franja verde de un CTA legado debajo de `MULTIPLICAR`; se extendió el pergamino en `StreetView` para cubrirla y la captura posterior confirma que ya no asoma. La composición aún **no está certificada ≥95%** respecto de la referencia.
+
+Se inició también una ejecución EditMode completa sin filtros, pero la consulta del job devolvió `TimeoutError` y el Editor volvió a no responder al ping; no se cuenta como aprobada ni como corrida completa. La suite PlayMode completa, QA visual/device, el gameplay real de nivel6 y los asuntos externos iOS/Firebase/dispositivo siguen pendientes. La meta de partidas reales sigue **0/200**: tests/capturas sintéticas no cuentan como intentos. No se guardó/modificó la escena, ni se generó APK, instaló, confirmó ni publicó nada. Evidencia visual: `/var/folders/bf/q6_2cmvn6ls9pc5h5g7thj8r0000gn/T/hay-chori-chulengo-pending-1080x1920.png`.
+
+## 2026-10-23 — APK Chulengo 0.2.61/code63
+
+APK generada desde una copia aislada con Unity 6000.6.3f1, Main-only Development IL2CPP/ARM64. BuildPipeline: Succeeded, 0 errores/1 warning de símbolos de diagnóstico, 448,59 s. 12/12 tests EditMode focalizados en Chulengo pasan; se corrigió en `StreetArtTests` el unboxing reflection de `Color` a `Color32`. Metadatos, ZIP, alineación, firma v2 y flags Firebase Analytics desactivado/GA AD ID desactivado verificados. APK 345.506.161 bytes, SHA-256 `31e2f830b814dfd7399d8ba821bd4e3be81035a17632b311af9abbc859b938ec`, artefacto local `/private/tmp/HayChoriYPaty-0.2.61-code63.apk`; debug-signed, no instalada ni subida a Git.
+
+El runtime incluye la recoloración de banderas Chulengo por colores del nivel. No se pudo capturar/inspeccionar el Game View de Unity ni comparar contra la imagen; la similitud ≥95% queda **sin certificar** y sigue pendiente de QA visual real. Unity MCP no respondió al ping; no se tocó el Editor activo. Ver evidencia completa en [android-prototype.md](features/android-prototype.md).
+
+## 2026-10-22 — Chulengo referencia de victoria (iteración en curso)
+
+Se ajustó `StreetView` para acercar el marco Chulengo a la composición vertical adjunta: marco con márgenes/posición más alineados, título y premio reordenados, texto de instrucción/multiplicador/advertencia sin colisiones, y controles inferiores escalables. Las telas de las dos banderas superiores ahora toman los colores del `ClubVisualTheme` del nivel; el arte fuente permanece sin modificación y los banderines inferiores continúan siendo temáticos.
+
+Se agregó cobertura focalizada en `StreetArtTests` y se cambió `isReadable` del popup para permitir el recolor en runtime. El primer filtro de pruebas por nombres cortos devolvió 0 tests; el segundo, con nombres completos, falló al inicializarse por desconexión del Editor antes de iniciar el runner. La captura de cámara disponible con `InitTestScenee16e6289-69f9-4473-8d22-310334403ecf` fuera de Play solo mostró cielo/suelo, no el juego ni Chulengo; el PNG temporal se eliminó y no sirve para QA. El objetivo visual ≥95% queda abierto y no se afirma como logrado. No se cambió escena ni Play Mode; preservar los cambios locales ajenos existentes.
+
 ## 2026-10-22 — Auditoría iOS: preflight detenido por toolchain/firma ausentes
 
 En el checkout activo se derivó el Bundle ID iOS `com.haychoriypaty.game` del Android existente y se fijó el primer build number iOS a1; se conservaron bundle version0.2.60, orientación vertical, mínimo iOS15.0, el AndroidBundleVersionCode62 y el ajuste local preexistente `runInBackground:1`. Se actualizó [firebase-player.md](features/firebase-player.md#auditoría-ios--2026-10-22) con el estado y aceptación pendiente.
@@ -98,3 +122,10 @@ Implemented optional post-victory CHULENGO with MULTIPLICAR and COBRAR, original
 ## Premium inicial gratuito en Racing — 2026-10-21
 
 Se implementó localmente, solo en nivel6, un Parrillero Premium gratis en cada partida/reintento junto al Normal; no consume el tier de primer hire pagado. No afecta niveles1–5 ni7–11. Cinco rondas reales en Main a ×1, seed1337, acciones por StreetView: todas perdidas. Mejor resultado197Chori, faltante13, frente al máximo anterior191/faltante19; déficit promedio24,4 frente a51,04 previo. No es victoria ni prueba de imposibilidad; compras variaron adaptativamente y se usó el perfilQA legado, no campaña nueva. `OnlyRacingStartsWithFreePremiumAndItsNextHireUsesBaseCostAcrossRetries` y guardia `RacingWithoutMozoCanCookButCannotSellOrWin`:2/2. La suite `StreetActiveCooksTests` ejecutó82,78 pasaron/4 fallaron en expectativas separadas. Perfil PlayerPrefs restaurado exactamente3439 caracteres; Editor parado, escena init original limpia, scale0, testInitfalse. Sin APK/instalación/commit/push. Informe y ledgers locales: `/Users/celestino/.codex/visualizations/2026/10/21/01a15bdf-e29b-7253-8456-9b392d7045a3/racing-default-premium/INFORME.md`.
+
+
+## Distancia y orientación de entrega del Mozo — 2026-10-22
+
+Ajuste local en el checkout activo: se redujo a la mitad el hueco vertical anterior entre la fila frontal y la línea de servicio, sin mover la columna del cliente. Con las coordenadas actuales, pasó de 76 a 38 unidades lógicas (Y=324→362, manteniendo Y=400 como origen/línea anterior). Al llegar, el Mozo queda quieto, gira para mirar hacia el cliente y conserva esa orientación durante el tiempo de entrega ya existente. El popup de monedas ahora aparece donde está el Mozo al concretar la venta. Contrato y tests EditMode relacionados se actualizaron; no hubo cambios de economía ni de compra.
+
+**Validación de este ajuste:** `git diff --check` pasó. Unity MCP no respondió al ping para `editor_state` ni `read_console`. Se lanzó una ejecución EditMode filtrada por las fixtures `StreetSimulationTests`, `StreetActiveCooksTests` y `StreetKitchenPresentationTests`, pero la sesión se desconectó mientras se esperaba el resultado; no contarla como aprobada. El intento anterior por nombres cortos devolvió 0 tests y tampoco cuenta. Compilación/runtime en Unity y captura/revisión visual quedan pendientes. No se hizo commit ni push; se preservaron las modificaciones y archivos locales preexistentes ajenos a este cambio.

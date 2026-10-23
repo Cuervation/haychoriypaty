@@ -43,6 +43,11 @@ namespace HayChoriYPaty.Tests
         private static float LayoutConstant(string name) => (float)Runtime("StreetKitchenLayout").GetField(name, BindingFlags.Public | BindingFlags.Static).GetRawConstantValue();
         private static float SceneWidth() => (float)Runtime("StreetSceneLayout").GetField("Width", BindingFlags.Public | BindingFlags.Static).GetValue(null);
         private static float WorkerServiceY() => (float)Runtime("StreetSceneLayout").GetField("WorkerServiceY", BindingFlags.Public | BindingFlags.Static).GetValue(null);
+        private static float CounterHandoffY()
+        {
+            float frontQueueY = (float)Runtime("StreetSimulation").GetField("FrontQueueY", BindingFlags.Public | BindingFlags.Static).GetRawConstantValue();
+            return Mathf.Lerp(frontQueueY, WorkerServiceY(), .5f);
+        }
 
         [TestCase(5)] [TestCase(6)] [TestCase(7)] [TestCase(8)] [TestCase(9)] [TestCase(10)]
         public void ActivePrepRowPreservesOriginalFurnitureAndCookSideRoutes(int level)
@@ -658,7 +663,7 @@ namespace HayChoriYPaty.Tests
 
                     for (int column = 0; column < 7; column++)
                     {
-                        Vector2 handoff = new Vector2(58 + column * 70, WorkerServiceY());
+                        Vector2 handoff = new Vector2(58 + column * 70, CounterHandoffY());
                         Vector2[] outbound = (Vector2[])Call(layout, "FindShortestSafeRoute", handoff, pickup);
                         Assert.Greater(outbound.Length, 0, "L" + level + " P" + product + " C" + column + " outbound route exists");
                         Assert.AreEqual(pickup, outbound[outbound.Length - 1]);

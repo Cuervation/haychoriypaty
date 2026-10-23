@@ -1,3 +1,19 @@
+## 2026-10-23 — APK Android 0.2.62/code64
+
+Unity 6000.6.3f1, Main-only Development IL2CPP/ARM64 en copia aislada: **Succeeded, 0 errores/6 warnings, 89,67 s**. APK `/private/tmp/HayChoriYPaty-0.2.62-code64.apk`, 345.505.605 bytes, SHA-256 `74b9700a5693cf5e228e534adbdf5443842b614eb45f402b1a3b0493bc9271e8`, package `com.haychoriypaty.game`, version0.2.62/code64, min API26/target36, ARM64. `aapt`, ZIP, zipalign, firma APK v2 y flags de Analytics comprobados. Debug-signed; no instalado en teléfono. APK fuera de Git por política de builds pesados. QA visual de ≥95% y físico siguen pendientes.
+
+## 2026-10-23 — Validación focalizada en Editor Unity
+
+Se comprobó la instancia MCP del checkout activo y Unity 6000.6.3f1. En ejecuciones focalizadas quedaron **40 EditMode únicos y 4 PlayMode únicos aprobados** para Chulengo, handoff/mozos y compactación de mesa. Se reparó el test de navegación del popup para respetar COBRAR antes de NIVELES. Una captura real de Game View detectó una franja verde del CTA legado bajo MULTIPLICAR; se amplió el pergamino y la captura repetida ya no muestra el artefacto. La similitud ≥95% aún no se certifica.
+
+La ejecución completa de EditMode se inició, pero el MCP expiró al consultar su job (`TimeoutError`) y el ping de estado del Editor no contestó: resultado no verificable. No hubo suite PlayMode completa, partida real nivel6, QA de dispositivo, APK ni cambio de escena. Captura: `/var/folders/bf/q6_2cmvn6ls9pc5h5g7thj8r0000gn/T/hay-chori-chulengo-pending-1080x1920.png`.
+
+## 2026-10-22 — Chulengo referencia de victoria (fuente actualizada; QA visual pendiente)
+
+Se reubicó la composición para el retrato de referencia, se separaron título/recompensa/monedas/copy del medidor para evitar solapes y el marco de victoria genera las dos telas de bandera usando los colores principales/secundarios del nivel activo. Se mantiene intacta la lógica de sectores/pago y los banderines inferiores ya usan la paleta del club. Se agregaron regresiones EditMode para la asignación de colores y el aislamiento de píxeles de las banderas.
+
+Validación Unity no concluyente: el filtro inicial por nombres cortos terminó con 0 tests; el segundo intento con nombres completos falló al inicializarse porque el Editor dejó de responder antes de iniciar las pruebas. No hay resultado EditMode válido ni compile/test pass que atribuir. Una captura Game View con el Editor en `InitTestScenee16e6289-69f9-4473-8d22-310334403ecf` y fuera de Play mostró solo cielo/suelo, sin el juego ni Chulengo; se eliminó el PNG temporal y esa captura no se usa para puntuar. La meta ≥95% queda **NOT_RUN**, sin puntaje declarado. No cambié escena ni Play Mode.
+
 ## 2026-10-22 — Compactación, handoff y APK 0.2.60/code62
 
 En niveles con cocineros activos, la reserva de cocina ya no retiene una celda visual durante la cocción/transporte: al depositar se elige una celda contigua; al retirar, el Mozo la libera inmediatamente y se compacta la mesa, manteniendo ID/claim y recalculando su destino si otro producto se mueve. El renderer anima el reflujo en 0,18 s. El waypoint final de entrega coincide exactamente con la columna del cliente en los once niveles; se conservan las rutas seguras respecto de muebles. Racing (nivel 6) inicia con contratación de Fernetero a $200 y la curva posterior $500/$1.000/$1.800/$2.800.
