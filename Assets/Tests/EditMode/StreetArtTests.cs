@@ -640,7 +640,7 @@ namespace HayChoriYPaty.Tests
                 if (pair.Alpha) Assert.IsTrue(importer.alphaIsTransparency);
                 var android = importer.GetPlatformTextureSettings("Android");
                 Assert.IsTrue(android.overridden);
-                Assert.AreEqual(TextureImporterFormat.RGBA32, android.format);
+                Assert.AreEqual(TextureImporterFormat.ETC2_RGBA8, android.format, "Android uses the established ETC2 override; source textures remain uncompressed.");
             }
 
             float duration = (float)View.GetField("IntroDuration", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue();

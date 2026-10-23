@@ -2180,14 +2180,20 @@ namespace HayChoriYPaty
                 int col = i % 2, row = i / 2;
                 Rect card = new Rect(24 + col * (cardWidth + 24f), cardTop + row * (cardHeight + gapY), cardWidth, cardHeight);
                 bool earned = i < game.UnlockedLevel || game.HasWonLevel(i);
-                DrawMarketWoodPanel(card, earned ? new Color(.97f, .82f, .51f) : new Color(.33f, .29f, .24f));
+                DrawMarketWoodPanel(card, earned ? new Color(.97f, .82f, .51f) : new Color(.76f, .73f, .65f));
                 DrawBadgePatch(new Rect(card.x + 8, card.y + 8, cardHeight - 16, cardHeight - 16), i, earned);
                 string[] clubParts = StreetSimulation.LevelDisplayNames[i].Split('/');
                 string club = clubParts[0].Trim().ToUpperInvariant();
-                MarketText(new Rect(card.x + cardHeight, card.y + 12, card.width - cardHeight - 12, 25), "CANCHA " + (i + 1) + " · " + club, 16, MarketInk, TextAnchor.MiddleLeft);
+                Rect textColumn = new Rect(card.x + cardHeight, card.y + 8, card.width - cardHeight - 12, card.height - 16);
+                MarketText(new Rect(textColumn.x, textColumn.y, textColumn.width, 16), "CANCHA " + (i + 1), 12, MarketInk, TextAnchor.MiddleLeft);
+                var clubStyle = new GUIStyle(menuTitle) { fontSize = 14, wordWrap = true,
+                    alignment = TextAnchor.MiddleLeft, padding = new RectOffset(),
+                    normal = { textColor = MarketInk }, resizeTextForBestFit = true,
+                    resizeTextMinSize = 10, resizeTextMaxSize = 14 };
+                GUI.Label(new Rect(textColumn.x, textColumn.y + 16, textColumn.width, card.height - 54), club, clubStyle);
                 string status = earned ? "CONSEGUIDA" : i == game.UnlockedLevel ? "PRÓXIMO RETO" : "BLOQUEADA";
-                MarketText(new Rect(card.x + cardHeight, card.y + 43, card.width - cardHeight - 12, 23), status, 14,
-                    earned ? new Color(.05f, .40f, .08f) : new Color(.34f, .25f, .15f), TextAnchor.MiddleLeft);
+                MarketText(new Rect(textColumn.x, card.yMax - 25, textColumn.width, 18), status, 12,
+                    earned ? new Color(.03f, .28f, .05f) : MarketInk, TextAnchor.MiddleLeft);
             }
             DrawStandardButton(BadgeBackBounds(height), BadgeBackAction, "VOLVER AL BARRIO");
         }
