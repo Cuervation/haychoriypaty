@@ -22,7 +22,14 @@ Las páginas nuevas vuelven al hub; se reutiliza IMGUI y las rutas/mercado exist
 - [x] Hub con hotspots para jugar, Mercado, Insignias, Ranking y Cuenta; entrada/salida preserva la autenticación y flujos actuales.
 - [x] Insignias muestran colección temporal derivada de desbloqueos/victorias ya guardados, sin reclamar persistencia o premios nuevos; la última también puede obtenerse al ganar Los Redondos. Ranking no presenta datos globales ficticios.
 - [x] Mapeo de hotspots cubierto por prueba geométrica con insets superiores/inferiores asimétricos.
-- [ ] Compilar, ejecutar pruebas Unity afectadas y revisar el Game View/dispositivo: pendiente porque el Editor del checkout activo está abierto y no hay Unity MCP disponible; no iniciar batch Unity en paralelo.
-- [ ] Generar y verificar APK Android versionName 0.2.64 / versionCode 66 una vez que la validación/build puedan ejecutarse con seguridad.
+- [x] Compilación Unity y pruebas focalizadas finales: **20/20 EditMode + 10/10 PlayMode**. Capturas reales de UI PlayMode a1080×1920 revisadas independientemente: portada, hub, insignias y ranking. Corregidos recorte de nombres y contraste en Insignias.
+- [x] APK Android **0.2.64/code66**, Main-only Development IL2CPP/ARM64: build Succeeded,0errores/1warning; metadatos, ZIP, alineación, firma APKv2 y bindings de escena verificados.
+- [ ] Validación física en Android y login Google online: **NOT_RUN** en esta entrega. Las pruebas usan el gate local aislado, no una sesión de usuario real.
 
-La aceptación marcada se refiere a implementación/evidencia estática, no certifica ejecución ni apariencia runtime.
+## Evidencia de entrega — 2026-10-23
+
+Unity6000.6.3f1 se ejecutó en copia aislada, después de confirmar que el usuario había cerrado el Editor. Sin Unity MCP disponible en este chat; sin modificar trust/servicios/seguridad global. Las65fuentes de runtime/escena coinciden con commit7d44f62; los cambios locales ajenos de barriles ilimitados se preservaron en el checkout y se excluyeron del snapshot final.
+
+Artefacto local `/private/tmp/HayChoriYPaty-0.2.64-code66-hub.apk`:370.871.429bytes, SHA-256 `0e5b6ad72fa135e6f06d0e74e43c9f6f71c0027d0a9ad27d471596fe7a591fe3`. Es debug Development, no firmado para PlayStore; no se instaló. Recibos/capturas: `/private/tmp/hcyp-hub-0.2.64/final/`; informe de build: `/private/tmp/hcyp-hub-0.2.64/build-report.txt`. El tamaño del APK se toma del archivo, no del campo agregado de BuildReport.
+
+**Límite de validación:** la corrida exploratoria ampliada sobre el workspace inicial ejecutó184casos:173PASS/11FAIL. Se corrigió la expectativa obsoleta RGBA32 de portada/logo (Android ya usa ETC2), y el recheck final enfocado quedó verde. Las otras10fallas son reflexión ambigua de rutas y expectativas históricas de plantilla/campaña/balance fuera de este pedido; no se cambiaron gameplay/economía para forzar su aprobación. Los reruns no se suman como casos únicos adicionales. La referencia directa de interfaz en una prueba local ajena impedía compilar: se sustituyó por proxy/reflection, conservando sus demás cambios locales; ese trabajo no se incorporó al release.

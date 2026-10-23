@@ -1,3 +1,11 @@
+# Entrega Android — 2026-10-23: hub 0.2.64/code66
+
+Portada automática con barra compacta, hub de partido, Insignias legibles y nivel6 de260s. Fuente runtime/escena del commit7d44f62(65archivos comparados sin diferencias), sin incluir trabajo ajeno de gameplay. Unity6000.6.3f1, copia aislada, Main-only Development IL2CPP/ARM64. **Build Succeeded,257,59s,0errores/1warning**. Pruebas enfocadas finales **20/20EditMode +10/10PlayMode** y capturas reales1080×1920 revisadas independientemente. La corrida amplia previa no está verde:173/184, con una expectativa de import corregida y10fallas ajenas de rutas/plantilla/balance; no se alteró el balance para hacerlas pasar.
+
+APK `/private/tmp/HayChoriYPaty-0.2.64-code66-hub.apk`, **370.871.429bytes**, SHA-256 `0e5b6ad72fa135e6f06d0e74e43c9f6f71c0027d0a9ad27d471596fe7a591fe3`; package `com.haychoriypaty.game`, min26/target36. ZIP,zipalign,firmaAPKv2(debug signer existente),flags Analytics/ad-ID off y parser directo de bindings de Main: **PASS** (StreetGame/StreetView/renderer activos y resueltos). Instalación y GoogleAuth online: **NOT_RUN**. No contiene una clasificación global real. Evidencia en `/private/tmp/hcyp-hub-0.2.64/final/`; ver [home-hub.md](home-hub.md). APK fuera de Git. El usuario autorizó explícitamente el remoto de origin; no se desactivaron controles de seguridad.
+
+---
+
 # Current Android delivery — 2026-10-23 (0.2.62/code64, Chulengo + handoff updates)
 
 Generated from an isolated copy with Unity 6000.6.3f1; Main-only Development IL2CPP/ARM64. `BuildPipeline` **Succeeded in 89.67 s; 0 errors / 6 warnings**. The final build includes the current Chulengo parchment extension that covers the legacy green CTA edge. Package `com.haychoriypaty.game`, version **0.2.62/code64**, min API26/target36, ARM64.
