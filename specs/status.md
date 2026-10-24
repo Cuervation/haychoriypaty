@@ -1,3 +1,21 @@
+## 2026-10-24 — Vacío +10%
+
+Applied the user's smaller 10% size request to both dimensions of shared-grill Vacío. Kept six pieces in the 3×2 right half with controlled logical overlap (4.1 horizontal / 1.7 depth units maximum); Bondiola and Vacío halves remain separate. Updated focused geometry tests and modular-kitchen SDD. Focused isolated Unity validation passed: `WholeBondiolaArtTests` 36/36, two affected presentation checks 1/1 each, and Level6 PlayMode visual check 1/1. Captures are in ignored `Logs/Acceptance/VacioFillHalf-20261024/`. `git diff --check` passed. No APK, installation, commit or push.
+
+## 2026-10-24 — Vacío half-grill completed
+
+Added selected-reference whole-cut art (Raw/Cooking/Cooked), actual intermediate cooking projection, and six real Vacíos in a tight 3×2 block on the shared grill’s right half, with the same rendered footprint as the six Bondiolas on the left. EditMode art/geometry 36/36 and production 11/11 passed; the two affected presentation checks passed. The full presentation class has three unrelated existing expectation/resource failures. Level 6 PlayMode visual test passed 1/1 with graphics; full-screen and projection-only evidence are in ignored `Logs/Acceptance/VacioFillHalf-20261024/`. No physical-device validation, APK, commit or push.
+
+## 2026-10-23 — Portada automática y hub de día de partido (0.2.64/code66)
+
+Se implementó la portada full-screen basada en el arte adjunto, sin botones y con barra pequeña de 118×6 durante cuatro segundos tras habilitar la sesión. Al completarse cambia sin toque al hub de calle: estadio, valla policial/DNI, hinchas, puesto de choripán, Mercado, camisetero ambulante, tablero de ranking y cuenta. JUGAR conserva selector/Mercado; las otras zonas reutilizan Mercado, abren Insignias derivadas de unlocks y victorias guardadas por club, muestran progreso propio (ranking global pendiente) y reutilizan Google/sesión. Racing (nivel 6) pasa de255 a260 s en configuración/fallback, tests y contrato. Assets están en `Assets/Art/Street/Resources/`.
+
+`git diff --check` pasó y un revisor independiente leyó el código/contrato: la conversión de hitboxes a safe area es top-origin coherente después de `CanvasViewport`; se amplió el test para insets asimétricos y reproyección a píxeles. Pruebas EditMode/PlayMode y captura real de Game View **BLOCKED/NOT_RUN**: Unity 6000.6.3f1 sigue activo en el checkout y el skill prohíbe batch en paralelo; no hay endpoint Unity MCP disponible. En consecuencia, APK 0.2.64/code66 **NOT_BUILT**; no se afirma compilación, instalación ni QA visual. El código quedó en el commit local `7a7e8b0`; el push a `origin` fue rechazado por la revisión de seguridad porque la frase general «subí a git» no verificó autorización específica para ese remoto privado. No se intentó otra vía.
+
+## 2026-10-23 — Barriles Coca/cerveza inagotables
+
+La cocina repone en el mismo slot cada Coca o cerveza retirada: los barriles conservan sus 12 unidades visibles y el servicio no reserva ni consume stock de Mercado. El gate de stock previo a la partida, las compras/recetas, la demanda, el Cocacolero y los ingresos por entrega real quedan sin cambios. Se agregó regresión EditMode para 24 entregas de cada bebida frente a un proveedor de ingredientes vacío; ejecución de Unity pendiente.
+
 ## 2026-10-23 — APK Android 0.2.62/code64
 
 Unity 6000.6.3f1, Main-only Development IL2CPP/ARM64 en copia aislada: **Succeeded, 0 errores/6 warnings, 89,67 s**. APK `/private/tmp/HayChoriYPaty-0.2.62-code64.apk`, 345.505.605 bytes, SHA-256 `74b9700a5693cf5e228e534adbdf5443842b614eb45f402b1a3b0493bc9271e8`, package `com.haychoriypaty.game`, version0.2.62/code64, min API26/target36, ARM64. `aapt`, ZIP, zipalign, firma APK v2 y flags de Analytics comprobados. Debug-signed; no instalado en teléfono. APK fuera de Git por política de builds pesados. QA visual de ≥95% y físico siguen pendientes.
@@ -1212,3 +1230,10 @@ Unity 6000.6.3f1: compilación limpia del runtime y EditMode assemblies. Unity M
 ## Premium inicial gratuito solo en Racing — 2026-10-21
 
 A pedido del usuario, cada intento fresco de Racing empieza con el Parrillero normal y un Premium gratuito; el primer Premium pago sigue al precio base. No se extiende a otros niveles. Focalizadas: 2/2 pasaron. Cinco partidas completas reales en Main a ×1: 0/5 victorias; mejor venta 197 Chori y faltante total13 vs el mejor anterior191/19; promedio de faltantes24,4 vs51,04. El plan de compras adaptó entre intentos, por lo que el avance observado no aísla causalidad ni prueba victoria. `StreetActiveCooksTests`:82 casos,78 pasaron y4 fallaron en expectativas ajenas a la nueva plantilla; suite no aprobada. Restauración PlayerPrefs/editor exacta; sin APK, instalación, commit o push. Detalle/evidencia: `/Users/celestino/.codex/visualizations/2026/10/21/01a15bdf-e29b-7253-8456-9b392d7045a3/racing-default-premium/INFORME.md`.
+## Vacío en 4 cortes por mitad — 2026-10-24
+
+Solicitud más reciente: cambiar Vacío de seis a cuatro unidades en la mitad derecha, cuadrícula2×2, más anchos para llenar con poco espacio libre. Capacidad real compartida cambia6→4; profundidad sigue al máximo de dos filas y se aplica ensanchamiento horizontal exclusivo a Vacío. Se conserva Bondiola6 y Vacío solo7. WholeBondiolaArtTests36/36; producción1/1; bounds1/1; separación1/1; PlayMode Game View1/1 + slots ambientales1/1 pasaron en copia aislada Unity6000.6.3f1. Capturas nivel6 full1080×1920 y detalle517×183 en `Logs/Acceptance/VacioFour-20261024/`. No APK/dispositivo/commit/push.
+
+## Vacío más ancho para comparación — 2026-10-24
+
+Se conservó profundidad +10% vs Bondiola y se amplió solo el ancho de Vacío 15% sobre su versión anterior. La primera columna parte en el lado derecho; las columnas exteriores mantienen separación compacta y pueden sobresalir del borde de la parrilla por pedido explícito. Geometría EditMode 2/2 y Game View PlayMode 1/1 aprobados en copia aislada; captura level 6 en `Logs/Acceptance/VacioWidth15-20261024/`. Sin prueba en teléfono, APK, commit ni push.

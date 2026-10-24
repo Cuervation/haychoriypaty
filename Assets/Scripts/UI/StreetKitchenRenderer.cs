@@ -29,6 +29,9 @@ namespace HayChoriYPaty
         private const float FernetDrinkFirstColumnFraction = .74f, FernetDrinkColumnStepFraction = .088f;
         private const string PrefabRoot = "ModularKitchen/Prefabs/";
         private const string SpriteRoot = "ModularKitchen/Sprites/";
+        private const string WholeBondiolaResource = "ModularKitchen/Art/meat-bondiola-whole-v1_";
+        private const string WholeVacioResource = "ModularKitchen/Art/meat-vacio-whole-v1_";
+        private Sprite[] wholeBondiolaSprites, wholeVacioSprites;
         private readonly Dictionary<int, GameObject> foodObjects = new Dictionary<int, GameObject>();
         private readonly Dictionary<string, Sprite[]> spriteCache = new Dictionary<string, Sprite[]>();
         private readonly Dictionary<string, GameObject> prefabCache = new Dictionary<string, GameObject>();
@@ -158,6 +161,10 @@ namespace HayChoriYPaty
             for (int i = 0; i < singleArt.Length; i++) if (Sprites(singleArt[i]).Length == 0) missing.Add(SpriteRoot + singleArt[i]);
             string[] meatArt = { "meat-chori", "meat-paty", "meat-bondiola", "meat-vacio" };
             for (int i = 0; i < meatArt.Length; i++) if (Sprites(meatArt[i]).Length != 4) missing.Add(SpriteRoot + meatArt[i] + " (four state sprites)");
+            foreach (int product in new[] { 2, 3 })
+                foreach (string state in AmbientMeatStates)
+                    if (WholeMeatSprite(product, state) == null)
+                        missing.Add((product == 2 ? WholeBondiolaResource : WholeVacioResource) + state);
             if (missing.Count > 0)
             {
                 if (!loggedMissingResources)
@@ -644,8 +651,8 @@ namespace HayChoriYPaty
                         Sprite stateSprite = StateSprite(MeatArt(product), AmbientMeatStates[visual.StateIndex]);
                         if (visual.Renderer.sprite != stateSprite) visual.Renderer.sprite = stateSprite;
                         visual.Renderer.color = Color.white;
-                        SetDesiredSize(visual.Object.transform, visual.Renderer,
-                            simulation.KitchenLayout.GrillMeatSize(product, companionAvailable));
+                        SetDesiredGrillMeatSize(visual.Object.transform, visual.Renderer, product,
+                            companionAvailable, simulation.KitchenLayout.GrillMeatSize(product, companionAvailable));
                     }
 
                     Vector2 position = simulation.KitchenLayout.GrillSlotPosition(product, slot,
@@ -722,7 +729,7 @@ namespace HayChoriYPaty
             {
                 if (isGrill)
                 {
-                    string state = VisualStateName(unit.State);
+                    string state = VisualStateNameForProduct(unit.Product, unit.State);
                     renderer.sprite = StateSprite(key, state);
                     renderer.color = unit.State == StreetFoodState.Burned
                         ? new Color(.94f, .78f, .60f, 1f) : Color.white;
@@ -735,7 +742,8 @@ namespace HayChoriYPaty
                 }
                 Vector2 size = isGrill ? simulation.KitchenLayout.GrillMeatSize(unit.Product, grillCompanionAvailable)
                     : isBarrelDrink && !carried ? new Vector2(8f, 15f) * BarrelDrinkScale : ServingSize(unit.Product, carried);
-                SetDesiredSize(go.transform, renderer, size);
+                if (isGrill) SetDesiredGrillMeatSize(go.transform, renderer, unit.Product, grillCompanionAvailable, size);
+                else SetDesiredSize(go.transform, renderer, size);
             }
             Vector2 position;
             if (isGrill) position = simulation.KitchenLayout.GrillSlotPosition(unit.Product, unit.Slot, grillCompanionAvailable, simulation.Kitchen.GrillCapacity(unit.Product));
@@ -1008,13 +1016,46 @@ namespace HayChoriYPaty
             return state == StreetFoodState.Cooked ? "Cooked" : "Passed";
         }
 
+        private static string VisualStateNameForProduct(int product, StreetFoodState state) =>
+            (product == 2 || product == 3) && state == StreetFoodState.Cooking ? "Cooking" : VisualStateName(state);
+
         private static string ArtStateName(string state) => state == "Passed" ? "Cooked" : state;
+
+        private Sprite WholeMeatSprite(int product, string artState)
+        {
+            // Standalone sprites retain one consistent silhouette through each cooking stage.
+            Sprite[] sprites;
+            if (product == 2)
+            {
+                if (wholeBondiolaSprites == null)
+                {
+                    wholeBondiolaSprites = new Sprite[AmbientMeatStates.Length];
+                    for (int i = 0; i < wholeBondiolaSprites.Length; i++)
+                        wholeBondiolaSprites[i] = Resources.Load<Sprite>(WholeBondiolaResource + AmbientMeatStates[i]);
+                }
+                sprites = wholeBondiolaSprites;
+            }
+            else if (product == 3)
+            {
+                if (wholeVacioSprites == null)
+                {
+                    wholeVacioSprites = new Sprite[AmbientMeatStates.Length];
+                    for (int i = 0; i < wholeVacioSprites.Length; i++)
+                        wholeVacioSprites[i] = Resources.Load<Sprite>(WholeVacioResource + AmbientMeatStates[i]);
+                }
+                sprites = wholeVacioSprites;
+            }
+            else return null;
+            return sprites[artState == "Raw" ? 0 : artState == "Cooking" ? 1 : 2];
+        }
 
         private Sprite StateSprite(string name, string state)
         {
-            Sprite[] items = Sprites(name);
-            // Passed reuses the appetizing cooked frame with a warm tint; the unused black-char frame is never shown.
+            // Passed keeps the existing cooked+tint projection; Bondiola and Vacío share their whole-cut state art.
             string artState = ArtStateName(state);
+            if (artState != "Burned" && (name == "meat-bondiola" || name == "meat-vacio"))
+                return WholeMeatSprite(name == "meat-bondiola" ? 2 : 3, artState);
+            Sprite[] items = Sprites(name);
             for (int i = 0; i < items.Length; i++)
                 if (items[i] != null && items[i].name.EndsWith("_" + artState, StringComparison.OrdinalIgnoreCase)) return items[i];
             int stateIndex = artState == "Raw" ? 0 : artState == "Cooking" ? 1 : 2;
@@ -1084,6 +1125,24 @@ namespace HayChoriYPaty
             float scaleY = height * .01f / source.y;
             if (preserveAspect) scaleX = scaleY = Mathf.Min(scaleX, scaleY);
             instance.transform.localScale = new Vector3(scaleX, scaleY, 1f);
+        }
+
+        private static void SetDesiredGrillMeatSize(Transform root, SpriteRenderer sr, int product,
+            bool companionAvailable, Vector2 size)
+        {
+            if (product != 3 || !companionAvailable)
+            {
+                SetDesiredSize(root, sr, size);
+                return;
+            }
+            if (sr == null || sr.sprite == null) return;
+            Vector2 source = sr.sprite.bounds.size;
+            if (source.x <= 0f || source.y <= 0f) return;
+            // Vacío's long, flat cut may stretch horizontally (not vertically) on the
+            // four-slot shared grill so the 2x2 group uses the available half-width.
+            float scale = Mathf.Min(size.x * .01f / source.x, size.y * .01f / source.y);
+            float horizontalStretch = size.x * .01f / (source.x * scale);
+            root.localScale = new Vector3(scale * horizontalStretch, scale, 1f);
         }
 
         private static void SetDesiredSize(Transform root, SpriteRenderer sr, Vector2 size)

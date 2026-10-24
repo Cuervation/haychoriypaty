@@ -698,13 +698,18 @@ namespace HayChoriYPaty
             }
             if (product == 2)
             {
-                float height = Mathf.Min(38f, grill.height * (GrillSurfaceBottom - GrillSurfaceTop));
-                return new Vector2(34f * height / 38f, height);
+                float surfaceHeight = grill.height * (GrillSurfaceBottom - GrillSurfaceTop);
+                // Maximize whole-roast size for a tightly filled 3x2 premium half (or 6x1 solo row).
+                // Exact 2x growth cannot fit two full-height rows and three columns inside the trapezoidal grate.
+                float height = Mathf.Min(15.4f, Mathf.Max(1f, (surfaceHeight - 1.2f) * 0.5f));
+                return new Vector2(height * 2.1f, height);
             }
             if (product == 3 && companionAvailable)
             {
-                float width = Mathf.Min(90f, grill.width * .27f);
-                return new Vector2(width, 14f * width / 90f);
+                // Four cuts in a 2x2 block: maximize depth as before, and give each
+                // Vacío a broad, flat footprint that nearly fills its half-width.
+                float height = GrillMeatSize(2, true).y * 1.10f;
+                return new Vector2(height * 3.4f, height);
             }
             return product == 0 ? new Vector2(36.4f, 14f)
                 : product == 1 ? new Vector2(34f, 20f)
@@ -718,19 +723,26 @@ namespace HayChoriYPaty
             int index = Mathf.Max(0, slot);
             Vector2 meatSize = GrillMeatSize(product, companionAvailable);
             int columns, rows, col, row;
-            if (companionAvailable && product < 2)
+            if (product == 2)
+            {
+                columns = companionAvailable ? 3 : 6;
+                rows = companionAvailable ? 2 : 1;
+                col = index % columns; row = index / columns;
+            }
+            else if (companionAvailable && product < 2)
             {
                 columns = 3;
                 rows = product == 0 ? 4 : 2;
                 col = index % columns; row = (index / columns) % rows;
             }
+            else if (product == 3 && companionAvailable)
+            {
+                columns = 2; rows = 2;
+                col = index % columns; row = index / columns;
+            }
             else if (companionAvailable && product >= 2)
             {
-                if (product == 2)
-                {
-                    columns = 4; rows = 1;
-                }
-                else { columns = 1; rows = Mathf.Max(1, capacity); }
+                columns = 1; rows = Mathf.Max(1, capacity);
                 col = index % columns; row = index / columns;
             }
             else
@@ -755,18 +767,28 @@ namespace HayChoriYPaty
             float leftEdge = r.x + r.width * Mathf.Max(LeftEdgeAt(topT), LeftEdgeAt(bottomT));
             float rightEdge = r.x + r.width * Mathf.Min(RightEdgeAt(topT), RightEdgeAt(bottomT));
             float zoneStart = companionAvailable
-                ? product == 1 ? .5f : product == 3 ? .6f : 0f
+                ? product == 1 ? .5f : product == 3 ? .5f : 0f
                 : 0f;
             float zoneEnd = companionAvailable
-                ? product == 0 ? .5f : product == 2 ? .6f : 1f
+                ? product == 0 ? .5f : product == 2 ? .5f : 1f
                 : 1f;
             float zonePadding = companionAvailable && (product == 0 || product == 1 || product == 2 || product == 3) ? 1f : 0f;
             float zoneLeft = Mathf.Lerp(leftEdge, rightEdge, zoneStart) + meatSize.x * .5f
                 + (companionAvailable && (product == 1 || product == 3) ? zonePadding : 0f);
             float zoneRight = Mathf.Lerp(leftEdge, rightEdge, zoneEnd) - meatSize.x * .5f
                 - (companionAvailable && (product == 0 || product == 2) ? zonePadding : 0f);
-            float x = columns <= 1 || zoneRight <= zoneLeft ? (zoneLeft + zoneRight) * .5f
-                : Mathf.Lerp(zoneLeft, zoneRight, col / (float)(columns - 1));
+            float x;
+            if (product == 3 && companionAvailable && columns > 1)
+            {
+                // Anchor the first broad Vacío inside the right half and leave only a
+                // one-unit seam before the second cut, using almost all of the width.
+                x = zoneLeft + col * (meatSize.x + 1f);
+            }
+            else
+            {
+                x = columns <= 1 || zoneRight <= zoneLeft ? (zoneLeft + zoneRight) * .5f
+                    : Mathf.Lerp(zoneLeft, zoneRight, col / (float)(columns - 1));
+            }
             return new Vector2(x, y);
         }
 

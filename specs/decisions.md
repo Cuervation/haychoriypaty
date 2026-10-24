@@ -1,4 +1,20 @@
+## 2026-10-24 — Match Vacío to Bondiola footprint
+
+The user's follow-up supersedes the temporary 25%-wider/2×3 presentation: size Vacío's six pieces to the same rendered footprint as Bondiola and return to a tight 3×2 right-half layout. This fills the shared perspective grill with very little unused space while preserving six real cooking slots, distinct whole-cut art, and all stock/economy behavior.
+
 # Technical decision log
+
+## 2026-10-24 — Four broad Vacíos in the shared grill half
+
+Supersede the immediately prior six-Vacío visual preview: retain four real Vacío grill slots in a 2×2 block beside six Bondiolas. Hold Vacío depth at the previously accepted 1.10× Bondiola size, stretch only its long horizontal axis to target aspect3.4, and use a 1-unit seam between columns. Anchor the inner edge at the product split; the outer edge may extend past the grate to minimize empty space. Leave solo-Vacío capacity7 unchanged. Do not change recipe, state, timing, stock, table slots or economy.
+
+## 2026-10-24 — Preview +15% width for Vacío
+
+Supersede only the same-day +10%-both-axes fit: keep Vacío depth at +10% vs Bondiola, make its width 15% larger than the prior Vacío width, and anchor the 3×2 block from the boundary toward the outer/right side. User explicitly accepts spill beyond the grill; do not compress the horizontal columns to keep them inside. This is a visual comparison only; no cooking/economy/capacity changes.
+
+## 2026-10-23 — Inagotable Coca/cerveza en barriles
+
+Mantener doce unidades visibles en cada barril habilitado y reponer la unidad en el mismo slot al retirarla. Coca y cerveza de barril no reservan ni consumen ingredientes de Mercado durante la partida; el preflight de stock de Mercado sigue sin cambios para limitar alcance y preservar compras/recetas. El rol Cocacolero, la demanda, la entrega física y los ingresos reales permanecen vigentes.
 
 ## 2026-10-22 — Compactar sándwiches al retirar
 
@@ -296,3 +312,12 @@ Por confirmación explícita del usuario se restaura la fila original de muebles
 | 2026-10-18 | Arrange table sandwiches in two front/back rows with four compact pile anchors per product section; scale on-table art to 80% of its former display target. | Existing tabletop depth cannot hold two full-size, non-overlapping rows; modestly reduce each sprite while preserving the furniture, inventory capacity, product zones, and slot-based Mozo pickup. |
 | 2026-10-19 | Replace goal-weighted active-cook scheduling with shared fixed alternation: Normal 0↔1 and Premium 2↔3. A blocked/completed recipe consumes its turn visually; only the next turn can attempt real production. | The explicit one-and-one rule is independent of goals/stock/workers. Keep balance untouched; the first fresh-campaign audit flags Racing as at risk (three tested hiring-policy factors lose L6), so do not imply that the new sequence preserves completion feasibility or silently rebalance. |
 | 2026-10-19 | Expand Normal/Premium sandwich tables toward the rear to support a 4×3 base grid while preserving the service edge, grill alignment, and Fernet table. Paired products share two columns each; a solo product uses all four. Stack surplus stock on those anchors to preserve table capacities48/36. | The service-side footprint drives pickup and delivery routes. Keep that edge fixed and verify row anchors remain outside the table-base obstacle; do not change sandwich art, inventory, or gameplay rules. |
+
+
+## Whole Vacío visual/composition (2026-10-24)
+
+Use the user's selected second whole-cut reference for custom transparent Raw/Cooking/Cooked sprite art. On the shared Premium grill, use six real Vacíos in a 3×2 block on the right half, paired symmetrically with six approved Bondiolas on the left. Increase only the shared Vacío grill capacity from3 to6 so the dense visual layout represents real cooking slots; keep solo-Vacío capacity and all preparation/economy values unchanged.
+
+## 2026-10-24 — Vacío +10% fit tradeoff
+
+The user approved reducing the requested enlargement to 10%. Keep the six whole Vacíos and 3×2 half-grill layout. The 1.10× rendering exceeds the no-overlap fit, so allow small logical overlaps (up to4.1 horizontal and1.7 depth units) while preserving grill bounds and separation from Bondiola. If later visual QA finds this overlap too noticeable, the tradeoff is grill-area/capacity redesign, not hidden inventory or cooking changes.

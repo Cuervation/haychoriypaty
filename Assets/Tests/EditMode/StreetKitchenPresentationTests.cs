@@ -605,7 +605,8 @@ namespace HayChoriYPaty.Tests
                         float grateLeft = grill.x + grill.width * Mathf.Max(leftAtTop, leftAtBottom);
                         float grateRight = grill.x + grill.width * Mathf.Min(rightAtTop, rightAtBottom);
                         Assert.GreaterOrEqual(meat.xMin, grateLeft - .02f, context + " outside the tapered left grate edge");
-                        Assert.LessOrEqual(meat.xMax, grateRight + .02f, context + " outside the tapered right grate edge");
+                        float allowedRight = product == 3 && companionAvailable ? grill.x + grill.width * 1.10f : grateRight;
+                        Assert.LessOrEqual(meat.xMax, allowedRight + .02f, context + " too far beyond the tapered right grate edge");
                     }
                 }
             }
@@ -969,7 +970,7 @@ namespace HayChoriYPaty.Tests
             AssertSlotsSeparated(layout, 0, 1, 48, chori, paty);
             AssertSlotsSeparated(layout, 2, 3, 48, bondiola, vacio);
             AssertSlotsSeparated(layout, 0, 1, 18, new Vector2(36.4f, 14f), new Vector2(34f, 20f), true);
-            AssertSlotsSeparated(layout, 2, 3, 7, new Vector2(34f, 38f), new Vector2(90f, 14f), true);
+            AssertSlotsSeparated(layout, 2, 3, 12, new Vector2(34f, 38f), new Vector2(90f, 14f), true);
         }
 
         private static void AssertSlotsSeparated(object layout, int first, int second, int count, Vector2 firstSize, Vector2 secondSize, bool grill = false)
@@ -980,15 +981,15 @@ namespace HayChoriYPaty.Tests
             {
                 Vector2 a = grill ? (Vector2)Call(layout, "GrillSlotPosition", first, i, true, first < 2 ? 12 : 4)
                     : (Vector2)Call(layout, "TableSlotPosition", first, i, true, count);
-                Vector2 b = grill ? (Vector2)Call(layout, "GrillSlotPosition", second, i, true, second < 2 ? 6 : 3)
+                Vector2 b = grill ? (Vector2)Call(layout, "GrillSlotPosition", second, i, true, second < 2 ? 6 : 6)
                     : (Vector2)Call(layout, "TableSlotPosition", second, i, true, count);
                 if (grill)
                 {
                     firstSize = (Vector2)Call(layout, "GrillMeatSize", first, true);
                     secondSize = (Vector2)Call(layout, "GrillMeatSize", second, true);
                 }
-                int firstLimit = grill ? (first == 0 ? 12 : first == 1 ? 6 : first == 2 ? 4 : 3) : count;
-                int secondLimit = grill ? (second == 0 ? 12 : second == 1 ? 6 : second == 2 ? 4 : 3) : count;
+                int firstLimit = grill ? (first == 0 ? 12 : first == 1 ? 6 : 6) : count;
+                int secondLimit = grill ? (second == 0 ? 12 : second == 1 ? 6 : second == 3 ? 4 : 6) : count;
                 if (i < firstLimit) firstRects.Add(new Rect(a - firstSize * .5f, firstSize));
                 if (i < secondLimit) secondRects.Add(new Rect(b - secondSize * .5f, secondSize));
             }

@@ -408,11 +408,11 @@ namespace HayChoriYPaty.Tests
                     Call(renderer, "Prepare", active, 1f, 960f);
 
                     Assert.IsTrue((bool)Get(active, "UsesActiveCooks"));
-                    Assert.AreEqual(25, ambient.Count, "Racing through level 11 has 18 normal + 7 Premium slots.");
+                    Assert.AreEqual(28, ambient.Count, "Racing through level 11 has 18 normal + 6 Bondiola + 4 Vacío slots.");
                     Assert.AreEqual(12, (int)Call(kitchen, "GrillCapacity", 0));
                     Assert.AreEqual(6, (int)Call(kitchen, "GrillCapacity", 1));
-                    Assert.AreEqual(4, (int)Call(kitchen, "GrillCapacity", 2));
-                    Assert.AreEqual(3, (int)Call(kitchen, "GrillCapacity", 3));
+                    Assert.AreEqual(6, (int)Call(kitchen, "GrillCapacity", 2));
+                    Assert.AreEqual(4, (int)Call(kitchen, "GrillCapacity", 3));
 
                     bool hasRaw = false, hasCooking = false, hasCooked = false;
                     for (int product = 0; product < 4; product++)
@@ -450,7 +450,7 @@ namespace HayChoriYPaty.Tests
                         GameObject go = (GameObject)visual.GetType().GetField("Object", Instance).GetValue(visual);
                         if (go.activeSelf) activeAmbientCount++;
                     }
-                    Assert.AreEqual(25, activeAmbientCount,
+                    Assert.AreEqual(28, activeAmbientCount,
                         "Each active cook level shows every available grill slot when no real unit occupies it.");
                     yield return null;
                 }
@@ -491,7 +491,7 @@ namespace HayChoriYPaty.Tests
                 Assert.IsTrue((bool)Call(noStockKitchen, "CanReserveCook", 0), "Active sandwiches can reserve physical cooking capacity without market ingredients.");
                 int noStockUnits = ((IList)Get(noStockKitchen, "Units")).Count;
                 Call(renderer, "Prepare", noStock, 1f, 960f);
-                Assert.AreEqual(25, ambient.Count, "No ingredient stock does not make the grill look empty.");
+                Assert.AreEqual(28, ambient.Count, "No ingredient stock does not make the grill look empty.");
                 Assert.AreEqual(noStockUnits, ((IList)Get(noStockKitchen, "Units")).Count);
                 yield return null;
 
@@ -506,7 +506,7 @@ namespace HayChoriYPaty.Tests
                 Assert.IsFalse((bool)Call(fullTableKitchen, "CanReserveCook", 0));
                 int fullTableUnits = ((IList)Get(fullTableKitchen, "Units")).Count;
                 Call(renderer, "Prepare", fullTable, 1f, 960f);
-                Assert.AreEqual(25, ambient.Count, "Full sandwich tables still leave ambient grill meat visible.");
+                Assert.AreEqual(28, ambient.Count, "Full sandwich tables still leave ambient grill meat visible.");
                 Assert.AreEqual(fullTableUnits, ((IList)Get(fullTableKitchen, "Units")).Count);
                 yield return null;
 

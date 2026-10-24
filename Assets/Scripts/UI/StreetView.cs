@@ -323,7 +323,7 @@ namespace HayChoriYPaty
         private int marketExpandedIngredient = -1;
         private GUIStyle marketLabelStyle;
         private readonly Sprite[] marketIngredientSprites = new Sprite[10];
-        private Texture2D marketFernetBottle, marketCocaLarge;
+        private Texture2D marketFernetBottle, marketCocaLarge, marketBreadCommon, marketBreadBurger;
         private readonly int[] marketPendingPacks = new int[10];
         private float marketScroll, marketPointerDownY, marketPointerDownScroll, marketLastPurchaseTime = -10f;
         private bool marketDragging, marketPointerHeld;
@@ -520,6 +520,8 @@ namespace HayChoriYPaty
             for (int i = 0; i < marketArt.Length; i++) marketIngredientSprites[i] = Resources.Load<Sprite>("ModularKitchen/Sprites/" + marketArt[i]);
             marketFernetBottle = Resources.Load<Texture2D>("ModularKitchen/Art/fernet-bottle-1l-v1");
             marketCocaLarge = Resources.Load<Texture2D>("ModularKitchen/Art/coca-2500ml-display-v1");
+            marketBreadCommon = Resources.Load<Texture2D>("ModularKitchen/Art/market-bread-common-v1");
+            marketBreadBurger = Resources.Load<Texture2D>("ModularKitchen/Art/market-bread-burger-v1");
             coverArt = Resources.Load<Texture2D>(IntroBackdropResource);
             hubBackdrop = Resources.Load<Texture2D>(HubBackdropResource);
             victoryPopup = Resources.Load<Texture2D>(VictoryPopupResource);
@@ -2501,8 +2503,7 @@ namespace HayChoriYPaty
             float faceHeight = row.height - (expanded ? MarketPurchaseHeight : 0f);
             Rect card = new Rect(row.x, row.y + 2, row.width, row.height - 5);
             DrawMarketWoodPanel(card, MarketCream);
-            float iconSize = faceHeight < 100 ? 62 : 78;
-            DrawMarketIngredientIcon(new Rect(row.x + 14, row.y + 13, iconSize, iconSize), id);
+            DrawMarketIngredientIcon(MarketIngredientIconBounds(row, faceHeight), id);
             float nameX = row.x + 100;
             MarketText(new Rect(nameX, row.y + 17, 144, 27), MarketIngredientName(id), 28, MarketInk, TextAnchor.MiddleLeft);
             MarketText(new Rect(nameX, row.y + 47, 94, 26), FormatMarketMoney(game.Market.PackPriceCents(id)), 25, MarketInk, TextAnchor.MiddleLeft);
@@ -2545,23 +2546,44 @@ namespace HayChoriYPaty
                 GUI.enabled = prior;
             }
         }
+        private static Rect MarketIngredientIconBounds(Rect row, float faceHeight)
+        {
+            float size = Mathf.Min(faceHeight < 100f ? 62f : 78f, Mathf.Max(0f, faceHeight - 24f));
+            return new Rect(row.x + 14f, row.y + (faceHeight - size) * .5f, size, size);
+        }
+        private static Rect FitMarketIngredientIcon(Rect bounds, Vector2 sourceSize)
+        {
+            if (bounds.width <= 0f || bounds.height <= 0f || sourceSize.x <= 0f || sourceSize.y <= 0f) return Rect.zero;
+            float scale = Mathf.Min(bounds.width / sourceSize.x, bounds.height / sourceSize.y);
+            Vector2 size = sourceSize * scale;
+            return new Rect(bounds.center - size * .5f, size);
+        }
+        private static Rect MarketIngredientSpriteSource(Sprite sprite)
+        {
+            Rect source = sprite.rect;
+            // External meat sprites keep authored pixel bounds even when Android downsizes the atlas.
+            // Normalize the entire source, not just its origin, so adjacent cooking states cannot bleed in.
+            if (sprite.name.StartsWith("meat-", System.StringComparison.Ordinal))
+            {
+                Vector2 scale = new Vector2(sprite.texture.width / 2172f, sprite.texture.height / 724f);
+                source = new Rect(Vector2.Scale(source.position, scale), Vector2.Scale(source.size, scale));
+            }
+            source.y = sprite.texture.height - source.yMax;
+            return source; // Full sprite, never slice a sandwich to fake a bread icon.
+        }
         private void DrawMarketIngredientIcon(Rect bounds, int id)
         {
-            if (id == 8 || id == 9)
+            Texture2D standalone = id == 1 ? marketBreadCommon : id == 3 ? marketBreadBurger
+                : id == 8 ? marketFernetBottle : id == 9 ? marketCocaLarge : null;
+            if (standalone != null)
             {
-                Texture2D bottle = id == 8 ? marketFernetBottle : marketCocaLarge;
-                if (bottle != null) { GUI.DrawTexture(bounds, bottle, ScaleMode.ScaleToFit, true); return; }
+                GUI.DrawTexture(FitMarketIngredientIcon(bounds, new Vector2(standalone.width, standalone.height)), standalone, ScaleMode.StretchToFill, true);
+                return;
             }
-            Sprite sprite = marketIngredientSprites[id];
+            Sprite sprite = id >= 0 && id < marketIngredientSprites.Length ? marketIngredientSprites[id] : null;
             if (sprite == null) { DrawProductIcon(bounds, id == 6 ? 4 : id == 7 ? 6 : id == 8 ? 5 : 0); return; }
-            Rect source = sprite.rect;
-            source.y = sprite.texture.height - source.yMax;
-            // Dedicated bread sprites do not exist: use each sandwich's own complete upper-bread area.
-            // Pan común for choripán must not reuse the round sesame burger bun.
-            if (id == 1 || id == 3) source.height *= .45f;
-            float scale = Mathf.Min(bounds.width / source.width, bounds.height / source.height);
-            Rect fit = new Rect(bounds.center.x - source.width * scale * .5f, bounds.center.y - source.height * scale * .5f,
-                source.width * scale, source.height * scale);
+            Rect source = MarketIngredientSpriteSource(sprite);
+            Rect fit = FitMarketIngredientIcon(bounds, source.size);
             DrawRaw(fit, sprite.texture, source, true, false);
         }
         private void DrawMarketScrollBar(Rect body)

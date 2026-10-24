@@ -67,6 +67,112 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(map.Invoke(null, new object[] { 11 }), map.Invoke(null, new object[] { -1 }));
         }
 
+        [TestCase("market-bread-common-v1", 1862, 845)]
+        [TestCase("market-bread-burger-v1", 1728, 910)]
+        public void MarketBreadArtKeepsFullSilhouetteWithTransparentMargins(string resource, int width, int height)
+        {
+            const string folder = "Assets/Resources/ModularKitchen/Art/";
+            Texture2D art = Resources.Load<Texture2D>("ModularKitchen/Art/" + resource);
+            Assert.NotNull(art);
+            Assert.AreEqual(width, art.width); Assert.AreEqual(height, art.height);
+            var importer = (TextureImporter)AssetImporter.GetAtPath(folder + resource + ".png");
+            Assert.IsFalse(importer.mipmapEnabled);
+            Assert.IsTrue(importer.alphaIsTransparency);
+            Assert.AreEqual(TextureImporterNPOTScale.None, importer.npotScale);
+            var decoded = new Texture2D(2, 2);
+            try
+            {
+                Assert.IsTrue(decoded.LoadImage(System.IO.File.ReadAllBytes(folder + resource + ".png")));
+                Color32[] pixels = decoded.GetPixels32();
+                Assert.Greater(pixels.Count(p => p.a > 240), pixels.Length / 5, "A visible complete bread must be present.");
+                for (int x = 0; x < width; x++)
+                {
+                    Assert.LessOrEqual(pixels[x].a, 10, "Bottom edge must not cut through bread.");
+                    Assert.LessOrEqual(pixels[(height - 1) * width + x].a, 10, "Top edge must not cut through bread.");
+                }
+                for (int y = 0; y < height; y++)
+                {
+                    Assert.LessOrEqual(pixels[y * width].a, 10, "Left edge must not cut through bread.");
+                    Assert.LessOrEqual(pixels[y * width + width - 1].a, 10, "Right edge must not cut through bread.");
+                }
+            }
+            finally { UnityEngine.Object.DestroyImmediate(decoded); }
+        }
+
+        [TestCase(96f)] [TestCase(104f)]
+        public void MarketIngredientIconHasBalancedPaddingInsideRow(float faceHeight)
+        {
+            var row = new Rect(18f, 200f, 495f, faceHeight + 72f);
+            Rect icon = (Rect)View.GetMethod("MarketIngredientIconBounds", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { row, faceHeight });
+            Assert.GreaterOrEqual(icon.yMin - row.y, 12f);
+            Assert.AreEqual(icon.yMin - row.y, row.y + faceHeight - icon.yMax, .001f);
+            Assert.GreaterOrEqual(icon.xMin, row.x + 12f);
+            Assert.Less(icon.xMax, row.x + 100f, "Icon must not overlap ingredient name or purchase controls.");
+        }
+
+        [TestCase(1862f, 845f)] [TestCase(1728f, 910f)]
+        [TestCase(32f, 64f)] [TestCase(64f, 64f)] [TestCase(128f, 32f)]
+        public void MarketIngredientIconFitsWithoutCropOrDistortion(float width, float height)
+        {
+            var bounds = new Rect(32f, 42f, 78f, 62f);
+            Rect fit = (Rect)View.GetMethod("FitMarketIngredientIcon", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { bounds, new Vector2(width, height) });
+            Assert.GreaterOrEqual(fit.xMin, bounds.xMin - .001f); Assert.LessOrEqual(fit.xMax, bounds.xMax + .001f);
+            Assert.GreaterOrEqual(fit.yMin, bounds.yMin - .001f); Assert.LessOrEqual(fit.yMax, bounds.yMax + .001f);
+            Assert.AreEqual(bounds.center, fit.center);
+            Assert.AreEqual(width / height, fit.width / fit.height, .001f);
+            Assert.IsTrue(Mathf.Abs(fit.width - bounds.width) < .001f || Mathf.Abs(fit.height - bounds.height) < .001f);
+        }
+
+        [TestCase(0f, 20f)] [TestCase(20f, 0f)]
+        public void MarketIngredientIconRejectsEmptySource(float width, float height)
+        {
+            Assert.AreEqual(Rect.zero, View.GetMethod("FitMarketIngredientIcon", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { new Rect(0, 0, 78, 78), new Vector2(width, height) }));
+        }
+
+        [TestCase("meat-chori/meat-chori_Raw")]
+        [TestCase("sandwich-chori/sandwich-chori")]
+        [TestCase("meat-paty/meat-paty_Raw")]
+        [TestCase("sandwich-paty/sandwich-paty")]
+        [TestCase("meat-bondiola/meat-bondiola_Raw")]
+        [TestCase("meat-vacio/meat-vacio_Raw")]
+        [TestCase("coca/coca")]
+        [TestCase("beer/beer")]
+        public void MarketIngredientSpriteSourceKeepsEntireSprite(string resource)
+        {
+            Sprite sprite = Resources.Load<Sprite>("ModularKitchen/Sprites/" + resource);
+            Assert.NotNull(sprite);
+            Rect source = (Rect)View.GetMethod("MarketIngredientSpriteSource", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { sprite });
+            Vector2 scale = resource.StartsWith("meat-", StringComparison.Ordinal)
+                ? new Vector2(sprite.texture.width / 2172f, sprite.texture.height / 724f) : Vector2.one;
+            Assert.AreEqual(Vector2.Scale(sprite.rect.size, scale), source.size, "Keep the whole sprite after import scaling.");
+            Assert.AreEqual(sprite.rect.x * scale.x, source.x);
+            Assert.AreEqual(sprite.texture.height - sprite.rect.yMax * scale.y, source.y, .001f);
+            Debug.Log(resource + " imported atlas " + sprite.texture.width + "x" + sprite.texture.height);
+        }
+
+        [TestCase(2172, 724)] [TestCase(2048, 683)]
+        public void MarketMeatAtlasKeepsNormalizedRegionAfterImportResize(int width, int height)
+        {
+            var texture = new Texture2D(width, height);
+            Sprite sprite = Sprite.Create(texture, new Rect(8, 221, 532, 293), Vector2.one * .5f);
+            sprite.name = "meat-vacio_Raw";
+            try
+            {
+                Rect source = (Rect)View.GetMethod("MarketIngredientSpriteSource", BindingFlags.Static | BindingFlags.NonPublic)
+                    .Invoke(null, new object[] { sprite });
+                Assert.AreEqual(8f / 2172f, source.x / width, .00001f);
+                Assert.AreEqual((724f - 221f - 293f) / 724f, source.y / height, .00001f);
+                Assert.AreEqual(532f / 2172f, source.width / width, .00001f);
+                Assert.AreEqual(293f / 724f, source.height / height, .00001f);
+                Assert.Less(source.xMax / width, .25f, "Exclude the neighboring cooking-state cell.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(sprite); UnityEngine.Object.DestroyImmediate(texture); }
+        }
+
         private const string SheetPath = "Assets/Art/Street/Resources/street-parrillero.png";
         private const string DiagonalSheetPath = "Assets/Art/Street/Resources/street-parrillero-diagonal-v1.png";
         private static Type View { get { return Type.GetType("HayChoriYPaty.StreetView, Assembly-CSharp", true); } }

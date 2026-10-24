@@ -18,7 +18,7 @@ On **every real victory**, including a replay of an unlocked level, add the full
 
 ## Production and handoff
 
-Do not create a second simulation. StreetSimulation optionally binds an IStreetKitchenStock provider (standalone simulation remains unlimited for compatibility). StreetKitchenProduction reserves ingredients temporarily per physical food ID when creating units; failed preparation/burn/discard/cancel releases reservations without consuming permanent stock. Validate physical carried food before committing a recipe once in Kitchen.Consume at successful handoff. Quotas and revenue mutate only after that same valid consume. Reservations protect outstanding minimum goals of other products that share ingredients, avoiding extra Chori tying up bread required for Bondiola/Vacío. Remaining stock survives victory; reservations do not. Loss restores snapshot including bottle portions.
+Do not create a second simulation. StreetSimulation optionally binds an IStreetKitchenStock provider (standalone simulation remains unlimited for compatibility). StreetKitchenProduction reserves ingredients temporarily per physical food ID for finite ingredient-backed products; failed preparation/burn/discard/cancel releases reservations without consuming permanent stock. Coca (product4) and beer (product6) barrels are the explicit exception: their twelve source/display slots are inexhaustible, each pickup is immediately replaced, and their kitchen units bypass Market reserve/consume while sales still require a real validated physical handoff. The Mercado pre-round stock gate, purchases, recipe definitions and stored ingredient balances remain unchanged. Quotas and revenue mutate only after a valid handoff. Reservations protect outstanding minimum goals of other products that share ingredients, avoiding extra Chori tying up bread required for Bondiola/Vacío. Remaining finite ingredient stock survives victory; reservations do not. Loss restores snapshot including bottle portions.
 
 ## API reference / historical implementation allocation
 
@@ -37,11 +37,13 @@ Do not create a second simulation. StreetSimulation optionally binds an IStreetK
 - [x] Actual requirements and shared bread; quarter-bottle remainder and independent shortages.
 - [x] Cash-only purchases reject unaffordable transactions atomically; debt is not serialized or deducted from earnings; existing v4 saves ignore legacy `debtCents`.
 - [x] All Boys Level 1 hides the optional ingredients section and reserves no layout/hit-test area for it; later levels retain the expandable group (focused PlayMode regression passed 1/1, 2026-10-15).
-- [x] Successful physical handoff consumes once; unavailable ingredients cannot produce/deliver; production and movement preserved.
+- [x] Successful physical handoff consumes finite recipe ingredients once; unavailable finite ingredients cannot produce/deliver. Coca/beer barrel drinks bypass ingredient consumption but still require real physical handoff and sales; focused barrel regressions passed (11unique EditMode checks, including48real handoffs with zero Coca/beer stock); evidence in [modular-kitchen](modular-kitchen.md).
 - [x] Victory stock/earned balance/progression, defeat snapshot/earnings, abandonment/reload restoration and settlement/replay deduplication. The pre-active-cook cash-only campaign verified stock affordability, wins and replay-award deduplication across eleven levels. This settlement evidence is not final acceptance of current active-kitchen balance9–11.
 - [x] Single Mercado navigation, disabled play until stocked, no retry, no level 12.
 - [x] Unity focused EditMode/PlayMode checks and real portrait captures; report unavailable/device validation truthfully.
 - [x] Mercado objectives render current simulation products and goals in at most two compact rows (1–3: one row; 4: 2+2; 5: 3+2; 6: 3+3; 7: 4+3), while the ingredient list alone scrolls and fixed purchase/play controls remain accessible.
+- [x] Ingredient art uses complete images, proportional fit and centered row padding: standalone common/Paty bread icons preserve the original sandwich assets; meat atlas rects authored at2172×724 are normalized to actual imported dimensions (2048×683 in the validated Editor). Focused visual regression2026-10-23:21unique EditMode cases and9unique PlayMode cases passed, with16fresh full GameView captures at540×960/1170/1200 in ignored `Logs/Acceptance/MarketIcons-20261023/`. Scroll viewport clipping of partially visible rows is intentional; purchases/stock/economy unchanged. No APK/device validation for this visual fix.
+
 
 
 ## Cash-only policy update — 2026-10-13

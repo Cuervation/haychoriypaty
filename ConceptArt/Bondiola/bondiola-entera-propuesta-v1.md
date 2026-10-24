@@ -1,0 +1,11 @@
+# Bondiola entera — propuesta v1
+
+Fecha:2026-10-23. image_gen integrado; transparent_background=true; num_last_images_to_include=2. Referencias: atlas actual de bondiola como estilo; fotografía HoyCerdo de pieza entera (vista en navegador) como forma.
+
+Asset: bondiola-entera-cocida-propuesta-v1.png. Propuesta de arte cocido, todavía NO integrada en Assets/runtime. No se modificaron sprites/GUIDs, gameplay, compras ni estados de cocción.
+
+El usuario eligió una pieza entera, no bifes ni medallón cilíndrico. La silueta generada es horizontal, irregular y completa, con transparencia y margen, sin guarnición.
+
+## Prompt final
+
+Create ONE original polished 2D game sprite concept: a WHOLE Argentine bondiola de cerdo roast, cooked on a street parrilla, NOT steaks, NOT slices, NOT a medallion. Use the photo of the whole horizontal pork roast as anatomical/form reference only, and the existing four-frame illustrated meat strip as the GAME ART STYLE reference only. Correct that strip's unnatural upright cylindrical steak shape: this is an intact pork neck/shoulder roast lying on its long side, organic elongated oval, horizontal axis, about 2.1 times as wide as tall, rounded irregular ends, softly lobed muscles and natural fat seams, visibly three-dimensional volume from hand-painted shading. No flat exposed sliced cross-section, no perfect circular top, no vertical barrel shape. Whole uncut silhouette. Cooked golden amber and warm caramel brown exterior, glistening rendered fat, subtle irregular darker seared patches and a few believable soft grill marks following the curved surface; juicy appetizing meat, not black charcoal. Match Hay Chori y Paty existing richly illustrated casual 2D cartoon food art: warm saturated colors, simplified readable forms, clean dark brown contour and controlled painterly highlights. Slightly elevated three-quarter front view, lighting top-left. One roast alone, centered, entire object fully visible with generous transparent padding on all sides. NO grill, plate, board, garnish, vegetables, bread, knife, string, bone, smoke, text, labels or background. Truly transparent alpha. This is a visual proposal, not an image of a gameplay screen.

@@ -1,6 +1,24 @@
+## 2026-10-24 — Current Vacío 4-piece comparison
+
+Latest user request supersedes prior six-piece/+15%-width visual preview. Shared premium grill now has four real Vacío units in a broad 2×2 right-half layout; Bondiola remains six on the left, solo Vacío remains7. Depth stays 1.10× Bondiola; only the shared-grill Vacío X scale is widened to target aspect3.4, with a 1-unit seam. Whole-bondiola art/geometry EditMode36/36, production1/1, bounds1/1, separation1/1; Level6 GameView PlayMode1/1 and ambient-slot integration1/1 passed in an isolated Unity6000.6.3f1 copy. Full-screen/detail evidence: `Logs/Acceptance/VacioFour-20261024/`. Preserve unrelated worktree edits; no APK, device, commit or push.
+
+## 2026-10-24 — Vacío enlarged 10%
+
+The user reduced the enlargement request to 10%. Shared-grill Vacío now renders at 1.10× Bondiola's width and depth. Six cuts remain in the 3×2 right-half layout and inside the grill; the tighter fit allows up to4.1 logical units of horizontal and1.7 of row-depth overlap. Focused EditMode `WholeBondiolaArtTests` passed36/36; the two affected presentation checks passed1/1 each; Level6 PlayMode visual check passed1/1 in an isolated Unity 6000.6.3f1 copy. Full GameView and grill-detail captures are `Logs/Acceptance/VacioFillHalf-20261024/vacio-plus10-level-6-1080x1920.png` and `vacio-plus10-detail-level-6.png`. `git diff --check` passes. No APK, install, commit, or push.
+
+## 2026-10-24 — Vacío half-grill completed
+
+Selected second Vacío reference implemented as whole transparent Raw/Cooking/Cooked sprites; shared premium grill holds six Vacíos in a tight 3×2 layout on the right, matching Bondiola’s rendered footprint and retaining six Bondiolas left. Sprite/geometry 36/36, production 11/11, relevant presentation checks 2/2, and Level 6 PlayMode 1/1 passed in isolated Unity 6000.6.3f1. Presentation suite has three unrelated existing expectation/resource mismatches (24 vs48 initial table count, Fernet size, missing table plank art). Full Game View and grill-detail captures: `Logs/Acceptance/VacioFillHalf-20261024/`. No APK/build/install/push.
+
 ## 2026-10-23 — Entrega de insignias Android0.2.65/code67
 
 Nueva APK con21insignias de ventas500/2500/5000 para7productos; flags obtenidos y ventas viajan juntos en snapshotFirebase porUID. Fuente197c3a3 publicada;32EditMode+1PlayMode previamenteaprobados reutilizados sin cambios y67fuentes runtime/escena comparadas. Build Main-only Development IL2CPP/ARM64 en copiaaislada:0errores/1warning,447,19s. APK `/private/tmp/HayChoriYPaty-0.2.65-code67-insignias.apk`,354.357.269bytes,SHA256 `98ca84f89eeb6e12635c6ad034234e907309642f7b3f9d1172c232e9b11170b0`. Metadatos/ZIP/alineación/firmaV2/debug/bindingsMain verificados e independientemente revisados. No instalada; el Motorola conserva0.2.64/code66. RoundtripFirebase real de insignias pendiente. Sin cambiosglobales/trust ni trabajoajeno incluido. Recibo en [Android delivery](features/android-prototype.md).
+
+## 2026-10-23 — APK login/UI regression repair
+
+**Do not deliver 0.2.61/code63 or 0.2.62/code64 again:** isolated compiler caches retained another snapshot's absolute path and exported Main with invalid script bindings. Regenerating compiler caches only in the isolated copy restored all five script classes. New FirebaseAndroidBuildGuard blocks invalid MonoScript types and missing/inactive Main components; three unique focused EditMode checks pass. No auth bypass, save rewrite, scene/GUID change or gameplay modification.
+
+Repair APK **0.2.63/code65**: `/private/tmp/HayChoriYPaty-0.2.63-code65-login-repair.apk`, 345,503,205 bytes, SHA256 `fc7b3109deffc36f5c6a49261d37e51cc57169462efe3ae7bfa5ae4bc6490958`; build succeeded0 errors/1 warning506.16s. Direct artifact parsing independently confirms StreetGame/View/KitchenRenderer active and valid. Installed on Motorola Edge60Fusion ZY22MBNWRB via `adb install --no-streaming -r` after streaming USB failed. PackageManager confirms0.2.63/code65 and unchanged firstInstallTime2026-10-03 18:49:24. Physical capture shows authenticated session recovered and Racing Mercado with standard styled buttons. No logout/new Google picker was exercised; cloud online sync is not certified (DNS warnings observed). No data clearing. Device evidence: `/private/tmp/hcyp-login-repair-device-awake.png` (full1220×2712 screen). See [Android repair](features/android-prototype.md).
 
 ## 2026-10-23 — APK Android 0.2.62/code64
 
@@ -51,6 +69,8 @@ Android Development APK actual: **0.2.48/code50**, Main-only IL2CPP/ARM64, built
 Firebase real configurado: Google habilitado, Android com.haychoriypaty.game con SHA debug, Firestore Standard en São Paulo y reglas seguras desplegadas; Billing=false. Roundtrip administrativo IAM real aprobado, no progreso de jugadores. SDK importado y compila; 46/47 EditMode (falla campaña nivel6) y4/4 PlayMode, gate manual sin sesión verificado. APK0.2.44/code46 IL2CPP/ARM64 generada (0 errores/2 warnings), sin instalación. Google real del cliente y reapertura/dispositivo pendientes. Detalle: [firebase-player.md](features/firebase-player.md#informe-verificable-de-entrega--2026-10-16).
 
 # Continuidad — estado vigente de Hay Chori y Paty
+
+**Nota 2026-10-24:** La variante actual solicitada para inspección visual de Vacío es +15% de ancho sobre la configuración +10% previa, con profundidad sin cambio y desborde exterior permitido. Geometría 2/2 y PlayMode Game View 1/1 pasan en copia aislada; evidencia 1080×1920 y detalle en `Logs/Acceptance/VacioWidth15-20261024/`. En esta disposición el corte más externo aún no cruza el límite de parrilla, aunque el layout ya no comprime el ancho para obligarlo a caber. Checkout con cambios locales ajenos preexistentes: preservar todo lo no relacionado.
 
 ## 1. Último estado confirmado — 2026-10-16
 

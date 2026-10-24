@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
+using HayChoriYPaty;
 using NUnit.Framework;
 
 namespace HayChoriYPaty.Tests
@@ -10,6 +11,23 @@ namespace HayChoriYPaty.Tests
     {
         private const BindingFlags PublicInstance = BindingFlags.Instance | BindingFlags.Public;
         private Type productionType, balanceType, stateType, locationType, roleType;
+
+        // The test asmdef cannot reference predefined Assembly-CSharp directly.
+        // Proxy the runtime interface just like the fixture reflects its other domain types.
+        private sealed class EmptyIngredientStock : System.Runtime.Remoting.Proxies.RealProxy
+        {
+            public int CanPrepareCalls, ReserveCalls, ConsumeCalls;
+            public EmptyIngredientStock() : base(Type.GetType("HayChoriYPaty.IStreetKitchenStock, Assembly-CSharp", true)) { }
+            public override System.Runtime.Remoting.Messaging.IMessage Invoke(System.Runtime.Remoting.Messaging.IMessage message)
+            {
+                var call = (System.Runtime.Remoting.Messaging.IMethodCallMessage)message;
+                if (call.MethodName == "CanPrepareFood") CanPrepareCalls++;
+                if (call.MethodName == "TryReserveFood") ReserveCalls++;
+                if (call.MethodName == "ConsumeReservedFood") ConsumeCalls++;
+                return new System.Runtime.Remoting.Messaging.ReturnMessage(
+                    call.MethodName == "ReleaseFood" ? null : (object)false, null, 0, call.LogicalCallContext, call);
+            }
+        }
 
         [SetUp]
         public void SetUp()
@@ -79,8 +97,8 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(12, (int)Call(full, "TableCount", 6));
             Assert.AreEqual(12, (int)Call(full, "GrillCapacity", 0));
             Assert.AreEqual(6, (int)Call(full, "GrillCapacity", 1));
-            Assert.AreEqual(4, (int)Call(full, "GrillCapacity", 2));
-            Assert.AreEqual(3, (int)Call(full, "GrillCapacity", 3));
+            Assert.AreEqual(6, (int)Call(full, "GrillCapacity", 2));
+            Assert.AreEqual(4, (int)Call(full, "GrillCapacity", 3));
             Assert.IsNotNull(Unit(full, 0, "Raw", "Grill"));
             Assert.IsNotNull(Unit(full, 2, "Raw", "Grill"));
         }
@@ -174,15 +192,98 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(48, (int)Call(kitchen, "TableCount", 0));
         }
 
-        [Test]
-        public void EmptyDrinkBarrelRefillsOnlyWhenItsResponsibleRoleIsHired()
+        [TestCase(false)] [TestCase(true)]
+        public void CocaAndBeerBarrelsStayFullAndServePastEmptyMarketStock(bool activeCooks)
         {
-            object kitchen = Make(new[] { 4 });
-            for (int worker = 1; worker <= 12; worker++) Call(kitchen, "TryTake", 4, EnumValue(roleType, "Cocacolero"), worker);
-            Call(kitchen, "Advance", 1f, 1f, false, false, false, false);
-            Assert.AreEqual(0, (int)Call(kitchen, "TableCount", 4));
-            Call(kitchen, "Advance", .28f, 1f, false, false, true, false);
-            Assert.AreEqual(1, (int)Call(kitchen, "TableCount", 4));
+            object balance = Activator.CreateInstance(balanceType);
+            var emptyStock = new EmptyIngredientStock();
+            object kitchen = Activator.CreateInstance(productionType,
+                new object[] { balance, new[] { 4, 6 }, emptyStock.GetTransparentProxy(), activeCooks });
+            object cocaRole = EnumValue(roleType, "Cocacolero");
+
+            foreach (int product in new[] { 4, 6 })
+            {
+                Assert.AreEqual(12, (int)Call(kitchen, "TableCapacity", product));
+                Assert.AreEqual(12, (int)Call(kitchen, "TableCount", product));
+                Assert.IsTrue((bool)Call(kitchen, "HasSupply", product), "An enabled barrel is never sold out.");
+
+                for (int delivery = 0; delivery < 24; delivery++)
+                {
+                    int workerId = 1000 + product * 100 + delivery;
+                    object item = Call(kitchen, "TryTake", product, cocaRole, workerId);
+                    Assert.IsNotNull(item, "An empty Mercado cannot block barrel item " + delivery + " for product " + product + ".");
+                    Assert.AreEqual("Carried", Get(item, "Location").ToString());
+                    Assert.AreEqual(12, (int)Call(kitchen, "TableCount", product), "Pickup immediately refills the same barrel slot.");
+                    Assert.IsTrue((bool)Call(kitchen, "Consume", (int)Get(item, "Id"), product, workerId));
+                    Assert.AreEqual(12, (int)Call(kitchen, "TableCount", product), "Serving does not reduce the barrel's visible stock.");
+                    Assert.IsTrue((bool)Call(kitchen, "HasSupply", product));
+                }
+            }
+
+            Assert.AreEqual(0, emptyStock.CanPrepareCalls, "Unlimited barrels do not consult finite ingredient stock.");
+            Assert.AreEqual(0, emptyStock.ReserveCalls, "Unlimited barrels never reserve Mercado units.");
+            Assert.AreEqual(0, emptyStock.ConsumeCalls, "Serving Coca/beer never consumes Mercado units.");
+        }
+
+        [Test]
+        public void UnlimitedBarrelsKeepRoleOwnershipCancellationAndFernetStockRules()
+        {
+            var empty = new EmptyIngredientStock();
+            object kitchen = Activator.CreateInstance(productionType, new object[] {
+                Activator.CreateInstance(balanceType), new[] { 4, 5, 6 }, empty.GetTransparentProxy() });
+            Assert.AreEqual(0, Call(kitchen, "TableCount", 5), "Fernet remains ingredient-backed.");
+            Assert.IsFalse((bool)Call(kitchen, "HasSupply", 5));
+            foreach (int product in new[] { 4, 6 })
+            {
+                Assert.IsNull(Call(kitchen, "TryTake", product, EnumValue(roleType, "Parrillero"), 1));
+                object item = Call(kitchen, "TryTake", product, EnumValue(roleType, "Cocacolero"), 2);
+                int id = (int)Get(item, "Id");
+                Assert.IsFalse((bool)Call(kitchen, "Consume", id, product, 3), "Only the actual carrier can hand it off.");
+                Assert.IsTrue((bool)Call(kitchen, "Consume", id, product, 2));
+                Assert.IsFalse((bool)Call(kitchen, "Consume", id, product, 2), "No duplicate consumption/sale.");
+                object cancelled = Call(kitchen, "TryTake", product, EnumValue(roleType, "Cocacolero"), 4);
+                Call(kitchen, "ReturnCarried", (int)Get(cancelled, "Id"), 4);
+                Assert.AreEqual(12, Call(kitchen, "TableCount", product), "Cancellation cannot grow the barrel beyond its12slots.");
+            }
+        }
+
+        [Test]
+        public void RealMarketWithZeroDrinkStockStillAllowsRepeatedPhysicalDrinkSales()
+        {
+            Type sb = Type.GetType("HayChoriYPaty.StreetBalance, Assembly-CSharp", true);
+            Type st = Type.GetType("HayChoriYPaty.StreetSimulation, Assembly-CSharp", true);
+            Type mt = Type.GetType("HayChoriYPaty.StreetMarket, Assembly-CSharp", true);
+            Type md = Type.GetType("HayChoriYPaty.StreetMarketData, Assembly-CSharp", true);
+            object balance = Activator.CreateInstance(sb);
+            sb.GetField("maxCustomers").SetValue(balance, 2);
+            sb.GetField("customerArrivalSeconds").SetValue(balance, 10000f);
+            object sim = Activator.CreateInstance(st, new object[] { balance, 4, 5f, 0, 1, 0 });
+            object data = Activator.CreateInstance(md);
+            object market = Activator.CreateInstance(mt, new[] { data, balance });
+            int[] required = (int[])Call(market, "RequiredUnits", sim);
+            md.GetField("stockUnits").SetValue(data, (int[])required.Clone());
+            Call(sim, "BindIngredientStock", market);
+            Assert.IsTrue((bool)Call(market, "BeginAttempt", sim), "The existing pre-round stock gate remains intact.");
+            Call(sim, "StartRound");
+            st.GetField("arrival", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(sim, 10000f); // Isolate the two scripted drink orders, including the initial arrival.
+            int[] stock = (int[])md.GetField("stockUnits").GetValue(data); stock[6] = stock[7] = 0;
+            st.GetProperty("Coins").SetValue(sim, 100000);
+            Assert.IsTrue((bool)Call(sim, "TryHire", EnumValue(roleType, "Cocacolero")));
+            Assert.IsTrue((bool)Call(sim, "TryHire", EnumValue(roleType, "Cocacolero")));
+            st.GetProperty("Coins").SetValue(sim, 0);
+            Assert.IsTrue((bool)Call(sim, "SpawnCustomer", 4, 24));
+            Assert.IsTrue((bool)Call(sim, "SpawnCustomer", 6, 24));
+            Assert.AreEqual(0, Get(sim, "Delivered")); Assert.AreEqual(0, Get(sim, "CoinsEarned"));
+            for (int i = 0; i < 4000 && ((int)Call(sim, "GetProductDelivered", 4) < 24 || (int)Call(sim, "GetProductDelivered", 6) < 24); i++)
+                Call(sim, "Step", .05f);
+            Assert.AreEqual(24, Call(sim, "GetProductDelivered", 4));
+            Assert.AreEqual(24, Call(sim, "GetProductDelivered", 6));
+            Assert.AreEqual(48, Get(sim, "Delivered"));
+            int expectedRevenue = 24 * ((int)(float)Call(sim, "GetProductPrice", 4) + (int)(float)Call(sim, "GetProductPrice", 6));
+            Assert.AreEqual(expectedRevenue, Get(sim, "CoinsEarned"), "Only actual handoffs generate the unchanged sale prices.");
+            Assert.AreEqual(0, Call(market, "Units", 6)); Assert.AreEqual(0, Call(market, "Units", 7));
+            Assert.AreEqual(12, Call(Get(sim, "Kitchen"), "TableCount", 4));
+            Assert.AreEqual(12, Call(Get(sim, "Kitchen"), "TableCount", 6));
         }
 
         [Test]

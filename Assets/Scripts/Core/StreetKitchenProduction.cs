@@ -54,6 +54,7 @@ namespace HayChoriYPaty
 
         public IReadOnlyList<StreetFoodUnit> Units { get { return units; } }
         public StreetKitchenBalance Balance { get { return balance; } }
+        private static bool IsUnlimitedBarrelProduct(int product) { return product == 4 || product == 6; }
         public StreetKitchenProduction(StreetKitchenBalance balance, int[] availableProducts)
             : this(balance, availableProducts, null) { }
 
@@ -72,6 +73,9 @@ namespace HayChoriYPaty
 
         public bool HasSupply(int product)
         {
+            // Coca and beer barrels are inexhaustible sources, not Market-backed inventory.
+            if (IsUnlimitedBarrelProduct(product))
+                return product >= 0 && product < tableCapacity.Length && tableCapacity[product] > 0;
             if (ingredientStock == null || (ActiveCooks && product >= 0 && product < 4)) return true;
             for (int i = 0; i < units.Count; i++)
                 if (units[i].Product == product && units[i].State != StreetFoodState.Burned) return true;
@@ -103,6 +107,11 @@ namespace HayChoriYPaty
                     (ActiveCooks && product < 4 && unit.WorkerId != workerId)) continue;
                 unit.Location = StreetFoodLocation.Carried;
                 unit.WorkerId = workerId;
+                if (IsUnlimitedBarrelProduct(product))
+                {
+                    // Replace the serving in its display slot immediately; barrel stock never empties.
+                    Add(product, StreetFoodState.Cooked, StreetFoodLocation.Table, unit.Slot);
+                }
                 if (ActiveCooks && product < 4)
                 {
                     // The sandwich no longer occupies a physical table cell once the Mozo lifts it.
@@ -255,9 +264,9 @@ namespace HayChoriYPaty
         {
             StreetFoodUnit unit = Find(id);
             if (unit == null || unit.Product != product || unit.Location != StreetFoodLocation.Carried || unit.WorkerId != workerId || unit.State != StreetFoodState.Cooked) return false;
-            // Active sandwich products (0–3) are not backed by Market/Fridge ingredients.
-            // Other products and legacy automatic levels retain their reserved-stock transaction.
-            if (!(ActiveCooks && product >= 0 && product < 4) &&
+            // Active sandwiches and Coca/beer barrel units bypass Market/Fridge ingredient stock.
+            // Other finite ingredient-backed products retain their reserved-stock transaction.
+            if (!IsUnlimitedBarrelProduct(product) && !(ActiveCooks && product >= 0 && product < 4) &&
                 ingredientStock != null && !ingredientStock.ConsumeReservedFood(id, product)) return false;
             units.Remove(unit);
             return true;
@@ -423,6 +432,8 @@ namespace HayChoriYPaty
             tableCapacity[6] = available[6] ? Mathf.Max(1, balance.barrelCapacity) : 0;
             SetGrillCapacities(available, 0, 1, 18, 12);
             SetGrillCapacities(available, 2, 3, 7, 4);
+            if (available[2]) grillCapacity[2] = 6; // User-selected whole Bondiola cooking grid:3 columns x 2 rows.
+            if (available[2] && available[3]) grillCapacity[3] = 4; // Fill the right half with four whole Vacíos in a compact 2x2 grid.
             for (int product = 0; product < 7; product++)
             {
                 int capacity = tableCapacity[product];
@@ -523,8 +534,8 @@ namespace HayChoriYPaty
         private StreetFoodUnit Add(int product, StreetFoodState state, StreetFoodLocation location, int slot)
         {
             if (slot < 0 && location == StreetFoodLocation.Table) return null;
-            // Racing+ real sandwiches intentionally bypass ingredient reservations; drinks keep theirs.
-            if (!(ActiveCooks && product >= 0 && product < 4) &&
+            // Racing+ sandwiches and inexhaustible Coca/beer barrels bypass ingredient reservations.
+            if (!IsUnlimitedBarrelProduct(product) && !(ActiveCooks && product >= 0 && product < 4) &&
                 ingredientStock != null && !ingredientStock.TryReserveFood(nextId, product)) return null;
             var unit = new StreetFoodUnit { Id = nextId++, Product = product, State = state, Location = location,
                 Slot = slot };
