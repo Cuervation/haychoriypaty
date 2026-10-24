@@ -2,7 +2,7 @@
 
 Se registra el estado aprobado: bondiola entera y cuatro Vacíos grandes 2×2 en parrilla compartida; panes completos en Mercado; Coca/cerveza inagotables. Runtime source b1c1426; la posterior actualización de tests/SDD no altera código runtime ni APK. APK Main-only Development IL2CPP/ARM64 construida en copia Unity6000.6.3f1:511.91s,0errores/1advertencia. /private/tmp/HayChoriYPaty-0.2.66-code68-vacio-four.apk,384458497bytes,SHA256 9ff3f511f948717b51983334ac51a0085bb3e58b6f8aee6d9323ac636afa81c9; metadatos,ZIP/alineación,firmaV2 y bindingsMain PASS.
 
-PASS focal: whole art36/36, producción11/11, build guard3/3, íconos Mercado21/21, bounds/separación1/1 cada uno, PlayMode pantalla completa1/1+slot ambiental1/1, aserción de sandwiches activos1/1. FAIL campaña ActualHandoffsAndAdaptivePurchasesFundAllElevenFirstUnlockTransitions: contabilidad de stock pasa antes de que la política adaptativa pierda nivel6; no se modificó el balance para forzar victoria. APK debug-signed; instalación/device/Firebase remoto NOT_RUN.
+PASS focal: whole art36/36, producción11/11, build guard3/3, íconos Mercado21/21, bounds/separación1/1 cada uno, PlayMode pantalla completa1/1+slot ambiental1/1, aserción de sandwiches activos1/1. FAIL campaña ActualHandoffsAndAdaptivePurchasesFundAllElevenFirstUnlockTransitions: contabilidad de stock pasa antes de que la política adaptativa pierda nivel6; no se modificó el balance para forzar victoria. APK debug-signed; commits b1c1426+a1486d5 pushed to origin/codex/street-automation (APK binary remains outside Git); instalación/device/Firebase remoto NOT_RUN.
 
 ## 2026-10-24 — Vacío +10%
 

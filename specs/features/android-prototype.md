@@ -8,7 +8,7 @@ Validación Unity focalizada: WholeBondiolaArtTests36/36; StreetKitchenProductio
 
 Límite separado: StreetMarketIntegrationTests.ActualHandoffsAndAdaptivePurchasesFundAllElevenFirstUnlockTransitions sigue FAIL al perderse la ronda de nivel6 (esperaba Won, obtuvo Lost); sus aserciones de contabilidad de ingredientes sí llegan a pasar antes de esa aserción. Se conserva como problema conocido de balance; no se alteraron tiempos, metas, stock de Mercado ni economía. La búsqueda amplia inicial Market también había incluido la expectativa vieja de consumo de sandwich/bebidas; se alinearon los tests y el contrato al comportamiento autorizado, sin cambiar runtime para forzar una victoria de campaña.
 
-Instalación y QA físico: NOT_RUN. No se afirma validación completa de campaña, Firebase remoto ni compatibilidad física.
+Source commits b1c1426 and a1486d5 pushed to origin/codex/street-automation; APK binary remains local and is not a Git blob. Instalación y QA físico: NOT_RUN. No se afirma validación completa de campaña, Firebase remoto ni compatibilidad física.
 
 ---
 
