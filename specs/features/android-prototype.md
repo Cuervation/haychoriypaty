@@ -1,3 +1,17 @@
+# Entrega Android — 2026-10-24: Vacío 2×2, cortes enteros y stock ilimitado 0.2.66/code68
+
+APK construida desde el commit runtime b1c1426 (solo Android versionada a0.2.66/code68). Incluye cuatro Vacíos anchos en la mitad derecha de la parrilla Premium, seis Bondiolas enteras a la izquierda y sus cocciones; Coca/cerveza inagotables aunque Mercado no tenga unidades; e íconos completos y sin recorte para panes de Mercado. Unity6000.6.3f1, copia aislada, Main-only Development IL2CPP/ARM64: Succeeded, 511.91s, 0errores/1warning.
+
+APK /private/tmp/HayChoriYPaty-0.2.66-code68-vacio-four.apk: 384.458.497bytes, SHA256 9ff3f511f948717b51983334ac51a0085bb3e58b6f8aee6d9323ac636afa81c9. Paquete com.haychoriypaty.game, versión0.2.66/code68, min26/target36, solo arm64-v8a. aapt, ZIP, zipalign, firma APKv2 y parser directo de Main/level0 (StreetGame, StreetView y StreetKitchenRenderer activos y válidos) PASS. Android Debug signer existente; no es firma de Play Store. Firebase Analytics desactivado y Google Analytics Ad ID desactivado. Recibo/logs en /private/tmp/hcyp-android-delivery-0.2.66-code68/.
+
+Validación Unity focalizada: WholeBondiolaArtTests36/36; StreetKitchenProductionTests11/11; StreetSceneBuildGuardTests3/3; StreetArtTests.Market*21/21; GrillMeatVisualBoundsStayInsideTheGrillForEveryLevel1/1; TableAndGrillSlotsDoNotMixTheTwoMeatFamilies1/1; PlayMode WholePremiumCutsFillBothHalvesAndUseRealCookingStates1/1 (Game View1080×1920) y ActiveGrillsStayVisuallyFullWithoutCreatingFoodAndRealCookOwnsItsSlot1/1. El fixture de stock actualizado ActiveCookSandwichesNeverReserveOrConsumeMarketIngredients1/1.
+
+Límite separado: StreetMarketIntegrationTests.ActualHandoffsAndAdaptivePurchasesFundAllElevenFirstUnlockTransitions sigue FAIL al perderse la ronda de nivel6 (esperaba Won, obtuvo Lost); sus aserciones de contabilidad de ingredientes sí llegan a pasar antes de esa aserción. Se conserva como problema conocido de balance; no se alteraron tiempos, metas, stock de Mercado ni economía. La búsqueda amplia inicial Market también había incluido la expectativa vieja de consumo de sandwich/bebidas; se alinearon los tests y el contrato al comportamiento autorizado, sin cambiar runtime para forzar una victoria de campaña.
+
+Instalación y QA físico: NOT_RUN. No se afirma validación completa de campaña, Firebase remoto ni compatibilidad física.
+
+---
+
 # Entrega Android — 2026-10-23: insignias 0.2.65/code67
 
 Incluye21insignias de ventas500/2500/5000 para los7productos, con contadores y flags obtenidos persistidos en el snapshotFirebase porUID. Fuente197c3a3,67archivos runtime/escena comparados sin diferencias; trabajo local ajeno excluido/preservado. Se reutiliza evidencia sin cambios:32/32EditMode+1/1PlayMode y captura real1080×1920 con datosQA, ya revisados independientemente. Firebase remoto real: **NOT_RUN**, no confundir transporte snapshot probado localmente con roundtrip autenticado real.

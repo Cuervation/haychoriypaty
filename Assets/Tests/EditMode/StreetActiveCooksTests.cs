@@ -1042,7 +1042,7 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void RealMarketIngredientsAreReleasedOnCookCancellationAndConsumedOnlyAtSale()
+        public void ActiveCookSandwichesNeverReserveOrConsumeMarketIngredients()
         {
             object balance = MakeActiveBalance(5, 1000);
             object sim = Activator.CreateInstance(simulationType, new object[] { balance, 5, 5f, 0, 1, 0 });
@@ -1065,7 +1065,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(breadBefore, Call(market, "Units", 1));
             Call(kitchen, "CancelCook", 1);
             Assert.IsNull(Call(kitchen, "Find", cancelledId));
-            Assert.AreEqual(chorizoBefore, Call(market, "Units", 0), "Cancelled cooking releases its reserved recipe.");
+            Assert.AreEqual(chorizoBefore, Call(market, "Units", 0), "Cancelled active cooking leaves Market ingredients untouched.");
             Assert.AreEqual(breadBefore, Call(market, "Units", 1));
 
             object cooked = Call(kitchen, "ReserveCook", 0, 2);
@@ -1073,13 +1073,13 @@ namespace HayChoriYPaty.Tests
             Assert.IsTrue((bool)Call(kitchen, "AdvanceCook", cookedId, 2, 2f, 1f));
             Assert.IsTrue((bool)Call(kitchen, "TakeCooked", cookedId, 2));
             Assert.IsTrue((bool)Call(kitchen, "DepositCooked", cookedId, 2));
-            Assert.AreEqual(chorizoBefore, Call(market, "Units", 0), "Depositing edible food does not consume its ingredient reservation.");
+            Assert.AreEqual(chorizoBefore, Call(market, "Units", 0), "Depositing active-cook sandwiches does not debit Market stock.");
             Assert.AreEqual(breadBefore, Call(market, "Units", 1));
             Assert.IsNotNull(Call(kitchen, "ReserveTableUnit", 0, 3));
             Assert.IsNotNull(Call(kitchen, "TryTake", 0, EnumValue(roleType, "Mozo"), 3));
             Assert.IsTrue((bool)Call(kitchen, "Consume", cookedId, 0, 3));
-            Assert.AreEqual(chorizoBefore - 1, Call(market, "Units", 0));
-            Assert.AreEqual(breadBefore - 1, Call(market, "Units", 1));
+            Assert.AreEqual(chorizoBefore, Call(market, "Units", 0), "Selling active-cook Chori does not debit Market stock.");
+            Assert.AreEqual(breadBefore, Call(market, "Units", 1), "Selling active-cook Chori does not debit Market stock.");
         }
 
         [Test]
