@@ -47,6 +47,7 @@ namespace HayChoriYPaty
         private readonly HashSet<int> liveIds = new HashSet<int>();
         private readonly List<int> stale = new List<int>();
         private readonly Texture2D extension, premiumExtension, fernetExtension;
+        private readonly Texture2D cocaBarrelPickupPose;
         private readonly Texture2D cookingPoses;
         private Texture2D premiumCookingPoses;
         private Texture2D normal, diagonal, premium, premiumDiagonal, drink, fernet, mozo, mozoDiagonal, mozoExtension;
@@ -68,6 +69,7 @@ namespace HayChoriYPaty
         {
             this.parent = parent; this.material = material;
             extension = Resources.Load<Texture2D>("street-worker-direction-extension-v1");
+            cocaBarrelPickupPose = Resources.Load<Texture2D>("street-cocacolero-barrel-reach-v1");
             cookingPoses = Resources.Load<Texture2D>("street-parrillero-cooking-arms-v1");
             if (cookingPoses != null)
                 premiumCookingPoses = StreetWorkerAppearance.CreateVariant(cookingPoses, StreetWorkerRole.ParrilleroPremium,
@@ -400,23 +402,37 @@ namespace HayChoriYPaty
                 // Only the integrated cooking atlas needs its own transparent-foot crop correction.
                 if (pose.WorkingAtGrill && hasCookingPose)
                     displayPosition.y += CookingPoseFootInset(pose.CookingFrame) / Mathf.Max(.01f, verticalScale);
+                bool cocaBarrelPickup = pose.PickingUp && w.Role == StreetWorkerRole.Cocacolero &&
+                    w.Product == 4 && cocaBarrelPickupPose != null;
                 Art upper = pose.Carrying ? Carry(w,pose.Facing) : Walk(w,pose.Facing,contact,pose.Moving);
                 if (pose.Cooking) upper = Original(w, 0, false);
                 if (pose.PickingUp)
-                    upper = Beverage(w) ? Carry(w,pose.Facing)
-                        : Original(w,11, w.Position.x < sim.KitchenLayout.BoundsForProduct(w.Product).center.x);
+                    upper = cocaBarrelPickup
+                        ? new Art { Texture = cocaBarrelPickupPose, Bounds = new Rect(0,0,cocaBarrelPickupPose.width,cocaBarrelPickupPose.height),
+                            Flip = false, Palm = new Vector2(.27f,.28f) }
+                        : Beverage(w) ? Carry(w,pose.Facing)
+                            : Original(w,11, w.Position.x < sim.KitchenLayout.BoundsForProduct(w.Product).center.x);
                 bool passing = !pose.Moving || (pose.Frame & 1) == 1;
                 StreetFacing legFacing = Diagonal(pose.Facing) ? (pose.Facing == StreetFacing.UpLeft || pose.Facing == StreetFacing.UpRight ? StreetFacing.Up : StreetFacing.Down) : pose.Facing;
                 Art legs = passing ? Walk(w,legFacing,0,false) : Walk(w,pose.Facing,contact,true);
                 float upperScale = Scale(upper) * presentationScale, legScale = Scale(legs) * presentationScale;
                 // Overlap the paired cutouts slightly; the upper layer hides the atlas seam
                 // without leaving a gap when the cook transitions back to gait/carry poses.
-                float split = upper.Bounds.height * (Waist + WaistOverlap);
-                float reach = pose.PickingUp ? Mathf.Sin(pose.PickupProgress * Mathf.PI) * Height * .20f : 0f;
-                float upperBottom = upper.Bounds.height * (1f-Waist-WaistOverlap) * upperScale - pose.Bob * presentationScale - reach * presentationScale;
+                float splitRatio = cocaBarrelPickup ? .82f : Waist + WaistOverlap;
+                float split = upper.Bounds.height * splitRatio;
+                float reach = pose.PickingUp ? Mathf.Sin(pose.PickupProgress * Mathf.PI) * Height * (cocaBarrelPickup ? .24f : .20f) : 0f;
+                float upperBottom = upper.Bounds.height * (1f-splitRatio) * upperScale - pose.Bob * presentationScale - reach * presentationScale;
                 // A tiny x-based tie-break makes same-row workers deterministic without overriding y-depth.
                 int depth = (sim.UsesActiveCooks ? SceneDepth(displayPosition.y * verticalScale)
                     : -5000 + Mathf.RoundToInt(displayPosition.y * verticalScale)) + RowSortBias(sim, w, displayPosition);
+                int upperOrder = depth + 2;
+                if (cocaBarrelPickup)
+                {
+                    Rect barrel = sim.KitchenLayout.BoundsForProduct(w.Product);
+                    int barrelDepth = sim.UsesActiveCooks ? SceneDepth(barrel.yMax * verticalScale) : 0;
+                    // Keep legs behind the barrel, but bring the authored reach/torso over its rim and stocked bottles.
+                    upperOrder = Mathf.Max(upperOrder, barrelDepth + 24);
+                }
                 v.Root.localPosition = new Vector3((displayPosition.x-270f)*.01f, (canvasHeight*.5f-displayPosition.y*verticalScale)*.01f,0);
                 if (hasCookingPose)
                 {
@@ -426,7 +442,7 @@ namespace HayChoriYPaty
                 }
                 else
                 {
-                    DrawPart(v.Torso,upper,new Rect(upper.Bounds.x,upper.Bounds.y,upper.Bounds.width,split),new Vector2(0,upperBottom),depth+2,presentationScale);
+                    DrawPart(v.Torso,upper,new Rect(upper.Bounds.x,upper.Bounds.y,upper.Bounds.width,split),new Vector2(0,upperBottom),upperOrder,presentationScale);
                     float legHeight = legs.Bounds.height * (1f-Waist+WaistOverlap), half = legs.Bounds.width*.5f;
                     // Passing keyframes articulate alternate legs; at least one foot stays planted.
                     float leftLift = pose.Moving && pose.Frame == 1 ? 2f : 0f;

@@ -16,10 +16,11 @@ namespace HayChoriYPaty
         private const string ChicagoBackgroundResource = "street-background-chicago-v1";
         private const string VelezBackgroundResource = "street-background-velez-v1";
         private const string VelezCrestResource = "street-velez-crest-v1";
+        private const string RacingCrestResource = "street-racing-crest-v1";
         // Ordered by StreetSimulation.LevelDisplayNames. Unknown/unlicensed marks stay null.
         private static readonly string[] LevelCrestResourceNames = {
             AllBoysCrestResource, ChicagoCrestResource, VelezCrestResource,
-            null, null, null, null, null, null, null, null
+            null, null, RacingCrestResource, null, null, null, null, null
         };
         private const string VelezFrontFansResource = "street-velez-fans-front-v1";
         private const string VelezWalkingFansResource = "street-velez-fans-walk-v1";
@@ -132,7 +133,10 @@ namespace HayChoriYPaty
         // Read-only product chips are a separate overlay over the mural, not part of the HUD bar.
         private static readonly Rect HudSales = HudQuotaGrid;
         private static readonly Rect CutoutHudGap = new Rect(232, 0, 70, 34);
-        private const int HudStatusValueFontSize = 35, HudClockFontSize = 35;
+        private const int HudCounterFontSize = 35;
+        private const int HudStatusValueFontSize = HudCounterFontSize;
+        private const int HudClockFontSize = HudCounterFontSize;
+        private const int HudQuotaCounterFontSize = HudCounterFontSize;
         private const float CustomerHiddenLegHeight = StreetSceneLayout.CustomerHiddenLegHeight;
         // Standard station dimensions come from live Floresta, not per-level fitting.
         private const string ChicagoGrillResource = "street-parrilla-large-v4";
@@ -241,8 +245,14 @@ namespace HayChoriYPaty
             float panelBottom = pennantHeight > 1f
                 ? pennantTop - pennantClearance
                 : decorationBottom - 4f * compactScale;
-            float panelTop = panelBottom - panelHeight;
+            // Keep the club/neighborhood caption at the top of the footer, just below the
+            // kitchen field. Center the controls in the remaining safe space before pennants.
+            // If the footer is tight, sacrifice the spare gap before allowing the block to clip.
+            float panelTop = Mathf.Min(stageBottom + topPadding, panelBottom - panelHeight);
             float cardTop = panelTop + badgeHeight + sectionGap;
+            float buttonBlockHeight = cardBlockHeight + selectorGap + selectorHeight;
+            float spareButtonSpace = Mathf.Max(0f, panelBottom - cardTop - buttonBlockHeight);
+            cardTop += spareButtonSpace * .5f;
 
             var cards = new Rect[count];
             for (int i = 0; i < count; i++)
@@ -366,8 +376,9 @@ namespace HayChoriYPaty
         private static readonly Rect RiotReturnButton = new Rect(88, 858, 364, 66);
         private StreetGame game;
         private int VisualLevelIndex => game != null && game.Sim != null ? game.Sim.LevelIndex : 0;
-        private Texture2D backdrop, chicagoBackground, velezBackground, velezCrest, velezGrill, people, items, parrillero, parrilleroDiagonal, cocacolero, laterCocacolero, parrilleroIcon, upgradeWood, speedArrows, largeGrill, gameCoin, muralArt, allBoysCrest, chicagoCrest, cocaBottle, beverageBarrel, chicagoGrill;
+        private Texture2D backdrop, chicagoBackground, velezBackground, velezGrill, people, items, parrillero, parrilleroDiagonal, cocacolero, laterCocacolero, parrilleroIcon, upgradeWood, speedArrows, largeGrill, gameCoin, muralArt, allBoysCrest, chicagoCrest, cocaBottle, beverageBarrel, chicagoGrill;
         private Texture2D[] levelCrests;
+        private static Texture2D racingCrestCutout;
         private Texture2D clubPennantTexture;
         private string clubPennantThemeName;
         private float clubPennantLogicalHeight = -1f;
@@ -499,7 +510,66 @@ namespace HayChoriYPaty
             }
             allBoysCrest = levelCrests[0];
             chicagoCrest = levelCrests[1];
-            velezCrest = levelCrests[2];
+            if (levelCrests[5] != null)
+            {
+                if (racingCrestCutout == null) racingCrestCutout = CreateRacingCrestCutout(levelCrests[5]);
+                levelCrests[5] = racingCrestCutout;
+            }
+        }
+
+        private static Texture2D CreateRacingCrestCutout(Texture2D source)
+        {
+            if (source == null || !source.isReadable) return null;
+            int width = source.width, height = source.height;
+            Color32[] pixels = source.GetPixels32();
+            bool[] background = new bool[pixels.Length];
+            int[] queue = new int[pixels.Length];
+            int tail = 0;
+            for (int x = 0; x < width; x++)
+            {
+                QueueRacingBackgroundPixel(x, 0, width, height, pixels, background, queue, ref tail);
+                QueueRacingBackgroundPixel(x, height - 1, width, height, pixels, background, queue, ref tail);
+            }
+            for (int y = 1; y < height - 1; y++)
+            {
+                QueueRacingBackgroundPixel(0, y, width, height, pixels, background, queue, ref tail);
+                QueueRacingBackgroundPixel(width - 1, y, width, height, pixels, background, queue, ref tail);
+            }
+            int head = 0;
+            while (head < tail)
+            {
+                int index = queue[head++], x = index % width, y = index / width;
+                if (x > 0) QueueRacingBackgroundPixel(x - 1, y, width, height, pixels, background, queue, ref tail);
+                if (x + 1 < width) QueueRacingBackgroundPixel(x + 1, y, width, height, pixels, background, queue, ref tail);
+                if (y > 0) QueueRacingBackgroundPixel(x, y - 1, width, height, pixels, background, queue, ref tail);
+                if (y + 1 < height) QueueRacingBackgroundPixel(x, y + 1, width, height, pixels, background, queue, ref tail);
+            }
+            for (int i = 0; i < pixels.Length; i++)
+                if (background[i]) pixels[i] = new Color32(0, 0, 0, 0);
+
+            var result = new Texture2D(width, height, TextureFormat.RGBA32, false);
+            result.name = "Racing crest (checkerboard cutout)";
+            result.filterMode = source.filterMode;
+            result.wrapMode = TextureWrapMode.Clamp;
+            result.hideFlags = HideFlags.HideAndDontSave;
+            result.SetPixels32(pixels);
+            result.Apply(false, false);
+            return result;
+        }
+
+        private static void QueueRacingBackgroundPixel(int x, int y, int width, int height, Color32[] pixels,
+            bool[] background, int[] queue, ref int tail)
+        {
+            int index = y * width + x;
+            if (background[index]) return;
+            Color32 color = pixels[index];
+            int min = Mathf.Min(color.r, Mathf.Min(color.g, color.b));
+            int max = Mathf.Max(color.r, Mathf.Max(color.g, color.b));
+            // The supplied screenshot has a neutral, light checkerboard. Flood fill only from
+            // the texture edge, so enclosed white lettering/stripes remain part of the crest.
+            if (min < 165 || max - min > 48) return;
+            background[index] = true;
+            queue[tail++] = index;
         }
 
         private Texture2D LevelCrestForLevel(int levelIndex)
@@ -1148,6 +1218,10 @@ namespace HayChoriYPaty
                         riotBackdrop, ScaleMode.ScaleAndCrop, true);
                 }
                 finally { GUI.matrix = previous; GUI.color = previousColor; }
+
+                // The wrecked-stall plate has its own generic wall. Keep the active level's
+                // gameplay mural/header in front of it so the location does not change at defeat.
+                DrawGameplayMuralInScreenSpace();
             }
 
             DrawRiotWaitingCrowd(game != null ? game.Sim : null, elapsed);
@@ -1501,6 +1575,13 @@ namespace HayChoriYPaty
                 DrawRaw(StreetSceneLayout.ProjectSourceRect(StreetSceneLayout.BakedSideTableSource, canvasHeight),
                     backdrop, StreetSceneLayout.CleanCounterSideSource, true, true);
             }
+            DrawGameplayMural(canvasHeight, verticalScale);
+            DrawClubPennants(canvasHeight, verticalScale, safeViewport, safePennants);
+        }
+
+        private void DrawGameplayMural(float canvasHeight, float verticalScale)
+        {
+            ClubVisualTheme theme = ClubVisualTheme.ForLevel(VisualLevelIndex);
             if (!string.IsNullOrEmpty(theme.MuralResource))
                 DrawThemedMural(theme, canvasHeight, verticalScale);
             else if (muralArt != null)
@@ -1508,7 +1589,23 @@ namespace HayChoriYPaty
                 Rect band = new Rect(0f, HudBar.yMax, W, MuralBounds.height * verticalScale);
                 DrawRawCover(band, muralArt, MuralSource);
             }
-            DrawClubPennants(canvasHeight, verticalScale, safeViewport, safePennants);
+        }
+
+        private void DrawGameplayMuralInScreenSpace()
+        {
+            if (Screen.width <= 0 || Screen.height <= 0) return;
+
+            Matrix4x4 previous = GUI.matrix;
+            Color previousColor = GUI.color;
+            float scale = Screen.width / W;
+            float fullHeight = Screen.height / scale;
+            try
+            {
+                GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
+                GUI.color = Color.white;
+                DrawGameplayMural(fullHeight, fullHeight / H);
+            }
+            finally { GUI.matrix = previous; GUI.color = previousColor; }
         }
 
         private void DrawThemedMural(ClubVisualTheme theme, float canvasHeight, float verticalScale)
@@ -1996,7 +2093,7 @@ namespace HayChoriYPaty
             Rect icon = new Rect(bounds.x + HudQuotaCardInset, bounds.center.y - iconSize * .5f, iconSize, iconSize);
             DrawHudIcon(icon, product);
             Rect counter = HudQuotaCounterBounds(bounds, icon);
-            int fontSize = Mathf.Clamp(Mathf.FloorToInt(bounds.height * .78f), 12, 30);
+            int fontSize = HudQuotaCounterFontSize;
             DrawHudNumber(counter, delivered + "/" + goal, fontSize, HudQuotaCounterTextAlignment);
         }
         private static Rect HudQuotaCounterBounds(Rect card, Rect icon)
@@ -2885,9 +2982,10 @@ namespace HayChoriYPaty
                     DrawRawCover(LayoutRect(bounds), art, new Rect(source.x * art.width, source.y * art.height,
                         source.width * art.width, source.height * art.height));
                     FillRect(new Rect(bounds.x, bounds.y, bounds.width, 5 * cardScale), theme.PrimaryColor);
-                    if (index == 2 && velezCrest != null)
+                    Texture2D crest = LevelCrestForLevel(index);
+                    if (crest != null)
                         GUI.DrawTexture(LayoutRect(new Rect(bounds.x + 5 * cardScale, bounds.y + 5 * cardScale,
-                            30 * cardScale, 34 * cardScale)), velezCrest, ScaleMode.ScaleToFit, true);
+                            30 * cardScale, 34 * cardScale)), crest, ScaleMode.ScaleToFit, true);
                     return;
                 }
             }
@@ -4423,16 +4521,27 @@ namespace HayChoriYPaty
                 }
             texture.SetPixels(pixels); texture.Apply(false, true); return texture;
         }
+        private const int ChulengoNeedleThicknessScale = 3;
+        private static float ChulengoNeedleHalfWidthAt(float t)
+        {
+            const float currentBaseHalfWidth = 18f + 1.2f;
+            const float currentTipHalfWidth = 1.2f;
+            return Mathf.Lerp(currentBaseHalfWidth * ChulengoNeedleThicknessScale, currentTipHalfWidth, Mathf.Clamp01(t));
+        }
+
+        private static float ChulengoNeedleDisplayHeight(float meterHeight) =>
+            Mathf.Max(10f, meterHeight * .16f) * ChulengoNeedleThicknessScale;
+
         private static Texture2D CreateChulengoNeedleTexture()
         {
-            const int width = 512, height = 64, tip = 494;
+            const int width = 512, height = 64 * ChulengoNeedleThicknessScale, tip = 494;
             var texture = new Texture2D(width, height, TextureFormat.RGBA32, false) { name = "Chulengo red pointer", filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
             var pixels = new Color[width * height];
             for (int y = 0; y < height; y++)
                 for (int x = 0; x < width; x++)
                 {
                     float t = Mathf.Clamp01((x - 8f) / (tip - 8f));
-                    float half = 18f * (1f - t) + 1.2f;
+                    float half = ChulengoNeedleHalfWidthAt(t);
                     float distance = Mathf.Abs(y + .5f - height * .5f);
                     if (x < 8 || x > tip || distance > half + 2f) pixels[y * width + x] = new Color(0, 0, 0, 0);
                     else if (distance > half) pixels[y * width + x] = new Color(.09f, .035f, .025f, 1f);
@@ -4534,7 +4643,8 @@ namespace HayChoriYPaty
                     float outerY = bounds.height * (326f / 384f);
                     float length = .96f / Mathf.Sqrt(Mathf.Cos(angle) * Mathf.Cos(angle) / (outerX * outerX)
                         + Mathf.Sin(angle) * Mathf.Sin(angle) / (outerY * outerY));
-                    float needleHeight = Mathf.Max(10f, bounds.height * .16f);
+                    // Triple canvas and display thickness together to widen the base without enlarging the tip.
+                    float needleHeight = ChulengoNeedleDisplayHeight(bounds.height);
                     Rect needle = new Rect(center.x, center.y - needleHeight * .5f, length, needleHeight);
                     if (chulengoNeedle != null) GUI.DrawTexture(needle, chulengoNeedle, ScaleMode.StretchToFill, true);
                 }

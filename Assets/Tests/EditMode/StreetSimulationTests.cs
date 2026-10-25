@@ -2172,7 +2172,7 @@ object sim = Make(level: level);
                 new[] {250,180,110,95,210,90,115}, new[] {275,195,120,110,225,100,125},
                 new[] {310,220,135,125,255,110,145}, new[] {345,245,150,140,285,120,165} };
             float[] durations = {120f,150f,180f,210f,240f,260f,270f,295f,300f,300f,315f};
-            int[] openingCoins = {0,0,0,0,0,250,250,250,250,500,2000};
+            int[] openingCoins = {0,10,0,0,0,250,250,250,250,500,2000};
             for (int level = 0; level < 11; level++)
             {
                 object balance = NewBalance(); object sim = Make(level: level, balance: balance); int total = 0;
@@ -2218,7 +2218,7 @@ object sim = Make(level: level);
             }
         }
 
-        [TestCase(8, 250)] [TestCase(9, 500)] [TestCase(10, 2000)]
+        [TestCase(1, 10)] [TestCase(8, 250)] [TestCase(9, 500)] [TestCase(10, 2000)]
         public void AdjustedOpeningBalanceAppliesOnSelectionAdvanceStartAndRetry(int level, int expectedCoins)
         {
             object selected = Make();

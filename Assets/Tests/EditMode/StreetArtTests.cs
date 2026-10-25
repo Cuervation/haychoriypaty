@@ -870,14 +870,47 @@ namespace HayChoriYPaty.Tests
             string[] levels = (string[])simulation.GetField("LevelDisplayNames").GetValue(null);
             Assert.AreEqual(levels.Length, resources.Length, "The crest manifest must stay aligned with the level catalog");
 
-            string[] existing = { "street-allboys-crest", "street-new-chicago-crest-v1", "street-velez-crest-v1" };
+            string[] existing = { "street-allboys-crest", "street-new-chicago-crest-v1", "street-velez-crest-v1", "street-racing-crest-v1" };
+            int[] levelIndices = { 0, 1, 2, 5 };
             for (int i = 0; i < existing.Length; i++)
             {
-                Assert.AreEqual(existing[i], resources[i]);
-                Assert.NotNull(Resources.Load<Texture2D>(resources[i]), "Existing level crest resource must resolve: " + resources[i]);
+                Assert.AreEqual(existing[i], resources[levelIndices[i]]);
+                Assert.NotNull(Resources.Load<Texture2D>(resources[levelIndices[i]]), "Existing level crest resource must resolve: " + resources[levelIndices[i]]);
             }
-            for (int i = existing.Length; i < resources.Length; i++)
-                Assert.IsNull(resources[i], "Do not draw an unverified or unlicensed mark as a crest for " + levels[i]);
+            Assert.AreEqual("Racing Club / Avellaneda", levels[5]);
+            for (int i = 0; i < resources.Length; i++)
+                if (Array.IndexOf(levelIndices, i) < 0)
+                    Assert.IsNull(resources[i], "Do not draw an unverified or unlicensed mark as a crest for " + levels[i]);
+        }
+
+        [Test]
+        public void RacingClubCrestCutoutPreservesWhiteDetailsAndNativeArtworkBounds()
+        {
+            const string resource = "street-racing-crest-v1";
+            const string path = "Assets/Art/Street/Resources/street-racing-crest-v1.png";
+            Texture2D crest = Resources.Load<Texture2D>(resource);
+            Assert.NotNull(crest);
+            Assert.AreEqual(310, crest.width); Assert.AreEqual(382, crest.height);
+            TextureImporter importer = (TextureImporter)AssetImporter.GetAtPath(path);
+            Assert.NotNull(importer);
+            Assert.IsFalse(importer.DoesSourceTextureHaveAlpha(), "The supplied clipboard PNG has the checkerboard baked in");
+            Assert.IsTrue(importer.isReadable, "Runtime cutout needs readable source pixels");
+            Assert.IsFalse(importer.mipmapEnabled);
+            Assert.AreEqual(TextureImporterNPOTScale.None, importer.npotScale);
+            Assert.AreEqual(TextureImporterFormat.RGBA32, importer.GetPlatformTextureSettings("Android").format);
+
+            var createCutout = View.GetMethod("CreateRacingCrestCutout", BindingFlags.Static | BindingFlags.NonPublic);
+            Texture2D cutout = (Texture2D)createCutout.Invoke(null, new object[] { crest });
+            Assert.NotNull(cutout);
+            try
+            {
+                Assert.AreEqual(0f, cutout.GetPixel(0, 0).a, .01f, "Exterior checkerboard should become transparent");
+                Color stripe = cutout.GetPixel(87, 230);
+                Assert.AreEqual(1f, stripe.a, .01f, "White stripe inside the blue shield must stay opaque");
+                Assert.Greater(stripe.r, .9f, "White stripe color must be preserved");
+                Assert.Greater(cutout.GetPixel(123, 190).b, .6f, "Blue field should remain intact");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(cutout); }
         }
 
         [TestCase("PlayingLevelBadge", true, 300f)]
@@ -976,6 +1009,24 @@ namespace HayChoriYPaty.Tests
             TextureImporter importer = (TextureImporter)AssetImporter.GetAtPath(path);
             Assert.IsTrue(importer.DoesSourceTextureHaveAlpha());
             Assert.IsFalse(importer.mipmapEnabled); Assert.AreEqual(TextureImporterNPOTScale.None, importer.npotScale);
+            Assert.AreEqual(TextureImporterCompression.Uncompressed, importer.textureCompression);
+            Assert.AreEqual(TextureImporterFormat.RGBA32, importer.GetPlatformTextureSettings("Android").format);
+        }
+
+        [Test]
+        public void CocaBarrelReachSpriteImportsAsTransparentWorkerArt()
+        {
+            const string resource = "street-cocacolero-barrel-reach-v1";
+            const string path = "Assets/Art/Street/Resources/street-cocacolero-barrel-reach-v1.png";
+            Texture2D pose = Resources.Load<Texture2D>(resource);
+            Assert.NotNull(pose);
+            Assert.AreEqual(1247, pose.width); Assert.AreEqual(1261, pose.height);
+            TextureImporter importer = (TextureImporter)AssetImporter.GetAtPath(path);
+            Assert.NotNull(importer);
+            Assert.IsTrue(importer.DoesSourceTextureHaveAlpha());
+            Assert.IsTrue(importer.alphaIsTransparency);
+            Assert.IsFalse(importer.mipmapEnabled);
+            Assert.AreEqual(TextureImporterNPOTScale.None, importer.npotScale);
             Assert.AreEqual(TextureImporterCompression.Uncompressed, importer.textureCompression);
             Assert.AreEqual(TextureImporterFormat.RGBA32, importer.GetPlatformTextureSettings("Android").format);
         }
@@ -1407,7 +1458,18 @@ namespace HayChoriYPaty.Tests
                     .Invoke(null, new object[] { flags, canvasHeight, 0f });
                 if (flags.height > 1f) Assert.AreEqual(flags, pennantArt, "Visible pennant slots retain their exact bounds.");
                 else Assert.AreEqual(Rect.zero, pennantArt, "No pennant fallback may be painted behind cards.");
-                Assert.GreaterOrEqual(drawnBadge.yMin, stageBottom - 16f, "Level " + level + " title stays at the footer seam.");
+                float compactScale = Mathf.Min(1f, verticalScale);
+                float footerBottom = flags.height > 1f ? flags.yMin - 2f * compactScale : canvasHeight - 4f * compactScale;
+                Rect drawnButtons = FooterButtonVerticalBounds(raw, verticalScale, Rect.zero);
+                float buttonAreaTop = drawnBadge.yMax + 6f * compactScale;
+                float expectedButtonTop = buttonAreaTop + Mathf.Max(0f,
+                    (footerBottom - buttonAreaTop - drawnButtons.height) * .5f);
+                float expectedBadgeTop = Mathf.Min(stageBottom + 4f * compactScale,
+                    footerBottom - (drawnBadge.height + 6f * compactScale + drawnButtons.height));
+                Assert.AreEqual(expectedBadgeTop, drawnBadge.yMin, .2f,
+                    "Level " + level + " name/neighborhood begins at the top of the safe footer.");
+                Assert.AreEqual(expectedButtonTop, drawnButtons.yMin, .2f,
+                    "Level " + level + " upgrade block is vertically centered below its caption.");
                 for (int i = 0; i < raw.Length; i++)
                 {
                     Rect card = (Rect)scaleCard.Invoke(null, new object[] { raw[i], verticalScale });
@@ -1438,6 +1500,19 @@ namespace HayChoriYPaty.Tests
                     true, canvasHeight, stageBottom, 0f);
                 Assert.AreEqual(expectedReadyFlags, readyFlags.height, .2f);
                 Assert.IsFalse(drawnSelector.Overlaps(readyFlags));
+                Rect[] readyCards = raw.Length <= 3 ? (Rect[])ready.GetType().GetField("UpgradeBounds").GetValue(ready) : new Rect[0];
+                Rect drawnReadyButtons = FooterButtonVerticalBounds(readyCards, verticalScale, selector);
+                float readyFooterBottom = readyFlags.height > 1f
+                    ? readyFlags.yMin - 2f * compactScale : canvasHeight - 4f * compactScale;
+                float readyButtonAreaTop = drawnReadyBadge.yMax + 6f * compactScale;
+                float expectedReadyButtonTop = readyButtonAreaTop + Mathf.Max(0f,
+                    (readyFooterBottom - readyButtonAreaTop - drawnReadyButtons.height) * .5f);
+                float expectedReadyBadgeTop = Mathf.Min(stageBottom + 4f * compactScale,
+                    readyFooterBottom - (drawnReadyBadge.height + 6f * compactScale + drawnReadyButtons.height));
+                Assert.AreEqual(expectedReadyBadgeTop, drawnReadyBadge.yMin, .2f,
+                    "Ready keeps the location label at the top of the footer.");
+                Assert.AreEqual(expectedReadyButtonTop, drawnReadyButtons.yMin, .2f,
+                    "Ready buttons are centered below the location label.");
                 Rect readyPennantArt = (Rect)View.GetMethod("FooterPennantRenderBounds", BindingFlags.Static | BindingFlags.NonPublic)
                     .Invoke(null, new object[] { readyFlags, canvasHeight, 0f });
                 if (readyFlags.height > 1f) Assert.AreEqual(readyFlags, readyPennantArt);
@@ -1452,6 +1527,20 @@ namespace HayChoriYPaty.Tests
                 if (noControlFlags.height > 1f) Assert.AreEqual(noControlFlags, noControlPennantArt);
                 else Assert.AreEqual(Rect.zero, noControlPennantArt);
             }
+        }
+
+        private static Rect FooterButtonVerticalBounds(Rect[] cards, float verticalScale, Rect selector)
+        {
+            float compactScale = Mathf.Min(1f, verticalScale);
+            float top = selector.height > 0f ? selector.y * verticalScale : float.PositiveInfinity;
+            float bottom = selector.height > 0f ? selector.y * verticalScale + selector.height : float.NegativeInfinity;
+            for (int i = 0; i < cards.Length; i++)
+            {
+                float cardTop = cards[i].y * verticalScale;
+                top = Mathf.Min(top, cardTop);
+                bottom = Mathf.Max(bottom, cardTop + cards[i].height * compactScale);
+            }
+            return float.IsPositiveInfinity(top) ? Rect.zero : Rect.MinMaxRect(0f, top, 1f, bottom);
         }
 
         private static float ExpectedResponsivePennantHeight(int count, bool ready, float canvasHeight, float stageBottom, float bottomBleed)
@@ -1689,8 +1778,12 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
             }
             foreach (string name in new[] { "CutoutHudCoins", "CutoutHudTime", "CutoutHudSales" })
                 Assert.IsNull(View.GetField(name, BindingFlags.Static | BindingFlags.NonPublic), name + " is not a supported HUD layout");
-            Assert.AreEqual(35, (int)View.GetField("HudClockFontSize", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue());
-            Assert.AreEqual(35, (int)View.GetField("HudStatusValueFontSize", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue());
+            const BindingFlags counterFlags = BindingFlags.Static | BindingFlags.NonPublic;
+            int sharedCounterFontSize = (int)View.GetField("HudCounterFontSize", counterFlags).GetRawConstantValue();
+            Assert.AreEqual(35, sharedCounterFontSize, "Keep the largest current HUD counter size.");
+            foreach (string counter in new[] { "HudClockFontSize", "HudStatusValueFontSize", "HudQuotaCounterFontSize" })
+                Assert.AreEqual(sharedCounterFontSize,
+                    (int)View.GetField(counter, counterFlags).GetRawConstantValue(), counter + " shares the common size.");
             Assert.AreEqual(28.8f, (float)View.GetField("HudStatusIconSize", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue(), .001f);
         }
 

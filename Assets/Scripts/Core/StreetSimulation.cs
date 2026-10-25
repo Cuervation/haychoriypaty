@@ -87,7 +87,7 @@ namespace HayChoriYPaty
             return new[]
             {
                 new StreetLevelBalance(new[] {200,0,0,0,0,0,0}, new[] {15,0,0,0}, 1f),
-                new StreetLevelBalance(new[] {200,0,0,0,200,0,0}, new[] {20,20,0,0}, 1.5f),
+                new StreetLevelBalance(new[] {200,0,0,0,200,0,0}, new[] {20,20,0,0}, 1.5f, 10),
                 new StreetLevelBalance(new[] {180,120,0,0,150,0,0}, new[] {25,25,0,0}, 2.25f),
                 new StreetLevelBalance(new[] {185,125,60,0,155,0,75}, new[] {30,30,35,0}, 3.25f),
                 new StreetLevelBalance(new[] {190,130,70,65,160,65,80}, new[] {35,35,45,40}, 4.50f),

@@ -12,6 +12,7 @@ namespace HayChoriYPaty.Tests
         private const BindingFlags AnyInstance = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
         private const BindingFlags PrivateInstance = BindingFlags.Instance | BindingFlags.NonPublic;
         private const BindingFlags StaticPublic = BindingFlags.Static | BindingFlags.Public;
+        private const BindingFlags PrivateStatic = BindingFlags.Static | BindingFlags.NonPublic;
 
         private Type gameType, matchType;
         private GameObject host;
@@ -114,6 +115,31 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(151L, scale.Invoke(null, new object[] { 101L, 3 }), "Odd cent values use deterministic floor rounding.");
             Assert.AreEqual(202L, scale.Invoke(null, new object[] { 101L, 4 }));
             Assert.Throws<OverflowException>(() => scale.Invoke(null, new object[] { long.MaxValue, 4 }));
+        }
+
+        [Test]
+        public void NeedleIsThreeTimesWiderAtBaseAndTapersToItsOriginalTip()
+        {
+            Type view = Runtime("StreetView");
+            MethodInfo halfWidthAt = view.GetMethod("ChulengoNeedleHalfWidthAt", PrivateStatic);
+            MethodInfo displayHeight = view.GetMethod("ChulengoNeedleDisplayHeight", PrivateStatic);
+            Assert.IsNotNull(halfWidthAt);
+            Assert.IsNotNull(displayHeight);
+
+            float meterHeight = 500f;
+            float oldDisplayHeight = Mathf.Max(10f, meterHeight * .16f);
+            float newDisplayHeight = (float)displayHeight.Invoke(null, new object[] { meterHeight });
+            float baseHalfWidth = (float)halfWidthAt.Invoke(null, new object[] { 0f });
+            float middleHalfWidth = (float)halfWidthAt.Invoke(null, new object[] { .5f });
+            float tipHalfWidth = (float)halfWidthAt.Invoke(null, new object[] { 1f });
+            Assert.AreEqual((18f + 1.2f) * 3f, baseHalfWidth, .0001f);
+            Assert.AreEqual((baseHalfWidth + 1.2f) * .5f, middleHalfWidth, .0001f);
+            Assert.AreEqual(1.2f, tipHalfWidth, .0001f);
+            Assert.AreEqual(oldDisplayHeight * 3f, newDisplayHeight, .0001f);
+            Assert.AreEqual(19.2f / 64f * oldDisplayHeight * 3f,
+                baseHalfWidth / 192f * newDisplayHeight, .0001f, "The base renders three times wider.");
+            Assert.AreEqual(1.2f / 64f * oldDisplayHeight,
+                tipHalfWidth / 192f * newDisplayHeight, .0001f, "The point keeps its former width.");
         }
 
         [Test]

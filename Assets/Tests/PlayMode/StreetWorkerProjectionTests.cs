@@ -166,6 +166,23 @@ namespace HayChoriYPaty.Tests
                             object workerVisual=views[workerId];
                             var torso=(SpriteRenderer)Field(workerVisual,"Torso");
                             Call(renderer,"PrepareWorkers",normal,diagonal,normal,diagonal,beverage,beverage,true);
+                            if (product == 4)
+                            {
+                                Texture2D pickupPose = Resources.Load<Texture2D>("street-cocacolero-barrel-reach-v1");
+                                Assert.NotNull(pickupPose, "Coca pickup needs its authored reach sprite.");
+                                Assert.AreSame(pickupPose, torso.sprite.texture, "Cocacolero pickup must use the new reach pose.");
+                                Assert.That(torso.sprite.rect.height / pickupPose.height, Is.EqualTo(.82f).Within(.001f),
+                                    "Crop the authored reach pose before its legs; the original lower legs stay behind the barrel.");
+                                Transform props = ((GameObject)Field(renderer,"propsRoot")).transform;
+                                Transform barrelRoot = props.Find("station:Station_CocaBarrel");
+                                Assert.NotNull(barrelRoot, "The Coca barrel must exist in the same native sorting pass.");
+                                SpriteRenderer barrelRenderer = barrelRoot.GetComponentInChildren<SpriteRenderer>(true);
+                                Assert.NotNull(barrelRenderer);
+                                Assert.Less(((SpriteRenderer)Field(workerVisual,"LeftLeg")).sortingOrder, barrelRenderer.sortingOrder,
+                                    "The feet/legs remain behind the barrel's front face.");
+                                Assert.Greater(torso.sortingOrder, barrelRenderer.sortingOrder,
+                                    "The leaning torso and reaching arm render over the barrel rim.");
+                            }
                             float idleReachY=torso.transform.localPosition.y;
                             Vector2 idlePalm=(Vector2)Field(workerVisual,"Palm");
                             GameObject carryRoot=(GameObject)Field(renderer,"carryRoot");
@@ -177,11 +194,17 @@ namespace HayChoriYPaty.Tests
                             }
                             Set(worker,"PickupProgress",.5f);
                             Call(renderer,"PrepareWorkers",normal,diagonal,normal,diagonal,beverage,beverage,true);
-                            Assert.That(idleReachY-torso.transform.localPosition.y, Is.EqualTo(0.196f).Within(.002f),
-                                "At peak dwell, the empty-handed torso must reach 20% of the authored worker height toward the barrel.");
+                            float expectedReach = product == 4 ? .2352f : .196f;
+                            Assert.That(idleReachY-torso.transform.localPosition.y, Is.EqualTo(expectedReach).Within(.002f),
+                                "At peak dwell, the empty-handed torso must reach toward the barrel without changing beer presentation.");
                             Vector2 reachingPalm=(Vector2)Field(workerVisual,"Palm");
-                            Assert.That(reachingPalm.y-idlePalm.y, Is.EqualTo(19.6f).Within(.02f),
+                            Assert.That(reachingPalm.y-idlePalm.y, Is.EqualTo(product == 4 ? 23.52f : 19.6f).Within(.02f),
                                 "The hand anchor must follow the visible reach instead of staying at the carry pose.");
+                            if (product == 4)
+                            {
+                                yield return null; yield return null;
+                                SaveProjectionCapture(renderer, "cocacolero-barrel-pickup");
+                            }
                         }
                         object unit=Call(kitchen,"TryTake",product,Get(worker,"Role"),workerId);Assert.NotNull(unit);
                         int itemId=(int)Get(unit,"Id");

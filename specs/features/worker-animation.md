@@ -17,6 +17,7 @@ Eight canvas-space directions; four distinct gait samples per direction, reusing
 - [x] Beverage pickup reaches a safe barrel anchor, animates empty-handed during the existing dwell, and only carries the real inventory unit after withdrawal; Coca/beer workers operate concurrently.
 - [x] Worker gait cadence is40% slower, remains distance-proportional for all four roles (including the fallback renderer), and halts in idle/pickup/handoff without changing fan animation.
 - [ ] Cocacolero faces forward throughout beverage pickup and stops 2 logical units from the barrel front without intersecting it.
+- [x] Coca pickup uses a dedicated empty-handed reach pose: the torso/hand render over the barrel rim while the legs remain behind its front; route, pickup timing, inventory withdrawal, and physical item identity remain unchanged.
 
 ## Validation
 - Original PNGs and their `.meta` GUIDs are unchanged. New transparent `street-worker-direction-extension-v1.png` adds only 20 missing poses (1086×1448): food quarter-carry, beverage quarter-walk and empty-handed carry views. Existing contact art plus articulated passing legs provide four **runtime-composed gait samples**, not 32 newly authored bitmap frames. Supplement imports at original dimensions, Android RGBA32, no obsolete iPhone PVRTC override.
@@ -40,6 +41,10 @@ Visual code review found the native Cocacolero borrowed an empty-handed carry po
 ### 2026-10-12 — Front-facing, closer Cocacolero pickup
 
 During an empty-handed Cocacolero barrel-pickup dwell, presentation now forces the existing front-facing reach pose, independent of the worker's last route direction; normal route-facing resumes outside the pickup state. Coca/beer pickup anchors moved from 12 to 2 logical units in front of each barrel (10 units closer), retaining 2 units of worker-foot clearance. Routes still use the shared catalog layout; pickup duration, inventory withdrawal, carried-item timing, movement, and delivery logic are unchanged. Focused EditMode regressions cover front-facing state and all 11 catalog layouts; Unity execution/visual capture status is pending.
+
+### 2026-10-25 — Dedicated Coca barrel reach pose
+
+Added the transparent `street-cocacolero-barrel-reach-v1` full-body pose for Coca pickup. Native projection slices the empty-handed torso/reaching arm farther down, moves the hand anchor with a 24%-height peak reach, and sorts that upper cutout over the barrel while keeping the existing legs behind it. The change is presentation-only: worker route/anchor, dwell, `TryTake`, barrel stock, and carried-item identity are unchanged. Focused Unity 6000.6.3f1 validation passed: asset-import EditMode 1/1 and native worker-projection PlayMode 1/1. Reviewed actual kitchen-camera projection captures at 1080×1920 and 1080×2400; this is projection-only evidence, not a full Game View capture.
 
 
 ## Racing+ Mozo — 2026-10-15
