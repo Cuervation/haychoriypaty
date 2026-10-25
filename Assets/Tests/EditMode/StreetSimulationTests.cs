@@ -3,7 +3,9 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using NUnit.Framework;
+using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace HayChoriYPaty.Tests
 {
@@ -128,7 +130,7 @@ namespace HayChoriYPaty.Tests
         private static Rect WorkerBounds(string method, Vector2 position) => (Rect)Workstations.GetMethod(method, new[] { typeof(Vector2) }).Invoke(null, new object[] { position });
         private static Rect KitchenFootprint(object layout, int product) => (Rect)KitchenLayout.GetMethod("FootprintForProduct").Invoke(layout, new object[] { product });
         private static Rect KitchenGrillBounds(object layout, int product) => (Rect)KitchenLayout.GetMethod("GrillBoundsForProduct").Invoke(layout, new object[] { product });
-        private static Vector2 KitchenPickupPosition(object layout, int product) => (Vector2)KitchenLayout.GetMethod("PickupPosition").Invoke(layout, new object[] { product });
+        private static Vector2 KitchenPickupPosition(object layout, int product) => (Vector2)KitchenLayout.GetMethod("PickupPosition", new[] { typeof(int) }).Invoke(layout, new object[] { product });
         private static Vector2[] KitchenShortestRoute(object layout, Vector2 start, Vector2 destination) =>
             (Vector2[])KitchenLayout.GetMethod("FindShortestSafeRoute").Invoke(layout, new object[] { start, destination });
         private static Rect KitchenWorkerFootBounds(Vector2 position) => new Rect(position.x - 18f, position.y - 12f, 36f, 12f);
@@ -314,6 +316,42 @@ namespace HayChoriYPaty.Tests
                 Assert.AreEqual(2 * Mathf.RoundToInt((float)Call(sim, "GetProductPrice", product)), Get(sim, "Coins"));
                 Assert.AreEqual(0, Get(client, "Reserved"));
                 foreach (object worker in (IList)Get(sim, "Workers")) Assert.AreEqual("Idle", Get(worker, "State").ToString());
+            }
+        }
+
+        [TestCase(1, true)]
+        [TestCase(2, true)]
+        [TestCase(3, false)]
+        public void CocaPickupLaneIsCenteredOnlyInLevelsTwoAndThree(int level, bool expectCentered)
+        {
+            object sim = Make(level: level);
+            Call(sim, "RestoreWorkerCounts", 1, 2);
+            IList workers = (IList)Get(sim, "Workers");
+            object layout = Get(sim, "KitchenLayout");
+            Vector2 center = KitchenPickupPosition(layout, 4);
+            MethodInfo pickupForWorker = simType.GetMethod("PickupPositionForWorker", Hidden);
+            Assert.NotNull(pickupForWorker);
+
+            Vector2[] points = new Vector2[2];
+            int found = 0;
+            foreach (object worker in workers)
+            {
+                if (Get(worker, "Role").ToString() != "Cocacolero") continue;
+                Set(worker, "Product", 4);
+                points[found++] = (Vector2)pickupForWorker.Invoke(sim, new[] { worker });
+            }
+            Assert.AreEqual(2, found);
+            if (expectCentered)
+            {
+                Assert.AreEqual(center, points[0]);
+                Assert.AreEqual(center, points[1], "Additional Coca staff must not create a sideways pickup lane in levels 2 and 3.");
+            }
+            else
+            {
+                MethodInfo spread = KitchenLayout.GetMethod("PickupPosition", new[] { typeof(int), typeof(int), typeof(int) });
+                Assert.AreEqual(spread.Invoke(layout, new object[] { 4, 0, 3 }), points[0]);
+                Assert.AreEqual(spread.Invoke(layout, new object[] { 4, 1, 3 }), points[1]);
+                Assert.AreNotEqual(points[0], points[1], "Later levels keep the existing multi-worker barrel access spread.");
             }
         }
 
@@ -1223,7 +1261,7 @@ object defaults = Make(level: 1);
             Assert.AreEqual(400, Get(defaults, "Goal"), "Chicago's aggregate is informational: 200 choris plus 200 Coca");
             Assert.AreEqual(200, Call(defaults, "GetProductGoal", 0));
             Assert.AreEqual(200, Call(defaults, "GetProductGoal", 4));
-            Assert.AreEqual(180f, Get(defaults, "TimeRemaining"));
+            Assert.AreEqual(150f, Get(defaults, "TimeRemaining"));
             Assert.AreEqual(5f, Call(defaults, "GetProductPrice", 0));
             Assert.AreEqual(5f, Call(defaults, "GetProductPrice", 4));
             Assert.IsFalse((bool)Get(defaults, "CanEditPrices"));
@@ -2133,7 +2171,7 @@ object sim = Make(level: level);
                 new[] {210,145,80,75,175,75,90}, new[] {230,165,100,85,195,80,105},
                 new[] {250,180,110,95,210,90,115}, new[] {275,195,120,110,225,100,125},
                 new[] {310,220,135,125,255,110,145}, new[] {345,245,150,140,285,120,165} };
-            float[] durations = {120f,180f,180f,210f,240f,260f,270f,295f,300f,300f,315f};
+            float[] durations = {120f,150f,180f,210f,240f,260f,270f,295f,300f,300f,315f};
             int[] openingCoins = {0,0,0,0,0,250,250,250,250,500,2000};
             for (int level = 0; level < 11; level++)
             {
@@ -2146,6 +2184,37 @@ object sim = Make(level: level);
                     total += goals[level][product];
                 }
                 Assert.AreEqual(total, Get(sim, "Goal"), "Aggregate remains informational only");
+            }
+        }
+
+        [Test]
+        public void MainSceneKeepsSecondLevelAtTwoMinutesThirtySeconds()
+        {
+            var previous = SceneManager.GetActiveScene();
+            var scene = SceneManager.GetSceneByPath("Assets/Scenes/Main.unity");
+            bool opened = !scene.IsValid() || !scene.isLoaded;
+            try
+            {
+                if (opened) scene = EditorSceneManager.OpenScene("Assets/Scenes/Main.unity", OpenSceneMode.Additive);
+                Type gameType = Type.GetType("HayChoriYPaty.StreetGame, Assembly-CSharp", true);
+                Component game = null;
+                foreach (var root in scene.GetRootGameObjects())
+                {
+                    foreach (Component candidate in root.GetComponentsInChildren(gameType, true))
+                    {
+                        Assert.IsNull(game, "Main must contain only one StreetGame.");
+                        game = candidate;
+                    }
+                }
+                Assert.IsNotNull(game);
+                object balance = gameType.GetProperty("Balance", BindingFlags.Instance | BindingFlags.Public).GetValue(game, null);
+                float[] durations = (float[])balanceType.GetField("levelDurations", Instance).GetValue(balance);
+                CollectionAssert.AreEqual(new[] { 120f, 150f, 180f }, new[] { durations[0], durations[1], durations[2] });
+            }
+            finally
+            {
+                if (opened && scene.IsValid()) EditorSceneManager.CloseScene(scene, true);
+                if (previous.IsValid() && previous.isLoaded) SceneManager.SetActiveScene(previous);
             }
         }
 

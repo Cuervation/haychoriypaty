@@ -1,6 +1,6 @@
 ---
 name: unity-2d
-description: Modify Unity 2D scripts, scenes, prefabs, sprites, animation or settings in Hay Chori y Paty; not needed for documentation-only edits.
+description: Investigate or modify Unity 2D gameplay, including reviewing local gameplay videos as evidence, and work on scripts, scenes, prefabs, sprites, animation or settings in Hay Chori y Paty; not needed for unrelated documentation-only edits.
 ---
 
 - Confirm the active checkout and `ProjectSettings/ProjectVersion.txt`; read only the affected feature contract. Preserve scenes, serialized references, GUIDs, original assets and every `.meta`.
@@ -10,3 +10,10 @@ description: Modify Unity 2D scripts, scenes, prefabs, sprites, animation or set
 - Do not open a second Editor for a locked project, restart/close Unity, kill processes, clear locks, alter global services/config/trust, or affect other projects as an MCP workaround. Those actions are outside this skill; seek specific authorization where required. If reconnect fails, use only safe focused alternatives (static checks or batch/tests in an isolated copy when no relevant Editor is open) and mark unavailable Editor checks `BLOCKED`/`NOT_RUN`; never imply equivalent visual coverage.
 - Visual acceptance requires a real capture from the affected Unity view. Label full Game View, PlayMode/projection, or physical device correctly; verify only the shown criteria and resolutions/safe areas actually captured. A camera/projection image is not a full-screen or device test.
 - Preserve actual saves during validation and restore any temporary QA state. Reuse current cameras, art, fonts and packages; no dependencies/services installed by this skill. Choose only affected checks with `targeted-testing`; build/install only when authorized.
+
+## Local gameplay-video inspection (especially WhatsApp MP4)
+
+- Do not stop at an attached video’s poster/thumbnail when the local original is available. Keep the source read-only. Inspect its metadata (container, duration, video/audio codecs, resolution and frame rate), then decode frames with locally available tools. Sample across the full timeline and more densely around the reported event; create contact sheets/crops under `/private/tmp`, not inside the Unity project. State clearly whether the review used frame samples or actual playback/audio.
+- A native AVFoundation/VideoToolbox error (for example `-11821`) does not by itself prove that an MP4 is unreadable. If metadata and compressed packets are readable, check already-installed application bundles for an existing decoder before giving up. Proven fallback on this Mac: AVFoundation compressed passthrough with Unity Hub’s bundled `/Applications/Unity Hub.app/Contents/Frameworks/Electron Framework.framework/Versions/A/Libraries/libffmpeg.dylib` (FFmpeg 7.1.2). Use the existing installation only; do not install/download a decoder, alter the original, or change global settings. If the app path differs, inspect the installed Unity Hub bundle rather than assuming this path is universal.
+- Ground gameplay claims in timestamped frames, then trace the corresponding runtime path: role/order assignment → station anchor/route → worker state and real carried item → renderer/sorting/occlusion and worker spacing. Separate an intentional gameplay trip from a presentation problem; keep correct routing unless code evidence shows otherwise. For visual ambiguity, recommend or implement a small pickup cue/spacing change and add a focused regression where appropriate.
+- If all existing local decoders fail, record which tools were tried and their exact errors, and report the limitation precisely; never conclude “video cannot be viewed” from one backend’s decode failure alone.

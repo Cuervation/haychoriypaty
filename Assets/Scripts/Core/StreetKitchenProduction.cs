@@ -45,6 +45,8 @@ namespace HayChoriYPaty
         private readonly StreetKitchenBalance balance;
         private readonly IStreetKitchenStock ingredientStock;
         private readonly List<StreetFoodUnit> units = new List<StreetFoodUnit>();
+        // Reused per-step order keeps legacy grill transfer rear/top-first without allocating.
+        private readonly List<StreetFoodUnit> advanceOrder = new List<StreetFoodUnit>();
         private readonly int[] tableCapacity = new int[7];
         private readonly int[] grillCapacity = new int[7];
         private readonly float[] drinkProgress = new float[7];
@@ -99,30 +101,57 @@ namespace HayChoriYPaty
         public StreetFoodUnit TryTake(int product, StreetWorkerRole role, int workerId)
         {
             if (product < 0 || product >= 7 || workerId <= 0 || !StreetSpecialties.IsDeliveryResponsible(role, product, ActiveCooks)) return null;
+
+            // Levels 1-5 display sandwiches as physical table stacks. Take the highest
+            // occupied layer first, then move rear-to-front within that layer, so empty
+            // lower layers are never left holding visibly suspended sandwiches.
+            int legacyBaseSlotCount = !ActiveCooks && product < 4
+                ? (tableCapacity[product ^ 1] > 0 ? 6 : 12)
+                : 0;
+            StreetFoodUnit selected = null;
             for (int i = 0; i < units.Count; i++)
             {
                 StreetFoodUnit unit = units[i];
                 if (unit.Product != product || unit.Location != StreetFoodLocation.Table || unit.State != StreetFoodState.Cooked ||
                     (unit.WorkerId != 0 && unit.WorkerId != workerId) ||
                     (ActiveCooks && product < 4 && unit.WorkerId != workerId)) continue;
-                unit.Location = StreetFoodLocation.Carried;
-                unit.WorkerId = workerId;
-                if (IsUnlimitedBarrelProduct(product))
-                {
-                    // Replace the serving in its display slot immediately; barrel stock never empties.
-                    Add(product, StreetFoodState.Cooked, StreetFoodLocation.Table, unit.Slot);
-                }
-                if (ActiveCooks && product < 4)
-                {
-                    // The sandwich no longer occupies a physical table cell once the Mozo lifts it.
-                    // Keep WorkerId as the exclusive item claim, but make its old slot reusable.
-                    unit.Slot = -1;
-                    unit.ReservedTableCapacity = false;
-                    CompactTableSlots(product);
-                }
-                return unit;
+
+                if (selected == null || (legacyBaseSlotCount > 0 && LegacyTablePickupPrecedes(unit, selected, legacyBaseSlotCount)))
+                    selected = unit;
+                if (legacyBaseSlotCount == 0) break;
             }
-            return null;
+            if (selected == null) return null;
+
+            selected.Location = StreetFoodLocation.Carried;
+            selected.WorkerId = workerId;
+            if (IsUnlimitedBarrelProduct(product))
+            {
+                // Replace the serving in its display slot immediately; barrel stock never empties.
+                Add(product, StreetFoodState.Cooked, StreetFoodLocation.Table, selected.Slot);
+            }
+            if (ActiveCooks && product < 4)
+            {
+                // The sandwich no longer occupies a physical table cell once the Mozo lifts it.
+                // Keep WorkerId as the exclusive item claim, but make its old slot reusable.
+                selected.Slot = -1;
+                selected.ReservedTableCapacity = false;
+                CompactTableSlots(product);
+            }
+            return selected;
+        }
+
+        private static bool LegacyTablePickupPrecedes(StreetFoodUnit candidate, StreetFoodUnit current, int baseSlotCount)
+        {
+            if (candidate.Slot < 0) return false;
+            if (current.Slot < 0) return true;
+            int candidateLayer = candidate.Slot / baseSlotCount;
+            int currentLayer = current.Slot / baseSlotCount;
+            if (candidateLayer != currentLayer) return candidateLayer > currentLayer;
+            int candidateBaseSlot = candidate.Slot % baseSlotCount;
+            int currentBaseSlot = current.Slot % baseSlotCount;
+            return candidateBaseSlot != currentBaseSlot
+                ? candidateBaseSlot < currentBaseSlot
+                : candidate.Id < current.Id;
         }
 
         public int SupplyCount(int product)
@@ -306,6 +335,16 @@ namespace HayChoriYPaty
             }
         }
 
+        private static int CompareLegacyGrillAdvanceOrder(StreetFoodUnit left, StreetFoodUnit right)
+        {
+            // Preserve the former descending product-family priority. Within each grill,
+            // slot 0 is the rear/top row and must transfer before progressively lower slots.
+            int product = right.Product.CompareTo(left.Product);
+            if (product != 0) return product;
+            int slot = left.Slot.CompareTo(right.Slot);
+            return slot != 0 ? slot : left.Id.CompareTo(right.Id);
+        }
+
         public void Advance(float delta, float workRate, bool normalCook, bool premiumCook, bool cocaWorker, bool fernetero)
         {
             // Retain the original shared-rate API for existing callers/tests.
@@ -332,9 +371,28 @@ namespace HayChoriYPaty
                     Add(product, StreetFoodState.Cooked, StreetFoodLocation.Table, FirstFreeTableSlot(product));
                 }
             }
-            for (int i = units.Count - 1; i >= 0; i--)
+            advanceOrder.Clear();
+            if (ActiveCooks)
             {
-                StreetFoodUnit unit = units[i];
+                // Preserve Racing+ behavior exactly; its grill food is worker-reserved.
+                for (int i = units.Count - 1; i >= 0; i--) advanceOrder.Add(units[i]);
+            }
+            else
+            {
+                // Levels 1–5 have no Mozos. Transfer each physical grill rear/top-first,
+                // then foreground/bottom, while preserving the former product priority.
+                for (int i = 0; i < units.Count; i++)
+                {
+                    StreetFoodUnit candidate = units[i];
+                    if (candidate.Location == StreetFoodLocation.Grill && candidate.Product >= 0 && candidate.Product < 4)
+                        advanceOrder.Add(candidate);
+                }
+                advanceOrder.Sort(CompareLegacyGrillAdvanceOrder);
+            }
+
+            for (int i = 0; i < advanceOrder.Count; i++)
+            {
+                StreetFoodUnit unit = advanceOrder[i];
                 if (unit.Location == StreetFoodLocation.Carried || (ActiveCooks && unit.Product < 4)) continue;
                 bool cookingEnabled = unit.Product <= 1 ? normalCook : unit.Product <= 3 ? premiumCook : unit.Product == 5 ? fernetero : cocaWorker;
                 if (unit.Location == StreetFoodLocation.Table)
@@ -392,7 +450,7 @@ namespace HayChoriYPaty
                     unit.BurnedAge += delta;
                     if (unit.BurnedAge >= balance.discardBurnedAfterSeconds)
                     {
-                        units.RemoveAt(i);
+                        units.Remove(unit);
                         ingredientStock?.ReleaseFood(unit.Id);
                         Add(unit.Product, StreetFoodState.Raw, StreetFoodLocation.Grill, unit.Slot);
                     }

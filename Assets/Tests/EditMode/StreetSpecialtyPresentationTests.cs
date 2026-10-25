@@ -16,7 +16,7 @@ namespace HayChoriYPaty.Tests
             throw new MissingMethodException(name);
         }
         [TestCase(234f,120f)] [TestCase(234f,104f)] [TestCase(156f,120f)] [TestCase(156f,100f)]
-        public void UpgradePortraitsAndSpeedIconAreCenteredInsideOvalWithoutDistortion(float width,float height)
+        public void UpgradePortraitsAndSpeedIconAreCenteredInsideCircularMedallionWithoutDistortion(float width,float height)
         {
             Type view=Runtime("StreetView"); const BindingFlags flags=BindingFlags.NonPublic|BindingFlags.Static;
             Rect card=new Rect(24,740,width,height);
@@ -28,9 +28,11 @@ namespace HayChoriYPaty.Tests
                 Assert.AreEqual(source.x/source.y,fitted.width/fitted.height,.001f);
                 foreach(Vector2 corner in new[]{fitted.min,fitted.max,new Vector2(fitted.xMin,fitted.yMax),new Vector2(fitted.xMax,fitted.yMin)})
                 {
-                    Vector2 n=corner-oval.center;
-                    float ellipse=n.x*n.x/(oval.width*oval.width*.25f)+n.y*n.y/(oval.height*oval.height*.25f);
-                    Assert.LessOrEqual(ellipse,.94f*.94f+.001f,"All artwork stays inside the original oval with a small gold-frame clearance.");
+                    Assert.LessOrEqual(corner.x, oval.xMax - oval.width * .10f + .001f);
+                    Assert.GreaterOrEqual(corner.x, oval.xMin + oval.width * .10f - .001f);
+                    Assert.LessOrEqual(corner.y, oval.yMax - oval.height * .10f + .001f);
+                    Assert.GreaterOrEqual(corner.y, oval.yMin + oval.height * .10f - .001f,
+                        "Portrait/speed art stays inside the circular medallion with a clear rim.");
                 }
             }
             Rect status=(Rect)view.GetMethod("UpgradeSpeedStatusBounds",flags).Invoke(null,new object[]{card});

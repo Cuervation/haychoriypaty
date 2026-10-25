@@ -103,20 +103,22 @@ namespace HayChoriYPaty
         private const float HudBottomPadding = 3f * HudBandScale;
         private const float HudQuotaBaseGridHeight = 38f * HudBandScale * HudStatusHeightScale;
         private const float HudStatusIconSize = 20f * HudBandScale * HudStatusHeightScale;
-        private const float HudQuotaCardScale = 1.2f;
+        private const float HudQuotaCardEnlargement = 1.25f;
+        private const float HudQuotaCardScale = 1.2f * HudQuotaCardEnlargement;
         private const float HudStatusCardPadding = 8f;
         private const float HudStatusCardSpacing = 6f;
         private const float HudStatusTextGap = 6f * HudBandScale;
         private const float HudCutoutClearance = 2f * HudBandScale;
         private const float HudChipInset = 2f * HudBandScale;
-        private const float HudQuotaCardInset = HudChipInset * .5f;
-        private const float HudQuotaCounterRightInset = 4f * HudBandScale;
+        private const float HudQuotaCardInset = HudChipInset * .5f * HudQuotaCardEnlargement;
+        private const float HudQuotaCounterRightInset = 4f * HudBandScale * HudQuotaCardEnlargement;
         private const TextAnchor HudQuotaCounterTextAlignment = TextAnchor.MiddleRight;
         private const float HudChipTextTopInset = 1f * HudBandScale;
         private const float HudChipTextHeightInset = 3f * HudBandScale;
         private const float HudQuotaBaseCardHeight = (HudQuotaBaseGridHeight - HudObjectiveGap - HudChipInset) * .5f;
         private const float HudQuotaCardHeight = HudQuotaBaseCardHeight * HudQuotaCardScale;
-        private const float HudQuotaCardWidth = 84f;
+        private const float HudQuotaCardBaseWidth = 84f;
+        private const float HudQuotaCardWidth = HudQuotaCardBaseWidth * HudQuotaCardEnlargement;
         private const int HudQuotaSolidProductCount = 4;
         private const float HudQuotaGridHeight = HudQuotaCardHeight * HudQuotaSolidProductCount
             + HudObjectiveGap * (HudQuotaSolidProductCount - 1);
@@ -229,16 +231,16 @@ namespace HayChoriYPaty
             float panelHeight = badgeHeight + sectionGap + cardBlockHeight + selectorGap + selectorHeight;
             float stageBottom = sim.KitchenLayout.PlayfieldBottom * verticalScale;
             float pennantClearance = 2f * compactScale;
-            float pennantHeight = Mathf.Max(0f, decorationBottom - stageBottom - topPadding
-                - MaximumResponsiveFooterPanelHeight(compactScale) - pennantClearance);
+            float desiredPennantHeight = 80f * compactScale;
+            float availablePennantHeight = Mathf.Max(0f, decorationBottom - stageBottom - topPadding
+                - panelHeight - pennantClearance);
+            float pennantHeight = Mathf.Min(desiredPennantHeight, availablePennantHeight);
             float pennantTop = decorationBottom - pennantHeight;
-            // Bottom-align smaller footer layouts to the common pennant band, preserving
-            // its size while using the freed space instead of leaving a blank gap.
-            float panelBottom = sim.UsesActiveCooks
-                ? decorationBottom - 4f * compactScale
-                : pennantHeight > 1f
+            // Keep every authored button/title bound intact. Reserve the visible pennant band
+            // only from space left after the actual footer and playfield; never paint it behind cards.
+            float panelBottom = pennantHeight > 1f
                 ? pennantTop - pennantClearance
-                : stageBottom + topPadding + panelHeight;
+                : decorationBottom - 4f * compactScale;
             float panelTop = panelBottom - panelHeight;
             float cardTop = panelTop + badgeHeight + sectionGap;
 
@@ -265,7 +267,6 @@ namespace HayChoriYPaty
                 ? new Rect(0f, pennantTop, W, pennantHeight)
                 : new Rect(0f, pennantTop, W, 0f);
 
-            if (sim.UsesActiveCooks) pennants = Rect.zero;
             return new ResponsiveFooterLayout {
                 UpgradeBounds = cards, LevelBadge = badge, ReadySelector = selector, Pennants = pennants
             };
@@ -306,6 +307,23 @@ namespace HayChoriYPaty
         private const int LevelSelectorBackAction = 8, VictoryExitAction = 9, RiotReturnAction = 15, LevelSelectFirstAction = 30;
         private const int HubPlayAction = 200, HubMarketAction = 201, HubBadgesAction = 202, HubRankingAction = 203, HubAccountAction = 204;
         private const int BadgeBackAction = 205, RankingBackAction = 206;
+        private const string LevelOneTutorialCompletedKey = "HayChoriYPaty.LevelOneTutorial.Completed.v1";
+        private const int LevelOneTutorialPrimaryAction = 300, LevelOneTutorialSkipAction = 301;
+        private const float LevelOneTutorialBubbleWidth = 320f;
+        private const float LevelOneTutorialBubbleHeight = 140f;
+        private const float LevelOneTutorialBubbleTailWidth = 52f;
+        private static readonly string[] LevelOneTutorialHeadlines = {
+            "Tu objetivo: entregar\n200 choris.",
+            "Cada chori entregado\nsuma monedas.",
+            "Contratá más Parrilleros\npara cocinar más choris.",
+            "Mejorá la velocidad\nde trabajo."
+        };
+        private static readonly string[] LevelOneTutorialExplanations = {
+            "Acá ves cuánto llevás.",
+            "",
+            "El costo aparece en esta tarjeta.",
+            "El próximo costo aparece\nen esta tarjeta."
+        };
         private const int LevelSelectorPreviousAction = 17, LevelSelectorNextAction = 18, LevelSelectorPageSize = 6;
         private const int ReadyLevelSelectorAction = 19;
         private const int MarketBackAction = 70, MarketOtherAction = 190;
@@ -372,12 +390,16 @@ namespace HayChoriYPaty
         private Texture2D victoryPopup, clubColoredVictoryPopup;
         private int clubColoredVictoryPopupLevel = int.MinValue;
         private Texture2D chulengoMeter, chulengoNeedle, chulengoHub, chulengoParchment, chulengoBowl;
-        private Texture2D coverArt, hubBackdrop, titleLogo, introGlow, menuButton, googleButtonSurface, hudBarTexture, cutoutHudBarTexture, hudQuotaCardTexture, hudQuotaCardOutlineTexture, riotBackdrop, riotFanAtlas, riotImpactCloud;
+        private Texture2D coverArt, hubBackdrop, titleLogo, introGlow, menuButton, googleButtonSurface, hudBarTexture, cutoutHudBarTexture, hudQuotaCardTexture, hudQuotaCardOutlineTexture, gameplayFooterTexture, riotBackdrop, riotFanAtlas, riotImpactCloud;
+        private readonly System.Collections.Generic.Dictionary<string, Texture2D> glossyUpgradeCardTextures =
+            new System.Collections.Generic.Dictionary<string, Texture2D>();
         private Font menuFont;
         private GUIStyle menuTitle, levelTitle;
         private bool introActive;
         private bool levelSelectActive;
         private bool hubActive, badgesActive, rankingActive;
+        private bool levelOneTutorialActive;
+        private int levelOneTutorialStep;
         private float introStarted;
         private bool splashClockStarted;
         private bool riotScreenActive;
@@ -386,6 +408,13 @@ namespace HayChoriYPaty
         private bool SplashComplete { get { return splashClockStarted && Time.unscaledTime - introStarted >= IntroDuration; } }
         private const string ParrilleroLabel = "Parrillero";
         private GUIStyle tiny, small, text, title, header, amount, invisible, hudNumber, upgradeTitle, upgradePercent, upgradePrice, riotCue;
+        private GUIStyle levelOneTutorialTitleStyle, levelOneTutorialBodyStyle, levelOneTutorialSkipStyle;
+        private Texture2D levelOneTutorialBubbleTexture;
+        private int levelOneTutorialBubbleTextureStep = -1;
+        private Rect levelOneTutorialBubbleTexturePanel;
+        private Vector2 levelOneTutorialBubbleTextureTip;
+        private float levelOneTutorialBubbleTextureTailWidth;
+        private bool levelOneTutorialBubbleTextureTailAbove;
         private int pressedAction, lastAction;
         private float feedbackUntil, feedbackScale;
         private float layoutVerticalScale = 1f;
@@ -459,7 +488,6 @@ namespace HayChoriYPaty
         // Threshold-alpha bounds from the transparent upgrade board and three-arrow icon.
         private static readonly Rect UpgradeWoodBounds = new Rect(13,148,1484,715);
         // Clean board face from the existing upgrade-wood art; avoids its oval, plaque and metal frame.
-        private static readonly Rect FooterWoodSource = new Rect(680, 511, 650, 280);
         private static readonly Rect SpeedArrowBounds = new Rect(114,224,1174,662);
         private void LoadLevelCrests()
         {
@@ -543,6 +571,7 @@ namespace HayChoriYPaty
             cachedHudCutoutGap = CutoutHudGap;
             hudQuotaCardTexture = CreateHudQuotaCardTexture(false);
             hudQuotaCardOutlineTexture = CreateHudQuotaCardTexture(true);
+            gameplayFooterTexture = CreateGameplayFooterTexture();
             menuFont = Resources.Load<Font>("Menu/LuckiestGuy-Regular");
             premiumGrill = Resources.Load<Texture2D>("street-grill-premium-v1");
             premiumWorker = StreetWorkerAppearance.CreateVariant(parrillero, StreetWorkerRole.ParrilleroPremium, ParrilleroPoses, new Vector2(1315,1197));
@@ -552,10 +581,15 @@ namespace HayChoriYPaty
             fernetWorkerLater = StreetWorkerAppearance.CreateVariant(laterCocacolero, StreetWorkerRole.Fernetero, MatchedCocacoleroPoses, new Vector2(1247,1261));
             introActive = true;
             levelSelectActive = false;
+            levelOneTutorialActive = false;
+            levelOneTutorialStep = 0;
             introStarted = Time.unscaledTime;
             splashClockStarted = false;
             tiny = small = text = title = header = amount = invisible = menuTitle = levelTitle = marketLabelStyle = null;
             upgradeTitle = upgradePercent = upgradePrice = riotCue = null;
+            levelOneTutorialTitleStyle = levelOneTutorialBodyStyle = levelOneTutorialSkipStyle = null;
+            levelOneTutorialBubbleTexture = null;
+            levelOneTutorialBubbleTextureStep = -1;
             pressedAction = lastAction = 0;
         }
         private void OnDisable()
@@ -587,6 +621,14 @@ namespace HayChoriYPaty
             hudQuotaCardTexture = null;
             if (hudQuotaCardOutlineTexture != null) Destroy(hudQuotaCardOutlineTexture);
             hudQuotaCardOutlineTexture = null;
+            if (gameplayFooterTexture != null) Destroy(gameplayFooterTexture);
+            gameplayFooterTexture = null;
+            if (levelOneTutorialBubbleTexture != null) Destroy(levelOneTutorialBubbleTexture);
+            levelOneTutorialBubbleTexture = null;
+            levelOneTutorialBubbleTextureStep = -1;
+            foreach (Texture2D texture in glossyUpgradeCardTextures.Values)
+                if (texture != null) Destroy(texture);
+            glossyUpgradeCardTextures.Clear();
             if (clubPennantTexture != null) Destroy(clubPennantTexture);
             clubPennantTexture = null;
             clubPennantThemeName = null;
@@ -705,6 +747,11 @@ namespace HayChoriYPaty
             }
             if (marketActive) { p.y *= layoutVerticalScale; return HitMarketAction(p); }
             if (introActive) return 0;
+            if (levelOneTutorialActive)
+            {
+                if (LevelOneTutorialSkipBounds().Contains(p)) return LevelOneTutorialSkipAction;
+                return LevelOneTutorialPrimaryBounds().Contains(p) ? LevelOneTutorialPrimaryAction : 0;
+            }
             if (badgesActive) { p.y *= layoutVerticalScale; return BadgeBackBounds(logicalCanvasHeight).Contains(p) ? BadgeBackAction : 0; }
             if (rankingActive) { p.y *= layoutVerticalScale; return RankingBackBounds(logicalCanvasHeight).Contains(p) ? RankingBackAction : 0; }
             if (hubActive && !marketActive)
@@ -765,6 +812,23 @@ namespace HayChoriYPaty
                 return;
             }
             if (introActive) return;
+            if (levelOneTutorialActive)
+            {
+                if (a == LevelOneTutorialSkipAction ||
+                    (a == LevelOneTutorialPrimaryAction && levelOneTutorialStep == 3))
+                {
+                    if (game.TryStartRound())
+                    {
+                        levelOneTutorialActive = false;
+                        levelOneTutorialStep = 0;
+                        PlayerPrefs.SetInt(LevelOneTutorialCompletedKey, 1);
+                        PlayerPrefs.Save();
+                    }
+                }
+                else if (a == LevelOneTutorialPrimaryAction && levelOneTutorialStep < 3)
+                    levelOneTutorialStep++;
+                return;
+            }
             if (hubActive && !marketActive)
             {
                 if (a == HubPlayAction)
@@ -818,7 +882,16 @@ namespace HayChoriYPaty
                         levelSelectActive = false;
                         if (level == 0)
                         {
-                            if (game.CanStartRound) { marketMessage=""; game.TryStartRound(); }
+                            if (game.CanStartRound)
+                            {
+                                marketMessage = "";
+                                if (PlayerPrefs.GetInt(LevelOneTutorialCompletedKey, 0) == 0)
+                                {
+                                    levelOneTutorialActive = true;
+                                    levelOneTutorialStep = 0;
+                                }
+                                else game.TryStartRound();
+                            }
                             else { marketMessage="Falta stock para iniciar. Revisá Mercado."; levelSelectActive=true; }
                         }
                         else { marketFromSelector = true; marketActive = true; marketMessage = ""; marketScroll = 0; marketOtherExpanded = false; marketExpandedIngredient = -1; }
@@ -1033,9 +1106,14 @@ namespace HayChoriYPaty
                     Upgrade(ScaleCardBounds(footer.UpgradeBounds[i], layoutVerticalScale), action, speed ? 15 : 16,
                         speed ? "VELOCIDAD" : RoleCaption(role), cost, canBuy);
                 }
-            if(sim.Phase==RoundPhase.Ready) ReadyPanel(footer);
+            if (sim.Phase == RoundPhase.Ready)
+            {
+                if (levelOneTutorialActive) DrawLevelBadge(game.SelectedLevel, footer.LevelBadge);
+                else ReadyPanel(footer);
+            }
             else if(sim.Phase==RoundPhase.Won||sim.Phase==RoundPhase.Lost) ResultPanel();
             else DrawLevelBadge(sim.LevelIndex, footer.LevelBadge);
+            if (levelOneTutorialActive) DrawLevelOneTutorial();
             GUI.color=old;GUI.matrix=m;
         }
         private static Rect ScreenBounds(Vector2 size) => new Rect(0, 0, size.x, size.y);
@@ -1377,13 +1455,20 @@ namespace HayChoriYPaty
             float canvasHeight = CanvasLogicalHeight(viewport);
             float bottomBleed = SafeAreaBottomInsetLogical(viewport, Screen.height);
             ResponsiveFooterLayout footer = CurrentResponsiveFooter(game.Sim, canvasHeight, bottomBleed);
+            Rect pennantArtBounds = FooterPennantRenderBounds(footer.Pennants, canvasHeight, bottomBleed);
             try
             {
                 GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1));
                 GUI.color = Color.white;
-                DrawBackdropLayers(fullHeight, fullHeight / H, viewport, footer.Pennants);
+                DrawBackdropLayers(fullHeight, fullHeight / H, viewport, pennantArtBounds);
             }
             finally { GUI.matrix = previous; GUI.color = color; }
+        }
+        private static Rect FooterPennantRenderBounds(Rect layoutBounds, float safeCanvasHeight, float bottomBleed)
+        {
+            // A zero slot means the playfield/footer has no safe pennant band at this aspect.
+            // Do not fake one behind the cards: that hides fabric and makes the block spacing lie.
+            return layoutBounds.height > 1f ? layoutBounds : Rect.zero;
         }
         private Texture2D CurrentGameplayBackdrop()
         {
@@ -1533,13 +1618,15 @@ namespace HayChoriYPaty
                             }
                         }
                     }
-                    DrawFooterWood(new Rect(0f, game.Sim.KitchenLayout.PlayfieldBottom * verticalScale,
+                    DrawFooterBluePanel(new Rect(0f, game.Sim.KitchenLayout.PlayfieldBottom * verticalScale,
                         W, Mathf.Max(0f, canvasHeight - game.Sim.KitchenLayout.PlayfieldBottom * verticalScale)), verticalScale);
-                    return;
                 }
-                // Replace the complete baked cream footer, including behind the transparent pennants.
-                float footerTop = game.Sim.KitchenLayout.PlayfieldBottom * verticalScale;
-                DrawFooterWood(new Rect(0f, footerTop, W, Mathf.Max(0f, canvasHeight - footerTop)), verticalScale);
+                else
+                {
+                    // Replace the complete baked cream footer, including behind the transparent pennants.
+                    float footerTop = game.Sim.KitchenLayout.PlayfieldBottom * verticalScale;
+                    DrawFooterBluePanel(new Rect(0f, footerTop, W, Mathf.Max(0f, canvasHeight - footerTop)), verticalScale);
+                }
 
                 if (safePennants.height <= 1f || safeViewport.width <= 0f) return;
                 if (clubPennantTexture == null || clubPennantThemeName != theme.ClubName ||
@@ -1569,7 +1656,7 @@ namespace HayChoriYPaty
         private static Texture2D CreateFooterPennants(ClubVisualTheme theme, float logicalHeight, bool keepReadable = false) =>
             ClubPennantRenderer.CreateAdaptiveTexture(theme, logicalHeight, keepReadable, false);
 
-        private void DrawFooterWood(Rect bounds, float verticalScale)
+        private void DrawFooterBluePanel(Rect bounds, float verticalScale)
         {
             if (bounds.width <= 0f || bounds.height <= 0f) return;
             float scale = Mathf.Max(.01f, verticalScale);
@@ -1580,26 +1667,23 @@ namespace HayChoriYPaty
             Color previous = GUI.color;
             try
             {
-                if (upgradeWood != null && woodBounds.height > 0f &&
-                    FooterWoodSource.xMin >= 0f && FooterWoodSource.yMin >= 0f &&
-                    FooterWoodSource.xMax <= upgradeWood.width && FooterWoodSource.yMax <= upgradeWood.height)
+                if (gameplayFooterTexture != null && woodBounds.height > 0f)
                 {
-                    // Cover-crop to each responsive footer aspect so the authored grain is not stretched.
-                    GUI.color = new Color(.72f, .63f, .53f, 1f);
-                    DrawRawCover(woodBounds, upgradeWood, FooterWoodSource);
+                    GUI.color = Color.white;
+                    GUI.DrawTexture(woodBounds, gameplayFooterTexture, ScaleMode.StretchToFill, true);
                 }
                 else
                 {
-                    GUI.color = new Color(.18f, .075f, .027f, 1f);
+                    GUI.color = new Color(.025f, .12f, .34f, 1f);
                     GUI.DrawTexture(woodBounds, Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
                 }
 
-                GUI.color = new Color(.075f, .035f, .016f, 1f);
+                GUI.color = new Color(.012f, .035f, .13f, 1f);
                 GUI.DrawTexture(new Rect(bounds.x, bounds.y, bounds.width, darkEdgeHeight),
                     Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
                 if (warmEdgeHeight > 0f)
                 {
-                    GUI.color = new Color(.39f, .19f, .065f, 1f);
+                    GUI.color = new Color(.12f, .72f, 1f, 1f);
                     GUI.DrawTexture(new Rect(bounds.x, bounds.y + darkEdgeHeight, bounds.width, warmEdgeHeight),
                         Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
                 }
@@ -1684,7 +1768,7 @@ namespace HayChoriYPaty
                 levelTitle.fontSize = Mathf.Max(12, Mathf.FloorToInt(originalSize * (available - 8f) / measured));
             Rect[] layout = LevelBadgeLayout(bounds, levelTitle.CalcSize(new GUIContent(caption)).x + 8f, showCrest);
             if (showCrest) GUI.DrawTexture(LayoutRect(layout[0]), crest, ScaleMode.ScaleToFit, true);
-            levelTitle.normal.textColor = new Color(.16f, .10f, .08f);
+            levelTitle.normal.textColor = new Color(.005f, .035f, .16f);
             for (int y = -1; y <= 1; y++)
             for (int x = -1; x <= 1; x++)
                 if (x != 0 || y != 0)
@@ -1804,6 +1888,15 @@ namespace HayChoriYPaty
             return Mathf.Clamp01(HudStatusCellBounds(0, cutoutGap).width / defaultWidth);
         }
 
+        private static Rect HudCoinIconBounds(Rect cutoutGap)
+        {
+            Rect cell = HudStatusCellBounds(0, cutoutGap);
+            float scale = HudStatusScale(cutoutGap);
+            float size = Mathf.Min(HudStatusIconSize * scale, cell.height - HudChipInset * 2f);
+            float inset = HudStatusCardPadding * scale;
+            return new Rect(cell.x + inset, cell.center.y - size * .5f, size, size);
+        }
+
         private static Rect HudStatusTextBounds(int slot, Rect cutoutGap)
         {
             if (slot < 0 || slot > 1) return Rect.zero;
@@ -1868,6 +1961,14 @@ namespace HayChoriYPaty
             return new Rect(x, y, width, HudQuotaCardHeight);
         }
 
+        private static Rect HudQuotaCellBounds(int slot, Rect cutoutGap) =>
+            HudQuotaCellBounds(slot, DefaultHudProductIds, DefaultHudProductIds.Length, cutoutGap);
+
+        private static Rect HudQuotaCellBounds(int slot) => HudQuotaCellBounds(slot, Rect.zero);
+
+        private static Rect HudQuotaCellBounds(int slot, int productCount, Rect cutoutGap) =>
+            HudQuotaCellBounds(slot, DefaultHudProductIds, Mathf.Clamp(productCount, 0, DefaultHudProductIds.Length), cutoutGap);
+
         private static Color HudQuotaCardColor(bool complete) =>
             complete ? new Color(.025f, .34f, .40f, .65f) : new Color(.025f, .09f, .24f, .65f);
 
@@ -1901,9 +2002,9 @@ namespace HayChoriYPaty
         private static Rect HudQuotaCounterBounds(Rect card, Rect icon)
         {
             float x = icon.xMax + HudQuotaCardInset;
-            return new Rect(x, card.y + HudChipTextTopInset,
+            return new Rect(x, card.y + HudChipTextTopInset * HudQuotaCardEnlargement,
                 Mathf.Max(0f, card.xMax - HudQuotaCounterRightInset - x),
-                Mathf.Max(0f, card.height - HudChipTextHeightInset));
+                Mathf.Max(0f, card.height - HudChipTextHeightInset * HudQuotaCardEnlargement));
         }
         private void DrawHudIcon(Rect slot, int itemId)
         {
@@ -1958,14 +2059,6 @@ namespace HayChoriYPaty
         {
             // Original code-authored artwork: no reference pixels or baked-in live numbers.
             const int width = 1080;
-        private static Rect HudQuotaCellBounds(int slot, Rect cutoutGap) =>
-            HudQuotaCellBounds(slot, DefaultHudProductIds, DefaultHudProductIds.Length, cutoutGap);
-
-        private static Rect HudQuotaCellBounds(int slot) => HudQuotaCellBounds(slot, Rect.zero);
-
-        private static Rect HudQuotaCellBounds(int slot, int productCount, Rect cutoutGap) =>
-            HudQuotaCellBounds(slot, DefaultHudProductIds, Mathf.Clamp(productCount, 0, DefaultHudProductIds.Length), cutoutGap);
-
             int height = Mathf.CeilToInt(HudBarHeightFor(reservedHudGap) * 2f);
             float logicalHeight = height * .5f;
             var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
@@ -2035,6 +2128,33 @@ namespace HayChoriYPaty
                 float coverage = outline ? Mathf.Max(0f, outerCoverage - innerCoverage) : outerCoverage;
                 // Coverage supplies only the rounded silhouette; GUI.color applies the requested 65% opacity.
                 pixels[y * width + x] = new Color(1f, 1f, 1f, coverage);
+            }
+            texture.SetPixels(pixels);
+            texture.Apply(false, true);
+            return texture;
+        }
+
+        private static Texture2D CreateGameplayFooterTexture()
+        {
+            const int width = 256, height = 256;
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+            {
+                name = "Barrio animado blue gameplay footer",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            var pixels = new Color[width * height];
+            for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
+            {
+                float vertical = (height - y - .5f) / height;
+                float horizontal = Mathf.Sin(x / (float)(width - 1) * Mathf.PI * 2f) * .012f;
+                Color color = Color.Lerp(new Color(.012f, .075f, .23f), new Color(.025f, .29f, .62f), vertical);
+                color.r = Mathf.Clamp01(color.r + horizontal);
+                float upperGloss = .22f * (1f - IntroEase((vertical - .72f) / .25f));
+                color = Color.Lerp(color, new Color(.36f, .85f, 1f), upperGloss);
+                pixels[y * width + x] = color;
             }
             texture.SetPixels(pixels);
             texture.Apply(false, true);
@@ -3720,13 +3840,17 @@ namespace HayChoriYPaty
             bool available=affordable&&game.Sim.Phase==RoundPhase.Playing;
             Color old=GUI.color;GUI.color=available?Color.white:new Color(.57f,.57f,.57f,1);
             Rect drawn=r;if(lastAction==action&&Time.unscaledTime<feedbackUntil){drawn.width*=feedbackScale;drawn.height*=feedbackScale;drawn.center=r.center;}
-            if(upgradeWood!=null)Draw(drawn,upgradeWood,UpgradeWoodBounds,true,false);else Item(drawn,12,true);
+            Texture2D glossyCard = GetGlossyUpgradeCardTexture(r);
+            if (glossyCard != null) GUI.DrawTexture(drawn, glossyCard, ScaleMode.StretchToFill, true);
+            else FillRect(drawn, new Color(.025f, .14f, .40f, 1f));
             GUI.color=old;
             bool compact = r.width < 200;
             int titleSize = upgradeTitle.fontSize;
-            if (r.height < 120) upgradeTitle.fontSize = action == HirePremiumAction ? 12 : (compact ? 15 : 17);
-            else if (compact) upgradeTitle.fontSize = 15;
-            UpgradeOutline(UpgradeTitleBounds(drawn),name,upgradeTitle,new Color(1f,.9f,.69f));
+            upgradeTitle.fontSize = r.height < 120 ? (action == HirePremiumAction ? 13 : compact ? 15 : 17)
+                : compact ? 16 : 18;
+            Rect titleBounds = UpgradeTitleBounds(drawn);
+            upgradeTitle.fontSize = FitUpgradeStatusFontSize(upgradeTitle,name,titleBounds.width);
+            UpgradeOutline(titleBounds,name,upgradeTitle,new Color(.98f,.99f,1f));
             upgradeTitle.fontSize = titleSize;
             string statusText = action == 3
                 ? "×" + game.Sim.WorkRate.ToString("0.00").Replace('.', ',') + "  ·  +10%"
@@ -3736,7 +3860,7 @@ namespace HayChoriYPaty
             int originalStatusSize = upgradePercent.fontSize;
             if (compact) upgradePercent.fontSize = action == 3 ? 12 : 13;
             upgradePercent.fontSize = FitUpgradeStatusFontSize(upgradePercent, statusText, statusBounds.width);
-            UpgradeOutline(statusBounds,statusText,upgradePercent,new Color(1f,.76f,.22f));
+            UpgradeOutline(statusBounds,statusText,upgradePercent,new Color(.55f,.90f,1f));
             upgradePercent.fontSize = originalStatusSize;
             if(action==3)
             {
@@ -3757,58 +3881,372 @@ namespace HayChoriYPaty
             int originalPriceSize=upgradePrice.fontSize;
             if (compact || r.height < 120) upgradePrice.fontSize = 24;
             upgradePrice.fontSize=FitUpgradePriceFontSize(upgradePrice,priceText,UpgradePriceTextBounds(drawn).width);
-            Label(UpgradePriceTextBounds(drawn),priceText,upgradePrice);
+            UpgradeOutline(UpgradePriceTextBounds(drawn),priceText,upgradePrice,new Color(.98f,.99f,1f));
             upgradePrice.fontSize=originalPriceSize;
             bool prev=GUI.enabled;GUI.enabled=available;
             if(GUI.Button(LayoutRect(r),"",invisible))NativeAction(action);GUI.enabled=prev;
             layoutVerticalScale = previousVertical;
         }
-        // Interior of the existing gold oval, measured against UpgradeWoodBounds.
-        private static Rect UpgradeOvalBounds(Rect card) => new Rect(card.x + card.width * .10f,
-            card.y + card.height * .22f, card.width * .29f, card.height * .55f);
+        private Texture2D GetGlossyUpgradeCardTexture(Rect card)
+        {
+            int width = Mathf.Clamp(Mathf.RoundToInt(card.width * 2f), 128, 1024);
+            int height = Mathf.Clamp(Mathf.RoundToInt(card.height * 2f), 96, 768);
+            string key = width + "x" + height;
+            if (glossyUpgradeCardTextures.TryGetValue(key, out Texture2D cached) && cached != null) return cached;
+            Texture2D created = CreateGlossyUpgradeCardTexture(width, height);
+            glossyUpgradeCardTextures[key] = created;
+            return created;
+        }
+        private static Texture2D CreateGlossyUpgradeCardTexture(int width, int height, bool keepReadable = false)
+        {
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+            {
+                name = "Barrio animado cyan-gloss upgrade card with circular medallion " + width + "x" + height,
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            var pixels = new Color[width * height];
+            float radius = Mathf.Min(width, height) * .12f;
+            var shadow = new Rect(2f, 4f, width - 4f, height - 7f);
+            var outer = new Rect(1f, 1f, width - 2f, height - 5f);
+            var rim = new Rect(3f, 3f, width - 6f, height - 9f);
+            var face = new Rect(6f, 6f, width - 12f, height - 15f);
+            var priceRim = new Rect(face.x + face.width * .49f, face.y + face.height * .64f,
+                face.width * .49f, face.height * .30f);
+            var priceFace = new Rect(priceRim.x + 2f, priceRim.y + 2f,
+                Mathf.Max(1f, priceRim.width - 4f), Mathf.Max(1f, priceRim.height - 4f));
+            float priceRadius = Mathf.Min(priceRim.height * .5f, radius * .52f);
+            Vector2 medalCenter = new Vector2(face.x + face.width * .25f, face.center.y);
+            float medalOuterRadius = face.height * .35f;
+            float medalRimRadius = face.height * .32f;
+            float medalInnerRadius = face.height * .285f;
+            for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
+            {
+                float px = x + .5f, py = height - y - .5f;
+                float t = Mathf.Clamp01((py - face.y) / Mathf.Max(1f, face.height));
+                Color color = new Color(.004f, .015f, .075f, .72f * RoundedCoverage(px, py, shadow, radius));
+                color = Over(color, new Color(.008f, .035f, .15f), RoundedCoverage(px, py, outer, radius));
+                color = Over(color, Color.Lerp(new Color(.48f, .94f, 1f), new Color(.02f, .27f, .82f), 1f - t),
+                    RoundedCoverage(px, py, rim, Mathf.Max(2f, radius - 2f)));
+                float faceCoverage = RoundedCoverage(px, py, face, Mathf.Max(2f, radius - 5f));
+                Color faceColor = Color.Lerp(new Color(.045f, .42f, .92f), new Color(.012f, .16f, .62f), 1f - t);
+                color = Over(color, faceColor, faceCoverage);
+                float gloss = .20f * (1f - IntroEase((t - .56f) / .36f));
+                color = Over(color, new Color(.76f, .96f, 1f), faceCoverage * gloss);
+
+                float priceOuterCoverage = RoundedCoverage(px, py, priceRim, priceRadius);
+                float priceInnerCoverage = RoundedCoverage(px, py, priceFace, Mathf.Max(1f, priceRadius - 2f));
+                color = Over(color, new Color(.008f, .055f, .24f, .96f), priceOuterCoverage);
+                Color priceColor = Color.Lerp(new Color(.06f, .66f, 1f), new Color(.015f, .28f, .80f), 1f - t);
+                color = Over(color, priceColor, priceInnerCoverage);
+                color = Over(color, new Color(.64f, .95f, 1f), priceInnerCoverage * .20f *
+                    (1f - IntroEase((t - .62f) / .30f)));
+
+                float medalDistance = Vector2.Distance(new Vector2(px, py), medalCenter);
+                color = Over(color, new Color(.002f, .025f, .12f, .72f), CircleCoverage(px, py, medalCenter, medalOuterRadius + 4f));
+                color = Over(color, new Color(.008f, .045f, .20f), CircleCoverage(px, py, medalCenter, medalOuterRadius));
+                color = Over(color, new Color(.32f, .90f, 1f), CircleCoverage(px, py, medalCenter, medalRimRadius));
+                float innerCoverage = CircleCoverage(px, py, medalCenter, medalInnerRadius);
+                float medalT = Mathf.Clamp01((py - (medalCenter.y - medalInnerRadius)) / (2f * medalInnerRadius));
+                Color medalFace = Color.Lerp(new Color(.035f, .35f, .82f), new Color(.008f, .105f, .40f), 1f - medalT);
+                color = Over(color, medalFace, innerCoverage);
+                float innerEdge = Mathf.Max(0f, innerCoverage - CircleCoverage(px, py, medalCenter, medalInnerRadius - 2.5f));
+                color = Over(color, new Color(.82f, .98f, 1f), innerEdge * .9f);
+                float glint = Mathf.Clamp01(1f - Mathf.Abs(medalDistance - medalOuterRadius * .73f) / 2.5f)
+                    * Mathf.Clamp01((py - medalCenter.y) / Mathf.Max(1f, medalOuterRadius));
+                color = Over(color, Color.white, glint * .52f);
+                pixels[y * width + x] = color;
+            }
+            texture.SetPixels(pixels);
+            texture.Apply(false, !keepReadable);
+            return texture;
+        }
+        private static Rect UpgradeOvalBounds(Rect card)
+        {
+            float diameter = Mathf.Min(card.height * .68f, card.width * .43f);
+            return new Rect(card.x + 8f, card.y + (card.height - diameter) * .5f, diameter, diameter);
+        }
         private static Rect UpgradeOvalContentBounds(Rect card, Vector2 sourceSize)
         {
-            Rect oval = UpgradeOvalBounds(card);
-            // Inscribe all four corners in the ellipse, using one scale for both source axes.
-            float x = sourceSize.x / oval.width, y = sourceSize.y / oval.height;
-            float scale = .94f / Mathf.Sqrt(x * x + y * y);
+            Rect medallion = UpgradeOvalBounds(card);
+            float inset = medallion.width * .10f;
+            Rect inner = new Rect(medallion.x + inset, medallion.y + inset,
+                medallion.width - inset * 2f, medallion.height - inset * 2f);
+            float scale = Mathf.Min(inner.width / Mathf.Max(1f, sourceSize.x),
+                inner.height / Mathf.Max(1f, sourceSize.y));
             Vector2 size = sourceSize * scale;
-            return new Rect(oval.center - size * .5f, size);
+            return new Rect(medallion.center - size * .5f, size);
         }
         private void DrawUpgradeOvalContent(Rect card, Texture2D texture, Rect source)
         {
             if (texture != null) Draw(UpgradeOvalContentBounds(card,source.size),texture,source,true,false);
         }
-        private static Rect UpgradeSpeedStatusBounds(Rect card) => card.width < 200
-            ? new Rect(card.x+62,card.y+29,card.width-70,27)
-            : UpgradeStatusBounds(card);
-        private static Rect UpgradeTitleBounds(Rect card){return card.width < 200 ? new Rect(card.x+6,card.y+6,card.width-12,29) : new Rect(card.x+94,card.y+6,card.width-104,32);}
-        private static Rect UpgradeStatusBounds(Rect card){return card.width < 200 ? new Rect(card.x+62,card.y+38,card.width-70,29) : new Rect(card.x+94,card.y+35,card.width-104,22);}
-        private static Rect UpgradeCoinBounds(Rect card){return card.width < 200 ? new Rect(card.x+63,card.y+card.height*.64f,18,18) : new Rect(card.x+101,card.y+(card.height < 120 ? 64 : 74),21,21);}
-        private static Rect UpgradePriceTextBounds(Rect card){return card.width < 200 ? new Rect(card.x+82,card.y+card.height*.60f,card.width-90,30) : new Rect(card.x+126,card.y+(card.height < 120 ? 60 : 68),card.width-145,30);}
+        private static float UpgradeContentLeft(Rect card) => UpgradeOvalBounds(card).xMax + 6f;
+        private static Rect UpgradeSpeedStatusBounds(Rect card)
+        {
+            float x = UpgradeContentLeft(card);
+            return new Rect(x, card.y + 33f, Mathf.Max(0f, card.xMax - 8f - x), 28f);
+        }
+        private static Rect UpgradeTitleBounds(Rect card)
+        {
+            float x = UpgradeContentLeft(card);
+            return new Rect(x, card.y + 5f, Mathf.Max(0f, card.xMax - 8f - x), 30f);
+        }
+        private static Rect UpgradeStatusBounds(Rect card)
+        {
+            float x = UpgradeContentLeft(card);
+            return new Rect(x, card.y + 36f, Mathf.Max(0f, card.xMax - 8f - x), 23f);
+        }
+        private static Rect UpgradeCoinBounds(Rect card)
+        {
+            float x = UpgradeContentLeft(card) + 1f;
+            return new Rect(x, card.y + card.height * .69f, 20f, 20f);
+        }
+        private static Rect UpgradePriceTextBounds(Rect card)
+        {
+            Rect coin = UpgradeCoinBounds(card);
+            float x = coin.xMax + 2f;
+            return new Rect(x, card.y + card.height * .65f, Mathf.Max(0f, card.xMax - 8f - x), card.height * .30f);
+        }
         private static int FitUpgradePriceFontSize(GUIStyle style,string value,float maxWidth)
         {
             int original=style.fontSize;float needed=style.CalcSize(new GUIContent(value)).x;
-            return needed>maxWidth-2?Mathf.Max(16,Mathf.FloorToInt(original*(maxWidth-2)/needed)):original;
+            return needed>maxWidth-2?Mathf.Max(14,Mathf.FloorToInt(original*(maxWidth-2)/needed)):original;
         }
         private static int FitUpgradeStatusFontSize(GUIStyle style,string value,float maxWidth)
         {
             int original=style.fontSize;float needed=style.CalcSize(new GUIContent(value)).x;
-            return needed>maxWidth-2?Mathf.Max(11,Mathf.FloorToInt(original*(maxWidth-2)/needed)):original;
+            return needed>maxWidth-2?Mathf.Max(10,Mathf.FloorToInt(original*(maxWidth-2)/needed)):original;
         }
         private void UpgradeOutline(Rect bounds,string value,GUIStyle style,Color fill)
         {
-            Color previous=style.normal.textColor;style.normal.textColor=new Color(.12f,.045f,.018f,1);
+            Color previous=style.normal.textColor;style.normal.textColor=new Color(.005f,.035f,.16f,1);
             for(int y=-1;y<=1;y++)for(int x=-1;x<=1;x++)if(x!=0||y!=0)
-                Label(new Rect(bounds.x+x,bounds.y+y,bounds.width,bounds.height),value,style);
+                Label(new Rect(bounds.x+x*1.25f,bounds.y+y*1.25f,bounds.width,bounds.height),value,style);
             style.normal.textColor=fill;Label(bounds,value,style);style.normal.textColor=previous;
         }
+        private static float CircleCoverage(float x, float y, Vector2 center, float radius) =>
+            Mathf.Clamp01(radius + .5f - Vector2.Distance(new Vector2(x, y), center));
         private void ReadyPanel(ResponsiveFooterLayout footer)
         {
             // Prices are fixed in every location; Ready has no price-selection panel or hidden controls.
             DrawStandardButton(Start, 1, "JUGAR");
             DrawLevelBadge(game.SelectedLevel, footer.LevelBadge);
             DrawStandardButton(footer.ReadySelector, ReadyLevelSelectorAction, "CANCHAS");
+        }
+        private Rect LevelOneTutorialPanelBounds() =>
+            LevelOneTutorialPanelBounds(levelOneTutorialStep, LevelOneTutorialTargetBounds(), layoutVerticalScale);
+
+        private static Rect LevelOneTutorialPanelBounds(int step, Rect target, float verticalScale)
+        {
+            float width = Mathf.Min(LevelOneTutorialBubbleWidth, W - 28f);
+            float x = step == 0 ? target.center.x + 20f - width * .5f
+                : step == 1 ? target.center.x + 30f
+                : step == 2 ? target.center.x - width * .5f - 55f
+                : target.center.x - width * .5f + 155f;
+            x = Mathf.Clamp(x, 14f, W - width - 14f);
+            float vertical = Mathf.Max(.01f, verticalScale);
+            float y = step < 2 ? target.yMax + 56f / vertical : target.yMin - 310f / vertical;
+            return new Rect(x, y, width, LevelOneTutorialBubbleHeight);
+        }
+
+        private Rect LevelOneTutorialPrimaryBounds() =>
+            LevelOneTutorialPrimaryBounds(LevelOneTutorialPanelBounds(), layoutVerticalScale);
+        private static Rect LevelOneTutorialPrimaryBounds(Rect panel, float verticalScale) =>
+            new Rect(panel.center.x - 100f, panel.y + 126f / Mathf.Max(.01f, verticalScale), 200f, 58f);
+
+        private Rect LevelOneTutorialSkipBounds() =>
+            LevelOneTutorialSkipBounds(LevelOneTutorialPanelBounds(), layoutVerticalScale);
+        private static Rect LevelOneTutorialSkipBounds(Rect panel, float verticalScale) =>
+            new Rect(panel.center.x - 42f, panel.y + 188f / Mathf.Max(.01f, verticalScale), 84f, 26f);
+
+        private string LevelOneTutorialPrimaryCaption() => levelOneTutorialStep == 3 ? "JUGAR" : "SIGUIENTE";
+        private Rect LevelOneTutorialTargetBounds()
+        {
+            if (game == null || game.Sim == null) return Rect.zero;
+            Rect gap = TopHudCutoutBounds(new Vector2(Screen.width, Screen.height), Screen.cutouts);
+            if (levelOneTutorialStep == 0)
+            {
+                int count = Mathf.Min(game.Sim.ProductCount, hudQuotaProductIds.Length);
+                for (int slot = 0; slot < count; slot++)
+                    hudQuotaProductIds[slot] = game.Sim.GetAvailableProduct(slot);
+                hudQuotaProductCount = count;
+                return HudScreenRectToSafeCanvas(HudQuotaCellBounds(0, hudQuotaProductIds, count, gap));
+            }
+            if (levelOneTutorialStep == 1)
+                return HudScreenRectToSafeCanvas(HudCoinIconBounds(gap));
+            return ResponsiveUpgradeCardBounds(game.Sim, levelOneTutorialStep == 2 ? 2 : 3);
+        }
+        private Rect HudScreenRectToSafeCanvas(Rect screenLogicalBounds)
+        {
+            Vector2 screen = new Vector2(Screen.width, Screen.height);
+            Rect viewport = CanvasViewport(screen, Screen.safeArea);
+            if (viewport.width <= 0f || screenLogicalBounds.width <= 0f || screenLogicalBounds.height <= 0f) return Rect.zero;
+            float screenScale = Screen.width / W;
+            Vector2 topLeft = ScreenToLayoutPoint(
+                new Vector2(screenLogicalBounds.x * screenScale, Screen.height - screenLogicalBounds.y * screenScale), screen, viewport);
+            Vector2 bottomRight = ScreenToLayoutPoint(
+                new Vector2(screenLogicalBounds.xMax * screenScale, Screen.height - screenLogicalBounds.yMax * screenScale), screen, viewport);
+            return Rect.MinMaxRect(topLeft.x, topLeft.y, bottomRight.x, bottomRight.y);
+        }
+        private void DrawLevelOneTutorial()
+        {
+            Rect panel = LevelOneTutorialPanelBounds();
+            Rect target = LevelOneTutorialTargetBounds();
+            bool targetAbove = levelOneTutorialStep < 2;
+            float vertical = Mathf.Max(.01f, layoutVerticalScale);
+            float tailWidth = levelOneTutorialStep == 0 ? 52f : levelOneTutorialStep == 1 ? 42f : 36f;
+            float baseX = levelOneTutorialStep == 2 ? panel.xMax - 30f
+                : levelOneTutorialStep == 3 ? panel.x + 30f : target.center.x;
+            baseX = Mathf.Clamp(baseX, panel.x + tailWidth * .5f,
+                panel.xMax - tailWidth * .5f);
+            Vector2 tip = new Vector2(target.center.x, targetAbove ? target.yMax : target.yMin);
+            // LayoutRect scales anchor positions (not element sizes) vertically. Rasterize the
+            // complete silhouette in that same rendered coordinate space so the tail stays
+            // attached while its gap remains constant across portrait heights.
+            Rect bubblePanel = new Rect(panel.x, panel.y * vertical, panel.width, panel.height);
+            Vector2 bubbleTip = new Vector2(tip.x, tip.y * vertical);
+            Rect bubbleBounds = LevelOneTutorialBubbleDrawBounds(bubblePanel, bubbleTip, baseX, tailWidth, targetAbove);
+            if (levelOneTutorialBubbleTexture == null || levelOneTutorialBubbleTextureStep != levelOneTutorialStep ||
+                !levelOneTutorialBubbleTexturePanel.Equals(bubblePanel) ||
+                !levelOneTutorialBubbleTextureTip.Equals(bubbleTip) ||
+                !Mathf.Approximately(levelOneTutorialBubbleTextureTailWidth, tailWidth) ||
+                levelOneTutorialBubbleTextureTailAbove != targetAbove)
+            {
+                if (levelOneTutorialBubbleTexture != null) Destroy(levelOneTutorialBubbleTexture);
+                levelOneTutorialBubbleTexture = CreateLevelOneTutorialBubbleTexture(bubblePanel, bubbleTip, baseX, tailWidth, targetAbove);
+                levelOneTutorialBubbleTextureStep = levelOneTutorialStep;
+                levelOneTutorialBubbleTexturePanel = bubblePanel;
+                levelOneTutorialBubbleTextureTip = bubbleTip;
+                levelOneTutorialBubbleTextureTailWidth = tailWidth;
+                levelOneTutorialBubbleTextureTailAbove = targetAbove;
+            }
+            GUI.DrawTexture(bubbleBounds, levelOneTutorialBubbleTexture, ScaleMode.StretchToFill, true);
+
+            string headline = LevelOneTutorialHeadlines[levelOneTutorialStep];
+            string explanation = LevelOneTutorialExplanations[levelOneTutorialStep];
+            Rect headlineBounds = new Rect(panel.x + 18f,
+                panel.y + (levelOneTutorialStep == 1 ? 29f : 12f) / vertical,
+                panel.width - 36f, levelOneTutorialStep == 1 ? 70f : 58f);
+            DrawTutorialText(headlineBounds, headline, levelOneTutorialTitleStyle,
+                levelOneTutorialStep == 2 ? 23 : 25, 20);
+            if (!string.IsNullOrEmpty(explanation))
+            {
+                Rect explanationBounds = new Rect(panel.x + 18f, panel.y + 72f / vertical, panel.width - 36f, 35f);
+                if (levelOneTutorialStep == 3) explanationBounds.height = 40f;
+                DrawTutorialText(explanationBounds, explanation, levelOneTutorialBodyStyle, 20, 17);
+            }
+
+            DrawStandardButton(LevelOneTutorialPrimaryBounds(panel, layoutVerticalScale), LevelOneTutorialPrimaryAction,
+                LevelOneTutorialPrimaryCaption());
+            Rect skipBounds = LevelOneTutorialSkipBounds(panel, layoutVerticalScale);
+            FillRect(skipBounds, new Color(1f, .98f, .94f, .94f));
+            Rect skip = LayoutRect(skipBounds);
+            GUI.Label(skip, "SALTAR", levelOneTutorialSkipStyle);
+            if (GUI.Button(skip, "", invisible)) NativeAction(LevelOneTutorialSkipAction);
+        }
+
+        private void DrawTutorialText(Rect bounds, string value, GUIStyle style, int preferredSize, int minimumSize)
+        {
+            int previous = style.fontSize;
+            try
+            {
+                style.fontSize = preferredSize;
+                while (style.fontSize > minimumSize && style.CalcHeight(new GUIContent(value), bounds.width) > bounds.height)
+                    style.fontSize--;
+                Rect drawn = LayoutRect(bounds);
+                if (style == levelOneTutorialTitleStyle || style == levelOneTutorialBodyStyle)
+                {
+                    const float weight = .55f;
+                    GUI.Label(new Rect(drawn.x - weight, drawn.y, drawn.width, drawn.height), value, style);
+                    GUI.Label(new Rect(drawn.x + weight, drawn.y, drawn.width, drawn.height), value, style);
+                    GUI.Label(new Rect(drawn.x, drawn.y - weight, drawn.width, drawn.height), value, style);
+                    GUI.Label(new Rect(drawn.x, drawn.y + weight, drawn.width, drawn.height), value, style);
+                }
+                GUI.Label(drawn, value, style);
+            }
+            finally { style.fontSize = previous; }
+        }
+
+        private static Rect LevelOneTutorialBubbleDrawBounds(Rect panel, Vector2 tip, float baseX, float tailWidth, bool tailAbove)
+        {
+            float baseY = tailAbove ? panel.y : panel.yMax;
+            return Rect.MinMaxRect(
+                Mathf.Min(panel.x, tip.x, baseX - tailWidth * .5f),
+                Mathf.Min(panel.y, tip.y, baseY),
+                Mathf.Max(panel.xMax, tip.x, baseX + tailWidth * .5f),
+                Mathf.Max(panel.yMax, tip.y, baseY));
+        }
+
+        private static Texture2D CreateLevelOneTutorialBubbleTexture(Rect panel, Vector2 tip, float baseX,
+            float tailWidth, bool tailAbove)
+        {
+            const float rasterScale = 3f;
+            const float radius = 18f, border = 5f;
+            Rect bounds = LevelOneTutorialBubbleDrawBounds(panel, tip, baseX, tailWidth, tailAbove);
+            int width = Mathf.Max(1, Mathf.CeilToInt(bounds.width * rasterScale));
+            int height = Mathf.Max(1, Mathf.CeilToInt(bounds.height * rasterScale));
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+            {
+                name = "First match unified cream speech bubble and pointer",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            var pixels = new Color[width * height];
+            Color outline = new Color(.22f, .075f, .025f, 1f);
+            Color face = new Color(1f, .94f, .80f, 1f);
+            float edgeY = tailAbove ? panel.y : panel.yMax;
+            Vector2 baseCenter = new Vector2(baseX, edgeY);
+            Vector2 leftBase = new Vector2(baseX - tailWidth * .5f, edgeY);
+            Vector2 rightBase = new Vector2(baseX + tailWidth * .5f, edgeY);
+            Rect innerPanel = Rect.MinMaxRect(panel.x + border, panel.y + border,
+                panel.xMax - border, panel.yMax - border);
+            float innerRadius = Mathf.Max(1f, radius - border);
+            float innerTailWidth = Mathf.Max(4f, tailWidth - border * 2f);
+            float innerBaseY = tailAbove ? panel.y + border : panel.yMax - border;
+            Vector2 innerTip = Vector2.MoveTowards(tip, baseCenter, border);
+            Vector2 innerLeftBase = new Vector2(baseX - innerTailWidth * .5f, innerBaseY);
+            Vector2 innerRightBase = new Vector2(baseX + innerTailWidth * .5f, innerBaseY);
+            for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
+            {
+                Vector2 point = new Vector2(bounds.x + (x + .5f) / rasterScale,
+                    bounds.yMax - (y + .5f) / rasterScale);
+                bool insideOuter = TutorialBubbleRoundedRectContains(point, panel, radius) ||
+                    TutorialBubbleTriangleContains(point, tip, leftBase, rightBase);
+                if (!insideOuter) continue;
+                bool insideFace = TutorialBubbleRoundedRectContains(point, innerPanel, innerRadius) ||
+                    TutorialBubbleTriangleContains(point, innerTip, innerLeftBase, innerRightBase);
+                pixels[(height - 1 - y) * width + x] = insideFace ? face : outline;
+            }
+            texture.SetPixels(pixels);
+            texture.Apply(false, false);
+            return texture;
+        }
+
+        private static bool TutorialBubbleRoundedRectContains(Vector2 point, Rect bounds, float radius)
+        {
+            if (bounds.width <= 0f || bounds.height <= 0f) return false;
+            radius = Mathf.Clamp(radius, 0f, Mathf.Min(bounds.width, bounds.height) * .5f);
+            float qx = Mathf.Abs(point.x - bounds.center.x) - (bounds.width * .5f - radius);
+            float qy = Mathf.Abs(point.y - bounds.center.y) - (bounds.height * .5f - radius);
+            float outsideX = Mathf.Max(0f, qx), outsideY = Mathf.Max(0f, qy);
+            float distance = Mathf.Sqrt(outsideX * outsideX + outsideY * outsideY)
+                + Mathf.Min(Mathf.Max(qx, qy), 0f) - radius;
+            return distance <= 0f;
+        }
+
+        private static bool TutorialBubbleTriangleContains(Vector2 point, Vector2 a, Vector2 b, Vector2 c)
+        {
+            float ab = (point.x - b.x) * (a.y - b.y) - (a.x - b.x) * (point.y - b.y);
+            float bc = (point.x - c.x) * (b.y - c.y) - (b.x - c.x) * (point.y - c.y);
+            float ca = (point.x - a.x) * (c.y - a.y) - (c.x - a.x) * (point.y - a.y);
+            bool negative = ab < 0f || bc < 0f || ca < 0f;
+            bool positive = ab > 0f || bc > 0f || ca > 0f;
+            return !(negative && positive);
         }
         private static Rect LevelButton(int i){return new Rect(108+i*67,912,57,35);}
         private static Rect VictoryPopupBounds(float canvasHeight, bool chulengo = false)
@@ -4382,7 +4820,7 @@ namespace HayChoriYPaty
                 if(menuFont!=null){style.font=menuFont;style.fontStyle=FontStyle.Normal;}
                 style.wordWrap=false;style.padding=new RectOffset(0,0,0,0);
             }
-            upgradePrice.normal.textColor=new Color(.25f,.09f,.025f);
+            upgradePrice.normal.textColor=Color.white;
             riotCue = Style(28); riotCue.normal.textColor = new Color(.96f, .08f, .04f);
             riotCue.wordWrap = false;
             hudNumber = Style(40);
@@ -4396,6 +4834,15 @@ namespace HayChoriYPaty
             menuTitle = Style(38);
             if (menuFont != null) { menuTitle.font = menuFont; menuTitle.fontStyle = FontStyle.Normal; }
             menuTitle.wordWrap = false;
+            Font tutorialFont = Resources.Load<Font>("Google/GoogleSans-Medium");
+            levelOneTutorialTitleStyle = new GUIStyle(menuTitle) { fontSize = 25, alignment = TextAnchor.MiddleCenter, wordWrap = true };
+            if (tutorialFont != null) { levelOneTutorialTitleStyle.font = tutorialFont; levelOneTutorialTitleStyle.fontStyle = FontStyle.Bold; }
+            levelOneTutorialTitleStyle.normal.textColor = new Color(.20f, .045f, .015f);
+            levelOneTutorialBodyStyle = new GUIStyle(menuTitle) { fontSize = 20, alignment = TextAnchor.MiddleCenter, wordWrap = true };
+            if (tutorialFont != null) { levelOneTutorialBodyStyle.font = tutorialFont; levelOneTutorialBodyStyle.fontStyle = FontStyle.Bold; }
+            levelOneTutorialBodyStyle.normal.textColor = new Color(.24f, .085f, .03f);
+            levelOneTutorialSkipStyle = new GUIStyle(menuTitle) { fontSize = 14, alignment = TextAnchor.MiddleCenter, wordWrap = false };
+            levelOneTutorialSkipStyle.normal.textColor = new Color(.045f, .14f, .29f);
         }
         private static GUIStyle Style(int size){var s=new GUIStyle(GUI.skin.label){fontSize=size,fontStyle=FontStyle.Bold,alignment=TextAnchor.MiddleCenter,wordWrap=true};s.normal.textColor=new Color(.16f,.10f,.08f);return s;}
         private void Label(Rect r,string value,GUIStyle style){GUI.Label(LayoutRect(r),value,style);}

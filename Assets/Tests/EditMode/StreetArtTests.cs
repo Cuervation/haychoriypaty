@@ -339,26 +339,63 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(expected, actual);
         }
 
-        [TestCase(80f)]
-        [TestCase(110f)]
-        [TestCase(180f)]
-        public void FooterWoodCoverCropPreservesGrainAspectAcrossResponsiveHeights(float footerHeight)
+        [Test]
+        public void GlossyBlueGameplayFooterCreatesReusableTexture()
         {
-            Texture2D wood = Resources.Load<Texture2D>("street-upgrade-wood-v1");
-            Assert.NotNull(wood);
-            Rect source = (Rect)View.GetField("FooterWoodSource", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
-            Assert.GreaterOrEqual(source.xMin, 0f); Assert.GreaterOrEqual(source.yMin, 0f);
-            Assert.LessOrEqual(source.xMax, wood.width); Assert.LessOrEqual(source.yMax, wood.height);
-            float aspect = 540f / footerHeight;
-            Rect crop = (Rect)View.GetMethod("CropSourceToAspect", BindingFlags.Static | BindingFlags.NonPublic)
-                .Invoke(null, new object[] { source, aspect });
-            Assert.AreEqual(aspect, crop.width / crop.height, .01f);
-            Assert.GreaterOrEqual(crop.xMin, source.xMin); Assert.LessOrEqual(crop.xMax, source.xMax);
-            Assert.GreaterOrEqual(crop.yMin, source.yMin); Assert.LessOrEqual(crop.yMax, source.yMax);
+            Texture2D footer = (Texture2D)View.GetMethod("CreateGameplayFooterTexture", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, null);
+            try
+            {
+                Assert.NotNull(footer);
+                Assert.AreEqual(256, footer.width);
+                Assert.AreEqual(256, footer.height);
+                Assert.AreEqual(TextureWrapMode.Clamp, footer.wrapMode);
+                Assert.AreEqual(FilterMode.Bilinear, footer.filterMode);
+                StringAssert.Contains("blue gameplay footer", footer.name);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(footer); }
         }
 
         [Test]
-        public void AdaptivePennantsRemainTransparentOverWoodFooter()
+        public void GlossyUpgradeCardsMatchTheCyanMedallionReferenceWithoutChangingBounds()
+        {
+            Rect card = new Rect(24f, 740f, 156f, 100f);
+            Rect medallion = (Rect)View.GetMethod("UpgradeOvalBounds", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { card });
+            Assert.AreEqual(medallion.width, medallion.height, .01f, "The avatar plate is circular, not an oval.");
+            Assert.GreaterOrEqual(medallion.width, 64f);
+            Rect title = (Rect)View.GetMethod("UpgradeTitleBounds", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new object[] { card });
+            Rect status = (Rect)View.GetMethod("UpgradeStatusBounds", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new object[] { card });
+            Rect coin = (Rect)View.GetMethod("UpgradeCoinBounds", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new object[] { card });
+            Rect price = (Rect)View.GetMethod("UpgradePriceTextBounds", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new object[] { card });
+            Assert.GreaterOrEqual(title.xMin, medallion.xMax + 5f);
+            Assert.GreaterOrEqual(status.yMin, title.yMin + title.height);
+            Assert.GreaterOrEqual(coin.yMin, status.yMax + 5f);
+            Assert.GreaterOrEqual(price.xMin, coin.xMax + 1f);
+            foreach (Rect content in new[] { medallion, title, status, coin, price })
+            {
+                Assert.IsTrue(card.Contains(content.min));
+                Assert.IsTrue(card.Contains(content.max - Vector2.one * .01f));
+            }
+
+            Texture2D texture = (Texture2D)View.GetMethod("CreateGlossyUpgradeCardTexture", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { 312, 200, true });
+            try
+            {
+                Assert.AreEqual(312, texture.width); Assert.AreEqual(200, texture.height);
+                Assert.AreEqual(0f, texture.GetPixel(0, 0).a, .01f, "Rounded glossy corners remain transparent.");
+                Color face = texture.GetPixel(290, 100);
+                Color medallionPixel = texture.GetPixel(80, 100);
+                Assert.Greater(face.a, .9f); Assert.Greater(medallionPixel.a, .9f);
+                Assert.Greater(medallionPixel.b, medallionPixel.r, "The medallion uses the deeper blue inset.");
+                Assert.Greater(face.b, face.r, "The card face remains in the cyan/blue glossy family.");
+                StringAssert.Contains("circular medallion", texture.name);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(texture); }
+        }
+
+        [Test]
+        public void AdaptivePennantsRemainTransparentOverGlossyBlueFooter()
         {
             Type themes = Type.GetType("HayChoriYPaty.ClubVisualTheme, Assembly-CSharp", true);
             object theme = themes.GetMethod("ForLevel").Invoke(null, new object[] { 0 });
@@ -368,7 +405,7 @@ namespace HayChoriYPaty.Tests
             {
                 Assert.NotNull(flags);
                 Assert.AreEqual(0, flags.GetPixel(flags.width - 1, flags.height - 1).a,
-                    "Do not fill the wood backdrop with the old cream pennant-card color.");
+                    "Keep pennant decoration transparent outside its fabric over the blue footer.");
                 Assert.IsTrue(flags.GetPixels32().Any(pixel => pixel.a > 0),
                     "The existing pennants themselves must still render.");
             }
@@ -1219,11 +1256,14 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(1078.65f, logicalHeight, .1f);
             Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
             Assert.AreEqual(0f, bar.yMin, "The read-only HUD is drawn at the physical screen top, separately from safe controls");
-            foreach (string name in new[] { "HudCoins", "HudTime", "HudSales" })
+            foreach (string name in new[] { "HudCoins", "HudTime" })
             {
                 Rect field = (Rect)View.GetField(name, BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
                 Assert.IsTrue(bar.Contains(field.min)); Assert.IsTrue(bar.Contains(field.max));
             }
+            Rect sales = (Rect)View.GetField("HudSales", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+            Assert.GreaterOrEqual(sales.yMin, bar.yMax, "Product counters overlay the mural below the coins/time strip.");
+            Assert.IsFalse(bar.Contains(sales.min));
             Rect punchHoleViewport = (Rect)viewportMethod.Invoke(null, new object[] {
                 new Vector2(1440, 3088), new Rect(0, 0, 1440, 2999) });
             Assert.AreEqual(2999f, punchHoleViewport.height);
@@ -1232,7 +1272,7 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void TopCameraCutoutGetsAnActualHudGapAndSevenQuotaCellsReflowAroundIt()
+        public void TopCameraCutoutGetsAnActualHudGapAndQuotaColumnsStayBelowTheStatusStrip()
         {
             MethodInfo gapMethod = View.GetMethod("TopHudCutoutBounds", BindingFlags.Static | BindingFlags.NonPublic);
             Rect gap = (Rect)gapMethod.Invoke(null, new object[] {
@@ -1241,13 +1281,19 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(308f, gap.xMax, .01f);
             Assert.AreEqual(34f, gap.height);
 
+            int[] products = { 0, 1, 2, 3, 4, 6, 5 };
             MethodInfo cellsMethod = View.GetMethod("HudQuotaCellBounds", BindingFlags.Static | BindingFlags.NonPublic,
-                null, new[] { typeof(int), typeof(Rect) }, null);
+                null, new[] { typeof(int), typeof(int[]), typeof(int), typeof(Rect) }, null);
+            MethodInfo barHeightMethod = View.GetMethod("HudBarHeightFor", BindingFlags.Static | BindingFlags.NonPublic,
+                null, new[] { typeof(Rect) }, null);
             Rect[] cells = new Rect[7];
             for (int i = 0; i < cells.Length; i++)
             {
-                cells[i] = (Rect)cellsMethod.Invoke(null, new object[] { i, gap });
+                cells[i] = (Rect)cellsMethod.Invoke(null, new object[] { i, products, products.Length, gap });
                 Assert.IsFalse(cells[i].Overlaps(gap), "Quota chip " + i + " crosses the hardware camera channel");
+                Assert.GreaterOrEqual(cells[i].yMin, (float)barHeightMethod.Invoke(null, new object[] { gap }));
+                Assert.AreEqual(i < 4 ? 8f : 427f, cells[i].xMin, .01f,
+                    "Solids stay left and drinks stay right of the status strip after the 25% enlargement.");
                 for (int j = 0; j < i; j++) Assert.IsFalse(cells[i].Overlaps(cells[j]));
             }
             Rect[] statusCells = new Rect[2];
@@ -1265,10 +1311,9 @@ namespace HayChoriYPaty.Tests
                 "A centered cutout reduces both equal card widths.");
             Assert.Greater(statusCells[1].xMin, gap.xMax);
             Assert.IsNull(View.GetField("HudLevel", BindingFlags.Static | BindingFlags.NonPublic), "The level badge is removed.");
-            float cutoutHeight = (float)View.GetMethod("HudBarHeightFor", BindingFlags.Static | BindingFlags.NonPublic,
-                null, new[] { typeof(Rect) }, null)
-                .Invoke(null, new object[] { gap });
-            Assert.Greater(cutoutHeight, 81.6f, "The taller objective rows remain fully visible below the status strip.");
+            float cutoutHeight = (float)barHeightMethod.Invoke(null, new object[] { gap });
+            Assert.AreEqual(39.36f, cutoutHeight, .01f, "A centered camera island does not expand the status strip when both cards fit beside it.");
+            Assert.Less(cutoutHeight, 81.6f, "Quota cards no longer inflate the full-width header.");
         }
 
         [TestCase(1080, 1920)]
@@ -1308,9 +1353,16 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(expected, shouldDraw.Invoke(null, new[] { phaseValue, (object)catalogActionCount }));
         }
 
+        [TestCase(320, 568)]
+        [TestCase(360, 640)]
+        [TestCase(360, 800)]
+        [TestCase(393, 852)]
+        [TestCase(412, 915)]
+        [TestCase(720, 1600)]
         [TestCase(1080, 1920)]
-        [TestCase(1080, 2340)]
         [TestCase(1080, 2400)]
+        [TestCase(1170, 2532)]
+        [TestCase(1290, 2796)]
         [TestCase(1440, 3200)]
         [TestCase(1536, 2048)]
         public void ResponsiveFooterFitsAllElevenLevelsAndKeepsButtonsFlagsAndStageSeparate(int width, int height)
@@ -1325,19 +1377,17 @@ namespace HayChoriYPaty.Tests
             Type kitchenLayout = Type.GetType("HayChoriYPaty.StreetKitchenLayout, Assembly-CSharp", true);
             Type simulationType = Type.GetType("HayChoriYPaty.StreetSimulation, Assembly-CSharp", true);
             Type balanceType = Type.GetType("HayChoriYPaty.StreetBalance, Assembly-CSharp", true);
-            float playfieldBottom = (float)kitchenLayout.GetField("TiledPlayfieldBottom").GetRawConstantValue();
-            float stageBottom = playfieldBottom * verticalScale;
             string[] levelNames = (string[])simulationType.GetField("LevelNames").GetValue(null);
             ConstructorInfo simulationConstructor = simulationType.GetConstructor(new[] {
                 balanceType, typeof(int), typeof(float), typeof(int), typeof(int), typeof(int)
             });
             MethodInfo build = View.GetMethod("BuildResponsiveFooterLayout", BindingFlags.Static | BindingFlags.NonPublic);
             MethodInfo scaleCard = View.GetMethod("ScaleCardBounds", BindingFlags.Static | BindingFlags.NonPublic);
-            float commonPennantHeight = -1f;
             for (int level = 0; level < levelNames.Length; level++)
             {
-                object balance = Activator.CreateInstance(balanceType);
-                object sim = simulationConstructor.Invoke(new object[] { balance, level, 5f, 0, 1, 0 });
+                object sim = simulationConstructor.Invoke(new object[] { Activator.CreateInstance(balanceType), level, 5f, 0, 1, 0 });
+                object kitchen = simulationType.GetProperty("KitchenLayout").GetValue(sim);
+                float stageBottom = (float)kitchenLayout.GetProperty("PlayfieldBottom").GetValue(kitchen) * verticalScale;
                 object footer = build.Invoke(null, new object[] { sim, canvasHeight, true, false });
                 Type footerType = footer.GetType();
                 Rect[] raw = (Rect[])footerType.GetField("UpgradeBounds").GetValue(footer);
@@ -1346,11 +1396,18 @@ namespace HayChoriYPaty.Tests
                 Rect badge = (Rect)footerType.GetField("LevelBadge").GetValue(footer);
                 Rect drawnBadge = new Rect(badge.x, badge.y * verticalScale, badge.width, badge.height);
                 Rect flags = (Rect)footerType.GetField("Pennants").GetValue(footer);
-                Assert.AreEqual(canvasHeight, flags.yMax, .1f, "Level " + level + " pennants should end flush with the safe footer edge.");
-                if (commonPennantHeight < 0f) commonPennantHeight = flags.height;
-                Assert.AreEqual(commonPennantHeight, flags.height, .1f,
-                    "Level " + level + " pennants should use the same height for this viewport.");
-                Assert.GreaterOrEqual(drawnBadge.yMin, stageBottom - .1f, "Level " + level + " footer entered the playfield.");
+                float expectedFlags = ExpectedResponsivePennantHeight(actions.Length, false, canvasHeight, stageBottom, 0f);
+                Assert.AreEqual(expectedFlags, flags.height, .2f, "Level " + level + " reserves only real free pennant space.");
+                if (flags.height > 1f)
+                {
+                    Assert.AreEqual(canvasHeight, flags.yMax, .1f, "Level " + level + " pennants end flush with the safe footer edge.");
+                    Assert.GreaterOrEqual(flags.yMin, stageBottom - .1f);
+                }
+                Rect pennantArt = (Rect)View.GetMethod("FooterPennantRenderBounds", BindingFlags.Static | BindingFlags.NonPublic)
+                    .Invoke(null, new object[] { flags, canvasHeight, 0f });
+                if (flags.height > 1f) Assert.AreEqual(flags, pennantArt, "Visible pennant slots retain their exact bounds.");
+                else Assert.AreEqual(Rect.zero, pennantArt, "No pennant fallback may be painted behind cards.");
+                Assert.GreaterOrEqual(drawnBadge.yMin, stageBottom - 16f, "Level " + level + " title stays at the footer seam.");
                 for (int i = 0; i < raw.Length; i++)
                 {
                     Rect card = (Rect)scaleCard.Invoke(null, new object[] { raw[i], verticalScale });
@@ -1359,21 +1416,13 @@ namespace HayChoriYPaty.Tests
                     Assert.GreaterOrEqual(card.yMin, stageBottom - .1f, "Level " + level + " card entered the playfield.");
                     Assert.LessOrEqual(card.yMax, canvasHeight + .1f, "Level " + level + " card is clipped.");
                     Assert.GreaterOrEqual(card.yMin, drawnBadge.yMax - .1f);
-                    Assert.GreaterOrEqual(flags.yMin, card.yMax - .1f, "Level " + level + " decoration overlaps a card.");
+                    Assert.IsFalse(card.Overlaps(flags), "Level " + level + " card overlaps the reserved pennant band.");
                     for (int j = 0; j < i; j++)
                     {
                         Rect other = (Rect)scaleCard.Invoke(null, new object[] { raw[j], verticalScale });
                         other.y *= verticalScale;
                         Assert.IsFalse(card.Overlaps(other), "Level " + level + " upgrade cards overlap.");
                     }
-                }
-                Assert.GreaterOrEqual(flags.yMin, stageBottom - .1f);
-                Assert.LessOrEqual(flags.yMax, canvasHeight + .1f);
-                for (int i = 0; i < raw.Length; i++)
-                {
-                    Rect card = (Rect)scaleCard.Invoke(null, new object[] { raw[i], verticalScale });
-                    card.y *= verticalScale;
-                    Assert.IsFalse(card.Overlaps(flags), "Level " + level + " upgrade card " + card + " overlaps decoration " + flags + ".");
                 }
 
                 object ready = build.Invoke(null, new object[] { sim, canvasHeight, raw.Length <= 3, true });
@@ -1385,16 +1434,40 @@ namespace HayChoriYPaty.Tests
                 Rect drawnReadyBadge = new Rect(readyBadge.x, readyBadge.y * verticalScale, readyBadge.width, readyBadge.height);
                 Assert.IsFalse(drawnSelector.Overlaps(drawnReadyBadge));
                 Rect readyFlags = (Rect)ready.GetType().GetField("Pennants").GetValue(ready);
-                Assert.AreEqual(commonPennantHeight, readyFlags.height, .1f,
-                    "Ready-state pennants should match the playing-state height.");
-                Assert.GreaterOrEqual(readyFlags.yMin, drawnSelector.yMax - .1f);
-                Assert.AreEqual(canvasHeight, readyFlags.yMax, .1f);
+                float expectedReadyFlags = ExpectedResponsivePennantHeight(raw.Length <= 3 ? raw.Length : 0,
+                    true, canvasHeight, stageBottom, 0f);
+                Assert.AreEqual(expectedReadyFlags, readyFlags.height, .2f);
+                Assert.IsFalse(drawnSelector.Overlaps(readyFlags));
+                Rect readyPennantArt = (Rect)View.GetMethod("FooterPennantRenderBounds", BindingFlags.Static | BindingFlags.NonPublic)
+                    .Invoke(null, new object[] { readyFlags, canvasHeight, 0f });
+                if (readyFlags.height > 1f) Assert.AreEqual(readyFlags, readyPennantArt);
+                else Assert.AreEqual(Rect.zero, readyPennantArt);
 
                 object noControls = build.Invoke(null, new object[] { sim, canvasHeight, false, false });
                 Rect noControlFlags = (Rect)noControls.GetType().GetField("Pennants").GetValue(noControls);
-                Assert.AreEqual(commonPennantHeight, noControlFlags.height, .1f,
-                    "Level-selection pennants should match the gameplay height.");
+                float expectedNoControlFlags = ExpectedResponsivePennantHeight(0, false, canvasHeight, stageBottom, 0f);
+                Assert.AreEqual(expectedNoControlFlags, noControlFlags.height, .2f);
+                Rect noControlPennantArt = (Rect)View.GetMethod("FooterPennantRenderBounds", BindingFlags.Static | BindingFlags.NonPublic)
+                    .Invoke(null, new object[] { noControlFlags, canvasHeight, 0f });
+                if (noControlFlags.height > 1f) Assert.AreEqual(noControlFlags, noControlPennantArt);
+                else Assert.AreEqual(Rect.zero, noControlPennantArt);
             }
+        }
+
+        private static float ExpectedResponsivePennantHeight(int count, bool ready, float canvasHeight, float stageBottom, float bottomBleed)
+        {
+            float compact = Mathf.Min(1f, canvasHeight / 960f);
+            int rows = count == 0 ? 0 : count <= 3 ? 1 : 2;
+            float cardHeight = (count >= 5 ? 100f : count == 4 ? 104f : 120f) * compact;
+            float rowGap = rows > 1 ? 8f * compact : 0f;
+            float badgeHeight = (count >= 5 ? 20f : count == 4 ? 22f : 26f) * compact;
+            float sectionGap = rows > 0 || ready ? 6f * compact : 0f;
+            float selectorHeight = ready ? 44f * compact : 0f;
+            float selectorGap = ready && rows > 0 ? 6f * compact : 0f;
+            float panelHeight = badgeHeight + sectionGap + rows * cardHeight + Mathf.Max(0, rows - 1) * rowGap
+                + selectorGap + selectorHeight;
+            float free = canvasHeight + bottomBleed - stageBottom - 4f * compact - panelHeight - 2f * compact;
+            return Mathf.Min(80f * compact, Mathf.Max(0f, free));
         }
 
         [Test]
@@ -1420,9 +1493,18 @@ namespace HayChoriYPaty.Tests
                 .Invoke(null, new object[] { sim, canvasHeight, true, false, bottomBleed });
             Rect[] cards = (Rect[])footer.GetType().GetField("UpgradeBounds").GetValue(footer);
             Rect pennants = (Rect)footer.GetType().GetField("Pennants").GetValue(footer);
-            Assert.AreEqual(canvasHeight + bottomBleed, pennants.yMax, .01f);
-            Assert.Greater(pennants.height, 80f, "Tall safe areas expand pennants into the former blank band.");
-            foreach (Rect card in cards) Assert.GreaterOrEqual(pennants.yMin, card.yMax - .01f);
+            if (pennants.height > 1f)
+            {
+                Assert.AreEqual(canvasHeight + bottomBleed, pennants.yMax, .01f);
+                Assert.Greater(pennants.height, 1f, "The safe inset leaves a real, non-overlapping pennant band.");
+                foreach (Rect card in cards) Assert.GreaterOrEqual(pennants.yMin, card.yMax - .01f);
+            }
+            else Assert.AreEqual(0f, pennants.height, .01f,
+                "The Racing+ layout hides the original pennant slot without moving its controls.");
+            Rect pennantArt = (Rect)View.GetMethod("FooterPennantRenderBounds", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { pennants, canvasHeight, bottomBleed });
+            Assert.AreEqual(pennants, pennantArt,
+                "The safe inset extends only a reserved pennant band; an empty slot never paints behind cards.");
         }
 
         [Test]
@@ -1508,7 +1590,9 @@ namespace HayChoriYPaty.Tests
             }
 
             Rect price = (Rect)View.GetMethod("UpgradePriceTextBounds", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new object[] { speed });
-            Assert.AreEqual(speed.width - 145, price.width);
+            Rect coinBounds = (Rect)View.GetMethod("UpgradeCoinBounds", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new object[] { speed });
+            Assert.AreEqual(speed.xMax - 8f - (coinBounds.xMax + 2f), price.width, .01f);
+            Assert.Greater(price.width, 80f, "The right-side price capsule keeps four-digit costs legible.");
             Font font = Resources.Load<Font>("Menu/LuckiestGuy-Regular");
             Assert.NotNull(font);
             var style = new GUIStyle { font = font, fontSize = 27, wordWrap = false };
@@ -1580,13 +1664,14 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
             Assert.AreEqual(6f, cell1.xMin - cell0.xMax, .01f);
             Assert.AreEqual(34.56f, cell0.height, .01f, "The primary status strip is 20% taller.");
             Assert.AreEqual(8f, grid.x, .01f); Assert.AreEqual(41.76f, grid.y, .01f);
-            Assert.AreEqual(524f, grid.width, .01f); Assert.AreEqual(127.008f, grid.height, .01f);
+            Assert.AreEqual(524f, grid.width, .01f); Assert.AreEqual(156.96f, grid.height, .01f);
             Assert.IsTrue(bar.Contains(coins.min)); Assert.IsTrue(bar.Contains(coins.max));
             Assert.IsTrue(bar.Contains(clock.min)); Assert.IsTrue(bar.Contains(clock.max));
             Assert.IsFalse(coins.Overlaps(clock)); Assert.IsFalse(bar.Contains(grid.min));
             Assert.IsFalse(coins.Overlaps(grid)); Assert.IsFalse(clock.Overlaps(grid));
             Assert.IsNull(View.GetField("HudLevel", BindingFlags.Static | BindingFlags.NonPublic));
             Assert.AreEqual(207f, clock.width, .01f); Assert.AreEqual(34.56f, clock.height, .01f);
+            int[] products = { 0, 1, 2, 3, 4, 6, 5 };
             MethodInfo cellMethod = View.GetMethod("HudQuotaCellBounds", BindingFlags.Static | BindingFlags.NonPublic,
                 null, new[] { typeof(int), typeof(int[]), typeof(int), typeof(Rect) }, null);
             Rect[] cells = new Rect[7];
@@ -1597,9 +1682,9 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
                 Assert.LessOrEqual(cells[i].xMax, grid.xMax + .01f);
                 Assert.GreaterOrEqual(cells[i].yMin, grid.yMin - .01f);
                 Assert.LessOrEqual(cells[i].yMax, grid.yMax + .01f);
-                Assert.AreEqual(i < 4 ? 8f : 448f, cells[i].xMin, .01f);
+                Assert.AreEqual(i < 4 ? 8f : 427f, cells[i].xMin, .01f);
                 Assert.GreaterOrEqual(cells[i].yMin, bar.yMax);
-                Assert.AreEqual(84f, cells[i].width, .01f);
+                Assert.AreEqual(105f, cells[i].width, .01f);
                 for (int j = 0; j < i; j++) Assert.IsFalse(cells[i].Overlaps(cells[j]));
             }
             foreach (string name in new[] { "CutoutHudCoins", "CutoutHudTime", "CutoutHudSales" })
@@ -1669,16 +1754,16 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
             {
                 cards[i] = (Rect)cellMethod.Invoke(null, new object[] { i, products, products.Length, Rect.zero });
                 int column = products[i] < 4 ? 0 : 1;
-                Assert.AreEqual(column == 0 ? 8f : 448f, cards[i].xMin, .01f,
+                Assert.AreEqual(column == 0 ? 8f : 427f, cards[i].xMin, .01f,
                     "Solid SKUs stay left; drink SKUs stay right.");
                 Assert.GreaterOrEqual(cards[i].yMin, bar.yMax, "The count overlays scenery just below the status strip.");
-                Assert.AreEqual(84f, cards[i].width, .01f, "Shorter cards keep a stable width with room for the longest delivered/goal value.");
-                Assert.AreEqual(29.952f, cards[i].height, .02f, "Each counter is roughly twice the source chip's display height.");
+                Assert.AreEqual(105f, cards[i].width, .01f, "Each sales counter is 25% wider while staying compact enough for the longest delivered/goal value.");
+                Assert.AreEqual(37.44f, cards[i].height, .02f, "Each sales counter is 25% taller than its previous 29.952-unit size.");
                 Assert.GreaterOrEqual(cards[i].xMin, grid.xMin - .01f);
                 Assert.LessOrEqual(cards[i].xMax, grid.xMax + .01f);
                 Assert.GreaterOrEqual(cards[i].yMin, grid.yMin - .01f);
                 Assert.LessOrEqual(cards[i].yMax, grid.yMax + .01f);
-                Assert.AreEqual(currentRowsByColumn[column]++, Mathf.RoundToInt((cards[i].yMin - (bar.yMax + 2.4f)) / 32.352f),
+                Assert.AreEqual(currentRowsByColumn[column]++, Mathf.RoundToInt((cards[i].yMin - (bar.yMax + 2.4f)) / 39.84f),
                     "Each category has its own compact top-to-bottom stack.");
                 for (int j = 0; j < i; j++) Assert.IsFalse(cards[i].Overlaps(cards[j]));
             }
@@ -1724,8 +1809,8 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
             float inset = (float)View.GetField("HudQuotaCardInset", flags).GetRawConstantValue();
             float rightInset = (float)View.GetField("HudQuotaCounterRightInset", flags).GetRawConstantValue();
             Assert.AreEqual(TextAnchor.MiddleRight, alignment);
-            Assert.AreEqual(1.2f, inset, .01f, "The icon remains anchored just inside the card's left edge.");
-            Assert.AreEqual(4.8f, rightInset, .01f, "Keep a small but visible gap after the right-aligned count.");
+            Assert.AreEqual(1.5f, inset, .01f, "The icon inset scales with the enlarged card.");
+            Assert.AreEqual(6f, rightInset, .01f, "Keep a small but visible gap after the right-aligned count, scaled with the card.");
             Rect card = new Rect(0, 0, 100, 30);
             Rect icon = new Rect(inset, 2, 24, 24);
             Rect counter = (Rect)View.GetMethod("HudQuotaCounterBounds", flags)
@@ -1777,7 +1862,6 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
             Assert.AreEqual(expected, format.Invoke(null, new object[] { seconds }));
         }
 
-            int[] products = { 0, 1, 2, 3, 4, 6, 5 };
         [Test]
         public void UnifiedHudRuntimeTextureIsCachedSizedAndDisposable()
         {
@@ -1787,9 +1871,9 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
                 null, new[] { typeof(bool) }, null).Invoke(null, new object[] { true });
             try
             {
-                Assert.AreEqual(1080, texture.width); Assert.AreEqual(211, texture.height);
+                Assert.AreEqual(1080, texture.width); Assert.AreEqual(79, texture.height);
                 Assert.AreEqual(TextureWrapMode.Clamp, texture.wrapMode);
-                Assert.IsTrue(texture.name.Contains("objective"));
+                Assert.IsTrue(texture.name.Contains("gameplay HUD"));
                 Assert.AreEqual(HideFlags.HideAndDontSave, texture.hideFlags);
                 // Runtime textures deliberately discard their CPU copy after upload.
                 Assert.IsFalse(texture.isReadable); Assert.IsFalse(cutout.isReadable);

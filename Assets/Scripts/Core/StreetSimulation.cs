@@ -78,7 +78,7 @@ namespace HayChoriYPaty
         public string[] levelProductIds = { "0", "0,4", "0,1,4", "0,1,2,4,6", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5" };
         [HideInInspector, Tooltip("Legacy aggregate goals retained for serialized-scene compatibility; individual levelBalances are authoritative.")]
         public int[] levelGoals = { 200, 200, 65, 85, 110, 121, 133, 146, 161, 177, 195 };
-        public float[] levelDurations = { 120f, 180f, 180f, 210f, 240f, 260f, 270f, 295f, 300f, 300f, 315f };
+        public float[] levelDurations = { 120f, 150f, 180f, 210f, 240f, 260f, 270f, 295f, 300f, 300f, 315f };
         [Tooltip("Official per-level goals, role hire base costs, speed-cost multiplier, and opening attempt balance.")]
         public StreetLevelBalance[] levelBalances = CreateOfficialLevelBalances();
 
@@ -315,7 +315,7 @@ namespace HayChoriYPaty
         };
         private static readonly float[] DefaultDemandMultipliers = { 1f, 1.1f, 1.2f, 1.35f, 1.5f, 1.65f, 1.815f, 1.9965f, 2.19615f, 2.415765f, 2.6573415f };
         private static readonly int[] DefaultSpeedCosts = { 5, 10, 15, 20, 30, 45, 65, 90, 125 };
-        private static readonly float[] DefaultDurations = { 120f, 180f, 180f, 210f, 240f, 260f, 270f, 295f, 300f, 300f, 315f };
+        private static readonly float[] DefaultDurations = { 120f, 150f, 180f, 210f, 240f, 260f, 270f, 295f, 300f, 300f, 315f };
         private const int MaxHireCost = int.MaxValue - int.MaxValue % 5;
         private readonly StreetBalance balance;
         private readonly int[][] availableProductsByLevel;
@@ -720,6 +720,15 @@ namespace HayChoriYPaty
             foreach (StreetWorker other in workers)
                 if (other != worker && other.Role == worker.Role && other.Id < worker.Id) index++;
             return index % Mathf.Max(1, accessCount);
+        }
+
+        private Vector2 PickupPositionForWorker(StreetWorker worker)
+        {
+            // In levels 2 and 3 the Coca barrel is exposed on its own; keep every Cocacolero
+            // on the centered approach instead of spreading access points sideways.
+            if (worker.Product == 4 && (LevelIndex == 1 || LevelIndex == 2))
+                return KitchenLayout.PickupPosition(worker.Product);
+            return KitchenLayout.PickupPosition(worker.Product, WorkerAccessIndex(worker, 3), 3);
         }
         private void StepSlice(float dt)
         {
@@ -1372,7 +1381,7 @@ namespace HayChoriYPaty
             worker.ReturningToWaitPosition = false;
             worker.PickupProgress = 0f;
             worker.PickupDuration = 0f;
-            Vector2 pickup = KitchenLayout.PickupPosition(worker.Product, WorkerAccessIndex(worker, 3), 3);
+            Vector2 pickup = PickupPositionForWorker(worker);
             if (worker.Role == StreetWorkerRole.Mozo)
             {
                 StreetFoodUnit reserved = Kitchen.ReserveTableUnit(worker.Product, worker.Id);

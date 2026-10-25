@@ -75,8 +75,7 @@ namespace HayChoriYPaty.Tests
                 bool activeCooks = (bool)Get(sim, "UsesActiveCooks");
                 for (int product = 0; product < 7; product++)
                 {
-                    if (product == 4 || product == 6 || (activeCooks && product < 4))
-                        continue; // Coca/beer barrels are inexhaustible; Racing+ sandwiches also bypass Market stock.
+                    if (activeCooks && product < 4) continue; // Racing+ sandwich recipes bypass Market stock.
                     int delivered = (int)Call(sim, "GetProductDelivered", product);
                     int[] recipe = (int[])Runtime("StreetIngredientCatalog").GetMethod("Recipe").Invoke(null, new object[] { product });
                     foreach (int ingredient in recipe) consumed[ingredient] += delivered;

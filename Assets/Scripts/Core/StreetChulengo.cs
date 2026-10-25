@@ -20,7 +20,7 @@ namespace HayChoriYPaty
         public static float PositionAtTime(float seconds)
         {
             if (float.IsNaN(seconds) || float.IsInfinity(seconds)) return 0f;
-            double phase = Math.Max(0d, seconds) % 2.8d / 1.4d;
+            double phase = Math.Max(0d, seconds) % 1.4d / .7d;
             return (float)(phase <= 1d ? phase : 2d - phase);
         }
         public static long ScaleCents(long cents, int numerator)

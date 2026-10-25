@@ -608,15 +608,12 @@ namespace HayChoriYPaty
         {
             activeAmbientGrillSlots.Clear();
             if (simulation == null || simulation.Kitchen == null || propsRoot == null) return;
-            if (!simulation.UsesActiveCooks)
-            {
-                foreach (AmbientGrillMeat pooled in ambientGrillMeat.Values)
-                    SetAmbientActive(pooled.Object, false);
-                return;
-            }
-
+            // Render-only meat fills unused physical slots for every catalog level. The
+            // level catalog and actual grill capacity decide which products may appear;
+            // this must not depend on the cooking mode or create inventory.
             for (int product = 0; product < 4; product++)
             {
+                if (!simulation.IsProductAvailable(product)) continue;
                 int capacity = simulation.Kitchen.GrillCapacity(product);
                 if (capacity <= 0) continue;
                 bool companionAvailable = Available(product ^ 1);

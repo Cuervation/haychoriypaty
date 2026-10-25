@@ -6,6 +6,15 @@
 
 This newly requested milestone supersedes the delivery boundary of the [historical Floresta prototype](floresta-prototype.md), not its validation record. [Product](../product.md) retains the exact seven-product catalog and outdoor standing-only setting. [Visual reference](../visual-reference.md) distinguishes observed video evidence from prompt requirements. No copied Food Fever assets, new services/packages, manual movement or complex cooking controls.
 
+### First-match Floresta tutorial — 2026-10-24
+
+On the first selection of Level 1 (All Boys / Floresta), after the existing presentation → hub → level selector flow and only when CanStartRound is true, show four compact speech-bubble callouts on the actual Ready gameplay screen. Match the approved mockup's cream face, rounded dark-brown outline, integrated triangular tail, sentence-case dark text and existing glossy-blue primary button; keep the game fully visible (no dim overlay, dotted leader, target frame, or modal header). Point in order to the Chori quota, exact coin icon, Parrillero hire card, and speed card. Keep the callout body's 320×140 logical size and the primary's 200×58 area; derive placement from each target, the safe logical canvas, and `layoutVerticalScale`. Keep the small pale-backed SALTAR directly beneath the primary button. Explain the 200-Chori goal, coins per delivered Chori, where to hire, and where to find the next speed cost. The first three CTAs say **SIGUIENTE**; the fourth remains **JUGAR** and starts the round (the visual mockup's generic SIGUIENTE is not authoritative for that last label). **SALTAR** starts the round immediately. While open, block background controls; simulation stays Ready and the match timer does not run. Persist completion as a local UI-only PlayerPrefs flag after a successful start; do not alter Firebase/gameplay saves, stock, balance, or progression. Later Floresta selections retain the existing direct-start behavior. If starting stock is unavailable, leave the selector/market path unchanged and do not show or complete the tutorial.
+
+- [x] Ready screen owns bubble layout and tutorial input; final JUGAR and SALTAR share StreetGame.TryStartRound, and completion is written only after success.
+- [x] Focused PlayMode flow/geometry checks pass in isolated Unity 6000.6.3f1: FirstMatchTutorialBubblesStayCompactAndAttachToTargetsAcrossPortraitRatios plus FirstLevelTutorialExplainsHudAndOnlyStartsOnFinalJugar, SkippingFirstLevelTutorialStartsRound, and CompletedFirstLevelTutorialDoesNotReplay (4/4; responsive geometry at 540×960, 575×1280, 1080×1920, 1080×2400, 1220×2712).
+- [x] Rendered Game View captures at 540×960 and 575×1280 were reviewed for all four steps: `/private/tmp/hcyp-tutorial-bubbles-final-captures/`. UI geometry remains anchored in logical units across these portrait ratios.
+- [ ] NOT_RUN: Screenshot review on a physical device and safe-area/cutout validation.
+
 All eleven clubs below reuse the same scene/simulation. Current balance is configured in StreetBalance/Main, not inferred from reference video; product prices use the seven-ID fixed table, not a uniform $5 rule. Read-only code/serialized evidence resolves stale documentation; changing official balance still requires authorization.
 
 ### 2026-10-20 — Customer patience removed
@@ -34,14 +43,14 @@ User-authoritative ordering. Never reorder, omit a reserved slot or shift a club
 
 This order governs LevelNames, the selector, internal indices, progression/unlocks, visible names, backgrounds, configuration, asset mappings, navigation and tests. In particular, River owns index7; Boca/Camioneros/Los Redondos own8/9/10. Earlier provisional prepared-art mappings that skipped River are obsolete. The user's subsequent activation request below now supplies the missing configuration; the original order-only instruction did not authorize invented defaults.
 
-### Current per-product level balance — 2026-10-08
+### Current per-product level balance — 2026-10-24
 
 This table supersedes the historical aggregate-goal and shared-economy sections below. Product IDs remain Chori0, Paty1, Bondiola2, Vacío3, Coca4, Fernet5, Beer6. Every listed quota is an independently mandatory handoff count; summed totals are informational only and never determine victory.
 
 | Level | Chori (0) | Paty (1) | Coca (4) | Beer (6) | Bondiola (2) | Vacío (3) | Fernet (5) | Seconds |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | 1 All Boys | 200 | — | — | — | — | — | — | 120 |
-| 2 Nueva Chicago | 200 | — | 200 | — | — | — | — | 180 |
+| 2 Nueva Chicago | 200 | — | 200 | — | — | — | — | 150 |
 | 3 Vélez | 180 | 120 | 150 | — | — | — | — | 180 |
 | 4 Ferro | 185 | 125 | 155 | 75 | 60 | — | — | 210 |
 | 5 Independiente | 190 | 130 | 160 | 80 | 70 | 65 | 65 | 240 |
@@ -51,6 +60,8 @@ This table supersedes the historical aggregate-goal and shared-economy sections 
 | 9 Boca | 275 | 195 | 225 | 125 | 120 | 110 | 100 | 300 |
 | 10 Camioneros | 310 | 220 | 255 | 145 | 135 | 125 | 110 | 300 |
 | 11 Los Redondos | 345 | 245 | 285 | 165 | 150 | 140 | 120 | 315 |
+
+**2026-10-24 adjustment:** Level 2 (Nueva Chicago) runs for 150 seconds (2:30); all other level durations and quota targets remain unchanged.
 
 *River's deadline is 10 seconds longer than the originally requested 285 seconds. Real runs missed only the last unit in one representative seed at 285 seconds; 295 seconds yielded 3/3 wins with the optimized purchase strategy.
 

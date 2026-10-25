@@ -22,6 +22,9 @@ namespace HayChoriYPaty.Tests
         private Mouse mouse;
         private bool hadSavedProgress;
         private string previousSavedProgress;
+        private bool hadTutorialCompletion;
+        private int previousTutorialCompletion;
+        private string tutorialCompletedKey;
         private float previousTimeScale;
         private bool previousBackground;
         private InputSettings.BackgroundBehavior previousInputBackground;
@@ -50,6 +53,10 @@ namespace HayChoriYPaty.Tests
             root = new GameObject("Street pointer test (temporary)");
             game = root.AddComponent(gameType);
             Type viewType = Type.GetType("HayChoriYPaty.StreetView, Assembly-CSharp", true);
+            tutorialCompletedKey = (string)viewType.GetField("LevelOneTutorialCompletedKey", StaticPrivate).GetRawConstantValue();
+            hadTutorialCompletion = PlayerPrefs.HasKey(tutorialCompletedKey);
+            previousTutorialCompletion = hadTutorialCompletion ? PlayerPrefs.GetInt(tutorialCompletedKey) : 0;
+            PlayerPrefs.DeleteKey(tutorialCompletedKey);
             view = root.AddComponent(viewType);
             // Existing pointer checks isolate post-intro controls; the dedicated test below exercises startup.
             viewType.GetField("introActive", PrivateInstance).SetValue(view, false);
@@ -67,6 +74,8 @@ namespace HayChoriYPaty.Tests
             string key = (string)gameType.GetField("ProgressKey", BindingFlags.Public | BindingFlags.Static).GetValue(null);
             if (hadSavedProgress) PlayerPrefs.SetString(key, previousSavedProgress);
             else PlayerPrefs.DeleteKey(key);
+            if (hadTutorialCompletion) PlayerPrefs.SetInt(tutorialCompletedKey, previousTutorialCompletion);
+            else PlayerPrefs.DeleteKey(tutorialCompletedKey);
             PlayerPrefs.Save();
             Time.timeScale = previousTimeScale;
             Application.runInBackground = previousBackground;
@@ -156,6 +165,193 @@ namespace HayChoriYPaty.Tests
             game.GetType().GetProperty("Sim",PublicInstance).GetValue(game,null);
             SetSim("Coins",10000); Time.timeScale=0;
         }
+        [Test]
+        public void FirstMatchTutorialBubblesStayCompactAndAttachToTargetsAcrossPortraitRatios()
+        {
+            Type viewType = Type.GetType("HayChoriYPaty.StreetView, Assembly-CSharp", true);
+            MethodInfo panelBounds = viewType.GetMethod("LevelOneTutorialPanelBounds", StaticPrivate,
+                null, new[] { typeof(int), typeof(Rect), typeof(float) }, null);
+            MethodInfo primaryBounds = viewType.GetMethod("LevelOneTutorialPrimaryBounds", StaticPrivate,
+                null, new[] { typeof(Rect), typeof(float) }, null);
+            MethodInfo skipBounds = viewType.GetMethod("LevelOneTutorialSkipBounds", StaticPrivate,
+                null, new[] { typeof(Rect), typeof(float) }, null);
+            MethodInfo coinBounds = viewType.GetMethod("HudCoinIconBounds", StaticPrivate);
+            MethodInfo statusBounds = viewType.GetMethod("HudStatusCellBounds", StaticPrivate);
+            Assert.NotNull(panelBounds);
+            Assert.NotNull(primaryBounds);
+            Assert.NotNull(skipBounds);
+
+            int[,] portraitSizes = { { 540, 960 }, { 575, 1280 }, { 1080, 1920 }, { 1080, 2400 }, { 1220, 2712 } };
+            for (int size = 0; size < portraitSizes.GetLength(0); size++)
+            {
+                float verticalScale = portraitSizes[size, 1] / (float)portraitSizes[size, 0] * .5625f;
+                Rect[] targets = {
+                    new Rect(8f, 52f / verticalScale, 524f, 30f / verticalScale),
+                    new Rect(16f, 12f / verticalScale, 30f, 30f / verticalScale),
+                    new Rect(270f, (verticalScale > 1f ? 820f : 786f), 232f, 120f),
+                    new Rect(28f, (verticalScale > 1f ? 820f : 786f), 232f, 120f)
+                };
+                for (int step = 0; step < targets.Length; step++)
+                {
+                    Rect panel = (Rect)panelBounds.Invoke(null, new object[] { step, targets[step], verticalScale });
+                    Rect primary = (Rect)primaryBounds.Invoke(null, new object[] { panel, verticalScale });
+                    Rect skip = (Rect)skipBounds.Invoke(null, new object[] { panel, verticalScale });
+                    Assert.That(panel.xMin, Is.GreaterThanOrEqualTo(14f), $"step {step}, {portraitSizes[size,0]}x{portraitSizes[size,1]}");
+                    Assert.That(panel.xMax, Is.LessThanOrEqualTo(526f));
+                    Assert.That(panel.width, Is.EqualTo(320f));
+                    Assert.That(panel.height, Is.EqualTo(140f));
+                    Assert.That(primary.xMin, Is.GreaterThanOrEqualTo(panel.xMin));
+                    Assert.That(primary.xMax, Is.LessThanOrEqualTo(panel.xMax));
+                    Assert.That(skip.xMin, Is.GreaterThanOrEqualTo(panel.xMin));
+                    Assert.That(skip.xMax, Is.LessThanOrEqualTo(panel.xMax));
+                    Assert.That(primary.yMax, Is.LessThan(skip.yMax));
+                    if (step < 2)
+                        Assert.That((panel.y - targets[step].yMax) * verticalScale, Is.EqualTo(56f).Within(.05f));
+                    else
+                        Assert.That((targets[step].yMin - panel.y) * verticalScale, Is.EqualTo(310f).Within(.05f));
+                    Assert.That((primary.y - panel.y) * verticalScale, Is.EqualTo(126f).Within(.05f));
+                    Assert.That((skip.y - panel.y) * verticalScale, Is.EqualTo(188f).Within(.05f));
+                    if (step >= 2)
+                        Assert.That(skip.yMax, Is.LessThan(targets[step].yMin), "Skip must remain above the pointed-to footer card.");
+                }
+            }
+
+            Rect status = (Rect)statusBounds.Invoke(null, new object[] { 0, Rect.zero });
+            Rect coin = (Rect)coinBounds.Invoke(null, new object[] { Rect.zero });
+            Assert.That(coin.width, Is.LessThan(status.width * .2f), "The second step points at the coin icon, not the whole HUD capsule.");
+            Assert.That(coin.xMin, Is.EqualTo(status.xMin + 8f).Within(.01f));
+        }
+
+        [TestCase(true)]
+        [TestCase(false)]
+        public void FirstMatchTutorialBubblePointerIsOneContinuousSurfaceWithBody(bool tailAbove)
+        {
+            Type viewType = Type.GetType("HayChoriYPaty.StreetView, Assembly-CSharp", true);
+            MethodInfo create = viewType.GetMethod("CreateLevelOneTutorialBubbleTexture", StaticPrivate);
+            MethodInfo boundsMethod = viewType.GetMethod("LevelOneTutorialBubbleDrawBounds", StaticPrivate);
+            Assert.NotNull(create);
+            Assert.NotNull(boundsMethod);
+
+            float baseX = 270f, tailWidth = tailAbove ? 52f : 36f;
+            foreach (float verticalScale in new[] { 1f, 1.25f })
+            {
+                // Match the rendered-space geometry used by StreetView: anchor positions scale
+                // vertically, while the bubble body keeps its authored 140-unit height.
+                Rect panel = new Rect(110f, 200f * verticalScale, 320f, 140f);
+                Vector2 tip = new Vector2(baseX, tailAbove ? panel.y - 56f : panel.yMax + 170f);
+                Rect drawBounds = (Rect)boundsMethod.Invoke(null, new object[] { panel, tip, baseX, tailWidth, tailAbove });
+                Texture2D texture = (Texture2D)create.Invoke(null, new object[] { panel, tip, baseX, tailWidth, tailAbove });
+                try
+                {
+                    Assert.That(drawBounds.yMin, Is.EqualTo(Mathf.Min(panel.y, tip.y)).Within(.01f));
+                    Assert.That(drawBounds.yMax, Is.EqualTo(Mathf.Max(panel.yMax, tip.y)).Within(.01f));
+
+                    Vector2 baseCenter = new Vector2(baseX, tailAbove ? panel.y : panel.yMax);
+                    for (int i = 0; i <= 32; i++)
+                    {
+                        float t = Mathf.Lerp(.12f, .94f, i / 32f);
+                        Vector2 sample = Vector2.Lerp(tip, baseCenter, t);
+                        Color pixel = TutorialBubblePixel(texture, drawBounds, sample);
+                        Assert.That(pixel.a, Is.GreaterThan(.95f), $"Transparent gap along pointer at t={t:F2}, tailAbove={tailAbove}, scale={verticalScale}");
+                        Assert.That(pixel.r, Is.GreaterThan(.95f), $"Dark seam along pointer at t={t:F2}, tailAbove={tailAbove}, scale={verticalScale}");
+                    }
+
+                    for (float offset = -4f; offset <= 9f; offset += .5f)
+                    {
+                        Vector2 join = new Vector2(baseX, tailAbove ? panel.y + offset : panel.yMax - offset);
+                        Color joinedBody = TutorialBubblePixel(texture, drawBounds, join);
+                        Assert.That(joinedBody.a, Is.GreaterThan(.95f), $"Transparent gap at the tail/body join, offset={offset:F1}, tailAbove={tailAbove}, scale={verticalScale}");
+                        Assert.That(joinedBody.r, Is.GreaterThan(.95f), $"Outline seam at the tail/body join, offset={offset:F1}, tailAbove={tailAbove}, scale={verticalScale}");
+                    }
+                }
+                finally
+                {
+                    UnityEngine.Object.DestroyImmediate(texture);
+                }
+            }
+        }
+
+        private static Color TutorialBubblePixel(Texture2D texture, Rect bounds, Vector2 point)
+        {
+            int x = Mathf.Clamp(Mathf.FloorToInt((point.x - bounds.x) / bounds.width * texture.width), 0, texture.width - 1);
+            int yFromTop = Mathf.Clamp(Mathf.FloorToInt((point.y - bounds.y) / bounds.height * texture.height), 0, texture.height - 1);
+            return texture.GetPixel(x, texture.height - 1 - yFromTop);
+        }
+
+
+        [UnityTest]
+        public IEnumerator FirstLevelTutorialExplainsHudAndOnlyStartsOnFinalJugar()
+        {
+            Type viewType = view.GetType();
+            viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, true);
+            MethodInfo dispatch = viewType.GetMethod("DispatchAction", PrivateInstance);
+            dispatch.Invoke(view, new object[] { 30 }); // Select Floresta from the unlocked level selector.
+
+            Assert.IsTrue((bool)viewType.GetField("levelOneTutorialActive", PrivateInstance).GetValue(view));
+            Assert.AreEqual(0, viewType.GetField("levelOneTutorialStep", PrivateInstance).GetValue(view));
+            Assert.AreEqual("Ready", Phase, "The guide must not start the timer or attempt.");
+            float readyTime = (float)Sim.GetType().GetProperty("TimeRemaining", PublicInstance).GetValue(Sim, null);
+            yield return new WaitForSecondsRealtime(.12f);
+            Assert.That((float)Sim.GetType().GetProperty("TimeRemaining", PublicInstance).GetValue(Sim, null),
+                Is.EqualTo(readyTime).Within(.001f), "Tutorial time is paused while the simulation is Ready.");
+
+            int primaryAction = (int)viewType.GetField("LevelOneTutorialPrimaryAction", StaticPrivate).GetRawConstantValue();
+            int skipAction = (int)viewType.GetField("LevelOneTutorialSkipAction", StaticPrivate).GetRawConstantValue();
+            MethodInfo hit = viewType.GetMethod("HitAction", PrivateInstance);
+            MethodInfo primaryBounds = viewType.GetMethod("LevelOneTutorialPrimaryBounds", PrivateInstance);
+            Rect skipBounds = (Rect)viewType.GetMethod("LevelOneTutorialSkipBounds", PrivateInstance).Invoke(view, null);
+            Assert.AreEqual(skipAction, hit.Invoke(view, new object[] { skipBounds.center }));
+            for (int step = 0; step < 3; step++)
+            {
+                Rect button = (Rect)primaryBounds.Invoke(view, null);
+                Assert.AreEqual(primaryAction, hit.Invoke(view, new object[] { button.center }),
+                    "Only the current tutorial CTA receives input.");
+                dispatch.Invoke(view, new object[] { 1 }); // A background Ready button must not bypass the modal.
+                Assert.AreEqual(step, viewType.GetField("levelOneTutorialStep", PrivateInstance).GetValue(view));
+                yield return Click(button.center.x, button.center.y);
+                Assert.AreEqual(step + 1, viewType.GetField("levelOneTutorialStep", PrivateInstance).GetValue(view));
+                Assert.AreEqual("Ready", Phase);
+            }
+
+            string caption = (string)viewType.GetMethod("LevelOneTutorialPrimaryCaption", PrivateInstance).Invoke(view, null);
+            Assert.AreEqual("JUGAR", caption, "The last tutorial button starts the game, not another step.");
+            Rect lastButton = (Rect)primaryBounds.Invoke(view, null);
+            Assert.AreEqual(primaryAction, hit.Invoke(view, new object[] { lastButton.center }));
+            dispatch.Invoke(view, new object[] { 1 });
+            Assert.AreEqual("Ready", Phase, "The background Ready button remains blocked even on the final step.");
+            yield return Click(lastButton.center.x, lastButton.center.y);
+            Assert.AreEqual("Playing", Phase);
+            Assert.IsFalse((bool)viewType.GetField("levelOneTutorialActive", PrivateInstance).GetValue(view));
+            Assert.AreEqual(1, PlayerPrefs.GetInt(tutorialCompletedKey, 0));
+        }
+
+        [UnityTest]
+        public IEnumerator SkippingFirstLevelTutorialStartsRound()
+        {
+            Type viewType = view.GetType();
+            viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, true);
+            MethodInfo dispatch = viewType.GetMethod("DispatchAction", PrivateInstance);
+            dispatch.Invoke(view, new object[] { 30 });
+            Assert.IsTrue((bool)viewType.GetField("levelOneTutorialActive", PrivateInstance).GetValue(view));
+            Rect skipBounds = (Rect)viewType.GetMethod("LevelOneTutorialSkipBounds", PrivateInstance).Invoke(view, null);
+            yield return Click(skipBounds.center.x, skipBounds.center.y);
+            Assert.AreEqual("Playing", Phase, "Skip continues directly to the match.");
+            Assert.AreEqual(1, PlayerPrefs.GetInt(tutorialCompletedKey, 0));
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator CompletedFirstLevelTutorialDoesNotReplay()
+        {
+            PlayerPrefs.SetInt(tutorialCompletedKey, 1);
+            Type viewType = view.GetType();
+            viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, true);
+            viewType.GetMethod("DispatchAction", PrivateInstance).Invoke(view, new object[] { 30 });
+            Assert.AreEqual("Playing", Phase, "After completion, the existing direct-start flow is unchanged.");
+            Assert.IsFalse((bool)viewType.GetField("levelOneTutorialActive", PrivateInstance).GetValue(view));
+            yield return null;
+        }
+
         [UnityTest]
         public IEnumerator ClickingParrilleroDoesNotHireCocacolero()
         {

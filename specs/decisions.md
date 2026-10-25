@@ -321,3 +321,8 @@ Use the user's selected second whole-cut reference for custom transparent Raw/Co
 ## 2026-10-24 — Vacío +10% fit tradeoff
 
 The user approved reducing the requested enlargement to 10%. Keep the six whole Vacíos and 3×2 half-grill layout. The 1.10× rendering exceeds the no-overlap fit, so allow small logical overlaps (up to4.1 horizontal and1.7 depth units) while preserving grill bounds and separation from Bondiola. If later visual QA finds this overlap too noticeable, the tradeoff is grill-area/capacity redesign, not hidden inventory or cooking changes.
+
+
+## 2026-10-24 — Botones glossy preservando cotas y seguridad del playfield
+
+Usar medallones circulares y acabado azul glossy según referencia; mantener dimensiones/hitboxes de tarjetas y la distribución general. Los banderines no deben dibujarse sobre cards ni área activa: consumir solo el espacio libre, y ocultarse si no queda banda segura (por ejemplo, seis acciones en 1080×1920). Tradeoff aceptado para esta iteración: preservar legibilidad/controles y juego antes que superponer decoración; solicitar criterio visual posterior si se prefiere desplazar/reducir otras secciones para recuperar la bandera.

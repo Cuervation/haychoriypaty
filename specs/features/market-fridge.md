@@ -120,7 +120,7 @@ Focused validation and strict fresh all-level campaign results belong in status;
 
 ## Chulengo — authorized 2026-10-21
 
-Follow-up: the deterministic unscaled needle now completes a left-right-left cycle in 2.8 seconds (1.4 seconds per sweep), exactly 2× its prior speed; sector layout, saved pointer position and payout rules are unchanged. Focused EditMode regression `NeedleCompletesRoundTripAtTwiceItsPreviousSpeed` passed 1/1; no dedicated Game View capture was taken for this timing tweak.
+Follow-up 2026-10-24: the user requested doubling the current Chulengo speed again. The unscaled needle now completes a left-right-left cycle in 1.4 seconds (0.7 seconds per sweep), half the preceding 2.8-second cycle. Sector layout, saved pointer position and payout rules remain unchanged. Focused EditMode regression `NeedleCompletesRoundTripAtTwiceItsCurrentSpeed` passed 1/1; no dedicated Game View capture was taken for this timing tweak.
 
 The requested post-victory visual composition follows the supplied Chulengo reference while retaining this game's wooden Racing frame, parchment, crest, original smiling-parrillero sprite, coin sprite, seven-sector colors, and shared blue button family. The victory copy sits on the wood header; the large cook-and-reward block, embossed metallic ember meter with a pointed needle, dynamic `HASTA ×2` amount, and explicit ×0 warning use the parchment interior. The primary action remains **MULTIPLICAR** (not “Frenar aguja”); normal `COBRAR` and `NIVELES` remain secondary actions. Keep the exact seven-sector left-to-right order and existing pointer/payout semantics. A new Unity capture is required to accept the revised visual composition; no resemblance score may be claimed from source inspection alone.
 

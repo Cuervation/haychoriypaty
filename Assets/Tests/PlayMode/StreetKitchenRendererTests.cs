@@ -359,7 +359,8 @@ namespace HayChoriYPaty.Tests
                 Call(kitchen, "Add", product, Enum.Parse(state, "Cooked"), Enum.Parse(location, "Table"), slot);
         }
 
-        private static void CaptureKitchenTexture(Component renderer, string fileName)
+        private static void CaptureKitchenTexture(Component renderer, string fileName,
+            string acceptanceFolder = "SandwichTables-20261020")
         {
             RenderTexture target = (RenderTexture)Get(renderer, "BackgroundTexture");
             RenderTexture previous = RenderTexture.active;
@@ -367,12 +368,147 @@ namespace HayChoriYPaty.Tests
             var image = new Texture2D(target.width, target.height, TextureFormat.RGBA32, false);
             image.ReadPixels(new Rect(0f, 0f, target.width, target.height), 0, 0);
             image.Apply();
-            string folder = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/SandwichTables-20261020"));
+            string folder = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/" + acceptanceFolder));
             Directory.CreateDirectory(folder);
             File.WriteAllBytes(Path.Combine(folder, fileName), ImageConversion.EncodeToPNG(image));
             UnityEngine.Object.Destroy(image);
             RenderTexture.active = previous;
             TestContext.WriteLine("Native kitchen camera capture: " + Path.Combine(folder, fileName));
+        }
+
+        [UnityTest]
+        public IEnumerator FirstLevelChoriGrillStaysVisuallyFullAfterStockRunsOutWithoutCreatingFood()
+        {
+            var root = new GameObject("First level ambient chori grill projection test");
+            try
+            {
+                Component renderer = root.AddComponent(GameType("StreetKitchenRenderer"));
+                IDictionary ambient = (IDictionary)renderer.GetType()
+                    .GetField("ambientGrillMeat", Instance).GetValue(renderer);
+                IDictionary foodObjects = (IDictionary)renderer.GetType()
+                    .GetField("foodObjects", Instance).GetValue(renderer);
+                object balance = Activator.CreateInstance(GameType("StreetBalance"));
+                object firstLevel = Activator.CreateInstance(GameType("StreetSimulation"),
+                    new object[] { balance, 0, 5f, 0, 1, 0 });
+                object marketData = Activator.CreateInstance(GameType("StreetMarketData"));
+                var stockedIngredients = new int[10];
+                stockedIngredients[0] = 1000;
+                stockedIngredients[1] = 1000;
+                marketData.GetType().GetField("stockUnits", Instance).SetValue(marketData, stockedIngredients);
+                object market = Activator.CreateInstance(GameType("StreetMarket"), new[] { marketData, balance });
+                Assert.IsTrue((bool)Call(market, "BeginAttempt", firstLevel));
+                Call(firstLevel, "BindIngredientStock", market);
+                Call(firstLevel, "StartRound");
+                object kitchen = Get(firstLevel, "Kitchen");
+                ClearKitchenUnits(kitchen);
+                var marketStock = new int[10];
+                marketData.GetType().GetField("stockUnits", Instance).SetValue(marketData, marketStock);
+                marketData.GetType().GetField("attemptStock", Instance).SetValue(marketData, (int[])marketStock.Clone());
+                Assert.IsFalse((bool)Call(kitchen, "HasSupply", 0), "The real chorizo supply is exhausted.");
+                Assert.AreEqual(0, ((IList)Get(kitchen, "Units")).Count);
+
+                int coins = (int)Get(firstLevel, "Coins");
+                int grillCapacity = (int)Call(kitchen, "GrillCapacity", 0);
+                Assert.Greater(grillCapacity, 0);
+                Call(renderer, "Prepare", firstLevel, 1f, 960f);
+
+                Assert.AreEqual(grillCapacity, ambient.Count, "Every first-level chori grill slot gets a render-only cooking visual.");
+                Assert.AreEqual(0, foodObjects.Count, "Ambient choris never become real inventory units.");
+                foreach (DictionaryEntry entry in ambient)
+                {
+                    Assert.That((int)entry.Key, Is.InRange(0, 99), "The first-level ambient grill must contain only Chori visuals.");
+                    object visual = entry.Value;
+                    Assert.AreEqual(0, (int)visual.GetType().GetField("Product", Instance).GetValue(visual));
+                    GameObject go = (GameObject)visual.GetType().GetField("Object", Instance).GetValue(visual);
+                    var sprite = (SpriteRenderer)visual.GetType().GetField("Renderer", Instance).GetValue(visual);
+                    Assert.IsTrue(go.activeSelf, "The empty physical slot remains visibly filled.");
+                    Assert.IsNotNull(sprite.sprite);
+                }
+
+                yield return null;
+                CaptureKitchenTexture(renderer, "first-level-chori-grill-empty-market-1080x1920.png");
+                Assert.AreEqual(grillCapacity, ambient.Count);
+                Assert.AreEqual(0, ((IList)Get(kitchen, "Units")).Count);
+                Assert.AreEqual(0, marketStock[0], "Visual restocking never changes Market stock.");
+                Assert.AreEqual(coins, (int)Get(firstLevel, "Coins"), "Visual restocking never grants revenue.");
+            }
+            finally { UnityEngine.Object.Destroy(root); }
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator LevelsTwoThroughFiveKeepEmptyCatalogGrillSlotsVisuallyFullWithoutStock()
+        {
+            var root = new GameObject("All base levels ambient grill projection test");
+            try
+            {
+                Component renderer = root.AddComponent(GameType("StreetKitchenRenderer"));
+                IDictionary ambient = (IDictionary)renderer.GetType()
+                    .GetField("ambientGrillMeat", Instance).GetValue(renderer);
+                IDictionary foodObjects = (IDictionary)renderer.GetType()
+                    .GetField("foodObjects", Instance).GetValue(renderer);
+                object balance = Activator.CreateInstance(GameType("StreetBalance"));
+
+                for (int level = 1; level <= 4; level++)
+                {
+                    object simulation = Activator.CreateInstance(GameType("StreetSimulation"),
+                        new object[] { balance, level, 5f, 0, 1, 0 });
+                    object marketData = Activator.CreateInstance(GameType("StreetMarketData"));
+                    int[] stocked = new int[10];
+                    for (int ingredient = 0; ingredient < stocked.Length; ingredient++) stocked[ingredient] = 1000;
+                    marketData.GetType().GetField("stockUnits", Instance).SetValue(marketData, stocked);
+                    object market = Activator.CreateInstance(GameType("StreetMarket"), new[] { marketData, balance });
+                    Assert.IsTrue((bool)Call(market, "BeginAttempt", simulation), "Fixture stock should start level " + (level + 1));
+                    Call(simulation, "BindIngredientStock", market);
+                    Call(simulation, "StartRound");
+
+                    object kitchen = Get(simulation, "Kitchen");
+                    ClearKitchenUnits(kitchen);
+                    int[] depleted = new int[10];
+                    marketData.GetType().GetField("stockUnits", Instance).SetValue(marketData, depleted);
+                    marketData.GetType().GetField("attemptStock", Instance).SetValue(marketData, (int[])depleted.Clone());
+                    Assert.AreEqual(0, ((IList)Get(kitchen, "Units")).Count);
+                    for (int product = 0; product < 4; product++)
+                        if ((bool)Call(simulation, "IsProductAvailable", product))
+                            Assert.IsFalse((bool)Call(kitchen, "HasSupply", product), "Level " + (level + 1) + " must have no real product stock.");
+
+                    int expectedAmbientSlots = 0;
+                    for (int product = 0; product < 4; product++)
+                        expectedAmbientSlots += (int)Call(kitchen, "GrillCapacity", product);
+                    Assert.Greater(expectedAmbientSlots, 0);
+                    int coins = (int)Get(simulation, "Coins");
+                    Call(renderer, "Prepare", simulation, 1f, 960f);
+                    Assert.AreEqual(0, foodObjects.Count, "Ambient meat must never become real food inventory.");
+
+                    int activeAmbientSlots = 0;
+                    for (int product = 0; product < 4; product++)
+                    {
+                        int capacity = (int)Call(kitchen, "GrillCapacity", product);
+                        bool companion = (bool)Call(simulation, "IsProductAvailable", product ^ 1);
+                        for (int slot = 0; slot < capacity; slot++)
+                        {
+                            int key = product * 100 + slot;
+                            Assert.IsTrue(ambient.Contains(key), "Level " + (level + 1) + " needs a pooled visual for product " + product + " slot " + slot);
+                            object visual = ambient[key];
+                            Assert.AreEqual(product, (int)visual.GetType().GetField("Product", Instance).GetValue(visual));
+                            GameObject go = (GameObject)visual.GetType().GetField("Object", Instance).GetValue(visual);
+                            var sprite = (SpriteRenderer)visual.GetType().GetField("Renderer", Instance).GetValue(visual);
+                            Assert.IsTrue(go.activeSelf, "Every empty grill slot stays filled after stock runs out.");
+                            Assert.IsNotNull(sprite.sprite, "Each ambient piece uses the existing product sprite.");
+                            activeAmbientSlots++;
+                        }
+                    }
+                    Assert.AreEqual(expectedAmbientSlots, activeAmbientSlots);
+                    Assert.AreEqual(0, ((IList)Get(kitchen, "Units")).Count);
+                    Assert.AreEqual(coins, (int)Get(simulation, "Coins"), "Decorative meat cannot award money.");
+
+                    yield return null;
+                    if (level == 1)
+                        CaptureKitchenTexture(renderer, "level-2-nueva-chicago-empty-stock-1080x1920.png", "AllLevelGrill-20261024");
+                }
+            }
+            finally { UnityEngine.Object.Destroy(root); }
+            yield return null;
         }
 
         [UnityTest]
@@ -393,7 +529,10 @@ namespace HayChoriYPaty.Tests
                 int earlyUnitCount = ((IList)Get(Get(early, "Kitchen"), "Units")).Count;
                 Call(renderer, "Prepare", early, 1f, 960f);
                 Assert.IsFalse((bool)Get(early, "UsesActiveCooks"));
-                Assert.AreEqual(0, ambient.Count, "Levels 1–5 keep their original real-meat grill pipeline.");
+                int earlyGrillSlots = 0;
+                for (int product = 0; product < 4; product++)
+                    earlyGrillSlots += (int)Call(Get(early, "Kitchen"), "GrillCapacity", product);
+                Assert.AreEqual(earlyGrillSlots, ambient.Count, "Every catalog product gets a pooled visual across all levels.");
                 Assert.AreEqual(earlyUnitCount, ((IList)Get(Get(early, "Kitchen"), "Units")).Count);
                 Assert.GreaterOrEqual(foodObjects.Count, 25, "Earlier levels still render real grill units.");
 

@@ -77,6 +77,12 @@ namespace HayChoriYPaty.Tests
                 if ((int)Get(unit, "Product") == product && Get(unit, "State").ToString() == state && Get(unit, "Location").ToString() == location) return unit;
             return null;
         }
+        private static object UnitAt(object kitchen, int product, int slot, string location)
+        {
+            foreach (object unit in Units(kitchen))
+                if ((int)Get(unit, "Product") == product && (int)Get(unit, "Slot") == slot && Get(unit, "Location").ToString() == location) return unit;
+            return null;
+        }
 
         [Test]
         public void InitialStockAndGrillSlotsFollowAvailableCatalog()
@@ -161,6 +167,37 @@ namespace HayChoriYPaty.Tests
                 Assert.AreEqual(hasBeer ? 12 : 0, (int)Call(kitchen, "TableCount", 6));
                 Assert.AreEqual(hasCoca ? 12 : 0, (int)Call(kitchen, "TableCapacity", 4));
                 Assert.AreEqual(hasBeer ? 12 : 0, (int)Call(kitchen, "TableCapacity", 6));
+            }
+        }
+
+        [Test]
+        public void LegacySandwichPickupDrainsUpperStackLayersBeforeRearToFront()
+        {
+            int[][] catalogs = { new[] { 0 }, new[] { 0, 1 }, new[] { 2 }, new[] { 2, 3 } };
+            foreach (int[] catalog in catalogs)
+            {
+                int product = Array.IndexOf(catalog, 0) >= 0 ? 0 : 2;
+                string roleName = product == 0 ? "Parrillero" : "ParrilleroPremium";
+                object kitchen = Make(catalog);
+                int baseSlotCount = (int)Call(kitchen, "TableCapacity", product ^ 1) > 0 ? 6 : 12;
+                int highestOccupiedSlot = -1;
+                foreach (object unit in Units(kitchen))
+                    if ((int)Get(unit, "Product") == product && Get(unit, "Location").ToString() == "Table" &&
+                        Get(unit, "State").ToString() == "Cooked")
+                        highestOccupiedSlot = Math.Max(highestOccupiedSlot, (int)Get(unit, "Slot"));
+
+                Assert.GreaterOrEqual(highestOccupiedSlot, 0);
+                int upperLayerRearSlot = (highestOccupiedSlot / baseSlotCount) * baseSlotCount;
+                int workerId = 700 + product;
+                object first = Call(kitchen, "TryTake", product, EnumValue(roleType, roleName), workerId);
+                Assert.IsNotNull(first);
+                Assert.AreEqual(upperLayerRearSlot, (int)Get(first, "Slot"),
+                    roleName + " should take the uppermost stack layer, rear/top position first for catalog " + string.Join(",", catalog) + ".");
+                Assert.IsTrue((bool)Call(kitchen, "Consume", (int)Get(first, "Id"), product, workerId));
+                object next = Call(kitchen, "TryTake", product, EnumValue(roleType, roleName), workerId);
+                Assert.IsNotNull(next);
+                Assert.AreEqual(upperLayerRearSlot + 1, (int)Get(next, "Slot"),
+                    "Continue across the same upper layer before dropping to lower supported rows.");
             }
         }
 
@@ -284,6 +321,59 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(0, Call(market, "Units", 6)); Assert.AreEqual(0, Call(market, "Units", 7));
             Assert.AreEqual(12, Call(Get(sim, "Kitchen"), "TableCount", 4));
             Assert.AreEqual(12, Call(Get(sim, "Kitchen"), "TableCount", 6));
+        }
+
+        [Test]
+        public void LegacyLevelsCookEachGrillFromRearRowToFrontRowWithoutEmptyingIt()
+        {
+            int[][] levels = {
+                new[] { 0 },
+                new[] { 0, 4 },
+                new[] { 0, 1, 4 },
+                new[] { 0, 1, 2, 4, 6 },
+                new[] { 0, 1, 2, 3, 4, 6, 5 }
+            };
+
+            for (int level = 0; level < levels.Length; level++)
+            {
+                object kitchen = Make(levels[level], balance =>
+                    balanceType.GetField("cookSeconds", PublicInstance).SetValue(balance, .1f));
+                int[] tableCapacities = (int[])productionType
+                    .GetField("tableCapacity", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(kitchen);
+                var tracked = new Dictionary<int, object[]>();
+                foreach (int product in levels[level])
+                {
+                    if (product > 3) continue;
+                    int capacity = (int)Call(kitchen, "GrillCapacity", product);
+                    Assert.Greater(capacity, 1, "Every available food grill has multiple rows at level " + (level + 1));
+                    object rearSlot = UnitAt(kitchen, product, 0, "Grill");
+                    object frontSlot = UnitAt(kitchen, product, capacity - 1, "Grill");
+                    Assert.IsNotNull(rearSlot);
+                    Assert.IsNotNull(frontSlot);
+
+                    int workerId = 7000 + product;
+                    string roleName = product >= 2 ? "ParrilleroPremium" : "Parrillero";
+                    object carried = Call(kitchen, "TryTake", product, EnumValue(roleType, roleName), workerId);
+                    Assert.IsNotNull(carried, "Free one table space for product " + product + " at level " + (level + 1));
+                    // Leave exactly one table opening so the selected grill slot is observable.
+                    tableCapacities[product] = (int)Call(kitchen, "TableCount", product) + 1;
+                    Assert.IsTrue((bool)Call(kitchen, "Consume", (int)Get(carried, "Id"), product, workerId));
+                    tracked.Add(product, new[] { rearSlot, frontSlot });
+                }
+
+                Call(kitchen, "Advance", .1f, 1f, true, true, false, false);
+                foreach (KeyValuePair<int, object[]> pair in tracked)
+                {
+                    int product = pair.Key;
+                    Assert.AreEqual("Table", Get(pair.Value[0], "Location").ToString(),
+                        "Rear/top slot 0 should leave the grill before foreground slot " + (int)Get(pair.Value[1], "Slot") +
+                        " (level " + (level + 1) + ", product " + product + ").");
+                    Assert.AreEqual("Grill", Get(pair.Value[1], "Location").ToString(),
+                        "The front slot remains while the top/rear slot is served.");
+                    Assert.AreEqual((int)Call(kitchen, "GrillCapacity", product), CountAt(kitchen, product, "Grill"),
+                        "Each no-Mozo level keeps the real grill physically filled through same-slot replacement.");
+                }
+            }
         }
 
         [Test]
