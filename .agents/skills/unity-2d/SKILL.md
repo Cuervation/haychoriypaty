@@ -11,6 +11,12 @@ description: Investigate or modify Unity 2D gameplay, including reviewing local 
 - Visual acceptance requires a real capture from the affected Unity view. Label full Game View, PlayMode/projection, or physical device correctly; verify only the shown criteria and resolutions/safe areas actually captured. A camera/projection image is not a full-screen or device test.
 - Preserve actual saves during validation and restore any temporary QA state. Reuse current cameras, art, fonts and packages; no dependencies/services installed by this skill. Choose only affected checks with `targeted-testing`; build/install only when authorized.
 
+## Git publication
+
+- The user explicitly grants this project a standing preference: a direct request to “subí a Git”/push authorizes pushing the reviewed, scoped commit to the currently configured `origin` and branch, including when the repository is public. Do not ask a redundant second confirmation for that requested push.
+- Stage only requested product/docs changes; exclude unrelated local preferences, credentials, generated/audit/recovery files, and APK binaries unless explicitly requested. Never silently change the remote.
+- This preference does not override platform safety controls. If a control rejects a push, do not route around it with another API/tool; explain the block and follow any specific approval flow it requires.
+
 ## Local gameplay-video inspection (especially WhatsApp MP4)
 
 - Do not stop at an attached video’s poster/thumbnail when the local original is available. Keep the source read-only. Inspect its metadata (container, duration, video/audio codecs, resolution and frame rate), then decode frames with locally available tools. Sample across the full timeline and more densely around the reported event; create contact sheets/crops under `/private/tmp`, not inside the Unity project. State clearly whether the review used frame samples or actual playback/audio.
