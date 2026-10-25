@@ -1253,3 +1253,9 @@ Solicitud más reciente: cambiar Vacío de seis a cuatro unidades en la mitad de
 ## Vacío más ancho para comparación — 2026-10-24
 
 Se conservó profundidad +10% vs Bondiola y se amplió solo el ancho de Vacío 15% sobre su versión anterior. La primera columna parte en el lado derecho; las columnas exteriores mantienen separación compacta y pueden sobresalir del borde de la parrilla por pedido explícito. Geometría EditMode 2/2 y Game View PlayMode 1/1 aprobados en copia aislada; captura level 6 en `Logs/Acceptance/VacioWidth15-20261024/`. Sin prueba en teléfono, APK, commit ni push.
+
+## Mercado Barrio Animado azul — 2026-10-25
+
+La pantalla Mercado/stock adoptó una skin azul/celeste: paneles marino con borde cian, caras azul hielo, tinta azul oscuro, saldo/costo dorados y botones glossy azules comunes. Se preservaron el mural, emblemas e ilustraciones originales. La edición fue cosmética: no cambió geometría, hitboxes, scroll, navegación, compra, saldo, stock ni economía.
+
+**Validación:** `git diff --check` focalizado en `StreetView.cs` y contratos afectados pasó. En clon aislado Unity 6000.6.3f1 se compilaron assemblies runtime y PlayMode (`Assembly-CSharp.dll` y `HayChoriYPaty.PlayModeTests.dll` presentes, sin error de C#); la ejecución batch no inició/devolvió XML de resultados (**pruebas PlayMode BLOCKED**, no contar como aprobadas). Captura visual real de Game View del nuevo skin: **NOT_RUN**, pendiente de inspección; no se hizo APK ni prueba física.

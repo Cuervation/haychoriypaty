@@ -461,3 +461,9 @@ El relleno y el borde usan **65% de opacidad**; iconos y números permanecen ní
 - **Trifulca:** mantener visible el mural/cabecera del mismo nivel que durante el juego. La placa de puesto destruido puede aportar el área inferior, pero no reemplazar la identidad mural de la locación.
 - **Contadores:** monedas, reloj y cuotas de producto usan el mismo tamaño tipográfico, manteniendo el mayor tamaño anterior (35 lógicos); solo se unifican las fuentes/tamaños, no la geometría ni el formato de cada contador.
 - **Chulengo:** la aguja roja arranca con una base tres veces más ancha que antes y se afina progresivamente hasta conservar el ancho previo en la punta; no escalar uniformemente la punta.
+
+## Mercado Barrio Animado azul — 2026-10-25
+
+La referencia de Barrio Animado es la guía de composición del Mercado, adaptada a la marca azul/celeste del juego: paneles con marco azul marino y filete cian brillante, tarjetas azul hielo para metas e ingredientes, texto azul oscuro, club/escudo intactos, saldo y costo destacados en dorado y CTA glossy azul compartido. Los controles y arte original de ingredientes conservan su lectura y proporciones. Esto reemplaza únicamente la antigua skin madera/crema del Mercado; no incorpora las pestañas de la maqueta ni altera la pantalla única Mercado/stock, su geometría, input, economía, scroll o gate de stock.
+
+La implementación fuente ya usa este acabado en encabezado, identidad de club, objetivos, filas, saldo, sección de otros ingredientes, resumen fijo y progreso. La aceptación visual queda pendiente hasta inspeccionar una captura real del Game View actualizado; no inferirla de la inspección de código.

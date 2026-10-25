@@ -147,3 +147,11 @@ The supplied portrait reference is the current visual target. Keep the original 
 - [x] Source derives the two flag-cloth colors from the active level palette and keeps the rest of the victory artwork unchanged.
 - [x] Source coordinates separate the headline/reward content and keep the meter copy within the parchment; payout/sector behavior is unchanged.
 - [ ] Inspect and iterate on the actual Unity Game View against the attached portrait until ≥95% resemblance is visually substantiated. No score can be claimed from source inspection alone. A focused PlayMode capture now shows the Chulengo victory popup in Racing at `/var/folders/bf/q6_2cmvn6ls9pc5h5g7thj8r0000gn/T/hay-chori-chulengo-pending-1080x1920.png`; it exposed a legacy green CTA edge, which was covered by extending the parchment. The follow-up capture has no green bleed, but composition similarity ≥95% remains unverified.
+
+## Barrio Animado — Mercado azul — 2026-10-25
+
+Por pedido del usuario, la skin de madera/crema del Mercado queda supersedida por una presentación azul/celeste coherente con el resto del juego y el storyboard: marco azul marino con brillo cian, superficies azul hielo, títulos/tarjetas con tinta azul oscuro, saldo/costo destacados en dorado y reutilización de los botones glossy azules existentes. Se conservan el mural del club, los escudos y sprites originales de ingredientes.
+
+Es un cambio cosmético: permanece la única pantalla Mercado/stock, la geometría y el orden responsive de objetivos, la lista y expansión/scroll, hitboxes, labels, precios, cantidades, stock, controles de compra, saldo y gating de JUGAR. No se añade pestaña Heladera ni se modifica economía, persistencia o inventario.
+
+**Aceptación:** código actualizado; diff de layout/acciones no alterado. La captura real de Game View de Mercado nuevo aún requiere revisión visual antes de cerrar aceptación estética.

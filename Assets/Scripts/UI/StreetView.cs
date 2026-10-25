@@ -2466,9 +2466,14 @@ namespace HayChoriYPaty
         private const float MarketObjectiveTop = 202f;
         private const float MarketCompactRowHeight = 104f, MarketPurchaseHeight = 64f, MarketOthersHeight = 48f;
         private static readonly Color MarketInk = new Color(.20f, .08f, .025f);
-        private static readonly Color MarketCream = new Color(.98f, .88f, .69f);
-        private static readonly Color MarketGreen = new Color(.06f, .42f, .09f);
-        private static readonly Color MarketRed = new Color(.73f, .09f, .04f);
+        private static readonly Color MarketBlueInk = new Color(.025f, .075f, .20f);
+        private static readonly Color MarketIce = new Color(.91f, .97f, 1f);
+        private static readonly Color MarketNavy = new Color(.008f, .035f, .14f);
+        private static readonly Color MarketRoyalBlue = new Color(.025f, .24f, .70f);
+        private static readonly Color MarketCyan = new Color(.22f, .82f, 1f);
+        private static readonly Color MarketGold = new Color(1f, .80f, .24f);
+        private static readonly Color MarketGreen = new Color(.04f, .40f, .19f);
+        private static readonly Color MarketRed = new Color(.73f, .12f, .10f);
         private Rect MarketBodyBounds() => MarketBodyBounds(game.Sim.ProductCount, logicalCanvasHeight);
         private static Rect MarketBodyBounds(int productCount, float canvasHeight) =>
             new Rect(12, MarketBodyTop(productCount), W - 24, Mathf.Max(140f, canvasHeight - 184f - MarketBodyTop(productCount)));
@@ -2615,18 +2620,18 @@ namespace HayChoriYPaty
         {
             Texture2D scene = MarketSceneArt();
             if (scene != null) DrawRawCover(new Rect(0, 0, W, logicalCanvasHeight), scene, new Rect(0, 0, scene.width, scene.height * .58f));
-            FillRect(new Rect(0, 0, W, logicalCanvasHeight), new Color(.04f, .025f, .015f, .40f));
+            FillRect(new Rect(0, 0, W, logicalCanvasHeight), new Color(.015f, .045f, .14f, .38f));
             DrawStandardButton(MarketBackBounds(), MarketBackAction, marketFromSelector ? "NIVELES" : "BARRIO");
-            DrawMarketWoodPanel(new Rect(150, 8, 240, 56), new Color(.39f, .17f, .04f));
+            DrawMarketBluePanel(new Rect(150, 8, 240, 56), MarketRoyalBlue);
             MarketText(new Rect(164, 10, 212, 50), "MERCADO", 34, Color.white);
             DrawMarketClubHeader();
-            MarketText(new Rect(26, 176, 488, 22), "OBJETIVOS DEL PARTIDO", 18, Color.white);
+            MarketText(new Rect(26, 176, 488, 22), "OBJETIVOS DEL PARTIDO", 18, new Color(.84f, .96f, 1f));
             DrawMarketObjectiveCards(game.Sim);
             Rect economy = MarketEconomyBounds(game.Sim.ProductCount);
-            DrawMarketWoodPanel(economy, new Color(.095f, .055f, .025f, .98f));
+            DrawMarketBluePanel(economy, new Color(.012f, .075f, .25f, .98f));
             if (gameCoin != null) GUI.DrawTexture(new Rect(economy.x + 12, economy.y + 11, 36, 36), gameCoin, ScaleMode.ScaleToFit, true);
             MarketText(new Rect(economy.x + 54, economy.y + 12, 210, 32), "SALDO DISPONIBLE", 18, Color.white, TextAnchor.MiddleLeft);
-            MarketText(new Rect(economy.x + 267, economy.y + 7, economy.width - 278, 44), FormatMarketMoney(game.Market.BalanceCents), 38, new Color(.35f, 1f, .15f), TextAnchor.MiddleRight);
+            MarketText(new Rect(economy.x + 267, economy.y + 7, economy.width - 278, 44), FormatMarketMoney(game.Market.BalanceCents), 38, MarketGold, TextAnchor.MiddleRight);
             Rect body = MarketBodyBounds();
             Event evt = Event.current;
             if (evt.type == EventType.ScrollWheel)
@@ -2657,7 +2662,11 @@ namespace HayChoriYPaty
             finally { GUI.EndGroup(); }
             DrawMarketScrollBar(body);
             if (!string.IsNullOrEmpty(marketMessage))
-                MarketText(new Rect(20, logicalCanvasHeight - 180, W - 40, 20), marketMessage, 14, Color.white);
+            {
+                Rect messageBounds = new Rect(20, logicalCanvasHeight - 180, W - 40, 22);
+                DrawMarketBluePanel(messageBounds, new Color(.015f, .12f, .38f, .96f));
+                MarketText(new Rect(messageBounds.x + 6, messageBounds.y, messageBounds.width - 12, messageBounds.height), marketMessage, 14, Color.white);
+            }
             DrawMarketEconomyFooter();
             DrawMarketPlayButton(MarketPlayBounds(), "JUGAR PARTIDO", game.CanStartRound);
         }
@@ -2673,7 +2682,7 @@ namespace HayChoriYPaty
         }
         private void DrawMarketClubHeader()
         {
-            DrawMarketWoodPanel(new Rect(12, 70, W - 24, 100), new Color(.10f, .055f, .025f, .97f));
+            DrawMarketBluePanel(new Rect(12, 70, W - 24, 100), new Color(.012f, .065f, .22f, .97f));
             int level = game.Sim.LevelIndex;
             Texture2D crest = LevelCrestForLevel(level);
             Rect badge = new Rect(28, 82, 76, 76);
@@ -2681,13 +2690,13 @@ namespace HayChoriYPaty
             else
             {
                 // No invented official crest: existing club palette/initials identify levels without a crest asset.
-                DrawMarketWoodPanel(badge, ClubVisualTheme.ForLevel(level).PrimaryColor);
+                DrawMarketBluePanel(badge, ClubVisualTheme.ForLevel(level).PrimaryColor);
                 MarketText(new Rect(badge.x + 6, badge.y + 20, badge.width - 12, 36), MarketClubInitials(level), 22, Color.white);
             }
             string[] club = StreetSimulation.LevelDisplayNames[level].Split('/');
-            MarketText(new Rect(120, 77, 386, 24), "NIVEL " + (level + 1), 19, new Color(1f, .78f, .34f), TextAnchor.MiddleLeft);
+            MarketText(new Rect(120, 77, 386, 24), "NIVEL " + (level + 1), 19, MarketCyan, TextAnchor.MiddleLeft);
             MarketText(new Rect(120, 100, 386, 35), club[0].Trim().ToUpperInvariant(), 29, Color.white, TextAnchor.MiddleLeft);
-            MarketText(new Rect(120, 136, 386, 23), club.Length > 1 ? club[1].Trim().ToUpperInvariant() : "", 19, new Color(1f, .78f, .34f), TextAnchor.MiddleLeft);
+            MarketText(new Rect(120, 136, 386, 23), club.Length > 1 ? club[1].Trim().ToUpperInvariant() : "", 19, new Color(.82f, .94f, 1f), TextAnchor.MiddleLeft);
         }
         private static string MarketClubInitials(int level)
         {
@@ -2708,14 +2717,14 @@ namespace HayChoriYPaty
             for (int slot = 0; slot < sim.ProductCount; slot++)
             {
                 int product = sim.GetAvailableProduct(slot); Rect card = MarketObjectiveCardBounds(slot, sim.ProductCount);
-                DrawMarketWoodPanel(card, MarketCream);
+                DrawMarketBluePanel(card, MarketIce);
                 float iconSize = sim.ProductCount > 3 ? 32f : 48f;
                 Rect icon = new Rect(card.x + 10, card.center.y - iconSize * .5f, iconSize, iconSize);
                 DrawProductIcon(icon, product);
                 float textX = icon.xMax + 4f, textWidth = card.xMax - textX - 10f;
                 string name = MarketObjectiveCaption(sim, slot, false).Split('×')[0].Trim();
-                MarketText(new Rect(textX, card.y + 12, textWidth, 20), name, sim.ProductCount > 3 ? 14 : 20, MarketInk, TextAnchor.MiddleLeft);
-                MarketText(new Rect(textX, card.y + 31, textWidth, 27), "×" + sim.GetProductGoal(product), sim.ProductCount > 3 ? 24 : 28, MarketInk, TextAnchor.MiddleLeft);
+                MarketText(new Rect(textX, card.y + 12, textWidth, 20), name, sim.ProductCount > 3 ? 14 : 20, MarketBlueInk, TextAnchor.MiddleLeft);
+                MarketText(new Rect(textX, card.y + 31, textWidth, 27), "×" + sim.GetProductGoal(product), sim.ProductCount > 3 ? 24 : 28, MarketBlueInk, TextAnchor.MiddleLeft);
             }
         }
         private static string MarketIngredientName(int id) => id == 9 ? "Coca 2,25 L" : StreetIngredientCatalog.Names[id];
@@ -2724,29 +2733,29 @@ namespace HayChoriYPaty
             bool expanded = id == MarketExpandedId();
             float faceHeight = row.height - (expanded ? MarketPurchaseHeight : 0f);
             Rect card = new Rect(row.x, row.y + 2, row.width, row.height - 5);
-            DrawMarketWoodPanel(card, MarketCream);
+            DrawMarketBluePanel(card, MarketIce);
             DrawMarketIngredientIcon(MarketIngredientIconBounds(row, faceHeight), id);
             float nameX = row.x + 100;
-            MarketText(new Rect(nameX, row.y + 17, 144, 27), MarketIngredientName(id), 28, MarketInk, TextAnchor.MiddleLeft);
-            MarketText(new Rect(nameX, row.y + 47, 94, 26), FormatMarketMoney(game.Market.PackPriceCents(id)), 25, MarketInk, TextAnchor.MiddleLeft);
-            MarketText(new Rect(nameX + 96, row.y + 47, 50, 27), StreetIngredientCatalog.PackUnits[id] == 1 ? "1 u." : "4 porc.", 12, MarketInk, TextAnchor.MiddleLeft);
+            MarketText(new Rect(nameX, row.y + 17, 144, 27), MarketIngredientName(id), 28, MarketBlueInk, TextAnchor.MiddleLeft);
+            MarketText(new Rect(nameX, row.y + 47, 94, 26), FormatMarketMoney(game.Market.PackPriceCents(id)), 25, MarketRoyalBlue, TextAnchor.MiddleLeft);
+            MarketText(new Rect(nameX + 96, row.y + 47, 50, 27), StreetIngredientCatalog.PackUnits[id] == 1 ? "1 u." : "4 porc.", 12, MarketBlueInk, TextAnchor.MiddleLeft);
             int needed = game.Market.RequiredUnits(game.Sim)[id], stock = game.Market.Units(id), missing = game.Market.MissingUnits(game.Sim, id);
             float statsX = row.x + 252, statsWidth = row.width - 264, column = statsWidth / 3f;
             string[] labels = { "NECESITÁS", "TENÉS", "FALTAN" };
             int[] values = { needed, stock, missing };
             for (int i = 0; i < 3; i++)
             {
-                MarketText(new Rect(statsX + i * column, row.y + 12, column, 17), labels[i], 13, MarketInk);
+                MarketText(new Rect(statsX + i * column, row.y + 12, column, 17), labels[i], 13, MarketBlueInk);
                 MarketText(new Rect(statsX + i * column, row.y + 28, column, 30), values[i].ToString(), 28,
-                    i == 1 ? MarketGreen : i == 2 && missing > 0 ? MarketRed : MarketInk);
+                    i == 1 ? MarketGreen : i == 2 && missing > 0 ? MarketRed : MarketBlueInk);
             }
             Rect track = new Rect(statsX, row.y + 66, statsWidth - 84, 16);
-            FillRect(track, new Color(.22f, .16f, .10f));
+            FillRect(track, MarketNavy);
             bool unlocked = game.Market.IsIngredientUnlocked(id, game.UnlockedLevel);
             float coverage = needed > 0 ? Mathf.Clamp01((float)stock / needed) : 0f;
-            FillRect(new Rect(track.x + 2, track.y + 2, (track.width - 4) * coverage, track.height - 4), missing > 0 ? new Color(1f, .65f, .05f) : new Color(.20f, .78f, .09f));
+            FillRect(new Rect(track.x + 2, track.y + 2, (track.width - 4) * coverage, track.height - 4), missing > 0 ? MarketCyan : new Color(.20f, .78f, .32f));
             MarketText(new Rect(track.xMax + 4, row.y + 62, 80, 24), !unlocked ? "BLOQUEADO" : needed == 0 ? "RESERVA" : missing == 0 ? "COMPLETO" : "FALTANTE", 12,
-                !unlocked || needed == 0 ? MarketInk : missing > 0 ? MarketRed : MarketGreen);
+                !unlocked || needed == 0 ? MarketBlueInk : missing > 0 ? MarketRed : MarketGreen);
             if (unlocked)
             {
                 if (expanded && showControls)
@@ -2754,7 +2763,7 @@ namespace HayChoriYPaty
                     int packs = marketPendingPacks[id];
                     DrawStandardButton(MarketPurchaseControlBounds(row, MarketMinusAction), MarketMinusAction + id, "−", packs > 0);
                     Rect minus = MarketPurchaseControlBounds(row, MarketMinusAction);
-                    FillRect(new Rect(row.x + 54, minus.y + 3, 40, 40), new Color(.13f, .08f, .04f));
+                    FillRect(new Rect(row.x + 54, minus.y + 3, 40, 40), MarketNavy);
                     MarketText(new Rect(row.x + 54, minus.y, 40, 46), packs.ToString(), 24, Color.white);
                     DrawStandardButton(MarketPurchaseControlBounds(row, MarketPlusAction), MarketPlusAction + id, "+");
                     DrawStandardButton(MarketPurchaseControlBounds(row, MarketPlusTenAction), MarketPlusTenAction + id, "+10");
@@ -2812,13 +2821,13 @@ namespace HayChoriYPaty
         {
             float max = MarketMaxScroll(); if (max <= 0) return;
             Rect track = new Rect(W - 9, body.y, 4, body.height);
-            FillRect(track, new Color(.05f, .035f, .015f, .8f));
+            FillRect(track, new Color(.008f, .035f, .14f, .88f));
             float height = Mathf.Max(28, body.height * body.height / (body.height + max));
-            FillRect(new Rect(track.x, track.y + (track.height - height) * marketScroll / max, 4, height), new Color(1f, .80f, .36f));
+            FillRect(new Rect(track.x, track.y + (track.height - height) * marketScroll / max, 4, height), MarketCyan);
         }
         private void DrawMarketOthers(Rect bounds)
         {
-            DrawMarketWoodPanel(new Rect(bounds.x, bounds.y + 2, bounds.width, bounds.height - 4), new Color(.10f, .055f, .025f));
+            DrawMarketBluePanel(new Rect(bounds.x, bounds.y + 2, bounds.width, bounds.height - 4), new Color(.025f, .18f, .48f));
             int[] others = MarketIngredientIds(false);
             for (int i = 0; i < Mathf.Min(3, others.Length); i++) DrawMarketIngredientIcon(new Rect(bounds.x + 10 + i * 34, bounds.y + 8, 30, 30), others[i]);
             MarketText(new Rect(bounds.x + 118, bounds.y + 7, bounds.width - 156, 32), "OTROS INGREDIENTES", 18, Color.white, TextAnchor.MiddleLeft);
@@ -2828,10 +2837,10 @@ namespace HayChoriYPaty
         private void DrawMarketEconomyFooter()
         {
             Rect footer = MarketEconomyFooterBounds(logicalCanvasHeight);
-            DrawMarketWoodPanel(footer, new Color(.10f, .055f, .025f));
+            DrawMarketBluePanel(footer, new Color(.012f, .075f, .25f));
             long cost = game.Market.MinimumPurchaseCostCents(game.Sim);
             MarketText(new Rect(footer.x + 12, footer.y + 7, 230, 23), "COSTO PARA COMPLETAR", 14, Color.white);
-            MarketText(new Rect(footer.x + 12, footer.y + 30, 230, 30), FormatMarketMoney(cost), 36, new Color(1f, .80f, .25f));
+            MarketText(new Rect(footer.x + 12, footer.y + 30, 230, 30), FormatMarketMoney(cost), 36, MarketGold);
             bool canBuyMissing = MarketCanBuyMissing();
             string caption = !MarketHasMissing() ? "STOCK COMPLETO" : canBuyMissing ? "COMPRAR FALTANTES" : "SALDO INSUFICIENTE";
             DrawStandardButton(MarketBuyMissingBounds(logicalCanvasHeight), MarketMissingAction, caption, canBuyMissing);
@@ -2882,6 +2891,17 @@ namespace HayChoriYPaty
             marketLabelStyle.fontSize = Mathf.Max(12, Mathf.FloorToInt(size * Mathf.Min(1f, Mathf.Max(1f, bounds.width - 2f) / Mathf.Max(1f, measured))));
             marketLabelStyle.normal.textColor = color;
             GUI.Label(bounds, value, marketLabelStyle);
+        }
+        private void DrawMarketBluePanel(Rect bounds, Color face)
+        {
+            if (bounds.width <= 0f || bounds.height <= 0f) return;
+            FillRect(new Rect(bounds.x + 2f, bounds.y + 3f, bounds.width - 2f, bounds.height - 2f),
+                new Color(.003f, .018f, .075f, .64f));
+            FillRect(bounds, MarketNavy);
+            FillRect(new Rect(bounds.x + 2f, bounds.y + 2f, bounds.width - 4f, bounds.height - 4f), MarketCyan);
+            FillRect(new Rect(bounds.x + 4f, bounds.y + 4f, bounds.width - 8f, bounds.height - 8f), face);
+            FillRect(new Rect(bounds.x + 5f, bounds.y + 5f, bounds.width - 10f, Mathf.Min(3f, bounds.height - 10f)),
+                new Color(1f, 1f, 1f, .28f));
         }
         private string MarketEconomyFooterSummary()
         {
