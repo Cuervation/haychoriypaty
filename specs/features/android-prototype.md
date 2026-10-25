@@ -663,3 +663,8 @@ User explicitly requests APK but no phone connection/install/launch. Main first 
 ## Gameplay viewport follow-up — not yet built/installed (2026-10-04)
 
 Latest source removes solid gameplay fit-letterboxes using a tall aspect-responsive logical canvas; targeted StreetArt33/33 and StreetPointer17/17 passed. Existing Motorola0.2.6/code8 predates this change. No Android export or installation performed for this follow-up; do not equate earlier gameplay screenshot with full-screen acceptance. Native layout/touch review remains pending; an install will interrupt any unsaved active round.
+## Contadores translúcidos — 2026-10-25 (0.2.67/code69)
+
+APK Android Development, Main-only IL2CPP/ARM64, Unity 6000.6.3f1. BuildPipeline succeeded, 0 errores/1 advertencia; package `com.haychoriypaty.game`, min API26/target36. ZIP íntegro, firma v2 verificada (Android Debug; no es release Play Store). APK: `/private/tmp/HayChoriYPaty-0.2.67-code69-translucent-counters.apk`, 384.540.991 bytes, SHA-256 `7db6d2c5560ce92c42df2d69b9f24f9af8e9fa19a988ebd0b98e760593c9375f`.
+
+La fixture StreetArt terminó 213/230: todas las pruebas del nuevo HUD pasaron (11 niveles de catálogo, 5 formatos portrait y opacidad); las 17 fallas restantes son checks de importación de arte que esperan RGBA32 mientras la plataforma Android usa ETC2_RGBA8. No hubo captura de Game View física ni instalación en teléfono. La APK se compiló desde una copia aislada del working tree vigente, que contiene además otros cambios locales todavía no publicados; el commit acotado de este entrega registra solo los contadores.

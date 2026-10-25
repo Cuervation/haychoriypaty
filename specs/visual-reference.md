@@ -429,3 +429,7 @@ El recibo debe reservar la columna izquierda para las ilustraciones de monedas/r
 **Causa observada:** `DrawMarketReceipt` usaba el ancho entero del recibo y un único renglón para bono más reposición, aunque el popup contiene arte de monedas/reloj en la mitad izquierda. Game View real 1080×1920 lo mostró superpuesto en victorias de Camioneros y Los Redondos. Separar las filas, limitar el texto a la columna derecha y ajustar el tamaño si una cifra excepcionalmente larga no entra; no altera economía.
 
 **Validación:** Unity `6000.6.3f1`, PlayMode `Level11_LosRedondos_MoreCooks_NativeGameTimeControl_Attempt05` Passed; victoria real en UI a `Time.timeScale=1`, capturas nuevas en `Logs/Acceptance/AutonomousCampaign-20261019/L11-A-attempt05-*.png`. Se revisó `L11-A-attempt05-result.png`: el texto queda a la derecha de monedas/reloj y conserva las seis cifras legibles.
+
+## Contadores de metas translúcidos — 2026-10-25
+
+Mantener monedas y tiempo en la banda superior; dibujar los chips de productos aparte, superpuestos sobre el mural inmediatamente debajo. Sólidos (IDs 0–3) a la izquierda y líquidos (IDs 4–6) a la derecha, respetando el orden de catálogo. Conservar iconos y formato entregados/meta; sin bandeja inferior ni barra de progreso. Relleno y borde al 65% de opacidad; iconos/texto nítidos y opacos. Cada tarjeta: 84×30 unidades lógicas en el lienzo 540×960, con ancho compacto suficiente para el mayor contador, y respuesta uniforme a formatos portrait y cutouts.

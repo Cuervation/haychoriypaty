@@ -1564,7 +1564,7 @@ namespace HayChoriYPaty.Tests
         [Test] public void SpeedButtonIsVisible(){Assert.AreEqual(new Rect(24,710,156,120),SpecialtyCard(3));}
 
         [Test]
-        public void UnifiedTopHudFitsAboveRearOrdersAndSeparatesCounters()
+        public void StatusHudRemainsCompactWhileProductCountersOverlayTheMural()
         {
 Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
             Rect grid = (Rect)View.GetField("HudQuotaGrid", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
@@ -1574,26 +1574,32 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
                 .Invoke(null, new object[] { 0, Rect.zero });
             Rect cell1 = (Rect)View.GetMethod("HudStatusCellBounds", BindingFlags.Static | BindingFlags.NonPublic)
                 .Invoke(null, new object[] { 1, Rect.zero });
-            Assert.AreEqual(0f, bar.yMin); Assert.AreEqual(105.264f, bar.height, .01f);
+            Assert.AreEqual(0f, bar.yMin); Assert.AreEqual(39.36f, bar.height, .01f);
             Assert.AreEqual(8f, cell0.xMin, .01f); Assert.AreEqual(532f, cell1.xMax, .01f);
             Assert.AreEqual(cell0.width, cell1.width, .01f, "Coins and time share the main strip equally.");
             Assert.AreEqual(6f, cell1.xMin - cell0.xMax, .01f);
             Assert.AreEqual(34.56f, cell0.height, .01f, "The primary status strip is 20% taller.");
-            Assert.AreEqual(8f, grid.x, .01f); Assert.AreEqual(38.16f, grid.y, .01f);
-            Assert.AreEqual(524f, grid.width, .01f); Assert.AreEqual(63.504f, grid.height, .01f);
+            Assert.AreEqual(8f, grid.x, .01f); Assert.AreEqual(41.76f, grid.y, .01f);
+            Assert.AreEqual(524f, grid.width, .01f); Assert.AreEqual(127.008f, grid.height, .01f);
             Assert.IsTrue(bar.Contains(coins.min)); Assert.IsTrue(bar.Contains(coins.max));
             Assert.IsTrue(bar.Contains(clock.min)); Assert.IsTrue(bar.Contains(clock.max));
-            Assert.IsFalse(coins.Overlaps(clock));
+            Assert.IsFalse(coins.Overlaps(clock)); Assert.IsFalse(bar.Contains(grid.min));
             Assert.IsFalse(coins.Overlaps(grid)); Assert.IsFalse(clock.Overlaps(grid));
             Assert.IsNull(View.GetField("HudLevel", BindingFlags.Static | BindingFlags.NonPublic));
             Assert.AreEqual(207f, clock.width, .01f); Assert.AreEqual(34.56f, clock.height, .01f);
             MethodInfo cellMethod = View.GetMethod("HudQuotaCellBounds", BindingFlags.Static | BindingFlags.NonPublic,
-                null, new[] { typeof(int) }, null);
+                null, new[] { typeof(int), typeof(int[]), typeof(int), typeof(Rect) }, null);
             Rect[] cells = new Rect[7];
             for (int i = 0; i < cells.Length; i++)
             {
-                cells[i] = (Rect)cellMethod.Invoke(null, new object[] { i });
-                Assert.IsTrue(grid.Contains(cells[i].min)); Assert.IsTrue(grid.Contains(cells[i].max));
+                cells[i] = (Rect)cellMethod.Invoke(null, new object[] { i, products, products.Length, Rect.zero });
+                Assert.GreaterOrEqual(cells[i].xMin, grid.xMin - .01f);
+                Assert.LessOrEqual(cells[i].xMax, grid.xMax + .01f);
+                Assert.GreaterOrEqual(cells[i].yMin, grid.yMin - .01f);
+                Assert.LessOrEqual(cells[i].yMax, grid.yMax + .01f);
+                Assert.AreEqual(i < 4 ? 8f : 448f, cells[i].xMin, .01f);
+                Assert.GreaterOrEqual(cells[i].yMin, bar.yMax);
+                Assert.AreEqual(84f, cells[i].width, .01f);
                 for (int j = 0; j < i; j++) Assert.IsFalse(cells[i].Overlaps(cells[j]));
             }
             foreach (string name in new[] { "CutoutHudCoins", "CutoutHudTime", "CutoutHudSales" })
@@ -1622,84 +1628,92 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
             MethodInfo colorMethod = View.GetMethod("HudQuotaCardColor", BindingFlags.Static | BindingFlags.NonPublic);
             Color active = (Color)colorMethod.Invoke(null, new object[] { false });
             Color complete = (Color)colorMethod.Invoke(null, new object[] { true });
-            Assert.GreaterOrEqual(active.a, .5f, "The tinted card mask keeps a translucent fill.");
-            Assert.LessOrEqual(active.a, .9f);
-            Assert.GreaterOrEqual(complete.a, .5f);
-            Assert.LessOrEqual(complete.a, .9f);
+            Assert.AreEqual(.65f, active.a, .001f, "The active fill is 65% opaque.");
+            Assert.AreEqual(.65f, complete.a, .001f, "The completed fill is also 65% opaque.");
             Assert.Greater(active.b, active.r, "The active charcoal resource card contrasts with the warm wooden header.");
-            Assert.Less(active.r, .1f); Assert.Less(active.g, .15f); Assert.Less(active.b, .2f);
+            Assert.Less(active.r, .1f); Assert.Less(active.g, .15f); Assert.Less(active.b, .3f);
             Assert.AreNotEqual(active, complete);
         }
 
-        [TestCase(1, 1, 1)]
-        [TestCase(2, 1, 2)]
-        [TestCase(3, 1, 3)]
-        [TestCase(4, 1, 4)]
-        [TestCase(5, 1, 5)]
-        [TestCase(6, 2, 5)]
-        [TestCase(7, 2, 5)]
-        public void HudObjectiveCardsUseOneOrTwoCenteredRowsByLevelCatalog(int productCount, int expectedRows, int expectedColumns)
+        [TestCase(0, new[] { 0 })]
+        [TestCase(1, new[] { 0, 4 })]
+        [TestCase(2, new[] { 0, 1, 4 })]
+        [TestCase(3, new[] { 0, 1, 2, 4, 6 })]
+        [TestCase(4, new[] { 0, 1, 2, 3, 4, 6, 5 })]
+        [TestCase(5, new[] { 0, 1, 2, 3, 4, 6, 5 })]
+        [TestCase(6, new[] { 0, 1, 2, 3, 4, 6, 5 })]
+        [TestCase(7, new[] { 0, 1, 2, 3, 4, 6, 5 })]
+        [TestCase(8, new[] { 0, 1, 2, 3, 4, 6, 5 })]
+        [TestCase(9, new[] { 0, 1, 2, 3, 4, 6, 5 })]
+        [TestCase(10, new[] { 0, 1, 2, 3, 4, 6, 5 })]
+        public void HudQuotaCardsGroupSolidsLeftAndLiquidsRightForEveryLevel(int level, int[] products)
         {
-            MethodInfo rowMethod = View.GetMethod("HudQuotaRowCount", BindingFlags.Static | BindingFlags.NonPublic);
-            MethodInfo columnMethod = View.GetMethod("HudQuotaColumnCount", BindingFlags.Static | BindingFlags.NonPublic);
-            MethodInfo gridMethod = View.GetMethod("HudQuotaGridBounds", BindingFlags.Static | BindingFlags.NonPublic,
-                null, new[] { typeof(Rect), typeof(int) }, null);
+            Type simulationType = Type.GetType("HayChoriYPaty.StreetSimulation, Assembly-CSharp", true);
+            Type balanceType = Type.GetType("HayChoriYPaty.StreetBalance, Assembly-CSharp", true);
+            object simulation = Activator.CreateInstance(simulationType, new object[] {
+                Activator.CreateInstance(balanceType), level, 5f, 0, 1, 0
+            });
+            Assert.AreEqual(products.Length, simulationType.GetProperty("ProductCount").GetValue(simulation, null));
+            for (int i = 0; i < products.Length; i++)
+                Assert.AreEqual(products[i], simulationType.GetMethod("GetAvailableProduct").Invoke(simulation, new object[] { i }),
+                    "The test follows the official level catalog.");
             MethodInfo cellMethod = View.GetMethod("HudQuotaCellBounds", BindingFlags.Static | BindingFlags.NonPublic,
-                null, new[] { typeof(int), typeof(int), typeof(Rect) }, null);
-            Assert.AreEqual(expectedRows, (int)rowMethod.Invoke(null, new object[] { productCount }));
-            Assert.AreEqual(expectedColumns, (int)columnMethod.Invoke(null, new object[] { productCount }));
-            Rect area = (Rect)gridMethod.Invoke(null, new object[] { Rect.zero, productCount });
-            Rect[] cards = new Rect[productCount];
-            for (int i = 0; i < productCount; i++)
+                null, new[] { typeof(int), typeof(int[]), typeof(int), typeof(Rect) }, null);
+            MethodInfo gridMethod = View.GetMethod("HudQuotaGridBounds", BindingFlags.Static | BindingFlags.NonPublic,
+                null, new[] { typeof(Rect), typeof(int[]), typeof(int) }, null);
+            Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+            Rect grid = (Rect)gridMethod.Invoke(null, new object[] { Rect.zero, products, products.Length });
+            Rect[] cards = new Rect[products.Length];
+            int[] currentRowsByColumn = new int[2];
+            for (int i = 0; i < products.Length; i++)
             {
-                cards[i] = (Rect)cellMethod.Invoke(null, new object[] { i, productCount, Rect.zero });
-                Assert.IsTrue(area.Contains(cards[i].min)); Assert.IsTrue(area.Contains(cards[i].max));
-                Assert.Greater(cards[i].width, 60f); Assert.Greater(cards[i].height, 15f);
-                Assert.AreEqual(cards[0].width, cards[i].width, .01f, "Every product gets an identically sized card.");
-                Assert.AreEqual(cards[0].height, cards[i].height, .01f, "Cards stay the same height in either row.");
+                cards[i] = (Rect)cellMethod.Invoke(null, new object[] { i, products, products.Length, Rect.zero });
+                int column = products[i] < 4 ? 0 : 1;
+                Assert.AreEqual(column == 0 ? 8f : 448f, cards[i].xMin, .01f,
+                    "Solid SKUs stay left; drink SKUs stay right.");
+                Assert.GreaterOrEqual(cards[i].yMin, bar.yMax, "The count overlays scenery just below the status strip.");
+                Assert.AreEqual(84f, cards[i].width, .01f, "Shorter cards keep a stable width with room for the longest delivered/goal value.");
+                Assert.AreEqual(29.952f, cards[i].height, .02f, "Each counter is roughly twice the source chip's display height.");
+                Assert.GreaterOrEqual(cards[i].xMin, grid.xMin - .01f);
+                Assert.LessOrEqual(cards[i].xMax, grid.xMax + .01f);
+                Assert.GreaterOrEqual(cards[i].yMin, grid.yMin - .01f);
+                Assert.LessOrEqual(cards[i].yMax, grid.yMax + .01f);
+                Assert.AreEqual(currentRowsByColumn[column]++, Mathf.RoundToInt((cards[i].yMin - (bar.yMax + 2.4f)) / 32.352f),
+                    "Each category has its own compact top-to-bottom stack.");
                 for (int j = 0; j < i; j++) Assert.IsFalse(cards[i].Overlaps(cards[j]));
             }
-            if (expectedRows == 1 && productCount > 1)
-                Assert.Less(cards[0].center.x, cards[productCount - 1].center.x);
-            if (expectedRows == 2)
-                Assert.AreNotEqual(cards[0].center.y, cards[productCount - 1].center.y);
         }
 
-        [Test]
-        public void HudObjectiveCardsKeepUniformSizeAndUseFiveColumnsBeforeWrapping()
+        [TestCase(540f, 960f)]
+        [TestCase(575f, 1280f)]
+        [TestCase(1080f, 1920f)]
+        [TestCase(1080f, 2400f)]
+        [TestCase(1220f, 2712f)]
+        public void HudQuotaStacksStayInBoundsAcrossPortraitResolutions(float screenWidth, float screenHeight)
         {
+            Rect[] cutouts = new Rect[0];
+            if (screenWidth == 1080f && screenHeight == 2400f)
+                cutouts = new[] { new Rect(478f, 2320f, 124f, 80f) };
+            else if (screenWidth == 1220f)
+                cutouts = new[] { new Rect(534f, 2660f, 152f, 52f) };
+            Rect gap = (Rect)View.GetMethod("TopHudCutoutBounds", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { new Vector2(screenWidth, screenHeight), cutouts });
+            int[] products = { 0, 1, 2, 3, 4, 6, 5 };
             MethodInfo cellMethod = View.GetMethod("HudQuotaCellBounds", BindingFlags.Static | BindingFlags.NonPublic,
-                null, new[] { typeof(int), typeof(int), typeof(Rect) }, null);
-            MethodInfo barHeightMethod = View.GetMethod("HudBarHeightFor", BindingFlags.Static | BindingFlags.NonPublic,
-                null, new[] { typeof(Rect), typeof(int) }, null);
-            Vector2 expected = Vector2.zero;
-            foreach (int count in new[] { 1, 2, 3, 5, 6, 7 })
+                null, new[] { typeof(int), typeof(int[]), typeof(int), typeof(Rect) }, null);
+            float scale = screenWidth / 540f;
+            float logicalHeight = screenHeight / scale;
+            float barHeight = (float)View.GetMethod("HudBarHeightFor", BindingFlags.Static | BindingFlags.NonPublic,
+                null, new[] { typeof(Rect) }, null).Invoke(null, new object[] { gap });
+            Assert.LessOrEqual(barHeight * scale, screenHeight);
+            for (int i = 0; i < products.Length; i++)
             {
-                Rect card = (Rect)cellMethod.Invoke(null, new object[] { 0, count, Rect.zero });
-                if (expected == Vector2.zero) expected = card.size;
-                Assert.AreEqual(expected.x, card.width, .01f, "Level catalog size must not resize a product card.");
-                Assert.AreEqual(expected.y, card.height, .01f, "One-row cards keep the two-row card height.");
-                Assert.Greater((float)barHeightMethod.Invoke(null, new object[] { Rect.zero, count }), 0f);
+                Rect card = (Rect)cellMethod.Invoke(null, new object[] { i, products, products.Length, gap });
+                Assert.GreaterOrEqual(card.xMin, 0f); Assert.LessOrEqual(card.xMax, 540f);
+                Assert.GreaterOrEqual(card.yMin, barHeight);
+                Assert.LessOrEqual(card.yMax, logicalHeight, "Counters stay on-screen at " + screenWidth + "x" + screenHeight);
+                Assert.IsFalse(card.Overlaps(gap), "No counter crosses the top cutout at " + screenWidth + "x" + screenHeight);
             }
-            float compactBar = (float)barHeightMethod.Invoke(null, new object[] { Rect.zero, 5 });
-            float twoRowBar = (float)barHeightMethod.Invoke(null, new object[] { Rect.zero, 7 });
-            Assert.Less(compactBar, twoRowBar, "A single objective row must not leave an unused second row in the header.");
-        }
-
-        [Test]
-        public void HudObjectiveCardsGrowTwentyPercentAndTrimInnerPadding()
-        {
-            const BindingFlags flags = BindingFlags.Static | BindingFlags.NonPublic;
-            float cardHeight = (float)View.GetField("HudQuotaCardHeight", flags).GetValue(null);
-            float iconMax = (float)View.GetField("HudQuotaIconMaxSize", flags).GetValue(null);
-            float innerInset = (float)View.GetField("HudQuotaCardInset", flags).GetValue(null);
-            // Previous five-column layout: 24.96px card and a 20.16px icon at its height limit.
-            Assert.AreEqual(24.96f * 1.2f, cardHeight, .02f);
-            Assert.AreEqual(20.16f * 1.2f, iconMax, .02f);
-            Assert.AreEqual(1.2f, innerInset, .01f, "Card padding is halved to recover room for content.");
-            int preferredCounterFont = Mathf.FloorToInt(cardHeight * .78f);
-            Assert.AreEqual(23, preferredCounterFont, "Counter labels grow by about 20% with the card.");
-            Assert.Greater(preferredCounterFont / 19f, 1.2f);
         }
 
         [Test]
@@ -1763,6 +1777,7 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
             Assert.AreEqual(expected, format.Invoke(null, new object[] { seconds }));
         }
 
+            int[] products = { 0, 1, 2, 3, 4, 6, 5 };
         [Test]
         public void UnifiedHudRuntimeTextureIsCachedSizedAndDisposable()
         {
