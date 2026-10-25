@@ -1,3 +1,13 @@
+# Entrega Android — 2026-10-25: refinamientos de calle 0.2.68/code70
+
+Fuente runtime/arte commit `10d11eb` (`Implement street presentation refinements`), Unity **6000.6.3f1**, copia aislada; escena **Assets/Scenes/Main.unity** solamente, Android **Development IL2CPP/ARM64**. BuildPipeline **Succeeded, 515,998 s, 0 errores / 1 advertencia** (clang `-Wunused-command-line-argument`). Quedaron fuera preferencias locales de Firebase/Editor, auditorías, capturas, recovery y cambios ajenos.
+
+APK `/private/tmp/hcyp-release-0.2.68-code70/HayChoriYPaty-0.2.68-code70.apk`: **386.020.957 bytes**, SHA-256 `7ab33d9bf544996191c56bd9190a7737c9e5687c5c427361a0cc3a04e30f0ddd`. Paquete `com.haychoriypaty.game`, versión **0.2.68/code70**, min API26/target36, ABI `arm64-v8a`. **PASS:** metadata, integridad ZIP, `zipalign -c -v 4`, firma v2 verificada con Android Debug; no es firma Play Store. El manifiesto conserva `firebase_analytics_collection_deactivated=true` y `google_analytics_adid_collection_enabled=false`. APK fuera de Git; no instalada.
+
+Pruebas focalizadas EditMode en el proyecto aislado: balance de apertura (4 casos, incluido Nivel 2 con 10 monedas), aguja Chulengo (1), recorte/escudo Racing (1), HUD/contadores (1), footer responsive (12): **19/19 PASS**. El fixture Ready se corrigió para medir las tarjetas de su propio layout con el selector. El PlayMode de proyección de trabajadores no terminó: Unity batch `-nographics` salió con código139 durante el render URP de cámara; **NOT_RUN**, no equivale a un fallo funcional ni a un resultado aprobado. Suite completa, captura full-screen del mural y QA físico: **NOT_RUN**.
+
+---
+
 # Entrega Android — 2026-10-25: Nivel 2/3 Cocacolero centrado 0.2.67/code69
 
 APK generada desde una copia aislada del checkout vigente con Unity **6000.6.3f1**, escena **Assets/Scenes/Main.unity** solamente, Android **Development IL2CPP/ARM64**. BuildPipeline: **Succeeded, 549,63 s, 0 errores / 1 advertencia** (clang `-Wunused-command-line-argument`). Incluye los cambios pendientes de runtime/escena/documentación seleccionados para esta entrega; se excluyeron preferencias locales de `ProjectSettings`, metadatos Unity con solo churn de formato y artefactos locales de tests/auditoría/recovery.
