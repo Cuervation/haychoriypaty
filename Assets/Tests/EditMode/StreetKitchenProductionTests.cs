@@ -263,6 +263,53 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
+        public void VelezSandwichesStayAtTheirStartingCountWithEmptyMarketStock()
+        {
+            var emptyStock = new EmptyIngredientStock();
+            object balance = Activator.CreateInstance(balanceType);
+            object kitchen = Activator.CreateInstance(productionType, new object[] {
+                balance, new[] { 0, 1 }, emptyStock.GetTransparentProxy(), false, true });
+            object parrillero = EnumValue(roleType, "Parrillero");
+            foreach (int product in new[] { 0, 1 })
+            {
+                int startingCount = (int)Call(kitchen, "TableCount", product);
+                Assert.Greater(startingCount, 0);
+                Assert.IsTrue((bool)Call(kitchen, "HasSupply", product));
+                for (int i = 0; i < 20; i++)
+                {
+                    object unit = Call(kitchen, "TryTake", product, parrillero, 41);
+                    Assert.NotNull(unit, "Vélez must keep serving sandwiches with zero ingredient stock.");
+                    int id = (int)Get(unit, "Id");
+                    Assert.AreEqual(startingCount, Call(kitchen, "TableCount", product), "Pickup replaces the serving in the same table slot.");
+                    Assert.IsTrue((bool)Call(kitchen, "Consume", id, product, 41));
+                    Assert.AreEqual(startingCount, Call(kitchen, "TableCount", product), "Handoff must not reduce Vélez's sandwich count.");
+                    Assert.IsTrue((bool)Call(kitchen, "HasSupply", product));
+                }
+            }
+            Assert.AreEqual(0, emptyStock.CanPrepareCalls, "Unlimited Vélez sandwiches do not query ingredient availability.");
+            Assert.AreEqual(0, emptyStock.ReserveCalls, "Unlimited Vélez sandwiches do not reserve market stock.");
+            Assert.AreEqual(0, emptyStock.ConsumeCalls, "Serving Vélez sandwiches does not consume market stock.");
+        }
+
+        [Test]
+        public void OnlyVelezGetsUnlimitedSandwichSupply()
+        {
+            Type balanceRuntime = Type.GetType("HayChoriYPaty.StreetBalance, Assembly-CSharp", true);
+            Type simulation = Type.GetType("HayChoriYPaty.StreetSimulation, Assembly-CSharp", true);
+            foreach (int level in new[] { 1, 2, 3 })
+            {
+                var emptyStock = new EmptyIngredientStock();
+                object balance = Activator.CreateInstance(balanceRuntime);
+                object sim = Activator.CreateInstance(simulation, new object[] { balance, level, 5f, 0, 1, 0 });
+                Call(sim, "BindIngredientStock", emptyStock.GetTransparentProxy());
+                Call(sim, "StartRound");
+                object kitchen = Get(sim, "Kitchen");
+                bool hasSandwichSupply = (bool)Call(kitchen, "HasSupply", 0);
+                Assert.AreEqual(level == 2, hasSandwichSupply, "Only level 3 / Vélez has unlimited Chori supply.");
+            }
+        }
+
+        [Test]
         public void UnlimitedBarrelsKeepRoleOwnershipCancellationAndFernetStockRules()
         {
             var empty = new EmptyIngredientStock();

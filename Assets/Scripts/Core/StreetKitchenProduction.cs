@@ -44,6 +44,7 @@ namespace HayChoriYPaty
     {
         private readonly StreetKitchenBalance balance;
         private readonly IStreetKitchenStock ingredientStock;
+        private readonly bool unlimitedSandwiches;
         private readonly List<StreetFoodUnit> units = new List<StreetFoodUnit>();
         // Reused per-step order keeps legacy grill transfer rear/top-first without allocating.
         private readonly List<StreetFoodUnit> advanceOrder = new List<StreetFoodUnit>();
@@ -57,26 +58,35 @@ namespace HayChoriYPaty
         public IReadOnlyList<StreetFoodUnit> Units { get { return units; } }
         public StreetKitchenBalance Balance { get { return balance; } }
         private static bool IsUnlimitedBarrelProduct(int product) { return product == 4 || product == 6; }
+        private bool IsUnlimitedServingProduct(int product)
+        {
+            return IsUnlimitedBarrelProduct(product) || (unlimitedSandwiches && product >= 0 && product < 4 && tableCapacity[product] > 0);
+        }
         public StreetKitchenProduction(StreetKitchenBalance balance, int[] availableProducts)
             : this(balance, availableProducts, null) { }
 
         public StreetKitchenProduction(StreetKitchenBalance balance, int[] availableProducts,
             IStreetKitchenStock ingredientStock)
-            : this(balance, availableProducts, ingredientStock, false) { }
+            : this(balance, availableProducts, ingredientStock, false, false) { }
 
         public StreetKitchenProduction(StreetKitchenBalance balance, int[] availableProducts,
             IStreetKitchenStock ingredientStock, bool activeCooks)
+            : this(balance, availableProducts, ingredientStock, activeCooks, false) { }
+
+        public StreetKitchenProduction(StreetKitchenBalance balance, int[] availableProducts,
+            IStreetKitchenStock ingredientStock, bool activeCooks, bool unlimitedSandwiches)
         {
             this.balance = balance ?? new StreetKitchenBalance();
             this.ingredientStock = ingredientStock;
+            this.unlimitedSandwiches = unlimitedSandwiches && !activeCooks;
             ActiveCooks = activeCooks;
             Initialize(availableProducts ?? new int[0]);
         }
 
         public bool HasSupply(int product)
         {
-            // Coca and beer barrels are inexhaustible sources, not Market-backed inventory.
-            if (IsUnlimitedBarrelProduct(product))
+            // Coca/beer barrels and Vélez sandwiches are inexhaustible sources, not Market-backed inventory.
+            if (IsUnlimitedServingProduct(product))
                 return product >= 0 && product < tableCapacity.Length && tableCapacity[product] > 0;
             if (ingredientStock == null || (ActiveCooks && product >= 0 && product < 4)) return true;
             for (int i = 0; i < units.Count; i++)
@@ -124,9 +134,9 @@ namespace HayChoriYPaty
 
             selected.Location = StreetFoodLocation.Carried;
             selected.WorkerId = workerId;
-            if (IsUnlimitedBarrelProduct(product))
+            if (IsUnlimitedServingProduct(product))
             {
-                // Replace the serving in its display slot immediately; barrel stock never empties.
+                // Replace inexhaustible barrel servings and Vélez sandwiches in the same display slot.
                 Add(product, StreetFoodState.Cooked, StreetFoodLocation.Table, selected.Slot);
             }
             if (ActiveCooks && product < 4)
@@ -295,7 +305,7 @@ namespace HayChoriYPaty
             if (unit == null || unit.Product != product || unit.Location != StreetFoodLocation.Carried || unit.WorkerId != workerId || unit.State != StreetFoodState.Cooked) return false;
             // Active sandwiches and Coca/beer barrel units bypass Market/Fridge ingredient stock.
             // Other finite ingredient-backed products retain their reserved-stock transaction.
-            if (!IsUnlimitedBarrelProduct(product) && !(ActiveCooks && product >= 0 && product < 4) &&
+            if (!IsUnlimitedServingProduct(product) && !(ActiveCooks && product >= 0 && product < 4) &&
                 ingredientStock != null && !ingredientStock.ConsumeReservedFood(id, product)) return false;
             units.Remove(unit);
             return true;
@@ -592,8 +602,8 @@ namespace HayChoriYPaty
         private StreetFoodUnit Add(int product, StreetFoodState state, StreetFoodLocation location, int slot)
         {
             if (slot < 0 && location == StreetFoodLocation.Table) return null;
-            // Racing+ sandwiches and inexhaustible Coca/beer barrels bypass ingredient reservations.
-            if (!IsUnlimitedBarrelProduct(product) && !(ActiveCooks && product >= 0 && product < 4) &&
+            // Vélez and Racing+ sandwiches plus inexhaustible Coca/beer barrels bypass ingredient reservations.
+            if (!IsUnlimitedServingProduct(product) && !(ActiveCooks && product >= 0 && product < 4) &&
                 ingredientStock != null && !ingredientStock.TryReserveFood(nextId, product)) return null;
             var unit = new StreetFoodUnit { Id = nextId++, Product = product, State = state, Location = location,
                 Slot = slot };

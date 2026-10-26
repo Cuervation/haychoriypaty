@@ -65,11 +65,11 @@ El factor de abajo es la valoración de speed-up usada por la política adaptati
 
 ## Ajuste vigente de cocción activa — 2026-10-16
 
-A pedido del usuario, desde Racing+ Parrillero y Premium cocinan cada unidad en **2 / WorkRate segundos** (2 s a velocidad de trabajo ×1). El balance predeterminado y `Main.unity` guardan explícitamente 2 s. Niveles 1–5 conservan su `cookSeconds=4`; el ajuste previo de 1,3 s queda supersedido. La regresión de duración prueba el umbral de 2 s y el escalado por WorkRate; `StreetActiveCooksTests` pasó **19/19 EditMode** el2026-10-16. La APK0.2.42/code44 ya está instalada en Motorola Edge60Fusion; no se ejecutaron PlayMode ni revisión visual en vivo y el juego no se abrió. Detalle de build/firma en [android-prototype.md](android-prototype.md).
+A pedido del usuario, desde Racing+ Parrillero y Premium cocinan cada unidad en **2 / CookWorkRate segundos** (2 s a velocidad de trabajo ×1). El balance predeterminado y `Main.unity` guardan explícitamente 2 s. Niveles 1–5 conservan su `cookSeconds=4`; el ajuste previo de 1,3 s queda supersedido. La regresión de duración prueba el umbral de 2 s y el escalado por CookWorkRate; `StreetActiveCooksTests` pasó **19/19 EditMode** el2026-10-16. La APK0.2.42/code44 ya está instalada en Motorola Edge60Fusion; no se ejecutaron PlayMode ni revisión visual en vivo y el juego no se abrió. Detalle de build/firma en [android-prototype.md](android-prototype.md).
 
 ### Ajuste previo supersedido — 2026-10-16
 
-El pedido anterior fijó temporalmente la cocción activa en 1,3 / WorkRate segundos. Fue reemplazado por el ajuste vigente de 2 / WorkRate segundos; no cambian los 4 s base de niveles 1–5.
+El pedido anterior fijó temporalmente la cocción activa en 1,3 / WorkRate segundos. Fue reemplazado por el ajuste vigente de 2 / CookWorkRate segundos; no cambian los 4 s base de niveles 1–5.
 
 ## Ajuste de proximidad de trabajadores — 2026-10-16
 

@@ -44,6 +44,12 @@ namespace HayChoriYPaty.Tests
                 if (method.Name==name && method.GetParameters().Length==args.Length) return method.Invoke(obj,args);
             throw new MissingMethodException(name);
         }
+        private static Vector2 PresentedPosition(object simulation, object worker)
+        {
+            MethodInfo method = T("StreetWorkerProjection").GetMethod("PresentationPosition",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            return (Vector2)method.Invoke(null, new[] { simulation, worker });
+        }
         [UnityTest]
         public IEnumerator RealCooksApproachTheirReservedFoodWithoutMovingItOrOverlappingPosts()
         {
@@ -168,20 +174,19 @@ namespace HayChoriYPaty.Tests
                             Call(renderer,"PrepareWorkers",normal,diagonal,normal,diagonal,beverage,beverage,true);
                             if (product == 4)
                             {
-                                Texture2D pickupPose = Resources.Load<Texture2D>("street-cocacolero-barrel-reach-v1");
-                                Assert.NotNull(pickupPose, "Coca pickup needs its authored reach sprite.");
-                                Assert.AreSame(pickupPose, torso.sprite.texture, "Cocacolero pickup must use the new reach pose.");
-                                Assert.That(torso.sprite.rect.height / pickupPose.height, Is.EqualTo(.82f).Within(.001f),
-                                    "Crop the authored reach pose before its legs; the original lower legs stay behind the barrel.");
+                                Assert.AreSame(Resources.Load<Texture2D>("street-worker-direction-extension-v1"), torso.sprite.texture,
+                                    "Restore the upright, empty-handed frontal pickup pose.");
                                 Transform props = ((GameObject)Field(renderer,"propsRoot")).transform;
-                                Transform barrelRoot = props.Find("station:Station_CocaBarrel");
-                                Assert.NotNull(barrelRoot, "The Coca barrel must exist in the same native sorting pass.");
-                                SpriteRenderer barrelRenderer = barrelRoot.GetComponentInChildren<SpriteRenderer>(true);
-                                Assert.NotNull(barrelRenderer);
-                                Assert.Less(((SpriteRenderer)Field(workerVisual,"LeftLeg")).sortingOrder, barrelRenderer.sortingOrder,
-                                    "The feet/legs remain behind the barrel's front face.");
-                                Assert.Greater(torso.sortingOrder, barrelRenderer.sortingOrder,
-                                    "The leaning torso and reaching arm render over the barrel rim.");
+                                var barrelRenderer = props.Find("station:Station_CocaBarrel").GetComponentInChildren<SpriteRenderer>(true);
+                                Assert.Less(torso.sortingOrder, barrelRenderer.sortingOrder, "The barrel occludes the lower body.");
+                                Assert.Less(((SpriteRenderer)Field(workerVisual,"LeftLeg")).sortingOrder, barrelRenderer.sortingOrder);
+                                Rect barrelBounds = (Rect)Call(Get(sim,"KitchenLayout"),"BoundsForProduct",product);
+                                Transform workerRoot = (Transform)Field(workerVisual,"Root");
+                                float footX = workerRoot.localPosition.x * 100f + 270f;
+                                float footY = (height * .5f - workerRoot.localPosition.y * 100f) / scale;
+                                Assert.That(footX, Is.EqualTo(pickup.x).Within(.01f), "No sideways pickup shift.");
+                                Assert.That(footY, Is.EqualTo(barrelBounds.yMax - 24f).Within(.01f), "Feet reference the barrel base, not its rim.");
+                                Assert.IsFalse(torso.flipX, "Keep the front-facing authored pose.");
                             }
                             float idleReachY=torso.transform.localPosition.y;
                             Vector2 idlePalm=(Vector2)Field(workerVisual,"Palm");
@@ -194,11 +199,11 @@ namespace HayChoriYPaty.Tests
                             }
                             Set(worker,"PickupProgress",.5f);
                             Call(renderer,"PrepareWorkers",normal,diagonal,normal,diagonal,beverage,beverage,true);
-                            float expectedReach = product == 4 ? .2352f : .196f;
+                            float expectedReach = product == 4 ? -.0784f : .196f;
                             Assert.That(idleReachY-torso.transform.localPosition.y, Is.EqualTo(expectedReach).Within(.002f),
                                 "At peak dwell, the empty-handed torso must reach toward the barrel without changing beer presentation.");
                             Vector2 reachingPalm=(Vector2)Field(workerVisual,"Palm");
-                            Assert.That(reachingPalm.y-idlePalm.y, Is.EqualTo(product == 4 ? 23.52f : 19.6f).Within(.02f),
+                            Assert.That(reachingPalm.y-idlePalm.y, Is.EqualTo(product == 4 ? -7.84f : 19.6f).Within(.02f),
                                 "The hand anchor must follow the visible reach instead of staying at the carry pose.");
                             if (product == 4)
                             {
@@ -253,6 +258,88 @@ namespace HayChoriYPaty.Tests
                     }
                     // Stock is ample for one consumed unit of each product per portrait scale.
                 }
+            }
+            finally { UnityEngine.Object.Destroy(root); }
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator ChicagoCocacoleroPickupIsFrontalAndGroundedAtBarrel()
+        {
+            var root = new GameObject("Chicago Cocacolero barrel-side reach preview");
+            try
+            {
+                object sim = Activator.CreateInstance(T("StreetSimulation"), new object[]
+                    { Activator.CreateInstance(T("StreetBalance")), 1, 5f, 0, 1, 0 });
+                Call(sim, "StartRound");
+                Set(sim, "Coins", 10000);
+                Assert.IsTrue((bool)Call(sim, "TryHire", Enum.Parse(T("StreetWorkerRole"), "Cocacolero")));
+                IList workers = (IList)Get(sim, "Workers");
+                object cocaWorker = null;
+                foreach (object candidate in workers)
+                    if (Get(candidate, "Role").ToString() == "Cocacolero") { cocaWorker = candidate; break; }
+                Assert.IsNotNull(cocaWorker, "Chicago must include its hired Cocacolero.");
+
+                object layout = Get(sim, "KitchenLayout");
+                Rect barrel = (Rect)Call(layout, "BoundsForProduct", 4);
+                Vector2 pickup = (Vector2)Call(layout, "PickupPosition", 4);
+                float fullOffsetMagnitude = Mathf.Max(0f, barrel.height - 24f);
+                Set(cocaWorker, "Product", 4);
+                Set(cocaWorker, "State", Enum.Parse(T("StreetWorkerState"), "Pickup"));
+                Set(cocaWorker, "Position", pickup);
+                Set(cocaWorker, "Target", pickup);
+                Set(cocaWorker, "StepDistance", 0f);
+                Set(cocaWorker, "CarriedItemId", 0);
+                Set(cocaWorker, "PickupProgress", .5f);
+                T("StreetWorker").GetField("Route", Instance).SetValue(cocaWorker, Array.Empty<Vector2>());
+                T("StreetWorker").GetField("RouteIndex", Instance).SetValue(cocaWorker, 0);
+                Vector2 heldPosition = PresentedPosition(sim, cocaWorker);
+                Set(cocaWorker, "State", Enum.Parse(T("StreetWorkerState"), "ToStation"));
+                Set(cocaWorker, "Position", pickup + Vector2.left * 16f);
+                Vector2 approachPosition = PresentedPosition(sim, cocaWorker);
+                Set(cocaWorker, "State", Enum.Parse(T("StreetWorkerState"), "ToCounter"));
+                Set(cocaWorker, "Position", pickup + Vector2.right * 16f);
+                Vector2 departurePosition = PresentedPosition(sim, cocaWorker);
+                MethodInfo offsetMethod = T("StreetWorkerProjection").GetMethod("CocaBarrelPresentationOffset",
+                    BindingFlags.Static | BindingFlags.NonPublic);
+                float departureOffset = (float)offsetMethod.Invoke(null, new[] { sim, cocaWorker });
+                Assert.That(approachPosition.x, Is.EqualTo(pickup.x - 16f).Within(.01f));
+                Assert.That(departurePosition.x, Is.EqualTo(pickup.x + 16f).Within(.01f));
+                Assert.That(heldPosition.y, Is.EqualTo(barrel.yMax - 24f).Within(.01f));
+                Assert.That(approachPosition.y - pickup.y, Is.InRange(0.01f, fullOffsetMagnitude));
+                Assert.That(departureOffset, Is.InRange(0.01f, fullOffsetMagnitude));
+                Assert.That(Mathf.Abs(departurePosition.y - heldPosition.y), Is.LessThan(fullOffsetMagnitude));
+                Set(cocaWorker, "State", Enum.Parse(T("StreetWorkerState"), "Pickup"));
+                Set(cocaWorker, "Position", pickup);
+
+                var renderer = root.AddComponent(T("StreetKitchenRenderer"));
+                Texture2D normal = Resources.Load<Texture2D>("street-parrillero");
+                Texture2D diagonal = Resources.Load<Texture2D>("street-parrillero-diagonal-v1");
+                Texture2D beverage = Resources.Load<Texture2D>("street-cocacolero-levels3-5-v1");
+                Call(renderer, "Prepare", sim, 1f, 960f);
+                Call(renderer, "PrepareWorkers", normal, diagonal, normal, diagonal, beverage, beverage, true);
+                Assert.IsTrue((bool)Get(renderer, "WorkersReady"));
+
+                IDictionary views = (IDictionary)Field(Field(renderer, "workerProjection"), "workers");
+                object visual = views[(int)Get(cocaWorker, "Id")];
+                var torso = (SpriteRenderer)Field(visual, "Torso");
+                Transform workerRoot = (Transform)Field(visual, "Root");
+                float renderedFootX = workerRoot.localPosition.x * 100f + 270f;
+                Assert.That(renderedFootX, Is.EqualTo(pickup.x).Within(.01f));
+                Assert.That(480f - workerRoot.localPosition.y * 100f, Is.EqualTo(barrel.yMax - 24f).Within(.01f));
+                Assert.IsFalse(torso.flipX);
+                Transform propsRoot = ((GameObject)Field(renderer, "propsRoot")).transform;
+                Transform chicagoBarrelRoot = propsRoot.Find("station:Station_CocaBarrel");
+                Assert.NotNull(chicagoBarrelRoot);
+                Assert.Less(((SpriteRenderer)Field(visual,"LeftLeg")).sortingOrder,
+                    chicagoBarrelRoot.GetComponentInChildren<SpriteRenderer>(true).sortingOrder,
+                    "The lower body remains behind the barrel front while the upper reach stays visible.");
+                Assert.Less(torso.sortingOrder, chicagoBarrelRoot.GetComponentInChildren<SpriteRenderer>(true).sortingOrder,
+                    "The barrel hides the body instead of drawing the worker through its front.");
+
+                yield return null;
+                yield return null;
+                SaveProjectionCapture(renderer, "cocacolero-barrel-pickup-chicago-960");
             }
             finally { UnityEngine.Object.Destroy(root); }
             yield return null;

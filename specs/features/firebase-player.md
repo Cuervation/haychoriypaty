@@ -63,7 +63,7 @@ Revisión ajena: parar flush y nuevos comandos económicos de esa rama, conserva
 Contadores instrumentados separados de saldo y grants gratuitos; sumar una vez por operación aceptada. Cache muestra pendientes sin confundirlos con estado remoto de otra rama.
 
 - Compras: unidades/gasto por ingrediente[10] y totales existentes, solo éxito confirmado localmente.
-- Ventas: entregas por producto[7] y facturación real, nunca cocción/reserva/cancelación. Cliente atendido=al menos una entrega; pedido completo=todas las líneas entregadas; impaciencia solo salida por paciencia, no sold-out/cancelación.
+- Ventas: entregas por producto[7] y facturación real, nunca cocción/reserva/cancelación. Cliente atendido=al menos una entrega; pedido completo=todas las líneas entregadas. `CustomersLost` se conserva por compatibilidad y vale cero en rondas nuevas: no hay timeout de paciencia y una salida por agotamiento no es una pérdida por impaciencia.
 - Intentos iniciados solo BeginAttempt+guardado exitoso; finalizados=won+lost. Abandono solo evento explícito seguro; crash tiene recuperación técnica, no resultado inventado.
 - Contrataciones pagas por rol[5], costo previo al débito; excluir Parrillero inicial. Speed compras/gasto previo al incremento. Equipos/speed/monedas temporales nunca se restauran como siguiente plantilla.
 - Records por nivel: menor tiempo de victoria, mayor facturación finalizada, más unidades vendidas; empates conservan previo. Cobertura legacy parcial.
@@ -84,7 +84,7 @@ Match: UID, UUID intento/match, nivel/club, outcome, elapsed, fecha local/servid
 | StreetGame.ReturnToLevels/FinishOrAbort | distinguir cierre explícito de lifecycle incierto; preservar AbortAttempt |
 | StreetMarket.BeginAttempt/SettleAttempt/AbortAttempt/RecoverAbandonedAttempt | conservar snapshots/IDs/flags; exponer recibo/consumo, sin red ni recálculo económico |
 | StreetSimulation.Deliver | registrar tras Kitchen.Consume válido; Delivered/GetProductDelivered/CoinsEarned ya existen |
-| StreetSimulation.AdvanceCustomers/SetLeaving | motivo de impaciencia explícito y contado una vez, sin alterar comportamiento |
+| StreetSimulation.AdvanceCustomers/SetLeaving | registrar solo cierres/salidas reales; no instrumentar pérdidas por paciencia, porque no existe timeout y `CustomersLost` permanece en cero en rondas nuevas |
 | StreetKitchenProduction/IStreetKitchenStock | sin red por unidad ni persistir reservas/movimientos físicos |
 | StreetView | acceso Google, logout, error/sync/conflicto y gate de acciones, sin rediseñar gameplay |
 

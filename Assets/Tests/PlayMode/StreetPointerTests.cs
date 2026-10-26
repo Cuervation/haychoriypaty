@@ -166,6 +166,19 @@ namespace HayChoriYPaty.Tests
             SetSim("Coins",10000); Time.timeScale=0;
         }
         [Test]
+        public void FirstMatchTutorialUsesHalfOpacityBlackBackdropDimmer()
+        {
+            Type viewType = Type.GetType("HayChoriYPaty.StreetView, Assembly-CSharp", true);
+            MethodInfo dimmer = viewType.GetMethod("LevelOneTutorialBackdropDimColor", StaticPrivate);
+            Assert.NotNull(dimmer);
+            Color color = (Color)dimmer.Invoke(null, null);
+            Assert.AreEqual(Color.black.r, color.r);
+            Assert.AreEqual(Color.black.g, color.g);
+            Assert.AreEqual(Color.black.b, color.b);
+            Assert.That(color.a, Is.EqualTo(.50f).Within(.001f));
+        }
+
+        [Test]
         public void FirstMatchTutorialBubblesStayCompactAndAttachToTargetsAcrossPortraitRatios()
         {
             Type viewType = Type.GetType("HayChoriYPaty.StreetView, Assembly-CSharp", true);
@@ -245,6 +258,9 @@ namespace HayChoriYPaty.Tests
                 {
                     Assert.That(drawBounds.yMin, Is.EqualTo(Mathf.Min(panel.y, tip.y)).Within(.01f));
                     Assert.That(drawBounds.yMax, Is.EqualTo(Mathf.Max(panel.yMax, tip.y)).Within(.01f));
+                    Color bodyCenter = TutorialBubblePixel(texture, drawBounds, panel.center);
+                    Assert.That(bodyCenter.a, Is.GreaterThan(.95f), "Bubble body must render at its authored panel coordinates");
+                    Assert.That(bodyCenter.r, Is.GreaterThan(.95f), "Cream bubble face must stay behind the tutorial copy");
 
                     Vector2 baseCenter = new Vector2(baseX, tailAbove ? panel.y : panel.yMax);
                     for (int i = 0; i <= 32; i++)
@@ -280,7 +296,7 @@ namespace HayChoriYPaty.Tests
 
 
         [UnityTest]
-        public IEnumerator FirstLevelTutorialExplainsHudAndOnlyStartsOnFinalJugar()
+        public IEnumerator FirstLevelTutorialExplainsHudAndStartsOnFinalSiguiente()
         {
             Type viewType = view.GetType();
             viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, true);
@@ -303,6 +319,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(skipAction, hit.Invoke(view, new object[] { skipBounds.center }));
             for (int step = 0; step < 3; step++)
             {
+                Assert.AreEqual("SIGUIENTE", viewType.GetMethod("LevelOneTutorialPrimaryCaption", PrivateInstance).Invoke(view, null));
                 Rect button = (Rect)primaryBounds.Invoke(view, null);
                 Assert.AreEqual(primaryAction, hit.Invoke(view, new object[] { button.center }),
                     "Only the current tutorial CTA receives input.");
@@ -314,7 +331,7 @@ namespace HayChoriYPaty.Tests
             }
 
             string caption = (string)viewType.GetMethod("LevelOneTutorialPrimaryCaption", PrivateInstance).Invoke(view, null);
-            Assert.AreEqual("JUGAR", caption, "The last tutorial button starts the game, not another step.");
+            Assert.AreEqual("SIGUIENTE", caption, "The reference uses the same label on every tutorial step.");
             Rect lastButton = (Rect)primaryBounds.Invoke(view, null);
             Assert.AreEqual(primaryAction, hit.Invoke(view, new object[] { lastButton.center }));
             dispatch.Invoke(view, new object[] { 1 });
@@ -569,6 +586,71 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(5f, Sim.GetType().GetMethod("GetProductPrice", PublicInstance).Invoke(Sim, new object[] { 4 }));
         }
 
+        private object VictoryClock => view.GetType().GetField("victoryTransition", PrivateInstance).GetValue(view);
+        private bool VictoryAnimating => (bool)view.GetType().GetProperty("VictoryTransitionActive", PrivateInstance).GetValue(view);
+        private void SetVictoryElapsed(float elapsed)
+        {
+            object clock = VictoryClock;
+            clock.GetType().GetField("startedAt", PrivateInstance).SetValue(clock, Time.unscaledTime - elapsed);
+        }
+        private void PrepareLiveVictoryTransition()
+        {
+            StartChicagoForHiring();
+            view.GetType().GetMethod("ObserveVictoryTransition", PrivateInstance).Invoke(view, null);
+            SetSim("Phase", Enum.Parse(Sim.GetType().GetProperty("Phase").PropertyType, "Won"));
+            Assert.IsTrue((bool)CallGame("ProcessRoundResult"));
+            view.GetType().GetMethod("ObserveVictoryTransition", PrivateInstance).Invoke(view, null);
+            Assert.IsTrue(VictoryAnimating);
+        }
+        [UnityTest]
+        public IEnumerator VictoryTransitionSkipConsumesTapWithoutClaimingReward()
+        {
+            PrepareLiveVictoryTransition();
+            object market = Get("Market");
+            long balance = (long)market.GetType().GetProperty("BalanceCents").GetValue(market);
+            long reward = (long)Get("ChulengoBaseRewardCents");
+            float elapsed = (float)VictoryClock.GetType().GetMethod("Elapsed").Invoke(VictoryClock, new object[] { Time.unscaledTime });
+            yield return new WaitForSecondsRealtime(.08f);
+            Assert.Greater((float)VictoryClock.GetType().GetMethod("Elapsed").Invoke(VictoryClock, new object[] { Time.unscaledTime }), elapsed,
+                "Presentation must progress with timeScale zero");
+            Assert.AreEqual(0f, Time.timeScale);
+            view.GetType().GetMethod("DispatchAction", PrivateInstance).Invoke(view, new object[] { 3 });
+            Assert.IsTrue((bool)Get("HasPendingChulengo"));
+            yield return Click(270, 875); // A tap anywhere skips, never selects the newly revealed CTA.
+            Assert.IsFalse(VictoryAnimating);
+            Assert.IsTrue((bool)Get("HasPendingChulengo"));
+            Assert.AreEqual(balance, market.GetType().GetProperty("BalanceCents").GetValue(market));
+            Assert.AreEqual(reward, Get("ChulengoBaseRewardCents"));
+            view.GetType().GetMethod("ObserveVictoryTransition", PrivateInstance).Invoke(view, null);
+            Assert.IsFalse(VictoryAnimating, "Skipped win must not replay");
+            Assert.IsTrue((bool)CallGame("TryCollectVictoryReward"));
+            Assert.IsFalse((bool)Get("HasPendingChulengo"));
+            Assert.AreEqual(balance + reward, market.GetType().GetProperty("BalanceCents").GetValue(market));
+        }
+        [UnityTest]
+        public IEnumerator VictoryTransitionCapturesStagesAndConsumesReleaseAfterTimeout()
+        {
+            PrepareLiveVictoryTransition();
+            string dir = System.IO.Path.GetFullPath(System.IO.Path.Combine(Application.dataPath, "../Logs/Acceptance/VictoryTransition-20261026"));
+            System.IO.Directory.CreateDirectory(dir);
+            foreach (float elapsed in new[] { .65f, 1.18f, 1.5f, 2.95f })
+            {
+                SetVictoryElapsed(elapsed);
+                yield return WaitForRenderedFrame();
+                SaveRiotReviewScreenshot(dir, 1, "victory-" + elapsed.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture));
+            }
+            SetVictoryElapsed(.5f);
+            var handle = view.GetType().GetMethod("HandlePointer", PrivateInstance);
+            handle.Invoke(view, new object[] { Pixel(270, 875), true, false });
+            SetVictoryElapsed(3.1f);
+            handle.Invoke(view, new object[] { Pixel(270, 875), false, true });
+            Assert.IsFalse(VictoryAnimating);
+            Assert.IsFalse((bool)view.GetType().GetField("victorySkipHeld", PrivateInstance).GetValue(view));
+            Assert.IsTrue((bool)Get("HasPendingChulengo"), "The held gesture must not accidentally claim the newly enabled reward");
+            yield return WaitForRenderedFrame();
+            SaveRiotReviewScreenshot(dir, 1, "chulengo-final");
+        }
+
         [UnityTest]
         public IEnumerator VictoryPopupTouchBoundsReturnToSelectorAndBlockBackgroundUpgrades()
         {
@@ -655,27 +737,27 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
-        public IEnumerator NewLevelPagesSelectEveryClubWithCorrectPointerTargets()
+        public IEnumerator SingleScrollableLevelGridSelectsEveryClubWithCorrectPointerTargets()
         {
             Time.timeScale = 0f;
             object save = gameType.GetField("save", PrivateInstance).GetValue(game);
             save.GetType().GetField("unlockedLevel").SetValue(save, 10);
             Type viewType = view.GetType();
             MethodInfo hit = viewType.GetMethod("HitAction", PrivateInstance);
+            MethodInfo cardBounds = viewType.GetMethod("LevelSelectCardBounds", StaticPrivate);
+            MethodInfo maxScroll = viewType.GetMethod("LevelSelectorMaxScroll", StaticPrivate);
+            FieldInfo scroll = viewType.GetField("levelSelectScroll", PrivateInstance);
             viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, true);
-            viewType.GetField("levelSelectPage", PrivateInstance).SetValue(view, 0);
-            yield return Click(456, 690);
-            Assert.AreEqual(1, viewType.GetField("levelSelectPage", PrivateInstance).GetValue(view));
-            Assert.AreEqual("Ready", Phase, "Browsing pages never starts or changes a level");
-            Assert.AreEqual(0, Sim.GetType().GetProperty("LevelIndex").GetValue(Sim));
-            yield return Click(84, 690);
-            Assert.AreEqual(0, viewType.GetField("levelSelectPage", PrivateInstance).GetValue(view));
+            Assert.Greater((float)maxScroll.Invoke(null, new object[] { 960f }), 0f,
+                "All campaign levels belong to the same scrollable selector");
             for (int level = 5; level < 11; level++)
             {
                 SetSim("Phase", Enum.Parse(Sim.GetType().GetProperty("Phase").PropertyType, "Ready"));
                 viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, true);
-                viewType.GetField("levelSelectPage", PrivateInstance).SetValue(view, level / 6);
-                Rect card = (Rect)viewType.GetMethod("LevelSelectCardBounds", StaticPrivate).Invoke(null, new object[] { level });
+                Rect card = (Rect)cardBounds.Invoke(null, new object[] { level });
+                float offset = Mathf.Clamp(card.y - 142f, 0f, (float)maxScroll.Invoke(null, new object[] { 960f }));
+                scroll.SetValue(view, offset);
+                card.y -= offset;
                 Assert.AreEqual(30 + level, hit.Invoke(view, new object[] { card.center }));
                 yield return Click(card.center.x, card.center.y);
                 Assert.AreEqual(level, Sim.GetType().GetProperty("LevelIndex").GetValue(Sim));
@@ -687,13 +769,35 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
-        public IEnumerator LockedSecondPageCannotStartAnUnavailableLevel()
+        public IEnumerator LevelSelectorTouchDragScrollsTheCampaign()
         {
             Time.timeScale = 0f;
             Type viewType = view.GetType();
             viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, true);
-            viewType.GetField("levelSelectPage", PrivateInstance).SetValue(view, 1);
-            Rect card = (Rect)viewType.GetMethod("LevelSelectCardBounds", StaticPrivate).Invoke(null, new object[] { 7 });
+            MethodInfo handle = viewType.GetMethod("HandlePointer", PrivateInstance);
+            FieldInfo scroll = viewType.GetField("levelSelectScroll", PrivateInstance);
+            handle.Invoke(view, new object[] { Pixel(270f, 600f), true, false });
+            handle.Invoke(view, new object[] { Pixel(270f, 400f), false, false });
+            Assert.Greater((float)scroll.GetValue(view), 0f, "A vertical touch drag moves the selector");
+            handle.Invoke(view, new object[] { Pixel(270f, 420f), false, true });
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator LockedLevelsRemainUnselectableInTheScrollableGrid()
+        {
+            Time.timeScale = 0f;
+            object save = gameType.GetField("save", PrivateInstance).GetValue(game);
+            save.GetType().GetField("unlockedLevel").SetValue(save, 5);
+            Type viewType = view.GetType();
+            viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, true);
+            MethodInfo cardBounds = viewType.GetMethod("LevelSelectCardBounds", StaticPrivate);
+            MethodInfo maxScroll = viewType.GetMethod("LevelSelectorMaxScroll", StaticPrivate);
+            FieldInfo scroll = viewType.GetField("levelSelectScroll", PrivateInstance);
+            Rect card = (Rect)cardBounds.Invoke(null, new object[] { 7 });
+            float offset = Mathf.Clamp(card.y - 142f, 0f, (float)maxScroll.Invoke(null, new object[] { 960f }));
+            scroll.SetValue(view, offset);
+            card.y -= offset;
             Assert.AreEqual(0, viewType.GetMethod("HitAction", PrivateInstance).Invoke(view, new object[] { card.center }));
             yield return Click(card.center.x, card.center.y);
             Assert.AreEqual("Ready", Phase);
@@ -829,6 +933,93 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
+        public IEnumerator AffordableUpgradeCardsCaptureDoubleWhiteBorderOnlyWithEnoughCoins()
+        {
+            if (Application.isBatchMode) Assert.Ignore("Game-view captures require the interactive Editor.");
+
+            PlayerPrefs.SetInt(tutorialCompletedKey, 1);
+            Invoke(game, "SelectLevel", 0);
+            Invoke(game, "StartRound");
+            SetSim("Coins", 10000);
+            Time.timeScale = 0f;
+            Assert.AreEqual("Playing", Phase);
+            Type roleType = Type.GetType("HayChoriYPaty.StreetWorkerRole, Assembly-CSharp", true);
+            object parrillero = Enum.Parse(roleType, "Parrillero");
+            int hireCost = (int)Sim.GetType().GetMethod("HireCostForRole", PublicInstance)
+                .Invoke(Sim, new[] { parrillero });
+            int speedCost = (int)Sim.GetType().GetProperty("SpeedCost", PublicInstance).GetValue(Sim, null);
+            MethodInfo canHire = Sim.GetType().GetMethod("CanHireRole", PublicInstance);
+            PropertyInfo canUpgradeSpeed = Sim.GetType().GetProperty("CanUpgradeSpeed", PublicInstance);
+            Assert.Greater(hireCost, 0);
+            Assert.Greater(speedCost, 0);
+
+            string directory = System.IO.Path.GetFullPath(System.IO.Path.Combine(
+                Application.dataPath, "../Logs/Acceptance/UpgradeWhiteBorder-20261026"));
+            System.IO.Directory.CreateDirectory(directory);
+
+            int insufficientBalance = Math.Min(hireCost, speedCost) - 1;
+            SetSim("Coins", insufficientBalance);
+            Assert.IsFalse((bool)canHire.Invoke(Sim, new[] { parrillero }));
+            Assert.IsFalse((bool)canUpgradeSpeed.GetValue(Sim, null));
+            yield return WaitForRenderedFrame();
+            SaveUpgradeBorderReviewScreenshot(directory, "sin-monedas-suficientes");
+
+            int sufficientBalance = Math.Max(hireCost, speedCost);
+            SetSim("Coins", sufficientBalance);
+            Assert.IsTrue((bool)canHire.Invoke(Sim, new[] { parrillero }));
+            Assert.IsTrue((bool)canUpgradeSpeed.GetValue(Sim, null));
+            yield return WaitForRenderedFrame();
+            SaveUpgradeBorderReviewScreenshot(directory, "con-monedas-suficientes");
+        }
+
+        private static void SaveUpgradeBorderReviewScreenshot(string directory, string state)
+        {
+            Texture2D capture = ScreenCapture.CaptureScreenshotAsTexture();
+            try
+            {
+                Assert.AreEqual(1080, capture.width, "Review capture should use the portrait reference width.");
+                Assert.AreEqual(1920, capture.height, "Review capture should use the portrait reference height.");
+                System.IO.File.WriteAllBytes(System.IO.Path.Combine(directory, state + ".png"), capture.EncodeToPNG());
+            }
+            finally { UnityEngine.Object.Destroy(capture); }
+        }
+
+        [UnityTest]
+        public IEnumerator CocacoleroGroundContactFullGameView()
+        {
+            if (Application.isBatchMode) Assert.Ignore("Full Game View capture requires the interactive Editor.");
+            Time.timeScale = 0f;
+            object sim = Activator.CreateInstance(Type.GetType("HayChoriYPaty.StreetSimulation, Assembly-CSharp", true),
+                new object[] { Get("Balance"), 1, 5f, 0, 1, 0 });
+            sim.GetType().GetMethod("StartRound").Invoke(sim, null);
+            sim.GetType().GetProperty("Coins").GetSetMethod(true).Invoke(sim, new object[] { 10000 });
+            Type role = Type.GetType("HayChoriYPaty.StreetWorkerRole, Assembly-CSharp", true);
+            sim.GetType().GetMethod("TryHire", new[] { role }).Invoke(sim, new[] { Enum.Parse(role, "Cocacolero") });
+            object worker = null;
+            foreach (object candidate in (System.Collections.IEnumerable)sim.GetType().GetProperty("Workers").GetValue(sim))
+                if (candidate.GetType().GetProperty("Role").GetValue(candidate).ToString() == "Cocacolero") worker = candidate;
+            Assert.NotNull(worker);
+            object layout = sim.GetType().GetProperty("KitchenLayout").GetValue(sim);
+            Vector2 pickup = (Vector2)layout.GetType().GetMethod("PickupPosition", new[] { typeof(int) }).Invoke(layout, new object[] { 4 });
+            foreach (var pair in new System.Collections.Generic.Dictionary<string, object> {
+                { "Product", 4 }, { "Position", pickup }, { "Target", pickup }, { "PickupProgress", .5f },
+                { "CarriedItemId", 0 }, { "State", Enum.Parse(Type.GetType("HayChoriYPaty.StreetWorkerState, Assembly-CSharp", true), "Pickup") } })
+                worker.GetType().GetProperty(pair.Key).GetSetMethod(true).Invoke(worker, new[] { pair.Value });
+            gameType.GetField("sim", PrivateInstance).SetValue(game, sim);
+            gameType.GetField("selectedLevel", PrivateInstance).SetValue(game, 1);
+            view.GetType().GetField("introActive", PrivateInstance).SetValue(view, false);
+            view.GetType().GetField("levelSelectActive", PrivateInstance).SetValue(view, false);
+            yield return null; yield return null; yield return null;
+            yield return new WaitForEndOfFrame();
+            Texture2D capture = ScreenCapture.CaptureScreenshotAsTexture();
+            try {
+                Assert.Greater(capture.width, 0);
+                System.IO.File.WriteAllBytes("/private/tmp/hcyp-cocacolero-frontal-gameview.png", capture.EncodeToPNG());
+            }
+            finally { UnityEngine.Object.Destroy(capture); }
+        }
+
+        [UnityTest]
         public IEnumerator CapturesResponsiveHeaderForAllElevenLevels()
         {
             if (Application.isBatchMode) Assert.Ignore("Game-view captures require the interactive Unity Editor.");
@@ -856,6 +1047,38 @@ namespace HayChoriYPaty.Tests
                 selectedLevelField.SetValue(game, level);
                 yield return null;
                 yield return WaitForRenderedFrame();
+                SaveHudReviewScreenshot(directory, level);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator CapturesUniformCrestsAcrossAllElevenLevels()
+        {
+            if (Application.isBatchMode) Assert.Ignore("Game-view captures require the interactive Unity Editor.");
+
+            Time.timeScale = 0f;
+            Type simulationType = Type.GetType("HayChoriYPaty.StreetSimulation, Assembly-CSharp", true);
+            FieldInfo simulationField = gameType.GetField("sim", PrivateInstance);
+            FieldInfo selectedLevelField = gameType.GetField("selectedLevel", PrivateInstance);
+            Type viewType = view.GetType();
+            viewType.GetField("introActive", PrivateInstance).SetValue(view, false);
+            viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, false);
+
+            string directory = System.IO.Path.GetFullPath(System.IO.Path.Combine(
+                Application.dataPath, "../Logs/Acceptance/Crests32-20261026"));
+            System.IO.Directory.CreateDirectory(directory);
+            int levelCount = ((string[])simulationType.GetField("LevelNames", BindingFlags.Public | BindingFlags.Static)
+                .GetValue(null)).Length;
+            for (int level = 0; level < levelCount; level++)
+            {
+                object simulation = Activator.CreateInstance(simulationType, new object[] {
+                    Get("Balance"), level, 5f, 0, 1, 0
+                });
+                simulationType.GetMethod("StartRound", PublicInstance).Invoke(simulation, null);
+                simulationField.SetValue(game, simulation);
+                selectedLevelField.SetValue(game, level);
+                yield return null;
+                yield return new WaitForEndOfFrame();
                 SaveHudReviewScreenshot(directory, level);
             }
         }

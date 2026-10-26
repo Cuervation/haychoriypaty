@@ -1,3 +1,33 @@
+# Entrega Android — 2026-10-26: selector de niveles y tutorial v2 0.2.71/code73
+
+APK generada desde el working tree vigente en una copia Unity aislada, con `Assets/Scenes/Main.unity` únicamente, Unity **6000.6.3f1**, Android **Development IL2CPP/ARM64**. El build incorpora los cambios intencionales de runtime/arte del checkout, incluidos el selector/tutoría revisados visualmente; excluye preferencias de Firebase/Gvh, `TimeManager`/`runInBackground`, tests, auditorías, capturas, recovery y metadatos `.meta` de formato solamente. Los Player Settings del checkout avanzan a **0.2.71/code73**; se preserva el `runInBackground: 1` local sin publicarlo.
+
+BuildPipeline: **Succeeded, 577,82 s, 0 errores / 4 advertencias** (dos avisos de clang `-Wunused-command-line-argument`). APK `/private/tmp/hcyp-release-0.2.71-code73/HayChoriYPaty-0.2.71-code73.apk`, **385.633.166 bytes**, SHA-256 `b751dabc3ec5f9b0e6abbc4a58bcb85bb59f73a6b7a36fc9bab3cd882d4f20ad`. Paquete `com.haychoriypaty.game`, versión **0.2.71/code73**, min API26/target36, ABI `arm64-v8a`. **PASS:** integridad ZIP, `zipalign -c -v 4`, firma APK v2 y metadata; Analytics y ad-ID desactivados en el manifiesto. Firma Android Debug (no Play Store); **no instalada**. APK/logs/reportes fuera de Git en `/private/tmp/hcyp-release-0.2.71-code73/`.
+
+Validación visual y pruebas focalizadas, con alcance y límites, en [status](../status.md). Capturas full Game View y XML de Test Runner en `/private/tmp/hcyp-visual-preflight-20261026/`. Suite completa, QA físico y otros aspectos: **NOT_RUN**.
+
+---
+
+# Entrega Android — 2026-10-26: borde de contratación 0.2.70/code72
+
+APK generada desde `dee9fd1` más el código/arte local vigente en una copia aislada con Unity **6000.6.3f1**, solo `Assets/Scenes/Main.unity`, Android **Development IL2CPP/ARM64**. Incluye el doble borde blanco de las tarjetas contratables. El proyecto de build conservó la configuración Android; se excluyeron preferencias locales de Firebase/Gvh, `TimeManager`/`runInBackground`, pruebas, auditorías, capturas, recovery y seis `.meta` con cambios solo de formato. La versión del Player Settings activo se actualizó a **0.2.70/code72**. BuildPipeline: **Succeeded, 37,87 s, 0 errores / 1 advertencia** (reutilizó la caché IL2CPP caliente).
+
+APK `/private/tmp/hcyp-release-0.2.70-code72/HayChoriYPaty-0.2.70-code72.apk`: **387.401.677 bytes**, SHA-256 `79665a768733dba6f31647f8de1f3051ef0b35f3216152d15e04fe4809c023c1`. Paquete `com.haychoriypaty.game`, versión **0.2.70/code72**, min API26/target36, ABI `arm64-v8a`. **PASS:** ZIP íntegro, `zipalign -c 4`, firma APK v2 Android Debug verificada (no Play Store), metadata/ABI y Firebase Analytics/ad-ID desactivados. No instalada. Build log y JSON: `/private/tmp/hcyp-release-0.2.70-code72/`.
+
+Regresiones focalizadas ya ejecutadas sobre el mismo código: textura EditMode **2/2**; captura interactiva PlayMode **1/1** y contratación/precios/tope **1/1**. Suite Unity completa y QA físico: **NOT_RUN**.
+
+---
+
+# Entrega Android — 2026-10-25: Mercado azul, escudos y ajustes locales 0.2.69/code71
+
+Generada desde el commit base `dee9fd1` más los cambios de código/arte de juego que estaban locales, en proyecto aislado con Unity **6000.6.3f1** y escena **Assets/Scenes/Main.unity** solamente, Android **Development IL2CPP/ARM64**. Incluye el código/arte de juego presente en el checkout al momento del pedido (incluido el mercado azul, sándwiches ilimitados de Vélez y los siete escudos nuevos); se excluyeron preferencias locales de Editor/Firebase/TimeManager, archivos de auditoría/recovery/capturas/escenas de tests, y metadatos de importación con solo churn de formato. Se reparó el `.meta` del escudo de Ferro preservando su GUID antes de importar/build. BuildPipeline: **Succeeded, 274,77 s, 0 errores / 1 advertencia** (Unity Diagnostics Data recomienda habilitar Debug Symbols).
+
+APK `/private/tmp/hcyp-release-0.2.69-code71/HayChoriYPaty-0.2.69-code71.apk`: **387,086,695 bytes**, SHA-256 `b40fe612c1bdb09c271a3aace0e6ba2614f8481b39d76765c48cdaa0cd85b6f3`. Paquete `com.haychoriypaty.game`, versión **0.2.69/code71**, min API26/target36, ABI `arm64-v8a`. **PASS:** metadata, ZIP íntegro, `zipalign -c -v 4`, firma APK v2 verificada (Android Debug; no Play Store), Firebase Analytics desactivado y Google Analytics ad-ID desactivado. La APK queda fuera de Git y **no fue instalada**.
+
+**Pruebas focalizadas:** Vélez (sándwiches no se consumen, no hay gate de sus ingredientes, solo Vélez obtiene suministro ilimitado) pasó **3/3**; manifiesto/recursos de escudos **1/1**; recortes de escudos opacos **2/2**; tamaño de escudo igual al de All Boys **3/3**; estilo de retratos de especialistas **1/1**; velo oscuro del tutorial en PlayMode **1/1**. Un filtro más amplio de Vélez terminó **13/14**: la única falla es un test de importación antiguo que espera `RGBA32` y recibe `ETC2_RGBA8` para Android; no corresponde a los tres casos de suministro/gating aprobados. Suite completa, captura full-screen/Game View y QA en dispositivo: **NOT_RUN**.
+
+---
+
 # Entrega Android — 2026-10-25: refinamientos de calle 0.2.68/code70
 
 Fuente runtime/arte commit `10d11eb` (`Implement street presentation refinements`), Unity **6000.6.3f1**, copia aislada; escena **Assets/Scenes/Main.unity** solamente, Android **Development IL2CPP/ARM64**. BuildPipeline **Succeeded, 515,998 s, 0 errores / 1 advertencia** (clang `-Wunused-command-line-argument`). Quedaron fuera preferencias locales de Firebase/Editor, auditorías, capturas, recovery y cambios ajenos.

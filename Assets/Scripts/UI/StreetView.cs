@@ -7,7 +7,7 @@ namespace HayChoriYPaty
 {
     /// <summary>Sprite-backed portrait renderer of actual worker/order state; never simulates deliveries.</summary>
     [DisallowMultipleComponent, RequireComponent(typeof(StreetGame))]
-    public sealed class StreetView : MonoBehaviour
+    public sealed partial class StreetView : MonoBehaviour
     {
         private const float W = StreetSceneLayout.Width, H = StreetSceneLayout.Height;
         private StreetKitchenRenderer kitchenRenderer;
@@ -17,10 +17,19 @@ namespace HayChoriYPaty
         private const string VelezBackgroundResource = "street-background-velez-v1";
         private const string VelezCrestResource = "street-velez-crest-v1";
         private const string RacingCrestResource = "street-racing-crest-v1";
-        // Ordered by StreetSimulation.LevelDisplayNames. Unknown/unlicensed marks stay null.
+        private const string IndependienteCrestResource = "street-independiente-crest-v1";
+        private const string FerroCrestResource = "street-ferro-crest-v1";
+        private const string SanLorenzoCrestResource = "street-san-lorenzo-crest-v1";
+        private const string RiverCrestResource = "street-river-crest-v1";
+        private const string BocaCrestResource = "street-boca-crest-v1";
+        private const string CamionerosCrestResource = "street-camioneros-crest-v1";
+        private const string LosRedondosCrestResource = "street-los-redondos-crest-v1";
+        // Ordered by StreetSimulation.LevelDisplayNames; user-supplied crests are scoped to their levels.
         private static readonly string[] LevelCrestResourceNames = {
             AllBoysCrestResource, ChicagoCrestResource, VelezCrestResource,
-            null, null, RacingCrestResource, null, null, null, null, null
+            FerroCrestResource, IndependienteCrestResource, RacingCrestResource,
+            SanLorenzoCrestResource, RiverCrestResource, BocaCrestResource,
+            CamionerosCrestResource, LosRedondosCrestResource
         };
         private const string VelezFrontFansResource = "street-velez-fans-front-v1";
         private const string VelezWalkingFansResource = "street-velez-fans-walk-v1";
@@ -238,7 +247,10 @@ namespace HayChoriYPaty
             float desiredPennantHeight = 80f * compactScale;
             float availablePennantHeight = Mathf.Max(0f, decorationBottom - stageBottom - topPadding
                 - panelHeight - pennantClearance);
-            float pennantHeight = Mathf.Min(desiredPennantHeight, availablePennantHeight);
+            // The Racing campaign begins at zero-based index 5; omit decorative pennants from there onward.
+            float pennantHeight = sim.LevelIndex < 5
+                ? Mathf.Min(desiredPennantHeight, availablePennantHeight)
+                : 0f;
             float pennantTop = decorationBottom - pennantHeight;
             // Keep every authored button/title bound intact. Reserve the visible pennant band
             // only from space left after the actual footer and playfield; never paint it behind cards.
@@ -285,7 +297,7 @@ namespace HayChoriYPaty
         private ResponsiveFooterLayout CurrentResponsiveFooter(StreetSimulation sim, float canvasHeight, float bottomBleed = 0f)
         {
             bool ready = !levelSelectActive && sim.Phase == RoundPhase.Ready;
-            bool play = !levelSelectActive && sim.Phase == RoundPhase.Playing;
+            bool play = VictoryTransitionActive || (!levelSelectActive && sim.Phase == RoundPhase.Playing);
             bool showCards = play || (ready && CatalogUpgradeActions(sim).Length <= 3);
             return bottomBleed > 0f
                 ? BuildResponsiveFooterLayoutWithBottomBleed(sim, canvasHeight, showCards, ready, bottomBleed)
@@ -317,11 +329,14 @@ namespace HayChoriYPaty
         private const int LevelSelectorBackAction = 8, VictoryExitAction = 9, RiotReturnAction = 15, LevelSelectFirstAction = 30;
         private const int HubPlayAction = 200, HubMarketAction = 201, HubBadgesAction = 202, HubRankingAction = 203, HubAccountAction = 204;
         private const int BadgeBackAction = 205, RankingBackAction = 206;
-        private const string LevelOneTutorialCompletedKey = "HayChoriYPaty.LevelOneTutorial.Completed.v1";
+        private const string LevelOneTutorialCompletedKey = "HayChoriYPaty.LevelOneTutorial.Completed.v2";
         private const int LevelOneTutorialPrimaryAction = 300, LevelOneTutorialSkipAction = 301;
         private const float LevelOneTutorialBubbleWidth = 320f;
         private const float LevelOneTutorialBubbleHeight = 140f;
         private const float LevelOneTutorialBubbleTailWidth = 52f;
+        private const float LevelOneTutorialBackdropDimAlpha = .50f;
+        private static Color LevelOneTutorialBackdropDimColor() =>
+            new Color(0f, 0f, 0f, LevelOneTutorialBackdropDimAlpha);
         private static readonly string[] LevelOneTutorialHeadlines = {
             "Tu objetivo: entregar\n200 choris.",
             "Cada chori entregado\nsuma monedas.",
@@ -334,7 +349,10 @@ namespace HayChoriYPaty
             "El costo aparece en esta tarjeta.",
             "El próximo costo aparece\nen esta tarjeta."
         };
-        private const int LevelSelectorPreviousAction = 17, LevelSelectorNextAction = 18, LevelSelectorPageSize = 6;
+        private const float LevelSelectorCardHeight = 150f, LevelSelectorCardGap = 14f;
+        private static readonly Rect LevelSelectorViewport = new Rect(16f, 142f, W - 32f, 510f);
+        private float levelSelectScroll, levelSelectPointerDownY, levelSelectPointerDownScroll;
+        private bool levelSelectPointerHeld, levelSelectDragging;
         private const int ReadyLevelSelectorAction = 19;
         private const int MarketBackAction = 70, MarketOtherAction = 190;
         private const int MarketMinusAction = 80, MarketPlusAction = 100, MarketPlusTenAction = 120;
@@ -343,9 +361,6 @@ namespace HayChoriYPaty
         private const int MarketCloseAction = 161, ResultLevelsAction = 163;
         private const int ChulengoMultiplyAction = 164, ChulengoCollectAction = 165;
         private static readonly Rect ReadyLevelSelector = new Rect(161, 905, 218, 44);
-        private static readonly Rect LevelSelectPrevious = new Rect(28, 666, 112, 48);
-        private static readonly Rect LevelSelectNext = new Rect(400, 666, 112, 48);
-        private int levelSelectPage;
         private bool marketActive, marketFromSelector;
         private bool marketOtherExpanded;
         private int marketExpandedIngredient = -1;
@@ -357,7 +372,6 @@ namespace HayChoriYPaty
         private bool marketDragging, marketPointerHeld;
         private string marketMessage = "";
         private static readonly Rect LevelSelectTitle = new Rect(28, 61, 484, 64);
-        private static readonly Rect LevelSelectHint = new Rect(48, 718, 444, 28);
         private static readonly Rect LevelSelectBack = new Rect(126, 854, 288, 72);
         private const string VictoryPopupResource = "street-victory-popup-wood-v1";
         private const string ChulengoBowlResource = "street-chulengo-bowl-v1";
@@ -378,7 +392,11 @@ namespace HayChoriYPaty
         private int VisualLevelIndex => game != null && game.Sim != null ? game.Sim.LevelIndex : 0;
         private Texture2D backdrop, chicagoBackground, velezBackground, velezGrill, people, items, parrillero, parrilleroDiagonal, cocacolero, laterCocacolero, parrilleroIcon, upgradeWood, speedArrows, largeGrill, gameCoin, muralArt, allBoysCrest, chicagoCrest, cocaBottle, beverageBarrel, chicagoGrill;
         private Texture2D[] levelCrests;
-        private static Texture2D racingCrestCutout;
+        private readonly System.Collections.Generic.Dictionary<Texture2D, Rect> crestVisibleUvs =
+            new System.Collections.Generic.Dictionary<Texture2D, Rect>();
+        private readonly System.Collections.Generic.Dictionary<Texture2D, Rect> crestBodyUvs =
+            new System.Collections.Generic.Dictionary<Texture2D, Rect>();
+        private static Texture2D racingCrestCutout, camionerosCrestCutout, losRedondosCrestCutout;
         private Texture2D clubPennantTexture;
         private string clubPennantThemeName;
         private float clubPennantLogicalHeight = -1f;
@@ -401,8 +419,10 @@ namespace HayChoriYPaty
         private Texture2D victoryPopup, clubColoredVictoryPopup;
         private int clubColoredVictoryPopupLevel = int.MinValue;
         private Texture2D chulengoMeter, chulengoNeedle, chulengoHub, chulengoParchment, chulengoBowl;
-        private Texture2D coverArt, hubBackdrop, titleLogo, introGlow, menuButton, googleButtonSurface, hudBarTexture, cutoutHudBarTexture, hudQuotaCardTexture, hudQuotaCardOutlineTexture, gameplayFooterTexture, riotBackdrop, riotFanAtlas, riotImpactCloud;
+        private Texture2D coverArt, hubBackdrop, titleLogo, introGlow, introProgressCapsule, menuButton, googleButtonSurface, hudBarTexture, cutoutHudBarTexture, hudQuotaCardTexture, hudQuotaCardOutlineTexture, gameplayFooterTexture, riotBackdrop, riotFanAtlas, riotImpactCloud;
         private readonly System.Collections.Generic.Dictionary<string, Texture2D> glossyUpgradeCardTextures =
+            new System.Collections.Generic.Dictionary<string, Texture2D>();
+        private readonly System.Collections.Generic.Dictionary<string, Texture2D> affordableUpgradeBorderTextures =
             new System.Collections.Generic.Dictionary<string, Texture2D>();
         private Font menuFont;
         private GUIStyle menuTitle, levelTitle;
@@ -416,6 +436,8 @@ namespace HayChoriYPaty
         private bool riotScreenActive;
         private float riotStartedAt;
         private const float IntroDuration = 4f;
+        private const float IntroLogoSettleDuration = .48f;
+        private const float IntroLogoPushIn = .028f;
         private bool SplashComplete { get { return splashClockStarted && Time.unscaledTime - introStarted >= IntroDuration; } }
         private const string ParrilleroLabel = "Parrillero";
         private GUIStyle tiny, small, text, title, header, amount, invisible, hudNumber, upgradeTitle, upgradePercent, upgradePrice, riotCue;
@@ -512,12 +534,112 @@ namespace HayChoriYPaty
             chicagoCrest = levelCrests[1];
             if (levelCrests[5] != null)
             {
-                if (racingCrestCutout == null) racingCrestCutout = CreateRacingCrestCutout(levelCrests[5]);
+                if (racingCrestCutout == null) racingCrestCutout = CreateLevelCrestCutout(levelCrests[5]);
                 levelCrests[5] = racingCrestCutout;
+            }
+            if (levelCrests[9] != null)
+            {
+                if (camionerosCrestCutout == null) camionerosCrestCutout = CreateLevelCrestCutout(levelCrests[9]);
+                if (camionerosCrestCutout != null) levelCrests[9] = camionerosCrestCutout;
+            }
+            if (levelCrests[10] != null)
+            {
+                if (losRedondosCrestCutout == null) losRedondosCrestCutout = CreateLevelCrestCutout(levelCrests[10]);
+                if (losRedondosCrestCutout != null) levelCrests[10] = losRedondosCrestCutout;
+            }
+            crestVisibleUvs.Clear(); crestBodyUvs.Clear();
+            for (int i = 0; i < levelCrests.Length; i++)
+            {
+                Texture2D crest = levelCrests[i];
+                if (crest == null) continue;
+                Rect visible = LevelCrestVisibleUv(crest);
+                crestVisibleUvs[crest] = visible;
+                crestBodyUvs[crest] = LevelCrestBodyUv(i, visible);
             }
         }
 
-        private static Texture2D CreateRacingCrestCutout(Texture2D source)
+        private static Rect LevelCrestVisibleUv(Texture2D source)
+        {
+            // Measure once on load, including non-readable imported PNGs; never mutate assets.
+            RenderTexture previous = RenderTexture.active;
+            RenderTexture temporary = null;
+            Texture2D readable = null;
+            try
+            {
+                Texture2D texture = source;
+                if (!source.isReadable)
+                {
+                    temporary = RenderTexture.GetTemporary(source.width, source.height, 0, RenderTextureFormat.ARGB32);
+                    Graphics.Blit(source, temporary);
+                    RenderTexture.active = temporary;
+                    readable = new Texture2D(source.width, source.height, TextureFormat.RGBA32, false);
+                    readable.ReadPixels(new Rect(0, 0, source.width, source.height), 0, 0);
+                    readable.Apply();
+                    texture = readable;
+                }
+                Color32[] pixels = texture.GetPixels32();
+                int left = source.width, right = -1, bottom = source.height, top = -1;
+                for (int y = 0; y < source.height; y++)
+                for (int x = 0; x < source.width; x++)
+                {
+                    if (pixels[y * source.width + x].a < 8) continue;
+                    left = Mathf.Min(left, x); right = Mathf.Max(right, x);
+                    bottom = Mathf.Min(bottom, y); top = Mathf.Max(top, y);
+                }
+                return right < left ? new Rect(0, 0, 1, 1) :
+                    new Rect((float)left / source.width, (float)bottom / source.height,
+                        (float)(right - left + 1) / source.width, (float)(top - bottom + 1) / source.height);
+            }
+            finally
+            {
+                RenderTexture.active = previous;
+                if (temporary != null) RenderTexture.ReleaseTemporary(temporary);
+                if (readable != null)
+                {
+                    if (Application.isPlaying) Destroy(readable);
+                    else DestroyImmediate(readable);
+                }
+            }
+        }
+
+        private static Rect LevelCrestBodyUv(int levelIndex, Rect visibleUv)
+        {
+            // Authored alpha bounds of the supplied Vélez art: main shield 1076 px high,
+            // versus 1208 px including its detached star. Keep the star; only sizing excludes it.
+            if (levelIndex == 2) visibleUv.height *= 1076f / 1208f;
+            return visibleUv;
+        }
+
+        private static Rect FitLevelCrest(Rect slot, Vector2 textureSize, Rect visibleUv, Rect bodyUv)
+        {
+            float scale = slot.height / (textureSize.y * bodyUv.height);
+            float bodyWidth = textureSize.x * bodyUv.width * scale;
+            return new Rect(slot.center.x - bodyWidth * .5f + (visibleUv.xMin - bodyUv.xMin) * textureSize.x * scale,
+                slot.yMin - (visibleUv.yMax - bodyUv.yMax) * textureSize.y * scale,
+                textureSize.x * visibleUv.width * scale, textureSize.y * visibleUv.height * scale);
+        }
+
+        private Rect LevelCrestSizedSlot(Rect slot, Texture2D crest)
+        {
+            if (crest == null) return slot;
+            Rect body;
+            if (!crestBodyUvs.TryGetValue(crest, out body))
+                if (!crestVisibleUvs.TryGetValue(crest, out body)) body = new Rect(0, 0, 1, 1);
+            slot.width = slot.height * crest.width * body.width / (crest.height * body.height);
+            return slot;
+        }
+
+        private void DrawLevelCrest(Rect slot, Texture2D crest)
+        {
+            if (crest == null) return;
+            Rect uv, body;
+            if (!crestVisibleUvs.TryGetValue(crest, out uv)) uv = new Rect(0, 0, 1, 1);
+            if (!crestBodyUvs.TryGetValue(crest, out body)) body = uv;
+            slot = LevelCrestSizedSlot(slot, crest);
+            GUI.DrawTextureWithTexCoords(FitLevelCrest(slot, new Vector2(crest.width, crest.height), uv, body), crest, uv, true);
+        }
+
+        private static Texture2D CreateLevelCrestCutout(Texture2D source)
         {
             if (source == null || !source.isReadable) return null;
             int width = source.width, height = source.height;
@@ -527,28 +649,28 @@ namespace HayChoriYPaty
             int tail = 0;
             for (int x = 0; x < width; x++)
             {
-                QueueRacingBackgroundPixel(x, 0, width, height, pixels, background, queue, ref tail);
-                QueueRacingBackgroundPixel(x, height - 1, width, height, pixels, background, queue, ref tail);
+                QueueLightCrestBackgroundPixel(x, 0, width, height, pixels, background, queue, ref tail);
+                QueueLightCrestBackgroundPixel(x, height - 1, width, height, pixels, background, queue, ref tail);
             }
             for (int y = 1; y < height - 1; y++)
             {
-                QueueRacingBackgroundPixel(0, y, width, height, pixels, background, queue, ref tail);
-                QueueRacingBackgroundPixel(width - 1, y, width, height, pixels, background, queue, ref tail);
+                QueueLightCrestBackgroundPixel(0, y, width, height, pixels, background, queue, ref tail);
+                QueueLightCrestBackgroundPixel(width - 1, y, width, height, pixels, background, queue, ref tail);
             }
             int head = 0;
             while (head < tail)
             {
                 int index = queue[head++], x = index % width, y = index / width;
-                if (x > 0) QueueRacingBackgroundPixel(x - 1, y, width, height, pixels, background, queue, ref tail);
-                if (x + 1 < width) QueueRacingBackgroundPixel(x + 1, y, width, height, pixels, background, queue, ref tail);
-                if (y > 0) QueueRacingBackgroundPixel(x, y - 1, width, height, pixels, background, queue, ref tail);
-                if (y + 1 < height) QueueRacingBackgroundPixel(x, y + 1, width, height, pixels, background, queue, ref tail);
+                if (x > 0) QueueLightCrestBackgroundPixel(x - 1, y, width, height, pixels, background, queue, ref tail);
+                if (x + 1 < width) QueueLightCrestBackgroundPixel(x + 1, y, width, height, pixels, background, queue, ref tail);
+                if (y > 0) QueueLightCrestBackgroundPixel(x, y - 1, width, height, pixels, background, queue, ref tail);
+                if (y + 1 < height) QueueLightCrestBackgroundPixel(x, y + 1, width, height, pixels, background, queue, ref tail);
             }
             for (int i = 0; i < pixels.Length; i++)
                 if (background[i]) pixels[i] = new Color32(0, 0, 0, 0);
 
             var result = new Texture2D(width, height, TextureFormat.RGBA32, false);
-            result.name = "Racing crest (checkerboard cutout)";
+            result.name = "Level crest (light background cutout)";
             result.filterMode = source.filterMode;
             result.wrapMode = TextureWrapMode.Clamp;
             result.hideFlags = HideFlags.HideAndDontSave;
@@ -557,7 +679,7 @@ namespace HayChoriYPaty
             return result;
         }
 
-        private static void QueueRacingBackgroundPixel(int x, int y, int width, int height, Color32[] pixels,
+        private static void QueueLightCrestBackgroundPixel(int x, int y, int width, int height, Color32[] pixels,
             bool[] background, int[] queue, ref int tail)
         {
             int index = y * width + x;
@@ -565,8 +687,8 @@ namespace HayChoriYPaty
             Color32 color = pixels[index];
             int min = Mathf.Min(color.r, Mathf.Min(color.g, color.b));
             int max = Mathf.Max(color.r, Mathf.Max(color.g, color.b));
-            // The supplied screenshot has a neutral, light checkerboard. Flood fill only from
-            // the texture edge, so enclosed white lettering/stripes remain part of the crest.
+            // User-provided RGB crests have a light solid background. Flood fill only from the
+            // texture edge, so enclosed white lettering and shapes remain part of the crest.
             if (min < 165 || max - min > 48) return;
             background[index] = true;
             queue[tail++] = index;
@@ -629,6 +751,7 @@ namespace HayChoriYPaty
             riotImpactCloud = Resources.Load<Texture2D>(RiotImpactCloudResource);
             titleLogo = Resources.Load<Texture2D>("street-logo");
             introGlow = CreateIntroGlow();
+            introProgressCapsule = CreateIntroProgressCapsule();
             chulengoMeter = CreateChulengoMeterTexture();
             chulengoNeedle = CreateChulengoNeedleTexture();
             chulengoHub = CreateChulengoHubTexture();
@@ -671,6 +794,8 @@ namespace HayChoriYPaty
             clubColoredVictoryPopupLevel = int.MinValue;
             if (introGlow != null) Destroy(introGlow);
             introGlow = null;
+            if (introProgressCapsule != null) Destroy(introProgressCapsule);
+            introProgressCapsule = null;
             if (chulengoMeter != null) Destroy(chulengoMeter);
             chulengoMeter = null;
             if (chulengoNeedle != null) Destroy(chulengoNeedle);
@@ -699,6 +824,14 @@ namespace HayChoriYPaty
             foreach (Texture2D texture in glossyUpgradeCardTextures.Values)
                 if (texture != null) Destroy(texture);
             glossyUpgradeCardTextures.Clear();
+            foreach (Texture2D texture in affordableUpgradeBorderTextures.Values)
+                if (texture != null) Destroy(texture);
+            affordableUpgradeBorderTextures.Clear();
+            DisposeVictoryTransitionTextures();
+            foreach (var sizes in marketPanelTextures.Values)
+                foreach (Texture2D texture in sizes.Values)
+                    if (texture != null) Destroy(texture);
+            marketPanelTextures.Clear();
             if (clubPennantTexture != null) Destroy(clubPennantTexture);
             clubPennantTexture = null;
             clubPennantThemeName = null;
@@ -708,17 +841,24 @@ namespace HayChoriYPaty
         }
         private void Update()
         {
+            ObserveVictoryTransition();
             if (introActive && game != null && game.IsPlayerActive)
             {
                 if (!splashClockStarted) { introStarted = Time.unscaledTime; splashClockStarted = true; }
                 if (SplashComplete) OpenHubFromIntro();
             }
             if (introActive && (game == null || !game.ShowChulengoResult)) return;
-#if !(UNITY_ANDROID && !UNITY_EDITOR) && ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
+#if ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
+#if UNITY_ANDROID && !UNITY_EDITOR
+            // Normal Android buttons remain native IMGUI; only the modal skip uses this pointer path.
+            if (VictoryTransitionActive || victorySkipHeld)
+#endif
+            {
             var touch = Touchscreen.current; var mouse = Mouse.current;
             if (touch != null && (touch.primaryTouch.press.isPressed || touch.primaryTouch.press.wasReleasedThisFrame))
                 HandlePointer(touch.primaryTouch.position.ReadValue(), touch.primaryTouch.press.wasPressedThisFrame, touch.primaryTouch.press.wasReleasedThisFrame);
             else if (mouse != null) HandlePointer(mouse.position.ReadValue(), mouse.leftButton.wasPressedThisFrame, mouse.leftButton.wasReleasedThisFrame);
+            }
 #endif
         }
         private static Rect CanvasViewport(Vector2 size, Rect safe)
@@ -774,11 +914,41 @@ namespace HayChoriYPaty
         {
             if (game == null || !game.IsPlayerActive || game.Sim == null ||
                 (Cloud.FirebasePlayerSession.Instance != null && Cloud.FirebasePlayerSession.Instance.BlocksGameInput)) return;
+            if (ConsumeVictoryTransitionPointer(down, up)) return;
             Rect v = CanvasViewport(new Vector2(Screen.width,Screen.height),Screen.safeArea);
             if (v.width <= 0) return;
             logicalCanvasHeight = CanvasLogicalHeight(v);
             layoutVerticalScale = logicalCanvasHeight / H;
             Vector2 p = ScreenToLayoutPoint(pixel, new Vector2(Screen.width, Screen.height), v);
+            if (levelSelectActive && !game.ShowChulengoResult)
+            {
+                if (down)
+                {
+                    pressedAction = 0;
+                    levelSelectPointerHeld = LevelSelectorViewport.Contains(p);
+                    levelSelectPointerDownY = p.y;
+                    levelSelectPointerDownScroll = levelSelectScroll;
+                    levelSelectDragging = false;
+                    pressedAction = HitAction(p);
+                }
+                if (!down && !up && levelSelectPointerHeld)
+                {
+                    float delta = levelSelectPointerDownY - p.y;
+                    if (Mathf.Abs(delta) > 8f) { levelSelectDragging = true; pressedAction = 0; }
+                    if (levelSelectDragging)
+                        levelSelectScroll = Mathf.Clamp(levelSelectPointerDownScroll + delta, 0f, LevelSelectorMaxScroll(logicalCanvasHeight));
+                }
+                if (up)
+                {
+                    int hit = HitAction(p);
+                    if (!levelSelectDragging && pressedAction != 0 && pressedAction == hit)
+                        DispatchAction(pressedAction);
+                    pressedAction = 0;
+                    levelSelectPointerHeld = false;
+                    levelSelectDragging = false;
+                }
+                return;
+            }
             if (marketActive && !game.ShowChulengoResult)
             {
                 p.y *= layoutVerticalScale; // Market geometry uses the full logical safe-area height.
@@ -804,6 +974,7 @@ namespace HayChoriYPaty
         }
         private int HitAction(Vector2 p)
         {
+            if (VictoryTransitionActive || victorySkipHeld) return 0;
             if (game.ShowChulengoResult)
             {
                 Vector2 resultPoint = new Vector2(p.x, p.y * layoutVerticalScale);
@@ -834,12 +1005,14 @@ namespace HayChoriYPaty
             {
                 if (PointerHitBounds(MarketSelectorBounds()).Contains(p)) return MarketCloseAction;
                 if (PointerHitBounds(LevelSelectBack).Contains(p)) return LevelSelectorBackAction;
-                if (levelSelectPage > 0 && PointerHitBounds(LevelSelectPrevious).Contains(p)) return LevelSelectorPreviousAction;
-                if ((levelSelectPage + 1) * LevelSelectorPageSize < StreetSimulation.LevelNames.Length
-                    && PointerHitBounds(LevelSelectNext).Contains(p)) return LevelSelectorNextAction;
-                for (int i = levelSelectPage * LevelSelectorPageSize; i < Mathf.Min((levelSelectPage + 1) * LevelSelectorPageSize, StreetSimulation.LevelNames.Length); i++)
-                    if (i <= game.UnlockedLevel && PointerHitBounds(ScaleCardBounds(LevelSelectCardBounds(i), layoutVerticalScale)).Contains(p))
-                        return LevelSelectFirstAction + i;
+                if (LevelSelectorViewport.Contains(p))
+                    for (int i = 0; i < StreetSimulation.LevelNames.Length; i++)
+                    {
+                        Rect card = LevelSelectCardBounds(i);
+                        card.y -= levelSelectScroll;
+                        if (i <= game.UnlockedLevel && PointerHitBounds(ScaleCardBounds(card, layoutVerticalScale)).Contains(p))
+                            return LevelSelectFirstAction + i;
+                    }
                 return 0;
             }
             if (game.Sim.Phase == RoundPhase.Ready)
@@ -865,6 +1038,7 @@ namespace HayChoriYPaty
         }
         private void DispatchAction(int a)
         {
+            if (VictoryTransitionActive || victorySkipHeld) return;
             if (game.ShowChulengoResult)
             {
                 bool lockedRetry = game.HasPendingChulengo && game.ChulengoChoiceLocked;
@@ -876,7 +1050,7 @@ namespace HayChoriYPaty
                     : a == VictoryExitAction && !game.HasPendingChulengo ? game.NextLevel()
                     : a == ResultLevelsAction && !game.HasPendingChulengo ? game.ReturnToLevels() : false;
                 if (chulengoOk && a == VictoryExitAction) { marketActive = true; marketFromSelector = true; marketOtherExpanded = false; marketMessage = ""; }
-                if (chulengoOk && a == ResultLevelsAction) { marketActive = false; levelSelectActive = true; levelSelectPage = game.Sim.LevelIndex / LevelSelectorPageSize; }
+                if (chulengoOk && a == ResultLevelsAction) { marketActive = false; levelSelectActive = true; levelSelectScroll = 0f; }
                 if (a == ChulengoMultiplyAction || a == ChulengoCollectAction || a == VictoryExitAction || a == ResultLevelsAction)
                 { lastAction = a; feedbackUntil = Time.unscaledTime + .22f; feedbackScale = chulengoOk ? 1.04f : .97f; }
                 return;
@@ -904,7 +1078,7 @@ namespace HayChoriYPaty
                 if (a == HubPlayAction)
                 {
                     hubActive = false; levelSelectActive = true;
-                    levelSelectPage = game.Sim.LevelIndex / LevelSelectorPageSize;
+                    levelSelectScroll = 0f;
                 }
                 else if (a == HubMarketAction)
                 {
@@ -929,13 +1103,6 @@ namespace HayChoriYPaty
             if (levelSelectActive)
             {
                 if (a == MarketCloseAction) { levelSelectActive=false; marketActive=true; marketFromSelector=true; marketMessage=""; marketScroll=0; marketOtherExpanded=false; marketExpandedIngredient=-1; return; }
-                if (a == LevelSelectorPreviousAction || a == LevelSelectorNextAction)
-                {
-                    levelSelectPage = Mathf.Clamp(levelSelectPage + (a == LevelSelectorNextAction ? 1 : -1),
-                        0, (StreetSimulation.LevelNames.Length - 1) / LevelSelectorPageSize);
-                    pressedAction = 0;
-                    return;
-                }
                 if (a == LevelSelectorBackAction)
                 {
                     levelSelectActive = false;
@@ -982,8 +1149,8 @@ namespace HayChoriYPaty
                     MarketRevealIngredient(id); return;
                 }
                 if (a >= MarketMinusAction && a < MarketMinusAction+10) { int id=a-MarketMinusAction; marketPendingPacks[id]=Mathf.Max(0,marketPendingPacks[id]-1); return; }
-                if (a >= MarketPlusAction && a < MarketPlusAction+10) { int id=a-MarketPlusAction; marketPendingPacks[id]=Mathf.Min(99,marketPendingPacks[id]+1); return; }
-                if (a >= MarketPlusTenAction && a < MarketPlusTenAction+10) { int id=a-MarketPlusTenAction; marketPendingPacks[id]=Mathf.Min(99,marketPendingPacks[id]+10); return; }
+                if (a >= MarketPlusAction && a < MarketPlusAction+10) { int id=a-MarketPlusAction; marketPendingPacks[id]=(int)System.Math.Min(int.MaxValue,(long)marketPendingPacks[id]+1); return; }
+                if (a >= MarketPlusTenAction && a < MarketPlusTenAction+10) { int id=a-MarketPlusTenAction; marketPendingPacks[id]=(int)System.Math.Min(int.MaxValue,(long)marketPendingPacks[id]+10); return; }
                 if (a >= MarketBuyAction && a < MarketBuyAction+10)
                 {
                     int id=a-MarketBuyAction;
@@ -991,7 +1158,7 @@ namespace HayChoriYPaty
                     marketLastPurchaseTime=Time.unscaledTime;
                     int packs=marketPendingPacks[id];long cost=(long)packs*game.Market.PackPriceCents(id);
                     bool success=packs>0&&cost<=game.Market.BalanceCents&&game.TryBuyIngredient(id,packs,game.Market.NextPurchaseId);
-                    marketMessage=success?"Compra realizada":cost>game.Market.BalanceCents?MarketInsufficientFundsMessage(cost):"No se pudo realizar la compra";if(success){marketPendingPacks[id]=0;if(game.Market.MissingUnits(game.Sim,id)==0)marketExpandedIngredient=-1;marketScroll=Mathf.Clamp(marketScroll,0,MarketMaxScroll());}return;
+                    marketMessage=success?"Compra realizada. Podés seguir comprando.":cost>game.Market.BalanceCents?MarketInsufficientFundsMessage(cost):"No se pudo realizar la compra";if(success){marketPendingPacks[id]=0;marketExpandedIngredient=id;marketScroll=Mathf.Clamp(marketScroll,0,MarketMaxScroll());}return;
                 }
                 if(a>=MarketRowMissingAction&&a<MarketRowMissingAction+10)
                 {
@@ -999,7 +1166,10 @@ namespace HayChoriYPaty
                     if(Time.unscaledTime-marketLastPurchaseTime<.25f)return;
                     marketLastPurchaseTime=Time.unscaledTime;
                     long cost=(long)game.Market.MissingPacks(game.Sim,id)*game.Market.PackPriceCents(id);
-                    marketMessage=cost>game.Market.BalanceCents?MarketInsufficientFundsMessage(cost):game.BuyMissingIngredient(id)?"Compra mínima realizada":"No hay faltante o no se pudo comprar";return;
+                    if(cost>game.Market.BalanceCents){marketMessage=MarketInsufficientFundsMessage(cost);return;}
+                    bool success=game.BuyMissingIngredient(id);
+                    if(success)marketExpandedIngredient=id;
+                    marketMessage=success?"Objetivo cubierto. Podés comprar más con + y COMPRAR.":"No hay faltante o no se pudo comprar";return;
                 }
                 if(a==MarketMissingAction)
                 {
@@ -1017,14 +1187,14 @@ namespace HayChoriYPaty
             if (a == ReadyLevelSelectorAction && game.Sim.Phase == RoundPhase.Ready)
             {
                 levelSelectActive = true;
-                levelSelectPage = game.Sim.LevelIndex / LevelSelectorPageSize;
+                levelSelectScroll = 0f;
                 return;
             }
             if (a==1) game.TryStartRound(); else if (a==2) ok=game.TryHireParrillero(); else if (a==3) ok=game.TryUpgradeSpeed(); else if (a==HireCocacoleroAction || a==HirePremiumAction || a==HireFerneteroAction) ok=game.TryHire(RoleForAction(a)); else if (a==HireMozoAction) ok=game.TryHireMozo();
             else if (a == RiotReturnAction && game.Sim.Phase == RoundPhase.Lost)
             {
                 ok = game.ReturnToLevels();
-                if (ok) { levelSelectActive = true; levelSelectPage = game.Sim.LevelIndex / LevelSelectorPageSize; }
+                if (ok) { levelSelectActive = true; levelSelectScroll = 0f; }
             }
             else if (a == VictoryExitAction && game.Sim.Phase == RoundPhase.Won)
             {
@@ -1037,7 +1207,7 @@ namespace HayChoriYPaty
             }
             else if (a == ResultLevelsAction && (game.Sim.Phase == RoundPhase.Won || game.Sim.Phase == RoundPhase.Lost))
             {
-                ok=game.ReturnToLevels(); if(ok){marketActive=false;levelSelectActive=true;levelSelectPage=game.Sim.LevelIndex/LevelSelectorPageSize;}
+                ok=game.ReturnToLevels(); if(ok){marketActive=false;levelSelectActive=true;levelSelectScroll=0f;}
             }
             lastAction=a; feedbackUntil=Time.unscaledTime+0.22f; feedbackScale=ok?1.04f:0.97f;
         }
@@ -1129,7 +1299,7 @@ namespace HayChoriYPaty
                 return;
             }
             riotScreenActive = false;
-            if (chulengoResult)
+            if (chulengoResult && !VictoryTransitionActive)
             {
                 ResultPanel();
                 GUI.color=old;GUI.matrix=m;
@@ -1165,7 +1335,7 @@ namespace HayChoriYPaty
             DrawCounters(sim);
             // The same footer geometry drives rendering, touch targets and the decorative pennant gap.
             int[] catalogActions = CatalogUpgradeActions(sim);
-            if (ShouldDrawUpgradeCards(sim.Phase, catalogActions.Length))
+            if (VictoryTransitionActive || ShouldDrawUpgradeCards(sim.Phase, catalogActions.Length))
                 for (int i = 0; i < catalogActions.Length; i++)
                 {
                     int action = catalogActions[i];
@@ -1181,6 +1351,7 @@ namespace HayChoriYPaty
                 if (levelOneTutorialActive) DrawLevelBadge(game.SelectedLevel, footer.LevelBadge);
                 else ReadyPanel(footer);
             }
+            else if (VictoryTransitionActive) DrawVictoryTransition();
             else if(sim.Phase==RoundPhase.Won||sim.Phase==RoundPhase.Lost) ResultPanel();
             else DrawLevelBadge(sim.LevelIndex, footer.LevelBadge);
             if (levelOneTutorialActive) DrawLevelOneTutorial();
@@ -1255,7 +1426,7 @@ namespace HayChoriYPaty
             finally { GUI.color = previous; }
         }
 
-        private void LateUpdate() { UpdateRiotState(); }
+        private void LateUpdate() { UpdateRiotState(); ObserveVictoryTransition(); }
         private void UpdateRiotState()
         {
             bool lost = game != null && game.Sim != null && game.Sim.Phase == RoundPhase.Lost;
@@ -1852,6 +2023,8 @@ namespace HayChoriYPaty
             GUI.color = old;
         }
 
+        private const float LevelBadgeCrestSize = 32f;
+
         private void DrawLevelBadge(int levelIndex, Rect bounds)
         {
             if (VisualLevelIndex == RiverVisualLevelIndex) levelIndex = RiverVisualLevelIndex;
@@ -1859,12 +2032,14 @@ namespace HayChoriYPaty
             Texture2D crest = LevelCrestForLevel(levelIndex);
             bool showCrest = crest != null;
             int originalSize = levelTitle.fontSize;
-            float available = bounds.width - (showCrest ? Mathf.Min(32f, bounds.height) + 8f : 0f);
+            float crestWidth = showCrest
+                ? LevelCrestSizedSlot(new Rect(0, 0, LevelBadgeCrestSize, LevelBadgeCrestSize), crest).width : 0f;
+            float available = bounds.width - (showCrest ? crestWidth + 8f : 0f);
             float measured = levelTitle.CalcSize(new GUIContent(caption)).x;
             if (measured + 8f > available)
                 levelTitle.fontSize = Mathf.Max(12, Mathf.FloorToInt(originalSize * (available - 8f) / measured));
-            Rect[] layout = LevelBadgeLayout(bounds, levelTitle.CalcSize(new GUIContent(caption)).x + 8f, showCrest);
-            if (showCrest) GUI.DrawTexture(LayoutRect(layout[0]), crest, ScaleMode.ScaleToFit, true);
+            Rect[] layout = LevelBadgeLayoutForWidth(bounds, levelTitle.CalcSize(new GUIContent(caption)).x + 8f, crestWidth);
+            if (showCrest) DrawLevelCrest(LayoutRect(layout[0]), crest);
             levelTitle.normal.textColor = new Color(.005f, .035f, .16f);
             for (int y = -1; y <= 1; y++)
             for (int x = -1; x <= 1; x++)
@@ -1876,13 +2051,17 @@ namespace HayChoriYPaty
         }
         private static Rect[] LevelBadgeLayout(Rect bounds, float preferredTextWidth, bool includeCrest)
         {
-            float iconSize = includeCrest ? Mathf.Min(32f, bounds.height) : 0f;
-            float gap = includeCrest ? 8f : 0f;
-            float textWidth = Mathf.Clamp(preferredTextWidth, 0f, bounds.width - iconSize - gap);
-            float start = bounds.center.x - (iconSize + gap + textWidth) * .5f;
+            return LevelBadgeLayoutForWidth(bounds, preferredTextWidth, includeCrest ? LevelBadgeCrestSize : 0f);
+        }
+        private static Rect[] LevelBadgeLayoutForWidth(Rect bounds, float preferredTextWidth, float crestWidth)
+        {
+            float iconHeight = crestWidth > 0f ? LevelBadgeCrestSize : 0f;
+            float gap = crestWidth > 0f ? 8f : 0f;
+            float textWidth = Mathf.Clamp(preferredTextWidth, 0f, bounds.width - crestWidth - gap);
+            float start = bounds.center.x - (crestWidth + gap + textWidth) * .5f;
             return new[] {
-                new Rect(start, bounds.center.y - iconSize * .5f, iconSize, iconSize),
-                new Rect(start + iconSize + gap, bounds.y, textWidth, bounds.height)
+                new Rect(start, bounds.center.y - iconHeight * .5f, crestWidth, iconHeight),
+                new Rect(start + crestWidth + gap, bounds.y, textWidth, bounds.height)
             };
         }
         private static Rect TopHudCutoutBounds(Vector2 screenSize, Rect[] cutouts)
@@ -2295,7 +2474,19 @@ namespace HayChoriYPaty
         {
             return new Rect(0, 0, Mathf.Max(0, size.x), Mathf.Max(0, size.y));
         }
+        private static Rect IntroBackdropBounds(Vector2 screenSize, float scale)
+        {
+            float width = Mathf.Max(0f, screenSize.x * scale);
+            float height = Mathf.Max(0f, screenSize.y * scale);
+            return new Rect((screenSize.x - width) * .5f, (screenSize.y - height) * .5f, width, height);
+        }
+        private static Rect IntroLogoGlowBounds(Vector2 screenSize) =>
+            new Rect(screenSize.x * .08f, screenSize.y * .54f, screenSize.x * .84f, screenSize.y * .38f);
         private static void DrawIntroScreen(Texture2D texture, Color tint, ScaleMode scaleMode)
+        {
+            DrawIntroScreen(texture, tint, scaleMode, IntroScreenRect(new Vector2(Screen.width, Screen.height)));
+        }
+        private static void DrawIntroScreen(Texture2D texture, Color tint, ScaleMode scaleMode, Rect screenBounds)
         {
             if (texture == null) return;
             // Decorative art fills physical pixels; foreground/input keep the safe-area canvas.
@@ -2303,19 +2494,80 @@ namespace HayChoriYPaty
             try
             {
                 GUI.matrix = Matrix4x4.identity; GUI.color = tint;
-            GUI.DrawTexture(IntroScreenRect(new Vector2(Screen.width, Screen.height)), texture, scaleMode, true);
+                GUI.DrawTexture(screenBounds, texture, scaleMode, true);
             }
             finally { GUI.matrix = matrix; GUI.color = color; }
         }
-        private static Rect IntroProgressBounds() => new Rect((W - 118f) * .5f, H - 48f, 118f, 6f);
+        private static Rect IntroProgressBounds() => new Rect((W - 100f) * .5f, H - 48f, 100f, 8f);
+        private static float IntroProgressValue(float elapsed) => Mathf.Clamp01(elapsed / IntroDuration);
+        private static float IntroLogoScale(float elapsed) =>
+            1f + IntroLogoPushIn * IntroEase(elapsed / IntroLogoSettleDuration);
+        private static float IntroLogoGlowAlpha(float elapsed)
+        {
+            float reveal = IntroEase(elapsed / .18f);
+            float fade = 1f - IntroEase((elapsed - .18f) / .82f);
+            return .18f * reveal * fade;
+        }
+        private static Texture2D CreateIntroProgressCapsule()
+        {
+            const int width = 96, height = 16;
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false, true)
+            {
+                name = "Intro progress capsule mask",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            var pixels = new Color[width * height];
+            Rect shape = new Rect(0f, 0f, width, height);
+            for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
+            {
+                float alpha = RoundedCoverage(x + .5f, y + .5f, shape, height * .5f);
+                pixels[y * width + x] = new Color(1f, 1f, 1f, alpha);
+            }
+            texture.SetPixels(pixels);
+            texture.Apply(false, true);
+            return texture;
+        }
+        private void DrawIntroCapsule(Rect bounds, Color tint)
+        {
+            Color previous = GUI.color;
+            GUI.color = tint;
+            if (introProgressCapsule != null)
+                GUI.DrawTexture(LayoutRect(bounds), introProgressCapsule, ScaleMode.StretchToFill, true);
+            else
+                FillRect(bounds, tint);
+            GUI.color = previous;
+        }
+        private void DrawIntroProgress(float elapsed)
+        {
+            Rect bounds = IntroProgressBounds();
+            DrawIntroCapsule(new Rect(bounds.x, bounds.y + 1f, bounds.width, bounds.height), new Color(.003f, .015f, .05f, .72f));
+            DrawIntroCapsule(bounds, new Color(.45f, .86f, 1f, .96f));
+            Rect track = new Rect(bounds.x + 1f, bounds.y + 1f, bounds.width - 2f, bounds.height - 2f);
+            DrawIntroCapsule(track, new Color(.006f, .025f, .075f, .96f));
+            float progress = IntroProgressValue(elapsed);
+            Rect fill = new Rect(track.x + 1f, track.y + 1f, (track.width - 2f) * progress, track.height - 2f);
+            if (fill.width > 0f)
+            {
+                DrawIntroCapsule(fill, new Color(.025f, .62f, .98f, .98f));
+                if (fill.width > 8f)
+                    FillRect(new Rect(fill.x + 3f, fill.y + 1f, fill.width - 6f, 1f), new Color(.82f, .96f, 1f, .55f));
+            }
+        }
         private void DrawIntro(float elapsed)
         {
+            Vector2 screenSize = new Vector2(Screen.width, Screen.height);
             DrawIntroScreen(Texture2D.whiteTexture, Color.black, ScaleMode.StretchToFill);
-            DrawIntroScreen(coverArt, Color.white, ScaleMode.ScaleAndCrop);
-            Rect track = LayoutRect(IntroProgressBounds());
-            FillRect(track, new Color(.015f, .035f, .09f, .9f));
-            Rect fill = new Rect(track.x + 1f, track.y + 1f, Mathf.Max(0f, (track.width - 2f) * Mathf.Clamp01(elapsed / IntroDuration)), Mathf.Max(1f, track.height - 2f));
-            FillRect(fill, new Color(.03f, .72f, 1f, .96f));
+            // The wordmark is integrated into the splash artwork; animate that composite instead of drawing a duplicate logo.
+            DrawIntroScreen(coverArt, Color.white, ScaleMode.ScaleAndCrop,
+                IntroBackdropBounds(screenSize, IntroLogoScale(elapsed)));
+            float glowAlpha = IntroLogoGlowAlpha(elapsed);
+            if (introGlow != null && glowAlpha > .001f)
+                DrawIntroScreen(introGlow, new Color(1f, .86f, .62f, glowAlpha), ScaleMode.StretchToFill,
+                    IntroLogoGlowBounds(screenSize));
+            DrawIntroProgress(elapsed);
             GUI.color = Color.white;
         }
         private void DrawHubScreen()
@@ -2452,17 +2704,62 @@ namespace HayChoriYPaty
         {
             FillRect(new Rect(0, 0, W, logicalCanvasHeight), new Color(.035f, .025f, .025f, .58f));
             OutlineLabel(LevelSelectTitle, "ELEGÍ TU CANCHA", menuTitle, new Color(1f, .91f, .72f), 2f);
-            for (int i = levelSelectPage * LevelSelectorPageSize; i < Mathf.Min((levelSelectPage + 1) * LevelSelectorPageSize, StreetSimulation.LevelNames.Length); i++) DrawLevelSelectCard(i);
-            DrawStandardButton(LevelSelectPrevious, LevelSelectorPreviousAction, "ATRÁS", levelSelectPage > 0);
-            DrawStandardButton(LevelSelectNext, LevelSelectorNextAction, "MÁS", (levelSelectPage + 1) * LevelSelectorPageSize < StreetSimulation.LevelNames.Length);
-            Label(new Rect(148, 675, 244, 30), "CANCHAS " + (levelSelectPage + 1) + " / " + ((StreetSimulation.LevelNames.Length + LevelSelectorPageSize - 1) / LevelSelectorPageSize), small);
-            Label(LevelSelectHint, string.IsNullOrEmpty(marketMessage) ? "Superá cada cancha para desbloquear la siguiente" : marketMessage, small);
-            DrawStandardButton(LevelSelectBack, LevelSelectorBackAction, "VOLVER");
             DrawStandardButton(MarketSelectorBounds(), MarketCloseAction, "MERCADO");
+            Event evt = Event.current;
+            if (evt.type == EventType.ScrollWheel)
+            {
+                Vector2 point = ScreenToLayoutPoint(evt.mousePosition, new Vector2(Screen.width, Screen.height),
+                    CanvasViewport(new Vector2(Screen.width, Screen.height), Screen.safeArea));
+                if (LevelSelectorViewport.Contains(point))
+                {
+                    levelSelectScroll = Mathf.Clamp(levelSelectScroll + evt.delta.y * 28f, 0f,
+                        LevelSelectorMaxScroll(logicalCanvasHeight));
+                    evt.Use();
+                }
+            }
+            levelSelectScroll = Mathf.Clamp(levelSelectScroll, 0f, LevelSelectorMaxScroll(logicalCanvasHeight));
+            GUI.BeginGroup(LayoutRect(LevelSelectorViewport));
+            try
+            {
+                for (int i = 0; i < StreetSimulation.LevelNames.Length; i++)
+                {
+                    Rect card = LevelSelectCardBounds(i);
+                    if (card.yMax <= LevelSelectorViewport.y + levelSelectScroll ||
+                        card.y >= LevelSelectorViewport.yMax + levelSelectScroll) continue;
+                    card.x -= LevelSelectorViewport.x;
+                    card.y -= LevelSelectorViewport.y + levelSelectScroll;
+                    DrawLevelSelectCard(i, card);
+                }
+            }
+            finally { GUI.EndGroup(); }
+            DrawLevelSelectorScrollBar();
+            DrawStandardButton(LevelSelectBack, LevelSelectorBackAction, "VOLVER");
+        }
+        private static float LevelSelectorContentBottom(int levelCount)
+        {
+            int rows = Mathf.CeilToInt(Mathf.Max(0, levelCount) / 2f);
+            return rows <= 0 ? 0f : 160f + rows * LevelSelectorCardHeight + (rows - 1) * LevelSelectorCardGap;
+        }
+        private static float LevelSelectorMaxScroll(float canvasHeight)
+        {
+            float availableHeight = Mathf.Min(LevelSelectorViewport.height, Mathf.Max(100f, canvasHeight - LevelSelectorViewport.y - 112f));
+            return Mathf.Max(0f, LevelSelectorContentBottom(StreetSimulation.LevelNames.Length) -
+                LevelSelectorViewport.y - availableHeight);
+        }
+        private void DrawLevelSelectorScrollBar()
+        {
+            float max = LevelSelectorMaxScroll(logicalCanvasHeight);
+            if (max <= 0f) return;
+            Rect track = new Rect(W - 8f, LevelSelectorViewport.y, 4f, LevelSelectorViewport.height);
+            FillRect(track, new Color(.008f, .035f, .14f, .72f));
+            float thumbHeight = Mathf.Max(30f, track.height * track.height /
+                (track.height + LevelSelectorContentBottom(StreetSimulation.LevelNames.Length) - LevelSelectorViewport.y - track.height));
+            FillRect(new Rect(track.x, track.y + (track.height - thumbHeight) * levelSelectScroll / max,
+                track.width, thumbHeight), new Color(.22f, .82f, 1f, .95f));
         }
 
         private static Rect MarketBackBounds() => new Rect(12, 10, 132, 50);
-        private static Rect MarketSelectorBounds() => new Rect(115, 766, 310, 64);
+        private static Rect MarketSelectorBounds() => new Rect(W - 138f, 12f, 126f, 46f);
         private const float MarketObjectiveTop = 202f;
         private const float MarketCompactRowHeight = 104f, MarketPurchaseHeight = 64f, MarketOthersHeight = 48f;
         private static readonly Color MarketInk = new Color(.20f, .08f, .025f);
@@ -2685,8 +2982,8 @@ namespace HayChoriYPaty
             DrawMarketBluePanel(new Rect(12, 70, W - 24, 100), new Color(.012f, .065f, .22f, .97f));
             int level = game.Sim.LevelIndex;
             Texture2D crest = LevelCrestForLevel(level);
-            Rect badge = new Rect(28, 82, 76, 76);
-            if (crest != null) GUI.DrawTexture(badge, crest, ScaleMode.ScaleToFit, true);
+            Rect badge = LevelCrestSizedSlot(new Rect(28, 82, 76, 76), crest);
+            if (crest != null) DrawLevelCrest(badge, crest);
             else
             {
                 // No invented official crest: existing club palette/initials identify levels without a crest asset.
@@ -2694,9 +2991,11 @@ namespace HayChoriYPaty
                 MarketText(new Rect(badge.x + 6, badge.y + 20, badge.width - 12, 36), MarketClubInitials(level), 22, Color.white);
             }
             string[] club = StreetSimulation.LevelDisplayNames[level].Split('/');
-            MarketText(new Rect(120, 77, 386, 24), "NIVEL " + (level + 1), 19, MarketCyan, TextAnchor.MiddleLeft);
-            MarketText(new Rect(120, 100, 386, 35), club[0].Trim().ToUpperInvariant(), 29, Color.white, TextAnchor.MiddleLeft);
-            MarketText(new Rect(120, 136, 386, 23), club.Length > 1 ? club[1].Trim().ToUpperInvariant() : "", 19, new Color(.82f, .94f, 1f), TextAnchor.MiddleLeft);
+            float captionX = Mathf.Max(120f, badge.xMax + 16f);
+            float captionWidth = 506f - captionX;
+            MarketText(new Rect(captionX, 77, captionWidth, 24), "NIVEL " + (level + 1), 19, MarketCyan, TextAnchor.MiddleLeft);
+            MarketText(new Rect(captionX, 100, captionWidth, 35), club[0].Trim().ToUpperInvariant(), 29, Color.white, TextAnchor.MiddleLeft);
+            MarketText(new Rect(captionX, 136, captionWidth, 23), club.Length > 1 ? club[1].Trim().ToUpperInvariant() : "", 19, new Color(.82f, .94f, 1f), TextAnchor.MiddleLeft);
         }
         private static string MarketClubInitials(int level)
         {
@@ -2763,12 +3062,14 @@ namespace HayChoriYPaty
                     int packs = marketPendingPacks[id];
                     DrawStandardButton(MarketPurchaseControlBounds(row, MarketMinusAction), MarketMinusAction + id, "−", packs > 0);
                     Rect minus = MarketPurchaseControlBounds(row, MarketMinusAction);
-                    FillRect(new Rect(row.x + 54, minus.y + 3, 40, 40), MarketNavy);
-                    MarketText(new Rect(row.x + 54, minus.y, 40, 46), packs.ToString(), 24, Color.white);
+                    DrawMarketBluePanel(new Rect(row.x + 54, minus.y + 3, 40, 40), MarketNavy);
+                    MarketText(new Rect(row.x + 54, minus.y, 40, 46), packs.ToString(),
+                        Mathf.Min(24, 60 / packs.ToString().Length), Color.white);
                     DrawStandardButton(MarketPurchaseControlBounds(row, MarketPlusAction), MarketPlusAction + id, "+");
                     DrawStandardButton(MarketPurchaseControlBounds(row, MarketPlusTenAction), MarketPlusTenAction + id, "+10");
                     long cost = (long)packs * game.Market.PackPriceCents(id);
-                    DrawStandardButton(MarketPurchaseControlBounds(row, MarketBuyAction), MarketBuyAction + id, "COMPRAR\n" + FormatMarketMoney(cost), packs > 0 && cost <= game.Market.BalanceCents);
+                    DrawStandardButton(MarketPurchaseControlBounds(row, MarketBuyAction), MarketBuyAction + id,
+                        (missing == 0 && needed > 0 ? "COMPRAR MÁS\n" : "COMPRAR\n") + FormatMarketMoney(cost), packs > 0 && cost <= game.Market.BalanceCents);
                     DrawStandardButton(MarketPurchaseControlBounds(row, MarketRowMissingAction), MarketRowMissingAction + id, "COMPRAR\nFALTANTES", missing > 0 && (long)game.Market.MissingPacks(game.Sim, id) * game.Market.PackPriceCents(id) <= game.Market.BalanceCents);
                 }
                 // Row expansion never buys anything. On Android the hit surface is limited to its compact face.
@@ -2847,23 +3148,61 @@ namespace HayChoriYPaty
         }
         private void DrawMarketPlayButton(Rect bounds, string caption, bool enabled)
         {
-            Rect drawn = StandardButtonVisualBounds(bounds, pressedAction == MarketPlayAction);
-            Color previous = GUI.color; bool priorEnabled = GUI.enabled;
-            GUI.color = enabled ? Color.white : new Color(.48f, .48f, .48f, .9f);
-            if (items != null)
+            DrawStandardButton(bounds, MarketPlayAction, caption, enabled);
+        }
+
+        private readonly System.Collections.Generic.Dictionary<Color,
+            System.Collections.Generic.Dictionary<Vector2Int, Texture2D>> marketPanelTextures =
+            new System.Collections.Generic.Dictionary<Color, System.Collections.Generic.Dictionary<Vector2Int, Texture2D>>();
+
+        private void DrawMarketBluePanel(Rect bounds, Color face)
+        {
+            if (bounds.width <= 0f || bounds.height <= 0f) return;
+            System.Collections.Generic.Dictionary<Vector2Int, Texture2D> sizes;
+            if (!marketPanelTextures.TryGetValue(face, out sizes))
             {
-                Rect source = Items[13];
-                float sourceCap = source.height * .5f, cap = drawn.height * .5f;
-                DrawRaw(new Rect(drawn.x, drawn.y, cap, drawn.height), items, new Rect(source.x, source.y, sourceCap, source.height), true, false);
-                DrawRaw(new Rect(drawn.x + cap - .3f, drawn.y, drawn.width - 2 * cap + .6f, drawn.height), items,
-                    new Rect(source.x + sourceCap, source.y, source.width - 2 * sourceCap, source.height), true, false);
-                DrawRaw(new Rect(drawn.xMax - cap, drawn.y, cap, drawn.height), items, new Rect(source.xMax - sourceCap, source.y, sourceCap, source.height), true, false);
+                sizes = new System.Collections.Generic.Dictionary<Vector2Int, Texture2D>();
+                marketPanelTextures.Add(face, sizes);
             }
-            GUI.color = Color.white;
-            MarketText(new Rect(drawn.x + 16, drawn.y + 5, drawn.width - 32, drawn.height - 10), caption, 34, enabled ? Color.white : new Color(.80f, .80f, .80f));
-            GUI.enabled = enabled && priorEnabled;
-            if (GUI.Button(bounds, "", invisible)) NativeAction(MarketPlayAction);
-            GUI.enabled = priorEnabled; GUI.color = previous;
+            var size = new Vector2Int(Mathf.Max(1, Mathf.RoundToInt(bounds.width * 2f)),
+                Mathf.Max(1, Mathf.RoundToInt(bounds.height * 2f)));
+            Texture2D texture;
+            if (!sizes.TryGetValue(size, out texture))
+            {
+                texture = CreateRoundedMarketPanel(size.x, size.y, face);
+                sizes.Add(size, texture);
+            }
+            GUI.DrawTexture(bounds, texture, ScaleMode.StretchToFill, true);
+        }
+
+        private static Texture2D CreateRoundedMarketPanel(int width, int height, Color faceColor)
+        {
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false) {
+                name = "Rounded navy cyan market panel", hideFlags = HideFlags.HideAndDontSave,
+                wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+            float w = width * .5f, h = height * .5f;
+            float radius = Mathf.Min(16f, h * .32f);
+            Rect shadow = new Rect(1, 3, w - 1, h - 3);
+            Rect rim = new Rect(0, 0, w - 1, h - 3);
+            Rect cyan = new Rect(2, 2, w - 5, h - 7);
+            Rect face = new Rect(4, 4, w - 9, h - 11);
+            var pixels = new Color[width * height];
+            for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
+            {
+                float px = (x + .5f) * .5f, py = (height - y - .5f) * .5f;
+                Color color = new Color(.003f, .018f, .075f,
+                    .64f * RoundedCoverage(px, py, shadow, radius));
+                color = Over(color, MarketNavy, RoundedCoverage(px, py, rim, radius));
+                color = Over(color, MarketCyan, RoundedCoverage(px, py, cyan, Mathf.Max(1, radius - 2)));
+                float coverage = RoundedCoverage(px, py, face, Mathf.Max(1, radius - 4));
+                color = Over(color, faceColor, coverage);
+                float gloss = .22f * Mathf.Clamp01(1f - (py - face.y) / Mathf.Max(1, face.height * .38f));
+                color = Over(color, Color.white, coverage * gloss);
+                pixels[y * width + x] = color;
+            }
+            texture.SetPixels(pixels); texture.Apply();
+            return texture;
         }
         private void DrawMarketWoodPanel(Rect bounds, Color face)
         {
@@ -2892,17 +3231,6 @@ namespace HayChoriYPaty
             marketLabelStyle.normal.textColor = color;
             GUI.Label(bounds, value, marketLabelStyle);
         }
-        private void DrawMarketBluePanel(Rect bounds, Color face)
-        {
-            if (bounds.width <= 0f || bounds.height <= 0f) return;
-            FillRect(new Rect(bounds.x + 2f, bounds.y + 3f, bounds.width - 2f, bounds.height - 2f),
-                new Color(.003f, .018f, .075f, .64f));
-            FillRect(bounds, MarketNavy);
-            FillRect(new Rect(bounds.x + 2f, bounds.y + 2f, bounds.width - 4f, bounds.height - 4f), MarketCyan);
-            FillRect(new Rect(bounds.x + 4f, bounds.y + 4f, bounds.width - 8f, bounds.height - 8f), face);
-            FillRect(new Rect(bounds.x + 5f, bounds.y + 5f, bounds.width - 10f, Mathf.Min(3f, bounds.height - 10f)),
-                new Color(1f, 1f, 1f, .28f));
-        }
         private string MarketEconomyFooterSummary()
         {
             long balance = game.Market.BalanceCents, cost = game.Market.MinimumPurchaseCostCents(game.Sim);
@@ -2919,31 +3247,33 @@ namespace HayChoriYPaty
         private static string FormatMarketMoney(long cents) => "$"+(cents/100L)+","+(cents%100L).ToString("00");
         private static Rect LevelSelectCardBounds(int index)
         {
-            const float width = 236f, height = 150f;
-            int slot = index % LevelSelectorPageSize;
-            int row = slot / 2, column = slot % 2;
-            float x = index == StreetSimulation.LevelNames.Length - 1 && column == 0 ? (W - width) * .5f : 24f + column * 256f;
-            return new Rect(x, 154f + row * 174f, width, height);
+            const float width = 236f;
+            int row = index / 2, column = index % 2;
+            float x = index == StreetSimulation.LevelNames.Length - 1 && column == 0
+                ? (W - width) * .5f : 24f + column * 256f;
+            return new Rect(x, 160f + row * (LevelSelectorCardHeight + LevelSelectorCardGap),
+                width, LevelSelectorCardHeight);
         }
-        private void DrawLevelSelectCard(int index)
+        private void DrawLevelSelectCard(int index, Rect baseBounds)
         {
-            Rect baseBounds = LevelSelectCardBounds(index);
             float cardScale = Mathf.Min(1f, layoutVerticalScale);
             Rect bounds = ScaleCardBounds(baseBounds, cardScale);
             bool unlocked = index <= game.UnlockedLevel;
-            Color frame = unlocked ? new Color(.94f, .62f, .18f) : new Color(.24f, .20f, .18f);
-            FillRect(ScaleCardChild(new Rect(baseBounds.x - 2, baseBounds.y - 2, baseBounds.width + 4, baseBounds.height + 4), baseBounds, cardScale), frame);
-            FillRect(bounds, new Color(.10f, .07f, .045f));
+            Color frame = unlocked ? new Color(.025f, .24f, .70f) : new Color(.20f, .24f, .31f);
+            FillRect(ScaleCardChild(new Rect(baseBounds.x - 2, baseBounds.y - 2, baseBounds.width + 4, baseBounds.height + 4), baseBounds, cardScale), new Color(.008f, .035f, .14f));
+            FillRect(bounds, frame);
+            FillRect(ScaleCardChild(new Rect(baseBounds.x - 1, baseBounds.y - 1, baseBounds.width + 2, baseBounds.height + 2), baseBounds, cardScale), new Color(.22f, .82f, 1f));
             Rect artwork = ScaleCardChild(new Rect(baseBounds.x + 3, baseBounds.y + 3, baseBounds.width - 6, 106), baseBounds, cardScale);
             DrawLevelSelectArtwork(index, artwork, cardScale);
 
             Rect caption = ScaleCardChild(new Rect(baseBounds.x + 3, baseBounds.y + 109, baseBounds.width - 6, 38), baseBounds, cardScale);
-            FillRect(caption, new Color(.10f, .055f, .028f, .93f));
+            FillRect(caption, unlocked ? new Color(.98f, .94f, .81f) : new Color(.77f, .80f, .84f));
+            FillRect(new Rect(caption.x, caption.y, 6f * cardScale, caption.height), ClubVisualTheme.ForLevel(index).PrimaryColor);
             string number = "NIVEL " + (index + 1);
             int oldSize = menuTitle.fontSize;
             menuTitle.fontSize = Mathf.Max(12, Mathf.RoundToInt(19f * cardScale));
             OutlineLabel(new Rect(caption.x + 2 * cardScale, caption.y - cardScale, caption.width - 4 * cardScale,
-                20 * cardScale), number, menuTitle, unlocked ? Color.white : new Color(.76f, .72f, .67f), 1.3f * cardScale);
+                20 * cardScale), number, menuTitle, unlocked ? new Color(.025f, .075f, .20f) : new Color(.25f, .29f, .36f), .8f * cardScale);
             menuTitle.fontSize = oldSize;
 
             string name = StreetSimulation.LevelDisplayNames[index].ToUpperInvariant();
@@ -2954,22 +3284,15 @@ namespace HayChoriYPaty
                 levelTitle.fontSize = Mathf.Max(10, Mathf.FloorToInt(levelTitle.fontSize * (caption.width - 10 * cardScale) / measured));
             OutlineLabel(new Rect(caption.x + 4 * cardScale, caption.y + 17 * cardScale,
                 caption.width - 8 * cardScale, 20 * cardScale), name, levelTitle,
-                unlocked ? new Color(1f, .89f, .62f) : new Color(.72f, .69f, .65f), 1.1f * cardScale);
+                unlocked ? new Color(.035f, .09f, .22f) : new Color(.30f, .33f, .39f), .8f * cardScale);
             levelTitle.fontSize = oldLevelSize;
 
+            Rect tag = new Rect(artwork.xMax - (unlocked ? 83f : 98f) * cardScale,
+                artwork.y + 6f * cardScale, (unlocked ? 77f : 92f) * cardScale, 19f * cardScale);
+            FillRect(tag, unlocked ? new Color(.04f, .42f, .18f, .96f) : new Color(.12f, .17f, .25f, .94f));
             if (!unlocked)
-            {
-                FillRect(artwork, new Color(.015f, .012f, .012f, .60f));
-                Item(new Rect(artwork.center.x - 14 * cardScale, artwork.center.y - 16 * cardScale,
-                    28 * cardScale, 34 * cardScale), 17);
-            }
-            else
-            {
-                Rect tag = new Rect(artwork.xMax - 83 * cardScale, artwork.y + 6 * cardScale,
-                    77 * cardScale, 19 * cardScale);
-                FillRect(tag, new Color(.20f, .52f, .09f, .94f));
-                Label(tag, "DISPONIBLE", tiny);
-            }
+                Item(new Rect(tag.x + 3f * cardScale, tag.y + 1f * cardScale, 15f * cardScale, 17f * cardScale), 17);
+            Label(tag, unlocked ? "DISPONIBLE" : "BLOQUEADO", tiny);
 
             if (unlocked && GUI.Button(LayoutRect(bounds), "", invisible))
                 NativeAction(LevelSelectFirstAction + index);
@@ -2980,16 +3303,16 @@ namespace HayChoriYPaty
             {
                 DrawRawCover(LayoutRect(bounds), muralArt, AllBoysSelectorMuralSource);
                 if (allBoysCrest != null)
-                    GUI.DrawTexture(LayoutRect(new Rect(bounds.x + 5 * cardScale, bounds.y + 5 * cardScale,
-                        28 * cardScale, 32 * cardScale)), allBoysCrest, ScaleMode.ScaleToFit, true);
+                    DrawLevelCrest(LayoutRect(new Rect(bounds.x + 5 * cardScale, bounds.y + 5 * cardScale,
+                        30 * cardScale, 34 * cardScale)), allBoysCrest);
                 return;
             }
             if (index == 1 && chicagoBackground != null)
             {
                 DrawRawCover(LayoutRect(bounds), chicagoBackground, ChicagoSelectorMuralSource);
                 if (chicagoCrest != null)
-                    GUI.DrawTexture(LayoutRect(new Rect(bounds.x + 5 * cardScale, bounds.y + 5 * cardScale,
-                        28 * cardScale, 32 * cardScale)), chicagoCrest, ScaleMode.ScaleToFit, true);
+                    DrawLevelCrest(LayoutRect(new Rect(bounds.x + 5 * cardScale, bounds.y + 5 * cardScale,
+                        30 * cardScale, 34 * cardScale)), chicagoCrest);
                 return;
             }
             ClubVisualTheme theme = ClubVisualTheme.ForLevel(index);
@@ -3004,8 +3327,8 @@ namespace HayChoriYPaty
                     FillRect(new Rect(bounds.x, bounds.y, bounds.width, 5 * cardScale), theme.PrimaryColor);
                     Texture2D crest = LevelCrestForLevel(index);
                     if (crest != null)
-                        GUI.DrawTexture(LayoutRect(new Rect(bounds.x + 5 * cardScale, bounds.y + 5 * cardScale,
-                            30 * cardScale, 34 * cardScale)), crest, ScaleMode.ScaleToFit, true);
+                        DrawLevelCrest(LayoutRect(new Rect(bounds.x + 5 * cardScale, bounds.y + 5 * cardScale,
+                            30 * cardScale, 34 * cardScale)), crest);
                     return;
                 }
             }
@@ -3792,6 +4115,11 @@ namespace HayChoriYPaty
             return new Rect(pairedPoseColumn * cellWidth, atlas.height - (rowFromTop + 1) * cellHeight,
                 cellWidth, cellHeight);
         }
+        private static int SpecialistUpgradePortraitSourceLevel(int levelIndex)
+        {
+            // Keep Cocacolero/Fernetero upgrade-card portraits visually consistent across levels.
+            return levelIndex >= 0 && levelIndex < StreetSimulation.LevelNames.Length ? 1 : 0;
+        }
         private static bool UsesMatchedCocacoleroArt(int levelIndex)
         {
             // Chicago and later specialist levels share the same worker style and proportions.
@@ -3831,6 +4159,8 @@ namespace HayChoriYPaty
                 cocacoleroArt = UsesMatchedCocacoleroArt(levelIndex) && fernetWorkerLater != null ? fernetWorkerLater : fernetWorker;
             Vector2 movement=w.Target-w.Position;
             StreetWorkerPose workerPose = StreetWorkerAnimation.Sample(w);
+            if (w.State == StreetWorkerState.ToStation && StreetWorkerProjection.CocaBarrelPresentationOffset(game.Sim, w) > .01f)
+                movement = new Vector2(0f, 1f);
             moving = workerPose.Moving;
             int frame=moving?SelectParrilleroWalkFrame(movement,workerPose.Frame):0;
             if(w.State==StreetWorkerState.Pickup||w.State==StreetWorkerState.Deposit)frame=beverageRole?0:11;
@@ -3852,9 +4182,13 @@ namespace HayChoriYPaty
                     frame=x>y?9+phase:(movement.y>0?1+phase:5+phase);
                 }
                 bool flip=game.Sim.LevelIndex==1
-                    ? (w.State == StreetWorkerState.Pickup ? !StreetWorkstationLayout.PickupReachesRight(w.Product, game.Sim.HasParrilleroPremium)
+                    ? (w.State == StreetWorkerState.Pickup ? (w.Product == 4
+                        ? false
+                        : !StreetWorkstationLayout.PickupReachesRight(w.Product, game.Sim.HasParrilleroPremium))
                         : ChicagoWorkerFlip(true,frame,movement,false))
-                    : w.State == StreetWorkerState.Pickup ? !StreetWorkstationLayout.PickupReachesRight(w.Product, game.Sim.HasParrilleroPremium)
+                    : w.State == StreetWorkerState.Pickup ? (w.Product == 4
+                        ? false
+                        : !StreetWorkstationLayout.PickupReachesRight(w.Product, game.Sim.HasParrilleroPremium))
                         : moving && Mathf.Abs(movement.x)>Mathf.Abs(movement.y) && movement.x<0;
                 bool laterStyle = UsesMatchedCocacoleroArt(levelIndex) && laterCocacolero != null;
                 Rect pose = CocacoleroPoseForLevel(levelIndex, frame);
@@ -3962,6 +4296,7 @@ namespace HayChoriYPaty
             if (glossyCard != null) GUI.DrawTexture(drawn, glossyCard, ScaleMode.StretchToFill, true);
             else FillRect(drawn, new Color(.025f, .14f, .40f, 1f));
             GUI.color=old;
+            if (available) DrawAffordableUpgradeBorder(r);
             bool compact = r.width < 200;
             int titleSize = upgradeTitle.fontSize;
             upgradeTitle.fontSize = r.height < 120 ? (action == HirePremiumAction ? 13 : compact ? 15 : 17)
@@ -3984,11 +4319,11 @@ namespace HayChoriYPaty
             {
                 if(speedArrows!=null) DrawUpgradeOvalContent(drawn,speedArrows,SpeedArrowBounds);
             }
-            else if((action==HireCocacoleroAction || action==HireFerneteroAction) && CocacoleroArtForLevel(game.Sim.LevelIndex)!=null)
+            else if((action==HireCocacoleroAction || action==HireFerneteroAction) && CocacoleroArtForLevel(SpecialistUpgradePortraitSourceLevel(game.Sim.LevelIndex))!=null)
             {
-                int levelIndex = game.Sim.LevelIndex;
-                Texture2D art = action == HireFerneteroAction ? (UsesMatchedCocacoleroArt(levelIndex) ? fernetWorkerLater : fernetWorker) : CocacoleroArtForLevel(levelIndex);
-                DrawUpgradeOvalContent(drawn,art,CocacoleroPoseForLevel(levelIndex,0));
+                int artLevel = SpecialistUpgradePortraitSourceLevel(game.Sim.LevelIndex);
+                Texture2D art = action == HireFerneteroAction ? (UsesMatchedCocacoleroArt(artLevel) ? fernetWorkerLater : fernetWorker) : CocacoleroArtForLevel(artLevel);
+                DrawUpgradeOvalContent(drawn,art,CocacoleroPoseForLevel(artLevel,0));
             }
             else if (action == HirePremiumAction && premiumWorker != null) DrawUpgradeOvalContent(drawn,premiumWorker,ParrilleroPoses[0]);
             else if (action == HireMozoAction && mozoWorker != null) DrawUpgradeOvalContent(drawn,mozoWorker,ParrilleroPoses[0]);
@@ -4004,6 +4339,75 @@ namespace HayChoriYPaty
             bool prev=GUI.enabled;GUI.enabled=available;
             if(GUI.Button(LayoutRect(r),"",invisible))NativeAction(action);GUI.enabled=prev;
             layoutVerticalScale = previousVertical;
+        }
+        private void DrawAffordableUpgradeBorder(Rect card)
+        {
+            Texture2D border = GetAffordableUpgradeBorderTexture(card);
+            if (border == null) return;
+            float inset = AffordableUpgradeBorderPaddingPixels(Mathf.RoundToInt(card.width * 2f)) * .5f;
+            Color previous = GUI.color;
+            try
+            {
+                GUI.color = Color.white;
+                GUI.DrawTexture(new Rect(card.x - inset, card.y - inset,
+                    card.width + inset * 2f, card.height + inset * 2f), border, ScaleMode.StretchToFill, true);
+            }
+            finally { GUI.color = previous; }
+        }
+        private Texture2D GetAffordableUpgradeBorderTexture(Rect card)
+        {
+            int width = Mathf.Clamp(Mathf.RoundToInt(card.width * 2f), 128, 1024);
+            int height = Mathf.Clamp(Mathf.RoundToInt(card.height * 2f), 96, 768);
+            string key = width + "x" + height;
+            if (affordableUpgradeBorderTextures.TryGetValue(key, out Texture2D cached) && cached != null) return cached;
+            Texture2D created = CreateAffordableUpgradeBorderTexture(width, height);
+            affordableUpgradeBorderTextures[key] = created;
+            return created;
+        }
+        private static int AffordableUpgradeBorderPaddingPixels(int cardWidth) => cardWidth < 400 ? 10 : 14;
+        private static Rect InflateUpgradeBorderRect(Rect rect, float amount) =>
+            new Rect(rect.x - amount, rect.y - amount, rect.width + amount * 2f, rect.height + amount * 2f);
+        private static float UpgradeBorderRingCoverage(float x, float y, Rect subject, float outerWidth, float innerWidth, float baseRadius)
+        {
+            Rect outer = InflateUpgradeBorderRect(subject, outerWidth);
+            Rect inner = InflateUpgradeBorderRect(subject, innerWidth);
+            float outerRadius = Mathf.Max(1f, baseRadius + outerWidth);
+            float innerRadius = Mathf.Max(1f, baseRadius + innerWidth);
+            return Mathf.Max(0f, RoundedCoverage(x, y, outer, outerRadius) - RoundedCoverage(x, y, inner, innerRadius));
+        }
+        private static Texture2D CreateAffordableUpgradeBorderTexture(int cardWidth, int cardHeight, bool keepReadable = false)
+        {
+            int padding = AffordableUpgradeBorderPaddingPixels(cardWidth);
+            int width = cardWidth + padding * 2, height = cardHeight + padding * 2;
+            bool compact = cardWidth < 400;
+            float outerLine = compact ? 8f : 12f;
+            float outerGap = compact ? 5f : 8f;
+            float innerLine = compact ? 3f : 6f;
+            float innerEdge = compact ? 0f : 3f;
+            float radius = Mathf.Min(cardWidth, cardHeight) * .12f;
+            var subject = new Rect(padding, padding, cardWidth, cardHeight);
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+            {
+                name = "Double white border for affordable upgrade cards " + cardWidth + "x" + cardHeight,
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            var pixels = new Color[width * height];
+            for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
+            {
+                float px = x + .5f, py = height - y - .5f;
+                Color color = Color.clear;
+                color = Over(color, new Color(.96f, .99f, 1f, .98f),
+                    UpgradeBorderRingCoverage(px, py, subject, outerLine, outerGap, radius));
+                color = Over(color, Color.white,
+                    UpgradeBorderRingCoverage(px, py, subject, innerLine, innerEdge, radius));
+                pixels[y * width + x] = color;
+            }
+            texture.SetPixels(pixels);
+            texture.Apply(false, !keepReadable);
+            return texture;
         }
         private Texture2D GetGlossyUpgradeCardTexture(Rect card)
         {
@@ -4180,7 +4584,7 @@ namespace HayChoriYPaty
         private static Rect LevelOneTutorialSkipBounds(Rect panel, float verticalScale) =>
             new Rect(panel.center.x - 42f, panel.y + 188f / Mathf.Max(.01f, verticalScale), 84f, 26f);
 
-        private string LevelOneTutorialPrimaryCaption() => levelOneTutorialStep == 3 ? "JUGAR" : "SIGUIENTE";
+        private string LevelOneTutorialPrimaryCaption() => "SIGUIENTE";
         private Rect LevelOneTutorialTargetBounds()
         {
             if (game == null || game.Sim == null) return Rect.zero;
@@ -4211,6 +4615,9 @@ namespace HayChoriYPaty
         }
         private void DrawLevelOneTutorial()
         {
+            // Dim the entire physical screen behind the guide (including the HUD and safe-area insets).
+            // DrawIntroScreen restores the safe-area matrix; the bubble and controls below stay crisp.
+            DrawIntroScreen(Texture2D.whiteTexture, LevelOneTutorialBackdropDimColor(), ScaleMode.StretchToFill);
             Rect panel = LevelOneTutorialPanelBounds();
             Rect target = LevelOneTutorialTargetBounds();
             bool targetAbove = levelOneTutorialStep < 2;
@@ -4338,7 +4745,7 @@ namespace HayChoriYPaty
                 if (!insideOuter) continue;
                 bool insideFace = TutorialBubbleRoundedRectContains(point, innerPanel, innerRadius) ||
                     TutorialBubbleTriangleContains(point, innerTip, innerLeftBase, innerRightBase);
-                pixels[(height - 1 - y) * width + x] = insideFace ? face : outline;
+                pixels[y * width + x] = insideFace ? face : outline;
             }
             texture.SetPixels(pixels);
             texture.Apply(false, false);

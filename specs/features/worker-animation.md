@@ -16,8 +16,9 @@ Eight canvas-space directions; four distinct gait samples per direction, reusing
 - [x] Original artwork/metas, player save, and mechanics preserved.
 - [x] Beverage pickup reaches a safe barrel anchor, animates empty-handed during the existing dwell, and only carries the real inventory unit after withdrawal; Coca/beer workers operate concurrently.
 - [x] Worker gait cadence is40% slower, remains distance-proportional for all four roles (including the fallback renderer), and halts in idle/pickup/handoff without changing fan animation.
-- [ ] Cocacolero faces forward throughout beverage pickup and stops 2 logical units from the barrel front without intersecting it.
-- [x] Coca pickup uses a dedicated empty-handed reach pose: the torso/hand render over the barrel rim while the legs remain behind its front; route, pickup timing, inventory withdrawal, and physical item identity remain unchanged.
+- [x] Coca pickup restores the existing upright, front-facing empty-handed pose; its final approach also faces forward, with no horizontal presentation shift.
+- [x] The visual foot baseline eases toward barrel.yMax minus 24 logical units over the final/first 48 route units; the barrel occludes the lower body rather than drawing the torso or feet through its front. Route anchors, timing, inventory and physical IDs stay unchanged.
+- [ ] User acceptance of the revised frontal perspective and live transition; the historic 2-unit rim clearance is not a ground-plane measurement and is superseded by the base-relative presentation above.
 
 ## Validation
 - Original PNGs and their `.meta` GUIDs are unchanged. New transparent `street-worker-direction-extension-v1.png` adds only 20 missing poses (1086×1448): food quarter-carry, beverage quarter-walk and empty-handed carry views. Existing contact art plus articulated passing legs provide four **runtime-composed gait samples**, not 32 newly authored bitmap frames. Supplement imports at original dimensions, Android RGBA32, no obsolete iPhone PVRTC override.
@@ -46,6 +47,16 @@ During an empty-handed Cocacolero barrel-pickup dwell, presentation now forces t
 
 Added the transparent `street-cocacolero-barrel-reach-v1` full-body pose for Coca pickup. Native projection slices the empty-handed torso/reaching arm farther down, moves the hand anchor with a 24%-height peak reach, and sorts that upper cutout over the barrel while keeping the existing legs behind it. The change is presentation-only: worker route/anchor, dwell, `TryTake`, barrel stock, and carried-item identity are unchanged. Focused Unity 6000.6.3f1 validation passed: asset-import EditMode 1/1 and native worker-projection PlayMode 1/1. Reviewed actual kitchen-camera projection captures at 1080×1920 and 1080×2400; this is projection-only evidence, not a full Game View capture.
 
+### 2026-10-25 — Visible feet beside Coca barrel (historical; superseded below)
+
+The Cocacolero previously stood directly behind the Coca barrel during pickup, hiding its lower body. Over the final 48 logical units of approach, during Coca pickup, and over the first 48 units of departure, the presentation eases the worker toward the barrel's screen-center side by `min(0.65 × barrel width, 54)` logical units; the reach pose mirrors inward so the hand stays over stocked drinks. The route/simulation anchor, pickup dwell, stock withdrawal, carried item identity, and barrel depth remain unchanged. The legacy fallback uses the same side/arm choice. Unity 6000.6.3f1 PlayMode passed the Chicago approach/pickup/departure projection test 1/1 and native worker projection regression 1/1. The regenerated native kitchen-camera capture is station/worker-only, not a full Game View or device QA.
+
+
+### 2026-10-26 — Grounded frontal Coca pickup
+
+The user rejected the remaining distance apparent against the tiles and requested frontal arrival. The lateral shift and dedicated leaning pose are replaced by the existing upright frontal empty-hand pose. The presentation stays on the route's X axis and eases the foot baseline to 24 logical units behind the barrel base, not beyond its foreground edge. Torso/legs sort behind the barrel; the small upward pickup motion no longer lowers the whole torso toward the floor. The dedicated PNG remains preserved but inactive. Native and fallback share the base-relative position/front approach. No station dimensions, route anchors, stock, timers or carried IDs change.
+
+Unity 6000.6.3f1: two focused native PlayMode tests PASS (Chicago transition/grounding and seven-product/two-scale projection), plus interactive full Game View capture PASS at 1080×1920. The capture fixture first encountered an ambiguous TryHire overload, then the documented batch ScreenCapture restriction; explicit overload selection and interactive Editor capture resolved these test-only failures. Reviewed the full gameplay view with the tiled floor and foreground barrel; this is controlled pickup-state QA, not a physical-device or entire live-route video test. User visual acceptance remains open. Evidence: Logs/Acceptance/CocacoleroFront-20261026/.
 
 ## Racing+ Mozo — 2026-10-15
 

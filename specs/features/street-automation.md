@@ -6,14 +6,15 @@
 
 This newly requested milestone supersedes the delivery boundary of the [historical Floresta prototype](floresta-prototype.md), not its validation record. [Product](../product.md) retains the exact seven-product catalog and outdoor standing-only setting. [Visual reference](../visual-reference.md) distinguishes observed video evidence from prompt requirements. No copied Food Fever assets, new services/packages, manual movement or complex cooking controls.
 
-### First-match Floresta tutorial — 2026-10-24
+### First-match Floresta tutorial — actualizado 2026-10-25
 
-On the first selection of Level 1 (All Boys / Floresta), after the existing presentation → hub → level selector flow and only when CanStartRound is true, show four compact speech-bubble callouts on the actual Ready gameplay screen. Match the approved mockup's cream face, rounded dark-brown outline, integrated triangular tail, sentence-case dark text and existing glossy-blue primary button; keep the game fully visible (no dim overlay, dotted leader, target frame, or modal header). Point in order to the Chori quota, exact coin icon, Parrillero hire card, and speed card. Keep the callout body's 320×140 logical size and the primary's 200×58 area; derive placement from each target, the safe logical canvas, and `layoutVerticalScale`. Keep the small pale-backed SALTAR directly beneath the primary button. Explain the 200-Chori goal, coins per delivered Chori, where to hire, and where to find the next speed cost. The first three CTAs say **SIGUIENTE**; the fourth remains **JUGAR** and starts the round (the visual mockup's generic SIGUIENTE is not authoritative for that last label). **SALTAR** starts the round immediately. While open, block background controls; simulation stays Ready and the match timer does not run. Persist completion as a local UI-only PlayerPrefs flag after a successful start; do not alter Firebase/gameplay saves, stock, balance, or progression. Later Floresta selections retain the existing direct-start behavior. If starting stock is unavailable, leave the selector/market path unchanged and do not show or complete the tutorial.
+On the first selection of Level 1 (All Boys / Floresta), after the existing presentation → hub → level selector flow and only when CanStartRound is true, show four compact speech-bubble callouts on the actual Ready gameplay screen. Match the latest supplied storyboard: apply a full-physical-screen black dimmer at 50% opacity after drawing gameplay and before the guide, including the HUD and safe-area insets; keep the bubble, primary CTA and SALTAR crisp above it. Match the cream face, rounded dark-brown outline, integrated triangular tail, sentence-case dark text and existing glossy-blue primary button; do not add a dotted leader, target frame, or modal header. Point in order to the Chori quota, exact coin icon, Parrillero hire card, and speed card. Keep the callout body's 320×140 logical size and the primary's 200×58 area; derive placement from each target, the safe logical canvas, and `layoutVerticalScale`. Keep the small pale-backed SALTAR directly beneath the primary button. Explain the 200-Chori goal, coins per delivered Chori, where to hire, and where to find the next speed cost. All four CTAs say **SIGUIENTE**, exactly as in the supplied reference; tapping it on the fourth bubble starts the round. **SALTAR** starts the round immediately. While open, block background controls; simulation stays Ready and the match timer does not run. Persist completion as a local UI-only PlayerPrefs flag after a successful start; version the flag when this tutorial flow changes so a previously completed v1 tutorial can be seen once again. Do not alter Firebase/gameplay saves, stock, balance, or progression. Later Floresta selections retain the existing direct-start behavior. If starting stock is unavailable, leave the selector/market path unchanged and do not show or complete the tutorial.
 
-- [x] Ready screen owns bubble layout and tutorial input; final JUGAR and SALTAR share StreetGame.TryStartRound, and completion is written only after success.
-- [x] Focused PlayMode flow/geometry checks pass in isolated Unity 6000.6.3f1: FirstMatchTutorialBubblesStayCompactAndAttachToTargetsAcrossPortraitRatios plus FirstLevelTutorialExplainsHudAndOnlyStartsOnFinalJugar, SkippingFirstLevelTutorialStartsRound, and CompletedFirstLevelTutorialDoesNotReplay (4/4; responsive geometry at 540×960, 575×1280, 1080×1920, 1080×2400, 1220×2712).
-- [x] Rendered Game View captures at 540×960 and 575×1280 were reviewed for all four steps: `/private/tmp/hcyp-tutorial-bubbles-final-captures/`. UI geometry remains anchored in logical units across these portrait ratios.
-- [ ] NOT_RUN: Screenshot review on a physical device and safe-area/cutout validation.
+- [x] Ready screen owns bubble layout and tutorial input; the final **SIGUIENTE** and **SALTAR** share `StreetGame.TryStartRound`, and completion is written only after success.
+- [x] `DrawLevelOneTutorial` draws a 50%-alpha black dimmer over the physical screen before the cream callout, CTA and SALTAR; they remain crisp above the dim layer.
+- [x] Previous focused PlayMode flow/geometry checks and Game View captures passed for the earlier v1 wording/CTA. Those results do not validate the 2026-10-25 v2 CTA/replay correction or this backdrop dimmer.
+- [ ] BLOCKED: New PlayMode test invocation compiled runtime and test assemblies in the isolated Unity clone but returned without XML results; no assertion result is available.
+- [ ] NOT_RUN: Fresh full Game View capture for all four dimmed steps. Physical-device screenshot and safe-area/cutout validation also remain pending.
 
 All eleven clubs below reuse the same scene/simulation. Current balance is configured in StreetBalance/Main, not inferred from reference video; product prices use the seven-ID fixed table, not a uniform $5 rule. Read-only code/serialized evidence resolves stale documentation; changing official balance still requires authorization.
 
@@ -468,6 +469,16 @@ Use the user's selected wood-and-riveted-iron card style for the two playing upg
 - [ ] Focused Unity import/layout and upgrade pointer checks pass; runtime small-screen visual review remains separate.
 
 **Validation:** Pending focused Unity tests; no APK build or install requested/performed.
+
+### Double white affordability outline — speed and hires (2026-10-26)
+
+While the round is Playing, every upgrade card uses the same rounded double-white outer outline when its own purchase is affordable, including Speed and Parrillero. A card without enough coins or outside Playing has no outline. Keep card skins, costs, prices, input bounds and purchase behavior unchanged.
+
+- [x] The shared affordability gate draws the outline for Speed and hiring cards and suppresses it when unavailable.
+- [x] AffordableUpgradeBorderHasTwoWhiteRingsWithoutChangingCardFace passes 2/2 focused EditMode cases in an isolated Unity clone.
+- [ ] Level 1 full Game View capture verifies rendered parity and the no-coins state.
+
+**Validation:** Source/contract updated after the user's level 1 report; targeted EditMode 2/2 PASS. Batch mode has no interactive Game View, so the level 1 visual capture remains NOT_RUN; no APK build or installation requested.
 
 ### Dynamic status ribbon — selected option 1 (2026-10-05)
 

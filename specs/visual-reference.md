@@ -24,6 +24,10 @@ Only one chef appears; no purchase, finished customer departure, mixed-product o
 
 Normalize the observed 1080×1920 composition to a 540×960 logical safe-area canvas: signs occupy left/right top bands; customer feet approximately y310/240/170 in three rows; horizontal counter top y314/bottom y384; handoff worker feet around y400; worker floor y400–585; station pickup y578 with worker feet capped near y585; large management controls y675–855. The video shows signs at normalized y.01–.14, bubbles/crowd y.066–.325, counter y.325–.40, worker floor y.40–.60, stations y.59–.65 and stage foot near y.715. Speed spans x.16–.47 and Cook x.53–.84, y.695–.89. Preserve this functional hierarchy and scale without copying illustrations. Camera is fixed, frontal and slightly elevated, showing ground/object tops: not pure top-down, isometric or 3D. On tall portrait displays, extend the visible street vertically through the safe area while preserving one uniform scale for sprites and matching touch coordinates; do not leave solid letterbox bands or crop interaction controls.
 
+## Startup splash refinement — 2026-10-26
+
+Keep the existing full-screen street-cover-loading-v1 composition and its integrated Hay Chori y Paty wordmark. Because that mark is part of the artwork, do not overlay a second logo: give the composition a restrained 2.8% ease-in push and a brief warm radial glow centered on the title, then let the image settle. Keep the existing compact bottom-center loader, styled as a small rounded navy/cyan capsule; its fill follows the existing four-second unscaled splash timer and is a presentation cue, not a report of asynchronous asset-load completion. Preserve the cover, hub navigation, input gating, and timing.
+
 ## Required direction
 
 - 100% 2D mobile cartoon: small expressive supporters with oversized heads, rounded shapes, vivid colors, clean dark contours, consistent proportions and fluid simple animation.
@@ -401,26 +405,36 @@ Validado en Unity6000.6.3f1:13/13 EditMode (`a1e42a77f4bd4ef68e7b9de92940d20a`),
 
 ## Auditoría de emblemas de nivel y autorización — 2026-10-18
 
-La vista usa una única tabla ordenada por `StreetSimulation.LevelDisplayNames` para el pie y el encabezado del Mercado. Se conservan sin cambios los recursos existentes de All Boys (`street-allboys-crest`), Nueva Chicago (`street-new-chicago-crest-v1`) y Vélez Sarsfield (`street-velez-crest-v1`). Los niveles 4–11 quedan sin escudo hasta contar con autorización de uso comercial verificable; no se descargó ni agregó arte nuevo y no se sustituyen las marcas por emblemas inventados. El fondo/initials del Mercado sigue siendo su fallback visual existente, no un escudo.
+La vista usa una única tabla ordenada por `StreetSimulation.LevelDisplayNames` para el pie y el encabezado del Mercado. Se conservan sin cambios los recursos existentes de All Boys (`street-allboys-crest`), Nueva Chicago (`street-new-chicago-crest-v1`), Vélez Sarsfield (`street-velez-crest-v1`) y Racing Club (`street-racing-crest-v1`). Ferro, Independiente, San Lorenzo, River, Boca, Camioneros y Los Redondos usan las imágenes específicas provistas por el usuario para esos niveles; cada integración se limita a su emblema/nivel solicitado y no afirma una licencia general o autorización comercial. No se descargó ni inventó arte. El fallback de iniciales del Mercado sigue disponible para futuros slots vacíos.
 
 | Nivel | Estado visual | Fuente revisada / condición de uso |
 |---|---|---|
 | 1 — All Boys | Existente; preservado | Recurso existente; sin reemplazo. |
 | 2 — Nueva Chicago | Existente; preservado | Recurso existente; sin reemplazo. |
 | 3 — Vélez Sarsfield | Existente; preservado | Recurso existente; sin reemplazo. |
-| 4 — Ferro Carril Oeste | Pendiente | [Página oficial del escudo](https://www.ferrocarriloeste.org.ar/escudo/) ofrece PNG, pero el sitio reserva derechos; no equivale a permiso para videojuego. |
-| 5 — Independiente | Pendiente | [Identidad oficial](https://clubaindependiente.com/identidad/) somete el material gráfico a aprobación del club; no se obtuvo esa aprobación. |
-| 6 — Racing Club | Pendiente | [Historia/identidad oficial del escudo](https://www.racingclub.com.ar/escudo); la página revisada no otorga una licencia general de uso comercial. |
-| 7 — San Lorenzo de Almagro | Pendiente | [Recursos de identidad y contacto de marketing](https://sanlorenzo.com.ar/club/marketing/identidad); no se encontró licencia general para incorporarlo a un juego. |
-| 8 — River Plate | Pendiente | El [Código de Ética oficial](https://www.cariverplate.com.ar/imagenes/docs/codigo_etica_y_conducta.pdf) restringe copiar/usar la marca sin autorización previa. |
-| 9 — Boca Juniors | Pendiente | [Página oficial de identidad](https://www.bocajuniors.com.ar/identidad) identifica el escudo, pero no concede una licencia de videojuego comercial. |
-| 10 — Sindicato de Camioneros | Pendiente | [Sitio oficial del sindicato](https://www.camioneros.org.ar/) confirma que la identidad requerida es sindical, no la de un club; no publica permiso para este uso. |
-| 11 — Los Redondos | Pendiente | El [archivo revisado](https://commons.wikimedia.org/wiki/File:Los_Redondos_-_Oktubre.jpg) es arte/logo de una tapa de álbum aportado por terceros, no un escudo aislado verificado ni autorización de marca para un videojuego. |
+| 4 — Ferro Carril Oeste | Integrado con imagen provista por el usuario | El usuario adjuntó street-ferro-crest-v1.png y pidió incorporarlo. Esto registra solo la solicitud específica; no afirma autorización general del club ni licencia comercial. |
+| 5 — Independiente | Integrado con imagen provista por el usuario | El usuario adjuntó `street-independiente-crest-v1.png` y pidió incorporarlo. Esto registra solo la solicitud específica; no afirma autorización general del club ni licencia comercial. |
+| 6 — Racing Club | Integrado con imagen provista por el usuario | Recurso `street-racing-crest-v1`; el fondo claro conectado al borde se recorta en tiempo de ejecución, preservando detalles blancos encerrados. La fuente/mark sigue siendo de alcance puntual, no licencia general. |
+| 7 — San Lorenzo de Almagro | Integrado con imagen provista por el usuario | Recurso `street-san-lorenzo-crest-v1`, agregado por pedido del usuario al nivel 7. No afirma licencia general. |
+| 8 — River Plate | Integrado con imagen provista por el usuario | Recurso `street-river-crest-v1`, agregado por pedido del usuario al nivel 8. No afirma licencia general ni autorización del club. |
+| 9 — Boca Juniors | Integrado con imagen provista por el usuario | Recurso `street-boca-crest-v1`, agregado por pedido del usuario al nivel 9. No afirma licencia general. |
+| 10 — Sindicato de Camioneros | Integrado con imagen provista por el usuario | Recurso `street-camioneros-crest-v1`; el fondo claro se recorta conectado al borde en tiempo de ejecución. Integración específica del nivel 10; no afirma licencia general. |
+| 11 — Los Redondos | Integrado con imagen provista por el usuario | Recurso `street-los-redondos-crest-v1`; el exterior claro se recorta conectado al borde y el arte interior se conserva. Integración específica del nivel 11; no afirma licencia general. |
 
-Una licencia de descarga, dominio público alegado para un logotipo simple o licencia de una reproducción concreta no se toma como autorización de marca/uso comercial. Los recursos nuevos permanecen pendientes hasta recibir permiso expreso o material cuya licencia cubra claramente ese uso.
+Una licencia de descarga, dominio público alegado para un logotipo simple o licencia de una reproducción concreta no se toma como autorización general de marca/uso comercial. Las integraciones de imágenes provistas por el usuario se limitan estrictamente al escudo y nivel solicitado; no habilitan otros usos ni se presentan como autorización del club.
 
-**Validación focalizada:** se añadió `LevelCrestManifestMatchesAllLevelsAndOnlyLoadsVerifiedExistingCrests`, que comprueba las 11 entradas, los tres recursos existentes y los ocho slots vacíos. La comprobación estática confirmó sus PNG/`.meta`, lookup compartido y `git diff --check` limpio. Unity MCP no respondió al ping; importación/compilación, ejecución EditMode y captura visual quedan sin ejecutar. No se capturó una pantalla porque no cambió arte visible.
+**Validación focalizada anterior:** `LevelCrestManifestMatchesAllLevelsAndOnlyLoadsVerifiedExistingCrests` comprobó seis entradas activas y slots pendientes. La actualización del 2026-10-25 incorpora cinco PNG de usuario a los índices 6–10 y reemplaza esa expectativa por cobertura de las 11 entradas; pruebas de importación, EditMode y captura visual quedan por ejecutar para esta actualización.
 
+
+### Integración de emblemas restantes y ajuste del tutorial — 2026-10-25
+
+El usuario pidió incorporar al juego las cinco imágenes que había compartido: San Lorenzo, River, Boca, Camioneros y Los Redondos (niveles 7–11). Se agregaron byte por byte desde los adjuntos, con `.meta` propios y lookup común de emblemas. Los dos PNG RGB con fondo blanco (Camioneros y Los Redondos) usan recorte de fondo claro conectado al borde en runtime; no se altera la fuente ni el detalle blanco cerrado. La nota conserva que estas son integraciones puntuales provistas por el usuario, no licencias generales.
+
+En la misma actualización, el tutorial de Floresta ahora muestra `SIGUIENTE` también en el cuarto paso, como en la referencia; al tocarlo inicia la ronda. Se versionó la marca local de finalización a v2 para que quienes habían completado la versión anterior puedan ver una vez el tutorial corregido. La captura del tutorial no se incorpora como textura: sirve de referencia de UI.
+
+**Oscurecimiento del fondo — 2026-10-25:** el nuevo boceto pide una capa negra al 50% sobre toda la pantalla física detrás del tutorial; HUD e insets también se atenúan, mientras globo, `SIGUIENTE` y `SALTAR` permanecen nítidos encima. La implementación usa el dimmer físico de `DrawIntroScreen` antes de dibujar el callout. Unity aislado compiló runtime y PlayMode assemblies; el Test Runner cerró sin XML de resultados (**BLOCKED**). Captura fresca de Game View: **NOT_RUN**.
+
+Pruebas EditMode/PlayMode, importación real de Unity y captura visual de esta actualización: NOT_RUN hasta la validación focalizada.
 
 ## Recibo de liquidación en resultados — 2026-10-19
 
@@ -434,18 +448,29 @@ El recibo debe reservar la columna izquierda para las ilustraciones de monedas/r
 
 La primera referencia define el acabado de las tarjetas: marco/sombra azul marino grueso, cara azul intensa con brillo cian superior, medallón circular con doble aro, ilustración recortada a la izquierda, título y estado a la derecha, y cápsula celeste de precio/moneda abajo a la derecha. La tercera referencia define el orden de los bloques y el lugar del nombre/equipo arriba de las tarjetas, dentro de su bloque azul. No volver a usar óvalos para retratos.
 
-Conservar los tamaños authored de tarjetas (234×120/104 y 156×120/100 lógicos), sus hitboxes, gutters, cantidades por fila, nombre/barrio, HUD, parrilla, cocina y área de juego. Solo se rediseña la skin y la disposición interna del contenido de cada tarjeta. En niveles con seis acciones, se mantiene la grilla de tres columnas por dos filas. En resoluciones con espacio, conservar la banda original completa de banderines; cuando no quepa sin invadir el juego o las tarjetas, usar únicamente el remanente real (puede ser menor) y no pintar un falso banderín detrás de controles.
+Conservar los tamaños authored de tarjetas (234×120/104 y 156×120/100 lógicos), sus hitboxes, gutters, cantidades por fila, nombre/barrio, HUD, parrilla, cocina y área de juego. Solo se rediseña la skin y la disposición interna del contenido de cada tarjeta. En niveles con seis acciones, se mantiene la grilla de tres columnas por dos filas. En los niveles 1–5, conservar la banda de banderines solo en el espacio realmente libre, sin invadir el juego ni las tarjetas y sin pintar un falso banderín detrás de controles. Desde el nivel 6 (Racing) en adelante, no renderizar banderines ni reservarles espacio: el escenario del partido prevalece sobre esta decoración.
 
 **Validación:** 19/19 pruebas EditMode focalizadas pasaron (tarjeta, responsive footer, inset, capacidad de precio y medallones); captura PlayMode de Game View 1/1 pasó con seis capturas de niveles5/6 en 575×1280, 1080×1920 y 1080×2400. Se revisaron las tres escalas. La banda de banderines se adapta al espacio seguro disponible; en nivel6 a 1080×1920 no queda franja no solapada y se omite. No se hizo APK ni revisión física. Evidencia: `/private/tmp/hcyp-barrio-azul-0.2.66-code68/button-style-gameview-captures-final/`.
+
+### Borde blanco de contratación habilitada — 2026-10-26
+
+Cuando la partida está en `Playing` y la simulación permite pagar un rol, la tarjeta de ese rol recibe dos filetes blancos redondeados por fuera de la tarjeta azul para señalizar que puede contratarse. La condición no incluye Velocidad; tampoco resalta roles sin saldo, en fases que no permiten comprar o en `MAX`. No se oscurece ni sustituye la tarjeta, ni se mueven su precio, contenido, hitbox, costo o transacción. La sobreimpresión es transparente en el centro y se conserva aparte de la textura de tarjeta.
+
+**Validación:** EditMode de anillos compactos/estándar 2/2 PASS. PlayMode interactivo 1/1 PASS: a 1080×1920 comparó saldo 19/20 para tarjetas de costo 20; la versión financiable muestra el doble contorno en tarjetas de contratación, mientras Velocidad conserva su aspecto. Capturas inspeccionadas en `Logs/Acceptance/HireWhiteBorder-20261026/`. Sin APK ni verificación en teléfono físico.
 
 
 ## Primer partido — ayuda compacta de globos — 2026-10-24
 
-La guía de Floresta se integra a la escena Ready con globos crema de contorno marrón y cola triangular, texto marrón en caja oración, CTA azul glossy reutilizado y SALTAR pequeño sobre un respaldo claro. **El cuerpo y el pico deben ser una única silueta continua**, con el mismo contorno y relleno, sin espacio, pieza superpuesta visible ni línea de unión entre ambos, como en la referencia aprobada del 2026-10-25. No oscurecer el juego ni dibujar líder punteado, marco de objetivo o encabezado tipo modal. Mantener la caja en 320×140 y el botón primario en 200×58 unidades lógicas; fijar cada globo al objetivo y escalar los offsets locales por `layoutVerticalScale` para conservar los gaps cuando cambia la altura útil. Orden: contador de Chori, icono exacto de moneda, Parrillero, velocidad; el CTA final es **JUGAR** por la instrucción explícita del usuario.
+La guía de Floresta se integra a la escena Ready con globos crema de contorno marrón y cola triangular, texto marrón en caja oración, CTA azul glossy reutilizado y SALTAR pequeño sobre un respaldo claro. **El cuerpo y el pico deben ser una única silueta continua**, con el mismo contorno y relleno, sin espacio, pieza superpuesta visible ni línea de unión entre ambos. La regla anterior de “no oscurecer el juego” queda supersedida por el storyboard del 2026-10-25: un velo negro al 50% cubre toda la pantalla física detrás de la guía, incluido HUD e insets; globo y controles de tutorial se dibujan nítidos encima. No añadir líder punteado, marco de objetivo o encabezado tipo modal. Mantener la caja en 320×140 y el botón primario en 200×58 unidades lógicas; fijar cada globo al objetivo y escalar los offsets locales por `layoutVerticalScale` para conservar los gaps cuando cambia la altura útil. Orden: contador de Chori, icono exacto de moneda, Parrillero, velocidad. La versión inicial del 2026-10-24 terminaba en **JUGAR** (dato histórico); la referencia posterior del 2026-10-25 la reemplaza: los cuatro CTAs dicen **SIGUIENTE** y el cuarto inicia la partida.
 
-**Validación:** capturas reales de Game View revisadas para los cuatro pasos en 540×960 y 575×1280; prueba geométrica cubre además 1080×1920, 1080×2400 y 1220×2712. PlayMode focalizado 4/4. No es verificación en dispositivo físico ni de safe area/cutout.
+**Validación histórica v1:** capturas reales de Game View revisadas para los cuatro pasos en 540×960 y 575×1280; prueba geométrica cubrió además 1080×1920, 1080×2400 y 1220×2712. PlayMode focalizado 4/4. No fue verificación en dispositivo físico ni de safe area/cutout.
 
-**Unión del pico — 2026-10-25:** el cuerpo y la cola ahora se rasterizan como una sola superficie crema con contorno compartido. PlayMode focalizado: continuidad del relleno en colas arriba/abajo y dos escalas 2/2, bounds responsive 1/1, flujo (SIGUIENTE/JUGAR/SALTAR/no repetir) 3/3. Las capturas anteriores son previas a este ajuste; no se capturó Game View después de la modificación, así que la inspección visual final queda pendiente.
+**Unión del pico — 2026-10-25 (v1):** el cuerpo y la cola se rasterizan como una sola superficie crema con contorno compartido. La cobertura PlayMode anterior verificó continuidad y el flujo SIGUIENTE/JUGAR/SALTAR de v1; esas pruebas y capturas no validan el rótulo v2 ni la repetición.
+
+**Corrección de referencia — 2026-10-25 (v2):** los cuatro CTAs ahora dicen SIGUIENTE; el toque en el cuarto inicia el partido, SALTAR lo inicia de inmediato y la clave local v2 vuelve a ofrecer la guía a quienes ya completaron la v1. La compilación/importación del código y recursos se completó en el clon Unity aislado; dos invocaciones CLI del Test Runner compilaron las asambleas pero cerraron sin emitir XML de resultados. Pruebas EditMode/PlayMode: BLOCKED; captura actual de Game View: NOT_RUN; sin verificación física.
+
+**Cierre de revisión visual — 2026-10-26:** capturas full Game View reales de los cuatro pasos a 1080×1920 confirman el velo, el texto dentro de cada cuerpo crema, las colas hacia el objetivo, CTA y SALTAR. Se corrigió la inversión vertical del raster de `Texture2D`; PlayMode de continuidad/cuerpo del globo **2/2 PASS** y la interacción de guía quedó compilada al capturar. Esto supersede BLOCKED/NOT_RUN solo para esta resolución/código; sin validación física ni de otros ratios. Evidencia: `/private/tmp/hcyp-visual-preflight-20261026/captures/tutorial-step-{1,2,3,4}.png`.
+
 
 
 ## Contadores de metas translúcidos — 2026-10-25
@@ -457,13 +482,27 @@ El relleno y el borde usan **65% de opacidad**; iconos y números permanecen ní
 
 ## Continuidad de marca, mural, contadores y Chulengo — 2026-10-25
 
+- **Tarjetas de especialistas:** Cocacolero y Fernetero muestran el mismo retrato del atlas matched de Chicago en todos los niveles. Esto unifica solo el arte de las tarjetas; la apariencia de los trabajadores en la escena sigue determinada por el nivel.
+
 - **Racing (nivel 6):** por pedido explícito se muestra en el footer y selector el escudo entregado por el usuario. Su PNG original conserva el fondo ajedrezado; el renderer elimina únicamente las regiones claras conectadas al borde y conserva las franjas blancas interiores. Esto sustituye el estado visual pendiente de Racing del relevamiento anterior, sin afirmar una licencia general de marca ni habilitar emblemas de otros niveles.
+- **Ferro (nivel 4):** por pedido explícito se muestra en footer/selector el escudo PNG que aportó el usuario, conservando su transparencia y arte sin redibujarlo. La solicitud se limita a este recurso y no afirma licencia o autorización general del club.
+- **Independiente (nivel 5):** por pedido explícito se muestra en footer/selector el escudo PNG que aportó el usuario, conservando su transparencia y arte sin redibujarlo. La solicitud se limita a este recurso y no afirma licencia o autorización general del club.
 - **Trifulca:** mantener visible el mural/cabecera del mismo nivel que durante el juego. La placa de puesto destruido puede aportar el área inferior, pero no reemplazar la identidad mural de la locación.
 - **Contadores:** monedas, reloj y cuotas de producto usan el mismo tamaño tipográfico, manteniendo el mayor tamaño anterior (35 lógicos); solo se unifican las fuentes/tamaños, no la geometría ni el formato de cada contador.
+- **Escudos de nivel (2026-10-26, tamaño visual uniforme):** por pedido del usuario se iguala el **alto visible del cuerpo**, no una caja contenedora: 32 unidades lógicas en el pie, 34 por escala de tarjeta en el selector y 76 en Mercado. Se conservan proporciones y márgenes alfa recortados; el ancho se deriva de la silueta y se reserva antes de ubicar el título para evitar solapamientos (también en Mercado). La estrella exterior de Vélez se conserva por encima del cuerpo y no participa del alto de referencia; métrica del PNG provisto: cuerpo 1076 px / contorno completo 1208 px. Los demás emblemas completos son su cuerpo de referencia. Los PNG, GUID e importadores no cambian; UV y métrica se cachean al cargar, sin lecturas de píxeles por frame. Igual alto visible no fuerza un ancho idéntico ni deforma los escudos.
+- **San Lorenzo (2026-10-26):** el recurso existente se reemplazó byte por byte por el PNG RGBA/paleta de 1500×1500 `san-lorenzo-logo-footylogos.png` adjunto por el usuario, conservando GUID y ruta. La petición se limita a este escudo/nivel, sin afirmar licencia general.
 - **Chulengo:** la aguja roja arranca con una base tres veces más ancha que antes y se afina progresivamente hasta conservar el ancho previo en la punta; no escalar uniformemente la punta.
 
 ## Mercado Barrio Animado azul — 2026-10-25
 
 La referencia de Barrio Animado es la guía de composición del Mercado, adaptada a la marca azul/celeste del juego: paneles con marco azul marino y filete cian brillante, tarjetas azul hielo para metas e ingredientes, texto azul oscuro, club/escudo intactos, saldo y costo destacados en dorado y CTA glossy azul compartido. Los controles y arte original de ingredientes conservan su lectura y proporciones. Esto reemplaza únicamente la antigua skin madera/crema del Mercado; no incorpora las pestañas de la maqueta ni altera la pantalla única Mercado/stock, su geometría, input, economía, scroll o gate de stock.
 
-La implementación fuente ya usa este acabado en encabezado, identidad de club, objetivos, filas, saldo, sección de otros ingredientes, resumen fijo y progreso. La aceptación visual queda pendiente hasta inspeccionar una captura real del Game View actualizado; no inferirla de la inspección de código.
+La implementación fuente ya usa este acabado en encabezado, identidad de club, objetivos, filas, saldo, sección de otros ingredientes, resumen fijo y progreso. Corrección del 2026-10-26: paneles y filas pulsables usan esquinas redondeadas antialias (radio de hasta 16 unidades), borde navy/cian, brillo suave y sombra; no rectángulos de esquinas duras. Las superficies se cachean por tamaño/color y se liberan al desactivar la vista. JUGAR PARTIDO usa DrawStandardButton azul compartido, igual que los controles de compra existentes. Bounds, hitboxes, scroll, precios y compras no cambian. La aprobación estética del usuario sigue abierta.
+
+## Selector de canchas en una sola página — 2026-10-26
+
+El selector reúne los once niveles en una única grilla vertical de dos columnas con desplazamiento táctil y rueda del mouse; desaparecen la paginación, el contador de páginas y los botones ATRÁS/MÁS. VOLVER permanece fijo debajo de la lista y MERCADO se conserva accesible junto al encabezado. El orden, los bloqueos, la selección/desbloqueo y los murales/escudos de cada cancha conservan sus datos y arte originales.
+
+Cada tarjeta usa el mismo panel crema con texto azul marino para legibilidad y una franja angosta con el color principal del club. No teñir las ilustraciones; en niveles bloqueados, mantener visible el mural original y señalar el bloqueo con etiqueta/candado y un panel de texto moderadamente desaturado. No cambiar la mecánica, las metas ni la progresión.
+
+**Validación full Game View — 2026-10-26:** captura PlayMode real a 1080×1920, con niveles 1–3 disponibles y el resto bloqueados. `selector-top.png` y `selector-bottom.png` muestran las once tarjetas, escudos/murales originales, captions crema con acento de club y el pie VOLVER sin que la lista lo invada; el nivel 11 se alcanza al final del scroll (478 unidades lógicas). EditMode geométrico y PlayMode de selección/arrastre: **3/3 PASS**. Otras relaciones de aspecto, safe areas y teléfono físico: **NOT_RUN**. Evidencia: `/private/tmp/hcyp-visual-preflight-20261026/captures/`.

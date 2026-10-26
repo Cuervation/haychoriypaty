@@ -1,7 +1,7 @@
 # Hay Chori y Paty — reglas operativas
 
 ## Alcance y fuentes
-- Trabajar en el checkout Unity activo; confirmar raíz Git y `projectRoot` de MCP si difieren. El checkpoint y los límites pendientes están en [specs/continuity.md](specs/continuity.md).
+- Trabajar en el checkout Unity activo; confirmar raíz Git y `projectRoot` de MCP si difieren. El checkpoint y los límites pendientes están en [specs/current-state.md](specs/current-state.md).
 - [specs/README.md](specs/README.md) es el índice: leer solo el contrato de la tarea. `status.md` y `decisions.md` son historiales, no reglas completas vigentes. Ante contradicción, contrastar el contrato más reciente con código y valores serializados; informar lo irresoluble, no inventar gameplay ni adaptar código a reglas obsoletas.
 - Hacer el cambio mínimo autorizado. No implementar pendientes ni ampliar alcance; preservar trabajo local ajeno. Cambiar comportamiento exige actualizar su contrato; un retoque cosmético sin impacto contractual no exige reescribir SDD.
 

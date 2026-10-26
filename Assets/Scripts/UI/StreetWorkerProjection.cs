@@ -47,7 +47,6 @@ namespace HayChoriYPaty
         private readonly HashSet<int> liveIds = new HashSet<int>();
         private readonly List<int> stale = new List<int>();
         private readonly Texture2D extension, premiumExtension, fernetExtension;
-        private readonly Texture2D cocaBarrelPickupPose;
         private readonly Texture2D cookingPoses;
         private Texture2D premiumCookingPoses;
         private Texture2D normal, diagonal, premium, premiumDiagonal, drink, fernet, mozo, mozoDiagonal, mozoExtension;
@@ -69,7 +68,6 @@ namespace HayChoriYPaty
         {
             this.parent = parent; this.material = material;
             extension = Resources.Load<Texture2D>("street-worker-direction-extension-v1");
-            cocaBarrelPickupPose = Resources.Load<Texture2D>("street-cocacolero-barrel-reach-v1");
             cookingPoses = Resources.Load<Texture2D>("street-parrillero-cooking-arms-v1");
             if (cookingPoses != null)
                 premiumCookingPoses = StreetWorkerAppearance.CreateVariant(cookingPoses, StreetWorkerRole.ParrilleroPremium,
@@ -235,6 +233,10 @@ namespace HayChoriYPaty
             Vector2 position = worker.Position;
             if (simulation == null) return position;
 
+            // Align the frontal worker's ground plane near the barrel base, not its drawn rim.
+            // This is presentation-only: the worker's route and pickup anchor stay untouched.
+            position.y += CocaBarrelPresentationOffset(simulation, worker);
+
             // Share the contact correction between native sprites and the legacy IMGUI fallback,
             // fading it over the route so ToGrill/ToTable state changes cannot teleport the worker.
             StreetWorkerPose pose = StreetWorkerAnimation.Sample(worker, IsIdleAtGrill(simulation, worker));
@@ -245,6 +247,27 @@ namespace HayChoriYPaty
                 simulation.KitchenLayout.GrillVisualContactOffset(product);
             position.y += contactOffset * blend;
             return position;
+        }
+
+        internal static float CocaBarrelPresentationOffset(StreetSimulation simulation, StreetWorker worker)
+        {
+            if (simulation == null || worker == null || worker.Role != StreetWorkerRole.Cocacolero ||
+                worker.Product != 4) return 0f;
+            Rect barrel = simulation.KitchenLayout.BoundsForProduct(4);
+            if (barrel.width <= 0f) return 0f;
+            const float transitionDistance = 48f;
+            float blend;
+            if (worker.State == StreetWorkerState.Pickup) blend = 1f;
+            else if (worker.State == StreetWorkerState.ToStation)
+                blend = 1f - Mathf.SmoothStep(0f, 1f,
+                    RemainingRouteDistance(worker, simulation.KitchenLayout.PickupPosition(4)) / transitionDistance);
+            else if (worker.State == StreetWorkerState.ToCounter)
+                blend = 1f - Mathf.SmoothStep(0f, 1f,
+                    TravelledRouteDistance(worker, simulation.KitchenLayout.PickupPosition(4)) / transitionDistance);
+            else return 0f;
+            if (blend <= 0f) return 0f;
+            // Stop behind the barrel, not beyond its near edge (the rejected forward step).
+            return Mathf.Max(0f, barrel.height - 24f) * blend;
         }
         internal static float PresentationScale(StreetSimulation simulation, StreetWorker worker)
         {
@@ -395,6 +418,8 @@ namespace HayChoriYPaty
                 Vector2 displayPosition = PresentationPosition(sim, w);
                 float presentationScale = PresentationScale(sim, w);
                 StreetWorkerPose pose = StreetWorkerAnimation.Sample(w, IsIdleAtGrill(sim, w));
+                if (w.State == StreetWorkerState.ToStation && CocaBarrelPresentationOffset(sim, w) > .01f)
+                    pose.Facing = StreetFacing.Down;
                 int contact = pose.Frame >= 2 ? 1 : 0;
                 bool hasCookingPose = pose.Cooking && cookingPoses != null &&
                     TryCookingPresentationTarget(sim, w, out _, out _, out _);
@@ -403,13 +428,12 @@ namespace HayChoriYPaty
                 if (pose.WorkingAtGrill && hasCookingPose)
                     displayPosition.y += CookingPoseFootInset(pose.CookingFrame) / Mathf.Max(.01f, verticalScale);
                 bool cocaBarrelPickup = pose.PickingUp && w.Role == StreetWorkerRole.Cocacolero &&
-                    w.Product == 4 && cocaBarrelPickupPose != null;
+                    w.Product == 4;
                 Art upper = pose.Carrying ? Carry(w,pose.Facing) : Walk(w,pose.Facing,contact,pose.Moving);
                 if (pose.Cooking) upper = Original(w, 0, false);
                 if (pose.PickingUp)
                     upper = cocaBarrelPickup
-                        ? new Art { Texture = cocaBarrelPickupPose, Bounds = new Rect(0,0,cocaBarrelPickupPose.width,cocaBarrelPickupPose.height),
-                            Flip = false, Palm = new Vector2(.27f,.28f) }
+                        ? Carry(w, StreetFacing.Down)
                         : Beverage(w) ? Carry(w,pose.Facing)
                             : Original(w,11, w.Position.x < sim.KitchenLayout.BoundsForProduct(w.Product).center.x);
                 bool passing = !pose.Moving || (pose.Frame & 1) == 1;
@@ -418,9 +442,9 @@ namespace HayChoriYPaty
                 float upperScale = Scale(upper) * presentationScale, legScale = Scale(legs) * presentationScale;
                 // Overlap the paired cutouts slightly; the upper layer hides the atlas seam
                 // without leaving a gap when the cook transitions back to gait/carry poses.
-                float splitRatio = cocaBarrelPickup ? .82f : Waist + WaistOverlap;
+                float splitRatio = Waist + WaistOverlap;
                 float split = upper.Bounds.height * splitRatio;
-                float reach = pose.PickingUp ? Mathf.Sin(pose.PickupProgress * Mathf.PI) * Height * (cocaBarrelPickup ? .24f : .20f) : 0f;
+                float reach = pose.PickingUp ? Mathf.Sin(pose.PickupProgress * Mathf.PI) * Height * (cocaBarrelPickup ? -.08f : .20f) : 0f;
                 float upperBottom = upper.Bounds.height * (1f-splitRatio) * upperScale - pose.Bob * presentationScale - reach * presentationScale;
                 // A tiny x-based tie-break makes same-row workers deterministic without overriding y-depth.
                 int depth = (sim.UsesActiveCooks ? SceneDepth(displayPosition.y * verticalScale)
@@ -430,8 +454,9 @@ namespace HayChoriYPaty
                 {
                     Rect barrel = sim.KitchenLayout.BoundsForProduct(w.Product);
                     int barrelDepth = sim.UsesActiveCooks ? SceneDepth(barrel.yMax * verticalScale) : 0;
-                    // Keep legs behind the barrel, but bring the authored reach/torso over its rim and stocked bottles.
-                    upperOrder = Mathf.Max(upperOrder, barrelDepth + 24);
+                    // The barrel must occlude the body below its rim; never paint a torso
+                    // through the barrel just to keep the feet visible.
+                    upperOrder = Mathf.Min(upperOrder, barrelDepth - 1);
                 }
                 v.Root.localPosition = new Vector3((displayPosition.x-270f)*.01f, (canvasHeight*.5f-displayPosition.y*verticalScale)*.01f,0);
                 if (hasCookingPose)

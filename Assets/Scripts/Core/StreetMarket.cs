@@ -123,7 +123,10 @@ namespace HayChoriYPaty
             if (sim == null) return result;
             for (int slot = 0; slot < sim.ProductCount; slot++)
             {
-                int product = sim.GetAvailableProduct(slot), goal = Math.Max(0, sim.GetProductGoal(product));
+                int product = sim.GetAvailableProduct(slot);
+                // Vélez sandwiches are inexhaustible sources, so their ingredients are not a pre-round requirement.
+                if (sim.LevelIndex == 2 && product >= 0 && product < 4) continue;
+                int goal = Math.Max(0, sim.GetProductGoal(product));
                 foreach (int ingredient in StreetIngredientCatalog.Recipe(product)) result[ingredient] = SafeUnitAdd(result[ingredient], goal);
             }
             return result;

@@ -118,7 +118,7 @@ namespace HayChoriYPaty.Tests
 
                 Assert.IsTrue((bool)Call(game, "SelectLevel", 2), "The phone save's unlocked level 3 remains accessible through normal navigation.");
                 object levelThree = Get(game, "Sim");
-                Assert.AreEqual(82500L, Call(market, "MinimumPurchaseCostCents", levelThree));
+                Assert.AreEqual(37500L, Call(market, "MinimumPurchaseCostCents", levelThree));
                 long purchaseUnitsBefore = (long)Get(recoveredData, "cumulativePurchaseUnits");
                 long purchaseSpendBefore = (long)Get(recoveredData, "cumulativePurchaseSpendCents");
                 for (int ingredient = 0; ingredient < 10; ingredient++)
@@ -129,9 +129,9 @@ namespace HayChoriYPaty.Tests
                             "Exact Level 3 missing packs must be purchasable from the recovered receipt.");
                 }
                 Assert.IsTrue((bool)Call(market, "HasRequiredStock", levelThree));
-                Assert.AreEqual(274500L, Get(market, "BalanceCents"), "Only the $825.00 Level 3 stock shortfall is spent.");
-                Assert.AreEqual(82500L, (long)Get(recoveredData, "cumulativePurchaseSpendCents") - purchaseSpendBefore);
-                Assert.AreEqual(510L, (long)Get(recoveredData, "cumulativePurchaseUnits") - purchaseUnitsBefore);
+                Assert.AreEqual(319500L, Get(market, "BalanceCents"), "Only the $375.00 non-sandwich Level 3 stock shortfall is spent.");
+                Assert.AreEqual(37500L, (long)Get(recoveredData, "cumulativePurchaseSpendCents") - purchaseSpendBefore);
+                Assert.AreEqual(150L, (long)Get(recoveredData, "cumulativePurchaseUnits") - purchaseUnitsBefore);
                 Assert.AreEqual(15L, Get(recoveredData, "nextPurchaseId")); Assert.AreEqual(14L, Get(recoveredData, "lastPurchaseId"));
                 int[] stockAfterLevelThree = (int[])((int[])Get(recoveredData, "stockUnits")).Clone();
 
@@ -141,7 +141,7 @@ namespace HayChoriYPaty.Tests
                 game.GetType().GetMethod("OnEnable", Private).Invoke(game, null);
                 DisablePresentationAudio(game);
                 market = Get(game, "Market"); object persisted = Get(market, "Data");
-                Assert.AreEqual(274500L, Get(market, "BalanceCents"), "The lifecycle must not grant the migrated receipt twice after stock purchases.");
+                Assert.AreEqual(319500L, Get(market, "BalanceCents"), "The lifecycle must not grant the migrated receipt twice after stock purchases.");
                 CollectionAssert.AreEqual(stockAfterLevelThree, (int[])Get(persisted, "stockUnits"));
                 Assert.AreEqual(1625L, Get(persisted, "cumulativePurchaseUnits"));
                 Assert.AreEqual(261250L, Get(persisted, "cumulativePurchaseSpendCents"));

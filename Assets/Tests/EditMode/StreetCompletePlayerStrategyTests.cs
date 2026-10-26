@@ -213,10 +213,12 @@ namespace HayChoriYPaty.Tests
         {
             int[] consumed = new int[10];
             bool activeCooks = (bool)Get(sim, "UsesActiveCooks");
+            int levelIndex = (int)Get(sim, "LevelIndex");
             for (int slot = 0; slot < (int)Get(sim, "ProductCount"); slot++)
             {
                 int product = (int)Call(sim, "GetAvailableProduct", slot);
-                if (activeCooks && product < 4) continue; // Active sandwiches do not consume Market ingredients.
+                if ((activeCooks && product < 4) || (levelIndex == 2 && product < 4) || product == 4 || product == 6)
+                    continue; // Active/Vélez sandwiches and inexhaustible barrels bypass Market ingredients.
                 int goal = (int)Call(sim, "GetProductGoal", product);
                 int actual = (int)Call(sim, "GetProductDelivered", product);
                 Assert.GreaterOrEqual(actual, goal, "A win completes every required quota; genuine bonus sales may exceed it.");

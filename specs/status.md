@@ -1,6 +1,106 @@
+## 2026-10-26 — APK Android 0.2.71/code73
+
+Build Android **Development IL2CPP/ARM64**, Main-only, desde una copia aislada del working tree (Unity 6000.6.3f1): **Succeeded, 577,82 s, 0 errores / 4 advertencias**; dos avisos de clang por `-Wunused-command-line-argument`. APK `/private/tmp/hcyp-release-0.2.71-code73/HayChoriYPaty-0.2.71-code73.apk`, 385.633.166 bytes, SHA-256 `b751dabc3ec5f9b0e6abbc4a58bcb85bb59f73a6b7a36fc9bab3cd882d4f20ad`. Paquete/version/API/ABI, ZIP, zipalign, firma v2 Android Debug y flags Analytics/ad-ID **PASS**. No es firma Play Store y no se instaló. Evidencia detallada en [Android prototype](features/android-prototype.md). Suite completa y QA físico NOT_RUN.
+
+## 2026-10-26 — Revisión visual y regresiones de selector/tutoría v2
+
+La revisión full Game View en Unity 6000.6.3f1 usó una copia aislada y cuatro capturas del tutorial, más selector arriba/abajo, a 1080×1920. La primera captura reveló tarjetas del selector detrás del footer y la textura del globo volteada; ambos defectos se corrigieron y recapturaron. PASS: la grilla de once niveles no invade el pie fijo, el último nivel queda alcanzable (scroll máximo 478) y los cuatro pasos muestran texto dentro de sus globos con dimmer atrás. Evidencia: `/private/tmp/hcyp-visual-preflight-20261026/captures/{selector-top,selector-bottom,tutorial-step-1..4}.png` (full Game View de PlayMode; no captura de teléfono).
+
+Pruebas únicas sobre la copia aislada: EditMode `LevelSelectorCardsFitPortraitCanvasAndUseTeamMuralResources` **1/1 PASS**; PlayMode `SingleScrollableLevelGridSelectsEveryClubWithCorrectPointerTargets` y `LevelSelectorTouchDragScrollsTheCampaign` **2/2 PASS**; PlayMode `FirstMatchTutorialBubblePointerIsOneContinuousSurfaceWithBody` **2/2 PASS**. Unity Test Runner XML/logs en `/private/tmp/hcyp-visual-preflight-20261026/`. Las afirmaciones anteriores del tutorial v2 con pruebas BLOCKED y captura NOT_RUN quedan supersedidas solo para estas comprobaciones. Otros aspectos, dispositivo Android, suite completa y balance permanecen NOT_RUN.
+
+## 2026-10-26 — APK Android 0.2.70/code72
+
+## 2026-10-26 — Approved victory → Chulengo transition
+
+Implemented the preview as a 3-second unscaled, once-per-live-win presentation: victory lettering/coins, ascending warm smoke/embers and reveal of the existing Chulengo popup. Complete skip gestures are consumed; upgrades and result actions cannot fire behind it. Pending-claim reloads, save retries and losses bypass it; payout/stock/progression stay in existing domain code. Original art/fonts and shared blue CTAs retained; no screenshot playback or new audio.
+
+PASS: 14 unique focused EditMode cases (6 new clock/lifecycle + 8 existing Chulengo), 3 unique PlayMode cases, full Game View captures reviewed at 1080×1920. A discovered empty Won-footer slot array was corrected before the two affected PlayMode cases passed. Extra visual rerun is not double-counted. Evidence: ignored `Logs/Acceptance/VictoryTransition-20261026/`; contract: [market/fridge transition](features/market-fridge.md#victory--chulengo-transition--approved-2026-10-26). Physical Android/input/performance and other aspect ratios NOT_RUN. No APK/install, commit or push.
+
+
+Generada Main-only Development IL2CPP/ARM64 desde el working tree vigente, en copia aislada; Player Settings del checkout avanzan a 0.2.70/code72 sin tocar sus preferencias locales de Editor/Firebase/TimeManager. Unity 6000.6.3f1 BuildPipeline: **Succeeded, 37,87 s, 0 errores/1 advertencia**. APK `/private/tmp/hcyp-release-0.2.70-code72/HayChoriYPaty-0.2.70-code72.apk`, 387.401.677 bytes, SHA-256 `79665a768733dba6f31647f8de1f3051ef0b35f3216152d15e04fe4809c023c1`; paquete/version/API/ABI, ZIP, zipalign, firma v2 y flags Analytics validados. Debug-signed, no Play Store; no instalada. Pruebas previas del cambio visual: EditMode 2/2, PlayMode captura 1/1 y upgrade-input 1/1 PASS; suite completa y QA físico NOT_RUN. Sin commit ni push.
+
+## 2026-10-26 — Borde blanco doble para contrataciones habilitadas
+
+Se implementa la opción 1 elegida: durante Playing, cada tarjeta de contratación con saldo suficiente recibe un contorno exterior doble blanco, redondeado y más ancho, sobre la skin azul existente. No resalta Velocidad, tarjetas inasequibles ni botones fuera de partida; precio, hitbox, costo y lógica de compra permanecen intactos. Unity 6000.6.3f1: textura EditMode focalizada 2/2 PASS; captura interactiva PlayMode 1/1 PASS a 1080×1920; regresión existente de taps/precios/tope 1/1 PASS. Revisadas ambas capturas: con 19 monedas las contrataciones de costo 20 no resaltan; con 20 sí resaltan (Velocidad queda sin borde). Evidencia: `Logs/Acceptance/HireWhiteBorder-20261026/{sin-monedas-suficientes,con-monedas-suficientes}.png`; resultados XML en `/private/tmp/hcyp-hire-white-border-{editmode,playmode,upgrade-regression}.xml`. `git diff --check` PASS. Sin APK, instalación, commit ni push.
+
+
+## 2026-10-26 — Borde de asequibilidad también para Velocidad
+
+El reporte del nivel 1 reveló que el borde doble blanco se había limitado a contrataciones. Ahora la misma condición de compra disponible lo muestra también en Velocidad, así una mejora de velocidad y un Parrillero asequibles reciben el mismo énfasis; sin saldo suficiente no aparece. Se conserva la skin y la lógica económica/táctil. La nota anterior sobre excluir Velocidad queda supersedida.
+
+- Unity 6000.6.3f1, clon aislado: AffordableUpgradeBorderHasTwoWhiteRingsWithoutChangingCardFace EditMode 2/2 PASS.
+- git diff --check en archivos focalizados: PASS.
+- Captura full Game View de nivel 1: NOT_RUN (no había Editor interactivo); sin APK ni instalación.
+
+## 2026-10-26 — Compras manuales por encima del objetivo
+
+El objetivo queda como mínimo para jugar, no máximo de stock. El dominio ya admitía excedentes; se eliminó el cierre automático de controles al cubrir el requisito y el tope visual arbitrario de 99 packs. +/+10 ahora saturan sin overflow; la fila permanece seleccionada después de compra manual o mínimo por fila y el botón muestra COMPRAR MÁS cuando corresponde. FALTANTES sigue siendo un atajo opcional al mínimo. Precios, desbloqueos, consumo, persistencia, guardas de saldo/capacidad/operación duplicada y gate de inicio no cambian.
+
+Unity 6000.6.3f1 PlayMode focalizado 3/3 PASS: selección200, cumplimiento del requisito, compra adicional persistida, rechazo sin saldo, debounce y gate de stock. Un error de firma Invoke del nuevo fixture se corrigió antes del rerun aprobado. Resultados: /private/tmp/hcyp-market-extra.xml; diff check focalizado PASS. Sin nueva captura, APK, commit ni push.
+
+## 2026-10-26 — Mercado azul redondeado
+
+Las tarjetas pulsables/paneles y el contador de cantidad dejan las esquinas rectas de FillRect y pasan a superficies navy/cian redondeadas antialias con brillo y sombra, cacheadas por tamaño/color y liberadas al desactivar la vista. JUGAR PARTIDO deja el atlas antiguo y usa DrawStandardButton azul compartido; compra/+/- ya usaban ese renderer. No cambian geometría, hitboxes, scroll, precios ni transacciones. EditMode de superficie 1/1 PASS; PlayMode de compra explícita/debounce y captura real 2/2 PASS; captura final de cantidad redondeada repetida 1/1 PASS (tres pruebas únicas, no cuatro). Game View revisado a 1080×1920, nivel 2 con compra expandida: Logs/Acceptance/MarketRounded-20261026/gameview.png. Aprobación estética del usuario pendiente. Sin APK, commit ni push.
+
+## 2026-10-26 — Prueba de escudos del pie a 32×32
+
+Por pedido del usuario, la caja común del pie aumenta de 26×26 a 32×32 unidades lógicas (64×64 px a 1080 de ancho). Mantiene proporciones y recorte de márgenes alfa; selector y Mercado sin cambios. EditMode focalizado 7/7 PASS (centrado, límites/controles y ajuste de los once escudos). Captura interactiva PlayMode 1/1 PASS, once Game Views a 1080×1920 en Logs/Acceptance/Crests32-20261026/, preservando las capturas anteriores de 26. Revisado San Lorenzo: mayor tamaño sin tapar tarjetas; aprobación visual del usuario pendiente. Sin APK ni Git.
+
+## 2026-10-26 — San Lorenzo nuevo y escudos uniformes por pantalla
+
+Reemplazado el PNG de San Lorenzo por el adjunto de 1500×1500, idéntico al original suministrado y con el mismo GUID. Los once escudos se ajustan por su contorno alfa visible, sin márgenes transparentes ni deformación: pie 26×26 unidades lógicas; selector 30×34 por escala de tarjeta (antes All Boys/Chicago usaban 28×32); Mercado 76×76. Son cajas comunes, no una deformación a igual ancho/alto de siluetas distintas. Medición/caché al cargar, sin lectura de píxeles por frame ni cambios a importadores.
+
+Unity 6000.6.3f1: EditMode focalizado 7/7 PASS (recurso/alpha/GUID, padding, manifiesto, proporción/slots de los once niveles y footer); PlayMode interactivo de captura 1/1 PASS, once Game Views a 1080×1920 en Logs/Acceptance/Crests-20261026/. Revisadas visualmente las capturas representativas de San Lorenzo y Camioneros; selector/Mercado comprobados por geometría, sin nueva captura dedicada de esas pantallas. Diff check focalizado PASS. Sin APK, instalación, commit ni push.
+
+## 2026-10-26 — Coca frontal con apoyo referido a la base
+
+Se quita el corrimiento lateral y vuelve la pose frontal erguida anterior, también al aproximarse en los últimos 48 puntos. La referencia visual de pies pasa del borde superior del dibujo del barril a 24 puntos detrás de su base; torso/piernas quedan ocluidos por el barril, sin avanzar por delante de él. Solo presentación: anclas/rutas, stock, tiempos e IDs físicos conservados. Unity 6000.6.3f1: proyección Chicago y regresión nativa PASS 2/2; captura interactiva Game View completa PASS 1/1 (1080×1920, baldosas visibles). Dos fallos del fixture de captura se resolvieron seleccionando la sobrecarga de TryHire y pasando del batch al Editor interactivo; no se cuentan como fallos de gameplay ni como pruebas aprobadas. Evidencia: Logs/Acceptance/CocacoleroFront-20261026/. Aceptación del usuario y vídeo de toda la transición pendientes; no APK, commit ni push.
+
+## 2026-10-25 — Restaurados los pies visibles junto al barril (reemplazado el 26)
+
+A pedido del usuario, se revirtió el último acercamiento frontal: el Cocacolero vuelve a desplazarse solo en pantalla hacia el lado interno del barril (hasta `min(65% del ancho, 54)` unidades lógicas) y espeja el brazo hacia las botellas. Las piernas permanecen detrás del frente del barril; torso/mano se dibujan por encima. El ajuste solo afecta presentación y se suaviza en los últimos 48 puntos de aproximación y primeros 48 de salida; rutas, anclas, tiempos, stock e IDs físicos no cambian. Unity 6000.6.3f1 PlayMode: `ChicagoCocacoleroPickupShowsFeetBesideBarrelAndReachesIntoDrinks` 1/1 PASS y `NativeWorkersHaveFourGaitsAndPhysicallyHoldEveryProductAtBothPortraitScales` 1/1 PASS. Captura nativa regenerada en `Logs/Acceptance/CocacoleroPickup-20261025/chicago-cocacolero-barrel-reach.png`; muestra estaciones/trabajadores, no Game View completa ni QA de dispositivo. Sin APK, commit ni push.
+
+## 2026-10-25 — Oscurecimiento del tutorial según boceto
+
+Durante los cuatro pasos, `StreetView.DrawLevelOneTutorial` coloca un dimmer negro con alpha 0.50 sobre la pantalla física completa (incluye HUD e insets) antes de dibujar el globo, CTA y SALTAR, que quedan nítidos. El contrato reemplaza la instrucción previa de no oscurecer. Unity 6000.6.3f1 en clon aislado compiló `Assembly-CSharp` y `HayChoriYPaty.PlayModeTests.dll` sin errores C#; el batch cerró con código 0, pero no generó XML de resultados (**PlayMode BLOCKED**, sin assertion verificable). Game View completo: **NOT_RUN**. `git diff --check` pasó; sin APK, instalación, commit ni push.
+
+## 2026-10-25 — emblemas provistos y tutorial v2
+
+- Integrados al manifiesto de niveles los cinco escudos provistos por el usuario: San Lorenzo (6), River (7), Boca (8), Camioneros (9) y Los Redondos (10), conservando el orden y los recursos previos. No se declara licencia general. Se añadió recorte en runtime del fondo claro conectado al borde solo para las dos imágenes RGB opacas.
+- El tutorial de Floresta muestra `SIGUIENTE` en los cuatro pasos; el cuarto lo usa para iniciar. La clave local pasó a v2 para que el flujo corregido se muestre una vez a quienes ya habían terminado v1. La imagen de referencia no se incorpora como textura.
+- Se añadieron/actualizaron regresiones de manifiesto, cutout, CTA y replay. Unity 6000.6.3f1 en clon aislado importó los cinco PNG y compiló las asambleas de scripts/pruebas sin errores C# (PASS). Dos invocaciones CLI del Test Runner cerraron sin generar XML ni ejecutar pruebas identificables (BLOCKED: EditMode/PlayMode). Captura nueva de Game View: NOT_RUN. Sin APK ni instalación.
+
+## 2026-10-25 — Sándwiches inagotables en Vélez
+
+Solo el nivel 3 (Vélez) repone cada sándwich de productos disponibles 0–3 en el mismo slot de mesa y evita reservar/consumir ingredientes del Mercado al preparar o entregar. El gate previo del Mercado deja de exigir ingredientes de sándwich en Vélez, pero sigue activo para otros productos; los demás niveles mantienen su stock finito. Se añadieron regresiones EditMode para stock vacío, reposición tras toma/entrega, exclusividad del nivel y gate de ingredientes. git diff --check pasó; Unity EditMode/compilación no ejecutadas. Sin APK, instalación, commit ni push.
+
+## 2026-10-25 — Retratos uniformes en tarjetas de especialistas
+
+Las tarjetas de Cocacolero y Fernetero ahora toman el mismo retrato del atlas matched de Chicago para todos los niveles. El cambio afecta únicamente los botones de contratación; la apariencia de los trabajadores en la escena sigue determinada por el nivel. Se añadió regresión EditMode para los 11 índices. git diff --check pasó; Unity EditMode/importación y captura visual no ejecutados. Sin APK, instalación, commit ni push.
+
+## 2026-10-25 — Escudo de Ferro aportado por el usuario
+
+Se incorporó sin redibujar el PNG RGBA adjunto (street-ferro-crest-v1.png) y se vinculó solo al nivel 4/índice 3; el arte se renderiza dentro del mismo slot uniforme de 26 unidades lógicas que los escudos existentes. La solicitud específica no se presenta como licencia general del club. Se añadió expectativa de resolución/alpha e inclusión en el manifiesto a las pruebas EditMode. git diff --check pasó; Unity importación/compilación, EditMode y captura visual no ejecutados. Sin APK, instalación, commit ni push.
+
+## 2026-10-25 — Escudo de Independiente aportado por el usuario
+
+Se incorporó sin redibujar el PNG RGBA adjunto (`street-independiente-crest-v1.png`) y se vinculó solo al nivel 5/índice 4; el arte queda en el mismo slot uniforme de 26 unidades lógicas que el resto de escudos disponibles. La solicitud específica no se presenta como licencia general del club. Se añadió expectativa de resolución/alpha e inclusión en el manifiesto a las pruebas EditMode. `git diff --check` pasó; Unity importación/compilación, EditMode y captura visual no ejecutados (sin runner Unity MCP disponible). Sin APK, instalación, commit ni push.
+
+## 2026-10-25 — Tamaño uniforme de escudos del footer
+
+Los escudos disponibles en el rótulo de nivel ahora comparten una caja de 26 unidades lógicas de alto (referencia All Boys); se conserva el aspecto original mediante `ScaleToFit`. Añadí una regresión EditMode para alturas de rótulo 20/22/26 y actualicé el contrato visual. `git diff --check` pasó; Unity EditMode/PlayMode y captura visual no ejecutados (sin Unity MCP runner disponible en este chat). Sin APK, instalación, commit ni push.
+
+## 2026-10-25 — Sin banderines desde Racing (nivel 6)
+
+Por pedido del usuario, `StreetView` ya no reserva ni renderiza la franja decorativa de banderines desde el nivel 6 (índice 5, Racing) en adelante; la banda de niveles 1–5 sigue usando únicamente el espacio libre real. Actualicé expectativa de geometría en `StreetArtTests` y el contrato visual. `git diff --check` pasó; Unity EditMode/PlayMode y captura visual no ejecutados (no hay Unity MCP runner disponible en este chat). Sin APK, instalación, commit ni push.
+
 ## 2026-10-25 — Análisis de video nivel 2 y orden de retiro de sándwiches
 
 Recuperé y muestreé el video WhatsApp completo (~92,3 s) con la biblioteca FFmpeg ya incluida en Unity Hub. El Cocacolero usa el barril como punto asignado para tomar Coca y volver al hincha; varios sprites rojos se amontonan alrededor y la recogida no se lee bien, así que se recomienda mantener su función pero hacer visible/separar esa interacción. El final confirma sándwiches suspendidos sobre la mesa: `TryTake` antes elegía la capa baja primero. Se ajustó niveles 1–5 sin Mozos para retirar primero la capa visual superior y avanzar trasera→frontal dentro de ella, con regresión EditMode nueva. **Unity EditMode: NOT_RUN** por locks existentes en `Library` del proyecto activo y ausencia de Unity MCP runner. No APK, instalación, commit ni push. Evidencia en `/private/tmp/hcyp-cocacolero-video-20261025/`.
+
+## 2026-10-25 — Agarre del Cocacolero junto al barril
+
+Se generó una pose transparente dedicada y el renderer nativo ahora la usa solo durante el pickup de Coca: mano/torso se dibujan sobre el barril y sus botellas; las piernas se conservan detrás del frente. No cambian ruta, ancla, dwell, `TryTake`, stock ni unidad física. Unity 6000.6.3f1: `CocaBarrelReachSpriteImportsAsTransparentWorkerArt` EditMode 1/1 PASS; `NativeWorkersHaveFourGaitsAndPhysicallyHoldEveryProductAtBothPortraitScales` PlayMode 1/1 PASS. Captura real del render de cocina revisada a 1080×1920 y 1080×2400; no es una captura full-screen de Game View ni QA en dispositivo. Sin APK, commit ni push.
 
 ## 2026-10-24 — Iteración de botones glossy con medallón
 
@@ -8,7 +108,7 @@ Se actualizaron únicamente las tarjetas de mejora para acercarlas a la primera 
 
 ## 2026-10-24 — Barrio animado azul glossy responsive (0.2.66/code68)
 
-HUD, tarjetas de mejora y footer pasan al azul glossy; se conserva la geometría de nombre, cards, hit areas, parrilla y cocina. Los banderines existentes siguen en su lugar y los layouts que no reservan slot reciben arte decorativo solo de fondo, sin mover controles. Unity EditMode: layouts en12 tamaños × niveles1–11, textura footer y pennants/inset pasan. Game View interactivo:36 capturas a12 tamaños (Floresta, Independiente, Racing), revisadas en hojas de contacto y tamaños compactos/tablet; no es validación en teléfono físico. Se generó APK0.2.66/code68 (Debug-signed) y se instaló con `adb install -r` en Motorola Edge60Fusion `ZY22MBNWRB`; PackageManager confirma versión/código y conserva `firstInstallTime`. No se abrió la app ni se limpiaron datos. Sin commit ni push. Detalle/evidencia: [continuidad](continuity.md) y [entrega Android](features/android-prototype.md).
+HUD, tarjetas de mejora y footer pasan al azul glossy; se conserva la geometría de nombre, cards, hit areas, parrilla y cocina. Los banderines existentes siguen en su lugar y los layouts que no reservan slot reciben arte decorativo solo de fondo, sin mover controles. Unity EditMode: layouts en12 tamaños × niveles1–11, textura footer y pennants/inset pasan. Game View interactivo:36 capturas a12 tamaños (Floresta, Independiente, Racing), revisadas en hojas de contacto y tamaños compactos/tablet; no es validación en teléfono físico. Se generó APK0.2.66/code68 (Debug-signed) y se instaló con `adb install -r` en Motorola Edge60Fusion `ZY22MBNWRB`; PackageManager confirma versión/código y conserva `firstInstallTime`. No se abrió la app ni se limpiaron datos. Sin commit ni push. Detalle/evidencia: [continuidad](current-state.md) y [entrega Android](features/android-prototype.md).
 
 ## 2026-10-24 — Nivel 1 parrilla llena y Chulengo ×2 adicional
 
@@ -225,7 +325,7 @@ Firebase real configurado: Google habilitado, Android com.haychoriypaty.game con
 - Informe/ledgers/XML ignorados: `Logs/Acceptance/EconomyAudit-20261015/economy-audit.md`. Main/default difieren solo en dos arrays legacy con fallback equivalente; metas/costos/tiempos restantes coinciden. Editor955caracteres restaurados exactamente. Unity6000.6.3f1/MCP10.0 reconectados con herramientas locales existentes, sin installs/global config. No teléfono escrito, APK, instalación, cambios de balance/escena/UI, PlayMode, commit/push. ADBsin dispositivo al cierre; arreglo aún no está en APK instalada.
 
 
-> Para el estado vigente leer [continuity.md](continuity.md), no este archivo completo. Entradas conservadas por tarea/fecha, no siempre ordenadas cronológicamente. Un resultado vale para su código/alcance: los totales no se acumulan y las instrucciones temporales de una tarea vieja no autorizan acciones futuras. Racing+ reemplaza la franja de banderines y el flujo anteriores según [active-cooks-mozos.md](features/active-cooks-mozos.md).
+> Para el estado vigente leer [current-state.md](current-state.md), no este archivo completo. Entradas conservadas por tarea/fecha, no siempre ordenadas cronológicamente. Un resultado vale para su código/alcance: los totales no se acumulan y las instrucciones temporales de una tarea vieja no autorizan acciones futuras. Racing+ reemplaza la franja de banderines y el flujo anteriores según [active-cooks-mozos.md](features/active-cooks-mozos.md).
 
 ## Auditoría de agentes, skills y contexto SDD — 2026-10-15
 
@@ -355,7 +455,7 @@ Implemented the per-ID quota/hire/speed table, individual victory predicate, quo
 
 Measured real-simulation outcomes (three seeds: 1337, 407, 2026, full route/production/order/purchase logic) with those adjustments: River 3/3, average win 285.0s; Boca 3/3, 292.0s; Camioneros 3/3, 252.4s; Los Redondos 3/3, 278.0s. At zero opening funds, L6 and L7 were 3/3 (251s / 260s averages); L8–L11 respectively were 2/3, 2/3, 0/3, 0/3. For L10, $100 opening funds yielded 2/3 and $150 3/3; for L11, $100 yielded 0/3, $150 2/3 and $200 3/3.
 
-Unity 6000.6.3f1 compiled the edited scripts; the console query returned 0 errors/warnings. The focused NUnit job started but Unity MCP Test Runner disconnected/timed out before publishing results; `TestResults.xml` remained stale, so no new NUnit pass is claimed. The all-strategy A–D regression and portrait Game View review remain pending due that editor/MCP outage. See [the authoritative balance table](features/street-automation.md#current-per-product-level-balance--2026-10-08).
+Unity 6000.6.3f1 compiled the edited scripts; the console query returned 0 errors/warnings. The focused NUnit job started but Unity MCP Test Runner disconnected/timed out before publishing results; `TestResults.xml` remained stale, so no new NUnit pass is claimed. The all-strategy A–D regression and portrait Game View review remain pending due that editor/MCP outage. See [the authoritative balance table](features/street-automation.md#current-per-product-level-balance--2026-10-24).
 
 ## Official product sale prices — 2026-10-08
 
@@ -1259,3 +1359,7 @@ Se conservó profundidad +10% vs Bondiola y se amplió solo el ancho de Vacío 1
 La pantalla Mercado/stock adoptó una skin azul/celeste: paneles marino con borde cian, caras azul hielo, tinta azul oscuro, saldo/costo dorados y botones glossy azules comunes. Se preservaron el mural, emblemas e ilustraciones originales. La edición fue cosmética: no cambió geometría, hitboxes, scroll, navegación, compra, saldo, stock ni economía.
 
 **Validación:** `git diff --check` focalizado en `StreetView.cs` y contratos afectados pasó. En clon aislado Unity 6000.6.3f1 se compilaron assemblies runtime y PlayMode (`Assembly-CSharp.dll` y `HayChoriYPaty.PlayModeTests.dll` presentes, sin error de C#); la ejecución batch no inició/devolvió XML de resultados (**pruebas PlayMode BLOCKED**, no contar como aprobadas). Captura visual real de Game View del nuevo skin: **NOT_RUN**, pendiente de inspección; no se hizo APK ni prueba física.
+
+## Selector de canchas en una página — 2026-10-26
+
+StreetView ahora muestra los once niveles en una grilla scrollable de dos columnas, con VOLVER fijo y MERCADO junto al título. Las miniaturas/murales se conservan; el panel informativo usa crema/navy con acento por color de club y los bloqueados ya no oscurecen su ilustración. Contrato actualizado en specs/visual-reference.md. Unity compiló código y tests. EditMode selector 1/1 PASS; PlayMode scroll/selección/bloqueo 3/3 PASS. La batería completa StreetPointerTests terminó 34/47 PASS, 9 FAIL y 4 SKIP; entre ellos el test de transición del nivel 1 espera Playing sin completar el inicio, falla que también se reproduce aislada y no cambia con este retoque visual. Requiere revisión aparte; no se ajustó stock ni reglas de arranque. Captura Game View/revisión visual y dispositivo: NOT_RUN. git diff --check pasó.

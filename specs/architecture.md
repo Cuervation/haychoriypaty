@@ -1,11 +1,11 @@
 # Arquitectura técnica vigente
 
-Consultar [README.md](README.md) para el contrato de cada tarea y [continuity.md](continuity.md) para la referencia de versión. Este archivo describe el runtime actual; decisiones anteriores permanecen en [decisions.md](decisions.md), no constituyen una arquitectura alternativa.
+Consultar [README.md](README.md) para el contrato de cada tarea y [current-state.md](current-state.md) para la referencia de versión. Este archivo describe el runtime actual; decisiones anteriores permanecen en [decisions.md](decisions.md), no constituyen una arquitectura alternativa.
 
 ## Runtime y responsabilidades
 
 - `StreetGame` (MonoBehaviour): lifecycle, configuración `StreetBalance`, comandos, progresión y payload JSON v4 con Mercado, activado por repositorio de cuenta; PlayerPrefs original queda como legado protegido. Normaliza campos legacy; no restaura equipos comprados ni partidas en vuelo.
-- `StreetSimulation` (C#): clientes/colas FIFO, paciencia, workers, rutas, reservas/ownership, unidades, handoff, ingresos, cuotas y resultados. Siete columnas y hasta21clientes. Subpasos limitados/catch-up acotado; contratación sin tope de gameplay, velocidad sí limitada.
+- `StreetSimulation` (C#): clientes/colas FIFO sin temporizador de paciencia, workers, rutas, reservas/ownership, unidades, handoff, ingresos, cuotas y resultados. Siete columnas y hasta21clientes. Subpasos limitados/catch-up acotado; contratación sin tope de gameplay, velocidad sí limitada.
 - `StreetKitchenProduction`: IDs físicos y estados/reservas/capacidades. Lo avanza la simulación; producción/render nunca acreditan ventas por sí solos. `StreetMarket` enlaza recetas/ingredientes mediante `IStreetKitchenStock`.
 - `StreetView`: dibujo IMGUI y un catálogo compartido de acciones/hit-test. Canvas seguro de ancho540 y altura adaptable para interacción; escena/HUD decorativos pueden llenar pantalla física con su transformación separada. El puente Input System es para editor/desktop; Android GameActivity no debe duplicar el despacho nativo de touch IMGUI.
 - `StreetSceneLayout`: proyección de fondo raíz, mostrador, crowd y servicio compartidos. `ClubVisualTheme` define mural/ambiente e identidad de fans, no cambia perspectiva/alturas de gameplay.
@@ -33,7 +33,7 @@ Desde Racing cada cocinero reserva grill, ID de producto y lugar de mesa; viaja,
 
 `StreetBalance.levelBalances`/sus defaults configuran cuotas, bases por rol, multiplicador de velocidad y grant de monedas por intento; `levelProductIds` define disponibilidad. `HireCostForRole` es la autoridad de costo actual: ×1/×2,5/×5, luego n(n+1)/2−1, redondeado arriba a $5. No hay MAX de empleados por gameplay; `maxStaff`/caps y arrays antiguos son compatibilidad, no deben reactivarse. La saturación numérica no es un cap de diseño.
 
-Velocidad: nueve costos base5/10/15/20/30/45/65/90/125, multiplicador del nivel y redondeo a $5; +0,10 hasta×1,90. Toda nueva construcción/carga/selección/inicio/reintento reinicia a un Parrillero normal, cero otros roles/Mozo y SpeedLevel0; StartRound fija las monedas iniciales del nivel. No restaurar compras de plantilla/velocidad de saves antiguos. Tablas vigentes: [street-automation.md](features/street-automation.md#current-per-product-level-balance--2026-10-08).
+Velocidad: nueve costos base5/10/15/20/30/45/65/90/125, multiplicador del nivel y redondeo a $5; +0,10 hasta×1,90. Toda nueva construcción/carga/selección/inicio/reintento reinicia a un Parrillero normal, cero otros roles/Mozo y SpeedLevel0; StartRound fija las monedas iniciales del nivel. No restaurar compras de plantilla/velocidad de saves antiguos. Tablas vigentes: [street-automation.md](features/street-automation.md#current-per-product-level-balance--2026-10-24).
 
 ## UI, geometría y arte
 
@@ -53,4 +53,4 @@ Compras atómicas con saldo suficiente, sin deuda/crédito. Ingredientes se rese
 
 `Assets/Scenes` contiene Main; `Scripts/Core` dominio; `Scripts/UI` presentación; `Scripts/Editor` herramientas; `Resources`/arte/prefabs son recursos originales. EditMode valida dominio/geometría; PlayMode interacción/puente de entrada, usando assemblies de tests que acceden por reflexión sin cambiar GUIDs. Versiones en `ProjectSettings/ProjectVersion.txt`; preservar `.meta`, escenas y paquetes.
 
-Usar el editor ya abierto y las pruebas afectadas según `targeted-testing`; los registros de builds/tests previos no prueban cambios posteriores ni QA físico. Estado de pendientes y evidencia: [continuity.md](continuity.md), [status.md](status.md).
+Usar el editor ya abierto y las pruebas afectadas según `targeted-testing`; los registros de builds/tests previos no prueban cambios posteriores ni QA físico. Estado de pendientes y evidencia: [current-state.md](current-state.md), [status.md](status.md).

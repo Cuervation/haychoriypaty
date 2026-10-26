@@ -1610,7 +1610,7 @@ namespace HayChoriYPaty
             nextNormalCookProduct = 0;
             nextPremiumCookProduct = 2;
             nextCookQueueTicket = 0;
-            Kitchen = new StreetKitchenProduction(balance.kitchen, availableProductsByLevel[LevelIndex], ingredientStock, UsesActiveCooks);
+            Kitchen = new StreetKitchenProduction(balance.kitchen, availableProductsByLevel[LevelIndex], ingredientStock, UsesActiveCooks, !UsesActiveCooks && LevelIndex == 2);
             workers.Clear();
             nextWorker = 1;
             SpeedLevel = 0; // Zero purchased upgrades means the displayed speed is x1.00.

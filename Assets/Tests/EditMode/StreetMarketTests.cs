@@ -42,6 +42,18 @@ namespace HayChoriYPaty.Tests
             Assert.IsFalse((bool)Call(market,"IsIngredientUnlocked",8,0));
             Assert.IsTrue((bool)Call(market,"IsIngredientUnlocked",8,4));
         }
+        [Test] public void VelezDoesNotRequireSandwichIngredientsBeforeStarting()
+        {
+            object sim = Sim(2), data = Activator.CreateInstance(dataType), market = Market(data);
+            int[] required = (int[])Call(market, "RequiredUnits", sim);
+            for (int ingredient = 0; ingredient <= 3; ingredient++)
+                Assert.AreEqual(0, required[ingredient], "Vélez's inexhaustible Chori/Paty do not need Market stock.");
+            Assert.Greater(required[6], 0, "The exception is limited to sandwiches; the other unlocked drink retains its existing gate.");
+            dataType.GetField("stockUnits").SetValue(data, (int[])required.Clone());
+            market = Market(data);
+            Assert.IsTrue((bool)Call(market, "HasRequiredStock", sim), "No sandwich ingredient stock is required to start Vélez.");
+            Assert.IsTrue((bool)Call(market, "BeginAttempt", sim));
+        }
         [Test] public void NewGameKitUsesExactLevelOneRecipeGoalsAndAddsOnlyRequiredIngredients()
         {
             object balance=Activator.CreateInstance(balanceType), data=Activator.CreateInstance(dataType), market=Market(data,balance);

@@ -110,6 +110,36 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
+        public IEnumerator MarketAllowsExtraStockAfterGoalAndPersistsItWithoutCredit()
+        {
+            Assert.IsTrue((bool)gameType.GetMethod("SelectLevel", Pub).Invoke(game, new object[] { 1 }));
+            viewType.GetField("marketActive", Priv).SetValue(view, true);
+            object data = Market.GetType().GetProperty("Data", Pub).GetValue(Market);
+            int[] stock = (int[])data.GetType().GetField("stockUnits").GetValue(data);
+            stock[0] = 0;
+            int goal = ((int[])Market.GetType().GetMethod("RequiredUnits", Pub).Invoke(Market, new[] { Sim }))[0];
+            Assert.AreEqual(200, goal);
+            Dispatch(180);
+            for (int i=0;i<20;i++) Dispatch(120);
+            Assert.AreEqual(200, ((int[])viewType.GetField("marketPendingPacks", Priv).GetValue(view))[0], "No arbitrary99-pack ceiling.");
+            Dispatch(140);
+            Assert.AreEqual(goal, stock[0]);
+            Assert.AreEqual(0, viewType.GetMethod("MarketExpandedId", Priv).Invoke(view, null), "Keep buying after covering the goal.");
+            viewType.GetField("marketLastPurchaseTime", Priv).SetValue(view, -100f);
+            Dispatch(120); Dispatch(140); Dispatch(140);
+            Assert.AreEqual(goal + 10, stock[0], "Extra stock is bought once, not capped at the objective.");
+            string key = (string)gameType.GetField("ProgressKey", PubStatic).GetValue(null);
+            object saved = JsonUtility.FromJson(PlayerPrefs.GetString(key), gameType.GetNestedType("SaveData", BindingFlags.Public));
+            object savedMarket = saved.GetType().GetField("market").GetValue(saved);
+            Assert.AreEqual(goal+10, ((int[])savedMarket.GetType().GetField("stockUnits").GetValue(savedMarket))[0]);
+            data.GetType().GetField("balanceCents").SetValue(data, 0L);
+            viewType.GetField("marketLastPurchaseTime", Priv).SetValue(view, -100f);
+            Dispatch(120); Dispatch(140);
+            Assert.AreEqual(goal+10, stock[0], "Extra stock never bypasses the cash-only guard.");
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator PlayIsStockGatedCashOnlyRestockAndRetryIsGone()
         {
             Assert.IsTrue((bool)gameType.GetMethod("SelectLevel", Pub).Invoke(game, new object[] { 1 }),
@@ -355,6 +385,20 @@ namespace HayChoriYPaty.Tests
         }
 
 #if UNITY_EDITOR
+        [UnityTest]
+        public IEnumerator CaptureRoundedBlueMarket()
+        {
+            if (Application.isBatchMode) Assert.Ignore("Requires interactive Game View.");
+            Assert.IsTrue((bool)gameType.GetMethod("SelectLevel", Pub).Invoke(game, new object[] { 1 }));
+            viewType.GetField("marketActive", Priv).SetValue(view, true);
+            viewType.GetField("levelSelectActive", Priv).SetValue(view, false);
+            viewType.GetMethod("MarketRevealIngredient", Priv).Invoke(view, new object[] { 0 });
+            yield return null; yield return null; yield return new WaitForEndOfFrame();
+            var capture = ScreenCapture.CaptureScreenshotAsTexture();
+            try { File.WriteAllBytes("/private/tmp/hcyp-market-rounded.png", capture.EncodeToPNG()); }
+            finally { UnityEngine.Object.Destroy(capture); }
+        }
+
         [UnityTest]
         public IEnumerator CaptureUnifiedMarketLevelsAtPortraitGameViewSizes()
         {

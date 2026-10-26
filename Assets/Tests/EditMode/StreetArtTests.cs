@@ -394,6 +394,50 @@ namespace HayChoriYPaty.Tests
             finally { UnityEngine.Object.DestroyImmediate(texture); }
         }
 
+        [TestCase(312, 200, 10, 3, 8, 6)]
+        [TestCase(468, 240, 14, 4, 9, 7)]
+        public void AffordableUpgradeBorderHasTwoWhiteRingsWithoutChangingCardFace(
+            int cardWidth, int cardHeight, int padding, int outerX, int innerX, int gapX)
+        {
+            Texture2D texture = (Texture2D)View.GetMethod("CreateAffordableUpgradeBorderTexture", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { cardWidth, cardHeight, true });
+            try
+            {
+                Assert.AreEqual(cardWidth + padding * 2, texture.width);
+                Assert.AreEqual(cardHeight + padding * 2, texture.height);
+                Assert.That(texture.GetPixel(0, 0).a, Is.LessThan(.01f), "The extra rounded border canvas stays transparent at corners.");
+                int y = padding + cardHeight / 2;
+                Color outer = texture.GetPixel(outerX, y);
+                Color inner = texture.GetPixel(innerX, y);
+                Color gap = texture.GetPixel(gapX, y);
+                Assert.Greater(outer.a, .9f, "The outer white ring is visible.");
+                Assert.Greater(inner.a, .9f, "The second white ring is visible.");
+                Assert.Less(gap.a, .05f, "The two rings remain visually distinct.");
+                Assert.Greater(outer.r, .9f); Assert.Greater(outer.g, .9f); Assert.Greater(outer.b, .9f);
+                Assert.Greater(inner.r, .9f); Assert.Greater(inner.g, .9f); Assert.Greater(inner.b, .9f);
+                Assert.Less(texture.GetPixel(padding + cardWidth / 2, y).a, .01f,
+                    "The transparent overlay leaves the card's contents unobstructed.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(texture); }
+        }
+
+        [Test]
+        public void RoundedMarketPanelsHaveTransparentCornersAndSolidBlueFrame()
+        {
+            foreach (Vector2Int size in new[] { new Vector2Int(1032, 200), new Vector2Int(208, 136) })
+            {
+                var texture = (Texture2D)View.GetMethod("CreateRoundedMarketPanel", BindingFlags.Static | BindingFlags.NonPublic)
+                    .Invoke(null, new object[] { size.x, size.y, new Color(.8f,.9f,1f) });
+                try {
+                    Assert.That(texture.GetPixel(0,0).a, Is.LessThan(.01f));
+                    Assert.That(texture.GetPixel(0,size.y-1).a, Is.LessThan(.01f));
+                    Assert.That(texture.GetPixel(size.x/2,size.y/2).a, Is.GreaterThan(.99f));
+                    StringAssert.Contains("Rounded", texture.name);
+                }
+                finally { UnityEngine.Object.DestroyImmediate(texture); }
+            }
+        }
+
         [Test]
         public void AdaptivePennantsRemainTransparentOverGlossyBlueFooter()
         {
@@ -790,8 +834,22 @@ namespace HayChoriYPaty.Tests
             Assert.GreaterOrEqual(duration, 3.9f);
             Assert.LessOrEqual(duration, 4.1f);
             Rect progress = (Rect)View.GetMethod("IntroProgressBounds", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, null);
-            Assert.LessOrEqual(progress.width, 120f);
-            Assert.LessOrEqual(progress.height, 8f);
+            Assert.LessOrEqual(progress.width, 108f);
+            Assert.AreEqual(8f, progress.height, .001f);
+            MethodInfo progressValue = View.GetMethod("IntroProgressValue", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.NotNull(progressValue);
+            Assert.AreEqual(0f, (float)progressValue.Invoke(null, new object[] { 0f }), .001f);
+            Assert.AreEqual(.5f, (float)progressValue.Invoke(null, new object[] { 2f }), .001f);
+            Assert.AreEqual(1f, (float)progressValue.Invoke(null, new object[] { 4f }), .001f);
+            MethodInfo logoScale = View.GetMethod("IntroLogoScale", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.NotNull(logoScale);
+            Assert.AreEqual(1f, (float)logoScale.Invoke(null, new object[] { 0f }), .001f);
+            Assert.Greater((float)logoScale.Invoke(null, new object[] { .24f }), 1f);
+            Assert.AreEqual(1.028f, (float)logoScale.Invoke(null, new object[] { .6f }), .001f);
+            MethodInfo logoGlow = View.GetMethod("IntroLogoGlowAlpha", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.NotNull(logoGlow);
+            Assert.Greater((float)logoGlow.Invoke(null, new object[] { .18f }), .15f);
+            Assert.AreEqual(0f, (float)logoGlow.Invoke(null, new object[] { 1.1f }), .001f);
             Assert.NotNull(Resources.Load<Font>("Menu/LuckiestGuy-Regular"));
         }
 
@@ -804,6 +862,13 @@ namespace HayChoriYPaty.Tests
             Rect screen = (Rect)View.GetMethod("IntroScreenRect", BindingFlags.Static | BindingFlags.NonPublic)
                 .Invoke(null, new object[] { new Vector2(width, height) });
             Assert.AreEqual(new Rect(0, 0, width, height), screen);
+            MethodInfo backdropBounds = View.GetMethod("IntroBackdropBounds", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.NotNull(backdropBounds);
+            Rect animated = (Rect)backdropBounds.Invoke(null, new object[] { new Vector2(width, height), 1.028f });
+            Assert.LessOrEqual(animated.xMin, 0f);
+            Assert.LessOrEqual(animated.yMin, 0f);
+            Assert.GreaterOrEqual(animated.xMax, width);
+            Assert.GreaterOrEqual(animated.yMax, height);
         }
 
         [TestCase(1080, 1920)]
@@ -850,7 +915,14 @@ namespace HayChoriYPaty.Tests
         [TestCase("street-mural-real-v5", 940, 1673, false)]
         [TestCase("street-coin-gold-v2", 1254, 1254, true)]
         [TestCase("street-allboys-crest", 320, 320, true)]
-        public void NewStreetBackgroundAndGoldCoinKeepNativeResolution(string name, int width, int height, bool alpha)
+        [TestCase("street-independiente-crest-v1", 960, 997, true)]
+        [TestCase("street-ferro-crest-v1", 256, 256, true)]
+        [TestCase("street-san-lorenzo-crest-v1", 1500, 1500, true)]
+        [TestCase("street-river-crest-v1", 1200, 1487, true)]
+        [TestCase("street-boca-crest-v1", 400, 400, true)]
+        [TestCase("street-camioneros-crest-v1", 713, 485, false)]
+        [TestCase("street-los-redondos-crest-v1", 300, 300, false)]
+        public void NewStreetAssetsAndGoldCoinKeepNativeResolution(string name, int width, int height, bool alpha)
         {
             Texture2D texture = Resources.Load<Texture2D>(name); Assert.NotNull(texture);
             Assert.AreEqual(width, texture.width); Assert.AreEqual(height, texture.height);
@@ -863,24 +935,27 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void LevelCrestManifestMatchesAllLevelsAndOnlyLoadsVerifiedExistingCrests()
+        public void LevelCrestManifestMatchesAllLevelsAndLoadsUserSuppliedCrests()
         {
             string[] resources = (string[])View.GetField("LevelCrestResourceNames", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
             Type simulation = Type.GetType("HayChoriYPaty.StreetSimulation, Assembly-CSharp", true);
             string[] levels = (string[])simulation.GetField("LevelDisplayNames").GetValue(null);
+            string[] expected = {
+                "street-allboys-crest", "street-new-chicago-crest-v1", "street-velez-crest-v1",
+                "street-ferro-crest-v1", "street-independiente-crest-v1", "street-racing-crest-v1",
+                "street-san-lorenzo-crest-v1", "street-river-crest-v1", "street-boca-crest-v1",
+                "street-camioneros-crest-v1", "street-los-redondos-crest-v1"
+            };
             Assert.AreEqual(levels.Length, resources.Length, "The crest manifest must stay aligned with the level catalog");
-
-            string[] existing = { "street-allboys-crest", "street-new-chicago-crest-v1", "street-velez-crest-v1", "street-racing-crest-v1" };
-            int[] levelIndices = { 0, 1, 2, 5 };
-            for (int i = 0; i < existing.Length; i++)
+            Assert.AreEqual(expected.Length, resources.Length);
+            for (int i = 0; i < expected.Length; i++)
             {
-                Assert.AreEqual(existing[i], resources[levelIndices[i]]);
-                Assert.NotNull(Resources.Load<Texture2D>(resources[levelIndices[i]]), "Existing level crest resource must resolve: " + resources[levelIndices[i]]);
+                Assert.AreEqual(expected[i], resources[i], "Crest order must match the level catalog at index " + i);
+                Assert.NotNull(Resources.Load<Texture2D>(resources[i]), "Crest resource must resolve: " + resources[i]);
             }
+            Assert.AreEqual("Ferro / Caballito", levels[3]);
+            Assert.AreEqual("Independiente / Avellaneda", levels[4]);
             Assert.AreEqual("Racing Club / Avellaneda", levels[5]);
-            for (int i = 0; i < resources.Length; i++)
-                if (Array.IndexOf(levelIndices, i) < 0)
-                    Assert.IsNull(resources[i], "Do not draw an unverified or unlicensed mark as a crest for " + levels[i]);
         }
 
         [Test]
@@ -899,7 +974,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(TextureImporterNPOTScale.None, importer.npotScale);
             Assert.AreEqual(TextureImporterFormat.RGBA32, importer.GetPlatformTextureSettings("Android").format);
 
-            var createCutout = View.GetMethod("CreateRacingCrestCutout", BindingFlags.Static | BindingFlags.NonPublic);
+            var createCutout = View.GetMethod("CreateLevelCrestCutout", BindingFlags.Static | BindingFlags.NonPublic);
             Texture2D cutout = (Texture2D)createCutout.Invoke(null, new object[] { crest });
             Assert.NotNull(cutout);
             try
@@ -909,6 +984,25 @@ namespace HayChoriYPaty.Tests
                 Assert.AreEqual(1f, stripe.a, .01f, "White stripe inside the blue shield must stay opaque");
                 Assert.Greater(stripe.r, .9f, "White stripe color must be preserved");
                 Assert.Greater(cutout.GetPixel(123, 190).b, .6f, "Blue field should remain intact");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(cutout); }
+        }
+
+        [TestCase("street-camioneros-crest-v1")]
+        [TestCase("street-los-redondos-crest-v1")]
+        public void OpaqueUserCrestCutoutsRemoveOnlyExteriorLightBackground(string resource)
+        {
+            Texture2D source = Resources.Load<Texture2D>(resource);
+            Assert.NotNull(source);
+            Texture2D cutout = (Texture2D)View.GetMethod("CreateLevelCrestCutout", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { source });
+            Assert.NotNull(cutout);
+            try
+            {
+                Assert.AreEqual(0f, cutout.GetPixel(0, 0).a, .01f, "Exterior white background should become transparent");
+                int opaquePixels = 0;
+                foreach (Color pixel in cutout.GetPixels()) if (pixel.a > .95f) opaquePixels++;
+                Assert.Greater(opaquePixels, source.width * source.height / 5, "The crest artwork must remain visible");
             }
             finally { UnityEngine.Object.DestroyImmediate(cutout); }
         }
@@ -925,7 +1019,8 @@ namespace HayChoriYPaty.Tests
             foreach (Rect r in layout)
             {
                 Assert.GreaterOrEqual(r.xMin, bounds.xMin); Assert.LessOrEqual(r.xMax, bounds.xMax);
-                Assert.GreaterOrEqual(r.yMin, bounds.yMin); Assert.LessOrEqual(r.yMax, bounds.yMax);
+                float extra = Mathf.Max(0f, (r.height - bounds.height) * .5f);
+                Assert.GreaterOrEqual(r.yMin, bounds.yMin - extra); Assert.LessOrEqual(r.yMax, bounds.yMax + extra);
                 foreach (string control in new[] { "Speed", "HireParrillero" })
                     Assert.IsFalse(r.Overlaps((Rect)View.GetField(control, BindingFlags.Static | BindingFlags.NonPublic).GetValue(null)));
             }
@@ -937,6 +1032,102 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(includeCrest, layout[0].width > 0f);
         }
 
+        [TestCase(20f)]
+        [TestCase(22f)]
+        [TestCase(26f)]
+        public void LevelBadgeCrestsUseAllBoysReferenceSizeAcrossFooterHeights(float badgeHeight)
+        {
+            Rect bounds = new Rect(45f, 100f, 450f, badgeHeight);
+            Rect[] layout = (Rect[])View.GetMethod("LevelBadgeLayout", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { bounds, 240f, true });
+            Assert.AreEqual(32f, layout[0].width, .01f);
+            Assert.AreEqual(32f, layout[0].height, .01f);
+            Assert.AreEqual(bounds.center.y, layout[0].center.y, .01f);
+            Assert.IsFalse(layout[0].Overlaps(layout[1]));
+        }
+
+        [Test]
+        public void SanLorenzoReplacementKeepsSuppliedAlphaResolutionAndGuid()
+        {
+            const string path = "Assets/Art/Street/Resources/street-san-lorenzo-crest-v1.png";
+            var texture = Resources.Load<Texture2D>("street-san-lorenzo-crest-v1");
+            Assert.AreEqual(1500, texture.width); Assert.AreEqual(1500, texture.height);
+            Assert.IsTrue(((TextureImporter)AssetImporter.GetAtPath(path)).DoesSourceTextureHaveAlpha());
+            Assert.AreEqual("fb885176735e4c06b11b5a4bb4fd6612", AssetDatabase.AssetPathToGUID(path));
+        }
+
+        [Test]
+        public void CrestVisibleUvIgnoresTransparentPaddingWithoutDistortingArt()
+        {
+            var texture = new Texture2D(10, 10, TextureFormat.RGBA32, false);
+            var pixels = new Color32[100];
+            for (int y = 2; y < 8; y++)
+            for (int x = 3; x < 7; x++) pixels[y * 10 + x] = new Color32(255, 255, 255, 255);
+            texture.SetPixels32(pixels); texture.Apply();
+            try
+            {
+                Rect uv = (Rect)View.GetMethod("LevelCrestVisibleUv", BindingFlags.Static | BindingFlags.NonPublic)
+                    .Invoke(null, new object[] { texture });
+                Assert.That(uv.x, Is.EqualTo(.3f).Within(.001f));
+                Assert.That(uv.y, Is.EqualTo(.2f).Within(.001f));
+                Assert.That(uv.width, Is.EqualTo(.4f).Within(.001f));
+                Assert.That(uv.height, Is.EqualTo(.6f).Within(.001f));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(texture); }
+        }
+
+        [Test]
+        public void AllElevenCrestsHaveEqualVisibleBodyHeightWithoutDistortion()
+        {
+            string[] resources = (string[])View.GetField("LevelCrestResourceNames", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+            MethodInfo measure = View.GetMethod("LevelCrestVisibleUv", BindingFlags.Static | BindingFlags.NonPublic);
+            MethodInfo fit = View.GetMethod("FitLevelCrest", BindingFlags.Static | BindingFlags.NonPublic);
+            for (int i = 0; i < resources.Length; i++)
+            {
+                Texture2D source = Resources.Load<Texture2D>(resources[i]);
+                Texture2D cutout = null;
+                try
+                {
+                    if (i == 5 || i == 9 || i == 10)
+                        cutout = (Texture2D)View.GetMethod("CreateLevelCrestCutout", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new object[] { source });
+                    Texture2D texture = cutout != null ? cutout : source;
+                    Rect uv = (Rect)measure.Invoke(null, new object[] { texture });
+                    Assert.Greater(uv.width, 0); Assert.Greater(uv.height, 0);
+                    float aspect = texture.width * uv.width / (texture.height * uv.height);
+                    Rect body = (Rect)View.GetMethod("LevelCrestBodyUv", BindingFlags.Static | BindingFlags.NonPublic)
+                        .Invoke(null, new object[] { i, uv });
+                    foreach (Rect slot in new[] { new Rect(0,0,32,32), new Rect(0,0,30,34), new Rect(0,0,76,76) })
+                    {
+                        Rect visible = (Rect)fit.Invoke(null, new object[] { slot, new Vector2(texture.width, texture.height), uv, body });
+                        Assert.That(visible.width / visible.height, Is.EqualTo(aspect).Within(.001f), resources[i]);
+                        float scale = visible.height / (texture.height * uv.height);
+                        Assert.That(texture.height * body.height * scale, Is.EqualTo(slot.height).Within(.001f), resources[i]);
+                        float bodyTop = visible.y + texture.height * (uv.yMax - body.yMax) * scale;
+                        Assert.That(bodyTop, Is.EqualTo(slot.yMin).Within(.001f), resources[i]);
+                        Assert.That(visible.center.x, Is.EqualTo(slot.center.x).Within(.001f), resources[i]);
+                        if (i == 2) Assert.Greater(visible.height, slot.height, "Vélez star must not shrink the shield body");
+                        else Assert.That(visible.height, Is.EqualTo(slot.height).Within(.001f), resources[i]);
+                    }
+                }
+                finally { if (cutout != null) UnityEngine.Object.DestroyImmediate(cutout); }
+            }
+        }
+
+        [TestCase(23f)]
+        [TestCase(32f)]
+        [TestCase(48f)]
+        public void UniformBodyHeightBadgeReservesActualCrestWidth(float crestWidth)
+        {
+            Rect bounds = new Rect(45, 100, 450, 26);
+            Rect[] layout = (Rect[])View.GetMethod("LevelBadgeLayoutForWidth", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { bounds, 600f, crestWidth });
+            Assert.That(layout[0].height, Is.EqualTo(32f));
+            Assert.That(layout[0].width, Is.EqualTo(crestWidth));
+            Assert.That(layout[1].xMin - layout[0].xMax, Is.EqualTo(8f).Within(.001f));
+            Assert.That(layout[0].xMin, Is.GreaterThanOrEqualTo(bounds.xMin - .001f));
+            Assert.That(layout[1].xMax, Is.LessThanOrEqualTo(bounds.xMax + .001f));
+        }
+
         [Test]
         public void LevelSelectorCardsFitPortraitCanvasAndUseTeamMuralResources()
         {
@@ -946,10 +1137,18 @@ namespace HayChoriYPaty.Tests
             {
                 cards[i] = (Rect)cardBounds.Invoke(null, new object[] { i });
                 Assert.GreaterOrEqual(cards[i].xMin, 0f); Assert.LessOrEqual(cards[i].xMax, 540f);
-                Assert.GreaterOrEqual(cards[i].yMin, 0f); Assert.LessOrEqual(cards[i].yMax, 960f);
-                Assert.LessOrEqual(cards[i].yMax, 652f, "Cards must leave room for pagination/back");
-                for (int j = i / 6 * 6; j < i; j++) Assert.IsFalse(cards[i].Overlaps(cards[j]), "Same-page cards must have separate touch targets");
+                Assert.GreaterOrEqual(cards[i].yMin, 0f);
+                for (int j = i / 2 * 2; j < i; j++)
+                    Assert.IsFalse(cards[i].Overlaps(cards[j]), "Cards in the same grid row must have separate touch targets");
             }
+
+            Rect viewport = (Rect)View.GetField("LevelSelectorViewport", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+            Assert.LessOrEqual(viewport.yMax, 652f,
+                "Scrollable level cards must be clipped above the fixed lower selector footer");
+            MethodInfo maxScroll = View.GetMethod("LevelSelectorMaxScroll", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.Greater((float)maxScroll.Invoke(null, new object[] { 960f }), 0f,
+                "All eleven levels exceed the viewport and must be reachable by scrolling");
+            Assert.Greater(cards[10].yMax, 960f, "Campaign tail belongs below the initial viewport");
 
             Assert.AreEqual("street-mural-real-v5", View.GetField("MuralResource", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue());
             Assert.AreEqual("street-background-chicago-v1", View.GetField("ChicagoBackgroundResource", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue());
@@ -988,6 +1187,19 @@ namespace HayChoriYPaty.Tests
                 Assert.AreEqual(poses[i].yMin / 1261f, imported.yMin / atlas.height, .0001f,
                     "Importer downscaling must not change the source UV row");
             }
+        }
+
+        [Test]
+        public void SpecialistUpgradePortraitUsesChicagoStyleAtEveryLevel()
+        {
+            MethodInfo sourceLevel = View.GetMethod("SpecialistUpgradePortraitSourceLevel", BindingFlags.Static | BindingFlags.NonPublic);
+            MethodInfo matchedStyle = View.GetMethod("UsesMatchedCocacoleroArt", BindingFlags.Static | BindingFlags.NonPublic);
+            string[] levels = (string[])Type.GetType("HayChoriYPaty.StreetSimulation, Assembly-CSharp", true)
+                .GetField("LevelNames").GetValue(null);
+            for (int level = 0; level < levels.Length; level++)
+                Assert.AreEqual(1, sourceLevel.Invoke(null, new object[] { level }), "Upgrade card art should use the same matched atlas at every level");
+            Assert.IsTrue((bool)matchedStyle.Invoke(null, new object[] { 1 }), "The shared card portrait style must use the Chicago matched atlas");
+            Assert.AreEqual(0, sourceLevel.Invoke(null, new object[] { -1 }), "Invalid levels retain the legacy fallback");
         }
 
         [Test]
@@ -1447,7 +1659,7 @@ namespace HayChoriYPaty.Tests
                 Rect badge = (Rect)footerType.GetField("LevelBadge").GetValue(footer);
                 Rect drawnBadge = new Rect(badge.x, badge.y * verticalScale, badge.width, badge.height);
                 Rect flags = (Rect)footerType.GetField("Pennants").GetValue(footer);
-                float expectedFlags = ExpectedResponsivePennantHeight(actions.Length, false, canvasHeight, stageBottom, 0f);
+                float expectedFlags = ExpectedResponsivePennantHeight(level, actions.Length, false, canvasHeight, stageBottom, 0f);
                 Assert.AreEqual(expectedFlags, flags.height, .2f, "Level " + level + " reserves only real free pennant space.");
                 if (flags.height > 1f)
                 {
@@ -1496,7 +1708,7 @@ namespace HayChoriYPaty.Tests
                 Rect drawnReadyBadge = new Rect(readyBadge.x, readyBadge.y * verticalScale, readyBadge.width, readyBadge.height);
                 Assert.IsFalse(drawnSelector.Overlaps(drawnReadyBadge));
                 Rect readyFlags = (Rect)ready.GetType().GetField("Pennants").GetValue(ready);
-                float expectedReadyFlags = ExpectedResponsivePennantHeight(raw.Length <= 3 ? raw.Length : 0,
+                float expectedReadyFlags = ExpectedResponsivePennantHeight(level, raw.Length <= 3 ? raw.Length : 0,
                     true, canvasHeight, stageBottom, 0f);
                 Assert.AreEqual(expectedReadyFlags, readyFlags.height, .2f);
                 Assert.IsFalse(drawnSelector.Overlaps(readyFlags));
@@ -1520,7 +1732,7 @@ namespace HayChoriYPaty.Tests
 
                 object noControls = build.Invoke(null, new object[] { sim, canvasHeight, false, false });
                 Rect noControlFlags = (Rect)noControls.GetType().GetField("Pennants").GetValue(noControls);
-                float expectedNoControlFlags = ExpectedResponsivePennantHeight(0, false, canvasHeight, stageBottom, 0f);
+                float expectedNoControlFlags = ExpectedResponsivePennantHeight(level, 0, false, canvasHeight, stageBottom, 0f);
                 Assert.AreEqual(expectedNoControlFlags, noControlFlags.height, .2f);
                 Rect noControlPennantArt = (Rect)View.GetMethod("FooterPennantRenderBounds", BindingFlags.Static | BindingFlags.NonPublic)
                     .Invoke(null, new object[] { noControlFlags, canvasHeight, 0f });
@@ -1543,8 +1755,9 @@ namespace HayChoriYPaty.Tests
             return float.IsPositiveInfinity(top) ? Rect.zero : Rect.MinMaxRect(0f, top, 1f, bottom);
         }
 
-        private static float ExpectedResponsivePennantHeight(int count, bool ready, float canvasHeight, float stageBottom, float bottomBleed)
+        private static float ExpectedResponsivePennantHeight(int levelIndex, int count, bool ready, float canvasHeight, float stageBottom, float bottomBleed)
         {
+            if (levelIndex >= 5) return 0f;
             float compact = Mathf.Min(1f, canvasHeight / 960f);
             int rows = count == 0 ? 0 : count <= 3 ? 1 : 2;
             float cardHeight = (count >= 5 ? 100f : count == 4 ? 104f : 120f) * compact;

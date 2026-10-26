@@ -112,7 +112,7 @@ namespace HayChoriYPaty.Tests
             if (funded)
             {
                 int[] snapshot = (int[])Stock(market).Clone();
-                int product = (int)Call(sim, "GetAvailableProduct", 0);
+                int product = level == 2 ? (int)Call(sim, "GetAvailableProduct", 2) : (int)Call(sim, "GetAvailableProduct", 0);
                 int foodId = 100000 + level * 100 + fundingMode * 3 + tactic;
                 Assert.IsTrue((bool)Call(market, "TryReserveFood", foodId, product));
                 Assert.IsTrue((bool)Call(market, "ConsumeReservedFood", foodId, product));
