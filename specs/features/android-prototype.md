@@ -1,3 +1,13 @@
+# Entrega Android — 2026-10-26: splash con tres frases y corrección Coca 0.2.72/code74
+
+APK generada desde el código intencional vigente del checkout (base `2f9a7fa` más los cambios seleccionados), en copia Unity aislada, con **Unity 6000.6.3f1**, escena `Assets/Scenes/Main.unity` únicamente, Android **Development IL2CPP/ARM64**. Incluye el nuevo arranque con logo/brillos, barra compacta y tres frases; la corrección lineal del baseline Coca se aplica solo dentro de los últimos/primeros 48 puntos de ruta. Se excluyeron Tests, auditorías, capturas/recovery, preferencias locales Firebase/Gvh, `TimeManager`/`runInBackground` y churn de formato `.meta`. Player Settings del checkout: **0.2.72/code74**.
+
+BuildPipeline: **Succeeded, 511,04 s, 0 errores / 1 advertencia** (clang `-Wunused-command-line-argument`). APK `/private/tmp/hcyp-release-0.2.72-code74/HayChoriYPaty-0.2.72-code74.apk`, **387.366.977 bytes**, SHA-256 `e8d190663ccf6c3164fb04701767fe11ad60d25547f58b7c0a7dabee0954a103`. Paquete `com.haychoriypaty.game`, versión **0.2.72/code74**, min API26/target36, ABI `arm64-v8a`. **PASS:** ZIP íntegro, `zipalign -c -v 4`, firma APK v2 verificada y metadata; Firebase Analytics y recolección de Google ad-ID están desactivadas en el manifiesto. Firma Android Debug (no Play Store); **no instalada**. APK/logs/reportes fuera de Git en `/private/tmp/hcyp-release-0.2.72-code74/`.
+
+**Pruebas focalizadas:** splash EditMode `StartupCoverAndTitleLogoAreReadyForAndroidSplash` **1/1 PASS**; offset Coca EditMode `CocaBarrelBaselineOffsetIsLinearAcrossTheFinalAndFirstFortyEightUnits` **1/1 PASS**. `ChicagoCocacoleroPickupIsFrontalAndGroundedAtBarrel` quedó **BLOCKED**: al intentar la integración PlayMode, Unity `-nographics` terminó con SIGSEGV en URP/Null Device (exit139); no es un resultado PASS. Transición en vivo, captura Game View actualizada, QA físico y suite completa: **NOT_RUN/BLOCKED** según corresponda. Evidencia y logs: `/private/tmp/hcyp-release-0.2.72-code74/`; contrato: [worker animation](worker-animation.md).
+
+---
+
 # Entrega Android — 2026-10-26: selector de niveles y tutorial v2 0.2.71/code73
 
 APK generada desde el working tree vigente en una copia Unity aislada, con `Assets/Scenes/Main.unity` únicamente, Unity **6000.6.3f1**, Android **Development IL2CPP/ARM64**. El build incorpora los cambios intencionales de runtime/arte del checkout, incluidos el selector/tutoría revisados visualmente; excluye preferencias de Firebase/Gvh, `TimeManager`/`runInBackground`, tests, auditorías, capturas, recovery y metadatos `.meta` de formato solamente. Los Player Settings del checkout avanzan a **0.2.71/code73**; se preserva el `runInBackground: 1` local sin publicarlo.

@@ -5,7 +5,7 @@
 ## Project and environment
 
 - Active checkout: `/Users/celestino/HayChoriYPaty`, branch `codex/street-automation`; preserve all pre-existing local changes. The Documents/ChatGPT folder is a context copy, not the active checkout.
-- Unity `6000.6.3f1`; Android-first 2D portrait. `ProjectSettings.asset` reports `0.2.71` / code `73`; Development IL2CPP/ARM64 APK was generated and validated at `/private/tmp/hcyp-release-0.2.71-code73/HayChoriYPaty-0.2.71-code73.apk` (SHA-256 `b751dabc3ec5f9b0e6abbc4a58bcb85bb59f73a6b7a36fc9bab3cd882d4f20ad`). It is debug-signed and has not been installed. Delivery evidence is in [Android prototype](features/android-prototype.md).
+- Unity `6000.6.3f1`; Android-first 2D portrait. `ProjectSettings.asset` reports `0.2.72` / code `74`; Development IL2CPP/ARM64 APK is validated at `/private/tmp/hcyp-release-0.2.72-code74/HayChoriYPaty-0.2.72-code74.apk` (SHA-256 `e8d190663ccf6c3164fb04701767fe11ad60d25547f58b7c0a7dabee0954a103`). It is debug-signed and has not been installed. Delivery evidence is in [Android prototype](features/android-prototype.md).
 - The user confirmed selection/trust of the active checkout on 2026-10-26. No global settings were changed; existing skills/roles and configured model/effort values remain untouched.
 
 ## Implemented scope (high-level)
@@ -26,4 +26,4 @@ Start at [SDD index](README.md). Product boundary: [product](product.md); loop: 
 
 ## Evidence and history
 
-Latest pickup presentation (2026-10-26) restores upright frontal Coca pickup and final approach, removes the lateral shift and locates the visual feet 24 logical units behind the barrel base. The barrel occludes the lower body; simulation routes/anchors, stock and timing are unchanged. Two focused native PlayMode tests and one interactive full Game View capture passed (1080×1920 with tiled floor). User visual acceptance and complete live-transition video remain open. Evidence: Logs/Acceptance/CocacoleroFront-20261026/. Earlier unrelated refinements retain their own validation statuses in [status](status.md). Historical decisions remain in [decisions](decisions.md).
+Latest Coca presentation keeps the upright frontal approach, with its baseline offset now interpolated linearly only across the final/first 48 route units; feet remain 24 logical units behind the barrel base at pickup. The barrel occludes the lower body; routes/anchors, stock, timing and physical IDs are unchanged. EditMode blend regression passed 1/1. PlayMode integration is blocked by Unity URP Null Device SIGSEGV in headless mode; the updated live-transition capture and user visual acceptance remain open. The preceding full Game View capture at 1080×1920 is preserved in `Logs/Acceptance/CocacoleroFront-20261026/` but does not validate the new linear timing. Latest APK and complete delivery limits are in [Android prototype](features/android-prototype.md) and [status](status.md). Historical decisions remain in [decisions](decisions.md).

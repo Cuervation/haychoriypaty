@@ -1,3 +1,12 @@
+## 2026-10-26 — APK Android 0.2.72/code74 y Cocacolero lineal
+
+Build Development IL2CPP/ARM64, Main-only, desde copia aislada Unity 6000.6.3f1: **Succeeded, 511,04 s, 0 errores / 1 advertencia** (clang `-Wunused-command-line-argument`). Incluye splash de tres frases/logo/barra y corrección del offset Coca lineal dentro de 48 unidades. APK `/private/tmp/hcyp-release-0.2.72-code74/HayChoriYPaty-0.2.72-code74.apk`, 387.366.977 bytes, SHA-256 `e8d190663ccf6c3164fb04701767fe11ad60d25547f58b7c0a7dabee0954a103`. Paquete/version/API/ABI, ZIP, zipalign, firma APK v2 y flags de recolección analytics/ad-ID validados. Debug-signed, no Play Store; no instalada.
+
+- Splash EditMode: 1/1 **PASS**.
+- Offset Coca EditMode: 1/1 **PASS**.
+- Integración PlayMode Cocacolero: **BLOCKED**, Unity `-nographics` se cayó con SIGSEGV en URP/Null Device (exit139); la captura de transición/captura Game View actualizada y QA físico siguen pendientes.
+- Suite completa: **NOT_RUN**. Evidencia/logs: `/private/tmp/hcyp-release-0.2.72-code74/`. APK fuera de Git.
+
 ## 2026-10-26 — APK Android 0.2.71/code73
 
 Build Android **Development IL2CPP/ARM64**, Main-only, desde una copia aislada del working tree (Unity 6000.6.3f1): **Succeeded, 577,82 s, 0 errores / 4 advertencias**; dos avisos de clang por `-Wunused-command-line-argument`. APK `/private/tmp/hcyp-release-0.2.71-code73/HayChoriYPaty-0.2.71-code73.apk`, 385.633.166 bytes, SHA-256 `b751dabc3ec5f9b0e6abbc4a58bcb85bb59f73a6b7a36fc9bab3cd882d4f20ad`. Paquete/version/API/ABI, ZIP, zipalign, firma v2 Android Debug y flags Analytics/ad-ID **PASS**. No es firma Play Store y no se instaló. Evidencia detallada en [Android prototype](features/android-prototype.md). Suite completa y QA físico NOT_RUN.

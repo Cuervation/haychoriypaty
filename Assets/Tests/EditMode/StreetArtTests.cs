@@ -835,21 +835,35 @@ namespace HayChoriYPaty.Tests
             Assert.LessOrEqual(duration, 4.1f);
             Rect progress = (Rect)View.GetMethod("IntroProgressBounds", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, null);
             Assert.LessOrEqual(progress.width, 108f);
-            Assert.AreEqual(8f, progress.height, .001f);
+            Assert.AreEqual(95f, progress.width, .001f);
+            Assert.AreEqual(28f, progress.height, .001f);
+            Assert.AreEqual(882f, progress.y, .001f);
             MethodInfo progressValue = View.GetMethod("IntroProgressValue", BindingFlags.Static | BindingFlags.NonPublic);
             Assert.NotNull(progressValue);
             Assert.AreEqual(0f, (float)progressValue.Invoke(null, new object[] { 0f }), .001f);
             Assert.AreEqual(.5f, (float)progressValue.Invoke(null, new object[] { 2f }), .001f);
             Assert.AreEqual(1f, (float)progressValue.Invoke(null, new object[] { 4f }), .001f);
-            MethodInfo logoScale = View.GetMethod("IntroLogoScale", BindingFlags.Static | BindingFlags.NonPublic);
-            Assert.NotNull(logoScale);
-            Assert.AreEqual(1f, (float)logoScale.Invoke(null, new object[] { 0f }), .001f);
-            Assert.Greater((float)logoScale.Invoke(null, new object[] { .24f }), 1f);
-            Assert.AreEqual(1.028f, (float)logoScale.Invoke(null, new object[] { .6f }), .001f);
-            MethodInfo logoGlow = View.GetMethod("IntroLogoGlowAlpha", BindingFlags.Static | BindingFlags.NonPublic);
-            Assert.NotNull(logoGlow);
-            Assert.Greater((float)logoGlow.Invoke(null, new object[] { .18f }), .15f);
-            Assert.AreEqual(0f, (float)logoGlow.Invoke(null, new object[] { 1.1f }), .001f);
+            MethodInfo pop = View.GetMethod("IntroLogoPop", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.NotNull(pop);
+            Assert.AreEqual(0f, (float)pop.Invoke(null, new object[] { 0f }), .001f);
+            Assert.Greater((float)pop.Invoke(null, new object[] { .22f }), 1.2f);
+            Assert.AreEqual(1f, (float)pop.Invoke(null, new object[] { .53f }), .001f);
+            Rect logoBounds = (Rect)View.GetMethod("IntroLogoBounds", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { 1f });
+            Assert.AreEqual(new Rect(135f, 320f, 270f, 260f), logoBounds);
+            MethodInfo status = View.GetMethod("IntroStatus", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.AreEqual("PRENDIENDO LAS BRASAS...", (string)status.Invoke(null, new object[] { 0f }));
+            Assert.AreEqual("PRENDIENDO LAS BRASAS...", (string)status.Invoke(null, new object[] { 1.349f }));
+            Assert.AreEqual("LA HINCHADA ESTÁ LLEGANDO...", (string)status.Invoke(null, new object[] { 1.35f }));
+            Assert.AreEqual("LA HINCHADA ESTÁ LLEGANDO...", (string)status.Invoke(null, new object[] { 2.699f }));
+            Assert.AreEqual("¡QUE EMPIECE LA FIESTA EN EL BARRIO!", (string)status.Invoke(null, new object[] { 2.7f }));
+            Assert.AreEqual("¡QUE EMPIECE LA FIESTA EN EL BARRIO!", (string)status.Invoke(null, new object[] { 3.999f }));
+            Font statusFont = Resources.Load<Font>("Google/GoogleSans-Medium");
+            Assert.NotNull(statusFont);
+            int statusFontSize = (int)View.GetField("IntroStatusFontSize", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue();
+            Assert.AreEqual(14, statusFontSize);
+            var statusStyle = new GUIStyle { font = statusFont, fontSize = statusFontSize, fontStyle = FontStyle.Bold, wordWrap = false };
+            Assert.LessOrEqual(statusStyle.CalcSize(new GUIContent("¡QUE EMPIECE LA FIESTA EN EL BARRIO!")).x, 524f);
             Assert.NotNull(Resources.Load<Font>("Menu/LuckiestGuy-Regular"));
         }
 
@@ -2530,6 +2544,67 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
             Assert.IsNull(View.GetField("readySandwichesTable", BindingFlags.NonPublic | BindingFlags.Instance));
             Assert.IsNull(View.GetField("servingTable", BindingFlags.NonPublic | BindingFlags.Instance));
             Assert.IsNull(View.GetMethod("DrawServingTable", BindingFlags.NonPublic | BindingFlags.Instance));
+        }
+
+        [Test]
+        public void CocaBarrelBaselineOffsetIsLinearAcrossTheFinalAndFirstFortyEightUnits()
+        {
+            Type simulationType = Type.GetType("HayChoriYPaty.StreetSimulation, Assembly-CSharp", true);
+            Type balanceType = Type.GetType("HayChoriYPaty.StreetBalance, Assembly-CSharp", true);
+            Type workerType = Type.GetType("HayChoriYPaty.StreetWorker, Assembly-CSharp", true);
+            Type roleType = Type.GetType("HayChoriYPaty.StreetWorkerRole, Assembly-CSharp", true);
+            Type stateType = Type.GetType("HayChoriYPaty.StreetWorkerState, Assembly-CSharp", true);
+            object simulation = Activator.CreateInstance(simulationType,
+                new object[] { Activator.CreateInstance(balanceType), 1, 5f, 0, 1, 0 });
+            object worker = Activator.CreateInstance(workerType);
+            SetProjectionMember(worker, "Role", Enum.Parse(roleType, "Cocacolero"));
+            SetProjectionMember(worker, "Product", 4);
+            object layout = simulationType.GetProperty("KitchenLayout").GetValue(simulation);
+            Vector2 pickup = (Vector2)layout.GetType().GetMethod("PickupPosition", new[] { typeof(int) })
+                .Invoke(layout, new object[] { 4 });
+            Rect barrel = (Rect)layout.GetType().GetMethod("BoundsForProduct", new[] { typeof(int) })
+                .Invoke(layout, new object[] { 4 });
+            float fullOffset = Mathf.Max(0f, barrel.height - 24f);
+            MethodInfo offset = Type.GetType("HayChoriYPaty.StreetWorkerProjection, Assembly-CSharp", true)
+                .GetMethod("CocaBarrelPresentationOffset", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.NotNull(offset);
+            Func<float> sample = () => (float)offset.Invoke(null, new[] { simulation, worker });
+
+            SetProjectionMember(worker, "State", Enum.Parse(stateType, "ToStation"));
+            SetProjectionMember(worker, "Route", new[] { pickup });
+            SetProjectionMember(worker, "RouteDistance", 64f);
+            float[] remaining = { 48f, 36f, 24f, 12f, 0f };
+            float[] expectedApproach = { 0f, .25f, .5f, .75f, 1f };
+            for (int i = 0; i < remaining.Length; i++)
+            {
+                SetProjectionMember(worker, "Position", pickup + Vector2.left * remaining[i]);
+                Assert.That(sample(), Is.EqualTo(fullOffset * expectedApproach[i]).Within(.01f),
+                    "The final 48-unit approach must add a constant offset per equal route-distance step.");
+            }
+
+            SetProjectionMember(worker, "State", Enum.Parse(stateType, "ToCounter"));
+            SetProjectionMember(worker, "Route", new[] { pickup + Vector2.right * 64f });
+            SetProjectionMember(worker, "RouteDistance", 64f);
+            float[] travelled = { 0f, 12f, 24f, 36f, 48f };
+            float[] expectedDeparture = { 1f, .75f, .5f, .25f, 0f };
+            for (int i = 0; i < travelled.Length; i++)
+            {
+                SetProjectionMember(worker, "Position", pickup + Vector2.right * travelled[i]);
+                Assert.That(sample(), Is.EqualTo(fullOffset * expectedDeparture[i]).Within(.01f),
+                    "The first 48-unit departure must remove a constant offset per equal route-distance step.");
+            }
+        }
+
+        private static void SetProjectionMember(object instance, string name, object value)
+        {
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            PropertyInfo property = instance.GetType().GetProperty(name, flags);
+            if (property != null)
+            {
+                property.GetSetMethod(true).Invoke(instance, new[] { value });
+                return;
+            }
+            instance.GetType().GetField(name, flags).SetValue(instance, value);
         }
 
         [Test]

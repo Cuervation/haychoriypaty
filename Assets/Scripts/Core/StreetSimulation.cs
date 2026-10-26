@@ -266,6 +266,8 @@ namespace HayChoriYPaty
         // Visual telemetry only; movement math and service timing are unchanged.
         public float TravelDistance { get; internal set; }
         public float StepDistance { get; internal set; }
+        // Presentation telemetry only: lets station-facing visual corrections follow route progress linearly.
+        public float RouteDistance { get; internal set; }
         public Vector2 FacingVector { get; internal set; }
         internal float Delay;
         internal float PickupDuration;
@@ -1428,12 +1430,27 @@ namespace HayChoriYPaty
             if (worker.Route == null)
             {
                 worker.RouteIndex = 0;
+                worker.RouteDistance = 0f;
                 worker.Target = worker.Position;
                 return false;
             }
             worker.RouteIndex = 0;
+            worker.RouteDistance = RouteDistance(worker.Position, worker.Route, destination);
             worker.Target = worker.Route.Length > 0 ? worker.Route[0] : destination;
             return true;
+        }
+
+        private static float RouteDistance(Vector2 start, Vector2[] route, Vector2 destination)
+        {
+            if (route == null || route.Length == 0) return Vector2.Distance(start, destination);
+            float distance = 0f;
+            Vector2 previous = start;
+            for (int i = 0; i < route.Length; i++)
+            {
+                distance += Vector2.Distance(previous, route[i]);
+                previous = route[i];
+            }
+            return distance;
         }
 
         private static bool AdvanceWorkerRoute(StreetWorker worker)
@@ -1446,6 +1463,7 @@ namespace HayChoriYPaty
             }
             worker.Route = null;
             worker.RouteIndex = 0;
+            worker.RouteDistance = 0f;
             return true;
         }
 
@@ -1657,7 +1675,7 @@ namespace HayChoriYPaty
                 Position = home, Target = home, WaitPosition = home, State = StreetWorkerState.Idle,
                 CookStationIndex = stationIndex, CookQueueTicket = queueTicket });
         }
-        private void ResetWorker(StreetWorker w) { w.CookingProgress = 0f; w.VisualCooking = false; w.VisualCookingProduct = -1; w.CookingItemId = 0; w.CookingWorkPosition = Vector2.zero; w.GrillContactBlendStart = 0f; w.StepDistance = 0f; w.PickupProgress = 0f; w.PickupDuration = 0f; w.Customer = null; w.CustomerId = 0; w.Product = -1; w.CarriedItemId = 0; w.State = StreetWorkerState.Idle; w.Route = null; w.RouteIndex = 0; w.ReturningToWaitPosition = false; w.Target = w.Position; }
+        private void ResetWorker(StreetWorker w) { w.CookingProgress = 0f; w.VisualCooking = false; w.VisualCookingProduct = -1; w.CookingItemId = 0; w.CookingWorkPosition = Vector2.zero; w.GrillContactBlendStart = 0f; w.StepDistance = 0f; w.RouteDistance = 0f; w.PickupProgress = 0f; w.PickupDuration = 0f; w.Customer = null; w.CustomerId = 0; w.Product = -1; w.CarriedItemId = 0; w.State = StreetWorkerState.Idle; w.Route = null; w.RouteIndex = 0; w.ReturningToWaitPosition = false; w.Target = w.Position; }
         private static Vector2 Move(Vector2 from, Vector2 to, float speed, float dt) { return Vector2.MoveTowards(from, to, speed * dt); }
     }
 }

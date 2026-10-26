@@ -249,24 +249,33 @@ namespace HayChoriYPaty
             return position;
         }
 
+        private const float CocaBarrelTransitionDistance = 48f;
+
         internal static float CocaBarrelPresentationOffset(StreetSimulation simulation, StreetWorker worker)
         {
             if (simulation == null || worker == null || worker.Role != StreetWorkerRole.Cocacolero ||
                 worker.Product != 4) return 0f;
             Rect barrel = simulation.KitchenLayout.BoundsForProduct(4);
             if (barrel.width <= 0f) return 0f;
-            const float transitionDistance = 48f;
             float blend;
             if (worker.State == StreetWorkerState.Pickup) blend = 1f;
             else if (worker.State == StreetWorkerState.ToStation)
-                blend = 1f - Mathf.SmoothStep(0f, 1f,
-                    RemainingRouteDistance(worker, simulation.KitchenLayout.PickupPosition(4)) / transitionDistance);
+            {
+                float remaining = RemainingRouteDistance(worker, simulation.KitchenLayout.PickupPosition(4));
+                blend = 1f - Mathf.Clamp01(remaining / CocaBarrelTransitionDistance);
+            }
             else if (worker.State == StreetWorkerState.ToCounter)
-                blend = 1f - Mathf.SmoothStep(0f, 1f,
-                    TravelledRouteDistance(worker, simulation.KitchenLayout.PickupPosition(4)) / transitionDistance);
+            {
+                Vector2 destination = worker.Route != null && worker.Route.Length > 0
+                    ? worker.Route[worker.Route.Length - 1] : worker.Target;
+                float remaining = RemainingRouteDistance(worker, destination);
+                float travelled = Mathf.Max(0f, worker.RouteDistance - remaining);
+                blend = 1f - Mathf.Clamp01(travelled / CocaBarrelTransitionDistance);
+            }
             else return 0f;
             if (blend <= 0f) return 0f;
-            // Stop behind the barrel, not beyond its near edge (the rejected forward step).
+            // Linear route-distance blending preserves the same final ground plane without
+            // the ease-in/ease-out speed spike caused by the former 48-unit SmoothStep.
             return Mathf.Max(0f, barrel.height - 24f) * blend;
         }
         internal static float PresentationScale(StreetSimulation simulation, StreetWorker worker)

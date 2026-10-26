@@ -108,7 +108,12 @@ namespace HayChoriYPaty.Tests
             object sim = gt.GetProperty("Sim").GetValue(game);
             PropertyInfo remaining = sim.GetType().GetProperty("TimeRemaining");
             float before = (float)remaining.GetValue(sim);
-            yield return Capture("intro-playmode-1080x1920");
+            yield return new WaitForSecondsRealtime(.20f);
+            yield return Capture("intro-pop-playmode-1080x1920");
+            yield return new WaitForSecondsRealtime(.52f);
+            yield return Capture("intro-settled-playmode-1080x1920");
+            yield return new WaitForSecondsRealtime(2.25f);
+            yield return Capture("intro-finale-playmode-1080x1920");
             float deadline = Time.realtimeSinceStartup + 7f;
             while ((bool)Field("introActive") && Time.realtimeSinceStartup < deadline) yield return null;
             Assert.IsFalse((bool)Field("introActive"), "Authenticated splash must advance automatically.");

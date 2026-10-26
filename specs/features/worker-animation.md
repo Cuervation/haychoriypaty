@@ -17,7 +17,8 @@ Eight canvas-space directions; four distinct gait samples per direction, reusing
 - [x] Beverage pickup reaches a safe barrel anchor, animates empty-handed during the existing dwell, and only carries the real inventory unit after withdrawal; Coca/beer workers operate concurrently.
 - [x] Worker gait cadence is40% slower, remains distance-proportional for all four roles (including the fallback renderer), and halts in idle/pickup/handoff without changing fan animation.
 - [x] Coca pickup restores the existing upright, front-facing empty-handed pose; its final approach also faces forward, with no horizontal presentation shift.
-- [x] The visual foot baseline eases toward barrel.yMax minus 24 logical units over the final/first 48 route units; the barrel occludes the lower body rather than drawing the torso or feet through its front. Route anchors, timing, inventory and physical IDs stay unchanged.
+- [x] The visual foot baseline reaches barrel.yMax minus 24 logical units at pickup, and the barrel occludes the lower body rather than drawing the torso or feet through its front; the final frontal pose was reviewed in a full Game View capture.
+- [ ] During Coca approach/departure, the baseline correction advances linearly only across the final/first 48 route units to avoid a nonlinear apparent-speed spike while preserving the same route, speed, timing, inventory and physical IDs. The EditMode math regression passed; PlayMode renderer validation and live-transition capture remain pending.
 - [ ] User acceptance of the revised frontal perspective and live transition; the historic 2-unit rim clearance is not a ground-plane measurement and is superseded by the base-relative presentation above.
 
 ## Validation
@@ -86,3 +87,8 @@ Se reparten las recogidas concurrentes por la cara frontal de cada estación, lo
 - [ ] Ejecutar esas regresiones en Unity y revisar visualmente los cruces y los casos de alta concurrencia; no se cuenta como validado aún.
 
 `git diff --check` pasó. El primer refresh de Unity MCP respondió `tests_running`; un reintento luego informó que recuperó la conexión y que el editor estaba listo, pero consola/estado siguieron sin responder al ping. El pedido de las pruebas focalizadas se desconectó mientras esperaba el resultado, sin ID ni reporte; por eso no se confirma compilación/tests ni se generaron capturas.
+
+
+### 2026-10-26 — Avoid apparent acceleration on Coca barrel approach
+
+The user reported that the Cocacolero seemed to accelerate as it reached the barrel. `MoveWorker` uses constant `MoveTowards` speed; the apparent spike came from an ease-in/ease-out ground-plane offset that added up to ~94 logical units over only the final 48 units. Each assigned route records its total length as presentation-only telemetry. The ground-plane correction is now blended linearly over only the final/first 48 traveled route units on approach/departure, while pickup keeps the full offset. This removes the nonlinear late-route acceleration without changing the transition span, logical route, `WorkRate`, movement speed, pickup dwell, inventory, or items. The EditMode regression `CocaBarrelBaselineOffsetIsLinearAcrossTheFinalAndFirstFortyEightUnits` passed 1/1 in an isolated copy. `ChicagoCocacoleroPickupIsFrontalAndGroundedAtBarrel` was attempted headless: a stale fixture X expectation was corrected from ±16 to ±12; the rerun then crashed in Unity URP/Null Device (exit 139) during camera rendering, so the PlayMode integration result is BLOCKED, not PASS. Live-transition capture and user acceptance remain pending because no interactive editor control is available; the active Unity lock was preserved.

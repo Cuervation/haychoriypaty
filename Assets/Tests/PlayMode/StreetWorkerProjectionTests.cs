@@ -280,6 +280,26 @@ namespace HayChoriYPaty.Tests
                     if (Get(candidate, "Role").ToString() == "Cocacolero") { cocaWorker = candidate; break; }
                 Assert.IsNotNull(cocaWorker, "Chicago must include its hired Cocacolero.");
 
+                var workerType = T("StreetWorker");
+                Vector2 routeStart = (Vector2)Get(cocaWorker, "Position");
+                Vector2 routeTarget = routeStart + Vector2.right * 24f;
+                MethodInfo setRoute = sim.GetType().GetMethod("SetWorkerRoute", BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.IsNotNull(setRoute);
+                Assert.IsTrue((bool)setRoute.Invoke(sim, new object[] { cocaWorker, routeTarget }));
+                Vector2[] measuredRoute = (Vector2[])workerType.GetField("Route", Instance).GetValue(cocaWorker);
+                float expectedRouteDistance = 0f;
+                Vector2 previousRoutePoint = routeStart;
+                if (measuredRoute == null || measuredRoute.Length == 0)
+                    expectedRouteDistance = Vector2.Distance(routeStart, routeTarget);
+                else
+                    foreach (Vector2 point in measuredRoute)
+                    {
+                        expectedRouteDistance += Vector2.Distance(previousRoutePoint, point);
+                        previousRoutePoint = point;
+                    }
+                Assert.That((float)Get(cocaWorker, "RouteDistance"), Is.EqualTo(expectedRouteDistance).Within(.01f),
+                    "The presentation blend must use the actual assigned route length.");
+
                 object layout = Get(sim, "KitchenLayout");
                 Rect barrel = (Rect)Call(layout, "BoundsForProduct", 4);
                 Vector2 pickup = (Vector2)Call(layout, "PickupPosition", 4);
@@ -291,20 +311,43 @@ namespace HayChoriYPaty.Tests
                 Set(cocaWorker, "StepDistance", 0f);
                 Set(cocaWorker, "CarriedItemId", 0);
                 Set(cocaWorker, "PickupProgress", .5f);
-                T("StreetWorker").GetField("Route", Instance).SetValue(cocaWorker, Array.Empty<Vector2>());
-                T("StreetWorker").GetField("RouteIndex", Instance).SetValue(cocaWorker, 0);
+                workerType.GetField("Route", Instance).SetValue(cocaWorker, Array.Empty<Vector2>());
+                workerType.GetField("RouteIndex", Instance).SetValue(cocaWorker, 0);
+                Set(cocaWorker, "RouteDistance", 0f);
                 Vector2 heldPosition = PresentedPosition(sim, cocaWorker);
-                Set(cocaWorker, "State", Enum.Parse(T("StreetWorkerState"), "ToStation"));
-                Set(cocaWorker, "Position", pickup + Vector2.left * 16f);
-                Vector2 approachPosition = PresentedPosition(sim, cocaWorker);
-                Set(cocaWorker, "State", Enum.Parse(T("StreetWorkerState"), "ToCounter"));
-                Set(cocaWorker, "Position", pickup + Vector2.right * 16f);
-                Vector2 departurePosition = PresentedPosition(sim, cocaWorker);
                 MethodInfo offsetMethod = T("StreetWorkerProjection").GetMethod("CocaBarrelPresentationOffset",
                     BindingFlags.Static | BindingFlags.NonPublic);
+                Set(cocaWorker, "State", Enum.Parse(T("StreetWorkerState"), "ToStation"));
+                workerType.GetField("Route", Instance).SetValue(cocaWorker, new[] { pickup });
+                Set(cocaWorker, "RouteDistance", 64f);
+                Set(cocaWorker, "Position", pickup + Vector2.left * 48f);
+                float noApproachOffset = (float)offsetMethod.Invoke(null, new[] { sim, cocaWorker });
+                Set(cocaWorker, "Position", pickup + Vector2.left * 36f);
+                float quarterOffset = (float)offsetMethod.Invoke(null, new[] { sim, cocaWorker });
+                Set(cocaWorker, "Position", pickup + Vector2.left * 24f);
+                float halfOffset = (float)offsetMethod.Invoke(null, new[] { sim, cocaWorker });
+                Set(cocaWorker, "Position", pickup + Vector2.left * 12f);
+                Vector2 approachPosition = PresentedPosition(sim, cocaWorker);
+                float threeQuarterOffset = (float)offsetMethod.Invoke(null, new[] { sim, cocaWorker });
+                Set(cocaWorker, "Position", pickup);
+                float fullApproachOffset = (float)offsetMethod.Invoke(null, new[] { sim, cocaWorker });
+                Assert.That(noApproachOffset, Is.EqualTo(0f).Within(.01f));
+                Assert.That(quarterOffset, Is.EqualTo(fullOffsetMagnitude * .25f).Within(.01f));
+                Assert.That(halfOffset - quarterOffset, Is.EqualTo(fullOffsetMagnitude * .25f).Within(.01f),
+                    "Equal traveled distances within the final 48 units must apply equal offsets, avoiding an arrival speed spike.");
+                Assert.That(threeQuarterOffset - halfOffset, Is.EqualTo(fullOffsetMagnitude * .25f).Within(.01f));
+                Assert.That(fullApproachOffset - threeQuarterOffset, Is.EqualTo(fullOffsetMagnitude * .25f).Within(.01f));
+                Set(cocaWorker, "State", Enum.Parse(T("StreetWorkerState"), "ToCounter"));
+                workerType.GetField("Route", Instance).SetValue(cocaWorker, new[] { pickup + Vector2.right * 64f });
+                Set(cocaWorker, "RouteDistance", 64f);
+                Set(cocaWorker, "Target", pickup + Vector2.right * 64f);
+                Set(cocaWorker, "Position", pickup + Vector2.right * 12f);
+                Vector2 departurePosition = PresentedPosition(sim, cocaWorker);
                 float departureOffset = (float)offsetMethod.Invoke(null, new[] { sim, cocaWorker });
-                Assert.That(approachPosition.x, Is.EqualTo(pickup.x - 16f).Within(.01f));
-                Assert.That(departurePosition.x, Is.EqualTo(pickup.x + 16f).Within(.01f));
+                Set(cocaWorker, "Position", pickup + Vector2.right * 48f);
+                float departureEndOffset = (float)offsetMethod.Invoke(null, new[] { sim, cocaWorker });
+                Assert.That(approachPosition.x, Is.EqualTo(pickup.x - 12f).Within(.01f));
+                Assert.That(departurePosition.x, Is.EqualTo(pickup.x + 12f).Within(.01f));
                 Assert.That(heldPosition.y, Is.EqualTo(barrel.yMax - 24f).Within(.01f));
                 Assert.That(approachPosition.y - pickup.y, Is.InRange(0.01f, fullOffsetMagnitude));
                 Assert.That(departureOffset, Is.InRange(0.01f, fullOffsetMagnitude));
