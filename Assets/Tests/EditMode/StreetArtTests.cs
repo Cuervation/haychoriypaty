@@ -1143,8 +1143,14 @@ namespace HayChoriYPaty.Tests
             }
 
             Rect viewport = (Rect)View.GetField("LevelSelectorViewport", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
-            Assert.LessOrEqual(viewport.yMax, 652f,
-                "Scrollable level cards must be clipped above the fixed lower selector footer");
+            Rect back = (Rect)View.GetField("LevelSelectBack", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+            Assert.LessOrEqual(viewport.yMax, back.yMin - 8f,
+                "Scrollable level cards must stop before the fixed VOLVER button");
+            Assert.That(cards[0].width, Is.EqualTo(244f));
+            Assert.That(cards[0].height, Is.EqualTo(184f));
+            Assert.That(cards[1].xMin - cards[0].xMax, Is.EqualTo(12f));
+            Assert.That(cards[2].yMin - cards[0].yMax, Is.EqualTo(12f));
+            Assert.Less(cards[6].yMin, viewport.yMax, "A partial fourth row makes the scroll discoverable");
             MethodInfo maxScroll = View.GetMethod("LevelSelectorMaxScroll", BindingFlags.Static | BindingFlags.NonPublic);
             Assert.Greater((float)maxScroll.Invoke(null, new object[] { 960f }), 0f,
                 "All eleven levels exceed the viewport and must be reachable by scrolling");
@@ -1156,6 +1162,26 @@ namespace HayChoriYPaty.Tests
             Assert.NotNull(Resources.Load<Texture2D>("street-allboys-crest"));
             Assert.NotNull(Resources.Load<Texture2D>("street-background-chicago-v1"), "Nueva Chicago card uses its own mural scene");
             Assert.NotNull(Resources.Load<Texture2D>("street-new-chicago-crest-v1"));
+        }
+
+        [TestCase(960f)]
+        [TestCase(1200f)]
+        [TestCase(1356f)]
+        public void SelectorTallViewportExtendsWithoutStretchingCards(float canvasHeight)
+        {
+            Rect viewport = (Rect)View.GetMethod("LevelSelectorViewportBounds", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { canvasHeight });
+            Rect back = (Rect)View.GetMethod("LevelSelectorBackBounds", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { canvasHeight });
+            Assert.That(viewport.yMax, Is.EqualTo(canvasHeight - 100f));
+            Assert.That(back.yMin - viewport.yMax, Is.EqualTo(10f));
+            Assert.That(back.yMax, Is.LessThan(canvasHeight));
+            Rect card = (Rect)View.GetMethod("LevelSelectCardBounds", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { 10 });
+            float scroll = (float)View.GetMethod("LevelSelectorMaxScroll", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { canvasHeight });
+            Assert.That(card.yMax - scroll, Is.LessThanOrEqualTo(viewport.yMax + .01f));
+            Assert.That(card.size, Is.EqualTo(new Vector2(244f, 184f)), "Faces and text retain width-based proportions");
         }
 
         [Test]
@@ -1443,7 +1469,10 @@ namespace HayChoriYPaty.Tests
             }
             Rect lastCard = (Rect)scaleCard.Invoke(null, new object[] { cardBounds.Invoke(null, new object[] { 4 }), verticalScale });
             float drawnLastCardBottom = (lastCard.y + lastCard.height) * verticalScale;
-            Assert.Less(drawnLastCardBottom, 666f * verticalScale, "Selector pagination remains outside the last row.");
+            Rect viewport = (Rect)View.GetMethod("LevelSelectorViewportBounds", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { 960f });
+            Assert.Less(drawnLastCardBottom, viewport.yMax * verticalScale,
+                "The first three selector rows remain inside the scroll viewport.");
 
             MethodInfo catalogBounds = View.GetMethod("CatalogUpgradeCardBounds", BindingFlags.Static | BindingFlags.NonPublic);
             Type simType = Type.GetType("HayChoriYPaty.StreetSimulation, Assembly-CSharp", true);

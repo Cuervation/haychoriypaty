@@ -747,19 +747,23 @@ namespace HayChoriYPaty.Tests
             MethodInfo cardBounds = viewType.GetMethod("LevelSelectCardBounds", StaticPrivate);
             MethodInfo maxScroll = viewType.GetMethod("LevelSelectorMaxScroll", StaticPrivate);
             FieldInfo scroll = viewType.GetField("levelSelectScroll", PrivateInstance);
+            float canvasHeight = (float)viewType.GetField("logicalCanvasHeight", PrivateInstance).GetValue(view);
+            float verticalScale = canvasHeight / 960f;
+            Rect viewport = (Rect)viewType.GetMethod("LevelSelectorViewportBounds", StaticPrivate).Invoke(null, new object[] { canvasHeight });
             viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, true);
-            Assert.Greater((float)maxScroll.Invoke(null, new object[] { 960f }), 0f,
+            Assert.Greater((float)maxScroll.Invoke(null, new object[] { canvasHeight }), 0f,
                 "All campaign levels belong to the same scrollable selector");
             for (int level = 5; level < 11; level++)
             {
                 SetSim("Phase", Enum.Parse(Sim.GetType().GetProperty("Phase").PropertyType, "Ready"));
                 viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, true);
                 Rect card = (Rect)cardBounds.Invoke(null, new object[] { level });
-                float offset = Mathf.Clamp(card.y - 142f, 0f, (float)maxScroll.Invoke(null, new object[] { 960f }));
+                float offset = Mathf.Clamp(card.y - viewport.y, 0f, (float)maxScroll.Invoke(null, new object[] { canvasHeight }));
                 scroll.SetValue(view, offset);
                 card.y -= offset;
-                Assert.AreEqual(30 + level, hit.Invoke(view, new object[] { card.center }));
-                yield return Click(card.center.x, card.center.y);
+                Vector2 pointer = new Vector2(card.center.x, card.center.y / verticalScale);
+                Assert.AreEqual(30 + level, hit.Invoke(view, new object[] { pointer }));
+                yield return Click(pointer.x, pointer.y);
                 Assert.AreEqual(level, Sim.GetType().GetProperty("LevelIndex").GetValue(Sim));
                 Assert.AreEqual("Ready", Phase);
                 Assert.IsTrue((bool)viewType.GetField("marketActive", PrivateInstance).GetValue(view));
@@ -794,12 +798,16 @@ namespace HayChoriYPaty.Tests
             MethodInfo cardBounds = viewType.GetMethod("LevelSelectCardBounds", StaticPrivate);
             MethodInfo maxScroll = viewType.GetMethod("LevelSelectorMaxScroll", StaticPrivate);
             FieldInfo scroll = viewType.GetField("levelSelectScroll", PrivateInstance);
+            float canvasHeight = (float)viewType.GetField("logicalCanvasHeight", PrivateInstance).GetValue(view);
+            float verticalScale = canvasHeight / 960f;
+            Rect viewport = (Rect)viewType.GetMethod("LevelSelectorViewportBounds", StaticPrivate).Invoke(null, new object[] { canvasHeight });
             Rect card = (Rect)cardBounds.Invoke(null, new object[] { 7 });
-            float offset = Mathf.Clamp(card.y - 142f, 0f, (float)maxScroll.Invoke(null, new object[] { 960f }));
+            float offset = Mathf.Clamp(card.y - viewport.y, 0f, (float)maxScroll.Invoke(null, new object[] { canvasHeight }));
             scroll.SetValue(view, offset);
             card.y -= offset;
-            Assert.AreEqual(0, viewType.GetMethod("HitAction", PrivateInstance).Invoke(view, new object[] { card.center }));
-            yield return Click(card.center.x, card.center.y);
+            Vector2 pointer = new Vector2(card.center.x, card.center.y / verticalScale);
+            Assert.AreEqual(0, viewType.GetMethod("HitAction", PrivateInstance).Invoke(view, new object[] { pointer }));
+            yield return Click(pointer.x, pointer.y);
             Assert.AreEqual("Ready", Phase);
             Assert.AreEqual(0, Sim.GetType().GetProperty("LevelIndex").GetValue(Sim));
         }

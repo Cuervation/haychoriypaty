@@ -349,8 +349,8 @@ namespace HayChoriYPaty
             "El costo aparece en esta tarjeta.",
             "El próximo costo aparece\nen esta tarjeta."
         };
-        private const float LevelSelectorCardHeight = 150f, LevelSelectorCardGap = 14f;
-        private static readonly Rect LevelSelectorViewport = new Rect(16f, 142f, W - 32f, 510f);
+        private const float LevelSelectorCardHeight = 184f, LevelSelectorCardGap = 12f;
+        private static readonly Rect LevelSelectorViewport = new Rect(14f, 154f, W - 28f, 706f);
         private float levelSelectScroll, levelSelectPointerDownY, levelSelectPointerDownScroll;
         private bool levelSelectPointerHeld, levelSelectDragging;
         private const int ReadyLevelSelectorAction = 19;
@@ -371,8 +371,8 @@ namespace HayChoriYPaty
         private float marketScroll, marketPointerDownY, marketPointerDownScroll, marketLastPurchaseTime = -10f;
         private bool marketDragging, marketPointerHeld;
         private string marketMessage = "";
-        private static readonly Rect LevelSelectTitle = new Rect(28, 61, 484, 64);
-        private static readonly Rect LevelSelectBack = new Rect(126, 854, 288, 72);
+        private static readonly Rect LevelSelectTitle = new Rect(54, 88, 432, 58);
+        private static readonly Rect LevelSelectBack = new Rect(139, 870, 262, 66);
         private const string VictoryPopupResource = "street-victory-popup-wood-v1";
         private const string ChulengoBowlResource = "street-chulengo-bowl-v1";
         private static readonly Vector2 VictoryPopupArtSize = new Vector2(1122, 1402);
@@ -787,6 +787,7 @@ namespace HayChoriYPaty
         }
         private void OnDisable()
         {
+            DisposeLevelSelectorPresentation();
             // Release cached sprites before destroying their palette textures.
             if (kitchenRenderer != null) kitchenRenderer.ReleaseWorkers();
             if (clubColoredVictoryPopup != null) Destroy(clubColoredVictoryPopup);
@@ -922,14 +923,15 @@ namespace HayChoriYPaty
             Vector2 p = ScreenToLayoutPoint(pixel, new Vector2(Screen.width, Screen.height), v);
             if (levelSelectActive && !game.ShowChulengoResult)
             {
+                p.y *= layoutVerticalScale;
                 if (down)
                 {
                     pressedAction = 0;
-                    levelSelectPointerHeld = LevelSelectorViewport.Contains(p);
+                    levelSelectPointerHeld = LevelSelectorViewportBounds(logicalCanvasHeight).Contains(p);
                     levelSelectPointerDownY = p.y;
                     levelSelectPointerDownScroll = levelSelectScroll;
                     levelSelectDragging = false;
-                    pressedAction = HitAction(p);
+                    pressedAction = HitLevelSelectorAction(p);
                 }
                 if (!down && !up && levelSelectPointerHeld)
                 {
@@ -940,7 +942,7 @@ namespace HayChoriYPaty
                 }
                 if (up)
                 {
-                    int hit = HitAction(p);
+                    int hit = HitLevelSelectorAction(p);
                     if (!levelSelectDragging && pressedAction != 0 && pressedAction == hit)
                         DispatchAction(pressedAction);
                     pressedAction = 0;
@@ -1003,17 +1005,8 @@ namespace HayChoriYPaty
             }
             if (levelSelectActive)
             {
-                if (PointerHitBounds(MarketSelectorBounds()).Contains(p)) return MarketCloseAction;
-                if (PointerHitBounds(LevelSelectBack).Contains(p)) return LevelSelectorBackAction;
-                if (LevelSelectorViewport.Contains(p))
-                    for (int i = 0; i < StreetSimulation.LevelNames.Length; i++)
-                    {
-                        Rect card = LevelSelectCardBounds(i);
-                        card.y -= levelSelectScroll;
-                        if (i <= game.UnlockedLevel && PointerHitBounds(ScaleCardBounds(card, layoutVerticalScale)).Contains(p))
-                            return LevelSelectFirstAction + i;
-                    }
-                return 0;
+                p.y *= layoutVerticalScale;
+                return HitLevelSelectorAction(p);
             }
             if (game.Sim.Phase == RoundPhase.Ready)
             {
@@ -1247,7 +1240,7 @@ namespace HayChoriYPaty
             Matrix4x4 m=GUI.matrix; Color old=GUI.color;
             var sim=game.Sim;
             bool chulengoResult = game.ShowChulengoResult;
-            if ((!introActive || chulengoResult) && sim.Phase != RoundPhase.Lost) DrawGameplayScreenFill();
+            if ((!introActive || chulengoResult) && !levelSelectActive && sim.Phase != RoundPhase.Lost) DrawGameplayScreenFill();
             GUI.matrix=Matrix4x4.TRS(new Vector3(v.x,v.y),Quaternion.identity,new Vector3(v.width/W,v.width/W,1)); GUI.color=Color.white;
             if (introActive && !chulengoResult)
             {
@@ -1277,7 +1270,10 @@ namespace HayChoriYPaty
             }
             if (levelSelectActive && !chulengoResult)
             {
+                float selectorScale = layoutVerticalScale;
+                layoutVerticalScale = 1f;
                 DrawLevelSelector();
+                layoutVerticalScale = selectorScale;
                 GUI.color=old; GUI.matrix=m;
                 return; // Keep the locked/unlocked selector as the only interactive layer.
             }
@@ -2702,15 +2698,17 @@ namespace HayChoriYPaty
         }
         private void DrawLevelSelector()
         {
-            FillRect(new Rect(0, 0, W, logicalCanvasHeight), new Color(.035f, .025f, .025f, .58f));
-            OutlineLabel(LevelSelectTitle, "ELEGÍ TU CANCHA", menuTitle, new Color(1f, .91f, .72f), 2f);
+            Rect viewport = LevelSelectorViewportBounds(logicalCanvasHeight);
+            DrawLevelSelectorBackdrop();
+            DrawLevelSelectorHeading();
             DrawStandardButton(MarketSelectorBounds(), MarketCloseAction, "MERCADO");
             Event evt = Event.current;
             if (evt.type == EventType.ScrollWheel)
             {
                 Vector2 point = ScreenToLayoutPoint(evt.mousePosition, new Vector2(Screen.width, Screen.height),
                     CanvasViewport(new Vector2(Screen.width, Screen.height), Screen.safeArea));
-                if (LevelSelectorViewport.Contains(point))
+                point.y *= logicalCanvasHeight / H;
+                if (viewport.Contains(point))
                 {
                     levelSelectScroll = Mathf.Clamp(levelSelectScroll + evt.delta.y * 28f, 0f,
                         LevelSelectorMaxScroll(logicalCanvasHeight));
@@ -2718,48 +2716,46 @@ namespace HayChoriYPaty
                 }
             }
             levelSelectScroll = Mathf.Clamp(levelSelectScroll, 0f, LevelSelectorMaxScroll(logicalCanvasHeight));
-            GUI.BeginGroup(LayoutRect(LevelSelectorViewport));
+            GUI.BeginGroup(LayoutRect(viewport));
             try
             {
                 for (int i = 0; i < StreetSimulation.LevelNames.Length; i++)
                 {
                     Rect card = LevelSelectCardBounds(i);
-                    if (card.yMax <= LevelSelectorViewport.y + levelSelectScroll ||
-                        card.y >= LevelSelectorViewport.yMax + levelSelectScroll) continue;
-                    card.x -= LevelSelectorViewport.x;
-                    card.y -= LevelSelectorViewport.y + levelSelectScroll;
+                    if (card.yMax <= viewport.y + levelSelectScroll ||
+                        card.y >= viewport.yMax + levelSelectScroll) continue;
+                    card.x -= viewport.x;
+                    card.y -= viewport.y + levelSelectScroll;
                     DrawLevelSelectCard(i, card);
                 }
             }
             finally { GUI.EndGroup(); }
             DrawLevelSelectorScrollBar();
-            DrawStandardButton(LevelSelectBack, LevelSelectorBackAction, "VOLVER");
+            DrawStandardButton(LevelSelectorBackBounds(logicalCanvasHeight), LevelSelectorBackAction, "VOLVER");
         }
         private static float LevelSelectorContentBottom(int levelCount)
         {
             int rows = Mathf.CeilToInt(Mathf.Max(0, levelCount) / 2f);
             return rows <= 0 ? 0f : 160f + rows * LevelSelectorCardHeight + (rows - 1) * LevelSelectorCardGap;
         }
-        private static float LevelSelectorMaxScroll(float canvasHeight)
-        {
-            float availableHeight = Mathf.Min(LevelSelectorViewport.height, Mathf.Max(100f, canvasHeight - LevelSelectorViewport.y - 112f));
-            return Mathf.Max(0f, LevelSelectorContentBottom(StreetSimulation.LevelNames.Length) -
-                LevelSelectorViewport.y - availableHeight);
-        }
+        private static float LevelSelectorMaxScroll(float canvasHeight) =>
+            Mathf.Max(0f, LevelSelectorContentBottom(StreetSimulation.LevelNames.Length) -
+                LevelSelectorViewportBounds(canvasHeight).yMax);
+
         private void DrawLevelSelectorScrollBar()
         {
             float max = LevelSelectorMaxScroll(logicalCanvasHeight);
             if (max <= 0f) return;
-            Rect track = new Rect(W - 8f, LevelSelectorViewport.y, 4f, LevelSelectorViewport.height);
-            FillRect(track, new Color(.008f, .035f, .14f, .72f));
-            float thumbHeight = Mathf.Max(30f, track.height * track.height /
-                (track.height + LevelSelectorContentBottom(StreetSimulation.LevelNames.Length) - LevelSelectorViewport.y - track.height));
+            Rect viewport = LevelSelectorViewportBounds(logicalCanvasHeight);
+            Rect track = new Rect(W - 13f, viewport.y, 5f, viewport.height);
+            FillRect(track, new Color(.12f, .10f, .075f, .52f));
+            float thumbHeight = Mathf.Max(30f, track.height * track.height / (track.height + max));
             FillRect(new Rect(track.x, track.y + (track.height - thumbHeight) * levelSelectScroll / max,
-                track.width, thumbHeight), new Color(.22f, .82f, 1f, .95f));
+                track.width, thumbHeight), new Color(1f, .95f, .79f, .97f));
         }
 
         private static Rect MarketBackBounds() => new Rect(12, 10, 132, 50);
-        private static Rect MarketSelectorBounds() => new Rect(W - 138f, 12f, 126f, 46f);
+        private static Rect MarketSelectorBounds() => new Rect(W - 118f, 12f, 106f, 32f);
         private const float MarketObjectiveTop = 202f;
         private const float MarketCompactRowHeight = 104f, MarketPurchaseHeight = 64f, MarketOthersHeight = 48f;
         private static readonly Color MarketInk = new Color(.20f, .08f, .025f);
@@ -3247,55 +3243,16 @@ namespace HayChoriYPaty
         private static string FormatMarketMoney(long cents) => "$"+(cents/100L)+","+(cents%100L).ToString("00");
         private static Rect LevelSelectCardBounds(int index)
         {
-            const float width = 236f;
+            const float width = 244f;
             int row = index / 2, column = index % 2;
             float x = index == StreetSimulation.LevelNames.Length - 1 && column == 0
-                ? (W - width) * .5f : 24f + column * 256f;
+                ? (W - width) * .5f : 20f + column * 256f;
             return new Rect(x, 160f + row * (LevelSelectorCardHeight + LevelSelectorCardGap),
                 width, LevelSelectorCardHeight);
         }
         private void DrawLevelSelectCard(int index, Rect baseBounds)
         {
-            float cardScale = Mathf.Min(1f, layoutVerticalScale);
-            Rect bounds = ScaleCardBounds(baseBounds, cardScale);
-            bool unlocked = index <= game.UnlockedLevel;
-            Color frame = unlocked ? new Color(.025f, .24f, .70f) : new Color(.20f, .24f, .31f);
-            FillRect(ScaleCardChild(new Rect(baseBounds.x - 2, baseBounds.y - 2, baseBounds.width + 4, baseBounds.height + 4), baseBounds, cardScale), new Color(.008f, .035f, .14f));
-            FillRect(bounds, frame);
-            FillRect(ScaleCardChild(new Rect(baseBounds.x - 1, baseBounds.y - 1, baseBounds.width + 2, baseBounds.height + 2), baseBounds, cardScale), new Color(.22f, .82f, 1f));
-            Rect artwork = ScaleCardChild(new Rect(baseBounds.x + 3, baseBounds.y + 3, baseBounds.width - 6, 106), baseBounds, cardScale);
-            DrawLevelSelectArtwork(index, artwork, cardScale);
-
-            Rect caption = ScaleCardChild(new Rect(baseBounds.x + 3, baseBounds.y + 109, baseBounds.width - 6, 38), baseBounds, cardScale);
-            FillRect(caption, unlocked ? new Color(.98f, .94f, .81f) : new Color(.77f, .80f, .84f));
-            FillRect(new Rect(caption.x, caption.y, 6f * cardScale, caption.height), ClubVisualTheme.ForLevel(index).PrimaryColor);
-            string number = "NIVEL " + (index + 1);
-            int oldSize = menuTitle.fontSize;
-            menuTitle.fontSize = Mathf.Max(12, Mathf.RoundToInt(19f * cardScale));
-            OutlineLabel(new Rect(caption.x + 2 * cardScale, caption.y - cardScale, caption.width - 4 * cardScale,
-                20 * cardScale), number, menuTitle, unlocked ? new Color(.025f, .075f, .20f) : new Color(.25f, .29f, .36f), .8f * cardScale);
-            menuTitle.fontSize = oldSize;
-
-            string name = StreetSimulation.LevelDisplayNames[index].ToUpperInvariant();
-            int oldLevelSize = levelTitle.fontSize;
-            levelTitle.fontSize = Mathf.Max(11, Mathf.RoundToInt(17f * cardScale));
-            float measured = levelTitle.CalcSize(new GUIContent(name)).x;
-            if (measured > caption.width - 10 * cardScale)
-                levelTitle.fontSize = Mathf.Max(10, Mathf.FloorToInt(levelTitle.fontSize * (caption.width - 10 * cardScale) / measured));
-            OutlineLabel(new Rect(caption.x + 4 * cardScale, caption.y + 17 * cardScale,
-                caption.width - 8 * cardScale, 20 * cardScale), name, levelTitle,
-                unlocked ? new Color(.035f, .09f, .22f) : new Color(.30f, .33f, .39f), .8f * cardScale);
-            levelTitle.fontSize = oldLevelSize;
-
-            Rect tag = new Rect(artwork.xMax - (unlocked ? 83f : 98f) * cardScale,
-                artwork.y + 6f * cardScale, (unlocked ? 77f : 92f) * cardScale, 19f * cardScale);
-            FillRect(tag, unlocked ? new Color(.04f, .42f, .18f, .96f) : new Color(.12f, .17f, .25f, .94f));
-            if (!unlocked)
-                Item(new Rect(tag.x + 3f * cardScale, tag.y + 1f * cardScale, 15f * cardScale, 17f * cardScale), 17);
-            Label(tag, unlocked ? "DISPONIBLE" : "BLOQUEADO", tiny);
-
-            if (unlocked && GUI.Button(LayoutRect(bounds), "", invisible))
-                NativeAction(LevelSelectFirstAction + index);
+            DrawLevelSelectorCardPresentation(index, baseBounds);
         }
         private void DrawLevelSelectArtwork(int index, Rect bounds, float cardScale)
         {
