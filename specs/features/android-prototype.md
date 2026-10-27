@@ -1,3 +1,15 @@
+# Entrega Android — 2026-10-26: ensayo Mozo gratis en Racing 0.2.73/code75
+
+APK de Development IL2CPP/ARM64 generada con Unity **6000.6.3f1**, escena `Assets/Scenes/Main.unity` solamente, desde el commit de la prueba Racing más los campos de versión 0.2.73/code75. El Player Settings activo ya refleja esa versión; las preferencias locales `runInBackground`/Firebase/Gvh no forman parte del commit ni se cambiaron para el build. BuildPipeline: **Succeeded, 21,70 s (caché caliente), 0 errores / 1 advertencia**.
+
+APK `/private/tmp/hcyp-release-0.2.73-code75/HayChoriYPaty-0.2.73-code75.apk`: **387.440.180 bytes**, SHA-256 `233361b184ef1b8b2ad5eebc6029b3188664be8a0ef553c0f87ff6ec42c7b28b2`. Paquete `com.haychoriypaty.game`, versión **0.2.73/code75**, min API26/target36, `arm64-v8a`. **PASS:** metadata (`aapt`), ZIP, `zipalign -c -v 4`, firma APK v2 y flags de Firebase Analytics/ad-ID desactivados. Android Debug signer `d2fc25710ab22385b7c6979159c0ef647e91672aa9f6a8672916e52df2e28b5e`; no es firma Play Store. APK y evidencias fuera de Git.
+
+**Regresiones Unity:** `ActiveCookGateStartsAtSixthLevelAndDoesNotChangeEarlierMode`, `RacingFreeMozoKeepsFirstPaidCostAndResetsToOneOnEveryAttempt`, `RacingStartingMozoDeliversARealSandwichWithoutBeingHired`: **3/3 EditMode PASS**. `RacingFirstPaidMozoCardReceivesOneMouseClickAndChargesOnce`: **1/1 PlayMode PASS**. XML/logs en `/private/tmp/hcyp-release-0.2.73-code75/`.
+
+**Smoke Android (AVD Pixel 7a / API36, no teléfono físico conectado):** `adb install -r` **PASS**, actualizó la instalación 0.2.1/code3 y mantuvo su `firstInstallTime` del 2026-10-03; no se limpiaron datos. `UnityPlayerGameActivity` quedó en primer plano, proceso vivo tras más de dos minutos y sin `FATAL EXCEPTION`, señal fatal ni ANR del proceso del juego. **La presentación visual NO pasó:** las capturas de arranque en frío y relanzamiento quedaron en una pantalla uniforme oscura, sin portada ni interfaz. Hubo ANR de System UI/GMS durante el arranque frío del emulador antes de iniciar el juego; no se registró ANR del juego. Por eso el inicio visible queda **FAIL en este AVD / NOT_VERIFIED en dispositivo físico**; no afirmar que la APK ya abre correctamente en el teléfono. Capturas y logcat: `/private/tmp/hcyp-release-0.2.73-code75/{first-launch.png,warm-launch.png,first-launch-logcat.txt,second-launch-logcat.txt,app-full-logcat.txt}`. No se cambió ninguna lógica de juego para perseguir este resultado.
+
+---
+
 # Entrega Android — 2026-10-26: splash con tres frases y corrección Coca 0.2.72/code74
 
 APK generada desde el código intencional vigente del checkout (base `2f9a7fa` más los cambios seleccionados), en copia Unity aislada, con **Unity 6000.6.3f1**, escena `Assets/Scenes/Main.unity` únicamente, Android **Development IL2CPP/ARM64**. Incluye el nuevo arranque con logo/brillos, barra compacta y tres frases; la corrección lineal del baseline Coca se aplica solo dentro de los últimos/primeros 48 puntos de ruta. Se excluyeron Tests, auditorías, capturas/recovery, preferencias locales Firebase/Gvh, `TimeManager`/`runInBackground` y churn de formato `.meta`. Player Settings del checkout: **0.2.72/code74**.

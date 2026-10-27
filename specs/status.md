@@ -1,3 +1,7 @@
+## 2026-10-26 — APK Racing 0.2.73/code75 y prueba de apertura
+
+Build Unity 6000.6.3f1 Main-only Development IL2CPP/ARM64: **0 errores / 1 warning**, APK 387.440.180 bytes; metadata, ZIP, zipalign y firma v2 **PASS**. Regresiones focalizadas **3/3 EditMode + 1/1 PlayMode PASS**. AVD API36: instalación de actualización con `adb install -r` y actividad Unity en primer plano, sin crash/ANR del juego y sin limpiar datos; sin embargo, el frame permaneció negro en arranque frío y relanzamiento (**FAIL visual en AVD**). System UI/GMS tuvieron ANR durante boot antes de iniciar el juego. No había teléfono físico conectado (**QA físico NOT_RUN**). Hash, capturas y logs en `/private/tmp/hcyp-release-0.2.73-code75/`; APK fuera de Git. No declarar que abre visualmente hasta resolver/verificar esa limitación. Detalle en [Android prototype](features/android-prototype.md).
+
 ## 2026-10-26 — Ensayo experimental de Mozo gratis en Racing
 
 Solo en LevelIndex 5 cada intento ahora crea un Mozo gratis junto al Parrillero normal y al Premium gratis preexistente; se restablece a uno en retry/partida nueva. Primer Mozo pagado $50; luego $125/$250. Se mantienen $250 iniciales, siete cuotas, duración de 260 s, precios, costos restantes y velocidad. No se aplica a ningún otro nivel ni altera save/Firebase/mercado.

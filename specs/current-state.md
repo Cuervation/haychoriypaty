@@ -5,7 +5,7 @@
 ## Project and environment
 
 - Active checkout: `/Users/celestino/HayChoriYPaty`, branch `codex/street-automation`; preserve all pre-existing local changes. The Documents/ChatGPT folder is a context copy, not the active checkout.
-- Unity `6000.6.3f1`; Android-first 2D portrait. `ProjectSettings.asset` reports `0.2.72` / code `74`; Development IL2CPP/ARM64 APK is validated at `/private/tmp/hcyp-release-0.2.72-code74/HayChoriYPaty-0.2.72-code74.apk` (SHA-256 `e8d190663ccf6c3164fb04701767fe11ad60d25547f58b7c0a7dabee0954a103`). It is debug-signed and has not been installed. Delivery evidence is in [Android prototype](features/android-prototype.md).
+- Unity `6000.6.3f1`; Android-first 2D portrait. `ProjectSettings.asset` reports `0.2.73` / code `75`. Latest Development IL2CPP/ARM64 APK: `/private/tmp/hcyp-release-0.2.73-code75/HayChoriYPaty-0.2.73-code75.apk` (SHA-256 `233361b184ef1b8b2ad5eebc6029b3188664be8a0ef553c0f87ff6ec42c7b28b2`), debug-signed. Package/ZIP/alignment/signature checks pass; the AVD launched the Unity activity but remained visually blank, so startup is not accepted. No physical device was attached. Details: [Android prototype](features/android-prototype.md).
 - The user confirmed selection/trust of the active checkout on 2026-10-26. No global settings were changed; existing skills/roles and configured model/effort values remain untouched.
 
 ## Implemented scope (high-level)
@@ -18,7 +18,7 @@
 ## Open risks / pending
 
 - No current evidence here certifies a fresh-save, human-playable campaign across all 11 levels after the latest balance. Historical campaign results are scoped in [status](status.md); do not adjust goals, prices, or times without authorization.
-- Physical-device QA (safe area/cutout, touch, performance) and open visual acceptance remain contract-specific; see [worker animation](features/worker-animation.md), [street automation](features/street-automation.md), and [Android delivery](features/android-prototype.md).
+- Physical-device QA (safe area/cutout, touch, performance) remains NOT_RUN. The 0.2.73/code75 AVD startup smoke showed a live foreground Unity activity but a blank dark frame after cold and warm launches; do not claim visible startup acceptance until verified/fixed on a suitable device. See [Android delivery](features/android-prototype.md).
 - Racing-only free-Mozo experiment (LevelIndex 5): five authentic ×1 PlayMode attempts yielded 1/5 wins (256.06 s, 3.94 s left); target ≥3/5 and preferred ≥15 s was not met. Keep only as a provisional local experiment; do not generalize to other levels. Details and per-product results: [active cooks/Mozos](features/active-cooks-mozos.md) and [balance audit addendum](../docs/audits/2026-10-21-live-balance/INFORME_COMPLETO_TODOS_LOS_NIVELES.md).
 
 ## Contract map
