@@ -1131,13 +1131,15 @@ namespace HayChoriYPaty.Tests
             {
                 object sim = Activator.CreateInstance(simulationType, new object[] { balance, level, 5f, 0, 1, 0 });
                 Assert.AreEqual(level >= 5, (bool)Get(sim, "UsesActiveCooks"), "Unexpected active cook mode at level index " + level);
-                Assert.AreEqual(level == 5 ? 1 : 0, Get(sim, "MozoCount"),
-                    "Only Racing receives the experimental free Mozo, including no spill into other active-cook levels.");
+                Assert.AreEqual(level == 5 || level == 6 ? 1 : 0, Get(sim, "MozoCount"),
+                    "Only Racing and San Lorenzo receive a free starter Mozo; no other level changes.");
             }
             object early = Activator.CreateInstance(simulationType, new object[] { balance, 4, 5f, 0, 1, 0 });
             object active = Activator.CreateInstance(simulationType, new object[] { balance, 5, 5f, 0, 1, 0 });
             Assert.AreEqual(0, Get(early, "MozoCount"));
             Assert.AreEqual(1, Get(active, "MozoCount"), "Racing starts with exactly one experimental Mozo.");
+            object sanLorenzo = Activator.CreateInstance(simulationType, new object[] { balance, 6, 5f, 0, 1, 0 });
+            Assert.AreEqual(1, Get(sanLorenzo, "MozoCount"), "San Lorenzo starts with exactly one experimental Mozo.");
             Assert.IsFalse((bool)Get(early, "HasMozo"));
             Assert.IsTrue((bool)Get(active, "HasMozo"));
         }
@@ -1214,9 +1216,59 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void RacingStartingMozoDeliversARealSandwichWithoutBeingHired()
+        public void SanLorenzoFreeMozoKeepsFirstPaidCostAndResetsToOneOnEveryAttempt()
         {
-            object sim = MakeActiveSimulation(5, 250);
+            object balance = Activator.CreateInstance(simulationBalanceType);
+            object sim = Activator.CreateInstance(simulationType, new object[] { balance, 6, 5f, 0, 1, 0 });
+            object mozo = EnumValue(roleType, "Mozo");
+            Assert.AreEqual(1, Get(sim, "ParrilleroCount"));
+            Assert.AreEqual(1, Get(sim, "MozoCount"));
+            Assert.AreEqual(0, Get(sim, "ParrilleroPremiumCount"), "San Lorenzo must not receive a free Premium Parrillero.");
+            Assert.AreEqual(55, Get(sim, "MozoHireCost"), "The free starter must not consume San Lorenzo's first paid $55 hire.");
+
+            Call(sim, "StartRound");
+            Assert.AreEqual(250, Get(sim, "Coins"));
+            Assert.AreEqual(0, Get(sim, "CoinsEarned"), "The free starter does not count as earned or spent money.");
+            Assert.AreEqual(270f, Get(sim, "TimeRemaining"));
+            Assert.AreEqual(0, Get(sim, "SpeedLevel"), "No purchased speed upgrade means ×1.00.");
+            Assert.AreEqual(1f, Get(sim, "WorkRate"));
+            Assert.AreEqual(1f, Get(sim, "CookWorkRate"));
+            Assert.AreEqual(55, Get(sim, "MozoHireCost"));
+            Assert.IsTrue((bool)Get(sim, "CanHireMozo"));
+            Assert.IsTrue((bool)Call(sim, "TryHire", mozo));
+            Assert.AreEqual(195, Get(sim, "Coins"));
+            Assert.AreEqual(2, Get(sim, "MozoCount"));
+            Assert.AreEqual(140, Get(sim, "MozoHireCost"), "Second paid Mozo preserves the role-local ×2.5 progression and $5 rounding.");
+            Assert.IsTrue((bool)Call(sim, "TryHire", mozo));
+            Assert.AreEqual(55, Get(sim, "Coins"));
+            Assert.AreEqual(3, Get(sim, "MozoCount"));
+            Assert.AreEqual(275, Get(sim, "MozoHireCost"), "Third paid Mozo preserves the role-local ×5 tier.");
+            Assert.IsFalse((bool)Get(sim, "CanHireMozo"), "The next hire remains gated by real funds.");
+
+            Call(sim, "StartRound");
+            Assert.AreEqual(250, Get(sim, "Coins"));
+            Assert.AreEqual(1, Get(sim, "ParrilleroCount"));
+            Assert.AreEqual(1, Get(sim, "MozoCount"), "Retry discards hired Mozos and restores exactly one free starter.");
+            Assert.AreEqual(0, Get(sim, "ParrilleroPremiumCount"));
+            Assert.AreEqual(0, Get(sim, "SpeedLevel"));
+            Assert.AreEqual(55, Get(sim, "MozoHireCost"));
+
+            object levelSelection = Activator.CreateInstance(simulationType, new object[] { balance, 6, 5f, 0, 1, 0 });
+            Assert.IsTrue((bool)Call(levelSelection, "SelectLevel", 5));
+            Assert.AreEqual(1, Get(levelSelection, "MozoCount"), "Selecting Racing retains its existing free Mozo.");
+            Assert.AreEqual(1, Get(levelSelection, "ParrilleroPremiumCount"), "Selecting Racing retains its existing free Premium Parrillero.");
+            Assert.AreEqual(50, Get(levelSelection, "MozoHireCost"), "Racing's first paid Mozo cost is unchanged.");
+            Assert.IsTrue((bool)Call(levelSelection, "SelectLevel", 6));
+            Assert.AreEqual(1, Get(levelSelection, "MozoCount"), "Returning to San Lorenzo cannot duplicate the starter.");
+            Assert.AreEqual(0, Get(levelSelection, "ParrilleroPremiumCount"));
+            Assert.AreEqual(55, Get(levelSelection, "MozoHireCost"));
+        }
+
+        [TestCase(5)]
+        [TestCase(6)]
+        public void FreeStartingMozoDeliversARealSandwichWithoutBeingHired(int level)
+        {
+            object sim = MakeActiveSimulation(level, 250);
             Call(sim, "StartRound");
             SetArrivalFarFuture(sim);
             Assert.AreEqual(1, Get(sim, "MozoCount"));
@@ -1224,7 +1276,7 @@ namespace HayChoriYPaty.Tests
             for (int tick = 0; tick < 1200 && (int)Call(sim, "GetProductDelivered", 0) == 0; tick++)
                 Call(sim, "Step", .05f);
             Assert.AreEqual(1, Call(sim, "GetProductDelivered", 0),
-                "The initial Mozo must enter the normal cook-to-table-to-customer handoff loop.");
+                "The initial Mozo must enter the normal cook-to-table-to-customer handoff loop at level " + (level + 1) + ".");
             Assert.AreEqual(255, Get(sim, "Coins"), "Only the actual $5 Chori handoff awards revenue.");
             Assert.AreEqual(1, Get(sim, "MozoCount"), "Delivery must not create additional Mozos.");
         }

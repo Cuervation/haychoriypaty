@@ -92,7 +92,7 @@ namespace HayChoriYPaty
                 new StreetLevelBalance(new[] {185,125,60,0,155,0,75}, new[] {30,30,35,0}, 3.25f),
                 new StreetLevelBalance(new[] {190,130,70,65,160,65,80}, new[] {35,35,45,40}, 4.50f),
                 new StreetLevelBalance(new[] {210,145,80,75,175,75,90}, new[] {40,40,50,200,50}, 6.00f, 250),
-                new StreetLevelBalance(new[] {230,165,100,85,195,80,105}, new[] {45,45,55,50,55}, 8.00f, 250),
+                new StreetLevelBalance(new[] {230,175,110,95,205,90,115}, new[] {45,45,55,50,55}, 8.00f, 250),
                 new StreetLevelBalance(new[] {250,180,110,95,210,90,115}, new[] {50,50,65,55,60}, 10.50f, 250),
                 new StreetLevelBalance(new[] {275,195,120,110,225,100,125}, new[] {55,55,70,65,65}, 13.50f, 250),
                 new StreetLevelBalance(new[] {310,220,135,125,255,110,145}, new[] {60,60,80,70,70}, 17.00f, 500),
@@ -422,8 +422,8 @@ namespace HayChoriYPaty
                 ? Math.Max(1, WorkerCount(role)) // The opening Parrillero is free.
                 : role == StreetWorkerRole.ParrilleroPremium && LevelIndex == 5
                     ? Math.Max(1, WorkerCount(role)) // Racing's opening Premium Parrillero is free.
-                    : role == StreetWorkerRole.Mozo && LevelIndex == 5
-                        ? Math.Max(1, WorkerCount(role)) // Racing's experimental opening Mozo is free.
+                    : role == StreetWorkerRole.Mozo && (LevelIndex == 5 || LevelIndex == 6)
+                        ? Math.Max(1, WorkerCount(role)) // Racing and San Lorenzo opening Mozos are free.
                         : (long)WorkerCount(role) + 1;
             int baseCost = balance.GetHireBaseCost(LevelIndex, role);
             if (baseCost <= 0) return 0;
@@ -1636,7 +1636,7 @@ namespace HayChoriYPaty
             SpeedLevel = 0; // Zero purchased upgrades means the displayed speed is x1.00.
             AddWorker();
             if (LevelIndex == 5 && HasRole(StreetWorkerRole.ParrilleroPremium)) AddWorker(StreetWorkerRole.ParrilleroPremium);
-            if (LevelIndex == 5 && HasRole(StreetWorkerRole.Mozo)) AddWorker(StreetWorkerRole.Mozo);
+            if ((LevelIndex == 5 || LevelIndex == 6) && HasRole(StreetWorkerRole.Mozo)) AddWorker(StreetWorkerRole.Mozo);
         }
         private void AddWorker() { AddWorker(StreetWorkerRole.Parrillero); }
         private void AddWorker(StreetWorkerRole role)

@@ -56,7 +56,7 @@ This table supersedes the historical aggregate-goal and shared-economy sections 
 | 4 Ferro | 185 | 125 | 155 | 75 | 60 | — | — | 210 |
 | 5 Independiente | 190 | 130 | 160 | 80 | 70 | 65 | 65 | 240 |
 | 6 Racing | 210 | 145 | 175 | 90 | 80 | 75 | 75 | 260 |
-| 7 San Lorenzo | 230 | 165 | 195 | 105 | 100 | 85 | 80 | 270 |
+| 7 San Lorenzo | 230 | 175 | 205 | 115 | 110 | 95 | 90 | 270 |
 | 8 River | 250 | 180 | 210 | 115 | 110 | 95 | 90 | 295* |
 | 9 Boca | 275 | 195 | 225 | 125 | 120 | 110 | 100 | 300 |
 | 10 Camioneros | 310 | 220 | 255 | 145 | 135 | 125 | 110 | 300 |
@@ -99,6 +99,8 @@ The first Parrillero is free. All five roles (Mozo only from Racing, during play
 For Racing (level 6), the first Fernetero hire costs **$200**; later hires continue through the unchanged role-local multipliers (×2.5, ×5, then triangular progression), yielding $500, $1,000, $1,800 and $2,800 for hires 2–5. The opening attempt balance stays $250, so the first Fernetero is immediately affordable with $50 remaining. Other level rows and roles are unchanged.
 
 **2026-10-26 roster-only experiment:** Racing (LevelIndex 5) now also begins each attempt with one free Mozo; its existing free normal/Premium starters remain. This does not alter the $250 opening coins, this table's paid hire prices, speed, the quotas, sale prices or 260-second deadline, and it applies to no other level. The exact reset/cost contract and five-run outcome are in [active cooks/Mozos](active-cooks-mozos.md); the measured 1/5 result is experimental, not a balance acceptance.
+
+**2026-10-27 San Lorenzo balance trial:** Level 7 (LevelIndex 6) now uses quotas by stable product ID `[230,175,110,95,205,90,115]` (total 1,020) and starts each attempt with one free Mozo alongside its normal Parrillero. Chori, its $250 opening cash, ×1.00 speed, 270-second deadline, sales prices, all hire costs (first paid Mozo $55) and speed curve remain unchanged; San Lorenzo receives no free Premium. This roster/goal change applies only to San Lorenzo. Racing's full baseline remains unchanged; no other level gains a worker or quota change. This remains a provisional experiment: focused EditMode passes, but the five authentic San Lorenzo matches are blocked because no genuine LevelIndex 6 unlock checkpoint was obtained. Details and the baseline comparison are in section 11 of the [balance audit](../../docs/audits/2026-10-21-live-balance/INFORME_COMPLETO_TODOS_LOS_NIVELES.md) and the [active cooks/Mozos contract](active-cooks-mozos.md).
 
 Quota-aware demand retains random 1–4 quantities and mixed tickets (up to five unlocked products), weighting every product in the level catalog by outstanding goal deficit/time independently of hired staff. A missing specialist does not suppress demand: those order lines wait without a patience timeout and become serviceable if the responsible worker is hired later. Delivery/revenue still requires that responsible worker and a real handoff; no synthetic delivery is allowed. Completed quotas stay visible and may still sell for real revenue. Role responsibilities, stations, routes, stock and handoff accounting remain unchanged. Victory requires every unlocked product quota.
 

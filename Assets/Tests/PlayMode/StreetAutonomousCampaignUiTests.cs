@@ -25,6 +25,7 @@ namespace HayChoriYPaty.Tests
         private static readonly string OutputDirectory = Path.GetFullPath(
             Path.Combine(Application.dataPath, "../Logs/Acceptance/AutonomousCampaign-20261019"));
         private static readonly string ModeBLevel6CheckpointPath = Path.Combine(OutputDirectory, "mode-b-level6-authentic-checkpoint.json");
+        private static readonly string ModeBLevel7CheckpointPath = Path.Combine(OutputDirectory, "mode-b-level7-authentic-checkpoint.json");
         private static Type GameType => Type.GetType("HayChoriYPaty.StreetGame, Assembly-CSharp", true);
         private static Type ViewType => Type.GetType("HayChoriYPaty.StreetView, Assembly-CSharp", true);
         private static Type SimulationType => Type.GetType("HayChoriYPaty.StreetSimulation, Assembly-CSharp", true);
@@ -47,11 +48,14 @@ namespace HayChoriYPaty.Tests
         private bool previousEditorPersistence;
         private float previousTimeScale;
         private float matchTimeScale;
+        private int previousScreenWidth, previousScreenHeight;
         private bool realEconomyMode;
         private bool resumeFromLevel6Checkpoint;
+        private bool resumeFromLevel7Checkpoint;
         private bool previousBackground;
         private InputSettings.BackgroundBehavior previousInputBackground;
         private InputSettings.EditorInputBehaviorInPlayMode previousEditorInput;
+        private int measuredRacingReplayActionIndex;
         private readonly List<string> memorySnapshots = new List<string>();
         private readonly List<string> decisionSequence = new List<string>();
         private readonly List<CampaignObservation> observations = new List<CampaignObservation>();
@@ -59,6 +63,11 @@ namespace HayChoriYPaty.Tests
         [UnitySetUp]
         public IEnumerator SetUp()
         {
+            bool requiresSanLorenzoCheckpoint = TestContext.CurrentContext.Test.Name.StartsWith(
+                "ModeB_ResumeFromLevel7Checkpoint_", StringComparison.Ordinal);
+            if (requiresSanLorenzoCheckpoint && !File.Exists(ModeBLevel7CheckpointPath))
+                Assert.Ignore("San Lorenzo real matches require an authentic checkpoint earned by a Racing victory and reward collection.");
+
             FieldInfo editorGate = GameType.GetField("AllowEditorTestInitialization", StaticField);
             previousEditorPersistence = (bool)editorGate.GetValue(null);
             // Critical: adding StreetGame while this is false cannot read or write PlayerPrefs.
@@ -71,10 +80,15 @@ namespace HayChoriYPaty.Tests
             previousBackground = Application.runInBackground;
             previousInputBackground = InputSystem.settings.backgroundBehavior;
             previousEditorInput = InputSystem.settings.editorInputBehaviorInPlayMode;
+            previousScreenWidth = Screen.width;
+            previousScreenHeight = Screen.height;
             InputSystem.settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
             InputSystem.settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
             Time.timeScale = 1f;
             Application.runInBackground = true;
+            Screen.SetResolution(540, 960, false); // The campaign UI is authored for portrait; keep hitboxes on the same logical scale.
+            yield return null;
+            TestContext.WriteLine("Campaign UI resolution=" + Screen.width + "x" + Screen.height);
 
             Directory.CreateDirectory(OutputDirectory);
             memorySnapshots.Clear();
@@ -86,9 +100,13 @@ namespace HayChoriYPaty.Tests
                 addedAudioListener = root.AddComponent<AudioListener>();
             game = root.AddComponent(GameType);
             realEconomyMode = TestContext.CurrentContext.Test.Name.StartsWith("ModeB_", StringComparison.Ordinal);
-            resumeFromLevel6Checkpoint = TestContext.CurrentContext.Test.Name.StartsWith("ModeB_ResumeFromLevel6Checkpoint_", StringComparison.Ordinal);
+            resumeFromLevel6Checkpoint = TestContext.CurrentContext.Test.Name.StartsWith("ModeB_ResumeFromLevel6Checkpoint_", StringComparison.Ordinal)
+                || TestContext.CurrentContext.Test.Name.StartsWith("ModeB_CreateLevel7Checkpoint_", StringComparison.Ordinal);
+            resumeFromLevel7Checkpoint = TestContext.CurrentContext.Test.Name.StartsWith("ModeB_ResumeFromLevel7Checkpoint_", StringComparison.Ordinal);
             if (resumeFromLevel6Checkpoint)
                 Assert.IsTrue(File.Exists(ModeBLevel6CheckpointPath), "Resume requires a checkpoint written after a genuine Level 5 UI victory.");
+            if (resumeFromLevel7Checkpoint)
+                Assert.IsTrue(File.Exists(ModeBLevel7CheckpointPath), "San Lorenzo trials require a checkpoint written after a genuine Racing UI victory.");
             object balance = Get(game, "Balance");
             if (TestContext.CurrentContext.Test.Name.EndsWith("VisualReview_20261020", StringComparison.Ordinal))
             {
@@ -102,12 +120,15 @@ namespace HayChoriYPaty.Tests
                 foreach (object level in levels)
                     level.GetType().GetField("startingCoins", PublicInstance).SetValue(level, 50_000);
             string initialSave = !realEconomyMode ? CreateTestSaveJson()
+                : resumeFromLevel7Checkpoint ? File.ReadAllText(ModeBLevel7CheckpointPath)
                 : resumeFromLevel6Checkpoint ? File.ReadAllText(ModeBLevel6CheckpointPath) : null;
             Assert.IsTrue((bool)GameType.GetMethod("ActivatePlayer", PublicInstance).Invoke(game,
                 new object[] { initialSave, CreateMemoryPersistenceDelegate() }),
                 "Temporary in-memory player failed to initialize.");
             if (resumeFromLevel6Checkpoint)
                 Assert.AreEqual(5, Get(game, "UnlockedLevel"), "Resume must use the Racing unlock earned by the previous real UI campaign.");
+            if (resumeFromLevel7Checkpoint)
+                Assert.AreEqual(6, Get(game, "UnlockedLevel"), "San Lorenzo resume must use the unlock earned by a genuine Racing UI victory.");
             Assert.IsNull(firebaseSessionType.GetProperty("Instance", BindingFlags.Static | BindingFlags.Public).GetValue(null, null),
                 "No Firebase session may exist during the test.");
             view = root.AddComponent(ViewType);
@@ -125,6 +146,8 @@ namespace HayChoriYPaty.Tests
             if (mouse != null && mouse.added) InputSystem.RemoveDevice(mouse);
             InputSystem.settings.backgroundBehavior = previousInputBackground;
             InputSystem.settings.editorInputBehaviorInPlayMode = previousEditorInput;
+            if (previousScreenWidth > 0 && previousScreenHeight > 0)
+                Screen.SetResolution(previousScreenWidth, previousScreenHeight, false);
             yield return null; // StreetGame.OnDisable persists only into the in-memory delegate.
             Time.timeScale = previousTimeScale;
             Application.runInBackground = previousBackground;
@@ -255,6 +278,55 @@ namespace HayChoriYPaty.Tests
         public IEnumerator ModeB_CreateLevel6Checkpoint_FromFreshSave_ActualUiOnly()
         {
             yield return RunRealEconomyProgression(false, true);
+        }
+
+        [UnityTest]
+        [Timeout(7200000)]
+        public IEnumerator ModeB_CreateLevel7Checkpoint_FromLevel6CheckpointRacingWin_ActualUiOnly()
+        {
+            yield return RunRealEconomyProgression(true, false, 18, false, true);
+        }
+
+        [UnityTest]
+        [Timeout(7200000)]
+        public IEnumerator ModeB_CreateLevel7Checkpoint_FromLevel6CheckpointRacingWin_Attempt17_ActualUiOnly()
+        {
+            yield return RunRealEconomyProgression(true, false, 17, false, true);
+        }
+
+        [UnityTest]
+        [Timeout(7200000)]
+        public IEnumerator ModeB_ResumeFromLevel7Checkpoint_Attempt01_SpeedFirst_ActualUiOnly()
+        {
+            yield return RunRealEconomyProgression(false, false, 1, true);
+        }
+
+        [UnityTest]
+        [Timeout(7200000)]
+        public IEnumerator ModeB_ResumeFromLevel7Checkpoint_Attempt02_StaffFirst_ActualUiOnly()
+        {
+            yield return RunRealEconomyProgression(false, false, 2, true);
+        }
+
+        [UnityTest]
+        [Timeout(7200000)]
+        public IEnumerator ModeB_ResumeFromLevel7Checkpoint_Attempt03_ExpandedStaff_ActualUiOnly()
+        {
+            yield return RunRealEconomyProgression(false, false, 3, true);
+        }
+
+        [UnityTest]
+        [Timeout(7200000)]
+        public IEnumerator ModeB_ResumeFromLevel7Checkpoint_Attempt04_MozoFirst_ActualUiOnly()
+        {
+            yield return RunRealEconomyProgression(false, false, 4, true);
+        }
+
+        [UnityTest]
+        [Timeout(7200000)]
+        public IEnumerator ModeB_ResumeFromLevel7Checkpoint_Attempt05_ExpandedStaffVariant_ActualUiOnly()
+        {
+            yield return RunRealEconomyProgression(false, false, 5, true);
         }
 
         [UnityTest]
@@ -395,12 +467,11 @@ namespace HayChoriYPaty.Tests
             }
 
             yield return WaitForMenu();
-            yield return Click(new Rect(126f, 704f, 288f, 92f).center); // Genuine intro JUGAR.
-            if (levelIndex >= 6) yield return Click(GetStaticRectField("LevelSelectNext").center);
+            yield return Click(InvokeViewRect("HubArtworkActionBounds", 200).center); // Visible JUGAR hotspot on the current hub.
             if (levelIndex == 0)
                 yield return Click(InvokeStaticRectNoArgs("MarketSelectorBounds").center); // Level 1 stock inspection.
             else
-                yield return Click(InvokeStaticRect("LevelSelectCardBounds", levelIndex).center);
+                yield return SelectLevelThroughUi(levelIndex);
 
             object sim = Get(game, "Sim"), market = Get(game, "Market");
             Assert.AreEqual(levelIndex, Get(sim, "LevelIndex"), "The UI card must select the requested club.");
@@ -493,33 +564,36 @@ namespace HayChoriYPaty.Tests
             Assert.Greater(memorySnapshots.Count, 0, "Game save callbacks should remain in the memory-only store.");
         }
 
-        private IEnumerator RunRealEconomyProgression(bool resumeFromLevel6, bool stopAfterLevel6Checkpoint = false, int resumeAttempt = 8)
+        private IEnumerator RunRealEconomyProgression(bool resumeFromLevel6, bool stopAfterLevel6Checkpoint = false,
+            int resumeAttempt = 8, bool resumeFromLevel7 = false, bool stopAfterLevel7Checkpoint = false)
         {
             Assert.IsTrue(realEconomyMode, "Mode B uses only a fresh save or a genuine campaign checkpoint.");
             Time.timeScale = 1f;
-            Assert.AreEqual(resumeFromLevel6 ? 5 : 0, Get(game, "UnlockedLevel"), "Only a real UI victory may unlock a level.");
+            int resumeLevelIndex = resumeFromLevel7 ? 6 : resumeFromLevel6 ? 5 : 0;
+            Assert.AreEqual(resumeLevelIndex, Get(game, "UnlockedLevel"), "Only a real UI victory may unlock a level.");
             if (!resumeFromLevel6)
                 Assert.AreEqual(0L, Get(game, "Market") == null ? -1L : Get(Get(game, "Market"), "BalanceCents"),
                     "Mode B must begin with the project's real new-game Mercado balance.");
 
             yield return WaitForMenu();
-            yield return Click(new Rect(126f, 704f, 288f, 92f).center); // Real intro JUGAR.
-            if (resumeFromLevel6)
+            yield return Click(InvokeViewRect("HubArtworkActionBounds", 200).center); // Visible JUGAR hotspot on the current hub.
+            if (resumeFromLevel6 || resumeFromLevel7)
             {
                 Assert.IsTrue((bool)Get(view, "levelSelectActive"), "The saved campaign must open the genuine selector.");
-                yield return Click(InvokeStaticRect("LevelSelectCardBounds", 5).center); // Actual unlocked Racing card.
-                Assert.AreEqual(5, Get(game, "SelectedLevel"), "Racing must be selected through its visible card.");
+                yield return SelectLevelThroughUi(resumeLevelIndex);
+                Assert.AreEqual(resumeLevelIndex, Get(game, "SelectedLevel"), "The unlocked level must be selected through its visible card.");
             }
             else
                 yield return Click(InvokeStaticRectNoArgs("MarketSelectorBounds").center); // Real Mercado access for All Boys.
 
-            int levelIndex = resumeFromLevel6 ? 5 : 0;
+            int levelIndex = resumeLevelIndex;
             bool stopCampaign = false;
             while (levelIndex < 11 && !stopCampaign)
             {
                 bool levelWon = false;
-                int attempt = resumeFromLevel6 && levelIndex == 5 ? resumeAttempt : 1;
-                int maximumAttemptsForLevel = resumeFromLevel6 && levelIndex == 5 ? resumeAttempt : 7;
+                bool resumingTargetLevel = resumeFromLevel6 && levelIndex == 5 || resumeFromLevel7 && levelIndex == 6;
+                int attempt = resumingTargetLevel ? resumeAttempt : 1;
+                int maximumAttemptsForLevel = resumingTargetLevel ? resumeAttempt : 7;
                 while (attempt <= maximumAttemptsForLevel && !levelWon && !stopCampaign)
                 {
                     decisionSequence.Clear();
@@ -560,7 +634,9 @@ namespace HayChoriYPaty.Tests
                                                                             ? "B retry 15: keep four Mozos and other specialists; skip second Fernetero to fund speed level 9"
                                                                             : attempt == 16
                                                                                 ? "B retry 16: replay retry 12's opportunistic role purchase timing to verify the best result is reproducible"
-                                                                                : "B retry 17: keep four Mozos and target five Normal, four Premium/Coca, one Fernetero; spend remaining staff coins on speed";
+                                                                                : attempt == 17
+                                                                                    ? "B retry 17: keep four Mozos and target five Normal, four Premium/Coca, one Fernetero; spend remaining staff coins on speed"
+                                                                                    : "B retry 18 unlock prerequisite: replay the previously recorded legal Racing UI victory purchase timeline";
                     string marketShot = "";
                     long marketCentsStarting = (long)Get(market, "BalanceCents");
                     object marketData = Get(market, "Data");
@@ -570,8 +646,7 @@ namespace HayChoriYPaty.Tests
                     {
                         yield return Click(InvokeViewRectNoArgs("RiotResultButtonBounds").center);
                         Assert.IsTrue((bool)Get(view, "levelSelectActive"), "Loss must return through the real result UI to levels.");
-                        if (levelIndex >= 6) yield return Click(GetStaticRectField("LevelSelectNext").center);
-                        yield return Click(InvokeStaticRect("LevelSelectCardBounds", levelIndex).center);
+                        yield return SelectLevelThroughUi(levelIndex);
                         sim = Get(game, "Sim"); market = Get(game, "Market");
                         Assert.AreEqual(levelIndex, Get(sim, "LevelIndex"), "Retry must select the same unlocked level through its card.");
                         marketCentsStarting = (long)Get(market, "BalanceCents");
@@ -675,18 +750,29 @@ namespace HayChoriYPaty.Tests
                         staffCoinsStarting, marketCentsStarting, purchaseSpendBefore, 1f);
                     WriteProgress(report);
                     TestContext.WriteLine(JsonUtility.ToJson(report, true));
+                    if (stopAfterLevel7Checkpoint)
+                        Assert.AreEqual("Won", Get(sim, "Phase").ToString(),
+                            "A genuine Racing victory is required to create the San Lorenzo-unlocked checkpoint.");
 
                     if (TestContext.CurrentContext.Test.Name.EndsWith("VisualReview_20261020", StringComparison.Ordinal))
                     {
                         stopCampaign = true; // Focused review ends after this single Racing attempt, win or loss.
                         break;
                     }
+                    if (resumeFromLevel7)
+                        stopCampaign = true; // One authentic San Lorenzo trial per restored checkpoint.
 
                     if (Get(sim, "Phase").ToString() == "Won")
                     {
                         levelWon = true;
                         if (levelIndex < 10)
                         {
+                            if ((bool)Get(game, "ShowChulengoResult") && (bool)Get(game, "HasPendingChulengo"))
+                            {
+                                yield return Click(InvokeViewRectNoArgs("ChulengoCollectBounds").center);
+                                Assert.IsFalse((bool)Get(game, "HasPendingChulengo"),
+                                    "The authentic victory reward must be collected through the visible Chulengo action before advancing.");
+                            }
                             yield return Click(InvokeViewRectNoArgs("VictoryExitBounds").center);
                             Assert.IsTrue((bool)Get(view, "marketActive"), "SIGUIENTE PARTIDO must advance only after a real victory and open the next Mercado.");
                             if (realEconomyMode && levelIndex == 4)
@@ -694,14 +780,18 @@ namespace HayChoriYPaty.Tests
                                 WriteAuthenticLevel6Checkpoint();
                                 if (stopAfterLevel6Checkpoint) stopCampaign = true;
                             }
+                            if (realEconomyMode && levelIndex == 5)
+                            {
+                                WriteAuthenticLevel7Checkpoint();
+                                if (stopAfterLevel7Checkpoint) stopCampaign = true;
+                            }
                         }
                     }
                     else if (attempt < maximumAttemptsForLevel)
                     {
                         yield return Click(InvokeViewRectNoArgs("RiotResultButtonBounds").center);
                         Assert.IsTrue((bool)Get(view, "levelSelectActive"), "A real defeat must use the game's level-return control before retry.");
-                        if (levelIndex >= 6) yield return Click(GetStaticRectField("LevelSelectNext").center);
-                        yield return Click(InvokeStaticRect("LevelSelectCardBounds", levelIndex).center);
+                        yield return SelectLevelThroughUi(levelIndex);
                         attempt++;
                     }
                     else
@@ -717,6 +807,7 @@ namespace HayChoriYPaty.Tests
 
         private int ChooseRealEconomyUiAction(object sim, int levelIndex, int attempt)
         {
+            if (attempt == 18) return ChooseMeasuredRacingWinReplay(sim, levelIndex);
             if (attempt >= 17) return ChooseOneFernFiveNormalRealEconomyUiAction(sim, levelIndex);
             if (attempt >= 16) return ChooseOpportunisticOverflowNormalRealEconomyUiAction(sim, levelIndex);
             if (attempt >= 15) return ChooseOneFerneteroSpeedNineRealEconomyUiAction(sim, levelIndex);
@@ -745,6 +836,27 @@ namespace HayChoriYPaty.Tests
             if (levelIndex >= 5 && (int)Get(sim, "MozoCount") < mozoTarget && (bool)Get(sim, "CanHireMozo")) return 22;
             if ((int)Get(sim, "SpeedLevel") < 9 && (bool)Get(sim, "CanUpgradeSpeed")) return 3;
             return 0;
+        }
+
+        private int ChooseMeasuredRacingWinReplay(object sim, int levelIndex)
+        {
+            if (levelIndex != 5) return ChooseEarlySpeedRealEconomyUiAction(sim, levelIndex);
+            // Replay the legal button-action timeline from the October 26 authentic ×1 win.
+            // Purchases still require the live affordability gates; if a threshold is not met,
+            // this waits rather than injecting money or changing the lineup.
+            float[] seconds = { 1f, 2f, 9f, 13f, 18f, 21f, 24f, 30f, 38f, 43f, 49f, 56f,
+                60f, 69f, 77f, 83f, 93f, 100f, 106f, 117f, 131f, 146f, 159f, 176f, 196f };
+            int[] actions = { 2, 16, 21, 3, 3, 22, 20, 3, 16, 2, 3, 22,
+                20, 3, 16, 2, 22, 20, 3, 16, 2, 3, 21, 3, 3 };
+            if (measuredRacingReplayActionIndex >= seconds.Length) return 0;
+            if ((float)Get(sim, "Elapsed") + .01f < seconds[measuredRacingReplayActionIndex]) return 0;
+            int action = actions[measuredRacingReplayActionIndex];
+            bool affordable = action == 3
+                ? (bool)Get(sim, "CanUpgradeSpeed")
+                : (bool)Get(sim, CanHireProperty(action));
+            if (!affordable) return 0;
+            measuredRacingReplayActionIndex++;
+            return action;
         }
 
         private int ChooseOneFernFiveNormalRealEconomyUiAction(object sim, int levelIndex)
@@ -1054,6 +1166,22 @@ namespace HayChoriYPaty.Tests
             File.WriteAllText(ModeBLevel6CheckpointPath, json);
         }
 
+        private void WriteAuthenticLevel7Checkpoint()
+        {
+            Assert.IsTrue(realEconomyMode, "Only Mode B can create a resumable checkpoint.");
+            Assert.AreEqual(6, Get(game, "UnlockedLevel"));
+            Assert.Greater(memorySnapshots.Count, 0, "Checkpoint must come from the in-memory persistence delegate.");
+            string json = memorySnapshots[memorySnapshots.Count - 1];
+            Type saveType = GameType.GetNestedType("SaveData", BindingFlags.Public);
+            object save = JsonUtility.FromJson(json, saveType);
+            Assert.AreEqual(6, saveType.GetField("unlockedLevel", PublicInstance).GetValue(save));
+            object market = saveType.GetField("market", PublicInstance).GetValue(save);
+            Assert.IsNotNull(market);
+            Assert.IsFalse((bool)market.GetType().GetField("attemptActive", PublicInstance).GetValue(market),
+                "Checkpoint cannot restore the Racing round in progress.");
+            File.WriteAllText(ModeBLevel7CheckpointPath, json);
+        }
+
         private int ChooseExpandedRealEconomyUiAction(object sim, int levelIndex, int attempt)
         {
             bool rosterComplete = true;
@@ -1193,11 +1321,53 @@ namespace HayChoriYPaty.Tests
 
         private IEnumerator WaitForMenu()
         {
-            PropertyInfo property = ViewType.GetProperty("MenuAvailable", PrivateInstance);
-            Assert.NotNull(property, "Intro readiness property moved; update the test locator rather than bypassing the UI.");
+            PropertyInfo property = ViewType.GetProperty("HubAccountActionRendered", PublicInstance);
+            Assert.NotNull(property, "Hub readiness property moved; update the test locator rather than bypassing the UI.");
             float deadline = Time.realtimeSinceStartup + 12f;
             while (!(bool)property.GetValue(view, null) && Time.realtimeSinceStartup < deadline) yield return null;
-            Assert.IsTrue((bool)property.GetValue(view, null), "Timed out waiting for the genuine intro animation/menu.");
+            Assert.IsTrue((bool)property.GetValue(view, null), "Timed out waiting for the genuine intro-to-hub transition.");
+        }
+
+        private IEnumerator SelectLevelThroughUi(int levelIndex)
+        {
+            float logicalHeight = (float)Get(view, "logicalCanvasHeight");
+            Assert.Greater(logicalHeight, 0f, "Wait for responsive selector geometry before selecting a level.");
+            float verticalScale = logicalHeight / 960f;
+            MethodInfo viewportMethod = ViewType.GetMethod("LevelSelectorViewportBounds", StaticPrivate);
+            MethodInfo maximumScrollMethod = ViewType.GetMethod("LevelSelectorMaxScroll", StaticPrivate);
+            Assert.NotNull(viewportMethod, "Selector viewport locator missing.");
+            Assert.NotNull(maximumScrollMethod, "Selector scroll limit locator missing.");
+            Rect viewport = (Rect)viewportMethod.Invoke(null, new object[] { logicalHeight });
+            Rect card = InvokeStaticRect("LevelSelectCardBounds", levelIndex);
+            float maximumScroll = (float)maximumScrollMethod.Invoke(null, new object[] { logicalHeight });
+            float targetScroll = Mathf.Clamp(card.center.y - viewport.center.y, 0f, maximumScroll);
+            int swipes = 0;
+            while ((float)Get(view, "levelSelectScroll") + 1f < targetScroll && swipes++ < 8)
+            {
+                float currentScroll = (float)Get(view, "levelSelectScroll");
+                float startY = viewport.center.y;
+                float delta = Mathf.Min(targetScroll - currentScroll, startY - 5f);
+                Assert.Greater(delta, 0f, "Selector drag must make positive scroll progress.");
+                Vector2 from = Pixel(viewport.center.x, startY / verticalScale);
+                Vector2 to = Pixel(viewport.center.x, (startY - delta) / verticalScale);
+                InputSystem.QueueStateEvent(mouse, new MouseState { position = from }.WithButton(MouseButton.Left));
+                yield return null;
+                yield return null;
+                InputSystem.QueueStateEvent(mouse, new MouseState { position = to }.WithButton(MouseButton.Left));
+                yield return null;
+                yield return null;
+                InputSystem.QueueStateEvent(mouse, new MouseState { position = to });
+                yield return null;
+                yield return null;
+                Assert.Greater((float)Get(view, "levelSelectScroll"), currentScroll,
+                    "Dragging the selector through the viewport must move its real scroll position.");
+            }
+
+            float scroll = (float)Get(view, "levelSelectScroll");
+            float visibleCenterY = card.center.y - scroll;
+            Assert.That(visibleCenterY, Is.InRange(viewport.yMin, viewport.yMax),
+                "The unlocked card must be scrolled into the visible selector viewport.");
+            yield return Click(new Vector2(card.center.x, visibleCenterY / verticalScale));
         }
 
         private IEnumerator Click(Vector2 logicalPoint)

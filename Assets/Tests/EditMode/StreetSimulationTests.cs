@@ -2102,7 +2102,7 @@ string[] names = (string[])simType.GetField("LevelNames", BindingFlags.Public | 
         public void NewLevelsHaveStableNamesCatalogGoalsDurationAndDemand()
         {
 string[] expectedNames = { "Racing Club / Avellaneda", "San Lorenzo / Boedo", "River Plate / Núñez", "Boca Juniors / La Boca", "Sindicato de Camioneros / Plaza de Mayo", "Los Redondos / Tandil" };
-            int[] expectedGoals = { 850, 960, 1050, 1150, 1300, 1450 };
+            int[] expectedGoals = { 850, 1020, 1050, 1150, 1300, 1450 };
             float[] expectedDurations = { 260f, 270f, 295f, 300f, 300f, 315f };
             float[] expectedDemand = { 1.65f, 1.815f, 1.9965f, 2.19615f, 2.415765f, 2.6573415f };
             string[] names = (string[])simType.GetField("LevelNames", BindingFlags.Public | BindingFlags.Static).GetValue(null);
@@ -2131,7 +2131,7 @@ StrategyRun run = SimulateStrategy(10, 1337, "D");
             Assert.AreEqual(10, saveType.GetField("unlockedLevel").GetValue(restored));
         }
 
-        [TestCase(5, 850)] [TestCase(6, 960)] [TestCase(7, 1050)]
+        [TestCase(5, 850)] [TestCase(6, 1020)] [TestCase(7, 1050)]
         [TestCase(8, 1150)] [TestCase(9, 1300)] [TestCase(10, 1450)]
         public void LegacyFiveEntryBalanceFallsBackSafelyForNewLevels(int level, int goal)
         {
@@ -2168,7 +2168,7 @@ object sim = Make(level: level);
             int[][] goals = {
                 new[] {200,0,0,0,0,0,0}, new[] {200,0,0,0,200,0,0}, new[] {180,120,0,0,150,0,0},
                 new[] {185,125,60,0,155,0,75}, new[] {190,130,70,65,160,65,80},
-                new[] {210,145,80,75,175,75,90}, new[] {230,165,100,85,195,80,105},
+                new[] {210,145,80,75,175,75,90}, new[] {230,175,110,95,205,90,115},
                 new[] {250,180,110,95,210,90,115}, new[] {275,195,120,110,225,100,125},
                 new[] {310,220,135,125,255,110,145}, new[] {345,245,150,140,285,120,165} };
             float[] durations = {120f,150f,180f,210f,240f,260f,270f,295f,300f,300f,315f};
@@ -2184,6 +2184,75 @@ object sim = Make(level: level);
                     total += goals[level][product];
                 }
                 Assert.AreEqual(total, Get(sim, "Goal"), "Aggregate remains informational only");
+            }
+        }
+
+        [Test]
+        public void MainSceneUsesUpdatedSanLorenzoGoalsAndMatchingMarketMinimumStock()
+        {
+            var previous = SceneManager.GetActiveScene();
+            var scene = SceneManager.GetSceneByPath("Assets/Scenes/Main.unity");
+            bool opened = !scene.IsValid() || !scene.isLoaded;
+            try
+            {
+                if (opened) scene = EditorSceneManager.OpenScene("Assets/Scenes/Main.unity", OpenSceneMode.Additive);
+                Type gameType = Type.GetType("HayChoriYPaty.StreetGame, Assembly-CSharp", true);
+                Component game = null;
+                foreach (var root in scene.GetRootGameObjects())
+                    foreach (Component candidate in root.GetComponentsInChildren(gameType, true))
+                    {
+                        Assert.IsNull(game, "Main must contain only one StreetGame.");
+                        game = candidate;
+                    }
+                Assert.IsNotNull(game);
+                object balance = gameType.GetProperty("Balance", BindingFlags.Instance | BindingFlags.Public).GetValue(game, null);
+                int[][] expectedGoals = {
+                    new[] {200,0,0,0,0,0,0}, new[] {200,0,0,0,200,0,0}, new[] {180,120,0,0,150,0,0},
+                    new[] {185,125,60,0,155,0,75}, new[] {190,130,70,65,160,65,80},
+                    new[] {210,145,80,75,175,75,90}, new[] {230,175,110,95,205,90,115},
+                    new[] {250,180,110,95,210,90,115}, new[] {275,195,120,110,225,100,125},
+                    new[] {310,220,135,125,255,110,145}, new[] {345,245,150,140,285,120,165} };
+                float[] expectedDurations = {120f,150f,180f,210f,240f,260f,270f,295f,300f,300f,315f};
+                int[] expectedOpeningCoins = {0,10,0,0,0,250,250,250,250,500,2000};
+                object sanLorenzo = null;
+                for (int level = 0; level < 11; level++)
+                {
+                    object sim = Make(level: level, balance: balance);
+                    int total = 0;
+                    Assert.AreEqual(expectedDurations[level], Get(sim, "TimeRemaining"), "Main duration at level " + (level + 1));
+                    Assert.AreEqual(expectedOpeningCoins[level], Call(balance, "GetStartingCoins", level), "Main opening coins at level " + (level + 1));
+                    for (int product = 0; product < 7; product++)
+                    {
+                        Assert.AreEqual(expectedGoals[level][product], Call(sim, "GetProductGoal", product),
+                            "Effective Main goal at level " + (level + 1) + ", product ID " + product);
+                        total += expectedGoals[level][product];
+                    }
+                    if (level == 6)
+                    {
+                        sanLorenzo = sim;
+                        Assert.AreEqual(1020, total, "The San Lorenzo aggregate is informational and must equal the requested ID sum.");
+                    }
+                }
+                Assert.IsNotNull(sanLorenzo);
+                Start(sanLorenzo);
+                Assert.AreEqual(250, Get(sanLorenzo, "Coins"));
+                Assert.AreEqual(270f, Get(sanLorenzo, "TimeRemaining"));
+                Assert.AreEqual(1, Get(sanLorenzo, "ParrilleroCount"));
+                Assert.AreEqual(1, Get(sanLorenzo, "MozoCount"));
+                Assert.AreEqual(0, Get(sanLorenzo, "ParrilleroPremiumCount"));
+                Assert.AreEqual(0, Get(sanLorenzo, "SpeedLevel"));
+
+                Type marketType = Type.GetType("HayChoriYPaty.StreetMarket, Assembly-CSharp", true);
+                Type dataType = Type.GetType("HayChoriYPaty.StreetMarketData, Assembly-CSharp", true);
+                object market = Activator.CreateInstance(marketType, new[] { Activator.CreateInstance(dataType), balance });
+                CollectionAssert.AreEqual(new[] {230,435,175,175,110,95,205,115,90,90},
+                    (int[])Call(market, "RequiredUnits", sanLorenzo),
+                    "Mercado's existing quota-derived requirements must update without changing recipes or consumption.");
+            }
+            finally
+            {
+                if (opened && scene.IsValid()) EditorSceneManager.CloseScene(scene, true);
+                if (previous.IsValid() && previous.isLoaded) SceneManager.SetActiveScene(previous);
             }
         }
 
@@ -2259,7 +2328,9 @@ object sim = Make(level: level);
             for (int level = 0; level < 11; level++)
             {
                 object sim = Make(level: level); Start(sim);
-                Assert.AreEqual(1, Get(sim, "StaffCount"), "Only the starter Parrillero should be present in level " + level);
+                int expectedStartingStaff = 1 + (level == 5 ? 2 : level == 6 ? 1 : 0);
+                Assert.AreEqual(expectedStartingStaff, Get(sim, "StaffCount"),
+                    "Only the officially configured free starters should be present in level " + level);
                 var expected = new HashSet<int>();
                 for (int slot = 0; slot < (int)Get(sim, "ProductCount"); slot++)
                     expected.Add((int)Call(sim, "GetAvailableProduct", slot));
