@@ -19,6 +19,7 @@
 
 - No current evidence here certifies a fresh-save, human-playable campaign across all 11 levels after the latest balance. Historical campaign results are scoped in [status](status.md); do not adjust goals, prices, or times without authorization.
 - Physical-device QA (safe area/cutout, touch, performance) and open visual acceptance remain contract-specific; see [worker animation](features/worker-animation.md), [street automation](features/street-automation.md), and [Android delivery](features/android-prototype.md).
+- Racing-only free-Mozo experiment (LevelIndex 5): five authentic ×1 PlayMode attempts yielded 1/5 wins (256.06 s, 3.94 s left); target ≥3/5 and preferred ≥15 s was not met. Keep only as a provisional local experiment; do not generalize to other levels. Details and per-product results: [active cooks/Mozos](features/active-cooks-mozos.md) and [balance audit addendum](../docs/audits/2026-10-21-live-balance/INFORME_COMPLETO_TODOS_LOS_NIVELES.md).
 
 ## Contract map
 

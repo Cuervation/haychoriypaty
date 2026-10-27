@@ -1,3 +1,11 @@
+## 2026-10-26 — Ensayo experimental de Mozo gratis en Racing
+
+Solo en LevelIndex 5 cada intento ahora crea un Mozo gratis junto al Parrillero normal y al Premium gratis preexistente; se restablece a uno en retry/partida nueva. Primer Mozo pagado $50; luego $125/$250. Se mantienen $250 iniciales, siete cuotas, duración de 260 s, precios, costos restantes y velocidad. No se aplica a ningún otro nivel ni altera save/Firebase/mercado.
+
+EditMode focalizado: plantilla/limite por nivel/precio/reinicio/entrega real pasaron; fixture completa `StreetActiveCooksTests` 90/95 con cinco fallos no aprobados (alternancia receta única, pickup legado, liberación de ingrediente y dos retornos a espera). PlayMode de compra del primer Mozo pagado 1/1 PASS. Cinco partidas completas reales mediante UI a `Time.timeScale=1`: 1 victoria/5, a 256.06 s con 3.94 s de margen; meta 3/5 y margen preferido 15 s no alcanzados. Dos derrotas quedaron a 4 Choris; no hubo clientes perdidos. Ver tabla completa, estrategias y comparación con 0/25 previa en [contrato](features/active-cooks-mozos.md). Recomendación provisional: mantener solo como experimento en la rama, sin declararlo aceptado ni extenderlo. Datos JSON/CSV/XML fuera del repositorio: `/private/tmp/hcyp-racing-free-mozo-20261026/real-games/` y `/private/tmp/hcyp-racing-free-mozo-20261026/`.
+
+No se generó APK, no se instaló, no se hizo commit ni push.
+
 ## 2026-10-26 — APK Android 0.2.72/code74 y Cocacolero lineal
 
 Build Development IL2CPP/ARM64, Main-only, desde copia aislada Unity 6000.6.3f1: **Succeeded, 511,04 s, 0 errores / 1 advertencia** (clang `-Wunused-command-line-argument`). Incluye splash de tres frases/logo/barra y corrección del offset Coca lineal dentro de 48 unidades. APK `/private/tmp/hcyp-release-0.2.72-code74/HayChoriYPaty-0.2.72-code74.apk`, 387.366.977 bytes, SHA-256 `e8d190663ccf6c3164fb04701767fe11ad60d25547f58b7c0a7dabee0954a103`. Paquete/version/API/ABI, ZIP, zipalign, firma APK v2 y flags de recolección analytics/ad-ID validados. Debug-signed, no Play Store; no instalada.

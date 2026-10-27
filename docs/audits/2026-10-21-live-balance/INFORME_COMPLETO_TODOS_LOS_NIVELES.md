@@ -159,6 +159,24 @@ Son trazas ganadoras concretas de este entorno, no garantías universales. El ti
 **Nivel 5 — Independiente:** 17.3 s C (35→0); 25.9 s P (45→0); 30.4 s F (41→1); 32.5 s V (35→10); 34.0 s N (39→4); 36.5 s V (58→13); 40.1 s N (108→18); 43.1 s C (95→5); 45.6 s V (73→3); 51.2 s P (123→8); 58.8 s N (203→28); 60.9 s V (96→6); 63.4 s F (110→10); 68.5 s C (178→3); 72.6 s V (135→0); 81.7 s N (328→13); 86.3 s P (236→11); 90.9 s V (246→41); 94.4 s F (202→2); 104.1 s N (533→43); 110.2 s V (306→11); 118.8 s C (323→8); 126.9 s V (422→17); 135.6 s P (412→7); 149.8 s V (568→3).
 
 
+## 10. Addendum — ensayo Mozo gratis en Racing (2026-10-26)
+
+Este anexo no reescribe los totales históricos de la auditoría. La línea base permanece en **0/25 victorias de Racing**; su mejor intento comparativo (4) vendió `191/163/92/91/175/76/90` contra metas `210/145/80/75/175/75/90` (19 faltantes totales). En el cambio experimental solo se añadió un Mozo gratuito por intento a Racing; se conservaron el Parrillero normal y el Premium inicial ya existente, monedas de ronda `$250`, ventas, costos, metas y duración260s.
+
+Las cinco partidas fueron PlayMode completas, acciones reales de UI, escala1, stock comprado legalmente en Mercado. Se usó un checkpoint QA desbloqueado tras una victoria real anterior, con `$13,844.00` en Mercado al inicio de cada intento; no fue campaña nueva. En cada fila, ventas/faltantes se ordenan por IDs0–6: Chori/Paty/Bondiola/Vacío/Coca/Fernet/Cerveza. Plantel final: N/C/P/F/M (Normal/Coca/Premium/Fernet/Mozo); velocidad indica las mejoras compradas. La caja de ronda comenzó en `$250` en todos los casos. Todos terminaron con0 clientes perdidos.
+
+| Intento / plan | Resultado; tiempo y margen | Vendidos | Faltantes | Plantel N/C/P/F/M; velocidad | Monedas de ronda; Mercado final |
+|---|---|---|---|---|---|---|
+| 10 — balanceado; reservar para velocidad | Derrota;260.00s,0s | 206/154/126/105/199/76/122 | 4/0/0/0/0/0/0 | 5/4/4/2/4;9 | $1,951; $14,438.50 |
+| 11 — cinco Normales antes del Mozo4 | Derrota;260.00s,0s | 152/136/82/80/162/76/89 | 58/9/0/0/13/0/1 | 5/4/4/2/3;9 | $685; $13,680.50 |
+| 14 — tres Mozos; velocidad9 | Derrota;260.00s,0s | 160/141/82/77/168/76/90 | 50/4/0/0/7/0/0 | 4/4/4/2/3;9 | $1,111; $13,713.50 |
+| 15 — cuatro Mozos; un Fernetero | Derrota;260.00s,0s | 206/161/132/113/208/76/133 | 4/0/0/0/0/0/0 | 4/4/4/1/4;9 | $3,124; $14,595.00 |
+| 16 — repetir compras oportunistas | **Victoria;256.06s,3.94s** | 210/157/119/115/202/76/133 | 0/0/0/0/0/0/0 | 5/4/4/2/4;9 | $2,128; $10,898.00 |
+
+El resultado es **1/5**, por debajo del criterio de3/5 y sin el colchón preferido de15s. La comparación sugiere una mejora respecto del0/25 histórico —incluida una victoria y dos derrotas a solo4 Choris— pero las estrategias no fueron idénticas, por lo que no demuestra causalidad ni repetibilidad. La falta de Chori y el trabajo simultáneo de cocineros/mozos sugieren un límite en producción/entrega de esa línea; estos totales no separan con certeza parrilla, mesa, cola y handoff. Recomendación: conservarlo solo como ensayo local de Racing para que el usuario lo evalúe, sin extensión a otros niveles ni cambios adicionales para forzar victorias.
+
+Pruebas focalizadas y límites: EditMode `StreetActiveCooksTests` 90/95 (cinco fallos registrados en `specs/status.md`, ninguno oculto); caso PlayMode del primer cobro Mozo1/1 PASS; los cinco wrappers PlayMode de partidas reales completaron1/1 cada uno. No hubo captura visual de aceptación, APK, instalación, commit o push. Evidencia cruda local en `/private/tmp/hcyp-racing-free-mozo-20261026/real-games/`.
+
 ## Key Learnings:
 1. Los niveles1–5 tuvieron victoria; el tramo activo necesita revisión de balance y entrega con partidas reales, no una afirmación de imposibilidad matemática.
 2. Cocacolero atiende Coca y Cerveza; un Idle puede deberse a elegibilidad de cola, y la legibilidad actual no explica bien esa espera.

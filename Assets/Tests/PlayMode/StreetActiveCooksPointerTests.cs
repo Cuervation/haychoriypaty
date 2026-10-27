@@ -516,18 +516,20 @@ namespace HayChoriYPaty.Tests
 #endif
 
         [UnityTest]
-        public IEnumerator RacingMozoCardReceivesOneMouseClickAndChargesOnce()
+        public IEnumerator RacingFirstPaidMozoCardReceivesOneMouseClickAndChargesOnce()
         {
             StartLevel(5);
             Rect card = MozoCardBounds();
             Assert.Greater(card.width, 0f);
+            Assert.AreEqual(1, GetProperty(Sim, "MozoCount"), "Racing starts with one free Mozo.");
             int before = (int)GetProperty(Sim, "Coins");
             int cost = (int)GetProperty(Sim, "MozoHireCost");
+            Assert.AreEqual(50, cost, "The first paid Mozo must remain at its $50 base price.");
             yield return Click(card);
-            Assert.AreEqual(1, GetProperty(Sim, "MozoCount"));
+            Assert.AreEqual(2, GetProperty(Sim, "MozoCount"));
             Assert.AreEqual(before - cost, GetProperty(Sim, "Coins"), "One pointer-up action charges exactly once.");
             Assert.AreEqual(0, GetProperty(Sim, "CocacoleroCount"));
-            Assert.AreEqual(0, GetProperty(Sim, "ParrilleroPremiumCount"));
+            Assert.AreEqual(1, GetProperty(Sim, "ParrilleroPremiumCount"), "Preserve Racing's pre-existing free Premium worker.");
             Assert.AreEqual(0, GetProperty(Sim, "FerneteroCount"));
         }
 
