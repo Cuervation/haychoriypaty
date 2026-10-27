@@ -1,11 +1,11 @@
 # Current state — Hay Chori y Paty
 
-**Checkpoint date:** 2026-10-26. This is a compact snapshot, not a timeline or replacement for the contracts. Historical continuity entries are preserved verbatim in [continuity-log-through-20261025.md](history/continuity-log-through-20261025.md); older checkpoint: [continuity-before-20261015-audit.md](history/continuity-before-20261015-audit.md).
+**Checkpoint date:** 2026-10-27. This is a compact snapshot, not a timeline or replacement for the contracts. Historical continuity entries are preserved verbatim in [continuity-log-through-20261025.md](history/continuity-log-through-20261025.md); older checkpoint: [continuity-before-20261015-audit.md](history/continuity-before-20261015-audit.md).
 
 ## Project and environment
 
 - Active checkout: `/Users/celestino/HayChoriYPaty`, branch `codex/street-automation`; preserve all pre-existing local changes. The Documents/ChatGPT folder is a context copy, not the active checkout.
-- Unity `6000.6.3f1`; Android-first 2D portrait. `ProjectSettings.asset` reports `0.2.73` / code `75`. Latest Development IL2CPP/ARM64 APK: `/private/tmp/hcyp-release-0.2.73-code75/HayChoriYPaty-0.2.73-code75.apk` (SHA-256 `233361b184ef1b8b2ad5eebc6029b3188664be8a0ef553c0f87ff6ec42c7b28b2`), debug-signed. Package/ZIP/alignment/signature checks pass; the AVD launched the Unity activity but remained visually blank, so startup is not accepted. No physical device was attached. Details: [Android prototype](features/android-prototype.md).
+- Unity `6000.6.3f1`; Android-first 2D portrait. Player Settings release fields: `0.2.76` / code `78`. Latest Development IL2CPP/ARM64 APK: `/private/tmp/hcyp-splash-fix-0.2.76-code78/HayChoriYPaty-0.2.76-code78.apk` (387,369,899 bytes; SHA-256 `1802d95ae1a792b7aa2f60d22ca092d9d4090832e27bc892c247eb339b819953`), debug-signed; BuildPipeline succeeded (0 errors/5 warnings), ZIP, package/version/ABI, `zipalign` and APK Signature Scheme v2 verified. It was generated with the existing local `runInBackground: 1` preference, which remains unstaged/unpublished. This 0.2.76 APK was not installed; the previous AVD Pixel 7a/API36 smoke evidence belongs to 0.2.75/code77 only. No physical phone was touched. No authenticated OAuth/game session has been confirmed. Details: [Android prototype](features/android-prototype.md).
 - The user confirmed selection/trust of the active checkout on 2026-10-26. No global settings were changed; existing skills/roles and configured model/effort values remain untouched.
 
 ## Implemented scope (high-level)
@@ -18,7 +18,7 @@
 ## Open risks / pending
 
 - No current evidence here certifies a fresh-save, human-playable campaign across all 11 levels after the latest balance. Historical campaign results are scoped in [status](status.md); do not adjust goals, prices, or times without authorization.
-- Physical-device QA (safe area/cutout, touch, performance) remains NOT_RUN. The 0.2.73/code75 AVD startup smoke showed a live foreground Unity activity but a blank dark frame after cold and warm launches; do not claim visible startup acceptance until verified/fixed on a suitable device. See [Android delivery](features/android-prototype.md).
+- Authenticated gameplay on a real player account remains NOT_RUN. The AVD confirms logged-out behavior (hub stays visible; JUGAR/avatar opens CUENTA), while focused PlayMode tests with the isolated simulated Ready session confirm selector and round-start flows. AVD cold startup is functionally visible but slow: the full 66-resource load took 99.03 s; performance optimization and real OAuth remain open. No current physical-device QA was performed in this task; see [Android delivery](features/android-prototype.md).
 - Racing-only free-Mozo experiment (LevelIndex 5): five authentic ×1 PlayMode attempts yielded 1/5 wins (256.06 s, 3.94 s left); target ≥3/5 and preferred ≥15 s was not met. Keep only as a provisional local experiment; do not generalize to other levels. Details and per-product results: [active cooks/Mozos](features/active-cooks-mozos.md) and [balance audit addendum](../docs/audits/2026-10-21-live-balance/INFORME_COMPLETO_TODOS_LOS_NIVELES.md).
 
 ## Contract map

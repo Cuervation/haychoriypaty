@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
@@ -424,7 +425,7 @@ namespace HayChoriYPaty
             new System.Collections.Generic.Dictionary<string, Texture2D>();
         private readonly System.Collections.Generic.Dictionary<string, Texture2D> affordableUpgradeBorderTextures =
             new System.Collections.Generic.Dictionary<string, Texture2D>();
-        private Font menuFont;
+        private Font menuFont, googleSansFont;
         private GUIStyle menuTitle, levelTitle;
         private GUIStyle introStatusStyle;
         private Texture2D introPreviewBar;
@@ -524,13 +525,15 @@ namespace HayChoriYPaty
         private static readonly Rect UpgradeWoodBounds = new Rect(13,148,1484,715);
         // Clean board face from the existing upgrade-wood art; avoids its oval, plaque and metal frame.
         private static readonly Rect SpeedArrowBounds = new Rect(114,224,1174,662);
-        private void LoadLevelCrests()
+        private IEnumerator LoadLevelCrestsAsync()
         {
             levelCrests = new Texture2D[LevelCrestResourceNames.Length];
             for (int i = 0; i < LevelCrestResourceNames.Length; i++)
             {
                 string resource = LevelCrestResourceNames[i];
-                if (!string.IsNullOrEmpty(resource)) levelCrests[i] = Resources.Load<Texture2D>(resource);
+                int crestIndex = i;
+                if (!string.IsNullOrEmpty(resource))
+                    yield return LoadStartupResourceAsync<Texture2D>(resource, loaded => levelCrests[crestIndex] = loaded);
             }
             allBoysCrest = levelCrests[0];
             chicagoCrest = levelCrests[1];
@@ -702,76 +705,162 @@ namespace HayChoriYPaty
                 ? levelCrests[levelIndex] : null;
         }
 
-        private void OnEnable()
+        private const int TotalStartupResourceRequests = 66;
+        private Coroutine startupResourceRoutine;
+        private int startupResourcesCompleted;
+        private float startupLoadProgress, startupLoadStartedAt;
+        private bool startupArtReady, viewResourcesReady;
+
+        private IEnumerator LoadStartupResourceAsync<T>(string resourceName, System.Action<T> assign)
+            where T : UnityEngine.Object
         {
-            game = GetComponent<StreetGame>();
-            backdrop = Resources.Load<Texture2D>("street-background-open-street-v4");
-            muralArt = Resources.Load<Texture2D>(MuralResource);
-            LoadLevelCrests();
-            chicagoBackground = Resources.Load<Texture2D>(ChicagoBackgroundResource);
-            velezBackground = Resources.Load<Texture2D>(VelezBackgroundResource);
-            velezGrill = Resources.Load<Texture2D>(VelezGrillResource);
-            ferroBackground = Resources.Load<Texture2D>(FerroBackgroundResource);
-            independienteBackground = Resources.Load<Texture2D>(IndependienteBackgroundResource);
-            racingBackground = Resources.Load<Texture2D>(RacingBackgroundResource);
-            sanLorenzoBackground = Resources.Load<Texture2D>(SanLorenzoBackgroundResource);
-            bocaBackground = Resources.Load<Texture2D>(BocaBackgroundResource);
-            riverMural = Resources.Load<Texture2D>(RiverMuralResource);
-            riverHeaderExtension = Resources.Load<Texture2D>(RiverHeaderExtensionResource);
-            camionerosBackground = Resources.Load<Texture2D>(CamionerosBackgroundResource);
-            losRedondosBackground = Resources.Load<Texture2D>(LosRedondosBackgroundResource);
-            fourZoneGrill = Resources.Load<Texture2D>(FourZoneGrillResource);
-            beerBarrel = Resources.Load<Texture2D>(BeerBarrelResource);
-            fernetTable = Resources.Load<Texture2D>(FernetTableResource);
-            cocaBottle = Resources.Load<Texture2D>(CocaBottleResource);
-            beverageBarrel = Resources.Load<Texture2D>(BeverageBarrelResource);
-            people = Resources.Load<Texture2D>("street-characters");
-            items = Resources.Load<Texture2D>("street-items");
-            parrillero = Resources.Load<Texture2D>("street-parrillero");
-            parrilleroDiagonal = Resources.Load<Texture2D>("street-parrillero-diagonal-v1");
-            cocacolero = Resources.Load<Texture2D>("street-cocacolero-v1");
-            laterCocacolero = Resources.Load<Texture2D>(LaterCocacoleroResource);
-            parrilleroIcon = Resources.Load<Texture2D>("street-parrillero-icon");
-            upgradeWood = Resources.Load<Texture2D>("street-upgrade-wood-v1");
-            speedArrows = Resources.Load<Texture2D>("street-speed-arrows-v1");
-            largeGrill = Resources.Load<Texture2D>("street-parrilla-large-v2");
-            chicagoGrill = Resources.Load<Texture2D>(ChicagoGrillResource);
-            gameCoin = Resources.Load<Texture2D>("street-coin-gold-v2");
+            ResourceRequest request = Resources.LoadAsync<T>(resourceName);
+            float requestStartedAt = Time.realtimeSinceStartup;
+            while (!request.isDone)
+            {
+                startupLoadProgress = (startupResourcesCompleted + Mathf.Clamp01(request.progress)) /
+                    TotalStartupResourceRequests;
+                yield return null;
+            }
+
+            T loaded = request.asset as T;
+            assign(loaded);
+            startupResourcesCompleted++;
+            startupLoadProgress = Mathf.Clamp01((float)startupResourcesCompleted / TotalStartupResourceRequests);
+#if DEVELOPMENT_BUILD
+            float loadSeconds = Time.realtimeSinceStartup - requestStartedAt;
+            if (loaded == null)
+                Debug.LogWarning("StreetView startup resource was not found: " + resourceName);
+            else if (loadSeconds >= .5f)
+                Debug.Log("StreetView startup resource loaded in " + loadSeconds.ToString("F2") + "s: " + resourceName);
+#endif
+            // Keep even cache hits from collapsing into one long OnEnable frame.
+            yield return null;
+        }
+
+        private IEnumerator LoadViewResourcesAsync()
+        {
+            // Let Unity render its first frame and the Firebase sign-in/status UI before loading game art.
+            yield return null;
+            startupLoadStartedAt = Time.realtimeSinceStartup;
+#if DEVELOPMENT_BUILD
+            Debug.Log("StreetView startup resource loading started.");
+#endif
+
+            // Minimum set for the branded startup and account button; this becomes visible before
+            // the rest of the large club/gameplay art has finished loading.
+            yield return LoadStartupResourceAsync<Texture2D>(IntroBackdropResource, loaded => coverArt = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>("street-logo", loaded => titleLogo = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>(HubBackdropResource, loaded => hubBackdrop = loaded);
+            yield return LoadStartupResourceAsync<Font>("Menu/LuckiestGuy-Regular", loaded => menuFont = loaded);
+            yield return LoadStartupResourceAsync<Font>("Google/GoogleSans-Medium", loaded => googleSansFont = loaded);
+            menuButton = CreateMenuButton();
+            googleButtonSurface = CreateGoogleButtonSurface();
+            startupArtReady = true;
+#if DEVELOPMENT_BUILD
+            Debug.Log("StreetView startup cover assets ready after " +
+                (Time.realtimeSinceStartup - startupLoadStartedAt).ToString("F2") + "s.");
+#endif
+
+            yield return LoadStartupResourceAsync<Texture2D>("street-background-open-street-v4", loaded => backdrop = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>(MuralResource, loaded => muralArt = loaded);
+            yield return LoadLevelCrestsAsync();
+            yield return LoadStartupResourceAsync<Texture2D>(ChicagoBackgroundResource, loaded => chicagoBackground = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>(VelezBackgroundResource, loaded => velezBackground = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>(VelezGrillResource, loaded => velezGrill = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>(FerroBackgroundResource, loaded => ferroBackground = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>(IndependienteBackgroundResource, loaded => independienteBackground = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>(RacingBackgroundResource, loaded => racingBackground = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>(SanLorenzoBackgroundResource, loaded => sanLorenzoBackground = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>(BocaBackgroundResource, loaded => bocaBackground = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>(RiverMuralResource, loaded => riverMural = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>(RiverHeaderExtensionResource, loaded => riverHeaderExtension = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>(CamionerosBackgroundResource, loaded => camionerosBackground = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>(LosRedondosBackgroundResource, loaded => losRedondosBackground = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>(FourZoneGrillResource, loaded => fourZoneGrill = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>(BeerBarrelResource, loaded => beerBarrel = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>(FernetTableResource, loaded => fernetTable = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>(CocaBottleResource, loaded => cocaBottle = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>(BeverageBarrelResource, loaded => beverageBarrel = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>("street-characters", loaded => people = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>("street-items", loaded => items = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>("street-parrillero", loaded => parrillero = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>("street-parrillero-diagonal-v1", loaded => parrilleroDiagonal = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>("street-cocacolero-v1", loaded => cocacolero = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>(LaterCocacoleroResource, loaded => laterCocacolero = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>("street-parrillero-icon", loaded => parrilleroIcon = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>("street-upgrade-wood-v1", loaded => upgradeWood = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>("street-speed-arrows-v1", loaded => speedArrows = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>("street-parrilla-large-v2", loaded => largeGrill = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>(ChicagoGrillResource, loaded => chicagoGrill = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>("street-coin-gold-v2", loaded => gameCoin = loaded);
+
             string[] marketArt = { "meat-chori/meat-chori_Raw", "sandwich-chori/sandwich-chori",
                 "meat-paty/meat-paty_Raw", "sandwich-paty/sandwich-paty", "meat-bondiola/meat-bondiola_Raw",
                 "meat-vacio/meat-vacio_Raw", "coca/coca", "beer/beer" };
-            for (int i = 0; i < marketArt.Length; i++) marketIngredientSprites[i] = Resources.Load<Sprite>("ModularKitchen/Sprites/" + marketArt[i]);
-            marketFernetBottle = Resources.Load<Texture2D>("ModularKitchen/Art/fernet-bottle-1l-v1");
-            marketCocaLarge = Resources.Load<Texture2D>("ModularKitchen/Art/coca-2500ml-display-v1");
-            marketBreadCommon = Resources.Load<Texture2D>("ModularKitchen/Art/market-bread-common-v1");
-            marketBreadBurger = Resources.Load<Texture2D>("ModularKitchen/Art/market-bread-burger-v1");
-            coverArt = Resources.Load<Texture2D>(IntroBackdropResource);
-            hubBackdrop = Resources.Load<Texture2D>(HubBackdropResource);
-            victoryPopup = Resources.Load<Texture2D>(VictoryPopupResource);
-            riotBackdrop = Resources.Load<Texture2D>(RiotBackdropResource);
-            riotFanAtlas = Resources.Load<Texture2D>(RiotFanAtlasResource);
-            riotImpactCloud = Resources.Load<Texture2D>(RiotImpactCloudResource);
-            titleLogo = Resources.Load<Texture2D>("street-logo");
+            for (int i = 0; i < marketArt.Length; i++)
+            {
+                int spriteIndex = i;
+                yield return LoadStartupResourceAsync<Sprite>("ModularKitchen/Sprites/" + marketArt[i],
+                    loaded => marketIngredientSprites[spriteIndex] = loaded);
+            }
+            yield return LoadStartupResourceAsync<Texture2D>("ModularKitchen/Art/fernet-bottle-1l-v1", loaded => marketFernetBottle = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>("ModularKitchen/Art/coca-2500ml-display-v1", loaded => marketCocaLarge = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>("ModularKitchen/Art/market-bread-common-v1", loaded => marketBreadCommon = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>("ModularKitchen/Art/market-bread-burger-v1", loaded => marketBreadBurger = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>(VictoryPopupResource, loaded => victoryPopup = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>(RiotBackdropResource, loaded => riotBackdrop = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>(RiotFanAtlasResource, loaded => riotFanAtlas = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>(RiotImpactCloudResource, loaded => riotImpactCloud = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>(ChulengoBowlResource, loaded => chulengoBowl = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>("street-grill-premium-v1", loaded => premiumGrill = loaded);
+
             chulengoMeter = CreateChulengoMeterTexture();
+            yield return null;
             chulengoNeedle = CreateChulengoNeedleTexture();
+            yield return null;
             chulengoHub = CreateChulengoHubTexture();
+            yield return null;
             chulengoParchment = CreateChulengoParchmentTexture();
-            chulengoBowl = Resources.Load<Texture2D>(ChulengoBowlResource);
-            menuButton = CreateMenuButton();
-            googleButtonSurface = CreateGoogleButtonSurface();
+            yield return null;
             hudBarTexture = CreateHudBar();
+            yield return null;
             cutoutHudBarTexture = CreateHudBarTexture(true);
             cachedHudCutoutGap = CutoutHudGap;
+            yield return null;
             hudQuotaCardTexture = CreateHudQuotaCardTexture(false);
+            yield return null;
             hudQuotaCardOutlineTexture = CreateHudQuotaCardTexture(true);
+            yield return null;
             gameplayFooterTexture = CreateGameplayFooterTexture();
-            menuFont = Resources.Load<Font>("Menu/LuckiestGuy-Regular");
-            premiumGrill = Resources.Load<Texture2D>("street-grill-premium-v1");
+            yield return null;
+
             premiumWorker = StreetWorkerAppearance.CreateVariant(parrillero, StreetWorkerRole.ParrilleroPremium, ParrilleroPoses, new Vector2(1315,1197));
+            yield return null;
             premiumDiagonal = StreetWorkerAppearance.CreateVariant(parrilleroDiagonal, StreetWorkerRole.ParrilleroPremium, ParrilleroDiagonalPoses, new Vector2(1536,1024));
+            yield return null;
             mozoWorker = StreetWorkerAppearance.CreateVariant(parrillero, StreetWorkerRole.Mozo, ParrilleroPoses, new Vector2(1315,1197));
+            yield return null;
             fernetWorker = StreetWorkerAppearance.CreateVariant(cocacolero, StreetWorkerRole.Fernetero, ChicagoCocacoleroPoses, new Vector2(1247,1261));
+            yield return null;
             fernetWorkerLater = StreetWorkerAppearance.CreateVariant(laterCocacolero, StreetWorkerRole.Fernetero, MatchedCocacoleroPoses, new Vector2(1247,1261));
+            startupResourcesCompleted = TotalStartupResourceRequests;
+            startupLoadProgress = 1f;
+            startupResourceRoutine = null;
+            viewResourcesReady = true;
+#if DEVELOPMENT_BUILD
+            Debug.Log("StreetView startup assets fully ready after " +
+                (Time.realtimeSinceStartup - startupLoadStartedAt).ToString("F2") + "s.");
+#endif
+        }
+
+        private void OnEnable()
+        {
+            game = GetComponent<StreetGame>();
+            startupArtReady = false;
+            viewResourcesReady = false;
+            startupResourcesCompleted = 0;
+            startupLoadProgress = 0f;
             introActive = true;
             levelSelectActive = false;
             levelOneTutorialActive = false;
@@ -784,9 +873,14 @@ namespace HayChoriYPaty
             levelOneTutorialBubbleTexture = null;
             levelOneTutorialBubbleTextureStep = -1;
             pressedAction = lastAction = 0;
+            startupResourceRoutine = StartCoroutine(LoadViewResourcesAsync());
         }
         private void OnDisable()
         {
+            if (startupResourceRoutine != null) StopCoroutine(startupResourceRoutine);
+            startupResourceRoutine = null;
+            startupArtReady = false;
+            viewResourcesReady = false;
             DisposeLevelSelectorPresentation();
             // Release cached sprites before destroying their palette textures.
             if (kitchenRenderer != null) kitchenRenderer.ReleaseWorkers();
@@ -848,13 +942,16 @@ namespace HayChoriYPaty
         }
         private void Update()
         {
-            ObserveVictoryTransition();
-            if (introActive && game != null && game.IsPlayerActive)
+            // The branded presentation belongs to startup, not to the authenticated game session.
+            // Let it complete while Firebase resolves; game actions remain gated separately.
+            if (introActive && startupArtReady)
             {
                 if (!splashClockStarted) { introStarted = Time.unscaledTime; splashClockStarted = true; }
-                if (SplashComplete) OpenHubFromIntro();
+                if (viewResourcesReady && SplashComplete) OpenHubFromIntro();
             }
-            if (introActive && (game == null || !game.ShowChulengoResult)) return;
+            if (!viewResourcesReady || game == null || !game.IsPlayerActive || game.Sim == null) return;
+            ObserveVictoryTransition();
+            if (introActive && !game.ShowChulengoResult) return;
 #if ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
 #if UNITY_ANDROID && !UNITY_EDITOR
             // Normal Android buttons remain native IMGUI; only the modal skip uses this pointer path.
@@ -1037,7 +1134,16 @@ namespace HayChoriYPaty
         }
         private void DispatchAction(int a)
         {
-            if (VictoryTransitionActive || victorySkipHeld) return;
+            if (VictoryTransitionActive || victorySkipHeld || game == null) return;
+            var firebaseSession = Cloud.FirebasePlayerSession.Instance;
+            if (firebaseSession != null && firebaseSession.BlocksGameInput)
+            {
+                if (firebaseSession.AccountMenuOpen) return;
+                // Do not silently dead-end Jugar (or another hub destination) when login is
+                // required: bring up the account panel without leaving the hub.
+                if (hubActive) firebaseSession.OpenAccountMenu();
+                return;
+            }
             if (game.ShowChulengoResult)
             {
                 bool lockedRetry = game.HasPendingChulengo && game.ChulengoChoiceLocked;
@@ -1237,15 +1343,40 @@ namespace HayChoriYPaty
 
         private void OnGUI()
         {
-            if (game==null||!game.IsPlayerActive||game.Sim==null ||
-                (Cloud.FirebasePlayerSession.Instance != null && Cloud.FirebasePlayerSession.Instance.BlocksGameInput)) return;
+            if (game == null) return;
+            if (!startupArtReady) { DrawStartupLoadingFallback(); return; }
             Styles(); Rect v=CanvasViewport(new Vector2(Screen.width,Screen.height),Screen.safeArea); if(v.width<=0)return;
             logicalCanvasHeight = CanvasLogicalHeight(v);
             layoutVerticalScale = logicalCanvasHeight / H;
             projectedCounterTopY = StreetSceneLayout.CounterTopInViewport(Screen.width, Screen.height, v);
             Matrix4x4 m=GUI.matrix; Color old=GUI.color;
-            var sim=game.Sim;
+            if (!viewResourcesReady || introActive)
+            {
+                // Intro foreground uses logical-canvas coordinates just like the hub/game UI.
+                // DrawIntroScreen temporarily switches to identity for full-bleed background art.
+                GUI.matrix = Matrix4x4.TRS(new Vector3(v.x, v.y), Quaternion.identity,
+                    new Vector3(v.width / W, v.width / W, 1f));
+                GUI.color = Color.white;
+                float loadingElapsed = splashClockStarted ? Time.unscaledTime - introStarted : 0f;
+                DrawIntro(loadingElapsed);
+                GUI.color = old; GUI.matrix = m;
+                return;
+            }
             bool chulengoResult = game.ShowChulengoResult;
+            var sim = game.IsPlayerActive ? game.Sim : null;
+            if (sim == null)
+            {
+                // Firebase may not have an owner yet; the account hub is still a real screen.
+                // Gameplay/navigation destinations are gated in DispatchAction until auth resolves.
+                if (hubActive && !chulengoResult)
+                {
+                    GUI.matrix=Matrix4x4.TRS(new Vector3(v.x,v.y),Quaternion.identity,new Vector3(v.width/W,v.width/W,1));
+                    GUI.color=Color.white;
+                    DrawHubScreen();
+                }
+                GUI.color = old; GUI.matrix = m;
+                return;
+            }
             if ((!introActive || chulengoResult) && !levelSelectActive && sim.Phase != RoundPhase.Lost) DrawGameplayScreenFill();
             GUI.matrix=Matrix4x4.TRS(new Vector3(v.x,v.y),Quaternion.identity,new Vector3(v.width/W,v.width/W,1)); GUI.color=Color.white;
             if (introActive && !chulengoResult)
@@ -2490,8 +2621,7 @@ namespace HayChoriYPaty
                 wordWrap = false,
                 padding = new RectOffset(0, 0, 0, 0)
             };
-            Font sans = Resources.Load<Font>("Google/GoogleSans-Medium");
-            if (sans != null) introStatusStyle.font = sans;
+            if (googleSansFont != null) introStatusStyle.font = googleSansFont;
             introStatusStyle.normal.textColor = Color.white;
             return introStatusStyle;
         }
@@ -2588,6 +2718,11 @@ namespace HayChoriYPaty
                 introPreviewBarKey = key;
                 Color[] pixels = new Color[width * height];
                 float progress = Mathf.Clamp01(elapsed / 3.7f);
+                if (!viewResourcesReady)
+                {
+                    progress = Mathf.Min(.85f, progress * .85f);
+                    if (SplashComplete) progress = .85f + .15f * startupLoadProgress;
+                }
                 for (int y = 0; y < height; y++)
                 for (int x = 0; x < width; x++)
                 {
@@ -2632,6 +2767,34 @@ namespace HayChoriYPaty
             DrawIntroProgress(elapsed);
             GUI.color = Color.white;
         }
+        private void DrawStartupLoadingFallback()
+        {
+            Matrix4x4 previousMatrix = GUI.matrix;
+            Color previousColor = GUI.color;
+            GUI.matrix = Matrix4x4.identity;
+            GUI.color = new Color(.025f, .12f, .22f, 1f);
+            GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            float scale = Mathf.Min(Screen.width / 540f, Screen.height / 960f);
+            GUI.matrix = Matrix4x4.TRS(new Vector3((Screen.width - 540f * scale) * .5f,
+                (Screen.height - 960f * scale) * .5f), Quaternion.identity, Vector3.one * scale);
+            var label = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 23,
+                alignment = TextAnchor.MiddleCenter,
+                fontStyle = FontStyle.Bold
+            };
+            label.normal.textColor = Color.white;
+            GUI.Label(new Rect(24, 420, 492, 60), "PREPARANDO EL BARRIO...", label);
+            Rect track = new Rect(120, 500, 300, 18);
+            GUI.color = new Color(.02f, .08f, .15f, 1f);
+            GUI.DrawTexture(track, Texture2D.whiteTexture);
+            GUI.color = new Color(.10f, .73f, .94f, 1f);
+            GUI.DrawTexture(new Rect(track.x, track.y, track.width * startupLoadProgress, track.height), Texture2D.whiteTexture);
+            GUI.color = previousColor;
+            GUI.matrix = previousMatrix;
+        }
+
         private void DrawHubScreen()
         {
             DrawIntroScreen(hubBackdrop != null ? hubBackdrop : coverArt, Color.white, ScaleMode.ScaleAndCrop);
@@ -3405,6 +3568,11 @@ namespace HayChoriYPaty
         // Special upgrade cards and image-based level tiles retain their explicitly selected designs.
         public void DrawAccountButton(Rect bounds, string caption, System.Action activated)
         {
+            if (!startupArtReady)
+            {
+                if (GUI.Button(bounds, caption)) activated?.Invoke();
+                return;
+            }
             Styles(); float previousScale = layoutVerticalScale; layoutVerticalScale = 1f;
             try { DrawStandardButton(bounds, int.MinValue, caption, true, activated); }
             finally { layoutVerticalScale = previousScale; }
@@ -3412,6 +3580,11 @@ namespace HayChoriYPaty
 
         public void DrawGoogleAccountButton(Rect bounds, string caption, Texture2D googleMark, System.Action activated)
         {
+            if (!startupArtReady)
+            {
+                if (GUI.Button(bounds, caption)) activated?.Invoke();
+                return;
+            }
             Styles();
             float previousScale = layoutVerticalScale;
             Color previousColor = GUI.color;
@@ -3460,15 +3633,23 @@ namespace HayChoriYPaty
 
         public void ContinueToGameAfterGoogleSignIn()
         {
-            // Authentication only unlocks the existing save; start the cover timer once authorized.
-            if (!introActive || game == null || !game.IsPlayerActive || game.Sim == null) return;
-            introStarted = Time.unscaledTime;
-            splashClockStarted = true;
+            // Sign-in resolves the player profile but must not replay the presentation or
+            // bypass the hub's explicit Jugar -> selector -> Mercado flow.
+            if (game == null || !game.IsPlayerActive) return;
+            if (introActive && viewResourcesReady && SplashComplete) OpenHubFromIntro();
+        }
+
+        public void ReturnToHubAfterAuthenticationRequired()
+        {
+            if (!viewResourcesReady || introActive) return;
+            levelSelectActive = false; levelOneTutorialActive = false; levelOneTutorialStep = 0;
+            marketActive = false; badgesActive = false; rankingActive = false; hubActive = true;
+            marketFromSelector = false; pressedAction = 0;
         }
 
         private void OpenHubFromIntro()
         {
-            if (!introActive || game == null || game.Sim == null) return;
+            if (!introActive) return;
             introActive = false; levelSelectActive = false; marketActive = false;
             badgesActive = false; rankingActive = false; hubActive = true; marketFromSelector = false;
             pressedAction = 0;
@@ -5394,7 +5575,7 @@ namespace HayChoriYPaty
             menuTitle = Style(38);
             if (menuFont != null) { menuTitle.font = menuFont; menuTitle.fontStyle = FontStyle.Normal; }
             menuTitle.wordWrap = false;
-            Font tutorialFont = Resources.Load<Font>("Google/GoogleSans-Medium");
+            Font tutorialFont = googleSansFont;
             levelOneTutorialTitleStyle = new GUIStyle(menuTitle) { fontSize = 25, alignment = TextAnchor.MiddleCenter, wordWrap = true };
             if (tutorialFont != null) { levelOneTutorialTitleStyle.font = tutorialFont; levelOneTutorialTitleStyle.fontStyle = FontStyle.Bold; }
             levelOneTutorialTitleStyle.normal.textColor = new Color(.20f, .045f, .015f);

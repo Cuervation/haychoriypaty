@@ -16,6 +16,7 @@ namespace HayChoriYPaty.Tests
         private const BindingFlags PrivateInstance = BindingFlags.NonPublic | BindingFlags.Instance;
         private const BindingFlags StaticPrivate = BindingFlags.NonPublic | BindingFlags.Static;
         private GameObject root;
+        private GameObject accountRoot;
         private Component game;
         private Component view;
         private Type gameType;
@@ -27,6 +28,7 @@ namespace HayChoriYPaty.Tests
         private string tutorialCompletedKey;
         private float previousTimeScale;
         private bool previousBackground;
+        private bool startupResourcesDeferredAtEnable;
         private InputSettings.BackgroundBehavior previousInputBackground;
         private InputSettings.EditorInputBehaviorInPlayMode previousEditorInput;
 
@@ -58,15 +60,20 @@ namespace HayChoriYPaty.Tests
             previousTutorialCompletion = hadTutorialCompletion ? PlayerPrefs.GetInt(tutorialCompletedKey) : 0;
             PlayerPrefs.DeleteKey(tutorialCompletedKey);
             view = root.AddComponent(viewType);
+            startupResourcesDeferredAtEnable = !(bool)viewType.GetField("viewResourcesReady", PrivateInstance).GetValue(view);
             // Existing pointer checks isolate post-intro controls; the dedicated test below exercises startup.
             viewType.GetField("introActive", PrivateInstance).SetValue(view, false);
             yield return null;
+            FieldInfo resourcesReady = viewType.GetField("viewResourcesReady", PrivateInstance);
+            for (int frame = 0; frame < 1200 && !(bool)resourcesReady.GetValue(view); frame++) yield return null;
+            Assert.IsTrue((bool)resourcesReady.GetValue(view), "All runtime resources must finish staged loading before gameplay tests run.");
         }
 
         [UnityTearDown]
         public IEnumerator TearDown()
         {
             if (root != null) UnityEngine.Object.Destroy(root);
+            if (accountRoot != null) UnityEngine.Object.Destroy(accountRoot);
             if (mouse != null && mouse.added) InputSystem.RemoveDevice(mouse);
             InputSystem.settings.backgroundBehavior = previousInputBackground;
             InputSystem.settings.editorInputBehaviorInPlayMode = previousEditorInput;
@@ -479,6 +486,7 @@ namespace HayChoriYPaty.Tests
         [Test]
         public void IntroUsesSelectedIntegratedCoverWithoutDuplicateParrillero()
         {
+            Assert.IsTrue(startupResourcesDeferredAtEnable, "OnEnable must yield before loading the full art catalog.");
             Type type = view.GetType();
             Assert.AreSame(Resources.Load<Texture2D>("street-parrillero-icon"), type.GetField("parrilleroIcon", PrivateInstance).GetValue(view),
                 "The original game/hire portrait remains unchanged");
@@ -488,69 +496,126 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
-        public IEnumerator StartupIntroBlocksActionsAndUsesUnscaledTime()
+        public IEnumerator StartupPresentationAutoTransitionsToHubThenJugarStartsFirstLevel()
         {
             Type viewType = view.GetType();
             viewType.GetField("introActive", PrivateInstance).SetValue(view, true);
+            viewType.GetField("startupArtReady", PrivateInstance).SetValue(view, true);
+            viewType.GetField("viewResourcesReady", PrivateInstance).SetValue(view, true);
+            viewType.GetField("splashClockStarted", PrivateInstance).SetValue(view, true);
             viewType.GetField("introStarted", PrivateInstance).SetValue(view, Time.unscaledTime);
             viewType.GetMethod("DispatchAction", PrivateInstance).Invoke(view, new object[] { 1 });
-            Assert.AreEqual("Ready", Phase, "Native and bridge actions must not start behind the cover");
+            Assert.AreEqual("Ready", Phase, "Gameplay actions cannot start behind the presentation");
             viewType.GetMethod("DispatchAction", PrivateInstance).Invoke(view, new object[] { 6 });
             yield return Click(270, 750);
-            Assert.AreEqual("Ready", Phase, "Jugar must remain unavailable during the timed presentation");
+            Assert.AreEqual("Ready", Phase, "A tap during the timed presentation cannot start a level");
 
-            Assert.GreaterOrEqual((float)viewType.GetField("CoverHoldDuration", StaticPrivate).GetRawConstantValue(), 4f);
-            Assert.GreaterOrEqual((float)viewType.GetField("LogoHoldDuration", StaticPrivate).GetRawConstantValue(), 4f);
             Time.timeScale = 0f;
             float duration = (float)viewType.GetField("IntroDuration", StaticPrivate).GetRawConstantValue();
             yield return new WaitForSecondsRealtime(duration + .1f);
-            Assert.IsTrue((bool)viewType.GetField("introActive", PrivateInstance).GetValue(view), "The menu stays open until Jugar");
-            Assert.AreEqual("Ready", Phase, "Waiting at the menu must not start a timed round");
+            Assert.IsFalse((bool)viewType.GetField("introActive", PrivateInstance).GetValue(view),
+                "The three-phrase presentation should advance automatically.");
+            Assert.IsTrue((bool)viewType.GetField("hubActive", PrivateInstance).GetValue(view),
+                "The main hub follows the presentation, before Jugar is tapped.");
+            Assert.AreEqual("Ready", Phase, "Waiting through startup must not start a timed round");
             viewType.GetMethod("DispatchAction", PrivateInstance).Invoke(view, new object[] { 1 });
-            Assert.AreEqual("Ready", Phase, "Hidden gameplay Start stays blocked even when the menu is available");
+            Assert.AreEqual("Ready", Phase, "Gameplay Start remains unavailable on the hub");
             Time.timeScale = 1f;
-            yield return Click(270, 750);
-            Assert.IsFalse((bool)viewType.GetField("introActive", PrivateInstance).GetValue(view));
-            Assert.IsTrue((bool)viewType.GetField("levelSelectActive", PrivateInstance).GetValue(view), "Jugar opens the location selector");
-            Assert.AreEqual("Ready", Phase, "Opening the selector must not start the round");
-            yield return Click(142, 229);
-            Assert.IsFalse((bool)viewType.GetField("levelSelectActive", PrivateInstance).GetValue(view));
-            Assert.AreEqual("Playing", Phase, "Selecting the unlocked first location starts Floresta");
-        }
 
-        [Test]
-        public void GoogleSignInContinuesToTheFormerJugarDestinationWithoutStartingAMatch()
-        {
-            Type viewType = view.GetType();
-            float duration = (float)viewType.GetField("IntroDuration", StaticPrivate).GetRawConstantValue();
-            viewType.GetField("introActive", PrivateInstance).SetValue(view, true);
-            viewType.GetField("introStarted", PrivateInstance).SetValue(view, Time.unscaledTime - duration - .1f);
-
-            viewType.GetMethod("ContinueToGameAfterGoogleSignIn", PublicInstance).Invoke(view, null);
-
-            Assert.IsFalse((bool)viewType.GetField("introActive", PrivateInstance).GetValue(view));
+            viewType.GetMethod("DispatchAction", PrivateInstance).Invoke(view, new object[] { 200 });
             Assert.IsTrue((bool)viewType.GetField("levelSelectActive", PrivateInstance).GetValue(view),
-                "Google sign-in should continue to the same selector as the former JUGAR button");
-            Assert.AreEqual("Ready", Phase, "Continuing to play must not start a match before level/market selection");
+                "Jugar in the hub opens the location selector.");
+            Assert.AreEqual("Ready", Phase, "Opening the selector must not start the round.");
+            StockSelectedLevel();
+            Assert.IsTrue((bool)gameType.GetProperty("CanStartRound", PublicInstance).GetValue(game, null),
+                "Prepare the selected level's real stock before choosing it.");
+            viewType.GetMethod("DispatchAction", PrivateInstance).Invoke(view, new object[] { 30 });
+            Assert.IsFalse((bool)viewType.GetField("levelSelectActive", PrivateInstance).GetValue(view));
+            Assert.IsTrue((bool)viewType.GetField("levelOneTutorialActive", PrivateInstance).GetValue(view),
+                "A first-time player sees the required Level 1 tutorial before the round.");
+            Assert.AreEqual("Ready", Phase, "The round timer remains stopped until tutorial completion.");
+            MethodInfo tutorialBounds = viewType.GetMethod("LevelOneTutorialPrimaryBounds", PrivateInstance);
+            for (int step = 0; step < 4; step++)
+            {
+                Rect next = (Rect)tutorialBounds.Invoke(view, null);
+                yield return Click(next.center.x, next.center.y);
+            }
+            Assert.IsFalse((bool)viewType.GetField("levelOneTutorialActive", PrivateInstance).GetValue(view));
+            Assert.AreEqual("Playing", Phase, "Completing the tutorial starts Floresta.");
         }
 
         [Test]
-        public void GoogleSignInWaitsForThePresentationHoldBeforeOpeningLevels()
+        public void JugarRequiresAccountThenReturnsToHubBeforeOpeningSelector()
+        {
+            Type sessionType = Type.GetType("HayChoriYPaty.Cloud.FirebasePlayerSession, Assembly-CSharp", true);
+            accountRoot = new GameObject("Temporary Firebase account flow test");
+            Component session = accountRoot.AddComponent(sessionType);
+            ((Behaviour)session).enabled = false;
+            sessionType.GetProperty("Instance").GetSetMethod(true).Invoke(null, new[] { session });
+            PropertyInfo state = sessionType.GetProperty("State");
+            MethodInfo setState = state.GetSetMethod(true);
+            setState.Invoke(session, new[] { Enum.Parse(state.PropertyType, "LoginRequired") });
+            Type viewType = view.GetType();
+            viewType.GetField("introActive", PrivateInstance).SetValue(view, false);
+            viewType.GetField("hubActive", PrivateInstance).SetValue(view, true);
+            viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, false);
+            FieldInfo editorGate = gameType.GetField("AllowEditorTestInitialization", BindingFlags.Public | BindingFlags.Static);
+            bool previousEditorGate = (bool)editorGate.GetValue(null);
+            editorGate.SetValue(null, false); // Exercise the production Firebase gate for this one dispatch.
+            try
+            {
+            viewType.GetMethod("DispatchAction", PrivateInstance).Invoke(view, new object[] { 200 });
+            Assert.IsTrue((bool)sessionType.GetProperty("AccountMenuOpen").GetValue(session));
+            Assert.IsTrue((bool)viewType.GetField("hubActive", PrivateInstance).GetValue(view));
+            Assert.IsFalse((bool)viewType.GetField("levelSelectActive", PrivateInstance).GetValue(view));
+
+            setState.Invoke(session, new[] { Enum.Parse(state.PropertyType, "Ready") });
+            sessionType.GetField("game", PrivateInstance).SetValue(session, game);
+            sessionType.GetField("accountOpen", PrivateInstance).SetValue(session, true);
+            sessionType.GetMethod("ContinueToGameAfterGoogleSignIn", PrivateInstance).Invoke(session, null);
+            Assert.IsFalse((bool)sessionType.GetProperty("AccountMenuOpen").GetValue(session));
+            Assert.IsTrue((bool)viewType.GetField("hubActive", PrivateInstance).GetValue(view));
+
+            viewType.GetMethod("DispatchAction", PrivateInstance).Invoke(view, new object[] { 200 });
+            Assert.IsTrue((bool)viewType.GetField("levelSelectActive", PrivateInstance).GetValue(view));
+            Assert.IsFalse((bool)viewType.GetField("hubActive", PrivateInstance).GetValue(view));
+            Assert.AreEqual("Ready", Phase, "Jugar opens the selector but does not start a match.");
+            }
+            finally { editorGate.SetValue(null, previousEditorGate); }
+        }
+
+        [Test]
+        public void GoogleSignInReturnsToHubWithoutRestartingPresentationOrSkippingJugar()
         {
             Type viewType = view.GetType();
-            float duration = (float)viewType.GetField("IntroDuration", StaticPrivate).GetRawConstantValue();
-            viewType.GetField("introActive", PrivateInstance).SetValue(view, true);
-            viewType.GetField("introStarted", PrivateInstance).SetValue(view, Time.unscaledTime);
+            viewType.GetField("introActive", PrivateInstance).SetValue(view, false);
+            viewType.GetField("hubActive", PrivateInstance).SetValue(view, true);
+            viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, false);
 
             viewType.GetMethod("ContinueToGameAfterGoogleSignIn", PublicInstance).Invoke(view, null);
-            Assert.IsTrue((bool)viewType.GetField("introActive", PrivateInstance).GetValue(view));
-            Assert.IsTrue((bool)viewType.GetField("startGameAfterGoogleSignIn", PrivateInstance).GetValue(view));
-
-            viewType.GetField("introStarted", PrivateInstance).SetValue(view, Time.unscaledTime - duration - .1f);
-            viewType.GetMethod("Update", PrivateInstance).Invoke(view, null);
 
             Assert.IsFalse((bool)viewType.GetField("introActive", PrivateInstance).GetValue(view));
-            Assert.IsTrue((bool)viewType.GetField("levelSelectActive", PrivateInstance).GetValue(view));
+            Assert.IsTrue((bool)viewType.GetField("hubActive", PrivateInstance).GetValue(view));
+            Assert.IsFalse((bool)viewType.GetField("levelSelectActive", PrivateInstance).GetValue(view),
+                "Sign-in returns to the hub; the player must explicitly choose Jugar.");
+            Assert.AreEqual("Ready", Phase);
+        }
+
+        [Test]
+        public void GoogleSignInDoesNotRestartAnIntroAlreadyInProgress()
+        {
+            Type viewType = view.GetType();
+            float originalStart = Time.unscaledTime - .5f;
+            viewType.GetField("introActive", PrivateInstance).SetValue(view, true);
+            viewType.GetField("startupArtReady", PrivateInstance).SetValue(view, true);
+            viewType.GetField("viewResourcesReady", PrivateInstance).SetValue(view, true);
+            viewType.GetField("splashClockStarted", PrivateInstance).SetValue(view, true);
+            viewType.GetField("introStarted", PrivateInstance).SetValue(view, originalStart);
+
+            viewType.GetMethod("ContinueToGameAfterGoogleSignIn", PublicInstance).Invoke(view, null);
+
+            Assert.IsTrue((bool)viewType.GetField("introActive", PrivateInstance).GetValue(view));
+            Assert.AreEqual(originalStart, (float)viewType.GetField("introStarted", PrivateInstance).GetValue(view));
             Assert.AreEqual("Ready", Phase);
         }
 
@@ -824,15 +889,22 @@ namespace HayChoriYPaty.Tests
                 Invoke(game, "StartRound");
                 SetSim("Phase", Enum.Parse(Sim.GetType().GetProperty("Phase").PropertyType, "Won"));
                 CallGame("ProcessRoundResult");
+                if ((bool)gameType.GetProperty("HasPendingChulengo").GetValue(game))
+                    Assert.IsTrue((bool)CallGame("TryCollectVictoryReward"), "Resolve the Chulengo reward before leaving level " + level);
                 int expectedUnlock = Mathf.Min(10, level + 1);
                 Assert.AreEqual(expectedUnlock, gameType.GetProperty("UnlockedLevel").GetValue(game));
-                object loaded = gameType.GetMethod("Load", PrivateInstance).Invoke(game, null);
+                string saveKey = (string)gameType.GetField("ProgressKey", BindingFlags.Public | BindingFlags.Static).GetValue(null);
+                Type saveType = gameType.GetNestedType("SaveData", BindingFlags.Public);
+                object loaded = JsonUtility.FromJson(PlayerPrefs.GetString(saveKey), saveType);
                 Assert.AreEqual(expectedUnlock, loaded.GetType().GetField("unlockedLevel").GetValue(loaded));
                 Assert.IsFalse((bool)CallGame("Retry")); Assert.IsTrue((bool)CallGame("ReturnToLevels"));
                 Assert.AreEqual(1, Sim.GetType().GetProperty("ParrilleroCount").GetValue(Sim));
                 Assert.AreEqual(0, Sim.GetType().GetProperty("CocacoleroCount").GetValue(Sim));
                 Invoke(game, "StartRound");
                 SetSim("Phase", Enum.Parse(Sim.GetType().GetProperty("Phase").PropertyType, "Won"));
+                CallGame("ProcessRoundResult");
+                if ((bool)gameType.GetProperty("HasPendingChulengo").GetValue(game))
+                    Assert.IsTrue((bool)CallGame("TryCollectVictoryReward"), "Resolve the Chulengo reward before advancing from level " + level);
                 Assert.AreEqual(level < 10, CallGame("NextLevel"));
             }
             Assert.AreEqual(10, Sim.GetType().GetProperty("LevelIndex").GetValue(Sim));
@@ -1241,6 +1313,27 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(5f, Sim.GetType().GetProperty("Price").GetValue(Sim, null));
             yield return Click(270, 585);
             Assert.AreEqual("Playing", Phase);
+        }
+
+        [UnityTest]
+        public IEnumerator EveryUnlockedLevelStartsAfterStockPreparation()
+        {
+            Time.timeScale = 0f;
+            object save = gameType.GetField("save", PrivateInstance).GetValue(game);
+            save.GetType().GetField("unlockedLevel").SetValue(save, 10);
+            int levelCount = ((string[])Sim.GetType().GetField("LevelNames").GetValue(null)).Length;
+            for (int level = 0; level < levelCount; level++)
+            {
+                Assert.IsTrue((bool)CallGame("SelectLevel", level), "Select unlocked level " + level);
+                StockSelectedLevel();
+                Assert.IsTrue((bool)gameType.GetProperty("CanStartRound", PublicInstance).GetValue(game),
+                    "Prepared inventory should allow level " + level + " to start.");
+                Assert.IsTrue((bool)CallGame("TryStartRound"), "TryStartRound should enter Playing for level " + level);
+                Assert.AreEqual("Playing", Phase, "Level " + level + " must start only after its stock is ready.");
+                Assert.IsTrue((bool)CallGame("ReturnToLevels"), "Reset test attempt for level " + level);
+                Assert.AreEqual("Ready", Phase, "Returning to levels leaves level " + level + " ready.");
+            }
+            yield return null;
         }
 
         [UnityTest]

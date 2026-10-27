@@ -1,8 +1,10 @@
 # Feature: Portada y hub de día de partido
 
-## Alcance vigente — 2026-10-23
+## Alcance vigente — 2026-10-27
 
-La portada reproduce la ilustración proporcionada por el usuario, a pantalla completa y sin botones. Tras autenticar/cargar el perfil obligatorio y mostrarla durante cuatro segundos, el juego avanza automáticamente al hub; la barra de carga es compacta (118×6 unidades lógicas), dibujada por el juego y no forma parte del arte fuente. El cronómetro no consume tiempo mientras la sesión bloquea el juego.
+La presentación conserva la portada animada vigente (logo, tres frases y barra de progreso compacta de 118×6 unidades lógicas). Se muestra antes del hub, sin requerir que Firebase haya terminado el acceso. Al completar la duración mínima y la carga de recursos, avanza automáticamente a la pantalla principal. Ya no existe una portada Firebase independiente.
+
+La autenticación Firebase sigue siendo obligatoria para perfiles, progreso y juego. El acceso Google se abre dentro del hub, desde CUENTA; si se pulsa JUGAR con sesión no lista, se muestra ese panel en lugar de dejar el botón sin respuesta. Tras autenticarse y resolver perfil/consentimiento/conflicto, se vuelve al hub; solo entonces JUGAR abre el selector. La selección del primer nivel conserva el tutorial inicial y sus existencias/condiciones; los demás niveles mantienen el paso por Mercado y JUGAR PARTIDO. Ningún botón inicia una ronda sin el gate Firebase y el flujo normal de preparación.
 
 El hub es una escena ilustrada vertical, vista elevada de una calle de partido: se ve parte del estadio, viviendas/vereda, hinchas y un control policial donde se revisan DNI. Los puestos ilustrados funcionan como hotspots, dentro de los límites de su arte y respetando el área segura del canvas:
 

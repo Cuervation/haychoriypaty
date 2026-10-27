@@ -18,6 +18,7 @@ namespace HayChoriYPaty.Cloud
         public const string ProjectId = "haychoriypaty";
         public static FirebasePlayerSession Instance { get; private set; }
         public PlayerSessionState State { get; private set; } = PlayerSessionState.Initializing;
+        public bool AccountMenuOpen => accountOpen;
         public bool BlocksGameInput
         {
             get
@@ -49,7 +50,7 @@ namespace HayChoriYPaty.Cloud
         private FirestorePlayerRepository remote;
         private RemotePlayerState conflictRemote;
         private StreetGame game;
-        private Texture2D backdrop, googleButton;
+        private Texture2D googleButton;
         private int generation;
         private bool syncing, offline, accountOpen, initialSyncWaiting;
         private float retryAt, retryDelay = 2;
@@ -69,7 +70,6 @@ namespace HayChoriYPaty.Cloud
             Instance = this;
             root = Path.Combine(Application.persistentDataPath, "PlayerCloud");
             google = gameObject.AddComponent<GoogleCredentialProvider>();
-            backdrop = Resources.Load<Texture2D>("street-cover-loading-v1");
             googleButton = Resources.Load<Texture2D>("Google/google-g");
         }
         private async void Start() { await BootstrapAsync(); }
@@ -85,6 +85,8 @@ namespace HayChoriYPaty.Cloud
             {
                 generation++; game?.SuspendPlayer();
                 State = PlayerSessionState.LoginRequired; message = "Volvé a iniciar sesión con Google.";
+                accountOpen = true;
+                FindAnyObjectByType<StreetView>()?.ReturnToHubAfterAuthenticationRequired();
             }
         }
         private async Task BootstrapAsync()
@@ -191,6 +193,7 @@ namespace HayChoriYPaty.Cloud
         {
             if (game == null || !game.IsPlayerActive ||
                 (State != PlayerSessionState.Ready && State != PlayerSessionState.Recovering)) return;
+            accountOpen = false;
             FindAnyObjectByType<StreetView>()?.ContinueToGameAfterGoogleSignIn();
         }
 
@@ -281,13 +284,15 @@ namespace HayChoriYPaty.Cloud
         }
         public void OpenAccountMenu()
         {
-            if (State == PlayerSessionState.Ready) accountOpen = true;
+            // Login, recovery and conflict resolution all live inside the main hub account panel.
+            accountOpen = true;
         }
         public void SignOut()
         {
             if (game != null && !game.SuspendPlayer()) { Fail("No pudimos guardar. No cerramos tu sesión para proteger la partida."); return; }
             generation++; google.Cancel(); auth?.SignOut(); google.SignOut(); local = null; remote = null; conflictRemote = null;
-            accountOpen = false; initialSyncWaiting = false; State = PlayerSessionState.LoginRequired; message = "Iniciá sesión con Google para continuar.";
+            accountOpen = true; initialSyncWaiting = false; State = PlayerSessionState.LoginRequired; message = "Iniciá sesión con Google para continuar.";
+            FindAnyObjectByType<StreetView>()?.ReturnToHubAfterAuthenticationRequired();
         }
         private void Fail(string text) { State = PlayerSessionState.Error; message = text; }
         private static async Task<T> Within<T>(Task<T> task, int seconds = 20)
@@ -307,42 +312,99 @@ namespace HayChoriYPaty.Cloud
 #if UNITY_EDITOR
             if (StreetGame.AllowEditorTestInitialization) return;
 #endif
+            var view = FindAnyObjectByType<StreetView>();
             if (State == PlayerSessionState.Ready && !accountOpen)
             {
-                var view = FindAnyObjectByType<StreetView>();
                 if (view != null && view.AccountMenuVisible && !view.HubAccountActionRendered)
                     AccountButton(new Rect(Screen.width - 126, 16, 110, 32), "CUENTA", OpenAccountMenu);
                 return;
             }
-            var old = GUI.matrix; var color = GUI.color;
+
+            // Never put a second full-screen Firebase cover in front of the three-phrase
+            // startup presentation or the hub. The account panel is opened from the hub hotspot.
+            if (!accountOpen || (view != null && !view.AccountMenuVisible)) return;
+
+            Matrix4x4 oldMatrix = GUI.matrix;
+            Color oldColor = GUI.color;
             int oldDepth = GUI.depth;
             GUI.depth = -1000;
-            GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), backdrop != null ? backdrop : Texture2D.blackTexture, ScaleMode.ScaleAndCrop);
-            GUI.color = new Color(0, 0, 0, .58f); GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture); GUI.color = Color.white;
+            GUI.color = new Color(0f, 0f, 0f, .48f);
+            GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
+            GUI.color = Color.white;
             float scale = Mathf.Min(Screen.width / 540f, Screen.height / 960f);
-            GUI.matrix = Matrix4x4.TRS(new Vector3((Screen.width - 540 * scale) * .5f, (Screen.height - 960 * scale) * .5f), Quaternion.identity, Vector3.one * scale);
-            var text = new GUIStyle(GUI.skin.label) { fontSize = 23, alignment = TextAnchor.MiddleCenter, wordWrap = true };
-            string shown = accountOpen ? (offline ? "Sesión Google guardada. Jugando sin conexión." : "Tu progreso está vinculado a Google.") : message;
-            GUI.Label(new Rect(38, 385, 464, 180), shown, text);
-            if (accountOpen)
+            GUI.matrix = Matrix4x4.TRS(new Vector3((Screen.width - 540f * scale) * .5f,
+                (Screen.height - 960f * scale) * .5f), Quaternion.identity, Vector3.one * scale);
+
+            Rect card = new Rect(34, 245, 472, 470);
+            GUI.color = new Color(.025f, .16f, .31f, .98f);
+            GUI.DrawTexture(card, Texture2D.whiteTexture);
+            GUI.color = new Color(.16f, .77f, 1f, 1f);
+            GUI.DrawTexture(new Rect(card.x, card.y, card.width, 4), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(card.x, card.yMax - 4, card.width, 4), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(card.x, card.y, 4, card.height), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(card.xMax - 4, card.y, 4, card.height), Texture2D.whiteTexture);
+            GUI.color = Color.white;
+
+            var title = new GUIStyle(GUI.skin.label) { fontSize = 29, alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold };
+            title.normal.textColor = Color.white;
+            GUI.Label(new Rect(card.x + 20, card.y + 20, card.width - 40, 48), "CUENTA", title);
+
+            string shown;
+            if (State == PlayerSessionState.Ready)
+                shown = offline ? "Sesión de Google guardada. Progreso local pendiente de sincronizar."
+                    : "Tu progreso está vinculado con Google.";
+            else if (State == PlayerSessionState.LoginRequired && string.IsNullOrWhiteSpace(message))
+                shown = "Iniciá sesión con Google para jugar y guardar tu progreso.";
+            else
+                shown = string.IsNullOrWhiteSpace(message) ? "Preparando tu cuenta…" : message;
+            var text = new GUIStyle(GUI.skin.label) { fontSize = 21, alignment = TextAnchor.MiddleCenter, wordWrap = true };
+            text.normal.textColor = Color.white;
+            GUI.Label(new Rect(card.x + 36, card.y + 82, card.width - 72, 132), shown, text);
+
+            float buttonY = card.y + 278;
+            if (State == PlayerSessionState.Ready)
             {
-                AccountButton(new Rect(90, 600, 360, 56), "CERRAR SESIÓN", SignOut);
-                AccountButton(new Rect(90, 675, 360, 56), "VOLVER", () => accountOpen = false);
+                AccountButton(new Rect(74, buttonY, 392, 52), "CERRAR SESIÓN", SignOut);
+                buttonY += 60;
             }
             else if (State == PlayerSessionState.LoginRequired)
             {
-                var rect = new Rect(70, 610, 400, 60);
-                var view = FindAnyObjectByType<StreetView>();
-                if (view != null) view.DrawGoogleAccountButton(rect, "JUGAR CON GOOGLE", googleButton, SignIn);
-                else if (GUI.Button(rect, "JUGAR CON GOOGLE")) SignIn();
+                if (view != null) view.DrawGoogleAccountButton(new Rect(70, buttonY, 400, 54),
+                    "INICIAR SESIÓN CON GOOGLE", googleButton, SignIn);
+                else if (GUI.Button(new Rect(70, buttonY, 400, 54), "INICIAR SESIÓN CON GOOGLE")) SignIn();
+                buttonY += 60;
             }
-            else if (State == PlayerSessionState.LegacyConsent) AccountButton(new Rect(55, 600, 430, 65), "VINCULAR PROGRESO DE ESTE TELÉFONO", ConfirmLegacyImport);
-            else if (State == PlayerSessionState.Conflict && conflictRemote != null) AccountButton(new Rect(55, 600, 430, 65), "USAR NUBE Y CONSERVAR COPIA LOCAL", UseRemotePreservingLocal);
-            else if (State == PlayerSessionState.Error) AccountButton(new Rect(90, 600, 360, 56), "REINTENTAR", () => { _ = BootstrapAsync(); });
-            else if (initialSyncWaiting && offline) AccountButton(new Rect(90, 600, 360, 56), "REINTENTAR SINCRONIZACIÓN", () => { retryAt = 0; SyncPending(); });
+            else if (State == PlayerSessionState.LegacyConsent)
+            {
+                AccountButton(new Rect(58, buttonY, 424, 54), "VINCULAR PROGRESO DE ESTE TELÉFONO", ConfirmLegacyImport);
+                buttonY += 60;
+            }
+            else if (State == PlayerSessionState.Conflict && conflictRemote != null)
+            {
+                AccountButton(new Rect(58, buttonY, 424, 54), "USAR NUBE Y CONSERVAR COPIA LOCAL", UseRemotePreservingLocal);
+                buttonY += 60;
+            }
+            else if (State == PlayerSessionState.Error)
+            {
+                AccountButton(new Rect(74, buttonY, 392, 52), "REINTENTAR", () => { _ = BootstrapAsync(); });
+                buttonY += 60;
+            }
+            else if (initialSyncWaiting && offline)
+            {
+                AccountButton(new Rect(58, buttonY, 424, 54), "REINTENTAR SINCRONIZACIÓN", () => { retryAt = 0; SyncPending(); });
+                buttonY += 60;
+            }
+
             if (auth?.CurrentUser != null && State != PlayerSessionState.Ready && State != PlayerSessionState.Authenticating)
-                AccountButton(new Rect(90, 750, 360, 48), "CAMBIAR CUENTA GOOGLE", SignOut);
-            GUI.matrix = old; GUI.color = color; GUI.depth = oldDepth;
+            {
+                AccountButton(new Rect(74, buttonY, 392, 52), "CAMBIAR CUENTA GOOGLE", SignOut);
+                buttonY += 60;
+            }
+            AccountButton(new Rect(74, buttonY, 392, 52), "VOLVER", () => accountOpen = false);
+
+            GUI.matrix = oldMatrix;
+            GUI.color = oldColor;
+            GUI.depth = oldDepth;
         }
     }
 }

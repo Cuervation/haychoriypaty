@@ -11,7 +11,7 @@ namespace HayChoriYPaty.Tests
     public sealed class StreetHubViewTests
     {
         const BindingFlags P = BindingFlags.Instance | BindingFlags.NonPublic;
-        GameObject root;
+        GameObject root, accountRoot;
         Component game, view;
         Type gt, vt;
         string key, previous;
@@ -91,6 +91,7 @@ namespace HayChoriYPaty.Tests
         [UnityTearDown] public IEnumerator TearDown()
         {
             if (root != null) UnityEngine.Object.Destroy(root);
+            if (accountRoot != null) UnityEngine.Object.Destroy(accountRoot);
             yield return null;
             if (hadSave) PlayerPrefs.SetString(key, previous); else PlayerPrefs.DeleteKey(key);
             PlayerPrefs.Save(); Time.timeScale = oldScale;
@@ -102,6 +103,71 @@ namespace HayChoriYPaty.Tests
             }
 #endif
         }
+        [UnityTest] public IEnumerator StartupPresentationAndHubRenderBeforeFirebaseActivatesThePlayer()
+        {
+            float deadline = Time.realtimeSinceStartup + 20f;
+            while (!(bool)Field("viewResourcesReady") && Time.realtimeSinceStartup < deadline) yield return null;
+            Assert.IsTrue((bool)Field("viewResourcesReady"), "Startup art should finish loading.");
+            Assert.IsTrue((bool)gt.GetProperty("IsPlayerActive").GetValue(game), "The test fixture starts with its local test profile.");
+            Assert.IsTrue((bool)gt.GetMethod("SuspendPlayer").Invoke(game, null), "Simulate no authenticated profile.");
+            Assert.IsFalse((bool)gt.GetProperty("IsPlayerActive").GetValue(game));
+
+            float duration = (float)vt.GetField("IntroDuration", BindingFlags.NonPublic | BindingFlags.Static).GetRawConstantValue();
+            vt.GetField("introActive", P).SetValue(view, true);
+            vt.GetField("hubActive", P).SetValue(view, false);
+            vt.GetField("splashClockStarted", P).SetValue(view, true);
+            vt.GetField("introStarted", P).SetValue(view, Time.unscaledTime - .25f);
+            vt.GetMethod("Update", P).Invoke(view, null);
+            Assert.IsTrue((bool)Field("introActive"), "The startup presentation remains visible without a player profile.");
+            yield return Capture("startup-intro-before-auth-1080x1920");
+
+            vt.GetField("introStarted", P).SetValue(view, Time.unscaledTime - duration - .1f);
+            vt.GetMethod("Update", P).Invoke(view, null);
+            Assert.IsFalse((bool)Field("introActive"));
+            Assert.IsTrue((bool)Field("hubActive"), "The hub must appear before Firebase login.");
+            Assert.IsFalse((bool)gt.GetProperty("IsPlayerActive").GetValue(game));
+            Assert.IsTrue((bool)vt.GetProperty("HubAccountActionRendered").GetValue(view));
+            yield return Capture("hub-before-auth-1080x1920");
+        }
+
+        [Test] public void LoginRequiredHubActionOpensAccountAndReadyJugarOpensSelector()
+        {
+            Type sessionType = Type.GetType("HayChoriYPaty.Cloud.FirebasePlayerSession, Assembly-CSharp", true);
+            accountRoot = new GameObject("Temporary Firebase account panel test");
+            Component session = accountRoot.AddComponent(sessionType);
+            ((Behaviour)session).enabled = false; // Keep BootstrapAsync from contacting Firebase in a UI unit test.
+            sessionType.GetProperty("Instance").GetSetMethod(true).Invoke(null, new[] { session });
+            PropertyInfo state = sessionType.GetProperty("State");
+            state.GetSetMethod(true).Invoke(session, new[] { Enum.Parse(state.PropertyType, "LoginRequired") });
+            vt.GetField("introActive", P).SetValue(view, false);
+            vt.GetField("hubActive", P).SetValue(view, true);
+            vt.GetField("levelSelectActive", P).SetValue(view, false);
+            FieldInfo editorGate = gt.GetField("AllowEditorTestInitialization", BindingFlags.Public | BindingFlags.Static);
+            bool previousEditorGate = (bool)editorGate.GetValue(null);
+            editorGate.SetValue(null, false);
+            try
+            {
+            Dispatch(200); // Jugar while signed out should direct the player to Cuenta, not silently fail.
+            Assert.IsTrue((bool)sessionType.GetProperty("AccountMenuOpen").GetValue(session));
+            Assert.IsTrue((bool)Field("hubActive"));
+            Assert.IsFalse((bool)Field("levelSelectActive"));
+
+            state.GetSetMethod(true).Invoke(session, new[] { Enum.Parse(state.PropertyType, "Ready") });
+            sessionType.GetField("game", P).SetValue(session, game);
+            sessionType.GetField("accountOpen", P).SetValue(session, true);
+            sessionType.GetMethod("ContinueToGameAfterGoogleSignIn", P).Invoke(session, null);
+            Assert.IsFalse((bool)sessionType.GetProperty("AccountMenuOpen").GetValue(session));
+            Assert.IsTrue((bool)Field("hubActive"), "Finishing sign-in leaves the player on the hub.");
+
+            Dispatch(200);
+            Assert.IsTrue((bool)Field("levelSelectActive"), "Jugar must work after the session becomes Ready.");
+            Assert.IsFalse((bool)Field("hubActive"));
+            object sim = gt.GetProperty("Sim").GetValue(game);
+            Assert.AreEqual("Ready", sim.GetType().GetProperty("Phase").GetValue(sim).ToString());
+            }
+            finally { editorGate.SetValue(null, previousEditorGate); }
+        }
+
         [UnityTest] public IEnumerator AutomaticIntroThenHubPointerDestinationsAndBack()
         {
             Assert.IsTrue((bool)Field("introActive"));
