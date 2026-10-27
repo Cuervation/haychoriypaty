@@ -1,3 +1,11 @@
+# Entrega Android — 2026-10-27: balance San Lorenzo 0.2.77/code79
+
+APK Development IL2CPP/ARM64, escena `Assets/Scenes/Main.unity`, construida desde el commit limpio `18d97b6` en una copia aislada; el Editor del checkout original permaneció abierto e intacto, y los cambios locales ajenos (incluido `runInBackground: 1`) no se incluyeron. Unity 6000.6.3f1 BuildPipeline: **Succeeded, 0 errores / 5 advertencias** (18m 1.9s de BuildReport). El primer `Unity build --execute-method FirebaseAndroidBuildLauncher.Queue` solo dejó el estado `scheduled` y no produjo APK aunque el CLI devolvió éxito; se verificó la ausencia del archivo y se completó con una entrada temporal sincrónica que esperó el BuildPipeline real. La entrada temporal no forma parte del repositorio.
+
+APK `/Users/celestino/HayChoriYPaty/Builds/Android/HayChoriYPaty-0.2.77-Firebase.apk`: **387.369.019 bytes**, SHA-256 `5a27b7225b3a185bd5ddcdbc8dedc42a330e76577f326b2af19a71c05efa1321`. Package `com.haychoriypaty.game`, `versionName=0.2.77`, `versionCode=79`, min API26/target36, ABI `arm64-v8a`. `aapt` metadata, ZIP integrity, `zipalign -c -v 4`, APK Signature Scheme v2 y metadatos Android de Firebase Analytics/ad-ID verificados. Firma Android Debug; no es release firmado para Play Store. El APK y su recibo provenance están en `Builds/Android/` (ignorado por Git, no versionados). **No se instaló ni se probó en dispositivo.** La suite automatizada y las cinco partidas reales de San Lorenzo no se ejecutaron en esta compilación; las pruebas enfocadas previas fueron 14/14 EditMode, pero las cinco partidas PlayMode siguen BLOCKED/NOT_RUN por falta de checkpoint auténtico que desbloquee el nivel.
+
+---
+
 # Entrega Android — 2026-10-27: alineación de portada 0.2.76/code78
 
 Se corrigió el espacio de coordenadas de la portada: el camino temprano de `StreetView.OnGUI` dibujaba la presentación antes de aplicar el mismo viewport lógico/safe-area del hub, por lo que logo, frases y barra podían quedar fuera de su posición en pantallas altas. Ahora la portada usa el viewport de UI compartido y dibuja el fondo en coordenadas de pantalla. Evidencia visual previa en Game View real 1080×1920: `intro-settled-playmode-1080x1920.png` y `intro-finale-playmode-1080x1920.png` dentro de `/private/tmp/hcyp-splash-fixed-20261027/captures/`.
