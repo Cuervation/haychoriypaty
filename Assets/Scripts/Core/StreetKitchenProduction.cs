@@ -60,7 +60,9 @@ namespace HayChoriYPaty
         private static bool IsUnlimitedBarrelProduct(int product) { return product == 4 || product == 6; }
         private bool IsUnlimitedServingProduct(int product)
         {
-            return IsUnlimitedBarrelProduct(product) || (unlimitedSandwiches && product >= 0 && product < 4 && tableCapacity[product] > 0);
+            return IsUnlimitedBarrelProduct(product) ||
+                (product == 5 && tableCapacity[5] > 0) ||
+                (unlimitedSandwiches && product >= 0 && product < 4 && tableCapacity[product] > 0);
         }
         public StreetKitchenProduction(StreetKitchenBalance balance, int[] availableProducts)
             : this(balance, availableProducts, null) { }
@@ -85,7 +87,7 @@ namespace HayChoriYPaty
 
         public bool HasSupply(int product)
         {
-            // Coca/beer barrels and Vélez sandwiches are inexhaustible sources, not Market-backed inventory.
+            // Coca/beer barrels, unlocked Fernet and Vélez sandwiches are inexhaustible, not Market-backed inventory.
             if (IsUnlimitedServingProduct(product))
                 return product >= 0 && product < tableCapacity.Length && tableCapacity[product] > 0;
             if (ingredientStock == null || (ActiveCooks && product >= 0 && product < 4)) return true;
@@ -136,7 +138,7 @@ namespace HayChoriYPaty
             selected.WorkerId = workerId;
             if (IsUnlimitedServingProduct(product))
             {
-                // Replace inexhaustible barrel servings and Vélez sandwiches in the same display slot.
+                // Replace inexhaustible barrel/Fernet servings and Vélez sandwiches in the same display slot.
                 Add(product, StreetFoodState.Cooked, StreetFoodLocation.Table, selected.Slot);
             }
             if (ActiveCooks && product < 4)
@@ -303,7 +305,7 @@ namespace HayChoriYPaty
         {
             StreetFoodUnit unit = Find(id);
             if (unit == null || unit.Product != product || unit.Location != StreetFoodLocation.Carried || unit.WorkerId != workerId || unit.State != StreetFoodState.Cooked) return false;
-            // Active sandwiches and Coca/beer barrel units bypass Market/Fridge ingredient stock.
+            // Active sandwiches, Fernet and Coca/beer barrel units bypass Market/Fridge ingredient stock.
             // Other finite ingredient-backed products retain their reserved-stock transaction.
             if (!IsUnlimitedServingProduct(product) && !(ActiveCooks && product >= 0 && product < 4) &&
                 ingredientStock != null && !ingredientStock.ConsumeReservedFood(id, product)) return false;
@@ -602,7 +604,7 @@ namespace HayChoriYPaty
         private StreetFoodUnit Add(int product, StreetFoodState state, StreetFoodLocation location, int slot)
         {
             if (slot < 0 && location == StreetFoodLocation.Table) return null;
-            // Vélez and Racing+ sandwiches plus inexhaustible Coca/beer barrels bypass ingredient reservations.
+            // Inexhaustible Fernet/Coca/beer plus Vélez and Racing+ sandwiches bypass ingredient reservations.
             if (!IsUnlimitedServingProduct(product) && !(ActiveCooks && product >= 0 && product < 4) &&
                 ingredientStock != null && !ingredientStock.TryReserveFood(nextId, product)) return null;
             var unit = new StreetFoodUnit { Id = nextId++, Product = product, State = state, Location = location,

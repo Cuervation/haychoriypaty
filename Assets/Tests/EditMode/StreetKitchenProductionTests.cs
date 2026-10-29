@@ -310,13 +310,31 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void UnlimitedBarrelsKeepRoleOwnershipCancellationAndFernetStockRules()
+        public void UnlimitedSourcesKeepRoleOwnershipCancellationAndFernetIgnoresStock()
         {
             var empty = new EmptyIngredientStock();
             object kitchen = Activator.CreateInstance(productionType, new object[] {
                 Activator.CreateInstance(balanceType), new[] { 4, 5, 6 }, empty.GetTransparentProxy() });
-            Assert.AreEqual(0, Call(kitchen, "TableCount", 5), "Fernet remains ingredient-backed.");
-            Assert.IsFalse((bool)Call(kitchen, "HasSupply", 5));
+            Assert.AreEqual(45, Call(kitchen, "TableCapacity", 5));
+            Assert.AreEqual(45, Call(kitchen, "TableCount", 5), "All 45 real Fernet servings are present without ingredient stock.");
+            Assert.IsTrue((bool)Call(kitchen, "HasSupply", 5));
+            Assert.IsNull(Call(kitchen, "TryTake", 5, EnumValue(roleType, "Parrillero"), 10), "Fernet remains restricted to its responsible Fernetero.");
+            for (int delivery = 0; delivery < 60; delivery++)
+            {
+                object item = Call(kitchen, "TryTake", 5, EnumValue(roleType, "Fernetero"), 11);
+                Assert.IsNotNull(item, "The Fernetero can keep taking actual units beyond the initial 45.");
+                int id = (int)Get(item, "Id");
+                int slot = (int)Get(item, "Slot");
+                Assert.AreEqual(45, Call(kitchen, "TableCount", 5), "The same slot is replenished immediately after pickup.");
+                Assert.IsNotNull(UnitAt(kitchen, 5, slot, "Table"), "The real replacement stays in the picked serving's table slot.");
+                Assert.IsFalse((bool)Call(kitchen, "Consume", id, 5, 12), "Only the actual carrier can hand it off.");
+                Assert.IsTrue((bool)Call(kitchen, "Consume", id, 5, 11));
+                Assert.IsFalse((bool)Call(kitchen, "Consume", id, 5, 11), "No duplicate consumption/sale.");
+                Assert.AreEqual(45, Call(kitchen, "TableCount", 5));
+            }
+            object cancelledFernet = Call(kitchen, "TryTake", 5, EnumValue(roleType, "Fernetero"), 13);
+            Call(kitchen, "ReturnCarried", (int)Get(cancelledFernet, "Id"), 13);
+            Assert.AreEqual(45, Call(kitchen, "TableCount", 5), "Cancellation cannot grow the full 45-slot table.");
             foreach (int product in new[] { 4, 6 })
             {
                 Assert.IsNull(Call(kitchen, "TryTake", product, EnumValue(roleType, "Parrillero"), 1));
@@ -329,6 +347,14 @@ namespace HayChoriYPaty.Tests
                 Call(kitchen, "ReturnCarried", (int)Get(cancelled, "Id"), 4);
                 Assert.AreEqual(12, Call(kitchen, "TableCount", product), "Cancellation cannot grow the barrel beyond its12slots.");
             }
+            Assert.AreEqual(0, empty.CanPrepareCalls);
+            Assert.AreEqual(0, empty.ReserveCalls, "No Fernet or barrel unit reserves Market stock.");
+            Assert.AreEqual(0, empty.ConsumeCalls, "No Fernet or barrel handoff consumes Market stock.");
+
+            object lockedFernet = Activator.CreateInstance(productionType, new object[] {
+                Activator.CreateInstance(balanceType), new[] { 4, 6 }, empty.GetTransparentProxy() });
+            Assert.AreEqual(0, Call(lockedFernet, "TableCount", 5), "An unavailable catalog product does not create servings.");
+            Assert.IsFalse((bool)Call(lockedFernet, "HasSupply", 5));
         }
 
         [Test]
@@ -339,34 +365,44 @@ namespace HayChoriYPaty.Tests
             Type mt = Type.GetType("HayChoriYPaty.StreetMarket, Assembly-CSharp", true);
             Type md = Type.GetType("HayChoriYPaty.StreetMarketData, Assembly-CSharp", true);
             object balance = Activator.CreateInstance(sb);
-            sb.GetField("maxCustomers").SetValue(balance, 2);
+            sb.GetField("maxCustomers").SetValue(balance, 3);
             sb.GetField("customerArrivalSeconds").SetValue(balance, 10000f);
             object sim = Activator.CreateInstance(st, new object[] { balance, 4, 5f, 0, 1, 0 });
             object data = Activator.CreateInstance(md);
             object market = Activator.CreateInstance(mt, new[] { data, balance });
             int[] required = (int[])Call(market, "RequiredUnits", sim);
+            Assert.AreEqual(0, required[8], "Fernet is independent of Fernet ingredient stock.");
+            Assert.AreEqual(0, required[9], "Fernet is independent of large Coca stock.");
             md.GetField("stockUnits").SetValue(data, (int[])required.Clone());
+            int[] stock = (int[])md.GetField("stockUnits").GetValue(data); stock[8] = stock[9] = 0;
             Call(sim, "BindIngredientStock", market);
             Assert.IsTrue((bool)Call(market, "BeginAttempt", sim), "The existing pre-round stock gate remains intact.");
             Call(sim, "StartRound");
-            st.GetField("arrival", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(sim, 10000f); // Isolate the two scripted drink orders, including the initial arrival.
-            int[] stock = (int[])md.GetField("stockUnits").GetValue(data); stock[6] = stock[7] = 0;
+            st.GetField("arrival", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(sim, 10000f); // Isolate the three scripted drink orders from automatic arrivals.
+            stock[6] = stock[7] = 0;
             st.GetProperty("Coins").SetValue(sim, 100000);
             Assert.IsTrue((bool)Call(sim, "TryHire", EnumValue(roleType, "Cocacolero")));
             Assert.IsTrue((bool)Call(sim, "TryHire", EnumValue(roleType, "Cocacolero")));
+            Assert.IsTrue((bool)Call(sim, "TryHire", EnumValue(roleType, "Fernetero")));
             st.GetProperty("Coins").SetValue(sim, 0);
             Assert.IsTrue((bool)Call(sim, "SpawnCustomer", 4, 24));
+            Assert.IsTrue((bool)Call(sim, "SpawnCustomer", 5, 24));
             Assert.IsTrue((bool)Call(sim, "SpawnCustomer", 6, 24));
             Assert.AreEqual(0, Get(sim, "Delivered")); Assert.AreEqual(0, Get(sim, "CoinsEarned"));
-            for (int i = 0; i < 4000 && ((int)Call(sim, "GetProductDelivered", 4) < 24 || (int)Call(sim, "GetProductDelivered", 6) < 24); i++)
+            for (int i = 0; i < 12000 && ((int)Call(sim, "GetProductDelivered", 4) < 24 ||
+                (int)Call(sim, "GetProductDelivered", 5) < 24 || (int)Call(sim, "GetProductDelivered", 6) < 24); i++)
                 Call(sim, "Step", .05f);
             Assert.AreEqual(24, Call(sim, "GetProductDelivered", 4));
+            Assert.AreEqual(24, Call(sim, "GetProductDelivered", 5), "The Fernetero completes real handoffs with zero Fernet and large Coca stock.");
             Assert.AreEqual(24, Call(sim, "GetProductDelivered", 6));
-            Assert.AreEqual(48, Get(sim, "Delivered"));
-            int expectedRevenue = 24 * ((int)(float)Call(sim, "GetProductPrice", 4) + (int)(float)Call(sim, "GetProductPrice", 6));
+            Assert.AreEqual(72, Get(sim, "Delivered"));
+            int expectedRevenue = 24 * ((int)(float)Call(sim, "GetProductPrice", 4) +
+                (int)(float)Call(sim, "GetProductPrice", 5) + (int)(float)Call(sim, "GetProductPrice", 6));
             Assert.AreEqual(expectedRevenue, Get(sim, "CoinsEarned"), "Only actual handoffs generate the unchanged sale prices.");
             Assert.AreEqual(0, Call(market, "Units", 6)); Assert.AreEqual(0, Call(market, "Units", 7));
+            Assert.AreEqual(0, Call(market, "Units", 8)); Assert.AreEqual(0, Call(market, "Units", 9));
             Assert.AreEqual(12, Call(Get(sim, "Kitchen"), "TableCount", 4));
+            Assert.AreEqual(45, Call(Get(sim, "Kitchen"), "TableCount", 5));
             Assert.AreEqual(12, Call(Get(sim, "Kitchen"), "TableCount", 6));
         }
 

@@ -38,7 +38,10 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual((int)Call(sim,"GetProductGoal",0)+(int)Call(sim,"GetProductGoal",2)+(int)Call(sim,"GetProductGoal",3),req[1]);
             Assert.AreEqual(Call(sim,"GetProductGoal",1),req[3]);
             Assert.AreEqual(req[1],Call(market,"MissingUnits",sim,1));
-            Assert.AreEqual((req[8]+3)/4,Call(market,"MissingPacks",sim,8));
+            Assert.AreEqual(0,req[8],"Fernet ingredients are optional and never required to begin a round.");
+            Assert.AreEqual(0,req[9],"Large Coca ingredients are optional and never required to begin a round.");
+            Assert.AreEqual(0,Call(market,"MissingPacks",sim,8));
+            Assert.AreEqual(0,Call(market,"MissingPacks",sim,9));
             Assert.IsFalse((bool)Call(market,"IsIngredientUnlocked",8,0));
             Assert.IsTrue((bool)Call(market,"IsIngredientUnlocked",8,4));
         }
@@ -52,6 +55,22 @@ namespace HayChoriYPaty.Tests
             dataType.GetField("stockUnits").SetValue(data, (int[])required.Clone());
             market = Market(data);
             Assert.IsTrue((bool)Call(market, "HasRequiredStock", sim), "No sandwich ingredient stock is required to start Vélez.");
+            Assert.IsTrue((bool)Call(market, "BeginAttempt", sim));
+        }
+        [Test] public void FernetIngredientsAreNotRequiredWhenItsProductIsUnlocked()
+        {
+            object sim = Sim(4), data = Activator.CreateInstance(dataType), market = Market(data);
+            for (int level = 0; level < 11; level++)
+            {
+                int[] levelRequirements = (int[])Call(market, "RequiredUnits", Sim(level));
+                Assert.AreEqual(0, levelRequirements[8], "Fernet ingredient is never required at level " + (level + 1) + ".");
+                Assert.AreEqual(0, levelRequirements[9], "Large Coca ingredient is never required at level " + (level + 1) + ".");
+            }
+            int[] required = (int[])Call(market, "RequiredUnits", sim);
+            Assert.Greater(required[6], 0, "Other available catalog products retain their ingredient requirements.");
+            dataType.GetField("stockUnits").SetValue(data, (int[])required.Clone());
+            market = Market(data);
+            Assert.IsTrue((bool)Call(market, "HasRequiredStock", sim), "Zero Fernet ingredients do not block the market gate.");
             Assert.IsTrue((bool)Call(market, "BeginAttempt", sim));
         }
         [Test] public void NewGameKitUsesExactLevelOneRecipeGoalsAndAddsOnlyRequiredIngredients()
@@ -181,27 +200,35 @@ namespace HayChoriYPaty.Tests
             Assert.IsTrue((bool)Call(market,"TryReserveFood",53,0)); // Extra sales are allowed once other quotas are protected.
             Assert.IsFalse((bool)Call(market,"TryReserveFood",54,0));
         }
-        [Test] public void BottleShortagesAreIndependentAndPartialPortionsRestoreExactly()
+        [Test] public void FernetIngredientsAreOptionalPurchasableSurplusAndAbortRestoresFiniteStock()
         {
             object sim=Sim(4), market=Market(); Call(market,"Initialize",4);
             object data=Get(market,"Data"); dataType.GetField("balanceCents").SetValue(data,800L);
             int[] stock=(int[])dataType.GetField("stockUnits").GetValue(data);
-            int required=((int[])Call(market,"RequiredUnits",sim))[8];
-            stock[8]=required; stock[9]=required-1;
+            int[] required=(int[])Call(market,"RequiredUnits",sim);
+            Assert.AreEqual(0,required[8]); Assert.AreEqual(0,required[9]);
+            stock[8]=3; stock[9]=2;
             Assert.AreEqual(0,Call(market,"MissingPacks",sim,8));
-            Assert.AreEqual(1,Call(market,"MissingUnits",sim,9));
-            Assert.AreEqual(1,Call(market,"MissingPacks",sim,9));
+            Assert.AreEqual(0,Call(market,"MissingUnits",sim,9));
+            Assert.AreEqual(0,Call(market,"MissingPacks",sim,9));
             Assert.IsTrue((bool)Call(market,"TryBuy",sim,9,1,4,1L));
-            Assert.AreEqual(required+3,Call(market,"Units",9));
+            Assert.AreEqual(6,Call(market,"Units",9),"Manual surplus purchases still work even though Fernet does not use these ingredients.");
+            stock=(int[])dataType.GetField("stockUnits").GetValue(Get(market,"Data"));
+            stock[0]++; stock[1]++; // one actual finite Chori serving beyond its protected minimum
+            int stock0Before=stock[0], stock1Before=stock[1];
             Assert.IsTrue((bool)Call(market,"BeginAttempt",sim));
-            Assert.IsTrue((bool)Call(market,"TryReserveFood",91,5));
-            Assert.IsTrue((bool)Call(market,"ConsumeReservedFood",91,5));
-            Assert.AreEqual(required-1,Call(market,"Units",8));
-            Assert.AreEqual(required+2,Call(market,"Units",9));
+            Assert.IsTrue((bool)Call(market,"TryReserveFood",91,0));
+            Assert.IsTrue((bool)Call(market,"ConsumeReservedFood",91,0));
+            Assert.AreEqual(stock0Before-1,Call(market,"Units",0));
+            Assert.AreEqual(stock1Before-1,Call(market,"Units",1));
+            Assert.AreEqual(3,Call(market,"Units",8));
+            Assert.AreEqual(6,Call(market,"Units",9));
             object restored=Market(JsonUtility.FromJson(JsonUtility.ToJson(Get(market,"Data")),dataType));
             Assert.IsTrue((bool)Call(restored,"RecoverAbandonedAttempt"));
-            Assert.AreEqual(required,Call(restored,"Units",8));
-            Assert.AreEqual(required+3,Call(restored,"Units",9));
+            Assert.AreEqual(stock0Before,Call(restored,"Units",0));
+            Assert.AreEqual(stock1Before,Call(restored,"Units",1));
+            Assert.AreEqual(3,Call(restored,"Units",8));
+            Assert.AreEqual(6,Call(restored,"Units",9));
             Assert.IsFalse((bool)Call(restored,"RecoverAbandonedAttempt"));
         }
 
