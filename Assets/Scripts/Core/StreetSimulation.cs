@@ -78,7 +78,7 @@ namespace HayChoriYPaty
         public string[] levelProductIds = { "0", "0,4", "0,1,4", "0,1,2,4,6", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5" };
         [HideInInspector, Tooltip("Legacy aggregate goals retained for serialized-scene compatibility; individual levelBalances are authoritative.")]
         public int[] levelGoals = { 200, 200, 65, 85, 110, 121, 133, 146, 161, 177, 195 };
-        public float[] levelDurations = { 120f, 150f, 180f, 210f, 240f, 260f, 270f, 295f, 300f, 300f, 315f };
+        public float[] levelDurations = { 120f, 150f, 180f, 210f, 240f, 260f, 270f, 340f, 340f, 300f, 315f };
         [Tooltip("Official per-level goals, role hire base costs, speed-cost multiplier, and opening attempt balance.")]
         public StreetLevelBalance[] levelBalances = CreateOfficialLevelBalances();
 
@@ -93,8 +93,8 @@ namespace HayChoriYPaty
                 new StreetLevelBalance(new[] {190,130,70,65,160,65,80}, new[] {35,35,45,40}, 4.50f),
                 new StreetLevelBalance(new[] {210,145,80,75,175,75,90}, new[] {40,40,50,200,50}, 6.00f, 250),
                 new StreetLevelBalance(new[] {230,175,110,95,205,90,115}, new[] {45,45,55,50,55}, 8.00f, 250),
-                new StreetLevelBalance(new[] {250,180,110,95,210,90,115}, new[] {50,50,65,55,60}, 10.50f, 250),
-                new StreetLevelBalance(new[] {275,195,120,110,225,100,125}, new[] {55,55,70,65,65}, 13.50f, 250),
+                new StreetLevelBalance(new[] {250,180,110,95,210,90,115}, new[] {50,50,65,55,60}, 10.50f, 800),
+                new StreetLevelBalance(new[] {275,195,120,110,225,100,125}, new[] {55,55,70,65,65}, 13.50f, 800),
                 new StreetLevelBalance(new[] {310,220,135,125,255,110,145}, new[] {60,60,80,70,70}, 17.00f, 500),
                 new StreetLevelBalance(new[] {345,245,150,140,285,120,165}, new[] {70,70,90,80,80}, 21.00f, 2000)
             };
@@ -317,7 +317,7 @@ namespace HayChoriYPaty
         };
         private static readonly float[] DefaultDemandMultipliers = { 1f, 1.1f, 1.2f, 1.35f, 1.5f, 1.65f, 1.815f, 1.9965f, 2.19615f, 2.415765f, 2.6573415f };
         private static readonly int[] DefaultSpeedCosts = { 5, 10, 15, 20, 30, 45, 65, 90, 125 };
-        private static readonly float[] DefaultDurations = { 120f, 150f, 180f, 210f, 240f, 260f, 270f, 295f, 300f, 300f, 315f };
+        private static readonly float[] DefaultDurations = { 120f, 150f, 180f, 210f, 240f, 260f, 270f, 340f, 340f, 300f, 315f };
         private const int MaxHireCost = int.MaxValue - int.MaxValue % 5;
         private readonly StreetBalance balance;
         private readonly int[][] availableProductsByLevel;

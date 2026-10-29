@@ -1,3 +1,7 @@
+## 2026-10-29 — Adopt River's U opening setup for River and Boca
+
+At the user's request, set River and Boca to the River U experiment's start: $800 per attempt, one free normal Parrillero, no other free starters, ×1.00, and 340 seconds. Preserve their distinct quotas and all role/speed price curves. The isolated River U experiment produced 2/10 wins without a three-win streak; treat this as a provisional user-directed balance choice, not proven robust balance. `LegacySpeed3ThenRoster_v1` remains an audit purchase policy, not shipped automation.
+
 ## 2026-10-24 — Match Vacío to Bondiola footprint
 
 The user's follow-up supersedes the temporary 25%-wider/2×3 presentation: size Vacío's six pieces to the same rendered footprint as Bondiola and return to a tight 3×2 right-half layout. This fills the shared perspective grill with very little unused space while preserving six real cooking slots, distinct whole-cut art, and all stock/economy behavior.

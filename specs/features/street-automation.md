@@ -57,14 +57,14 @@ This table supersedes the historical aggregate-goal and shared-economy sections 
 | 5 Independiente | 190 | 130 | 160 | 80 | 70 | 65 | 65 | 240 |
 | 6 Racing | 210 | 145 | 175 | 90 | 80 | 75 | 75 | 260 |
 | 7 San Lorenzo | 230 | 175 | 205 | 115 | 110 | 95 | 90 | 270 |
-| 8 River | 250 | 180 | 210 | 115 | 110 | 95 | 90 | 295* |
-| 9 Boca | 275 | 195 | 225 | 125 | 120 | 110 | 100 | 300 |
+| 8 River | 250 | 180 | 210 | 115 | 110 | 95 | 90 | 340* |
+| 9 Boca | 275 | 195 | 225 | 125 | 120 | 110 | 100 | 340* |
 | 10 Camioneros | 310 | 220 | 255 | 145 | 135 | 125 | 110 | 300 |
 | 11 Los Redondos | 345 | 245 | 285 | 165 | 150 | 140 | 120 | 315 |
 
 **2026-10-24 adjustment:** Level 2 (Nueva Chicago) runs for 150 seconds (2:30); all other level durations and quota targets remain unchanged.
 
-*River's deadline is 10 seconds longer than the originally requested 285 seconds. Real runs missed only the last unit in one representative seed at 285 seconds; 295 seconds yielded 3/3 wins with the optimized purchase strategy.
+*River's previous 295-second result belongs to an earlier opening-economy variant. The user-adopted U setup produced 2/10 River wins without a three-win streak; Boca inherits only the starting configuration, not River's quotas or theme.
 
 Official unit-sale price by ID is fixed:
 
@@ -89,18 +89,20 @@ A real completed handoff alone increments that product's delivered count and awa
 | 5 | 35 | 35 | 45 | 40 | — | 4.50 | 0 |
 | 6 | 40 | 40 | 50 | 200 | 50 | 6.00 | 250 |
 | 7 | 45 | 45 | 55 | 50 | 55 | 8.00 | 250 |
-| 8 | 50 | 50 | 65 | 55 | 60 | 10.50 | 250 |
-| 9 | 55 | 55 | 70 | 65 | 65 | 13.50 | 250 |
+| 8 | 50 | 50 | 65 | 55 | 60 | 10.50 | 800 |
+| 9 | 55 | 55 | 70 | 65 | 65 | 13.50 | 800 |
 | 10 | 60 | 60 | 80 | 70 | 70 | 17.00 | 500 |
 | 11 | 70 | 70 | 90 | 80 | 80 | 21.00 | 2000 |
 
-The first Parrillero is free. All five roles (Mozo only from Racing, during play) can be hired without a worker-count cap whenever that role is enabled in the level and the next hire is affordable; each role has its own count-based price progression. For paid hire n, preserve multipliers ×1, ×2.5 and ×5 for n=1–3, then use n×(n+1)/2−1 from n=4 onward (×9, ×14, ×20, ×27, ×35, ×44, ×54 at n=4–10), rounded up to a $5 multiple. Saturate only at the largest representable positive $5 price; this is numeric overflow protection, not a gameplay cap. Each speed upgrade gives Parrilleros +6% (×1.54 at nine upgrades) and other roles +10% (×1.90); cooking, movement and work delays use the role-specific rate. The button's nine prices remain $5/$10/$15/$20/$30/$45/$65/$90/$125, multiplied by the exact level factor above and rounded up to $5. Attempt opening coins are a disclosed balance adjustment: level 1 begins at $0, level 2 at $10, and levels 3–5 at $0; levels 6–9 begin at $250, level 10 at $500, and level 11 at $2,000. They are not earned revenue, never carry over and reset on a fresh attempt. The final level lasts 315 seconds (5:15) to retain a small completion buffer; all product quotas, prices, hire and speed-cost curves remain unchanged.
+The first Parrillero is free. All five roles (Mozo only from Racing, during play) can be hired without a worker-count cap whenever that role is enabled in the level and the next hire is affordable; each role has its own count-based price progression. For paid hire n, preserve multipliers ×1, ×2.5 and ×5 for n=1–3, then use n×(n+1)/2−1 from n=4 onward (×9, ×14, ×20, ×27, ×35, ×44, ×54 at n=4–10), rounded up to a $5 multiple. Saturate only at the largest representable positive $5 price; this is numeric overflow protection, not a gameplay cap. Each speed upgrade gives Parrilleros +6% (×1.54 at nine upgrades) and other roles +10% (×1.90); cooking, movement and work delays use the role-specific rate. The button's nine prices remain $5/$10/$15/$20/$30/$45/$65/$90/$125, multiplied by the exact level factor above and rounded up to $5. Attempt opening coins are a disclosed balance adjustment: level 1 begins at $0, level 2 at $10, and levels 3–5 at $0; levels 6–7 begin at $250, levels 8–9 at $800, level 10 at $500, and level 11 at $2,000. They are not earned revenue, never carry over and reset on a fresh attempt. The final level lasts 315 seconds (5:15) to retain a small completion buffer; all product quotas, prices, hire and speed-cost curves remain unchanged.
 
 For Racing (level 6), the first Fernetero hire costs **$200**; later hires continue through the unchanged role-local multipliers (×2.5, ×5, then triangular progression), yielding $500, $1,000, $1,800 and $2,800 for hires 2–5. The opening attempt balance stays $250, so the first Fernetero is immediately affordable with $50 remaining. Other level rows and roles are unchanged.
 
 **2026-10-26 roster-only experiment:** Racing (LevelIndex 5) now also begins each attempt with one free Mozo; its existing free normal/Premium starters remain. This does not alter the $250 opening coins, this table's paid hire prices, speed, the quotas, sale prices or 260-second deadline, and it applies to no other level. The exact reset/cost contract and five-run outcome are in [active cooks/Mozos](active-cooks-mozos.md); the measured 1/5 result is experimental, not a balance acceptance.
 
 **2026-10-27 San Lorenzo balance trial:** Level 7 (LevelIndex 6) now uses quotas by stable product ID `[230,175,110,95,205,90,115]` (total 1,020) and starts each attempt with one free Mozo alongside its normal Parrillero. Chori, its $250 opening cash, ×1.00 speed, 270-second deadline, sales prices, all hire costs (first paid Mozo $55) and speed curve remain unchanged; San Lorenzo receives no free Premium. This roster/goal change applies only to San Lorenzo. Racing's full baseline remains unchanged; no other level gains a worker or quota change. This remains a provisional experiment: focused EditMode passes, but the five authentic San Lorenzo matches are blocked because no genuine LevelIndex 6 unlock checkpoint was obtained. Details and the baseline comparison are in section 11 of the [balance audit](../../docs/audits/2026-10-21-live-balance/INFORME_COMPLETO_TODOS_LOS_NIVELES.md) and the [active cooks/Mozos contract](active-cooks-mozos.md).
+
+**2026-10-29 River/Boca opening configuration U — user adopted:** LevelIndex7 (River) and LevelIndex8 (Boca) start each fresh attempt with **$800**, one free normal Parrillero, no other free starters and **×1.00** speed; both deadlines are **340 seconds**. Each club keeps its own seven-ID quotas, hire/speed prices, sale prices, demand and presentation. `LegacySpeed3ThenRoster_v1` (the audit sequence of purchasing speed up to ×3 before hiring) remains a test policy, not an automatic purchase feature in the shipped game. The River U sample won 2/10 and did not achieve three consecutive wins, so this is the requested provisional adoption, not a claim of robust balance or human-playtest acceptance; Boca has not been separately playtested.
 
 Quota-aware demand retains random 1–4 quantities and mixed tickets (up to five unlocked products), weighting every product in the level catalog by outstanding goal deficit/time independently of hired staff. A missing specialist does not suppress demand: those order lines wait without a patience timeout and become serviceable if the responsible worker is hired later. Delivery/revenue still requires that responsible worker and a real handoff; no synthetic delivery is allowed. Completed quotas stay visible and may still sell for real revenue. Role responsibilities, stations, routes, stock and handoff accounting remain unchanged. Victory requires every unlocked product quota.
 

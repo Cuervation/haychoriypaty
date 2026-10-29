@@ -1,3 +1,9 @@
+## 2026-10-29 — River/Boca U opening configuration
+
+At the user's request, River (LevelIndex 7) and Boca (8) start with $800, one free normal Parrillero, no other free starters, ×1.00 and 340 seconds. Club-specific quotas, economy, hire/speed costs and presentation remain distinct. River U recorded 2/10 wins without three consecutive wins; Boca has not been separately tested.
+
+**Static consistency: PASS** — runtime defaults/fallback, Main scene serialization, opening-balance rows and focused start/retry assertions align; `git diff --check` passes for the committed selection. **Unity EditMode/build: BLOCKED / NOT_RUN** — Unity MCP has no active editor session and the checkout still has `Library/EditorInstance.json` plus `Temp/UnityLockfile`; no second Unity editor was launched.
+
 ## 2026-10-27 — Ensayo de balance de San Lorenzo
 
 LevelIndex 6 usa metas `[230,175,110,95,205,90,115]` (IDs0–6, total1.020) y un Mozo inicial gratis junto al Parrillero Normal. Caja `$250`, 270s, ×1.00, objetivo Chori230, precios y curvas no cambian; el primer Mozo pagado sigue en `$55`, y Racing conserva sus starters/costos. Main.unity serializa metas agregadas legacy y duraciones, no metas por producto; el test carga Main real y confirma cuotas efectivas, requisitos derivados del Mercado y los once niveles.
