@@ -90,6 +90,9 @@ namespace HayChoriYPaty.Tests
                 new[] { balance, (object)0, 5f, 0, 1, 0 });
             Runtime("StreetBalance").GetField("customerArrivalSeconds", PublicInstance).SetValue(balance, 1000f);
             Set(simulation, "Phase", Enum.Parse(Runtime("RoundPhase"), "Playing"));
+            FieldInfo arrival = simulation.GetType().GetField("arrival", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.NotNull(arrival);
+            arrival.SetValue(simulation, 1000f);
             MethodInfo spawn = simulation.GetType().GetMethod("SpawnCustomer", PublicInstance, null,
                 new[] { typeof(int), typeof(int) }, null);
             Assert.IsTrue((bool)spawn.Invoke(simulation, new object[] { 0, 3 }));
@@ -112,8 +115,22 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(Vector2.Distance(previous, position), stepDistance, .001f);
             Assert.AreEqual(previousDistance + stepDistance, travelDistance, .001f);
 
-            Set(worker, "State", Enum.Parse(Runtime("StreetWorkerState"), "Idle"));
+            System.Collections.IList customers = (System.Collections.IList)simulation.GetType()
+                .GetProperty("Customers", PublicInstance).GetValue(simulation);
+            MethodInfo removeCustomer = simulation.GetType().GetMethod("RemoveCustomer", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.NotNull(removeCustomer);
+            while (customers.Count > 0) removeCustomer.Invoke(simulation, new[] { customers[0] });
+            MethodInfo cancelAssignment = simulation.GetType().GetMethod("CancelAssignment", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.NotNull(cancelAssignment);
+            cancelAssignment.Invoke(simulation, new[] { worker });
+            Assert.AreEqual("Idle", worker.GetType().GetProperty("State", PublicInstance).GetValue(worker).ToString());
+            Vector2 idlePosition = (Vector2)worker.GetType().GetProperty("Position", PublicInstance).GetValue(worker);
+            Set(worker, "Target", idlePosition);
+            Set(worker, "WaitPosition", idlePosition);
             step.Invoke(simulation, new object[] { .05f });
+            Assert.AreEqual(0, customers.Count, "No new customers should reassign the worker in the idle check.");
+            Assert.AreEqual("Idle", worker.GetType().GetProperty("State", PublicInstance).GetValue(worker).ToString());
+            Assert.AreEqual(idlePosition, worker.GetType().GetProperty("Position", PublicInstance).GetValue(worker));
             Assert.AreEqual(0f, worker.GetType().GetProperty("StepDistance", PublicInstance).GetValue(worker));
             Assert.AreEqual(travelDistance, worker.GetType().GetProperty("TravelDistance", PublicInstance).GetValue(worker));
         }

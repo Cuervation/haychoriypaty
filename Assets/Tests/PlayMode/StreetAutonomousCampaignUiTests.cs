@@ -132,6 +132,14 @@ namespace HayChoriYPaty.Tests
             Assert.IsNull(firebaseSessionType.GetProperty("Instance", BindingFlags.Static | BindingFlags.Public).GetValue(null, null),
                 "No Firebase session may exist during the test.");
             view = root.AddComponent(ViewType);
+            if (TestContext.CurrentContext.Test.Name.StartsWith("OperationalSmoke_", StringComparison.Ordinal))
+            {
+                // Avoid the intro transition, which intentionally clears a real tutorial marker.
+                Assert.IsTrue((bool)ViewType.GetField("RepeatLevelOneTutorialForTesting", StaticPrivate).GetRawConstantValue(),
+                    "This isolated smoke requires the current no-write tutorial override.");
+                ViewType.GetField("introActive", PrivateInstance).SetValue(view, false);
+                ViewType.GetField("hubActive", PrivateInstance).SetValue(view, true);
+            }
             yield return null;
             yield return null;
         }
@@ -153,6 +161,68 @@ namespace HayChoriYPaty.Tests
             Application.runInBackground = previousBackground;
             GameType.GetField("AllowEditorTestInitialization", StaticField).SetValue(null, previousEditorPersistence);
             yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator OperationalSmoke_AllBoys_InMemoryWithoutWinRequirement() => OperationalSmoke(0);
+
+        [UnityTest]
+        public IEnumerator OperationalSmoke_Racing_InMemoryWithoutWinRequirement() => OperationalSmoke(5);
+
+        [UnityTest]
+        public IEnumerator OperationalSmoke_LosRedondos_InMemoryWithoutWinRequirement() => OperationalSmoke(10);
+
+        private IEnumerator OperationalSmoke(int level)
+        {
+            float deadline = Time.realtimeSinceStartup + 120f;
+            while (!(bool)Get(view, "viewResourcesReady") && Time.realtimeSinceStartup < deadline) yield return null;
+            Assert.IsTrue((bool)Get(view, "viewResourcesReady"), "The isolated UI must finish loading.");
+            yield return null;
+            yield return Click(InvokeViewRect("HubArtworkActionBounds", 200).center);
+            Assert.IsTrue((bool)Get(view, "levelSelectActive"));
+            yield return SelectLevelThroughUi(level);
+            object sim = Get(game, "Sim");
+            Assert.AreEqual(level, Get(sim, "LevelIndex"));
+            if (level == 0)
+            {
+                Assert.IsTrue((bool)Get(view, "levelOneTutorialActive"));
+                yield return Click(InvokeViewRectNoArgs("LevelOneTutorialSkipBounds").center);
+            }
+            else
+            {
+                Assert.IsTrue((bool)Get(view, "marketActive"));
+                object market = Get(game, "Market");
+                if ((long)Call(market, "MinimumPurchaseCostCents", sim) > 0)
+                {
+                    yield return ClickMarket(InvokeMarketBuyMissingBounds().center);
+                    yield return new WaitForSecondsRealtime(.35f);
+                }
+                Assert.IsTrue((bool)Get(game, "CanStartRound"));
+                yield return ClickMarket(InvokeViewRectNoArgs("MarketPlayBounds").center);
+            }
+            Assert.AreEqual("Playing", Get(sim, "Phase").ToString());
+            if (level >= 5 && (int)Get(sim, "MozoCount") == 0)
+            {
+                yield return HireRoleThroughUi(sim, 22, "CanHireMozo", 1);
+                Assert.Greater((int)Get(sim, "MozoCount"), 0, "The actual Mozo control must hire a worker.");
+            }
+            float before = (float)Get(sim, "Elapsed");
+            yield return new WaitForSecondsRealtime(6f);
+            Assert.Greater((float)Get(sim, "Elapsed"), before, "The match must advance after the UI starts it.");
+            Assert.Greater(((ICollection)Get(sim, "Customers")).Count, 0, "The running match must spawn customers.");
+            Assert.Greater(memorySnapshots.Count, 0, "Persistence must remain in the memory-only delegate.");
+            yield return new WaitForEndOfFrame();
+            Texture2D capture = ScreenCapture.CaptureScreenshotAsTexture();
+            Assert.NotNull(capture);
+            try
+            {
+                string folder = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/TestRuns", Guid.NewGuid().ToString("N")));
+                Directory.CreateDirectory(folder);
+                string path = Path.Combine(folder, "operational-level-" + (level + 1) + ".png");
+                File.WriteAllBytes(path, capture.EncodeToPNG());
+                TestContext.WriteLine("Operational full Game View capture: " + path);
+            }
+            finally { UnityEngine.Object.Destroy(capture); }
         }
 
         [UnityTest]

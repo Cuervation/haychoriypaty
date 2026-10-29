@@ -368,7 +368,7 @@ namespace HayChoriYPaty.Tests
             var image = new Texture2D(target.width, target.height, TextureFormat.RGBA32, false);
             image.ReadPixels(new Rect(0f, 0f, target.width, target.height), 0, 0);
             image.Apply();
-            string folder = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/" + acceptanceFolder));
+            string folder = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/TestRuns", Guid.NewGuid().ToString("N"), acceptanceFolder));
             Directory.CreateDirectory(folder);
             File.WriteAllBytes(Path.Combine(folder, fileName), ImageConversion.EncodeToPNG(image));
             UnityEngine.Object.Destroy(image);
@@ -470,7 +470,8 @@ namespace HayChoriYPaty.Tests
                     Assert.AreEqual(0, ((IList)Get(kitchen, "Units")).Count);
                     for (int product = 0; product < 4; product++)
                         if ((bool)Call(simulation, "IsProductAvailable", product))
-                            Assert.IsFalse((bool)Call(kitchen, "HasSupply", product), "Level " + (level + 1) + " must have no real product stock.");
+                            Assert.AreEqual(level == 2, (bool)Call(kitchen, "HasSupply", product),
+                                "Only Vélez sandwiches have inexhaustible supply when Market ingredients are depleted.");
 
                     int expectedAmbientSlots = 0;
                     for (int product = 0; product < 4; product++)

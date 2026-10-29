@@ -2411,8 +2411,8 @@ object sim = Make(level: level);
                 if (wins > 0) { elapsed /= wins; left /= wins; }
                 var rateText = new List<string>();
                 var hireText = new List<string>();
-                string[] roleLabels = { "N", "C", "P", "F" };
-                for (int r = 0; r < 4; r++)
+                string[] roleLabels = { "N", "C", "P", "F", "M" };
+                for (int r = 0; r < roleLabels.Length; r++)
                 {
                     int count = 0; foreach (StrategyRun run in runs) count += run.Hires[r];
                     hireText.Add(roleLabels[r] + ":" + (count / runs.Count));
@@ -2476,7 +2476,7 @@ object sim = Make(level: level);
         private sealed class StrategyRun
         {
             public string Phase; public float Elapsed, Remaining; public int CoinsEarned, CoinsSpent, Speed;
-            public int[] Delivered = new int[7], Hires = new int[4], Products;
+            public int[] Delivered = new int[7], Hires = new int[5], Products;
             public int LimitingProduct = -1, LimitingGap;
         }
 
@@ -2485,6 +2485,8 @@ object sim = Make(level: level);
             object balance = NewBalance(); Tune(balance, "randomSeed", seed);
             object sim = Make(level: level, balance: balance); Start(sim);
             int openingCoins = (int)Get(sim, "Coins");
+            string[] roles = { "Parrillero", "Cocacolero", "ParrilleroPremium", "Fernetero", "Mozo" };
+            int[] initialStaff = Array.ConvertAll(roles, role => (int)Call(sim, "WorkerCount", Role(role)));
             int[] products = AvailableProducts(sim);
             for (int tick = 0; tick < 1300 && Get(sim, "Phase").ToString() == "Playing"; tick++)
             {
@@ -2495,8 +2497,7 @@ object sim = Make(level: level);
                 Remaining = (float)Get(sim, "TimeRemaining"), CoinsEarned = (int)Get(sim, "CoinsEarned"),
                 CoinsSpent = openingCoins + (int)Get(sim, "CoinsEarned") - (int)Get(sim, "Coins"),
                 Speed = (int)Get(sim, "SpeedLevel"), Products = products };
-            string[] roles = { "Parrillero", "Cocacolero", "ParrilleroPremium", "Fernetero" };
-            for (int r = 0; r < roles.Length; r++) result.Hires[r] = (int)Call(sim, "WorkerCount", Role(roles[r])) - (r == 0 ? 1 : 0);
+            for (int r = 0; r < roles.Length; r++) result.Hires[r] = (int)Call(sim, "WorkerCount", Role(roles[r])) - initialStaff[r];
             for (int p = 0; p < 7; p++)
             {
                 result.Delivered[p] = (int)Call(sim, "GetProductDelivered", p);
@@ -2508,7 +2509,7 @@ object sim = Make(level: level);
 
         private void ApplyStrategyPurchases(object sim, string strategy)
         {
-            string[] roleNames = { "Parrillero", "Cocacolero", "ParrilleroPremium", "Fernetero" };
+            string[] roleNames = { "Parrillero", "Cocacolero", "ParrilleroPremium", "Fernetero", "Mozo" };
             for (int purchase = 0; purchase < 8; purchase++)
             {
                 object missing = null; float missingDemand = -1f;
@@ -2566,16 +2567,44 @@ object sim = Make(level: level);
             }
         }
 
+        [Test]
+        public void StrategyDemandIncludesMozoOnlyForActiveSandwichDelivery()
+        {
+            object legacy = Make(level: 0);
+            object active = Make(level: 7);
+            object mozo = Role("Mozo");
+            Assert.AreEqual(0f, RoleQuotaRemaining(legacy, mozo));
+            int expected = 0;
+            for (int product = 0; product < 4; product++)
+                if ((bool)Call(active, "IsProductAvailable", product))
+                    expected += (int)Call(active, "GetProductRemaining", product);
+            Assert.Greater(expected, 0);
+            Assert.AreEqual((float)expected, RoleQuotaRemaining(active, mozo));
+            int beverageDemand = (int)Call(active, "GetProductRemaining", 4) +
+                (int)Call(active, "GetProductRemaining", 6);
+            Assert.AreEqual((float)beverageDemand, RoleQuotaRemaining(active, Role("Cocacolero")),
+                "A product served by its producer must be counted once, not twice.");
+            Start(active);
+            Assert.AreEqual(0, Call(active, "WorkerCount", mozo));
+            ApplyStrategyPurchases(active, "D");
+            Assert.Greater((int)Call(active, "WorkerCount", mozo), 0,
+                "An affordable missing Mozo must be hired for active sandwich handoffs.");
+        }
+
         private float RoleQuotaRemaining(object sim, object role)
         {
             float total = 0f; int count = (int)Get(sim, "ProductCount");
             Type specialtyType = Type.GetType("HayChoriYPaty.StreetSpecialties, Assembly-CSharp", true);
-            MethodInfo required = specialtyType.GetMethod("GetRequiredWorkerRole", BindingFlags.Public | BindingFlags.Static);
+            MethodInfo production = specialtyType.GetMethod("GetProductionRole", BindingFlags.Public | BindingFlags.Static);
+            MethodInfo delivery = specialtyType.GetMethod("GetDeliveryRole", BindingFlags.Public | BindingFlags.Static);
+            bool activeCooks = (bool)Get(sim, "UsesActiveCooks");
             for (int slot = 0; slot < count; slot++)
             {
                 int product = (int)Call(sim, "GetAvailableProduct", slot);
-                object productRole = required.Invoke(null, new object[] { product });
-                if (productRole.Equals(role)) total += (int)Call(sim, "GetProductRemaining", product);
+                object producer = production.Invoke(null, new object[] { product });
+                object deliverer = delivery.Invoke(null, new object[] { product, activeCooks });
+                if (producer.Equals(role) || deliverer.Equals(role))
+                    total += (int)Call(sim, "GetProductRemaining", product);
             }
             return total;
         }

@@ -7,12 +7,17 @@ using UnityEngine.SceneManagement;
 
 namespace HayChoriYPaty.Editor
 {
-    /// <summary>One-time setup helper for the playable scene and portrait target. Safe to rerun.</summary>
+    /// <summary>Historical prototype setup; replaces the current Main scene and player/build settings after confirmation.</summary>
     public static class PrototypeProjectSetup
     {
         [MenuItem("Hay Chori y Paty/Regenerate Main Prototype Scene")]
         public static void CreatePrototypeScene()
         {
+            if (!EditorUtility.DisplayDialog(
+                "Regenerar prototipo histórico",
+                "Esta acción reemplazará Assets/Scenes/Main.unity por el prototipo antiguo y modificará la configuración de compilación y del jugador. No regenera el juego actual. ¿Continuar?",
+                "Sobrescribir", "Cancelar")) return;
+
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
             GameObject cameraObject = GameObject.Find("Main Camera");
             Camera camera = cameraObject != null ? cameraObject.GetComponent<Camera>() : Camera.main;
