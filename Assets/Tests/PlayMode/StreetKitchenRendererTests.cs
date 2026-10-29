@@ -749,6 +749,7 @@ namespace HayChoriYPaty.Tests
         public IEnumerator FernetTableDisplayKeepsTwoRowsSupportedAndProportional()
         {
             var root = new GameObject("Fernet tabletop bottle display test");
+            GameObject captureRoot = null;
             try
             {
                 Component renderer = root.AddComponent(GameType("StreetKitchenRenderer"));
@@ -769,7 +770,7 @@ namespace HayChoriYPaty.Tests
                 Assert.IsNotNull(display);
                 Assert.AreEqual(8, display.childCount, "The tabletop display uses four bottles in each of two rows.");
                 float tableHeight = table.sprite.bounds.size.y;
-                float groupRight = table.sprite.bounds.min.x + table.sprite.bounds.size.x * .64f;
+                float groupLeft = table.sprite.bounds.max.x - table.sprite.bounds.size.x * .61f - tableHeight * .10f;
                 int[] cocaByRow = new int[2], fernetByRow = new int[2];
                 float[] rearY = { float.NaN, float.NaN };
                 for (int i = 0; i < display.childCount; i++)
@@ -788,9 +789,10 @@ namespace HayChoriYPaty.Tests
                     Assert.AreEqual(bottle.localScale.x, bottle.localScale.y, .0001f,
                         "Bottle sprites must preserve their original aspect ratios.");
                     Vector2 bottleSize = bottleRenderer.sprite.bounds.size * bottle.localScale.x;
-                    Assert.GreaterOrEqual(bottle.localPosition.x - bottleSize.x * .5f, table.sprite.bounds.min.x - .001f);
-                    Assert.LessOrEqual(bottle.localPosition.x + bottleSize.x * .5f, groupRight + .001f,
-                        "Stock bottles must remain in the left tabletop zone.");
+                    Assert.GreaterOrEqual(bottle.localPosition.x - bottleSize.x * .5f, groupLeft - .001f,
+                        "Stock bottles must remain in the right tabletop zone.");
+                    Assert.LessOrEqual(bottle.localPosition.x + bottleSize.x * .5f,
+                        table.sprite.bounds.max.x + .001f, "Stock bottles must remain on the tabletop.");
                     float depthFraction = row == 0 ? .03f : .32f;
                     float tabletopY = table.sprite.bounds.max.y - tableHeight * depthFraction;
                     float visibleInset = fernet ? 0f : bottleRenderer.sprite.bounds.size.y * .009f * bottle.localScale.y;
@@ -813,8 +815,49 @@ namespace HayChoriYPaty.Tests
                     Assert.AreEqual(2, fernetByRow[row], "Each row has two Fernet bottles.");
                 }
                 Assert.Greater(rearY[0], rearY[1], "The rear row is staggered behind the front row.");
+
+                // The fixture's manually-built bottle display is on the global prop layer;
+                // remove it before capturing the separate production renderer below.
+                UnityEngine.Object.Destroy(root);
+                root = null;
+                yield return null;
+
+                object balance = Activator.CreateInstance(GameType("StreetBalance"));
+                object sim = Activator.CreateInstance(GameType("StreetSimulation"), new object[] { balance, 10, 5f, 0, 1, 0 });
+                object kitchen = Get(sim, "Kitchen");
+                ClearKitchenUnits(kitchen);
+                AddTableFood(kitchen, 5, 0, 45);
+                object layout = Get(sim, "KitchenLayout");
+                Rect layoutBounds = (Rect)Get(layout, "FernetTableBounds");
+                MethodInfo drinkPosition = GameType("StreetKitchenRenderer").GetMethod("FernetDrinkDisplayPosition", Instance | BindingFlags.Static);
+                Assert.IsNotNull(drinkPosition);
+                float bottleZoneLeft = layoutBounds.xMax - layoutBounds.width * .61f - layoutBounds.height * .10f;
+                for (int slot = 0; slot < 45; slot++)
+                {
+                    Vector2 cup = (Vector2)drinkPosition.Invoke(null, new object[] { layout, slot });
+                    Assert.GreaterOrEqual(cup.x - 9f, layoutBounds.x - .01f,
+                        "Prepared cups remain inside the left tabletop area at maximum stock.");
+                    Assert.LessOrEqual(cup.x + 9f, bottleZoneLeft - .01f,
+                        "Prepared cups do not overlap the right-side bottle group.");
+                }
+
+                captureRoot = new GameObject("Fernet tabletop responsive capture");
+                Component captureRenderer = captureRoot.AddComponent(GameType("StreetKitchenRenderer"));
+                foreach (var view in new[] { (scale: 1f, height: 960f, suffix: "1080x1920"),
+                    (scale: 1.25f, height: 1200f, suffix: "1080x2400"),
+                    (scale: .85f, height: 800f, suffix: "918x1600") })
+                {
+                    Call(captureRenderer, "Prepare", sim, view.scale, view.height);
+                    yield return null;
+                    CaptureKitchenTexture(captureRenderer,
+                        "fernet-cups-left-bottles-right-" + view.suffix + ".png", "FernetTableLeftRight-20261029");
+                }
             }
-            finally { UnityEngine.Object.Destroy(root); }
+            finally
+            {
+                if (captureRoot != null) UnityEngine.Object.Destroy(captureRoot);
+                if (root != null) UnityEngine.Object.Destroy(root);
+            }
             yield return null;
         }
 

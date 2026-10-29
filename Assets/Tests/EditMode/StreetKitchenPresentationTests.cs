@@ -353,17 +353,24 @@ namespace HayChoriYPaty.Tests
                 Vector3 tableMin = station.transform.InverseTransformPoint(table.transform.TransformPoint(table.sprite.bounds.min));
                 Vector3 tableMax = station.transform.InverseTransformPoint(table.transform.TransformPoint(table.sprite.bounds.max));
                 float tableHeight = tableMax.y - tableMin.y;
-                float groupRight = tableMin.x + (tableMax.x - tableMin.x) * .61f + tableHeight * .10f;
+                float tableWidth = tableMax.x - tableMin.x;
+                float groupLeft = tableMax.x - tableWidth * .61f - tableHeight * .10f;
                 int fernetBottles = 0, cocaBottles = 0;
                 int[] fernetByRow = new int[2], cocaByRow = new int[2];
                 float[] rowMinX = { float.PositiveInfinity, float.PositiveInfinity };
+                float bottleLeftEdge = float.PositiveInfinity, bottleRightEdge = float.NegativeInfinity;
                 foreach (Transform item in display)
                 {
                     SpriteRenderer spriteRenderer = item.GetComponent<SpriteRenderer>();
                     Assert.NotNull(spriteRenderer);
                     int row = item.name.Contains("_Row0_") ? 0 : 1;
-                    rowMinX[row] = Mathf.Min(rowMinX[row], item.localPosition.x
-                        - spriteRenderer.sprite.bounds.size.x * item.localScale.x * .5f);
+                    float bottleLeft = item.localPosition.x
+                        - spriteRenderer.sprite.bounds.size.x * item.localScale.x * .5f;
+                    float bottleRight = item.localPosition.x
+                        + spriteRenderer.sprite.bounds.size.x * item.localScale.x * .5f;
+                    rowMinX[row] = Mathf.Min(rowMinX[row], bottleLeft);
+                    bottleLeftEdge = Mathf.Min(bottleLeftEdge, bottleLeft);
+                    bottleRightEdge = Mathf.Max(bottleRightEdge, bottleRight);
                     float height = spriteRenderer.sprite.bounds.size.y * item.localScale.y;
                     float contactDepth = row == 0 ? .03f : .32f;
                     float tabletopY = tableMax.y - tableHeight * contactDepth;
@@ -381,8 +388,8 @@ namespace HayChoriYPaty.Tests
                         "The bottle must render above its tabletop contact shadow.");
                     Assert.AreEqual(-spriteRenderer.sprite.bounds.size.y * .5f + visibleBaseInset,
                         contactShadow.localPosition.y, .02f, "The contact shadow must meet the visible bottle base.");
-                    Assert.LessOrEqual(item.localPosition.x + spriteRenderer.sprite.bounds.size.x * item.localScale.x * .5f,
-                        groupRight + .02f, "Stock bottles must remain in their dedicated left-side zone.");
+                    Assert.GreaterOrEqual(bottleLeft, groupLeft - .02f,
+                        "Stock bottles must remain in their dedicated right-side zone.");
                     Assert.AreEqual(row == 0 ? 2 : 4, spriteRenderer.sortingOrder,
                         "The front row must render above the rear row.");
                     if (spriteRenderer.sprite.name == "fernet-bottle-1l-v1")
@@ -408,7 +415,10 @@ namespace HayChoriYPaty.Tests
                     Assert.AreEqual(2, cocaByRow[row]);
                 }
                 Assert.AreEqual(tableHeight * .10f, rowMinX[0] - rowMinX[1], .02f,
-                    "The two compact rows are staggered enough to read as separate rows without reaching the prepared-drink area.");
+                    "The two compact rows keep their established rightward stagger.");
+                Assert.GreaterOrEqual(bottleLeftEdge, tableMin.x - .02f);
+                Assert.LessOrEqual(bottleRightEdge, tableMax.x + .02f,
+                    "Both bottle rows must remain within the tabletop.");
                 populateDisplay.Invoke(renderer, new object[] { station });
                 Assert.AreEqual(1, station.transform.childCount, "Responsive refresh must not duplicate the tabletop display.");
 
@@ -417,14 +427,21 @@ namespace HayChoriYPaty.Tests
                 Rect bounds = RectProperty(layout, "FernetTableBounds");
                 MethodInfo displayPosition = rendererType.GetMethod("FernetDrinkDisplayPosition", BindingFlags.NonPublic | BindingFlags.Static);
                 Assert.NotNull(displayPosition);
+                float bottleZoneLeft = bounds.xMax - bounds.width * .61f - bounds.height * .10f;
                 for (int slot = 0; slot < 45; slot++)
                 {
                     Vector2 position = (Vector2)displayPosition.Invoke(null, new object[] { layout, slot });
-                    Assert.GreaterOrEqual(position.x - 9f, bounds.x + bounds.width * .64f - .01f,
-                        "Prepared cups must stay to the right of the bottle group.");
+                    Assert.GreaterOrEqual(position.x - 9f, bounds.x - .01f,
+                        "Every prepared-cup slot must stay on the left side of the Fernet table.");
+                    Assert.LessOrEqual(position.x + 9f, bottleZoneLeft - .01f,
+                        "Prepared cups must not overlap the right-side bottle group.");
                     Assert.LessOrEqual(position.x + 9f, bounds.xMax + .01f,
                         "Every prepared-cup slot must remain on the Fernet table.");
                 }
+                Vector2 ferneteroCenterPickup = (Vector2)Call(layout, "PickupPosition", 5);
+                Vector2 ferneteroMiddleAccess = (Vector2)Call(layout, "PickupPosition", 5, 1, 3);
+                Assert.AreEqual(ferneteroCenterPickup, ferneteroMiddleAccess,
+                    "The Fernetero approach anchor stays at the table center; only drink sprite projection changes.");
             }
             finally
             {

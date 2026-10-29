@@ -26,7 +26,7 @@ namespace HayChoriYPaty
         private const float CocaBottleVisibleBaseInsetFraction = .009f;
         private const float FernetBottleDisplayWidthFraction = .61f;
         private const float FernetBottleBackRowOffsetFraction = .10f;
-        private const float FernetDrinkFirstColumnFraction = .74f, FernetDrinkColumnStepFraction = .088f;
+        private const float FernetDrinkFirstColumnFraction = .26f, FernetDrinkColumnStepFraction = -.088f;
         private const string PrefabRoot = "ModularKitchen/Prefabs/";
         private const string SpriteRoot = "ModularKitchen/Sprites/";
         private const string WholeBondiolaResource = "ModularKitchen/Art/meat-bondiola-whole-v1_";
@@ -480,7 +480,11 @@ namespace HayChoriYPaty
             float groupWidth = tableSize.x * FernetBottleDisplayWidthFraction;
             float gap = Mathf.Max(0f, (groupWidth - totalBottleWidth) / (bottleCount + 1));
             float rowUsedWidth = totalBottleWidth + gap * (bottleCount + 1);
-            float rowStartX = tableMin.x + (groupWidth - rowUsedWidth) * .5f + gap;
+            // Cups own the left tabletop area. Keep the staggered bottle block on the right,
+            // reserving its rear-row shift so neither row spills beyond the tabletop.
+            float groupLeftX = tableMin.x + tableSize.x - groupWidth
+                - tableSize.y * FernetBottleBackRowOffsetFraction;
+            float rowStartX = groupLeftX + (groupWidth - rowUsedWidth) * .5f + gap;
             Transform display = new GameObject("FernetBottleDisplay").transform;
             display.SetParent(station.transform, false);
             display.gameObject.layer = PropLayer;
