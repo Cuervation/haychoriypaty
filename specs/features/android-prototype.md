@@ -1,3 +1,13 @@
+# Entrega Android — 2026-10-30: corrección visual del ticket Chulengo, 0.2.79/code81
+
+APK Development IL2CPP/ARM64 generada desde el Editor activo Unity 6000.6.3f1 del checkout vigente, con `Assets/Scenes/Main.unity` como única escena explícita. Build job `build-1523f7f8fa`: **Succeeded en 322,13 s; 0 errores / 6 advertencias**. Se conservaron Player Settings en **0.2.79/code81** (`runInBackground: 1` sigue siendo una preferencia local ajena).
+
+Artefacto ignorado por Git: `Builds/Android/Archive/HayChoriYPaty-0.2.79-code81-ticket-corrected-20261030.apk`, **391.562.922 bytes**, SHA-256 `a71fbf7fef51b4e473d073dd7e68e5c33d348442ba30622cde1fc3a5449ea31c`. Package `com.haychoriypaty.game`, versionName `0.2.79`, versionCode `81`, min API 26/target 36, ABI `arm64-v8a`. **PASS:** ZIP íntegro, `zipalign -c -v 4`, firma APK Signature Scheme v2 y metadata; `global-metadata.dat` contiene `DrawChulengoTicketBadge`, `CreateChulengoTicketTexture` y el rótulo `+1 TICKET`. Firebase Analytics y Google ad-ID siguen desactivados en el manifiesto. Firma Android Debug; no es una versión firmada para Play Store.
+
+Validación visual previa del mismo código: EditMode **4/4 PASS** y PlayMode **1/1 PASS**, con captura full Game View 1080×1920 revisada. La APK Development conserva el bono temporal de **+30 tickets** para pruebas, fuera del Editor; retirarlo antes de preparar una distribución release. **Instalación posterior solicitada:** Motorola Edge 60 Fusion (`ZY22MBNWRB`), `adb install -r` **Success** el 2026-10-30 a las 17:36:35. PackageManager confirma 0.2.79/code81 y conserva `firstInstallTime=2026-10-03 18:49:24`; no se desinstaló ni se borraron datos. La app no se abrió; QA de gameplay/visual Android **NOT_RUN**. Sin commit ni push.
+
+---
+
 # Entrega Android — 2026-10-30: Camioneros y últimos cambios, 0.2.79/code81
 
 APK Development IL2CPP/ARM64 compilada desde el Editor Unity 6000.6.3f1 del checkout activo, con `Assets/Scenes/Main.unity` como única escena explícita. Build job `build-0238554307`: **Succeeded en 325,93 s; 0 errores / 5 advertencias**. Player Settings avanzaron de 0.2.78/code80 a **0.2.79/code81**; se preservó la preferencia local ajena `runInBackground: 1`.

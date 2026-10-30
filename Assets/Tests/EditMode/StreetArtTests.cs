@@ -2495,6 +2495,66 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
             Assert.LessOrEqual(levels.yMax, canvasHeight - 4f);
         }
 
+        [TestCase(700f)]
+        [TestCase(960f)]
+        [TestCase(1200f)]
+        public void ChulengoVictoryReferenceHeadlineAndTicketFitThePopup(float canvasHeight)
+        {
+            const BindingFlags flags = BindingFlags.Static | BindingFlags.NonPublic;
+            Assert.AreEqual("MISIÓN", View.GetField("ChulengoVictoryTitleFirstLine", flags).GetValue(null));
+            Assert.AreEqual("COMPLETADA", View.GetField("ChulengoVictoryTitleSecondLine", flags).GetValue(null));
+            Assert.AreEqual("+1 TICKET", View.GetField("ChulengoTicketCaption", flags).GetValue(null));
+            Assert.AreEqual(Color.white, View.GetField("ChulengoZeroWarningFill", flags).GetValue(null));
+
+            Rect frame = (Rect)View.GetMethod("VictoryPopupBounds", flags)
+                .Invoke(null, new object[] { canvasHeight, true });
+            Rect firstLine = (Rect)View.GetMethod("ChulengoTitleLineBoundsForFrame", flags)
+                .Invoke(null, new object[] { frame, false });
+            Rect secondLine = (Rect)View.GetMethod("ChulengoTitleLineBoundsForFrame", flags)
+                .Invoke(null, new object[] { frame, true });
+            Rect amount = (Rect)View.GetMethod("ChulengoPrizeAmountBoundsForFrame", flags).Invoke(null, new object[] { frame });
+            Rect ticket = (Rect)View.GetMethod("ChulengoTicketCardBoundsForFrame", flags).Invoke(null, new object[] { frame });
+            Rect ticketCaption = (Rect)View.GetMethod("ChulengoTicketCaptionBoundsForFrame", flags).Invoke(null, new object[] { frame });
+            Rect meterContainer = (Rect)View.GetMethod("VictorySlot", flags)
+                .Invoke(null, new object[] { frame, new Rect(.0625f, .50f, .875f, .245f) });
+            Rect meter = (Rect)View.GetMethod("FitChulengoMeter", flags).Invoke(null, new object[] { meterContainer });
+
+            Assert.IsTrue(frame.Contains(firstLine.min) && frame.Contains(firstLine.max));
+            Assert.IsTrue(frame.Contains(secondLine.min) && frame.Contains(secondLine.max));
+            Assert.IsFalse(firstLine.Overlaps(secondLine), "The two-line comic headline keeps independent text slots.");
+            Assert.IsTrue(frame.Contains(ticket.min) && frame.Contains(ticket.max));
+            Assert.IsTrue(frame.Contains(ticketCaption.min) && frame.Contains(ticketCaption.max));
+            Assert.IsFalse(amount.Overlaps(ticket), "The ticket badge sits beside, not over, the payout.");
+            Assert.IsFalse(amount.Overlaps(ticketCaption), "The ticket caption stays legible beside the payout.");
+            Assert.LessOrEqual(ticketCaption.yMax, meter.yMin,
+                "The ticket badge ends before the visible gauge begins.");
+        }
+
+        [Test]
+        public void ChulengoTicketArtworkUsesYellowStubRedPerforationAndBlueStar()
+        {
+            const BindingFlags flags = BindingFlags.Static | BindingFlags.NonPublic;
+            var texture = (Texture2D)View.GetMethod("CreateChulengoTicketTexture", flags).Invoke(null, null);
+            Assert.IsNotNull(texture);
+            try
+            {
+                Assert.AreEqual(512, texture.width);
+                Assert.AreEqual(320, texture.height);
+                Assert.Less(texture.GetPixel(0, 0).a, .01f, "The die-cut ticket stays transparent outside its silhouette.");
+                Color blueStar = texture.GetPixel(texture.width / 2, texture.height / 2);
+                Assert.Greater(blueStar.b, blueStar.r * 3f, "The coupon's central symbol is the reference's blue star.");
+                Color redPerforation = texture.GetPixel(Mathf.RoundToInt(texture.width * .22f),
+                    Mathf.RoundToInt(texture.height * .16f));
+                Assert.Greater(redPerforation.r, redPerforation.g * 2f, "The inset perforation line is red.");
+                Color yellowFace = texture.GetPixel(Mathf.RoundToInt(texture.width * .22f),
+                    Mathf.RoundToInt(texture.height * .23f));
+                Assert.Greater(yellowFace.r, .9f);
+                Assert.Greater(yellowFace.g, .55f);
+                Assert.Greater(yellowFace.r, yellowFace.b * 1.7f, "The ticket face is yellow, not a blue square.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(texture); }
+        }
+
         [Test]
         public void ChulengoFlagsUseTheActiveLevelPrimaryAndSecondaryColors()
         {

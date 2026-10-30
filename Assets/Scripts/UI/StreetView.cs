@@ -456,6 +456,17 @@ namespace HayChoriYPaty
         private const string VictoryPopupResource = "street-victory-popup-wood-v1";
         private const string ChulengoBowlResource = "street-chulengo-bowl-v1";
         private static readonly Vector2 VictoryPopupArtSize = new Vector2(1122, 1402);
+        private const string ChulengoVictoryTitleFirstLine = "MISIÓN";
+        private const string ChulengoVictoryTitleSecondLine = "COMPLETADA";
+        private const string ChulengoTicketCaption = "+1 TICKET";
+        private static readonly Color ChulengoZeroWarningFill = Color.white;
+        private static readonly Color ChulengoTitleOutline = new Color(.015f, .055f, .19f, .99f);
+        private static readonly Rect ChulengoTitleFirstLineSlot = new Rect(.235f, .125f, .53f, .085f);
+        private static readonly Rect ChulengoTitleSecondLineSlot = new Rect(.115f, .216f, .77f, .089f);
+        private static readonly Rect ChulengoPrizeLabelSlot = new Rect(.505f, .405f, .30f, .047f);
+        private static readonly Rect ChulengoPrizeAmountSlot = new Rect(.505f, .455f, .30f, .088f);
+        private static readonly Rect ChulengoTicketCardSlot = new Rect(.83f, .387f, .16f, .08f);
+        private static readonly Rect ChulengoTicketCaptionSlot = new Rect(.815f, .467f, .18f, .038f);
         // Normalized slots in the transparent artwork; text and pointer bounds use the same frame.
         private static readonly Rect VictoryExit = new Rect(.195f, .839f, .62f, .151f);
         private const string IntroBackdropResource = "street-cover-user-v5";
@@ -505,7 +516,7 @@ namespace HayChoriYPaty
         private Texture2D mozoWorker;
         private Texture2D victoryPopup, clubColoredVictoryPopup;
         private int clubColoredVictoryPopupLevel = int.MinValue;
-        private Texture2D chulengoMeter, chulengoNeedle, chulengoHub, chulengoParchment, chulengoBowl;
+        private Texture2D chulengoMeter, chulengoNeedle, chulengoHub, chulengoParchment, chulengoBowl, chulengoTicketTexture;
         private Texture2D coverArt, hubBackdrop, titleLogo, menuButton, googleButtonSurface, hudBarTexture, cutoutHudBarTexture, hudQuotaCardTexture, hudQuotaCardOutlineTexture, gameplayFooterTexture, riotBackdrop, riotFanAtlas, riotImpactCloud;
         private readonly System.Collections.Generic.Dictionary<string, Texture2D> glossyUpgradeCardTextures =
             new System.Collections.Generic.Dictionary<string, Texture2D>();
@@ -924,6 +935,8 @@ namespace HayChoriYPaty
             yield return null;
             chulengoParchment = CreateChulengoParchmentTexture();
             yield return null;
+            chulengoTicketTexture = CreateChulengoTicketTexture();
+            yield return null;
             hudBarTexture = CreateHudBar();
             yield return null;
             cutoutHudBarTexture = CreateHudBarTexture(true);
@@ -1019,6 +1032,8 @@ namespace HayChoriYPaty
             chulengoHub = null;
             if (chulengoParchment != null) Destroy(chulengoParchment);
             chulengoParchment = null;
+            if (chulengoTicketTexture != null) Destroy(chulengoTicketTexture);
+            chulengoTicketTexture = null;
             if (menuButton != null) Destroy(menuButton);
             menuButton = null;
             if (googleButtonSurface != null) Destroy(googleButtonSurface);
@@ -6615,6 +6630,95 @@ namespace HayChoriYPaty
                 }
             texture.SetPixels(pixels); texture.Apply(false, true); return texture;
         }
+        private static bool ChulengoTicketShapeContains(float x, float y, float inset)
+        {
+            float span = 1f - inset * 2f;
+            x = (x - inset) / span;
+            y = (y - inset) / span;
+            if (x < 0f || x > 1f || y < 0f || y > 1f) return false;
+
+            const float corner = .075f;
+            if (y < corner && (x < corner - y || x > 1f - corner + y)) return false;
+            if (y > 1f - corner && (x < corner - (1f - y) || x > 1f - corner + (1f - y))) return false;
+
+            float notchProgress = Mathf.Clamp01(1f - Mathf.Abs(y - .5f) / .09f);
+            float notch = .065f * Mathf.Sqrt(Mathf.Max(0f, 1f - (1f - notchProgress) * (1f - notchProgress)));
+            return x >= notch && x <= 1f - notch;
+        }
+
+        private static Vector2[] ChulengoTicketStarPoints(float outerRadius)
+        {
+            var points = new Vector2[10];
+            float innerRadius = outerRadius * .38f;
+            for (int i = 0; i < points.Length; i++)
+            {
+                float angle = Mathf.PI * .5f + i * Mathf.PI / 5f;
+                float radius = i % 2 == 0 ? outerRadius : innerRadius;
+                points[i] = new Vector2(.5f + Mathf.Cos(angle) * radius, .5f + Mathf.Sin(angle) * radius);
+            }
+            return points;
+        }
+
+        private static bool ChulengoTicketPolygonContains(float x, float y, Vector2[] points)
+        {
+            bool inside = false;
+            for (int i = 0, j = points.Length - 1; i < points.Length; j = i++)
+            {
+                Vector2 a = points[i], b = points[j];
+                if ((a.y > y) != (b.y > y) && x < (b.x - a.x) * (y - a.y) / (b.y - a.y) + a.x)
+                    inside = !inside;
+            }
+            return inside;
+        }
+
+        private static Texture2D CreateChulengoTicketTexture()
+        {
+            // A runtime vector-style coupon keeps the yellow stub, red perforations and blue star crisp at every UI scale.
+            const int width = 512, height = 320;
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+            {
+                name = "Chulengo illustrated ticket badge",
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp
+            };
+            var pixels = new Color32[width * height];
+            Color32 navy = new Color32(9, 24, 58, 255);
+            Color32 gold = new Color32(255, 166, 0, 255);
+            Color32 yellow = new Color32(255, 207, 23, 255);
+            Color32 face = new Color32(255, 226, 89, 255);
+            Color32 red = new Color32(204, 37, 37, 255);
+            Color32 starBlue = new Color32(20, 78, 194, 255);
+            Color32 starHighlight = new Color32(43, 113, 232, 255);
+            Vector2[] starOutline = ChulengoTicketStarPoints(.29f);
+            Vector2[] starFace = ChulengoTicketStarPoints(.26f);
+
+            for (int py = 0; py < height; py++)
+            for (int px = 0; px < width; px++)
+            {
+                float x = (px + .5f) / width;
+                float y = (py + .5f) / height;
+                Color32 pixel = new Color32(0, 0, 0, 0);
+                if (ChulengoTicketShapeContains(x, y, 0f)) pixel = navy;
+                if (ChulengoTicketShapeContains(x, y, .022f)) pixel = gold;
+                if (ChulengoTicketShapeContains(x, y, .047f)) pixel = yellow;
+                if (ChulengoTicketShapeContains(x, y, .075f)) pixel = face;
+
+                bool horizontalDash = (y >= .145f && y <= .17f || y >= .83f && y <= .855f) && x >= .13f && x <= .87f &&
+                    Mathf.Repeat((x - .13f) / .072f, 1f) < .58f;
+                bool verticalDash = (x >= .13f && x <= .155f || x >= .845f && x <= .87f) && y >= .19f && y <= .81f &&
+                    Mathf.Repeat((y - .19f) / .072f, 1f) < .58f;
+                if ((horizontalDash || verticalDash) && pixel.a > 0) pixel = red;
+
+                if (ChulengoTicketPolygonContains(x, y, starOutline)) pixel = navy;
+                if (ChulengoTicketPolygonContains(x, y, starFace))
+                    pixel = y > .5f ? starHighlight : starBlue;
+                pixels[py * width + px] = pixel;
+            }
+            texture.SetPixels32(pixels);
+            texture.Apply(false, false);
+            return texture;
+        }
+
         private static Rect FitChulengoMeter(Rect container)
         {
             const float aspect = 3f;
@@ -6694,13 +6798,16 @@ namespace HayChoriYPaty
                 Mathf.Max(1f, bounds.height - 6f) / Mathf.Max(1f, needed.y));
             return Mathf.Max(12, Mathf.FloorToInt(preferred * scale));
         }
-        private void VictoryText(Rect bounds, string value, int preferred, Color fill, TextAnchor alignment)
+        private void VictoryText(Rect bounds, string value, int preferred, Color fill, TextAnchor alignment) =>
+            VictoryText(bounds, value, preferred, fill, alignment, new Color(.08f, .035f, .018f, .98f));
+
+        private void VictoryText(Rect bounds, string value, int preferred, Color fill, TextAnchor alignment, Color outline)
         {
             // Keep popup/cover styles isolated and avoid inherited white hover on static summary labels.
             int fontSize = FitVictoryFont(menuTitle, value, preferred, bounds);
             var captionStyle = CreateStandardButtonLabelStyle(menuTitle, fontSize, fill);
             captionStyle.alignment = alignment;
-            var borderStyle = CreateStandardButtonLabelStyle(captionStyle, fontSize, new Color(.08f, .035f, .018f, .98f));
+            var borderStyle = CreateStandardButtonLabelStyle(captionStyle, fontSize, outline);
             float offset = preferred >= 32 ? 2f : .65f;
             for (int y = -1; y <= 1; y++)
             for (int x = -1; x <= 1; x++)
@@ -6716,6 +6823,85 @@ namespace HayChoriYPaty
             string amount = "$" + grouped;
             long remainder = cents % 100L;
             return remainder == 0L ? amount : amount + "," + remainder.ToString("00");
+        }
+
+        private static Rect ChulengoTitleLineBoundsForFrame(Rect frame, bool secondLine) =>
+            VictorySlot(frame, secondLine ? ChulengoTitleSecondLineSlot : ChulengoTitleFirstLineSlot);
+
+        private static Rect ChulengoPrizeAmountBoundsForFrame(Rect frame) => VictorySlot(frame, ChulengoPrizeAmountSlot);
+        private static Rect ChulengoTicketCardBoundsForFrame(Rect frame) => VictorySlot(frame, ChulengoTicketCardSlot);
+        private static Rect ChulengoTicketCaptionBoundsForFrame(Rect frame) => VictorySlot(frame, ChulengoTicketCaptionSlot);
+
+        private void DrawChulengoTitleRay(Rect frame, Vector2 normalizedCenter, float angle, Color color)
+        {
+            float width = frame.width * .034f;
+            float height = frame.width * .008f;
+            Vector2 center = new Vector2(frame.x + normalizedCenter.x * frame.width,
+                frame.y + normalizedCenter.y * frame.height);
+            Rect ray = new Rect(center.x - width * .5f, center.y - height * .5f, width, height);
+            Matrix4x4 previousMatrix = GUI.matrix;
+            Vector3 pivot = new Vector3(center.x, center.y, 0f);
+            try
+            {
+                GUI.matrix = previousMatrix * Matrix4x4.Translate(pivot) * Matrix4x4.Rotate(Quaternion.Euler(0f, 0f, angle)) *
+                    Matrix4x4.Translate(-pivot);
+                FillRect(ray, color);
+            }
+            finally { GUI.matrix = previousMatrix; }
+        }
+
+        private void DrawChulengoTitle(Rect frame, float fontScale)
+        {
+            Color accent = new Color(1f, .76f, .08f);
+            // Small burst marks echo the selected comic lettering without touching the crest or iron plates.
+            DrawChulengoTitleRay(frame, new Vector2(.105f, .232f), -24f, accent);
+            DrawChulengoTitleRay(frame, new Vector2(.135f, .205f), -10f, accent);
+            DrawChulengoTitleRay(frame, new Vector2(.105f, .264f), 16f, accent);
+            DrawChulengoTitleRay(frame, new Vector2(.895f, .232f), 24f, accent);
+            DrawChulengoTitleRay(frame, new Vector2(.865f, .205f), 10f, accent);
+            DrawChulengoTitleRay(frame, new Vector2(.895f, .264f), -16f, accent);
+
+            VictoryText(ChulengoTitleLineBoundsForFrame(frame, false), ChulengoVictoryTitleFirstLine,
+                Mathf.RoundToInt(75f * fontScale), Color.white, TextAnchor.MiddleCenter, ChulengoTitleOutline);
+            VictoryText(ChulengoTitleLineBoundsForFrame(frame, true), ChulengoVictoryTitleSecondLine,
+                Mathf.RoundToInt(70f * fontScale), new Color(1f, .78f, .12f), TextAnchor.MiddleCenter, ChulengoTitleOutline);
+        }
+
+        private void DrawChulengoTicketBadge(Rect frame, float fontScale)
+        {
+            // The reference sticker is a tilted, die-cut yellow coupon rather than a flat icon tile.
+            DrawChulengoTitleRay(frame, new Vector2(.969f, .379f), 44f, new Color(1f, .76f, .08f));
+            DrawChulengoTitleRay(frame, new Vector2(.984f, .401f), 8f, new Color(1f, .76f, .08f));
+            DrawChulengoTitleRay(frame, new Vector2(.949f, .365f), 66f, new Color(1f, .76f, .08f));
+
+            Rect card = ChulengoTicketCardBoundsForFrame(frame);
+            Vector2 pivot = card.center;
+            Matrix4x4 previousMatrix = GUI.matrix;
+            Color previousColor = GUI.color;
+            try
+            {
+                GUI.matrix = previousMatrix * Matrix4x4.Translate(new Vector3(pivot.x, pivot.y, 0f)) *
+                    Matrix4x4.Rotate(Quaternion.Euler(0f, 0f, -14f)) *
+                    Matrix4x4.Translate(new Vector3(-pivot.x, -pivot.y, 0f));
+                if (chulengoTicketTexture != null)
+                {
+                    Color shadow = new Color(.025f, .045f, .12f, .48f);
+                    GUI.color = shadow;
+                    GUI.DrawTexture(LayoutRect(new Rect(card.x + 2f, card.y + 3f, card.width, card.height)),
+                        chulengoTicketTexture, ScaleMode.StretchToFill, true);
+                    GUI.color = Color.white;
+                    GUI.DrawTexture(LayoutRect(card), chulengoTicketTexture, ScaleMode.StretchToFill, true);
+                }
+
+                Rect caption = ChulengoTicketCaptionBoundsForFrame(frame);
+                VictoryText(caption, ChulengoTicketCaption, Mathf.RoundToInt(33f * fontScale), Color.white,
+                    TextAnchor.MiddleCenter, ChulengoTitleOutline);
+            }
+            finally
+            {
+                GUI.matrix = previousMatrix;
+                GUI.color = previousColor;
+            }
         }
 
         private void DrawChulengoPaper(Rect frame)
@@ -6767,15 +6953,15 @@ namespace HayChoriYPaty
 
             Color resultColor = sector == 0 || sector == 6 ? new Color(.75f, .075f, .035f) : cream;
             if (pending || lockedRetry && sector < 0) resultColor = cream;
-            VictoryText(VictorySlot(frame, new Rect(.535f, .405f, .385f, .047f)), label,
+            VictoryText(VictorySlot(frame, ChulengoPrizeLabelSlot), label,
                 Mathf.RoundToInt(20f * fontScale), resultColor, TextAnchor.MiddleCenter);
             if (gameCoin != null)
             {
-                GUI.DrawTexture(VictorySlot(frame, new Rect(.405f, .435f, .075f, .075f)), gameCoin, ScaleMode.ScaleToFit, true);
-                GUI.DrawTexture(VictorySlot(frame, new Rect(.435f, .415f, .085f, .088f)), gameCoin, ScaleMode.ScaleToFit, true);
-                GUI.DrawTexture(VictorySlot(frame, new Rect(.455f, .445f, .075f, .077f)), gameCoin, ScaleMode.ScaleToFit, true);
+                GUI.DrawTexture(VictorySlot(frame, new Rect(.385f, .435f, .075f, .075f)), gameCoin, ScaleMode.ScaleToFit, true);
+                GUI.DrawTexture(VictorySlot(frame, new Rect(.405f, .415f, .085f, .088f)), gameCoin, ScaleMode.ScaleToFit, true);
+                GUI.DrawTexture(VictorySlot(frame, new Rect(.425f, .445f, .075f, .077f)), gameCoin, ScaleMode.ScaleToFit, true);
             }
-            VictoryText(VictorySlot(frame, new Rect(.56f, .455f, .37f, .088f)), FormatChulengoMoney(reward),
+            VictoryText(ChulengoPrizeAmountBoundsForFrame(frame), FormatChulengoMoney(reward),
                 Mathf.RoundToInt(80f * fontScale), sector == 0 || sector == 6 ? new Color(.75f, .075f, .035f) : new Color(1f, .69f, .14f), TextAnchor.MiddleCenter);
         }
 
@@ -6796,7 +6982,7 @@ namespace HayChoriYPaty
                     FormatChulengoMoney(maximum), Mathf.RoundToInt(68f * fontScale), new Color(1f, .69f, .14f), TextAnchor.MiddleLeft);
                 VictoryText(VictorySlot(frame, new Rect(.10f, .87f, .80f, .037f)),
                     "¡EN ×0 PERDÉS TODO EL PREMIO DEL TURNO!", Mathf.RoundToInt(22f * fontScale),
-                    new Color(.78f, .07f, .035f), TextAnchor.MiddleCenter);
+                    ChulengoZeroWarningFill, TextAnchor.MiddleCenter);
             }
             else if (lockedRetry)
             {
@@ -6859,8 +7045,6 @@ namespace HayChoriYPaty
                 }
                 float fontScale = frame.width / 516f;
                 Color gold = new Color(1f, .82f, .22f), brown = new Color(.18f, .055f, .018f);
-                VictoryText(VictorySlot(frame, new Rect(.095f, .149f, .81f, .189f)),
-                    "¡TURNO\nCOMPLETADO!", Mathf.RoundToInt(50f * fontScale), gold, TextAnchor.MiddleCenter);
 
                 bool victory = game.Sim.Phase == RoundPhase.Won;
                 if (game.ShowChulengoResult)
@@ -6869,9 +7053,11 @@ namespace HayChoriYPaty
                     bool pending = game.HasPendingChulengo && !lockedRetry;
                     int sector = game.ChulengoSelectedSector;
                     DrawChulengoPaper(frame);
+                    DrawChulengoTitle(frame, fontScale);
                     DrawChulengoHero(frame, pending, lockedRetry, sector);
-                    DrawChulengoMeter(VictorySlot(frame, new Rect(.0625f, .47f, .875f, .275f)),
+                    DrawChulengoMeter(VictorySlot(frame, new Rect(.0625f, .50f, .875f, .245f)),
                         !pending, sector, Mathf.RoundToInt(29f * fontScale));
+                    DrawChulengoTicketBadge(frame, fontScale);
                     DrawChulengoFooter(frame, pending, lockedRetry, sector);
                     if (pending || lockedRetry)
                     {
@@ -6892,6 +7078,8 @@ namespace HayChoriYPaty
                     }
                     return;
                 }
+                VictoryText(VictorySlot(frame, new Rect(.095f, .149f, .81f, .189f)),
+                    "¡TURNO\nCOMPLETADO!", Mathf.RoundToInt(50f * fontScale), gold, TextAnchor.MiddleCenter);
                 VictoryText(VictorySlot(frame, new Rect(.10f, .345f, .80f, .055f)),
                     victory ? "VENTAS COMPLETADAS" : "FALTAN", Mathf.RoundToInt(23f * fontScale), brown, TextAnchor.MiddleCenter);
                 string sales = FormatQuotaSummary(game.Sim, !victory);
