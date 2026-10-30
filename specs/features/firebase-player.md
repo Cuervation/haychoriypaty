@@ -12,6 +12,10 @@ Desde 2026-10-27 no se dibuja una portada Firebase separada. El acceso obligator
 
 Logout explícito cierra sesión, bloquea acceso y conserva cache/outbox separados del UID. No reutilizar un bool propio como autenticación. Cambio de cuenta desmonta simulación/referencias anteriores; callbacks asíncronos verifican UID y generación de sesión. No transferir datos entre cuentas. Una ronda activa debe cerrarse explícitamente o esperarse antes de logout, no abandonarla silenciosamente.
 
+## Ledger de Tickets y Extras — 2026-10-29
+
+`StreetTicketData` se serializa aditivamente dentro del snapshot de dominio v4 existente (saldo, totales, reservas por rol, marcador de migración y deduplicación). Premio terminal y canje se confirman mediante el mismo delegado de persistencia/outbox por UID; el inicio elegible guarda intento+consumo de reservas juntos. No se creó colección, fuente de verdad, campo de match ni regla Firestore nueva. La deduplicación local por intento/operación no sustituye la prueba remota de CAS ni la aceptación de dos dispositivos: offline con ramas divergentes sigue el conflicto conservador ya definido abajo. Tests locales/mock no equivalen a Firebase real.
+
 ## Persistencia local y migración v4
 
 Mantener v4 como payload de dominio compatible dentro de un envelope versionado por UID: `schemaVersion`, `uid`, `acknowledgedRevision`, `snapshot`, `pending`, `legacySourceHash`, `lastAcknowledgedMatchId`, `migrationCommitted`; wrapper con SHA256. Estadísticas y `activeAttemptSummary` viven dentro del snapshot v4. No se implementó installationId/branchId/localSequence: UUID de operación + CAS identifica cada cadena. Snapshot y operación/contadores relacionados se escriben en **una unidad local duradera** antes de confirmar éxito. Archivo temporal+flush+reemplazo y copia buena previa son una estrategia admisible. No separar saldo y outbox en dos claves que puedan quedar descoordinadas. Error de escritura conserva copia previa e impide confirmar comando.
@@ -88,7 +92,7 @@ Match: UID, UUID intento/match, nivel/club, outcome, elapsed, fecha local/servid
 | StreetKitchenProduction/IStreetKitchenStock | sin red por unidad ni persistir reservas/movimientos físicos |
 | StreetView | acceso Google, logout, error/sync/conflicto y gate de acciones, sin rediseñar gameplay |
 
-`OrderCompleted` actual sirve sonido y no sustituye ventas: verificar sus early-return antes de reutilizarlo para métricas; instrumentar finalización real de pedido una vez. Nuevos contadores guardados localmente en checkpoints y pausa, sin resumir ronda en carga; no depender de quit, que puede no ejecutarse. En guardados existentes durante Playing se captura un checkpoint de métricas reales: al recuperar un intento interrumpido coincidente se aplica una sola vez, sin match, outcome, premio, victoria, derrota ni abandono. La cola terminal borra ese checkpoint. No se añadió guardado por frame/producto ni timer periódico.
+`ProductUnitDelivered` dispara el sonido de presentación una vez por cada unidad tras su handoff real. `OrderCompleted` sigue siendo una señal distinta de cierre completo del ticket, no reemplaza ventas ni revenue. Nuevos contadores se guardan localmente en checkpoints y pausa, sin resumir ronda en carga; no depender de quit, que puede no ejecutarse. En guardados existentes durante Playing se captura un checkpoint de métricas reales: al recuperar un intento interrumpido coincidente se aplica una sola vez, sin match, outcome, premio, victoria, derrota ni abandono. La cola terminal borra ese checkpoint. No se añadió guardado por frame/producto ni timer periódico.
 
 ## Seguridad, operación y límites
 

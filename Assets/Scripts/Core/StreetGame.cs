@@ -3,6 +3,27 @@ using System;
 
 namespace HayChoriYPaty
 {
+    /// <summary>Bounded, snapshot-owned ticket wallet and one-attempt worker reservations.</summary>
+    [Serializable]
+    public sealed class StreetTicketData
+    {
+        public int schemaVersion = 1;
+        public long balance, totalEarned, totalSpent;
+        public long[] pendingWorkersByRole = new long[5];
+        public bool migrationApplied;
+        public string lastAwardedAttemptId, lastRedeemOperationId;
+        public int lastRedeemRole = -1;
+
+        public bool IsValid()
+        {
+            if (schemaVersion != 1 || balance < 0 || totalEarned < 0 || totalSpent < 0 ||
+                totalSpent > totalEarned || balance != totalEarned - totalSpent || totalSpent % 3 != 0 ||
+                pendingWorkersByRole == null || pendingWorkersByRole.Length != 5) return false;
+            for (int i = 0; i < pendingWorkersByRole.Length; i++) if (pendingWorkersByRole[i] < 0) return false;
+            return true;
+        }
+    }
+
     /// <summary>Unity lifecycle and isolated persistence wrapper for StreetSimulation.</summary>
     [DisallowMultipleComponent]
     public sealed class StreetGame : MonoBehaviour
@@ -45,6 +66,7 @@ namespace HayChoriYPaty
             public int ferneteros;
             public int mozos;
             public StreetMarketData market;
+            public StreetTicketData tickets;
             public StreetPlayerStatistics statistics = new StreetPlayerStatistics();
             public string activeAttemptId;
             // Checkpoint for cumulative metrics of a live attempt. It is snapshot-only, never history/outbox.
@@ -80,6 +102,25 @@ namespace HayChoriYPaty
         }
         public bool HasIncompleteSalesHistory => playerActive && save?.statistics != null && save.statistics.legacyCoverageIncomplete;
         public StreetMarket Market => playerActive ? market : null;
+        public long TicketBalance => playerActive && save?.tickets != null ? save.tickets.balance : 0L;
+        public long TicketTotalEarned => playerActive && save?.tickets != null ? save.tickets.totalEarned : 0L;
+        public long TicketTotalSpent => playerActive && save?.tickets != null ? save.tickets.totalSpent : 0L;
+        public bool TicketExtrasUnlocked => playerActive && save != null && save.unlockedLevel >= 5;
+        public string TicketRedemptionOperationId(StreetWorkerRole role)
+        {
+            int index = (int)role;
+            return save?.tickets != null && index >= 0 && index < 5
+                ? FormatTicketRedemptionOperationId(save.tickets.totalSpent / 3L, index) : null;
+        }
+        public long PendingTicketWorkers(StreetWorkerRole role)
+        {
+            int index = (int)role;
+            return playerActive && save?.tickets?.pendingWorkersByRole != null && index >= 0 && index < 5
+                ? save.tickets.pendingWorkersByRole[index] : 0L;
+        }
+        public bool TicketRewardAppliedForCurrentVictory => playerActive && sim != null && sim.Phase == RoundPhase.Won &&
+            save?.tickets != null && save.statistics != null && !string.IsNullOrEmpty(save.tickets.lastAwardedAttemptId) &&
+            save.tickets.lastAwardedAttemptId == save.statistics.lastAppliedAttemptId;
         public bool IsPlayerActive => playerActive;
         public string ActiveSaveJson => save == null ? null : JsonUtility.ToJson(save);
         public bool HasPendingChulengo => save != null && save.pendingVictoryMatch != null;
@@ -121,6 +162,7 @@ namespace HayChoriYPaty
             bool missingStatistics = save.statistics == null || string.IsNullOrEmpty(save.statistics.instrumentationStartedAtUtc);
             if (save.statistics == null) save.statistics = new StreetPlayerStatistics();
             save.statistics.Normalize();
+            if (!InitializeTicketData(save)) return false;
             if (missingStatistics)
             {
                 save.statistics.instrumentationStartedAtUtc = DateTime.UtcNow.ToString("o");
@@ -228,11 +270,9 @@ namespace HayChoriYPaty
                 resultSaved = Save(); // No final match/history/statistics before the player chooses.
                 return resultSaved;
             }
-            if (save.pendingMatch == null)
-            {
-                save.pendingMatch = BuildMatchRecord(receipt);
-                save.statistics.ApplyMatch(save.pendingMatch);
-            }
+            if (save.pendingMatch == null) save.pendingMatch = BuildMatchRecord(receipt);
+            if (save.pendingMatch.won && !EnsureVictoryTicketAwarded(save.pendingMatch)) return false;
+            save.statistics.ApplyMatch(save.pendingMatch);
             resultSaved = SaveWithMatch(save.pendingMatch);
             if (!resultSaved) save.unlockedLevel = previousUnlocked;
             else { ResetAttemptMetrics(); activeAttemptId = null; save.activeAttemptId = null; }
@@ -275,6 +315,7 @@ namespace HayChoriYPaty
             record.progressionBonusCents = receipt.progressionBonusCents;
             record.rewardCents = receipt.earnedCents;
             save.pendingMatch = record;
+            if (!EnsureVictoryTicketAwarded(record)) return false;
             save.statistics.ApplyMatch(record);
             save.pendingVictoryMatch = null;
             resultSaved = SaveWithMatch(record);
@@ -307,27 +348,93 @@ namespace HayChoriYPaty
         public bool TryStartRound()
         {
             if (!playerActive || !CanStartRound) return false;
+            long[] ticketGrants = new long[5];
+            bool eligibleLevel = sim.LevelIndex >= 5;
+            if (eligibleLevel) Array.Copy(save.tickets.pendingWorkersByRole, ticketGrants, ticketGrants.Length);
+            if (!sim.CanStartRoundWithTicketWorkers(ticketGrants)) return false;
+
             string previousMarket = JsonUtility.ToJson(market.Data);
+            string previousTickets = JsonUtility.ToJson(save.tickets);
             market.EnsureLevelOneStartingStock(sim);
             if (!market.BeginAttempt(sim))
             {
                 RestoreMarketAfterFailedStart(previousMarket);
                 return false;
             }
+            if (eligibleLevel)
+                for (int role = 0; role < ticketGrants.Length; role++)
+                    save.tickets.pendingWorkersByRole[role] -= ticketGrants[role];
             activeAttemptId = Guid.NewGuid().ToString("N");
             save.activeAttemptId = activeAttemptId;
             save.statistics.attemptsStarted++;
-            // Persist the top-up and full pre-attempt snapshot before any delivery can consume stock.
+            // The same durable snapshot confirms the attempt and consumes eligible reservations.
             if (!Save())
             {
                 save.statistics.attemptsStarted--;
                 save.activeAttemptId = null; activeAttemptId = null;
+                save.tickets = JsonUtility.FromJson<StreetTicketData>(previousTickets);
                 market.AbortAttempt();
                 RestoreMarketAfterFailedStart(previousMarket);
                 return false;
             }
             sim.BindIngredientStock(market);
-            resultSaved = false; sim.StartRound(); Save(); return true;
+            resultSaved = false;
+            if (!sim.StartRound(ticketGrants))
+            {
+                // Preflight and StartRound share the same role/count checks; this is a defensive recovery path.
+                save.statistics.attemptsStarted--;
+                save.activeAttemptId = null; activeAttemptId = null;
+                save.tickets = JsonUtility.FromJson<StreetTicketData>(previousTickets);
+                market.AbortAttempt();
+                RestoreMarketAfterFailedStart(previousMarket);
+                if (!Save()) FreezeAfterUnpersistedMutation();
+                return false;
+            }
+            Save(); return true;
+        }
+
+        public bool CanRedeemTicketWorker(StreetWorkerRole role)
+        {
+            int index = (int)role;
+            return playerActive && save?.tickets != null && market != null && sim != null &&
+                save.unlockedLevel >= 5 && sim.LevelIndex >= 5 && sim.Phase == RoundPhase.Ready &&
+                !HasPendingChulengo && !resumedChulengoResult && !market.Data.attemptActive &&
+                index >= 0 && index < 5 && sim.HasRole(role) && save.tickets.balance >= 3 &&
+                save.tickets.totalSpent <= long.MaxValue - 3 && save.tickets.pendingWorkersByRole[index] < long.MaxValue;
+        }
+
+        public bool TryRedeemTicketWorker(StreetWorkerRole role, string operationId)
+        {
+            int index = (int)role;
+            if (string.IsNullOrEmpty(operationId) || operationId.Length > 64 || index < 0 || index >= 5 || save?.tickets == null ||
+                !TryParseTicketRedemptionOperationId(operationId, out long sequence, out int operationRole) || operationRole != index) return false;
+            long nextSequence = save.tickets.totalSpent / 3L;
+            // Sequences are contiguous because every successful redemption costs exactly three.
+            // This recognizes any delayed replay without retaining an unbounded operation-ID list.
+            if (sequence < nextSequence) return true;
+            if (sequence != nextSequence || !CanRedeemTicketWorker(role)) return false;
+            string before = JsonUtility.ToJson(save.tickets);
+            save.tickets.balance -= 3;
+            save.tickets.totalSpent += 3;
+            save.tickets.pendingWorkersByRole[index]++;
+            save.tickets.lastRedeemOperationId = operationId;
+            save.tickets.lastRedeemRole = index;
+            if (Save()) return true;
+            save.tickets = JsonUtility.FromJson<StreetTicketData>(before);
+            return false;
+        }
+
+        private static string FormatTicketRedemptionOperationId(long sequence, int role) =>
+            "ticket-redeem/" + sequence.ToString(System.Globalization.CultureInfo.InvariantCulture) + "/" +
+            role.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        private static bool TryParseTicketRedemptionOperationId(string operationId, out long sequence, out int role)
+        {
+            sequence = -1; role = -1;
+            string[] fields = operationId.Split('/');
+            return fields.Length == 3 && fields[0] == "ticket-redeem" &&
+                long.TryParse(fields[1], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out sequence) && sequence >= 0 &&
+                int.TryParse(fields[2], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out role) && role >= 0 && role < 5;
         }
 
         private void RestoreMarketAfterFailedStart(string serializedMarket)
@@ -478,7 +585,7 @@ namespace HayChoriYPaty
                 if (data != null && StreetMatchRecord.IsAbsent(data.pendingMatch)) data.pendingMatch = null;
                 if (data != null && StreetMatchRecord.IsAbsent(data.pendingVictoryMatch)) data.pendingVictoryMatch = null;
                 if (data != null && StreetMatchRecord.IsAbsent(data.activeAttemptSummary)) data.activeAttemptSummary = null;
-                if (data == null || data.version != 4) { data = null; return false; }
+                if (data == null || data.version != 4 || (data.tickets != null && !data.tickets.IsValid())) { data = null; return false; }
                 data.unlockedLevel = Mathf.Clamp(data.unlockedLevel, 0, StreetSimulation.LevelNames.Length - 1);
                 data.price = Mathf.Clamp(data.price, balance.minPrice, balance.maxPrice);
                 data.staff = Mathf.Max(1, data.staff);
@@ -510,6 +617,58 @@ namespace HayChoriYPaty
             return data;
         }
 
+
+        private bool InitializeTicketData(SaveData data)
+        {
+            if (data == null) return false;
+            if (data.tickets == null) data.tickets = new StreetTicketData();
+            if (!data.tickets.IsValid()) return false;
+            if (!data.tickets.migrationApplied)
+            {
+                long migrated = InferLegacyTicketWins(data);
+                long room = Math.Min(long.MaxValue - data.tickets.balance, long.MaxValue - data.tickets.totalEarned);
+                migrated = Math.Min(migrated, room);
+                data.tickets.balance += migrated;
+                data.tickets.totalEarned += migrated;
+                // A pending old-style terminal record is already reflected in win statistics and migration.
+                if (data.pendingMatch != null && data.pendingMatch.won && !string.IsNullOrEmpty(data.pendingMatch.attemptId))
+                    data.tickets.lastAwardedAttemptId = data.pendingMatch.attemptId;
+                data.tickets.migrationApplied = true;
+            }
+            return data.tickets.IsValid();
+        }
+
+        private static long InferLegacyTicketWins(SaveData data)
+        {
+            if (data == null) return 0L;
+            long impliedFirstWins = Math.Max(0, Math.Min(StreetSimulation.LevelNames.Length, data.unlockedLevel));
+            long[] wins = data.statistics != null ? data.statistics.winsByLevel : null;
+            StreetMatchRecord pending = data.pendingVictoryMatch;
+            int pendingLevel = pending == null ? -1 : pending.level;
+            if (pending != null && pending.won && pendingLevel == impliedFirstWins - 1 &&
+                At(wins, pendingLevel) == 0 && impliedFirstWins > 0)
+                impliedFirstWins--; // ProcessRoundResult raised the unlock before the Chulengo result was finalized.
+
+            long total = impliedFirstWins;
+            for (int level = 0; level < StreetSimulation.LevelNames.Length; level++)
+            {
+                long recordedWins = At(wins, level);
+                long additional = level < impliedFirstWins ? Math.Max(0L, recordedWins - 1L) : recordedWins;
+                total = additional > 0 && total > long.MaxValue - additional ? long.MaxValue : total + additional;
+            }
+            return total;
+        }
+
+        private bool EnsureVictoryTicketAwarded(StreetMatchRecord record)
+        {
+            if (record == null || !record.won || record.abandoned || string.IsNullOrEmpty(record.attemptId) || save?.tickets == null) return false;
+            if (save.tickets.lastAwardedAttemptId == record.attemptId) return true;
+            if (save.tickets.balance == long.MaxValue || save.tickets.totalEarned == long.MaxValue) return false;
+            save.tickets.balance++;
+            save.tickets.totalEarned++;
+            save.tickets.lastAwardedAttemptId = record.attemptId;
+            return true;
+        }
 
         private SaveData DefaultSave() { return new SaveData { price = balance.initialPrice }; }
 
@@ -567,6 +726,7 @@ namespace HayChoriYPaty
         }
 
         private static long At(int[] values, int index) => values != null && index >= 0 && index < values.Length ? Math.Max(0, values[index]) : 0;
+        private static long At(long[] values, int index) => values != null && index >= 0 && index < values.Length ? Math.Max(0L, values[index]) : 0L;
 
         private bool Save()
         {

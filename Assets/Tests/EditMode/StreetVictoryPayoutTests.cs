@@ -121,18 +121,27 @@ namespace HayChoriYPaty.Tests
                 Assert.AreEqual(37500L, Call(market, "MinimumPurchaseCostCents", levelThree));
                 long purchaseUnitsBefore = (long)Get(recoveredData, "cumulativePurchaseUnits");
                 long purchaseSpendBefore = (long)Get(recoveredData, "cumulativePurchaseSpendCents");
+                long nextPurchaseIdBefore = (long)Get(recoveredData, "nextPurchaseId");
+                long lastPurchaseIdBefore = (long)Get(recoveredData, "lastPurchaseId");
+                int successfulPurchases = 0;
                 for (int ingredient = 0; ingredient < 10; ingredient++)
                 {
                     int missingPacks = (int)Call(market, "MissingPacks", levelThree, ingredient);
                     if (missingPacks > 0)
                         Assert.IsTrue((bool)Call(game, "TryBuyIngredient", ingredient, missingPacks, (long)Get(market, "NextPurchaseId")),
                             "Exact Level 3 missing packs must be purchasable from the recovered receipt.");
+                    if (missingPacks > 0) successfulPurchases++;
                 }
                 Assert.IsTrue((bool)Call(market, "HasRequiredStock", levelThree));
                 Assert.AreEqual(319500L, Get(market, "BalanceCents"), "Only the $375.00 non-sandwich Level 3 stock shortfall is spent.");
                 Assert.AreEqual(37500L, (long)Get(recoveredData, "cumulativePurchaseSpendCents") - purchaseSpendBefore);
                 Assert.AreEqual(150L, (long)Get(recoveredData, "cumulativePurchaseUnits") - purchaseUnitsBefore);
-                Assert.AreEqual(15L, Get(recoveredData, "nextPurchaseId")); Assert.AreEqual(14L, Get(recoveredData, "lastPurchaseId"));
+                Assert.AreEqual(nextPurchaseIdBefore + successfulPurchases, Get(recoveredData, "nextPurchaseId"));
+                Assert.AreEqual(lastPurchaseIdBefore + successfulPurchases, Get(recoveredData, "lastPurchaseId"));
+                long purchaseUnitsAfter = (long)Get(recoveredData, "cumulativePurchaseUnits");
+                long purchaseSpendAfter = (long)Get(recoveredData, "cumulativePurchaseSpendCents");
+                long nextPurchaseIdAfter = (long)Get(recoveredData, "nextPurchaseId");
+                long lastPurchaseIdAfter = (long)Get(recoveredData, "lastPurchaseId");
                 int[] stockAfterLevelThree = (int[])((int[])Get(recoveredData, "stockUnits")).Clone();
 
                 UnityEngine.Object.DestroyImmediate(host); host = null;
@@ -143,9 +152,10 @@ namespace HayChoriYPaty.Tests
                 market = Get(game, "Market"); object persisted = Get(market, "Data");
                 Assert.AreEqual(319500L, Get(market, "BalanceCents"), "The lifecycle must not grant the migrated receipt twice after stock purchases.");
                 CollectionAssert.AreEqual(stockAfterLevelThree, (int[])Get(persisted, "stockUnits"));
-                Assert.AreEqual(1625L, Get(persisted, "cumulativePurchaseUnits"));
-                Assert.AreEqual(261250L, Get(persisted, "cumulativePurchaseSpendCents"));
-                Assert.AreEqual(15L, Get(persisted, "nextPurchaseId")); Assert.AreEqual(14L, Get(persisted, "lastPurchaseId"));
+                Assert.AreEqual(purchaseUnitsAfter, Get(persisted, "cumulativePurchaseUnits"));
+                Assert.AreEqual(purchaseSpendAfter, Get(persisted, "cumulativePurchaseSpendCents"));
+                Assert.AreEqual(nextPurchaseIdAfter, Get(persisted, "nextPurchaseId"));
+                Assert.AreEqual(lastPurchaseIdAfter, Get(persisted, "lastPurchaseId"));
                 Assert.AreEqual(14L, Get(persisted, "nextAttemptId"));
                 Assert.AreEqual(13L, Get(persisted, "attemptId")); Assert.AreEqual(13L, Get(persisted, "settledAttemptId"));
                 Assert.AreEqual(1, Get(persisted, "attemptLevel")); Assert.AreEqual(10, Get(persisted, "initializedUnlockedLevel"));

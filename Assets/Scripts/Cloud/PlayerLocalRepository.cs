@@ -53,6 +53,7 @@ namespace HayChoriYPaty.Cloud
             var save = JsonUtility.FromJson<StreetGame.SaveData>(json);
             if (save == null || save.version < 1 || save.version > 4 || save.unlockedLevel < 0 || save.unlockedLevel > 10)
                 throw new InvalidDataException("Invalid legacy version/progress");
+            if (save.tickets != null && !save.tickets.IsValid()) throw new InvalidDataException("Invalid ticket ledger");
             if (save.market != null)
             {
                 if (save.market.balanceCents < 0 || save.market.stockUnits == null || save.market.stockUnits.Length != 10)

@@ -316,7 +316,8 @@ namespace HayChoriYPaty.Cloud
             if (State == PlayerSessionState.Ready && !accountOpen)
             {
                 if (view != null && view.AccountMenuVisible && !view.HubAccountActionRendered)
-                    AccountButton(new Rect(Screen.width - 126, 16, 110, 32), "CUENTA", OpenAccountMenu);
+                    AccountButton(HayChoriYPaty.StreetView.HubAccountButtonScreenBounds(
+                        new Vector2(Screen.width, Screen.height)), "CUENTA", OpenAccountMenu);
                 return;
             }
 

@@ -26,6 +26,21 @@ namespace HayChoriYPaty.Tests
         private bool hadTutorialCompletion;
         private int previousTutorialCompletion;
         private string tutorialCompletedKey;
+        private bool hadLevelTwoTutorialCompletion;
+        private int previousLevelTwoTutorialCompletion;
+        private string levelTwoTutorialCompletedKey;
+        private bool hadLevelThreeTutorialCompletion;
+        private int previousLevelThreeTutorialCompletion;
+        private string levelThreeTutorialCompletedKey;
+        private bool hadLevelFourTutorialCompletion;
+        private int previousLevelFourTutorialCompletion;
+        private string levelFourTutorialCompletedKey;
+        private bool hadLevelFiveTutorialCompletion;
+        private int previousLevelFiveTutorialCompletion;
+        private string levelFiveTutorialCompletedKey;
+        private bool hadLevelSixTutorialCompletion;
+        private int previousLevelSixTutorialCompletion;
+        private string levelSixTutorialCompletedKey;
         private float previousTimeScale;
         private bool previousBackground;
         private bool startupResourcesDeferredAtEnable;
@@ -59,6 +74,26 @@ namespace HayChoriYPaty.Tests
             hadTutorialCompletion = PlayerPrefs.HasKey(tutorialCompletedKey);
             previousTutorialCompletion = hadTutorialCompletion ? PlayerPrefs.GetInt(tutorialCompletedKey) : 0;
             PlayerPrefs.DeleteKey(tutorialCompletedKey);
+            levelTwoTutorialCompletedKey = (string)viewType.GetField("LevelTwoCocacoleroTutorialCompletedKey", StaticPrivate).GetRawConstantValue();
+            hadLevelTwoTutorialCompletion = PlayerPrefs.HasKey(levelTwoTutorialCompletedKey);
+            previousLevelTwoTutorialCompletion = hadLevelTwoTutorialCompletion ? PlayerPrefs.GetInt(levelTwoTutorialCompletedKey) : 0;
+            PlayerPrefs.DeleteKey(levelTwoTutorialCompletedKey);
+            levelThreeTutorialCompletedKey = (string)viewType.GetField("LevelThreePatyTutorialCompletedKey", StaticPrivate).GetRawConstantValue();
+            hadLevelThreeTutorialCompletion = PlayerPrefs.HasKey(levelThreeTutorialCompletedKey);
+            previousLevelThreeTutorialCompletion = hadLevelThreeTutorialCompletion ? PlayerPrefs.GetInt(levelThreeTutorialCompletedKey) : 0;
+            PlayerPrefs.DeleteKey(levelThreeTutorialCompletedKey);
+            levelFourTutorialCompletedKey = (string)viewType.GetField("LevelFourSpecialistsTutorialCompletedKey", StaticPrivate).GetRawConstantValue();
+            hadLevelFourTutorialCompletion = PlayerPrefs.HasKey(levelFourTutorialCompletedKey);
+            previousLevelFourTutorialCompletion = hadLevelFourTutorialCompletion ? PlayerPrefs.GetInt(levelFourTutorialCompletedKey) : 0;
+            PlayerPrefs.DeleteKey(levelFourTutorialCompletedKey);
+            levelFiveTutorialCompletedKey = (string)viewType.GetField("LevelFiveSpecialistsTutorialCompletedKey", StaticPrivate).GetRawConstantValue();
+            hadLevelFiveTutorialCompletion = PlayerPrefs.HasKey(levelFiveTutorialCompletedKey);
+            previousLevelFiveTutorialCompletion = hadLevelFiveTutorialCompletion ? PlayerPrefs.GetInt(levelFiveTutorialCompletedKey) : 0;
+            PlayerPrefs.DeleteKey(levelFiveTutorialCompletedKey);
+            levelSixTutorialCompletedKey = (string)viewType.GetField("LevelSixRacingTutorialCompletedKey", StaticPrivate).GetRawConstantValue();
+            hadLevelSixTutorialCompletion = PlayerPrefs.HasKey(levelSixTutorialCompletedKey);
+            previousLevelSixTutorialCompletion = hadLevelSixTutorialCompletion ? PlayerPrefs.GetInt(levelSixTutorialCompletedKey) : 0;
+            PlayerPrefs.DeleteKey(levelSixTutorialCompletedKey);
             view = root.AddComponent(viewType);
             startupResourcesDeferredAtEnable = !(bool)viewType.GetField("viewResourcesReady", PrivateInstance).GetValue(view);
             // Existing pointer checks isolate post-intro controls; the dedicated test below exercises startup.
@@ -83,6 +118,16 @@ namespace HayChoriYPaty.Tests
             else PlayerPrefs.DeleteKey(key);
             if (hadTutorialCompletion) PlayerPrefs.SetInt(tutorialCompletedKey, previousTutorialCompletion);
             else PlayerPrefs.DeleteKey(tutorialCompletedKey);
+            if (hadLevelTwoTutorialCompletion) PlayerPrefs.SetInt(levelTwoTutorialCompletedKey, previousLevelTwoTutorialCompletion);
+            else PlayerPrefs.DeleteKey(levelTwoTutorialCompletedKey);
+            if (hadLevelThreeTutorialCompletion) PlayerPrefs.SetInt(levelThreeTutorialCompletedKey, previousLevelThreeTutorialCompletion);
+            else PlayerPrefs.DeleteKey(levelThreeTutorialCompletedKey);
+            if (hadLevelFourTutorialCompletion) PlayerPrefs.SetInt(levelFourTutorialCompletedKey, previousLevelFourTutorialCompletion);
+            else PlayerPrefs.DeleteKey(levelFourTutorialCompletedKey);
+            if (hadLevelFiveTutorialCompletion) PlayerPrefs.SetInt(levelFiveTutorialCompletedKey, previousLevelFiveTutorialCompletion);
+            else PlayerPrefs.DeleteKey(levelFiveTutorialCompletedKey);
+            if (hadLevelSixTutorialCompletion) PlayerPrefs.SetInt(levelSixTutorialCompletedKey, previousLevelSixTutorialCompletion);
+            else PlayerPrefs.DeleteKey(levelSixTutorialCompletedKey);
             PlayerPrefs.Save();
             Time.timeScale = previousTimeScale;
             Application.runInBackground = previousBackground;
@@ -302,6 +347,31 @@ namespace HayChoriYPaty.Tests
         }
 
 
+        [Test]
+        public void QaStartupClearsOnlyTheTutorialCompletionMarker()
+        {
+            const string unrelatedKey = "HayChoriYPaty.Tests.TutorialMarkerUnrelatedSentinel";
+            bool hadUnrelated = PlayerPrefs.HasKey(unrelatedKey);
+            int previousUnrelated = hadUnrelated ? PlayerPrefs.GetInt(unrelatedKey) : 0;
+            try
+            {
+                PlayerPrefs.SetInt(tutorialCompletedKey, 1);
+                PlayerPrefs.SetInt(unrelatedKey, 42);
+                view.GetType().GetField("introActive", PrivateInstance).SetValue(view, true);
+                view.GetType().GetMethod("OpenHubFromIntro", PrivateInstance).Invoke(view, null);
+
+                Assert.IsFalse(PlayerPrefs.HasKey(tutorialCompletedKey),
+                    "QA startup should remove the stale tutorial-only marker.");
+                Assert.AreEqual(42, PlayerPrefs.GetInt(unrelatedKey),
+                    "Unrelated preferences must be preserved.");
+            }
+            finally
+            {
+                if (hadUnrelated) PlayerPrefs.SetInt(unrelatedKey, previousUnrelated);
+                else PlayerPrefs.DeleteKey(unrelatedKey);
+            }
+        }
+
         [UnityTest]
         public IEnumerator FirstLevelTutorialExplainsHudAndStartsOnFinalSiguiente()
         {
@@ -346,7 +416,504 @@ namespace HayChoriYPaty.Tests
             yield return Click(lastButton.center.x, lastButton.center.y);
             Assert.AreEqual("Playing", Phase);
             Assert.IsFalse((bool)viewType.GetField("levelOneTutorialActive", PrivateInstance).GetValue(view));
-            Assert.AreEqual(1, PlayerPrefs.GetInt(tutorialCompletedKey, 0));
+            Assert.AreEqual(0, PlayerPrefs.GetInt(tutorialCompletedKey, 0),
+                "Temporary QA repetition must not persist the completion marker.");
+        }
+
+        [UnityTest]
+        public IEnumerator LevelTwoCocacoleroTutorialExplainsQuotaAndHireBeforeStarting()
+        {
+            Type viewType = view.GetType();
+            viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, true);
+            MethodInfo dispatch = viewType.GetMethod("DispatchAction", PrivateInstance);
+            dispatch.Invoke(view, new object[] { 31 }); // Level 2: Nueva Chicago.
+            Assert.IsTrue((bool)viewType.GetField("marketActive", PrivateInstance).GetValue(view),
+                "Level 2 keeps the existing Mercado gate before the tutorial.");
+
+            StockSelectedLevel();
+            Assert.IsTrue((bool)Get("CanStartRound"), "The tutorial must be gated by enough starting stock.");
+            dispatch.Invoke(view, new object[] { 160 }); // JUGAR PARTIDO.
+
+            Assert.IsTrue((bool)viewType.GetField("levelTwoCocacoleroTutorialActive", PrivateInstance).GetValue(view));
+            Assert.AreEqual(0, viewType.GetField("levelTwoCocacoleroTutorialStep", PrivateInstance).GetValue(view));
+            Assert.AreEqual("Ready", Phase, "The new tutorial must not start the match timer.");
+            Rect cocaQuota = (Rect)viewType.GetMethod("LevelTwoCocacoleroTutorialTargetBounds", PrivateInstance).Invoke(view, null);
+            Assert.Greater(cocaQuota.width, 0f, "The first callout has a real Coca quota target in the HUD.");
+            float readyTime = (float)Sim.GetType().GetProperty("TimeRemaining", PublicInstance).GetValue(Sim, null);
+            yield return new WaitForSecondsRealtime(.12f);
+            Assert.That((float)Sim.GetType().GetProperty("TimeRemaining", PublicInstance).GetValue(Sim, null),
+                Is.EqualTo(readyTime).Within(.001f));
+            SaveLevelTwoTutorialCapture("step-1-coca-quota");
+
+            Rect firstButton = (Rect)viewType.GetMethod("LevelTwoCocacoleroTutorialPrimaryBounds", PrivateInstance).Invoke(view, null);
+            dispatch.Invoke(view, new object[] { 2 }); // Parrillero hire stays blocked behind the guide.
+            Assert.AreEqual(0, viewType.GetField("levelTwoCocacoleroTutorialStep", PrivateInstance).GetValue(view));
+            yield return Click(firstButton.center.x, firstButton.center.y);
+            Assert.AreEqual(1, viewType.GetField("levelTwoCocacoleroTutorialStep", PrivateInstance).GetValue(view));
+            yield return null;
+            SaveLevelTwoTutorialCapture("step-2-cocacolero-card");
+
+            Rect cocacoleroCard = (Rect)viewType.GetMethod("ResponsiveUpgradeCardBounds", PrivateInstance)
+                .Invoke(view, new[] { Sim, (object)16 });
+            Rect secondTarget = (Rect)viewType.GetMethod("LevelTwoCocacoleroTutorialTargetBounds", PrivateInstance).Invoke(view, null);
+            Assert.AreEqual(cocacoleroCard, secondTarget, "The second bubble points at the actual Cocacolero hire card.");
+            Rect finalButton = (Rect)viewType.GetMethod("LevelTwoCocacoleroTutorialPrimaryBounds", PrivateInstance).Invoke(view, null);
+            yield return Click(finalButton.center.x, finalButton.center.y);
+            Assert.AreEqual("Playing", Phase, "The final SIGUIENTE starts the level after both callouts.");
+            Assert.IsFalse((bool)viewType.GetField("levelTwoCocacoleroTutorialActive", PrivateInstance).GetValue(view));
+            Assert.AreEqual(1, PlayerPrefs.GetInt(levelTwoTutorialCompletedKey, 0),
+                "The local tutorial marker is stored only after the round starts successfully.");
+        }
+
+        private static void SaveLevelTwoTutorialCapture(string name)
+        {
+            Texture2D capture = ScreenCapture.CaptureScreenshotAsTexture();
+            try
+            {
+                System.IO.File.WriteAllBytes("/private/tmp/hcyp-level-two-tutorial-" + name + ".png", capture.EncodeToPNG());
+            }
+            finally { UnityEngine.Object.Destroy(capture); }
+        }
+
+        [UnityTest]
+        public IEnumerator SkippingLevelTwoCocacoleroTutorialStartsAndRemembersIt()
+        {
+            Type viewType = view.GetType();
+            viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, true);
+            MethodInfo dispatch = viewType.GetMethod("DispatchAction", PrivateInstance);
+            dispatch.Invoke(view, new object[] { 31 });
+            StockSelectedLevel();
+            dispatch.Invoke(view, new object[] { 160 }); // JUGAR PARTIDO opens the tutorial.
+
+            Assert.IsTrue((bool)viewType.GetField("levelTwoCocacoleroTutorialActive", PrivateInstance).GetValue(view));
+            Rect skip = (Rect)viewType.GetMethod("LevelTwoCocacoleroTutorialSkipBounds", PrivateInstance).Invoke(view, null);
+            yield return Click(skip.center.x, skip.center.y);
+            Assert.AreEqual("Playing", Phase, "SALTAR starts the match immediately.");
+            Assert.AreEqual(1, PlayerPrefs.GetInt(levelTwoTutorialCompletedKey, 0),
+                "Skipping also completes the tutorial only after a successful start.");
+        }
+
+        [UnityTest]
+        public IEnumerator LevelThreePatyTutorialExplainsQuotaAndSalePriceBeforeStarting()
+        {
+            Type viewType = view.GetType();
+            // Unlocking Level 3 is fixture-only; it does not weaken the production selector gate.
+            object save = gameType.GetField("save", PrivateInstance).GetValue(game);
+            save.GetType().GetField("unlockedLevel").SetValue(save, 2);
+            viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, true);
+            MethodInfo dispatch = viewType.GetMethod("DispatchAction", PrivateInstance);
+            dispatch.Invoke(view, new object[] { 32 }); // Level 3: Vélez.
+
+            Assert.AreEqual(2, Sim.GetType().GetProperty("LevelIndex", PublicInstance).GetValue(Sim, null));
+            Assert.IsTrue((bool)viewType.GetField("marketActive", PrivateInstance).GetValue(view));
+            dispatch.Invoke(view, new object[] { 160 }); // Without stock, the tutorial must not open.
+            Assert.IsFalse((bool)viewType.GetField("levelThreePatyTutorialActive", PrivateInstance).GetValue(view));
+            Assert.IsTrue((bool)viewType.GetField("marketActive", PrivateInstance).GetValue(view));
+            Assert.AreEqual(0, PlayerPrefs.GetInt(levelThreeTutorialCompletedKey, 0));
+
+            StockSelectedLevel();
+            Assert.IsTrue((bool)Get("CanStartRound"));
+            dispatch.Invoke(view, new object[] { 160 }); // JUGAR PARTIDO.
+            Assert.IsTrue((bool)viewType.GetField("levelThreePatyTutorialActive", PrivateInstance).GetValue(view));
+            Assert.AreEqual("Ready", Phase, "The tutorial must leave the match timer paused.");
+            Assert.AreEqual("En Vélez también\nvendés Patys.",
+                viewType.GetField("LevelThreePatyTutorialHeadline", StaticPrivate).GetRawConstantValue());
+            Assert.AreEqual("Meta: 120 entregas.\nCada Paty suma $5.",
+                viewType.GetField("LevelThreePatyTutorialExplanation", StaticPrivate).GetRawConstantValue());
+
+            Rect patyQuota = (Rect)viewType.GetMethod("LevelThreePatyTutorialTargetBounds", PrivateInstance).Invoke(view, null);
+            Assert.Greater(patyQuota.width, 0f, "The callout must point to the Paty quota HUD cell.");
+            int[] productIds = (int[])viewType.GetField("hudQuotaProductIds", PrivateInstance).GetValue(view);
+            Assert.IsTrue(Array.IndexOf(productIds, 1) >= 0, "The target is located by Paty product ID 1.");
+            float readyTime = (float)Sim.GetType().GetProperty("TimeRemaining", PublicInstance).GetValue(Sim, null);
+            yield return new WaitForSecondsRealtime(.12f);
+            Assert.That((float)Sim.GetType().GetProperty("TimeRemaining", PublicInstance).GetValue(Sim, null),
+                Is.EqualTo(readyTime).Within(.001f));
+            SaveLevelThreeTutorialCapture();
+
+            int skipAction = (int)viewType.GetField("LevelOneTutorialSkipAction", StaticPrivate).GetRawConstantValue();
+            int primaryAction = (int)viewType.GetField("LevelOneTutorialPrimaryAction", StaticPrivate).GetRawConstantValue();
+            MethodInfo hit = viewType.GetMethod("HitAction", PrivateInstance);
+            Rect skip = (Rect)viewType.GetMethod("LevelThreePatyTutorialSkipBounds", PrivateInstance).Invoke(view, null);
+            Rect primary = (Rect)viewType.GetMethod("LevelThreePatyTutorialPrimaryBounds", PrivateInstance).Invoke(view, null);
+            Assert.AreEqual(skipAction, hit.Invoke(view, new object[] { skip.center }));
+            Assert.AreEqual(primaryAction, hit.Invoke(view, new object[] { primary.center }));
+            dispatch.Invoke(view, new object[] { 2 }); // Parrillero controls remain modal-blocked.
+            Assert.AreEqual("Ready", Phase);
+            Assert.AreEqual(1, Sim.GetType().GetProperty("ParrilleroCount", PublicInstance).GetValue(Sim, null));
+            Assert.AreEqual(0, PlayerPrefs.GetInt(levelThreeTutorialCompletedKey, 0),
+                "Do not mark completion while the guide is merely open.");
+
+            yield return Click(primary.center.x, primary.center.y);
+            Assert.AreEqual("Playing", Phase, "SIGUIENTE starts Level 3 after explaining its new Paty product.");
+            Assert.IsFalse((bool)viewType.GetField("levelThreePatyTutorialActive", PrivateInstance).GetValue(view));
+            Assert.AreEqual(1, PlayerPrefs.GetInt(levelThreeTutorialCompletedKey, 0),
+                "Persist the UI-only marker after a successful start.");
+        }
+
+        [UnityTest]
+        public IEnumerator SkippingLevelThreePatyTutorialStartsAndRemembersIt()
+        {
+            object save = gameType.GetField("save", PrivateInstance).GetValue(game);
+            save.GetType().GetField("unlockedLevel").SetValue(save, 2);
+            Type viewType = view.GetType();
+            viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, true);
+            MethodInfo dispatch = viewType.GetMethod("DispatchAction", PrivateInstance);
+            dispatch.Invoke(view, new object[] { 32 });
+            StockSelectedLevel();
+            dispatch.Invoke(view, new object[] { 160 });
+
+            Assert.IsTrue((bool)viewType.GetField("levelThreePatyTutorialActive", PrivateInstance).GetValue(view));
+            Rect skip = (Rect)viewType.GetMethod("LevelThreePatyTutorialSkipBounds", PrivateInstance).Invoke(view, null);
+            yield return Click(skip.center.x, skip.center.y);
+            Assert.AreEqual("Playing", Phase, "SALTAR starts the match immediately.");
+            Assert.AreEqual(1, PlayerPrefs.GetInt(levelThreeTutorialCompletedKey, 0));
+        }
+
+        [UnityTest]
+        public IEnumerator LevelFourSpecialistsTutorialExplainsBondiolaAndBeerRolesBeforeStarting()
+        {
+            Type viewType = view.GetType();
+            object save = gameType.GetField("save", PrivateInstance).GetValue(game);
+            save.GetType().GetField("unlockedLevel").SetValue(save, 3);
+            viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, true);
+            MethodInfo dispatch = viewType.GetMethod("DispatchAction", PrivateInstance);
+            dispatch.Invoke(view, new object[] { 33 }); // Level 4: Ferro.
+
+            Assert.AreEqual(3, Sim.GetType().GetProperty("LevelIndex", PublicInstance).GetValue(Sim, null));
+            Assert.IsTrue((bool)viewType.GetField("marketActive", PrivateInstance).GetValue(view),
+                "Level 4 keeps the existing Mercado/stock gate.");
+            dispatch.Invoke(view, new object[] { 160 }); // No starting stock: stay in Mercado.
+            Assert.IsFalse((bool)viewType.GetField("levelFourSpecialistsTutorialActive", PrivateInstance).GetValue(view));
+            Assert.IsTrue((bool)viewType.GetField("marketActive", PrivateInstance).GetValue(view));
+            Assert.AreEqual(0, PlayerPrefs.GetInt(levelFourTutorialCompletedKey, 0));
+
+            StockSelectedLevel();
+            Assert.IsTrue((bool)Get("CanStartRound"));
+            dispatch.Invoke(view, new object[] { 160 }); // JUGAR PARTIDO.
+            Assert.IsTrue((bool)viewType.GetField("levelFourSpecialistsTutorialActive", PrivateInstance).GetValue(view));
+            Assert.AreEqual(0, viewType.GetField("levelFourSpecialistsTutorialStep", PrivateInstance).GetValue(view));
+            Assert.AreEqual("Ready", Phase, "The tutorial must keep the match timer stopped.");
+            Assert.AreEqual("La Bondiola la entrega\nel Parrillero Premium.",
+                ((string[])viewType.GetField("LevelFourSpecialistsTutorialHeadlines", StaticPrivate).GetValue(null))[0]);
+            Assert.AreEqual("Meta: 60 Bondiolas.\nContratalo en esta tarjeta.",
+                ((string[])viewType.GetField("LevelFourSpecialistsTutorialExplanations", StaticPrivate).GetValue(null))[0]);
+
+            MethodInfo targetBounds = viewType.GetMethod("LevelFourSpecialistsTutorialTargetBounds", PrivateInstance);
+            MethodInfo cardBounds = viewType.GetMethod("ResponsiveUpgradeCardBounds", PrivateInstance);
+            Assert.Greater(((Rect)targetBounds.Invoke(view, null)).width, 0f,
+                "The Premium card remains visible and has a nonzero target during the Ready tutorial.");
+            Assert.AreEqual((Rect)cardBounds.Invoke(view, new[] { Sim, (object)20 }), (Rect)targetBounds.Invoke(view, null),
+                "The first callout targets the real Parrillero Premium hire card.");
+            float readyTime = (float)Sim.GetType().GetProperty("TimeRemaining", PublicInstance).GetValue(Sim, null);
+            yield return new WaitForSecondsRealtime(.12f);
+            Assert.That((float)Sim.GetType().GetProperty("TimeRemaining", PublicInstance).GetValue(Sim, null),
+                Is.EqualTo(readyTime).Within(.001f));
+            SaveLevelFourTutorialCapture("step-1-premium-bondiola");
+
+            Rect firstButton = (Rect)viewType.GetMethod("LevelFourSpecialistsTutorialPrimaryBounds", PrivateInstance).Invoke(view, null);
+            dispatch.Invoke(view, new object[] { 2 }); // Background hire controls are modal-blocked.
+            Assert.AreEqual(1, Sim.GetType().GetProperty("ParrilleroCount", PublicInstance).GetValue(Sim, null));
+            Assert.AreEqual("Ready", Phase);
+            Assert.AreEqual(0, PlayerPrefs.GetInt(levelFourTutorialCompletedKey, 0),
+                "Do not mark completion while the guide is merely open.");
+            yield return Click(firstButton.center.x, firstButton.center.y);
+            Assert.AreEqual(1, viewType.GetField("levelFourSpecialistsTutorialStep", PrivateInstance).GetValue(view));
+            yield return null;
+
+            Assert.AreEqual("La cerveza la entrega\nel Cocacolero.",
+                ((string[])viewType.GetField("LevelFourSpecialistsTutorialHeadlines", StaticPrivate).GetValue(null))[1]);
+            Assert.AreEqual("Meta: 75 cervezas.\nContratalo en esta tarjeta.",
+                ((string[])viewType.GetField("LevelFourSpecialistsTutorialExplanations", StaticPrivate).GetValue(null))[1]);
+            Assert.Greater(((Rect)targetBounds.Invoke(view, null)).width, 0f,
+                "The Cocacolero card remains visible and has a nonzero target during the Ready tutorial.");
+            Assert.AreEqual((Rect)cardBounds.Invoke(view, new[] { Sim, (object)16 }), (Rect)targetBounds.Invoke(view, null),
+                "The second callout targets the real Cocacolero hire card.");
+            SaveLevelFourTutorialCapture("step-2-cocacolero-beer");
+
+            Rect finalButton = (Rect)viewType.GetMethod("LevelFourSpecialistsTutorialPrimaryBounds", PrivateInstance).Invoke(view, null);
+            yield return Click(finalButton.center.x, finalButton.center.y);
+            Assert.AreEqual("Playing", Phase, "The final SIGUIENTE starts the level after both specialist callouts.");
+            Assert.IsFalse((bool)viewType.GetField("levelFourSpecialistsTutorialActive", PrivateInstance).GetValue(view));
+            Assert.AreEqual(1, PlayerPrefs.GetInt(levelFourTutorialCompletedKey, 0),
+                "Store the UI-only completion marker only after a successful start.");
+        }
+
+        [UnityTest]
+        public IEnumerator SkippingLevelFourSpecialistsTutorialStartsAndRemembersIt()
+        {
+            object save = gameType.GetField("save", PrivateInstance).GetValue(game);
+            save.GetType().GetField("unlockedLevel").SetValue(save, 3);
+            Type viewType = view.GetType();
+            viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, true);
+            MethodInfo dispatch = viewType.GetMethod("DispatchAction", PrivateInstance);
+            dispatch.Invoke(view, new object[] { 33 });
+            StockSelectedLevel();
+            dispatch.Invoke(view, new object[] { 160 });
+
+            Assert.IsTrue((bool)viewType.GetField("levelFourSpecialistsTutorialActive", PrivateInstance).GetValue(view));
+            Rect skip = (Rect)viewType.GetMethod("LevelFourSpecialistsTutorialSkipBounds", PrivateInstance).Invoke(view, null);
+            yield return Click(skip.center.x, skip.center.y);
+            Assert.AreEqual("Playing", Phase, "SALTAR starts the match immediately.");
+            Assert.AreEqual(1, PlayerPrefs.GetInt(levelFourTutorialCompletedKey, 0),
+                "Skipping also records completion only after the round starts.");
+        }
+
+        [UnityTest]
+        public IEnumerator DirectReadyStartOpensLevelFourSpecialistsTutorial()
+        {
+            object save = gameType.GetField("save", PrivateInstance).GetValue(game);
+            save.GetType().GetField("unlockedLevel").SetValue(save, 3);
+            Type viewType = view.GetType();
+            viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, true);
+            MethodInfo dispatch = viewType.GetMethod("DispatchAction", PrivateInstance);
+            dispatch.Invoke(view, new object[] { 33 });
+            StockSelectedLevel();
+            // Simulate the already-prepared Ready screen reached by the direct-start route.
+            viewType.GetField("marketActive", PrivateInstance).SetValue(view, false);
+            viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, false);
+            dispatch.Invoke(view, new object[] { 1 });
+            Assert.IsTrue((bool)viewType.GetField("levelFourSpecialistsTutorialActive", PrivateInstance).GetValue(view));
+            Assert.AreEqual("Ready", Phase);
+            Assert.AreEqual(0, PlayerPrefs.GetInt(levelFourTutorialCompletedKey, 0));
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator LevelFiveSpecialistsTutorialExplainsVacioAndFernetRolesBeforeStarting()
+        {
+            Type viewType = view.GetType();
+            object save = gameType.GetField("save", PrivateInstance).GetValue(game);
+            save.GetType().GetField("unlockedLevel").SetValue(save, 4);
+            viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, true);
+            MethodInfo dispatch = viewType.GetMethod("DispatchAction", PrivateInstance);
+            dispatch.Invoke(view, new object[] { 34 }); // Level 5: Independiente.
+
+            Assert.AreEqual(4, Sim.GetType().GetProperty("LevelIndex", PublicInstance).GetValue(Sim, null));
+            Assert.IsTrue((bool)viewType.GetField("marketActive", PrivateInstance).GetValue(view),
+                "Level 5 keeps the existing Mercado/stock gate.");
+            dispatch.Invoke(view, new object[] { 160 }); // No starting stock: remain in Mercado.
+            Assert.IsFalse((bool)viewType.GetField("levelFiveSpecialistsTutorialActive", PrivateInstance).GetValue(view));
+            Assert.IsTrue((bool)viewType.GetField("marketActive", PrivateInstance).GetValue(view));
+            Assert.AreEqual(0, PlayerPrefs.GetInt(levelFiveTutorialCompletedKey, 0));
+
+            StockSelectedLevel();
+            Assert.IsTrue((bool)Get("CanStartRound"));
+            dispatch.Invoke(view, new object[] { 160 }); // JUGAR PARTIDO.
+            Assert.IsTrue((bool)viewType.GetField("levelFiveSpecialistsTutorialActive", PrivateInstance).GetValue(view));
+            Assert.AreEqual(0, viewType.GetField("levelFiveSpecialistsTutorialStep", PrivateInstance).GetValue(view));
+            Assert.AreEqual("Ready", Phase, "The tutorial must keep the match timer stopped.");
+            Assert.AreEqual("El Vacío lo entrega\nel Parrillero Premium.",
+                ((string[])viewType.GetField("LevelFiveSpecialistsTutorialHeadlines", StaticPrivate).GetValue(null))[0]);
+            Assert.AreEqual("Meta: 65 Vacíos.\nContratalo en esta tarjeta.",
+                ((string[])viewType.GetField("LevelFiveSpecialistsTutorialExplanations", StaticPrivate).GetValue(null))[0]);
+
+            MethodInfo targetBounds = viewType.GetMethod("LevelFiveSpecialistsTutorialTargetBounds", PrivateInstance);
+            MethodInfo cardBounds = viewType.GetMethod("ResponsiveUpgradeCardBounds", PrivateInstance);
+            Assert.Greater(((Rect)targetBounds.Invoke(view, null)).width, 0f,
+                "The Premium card remains visible and has a nonzero target during the Ready tutorial.");
+            Assert.AreEqual((Rect)cardBounds.Invoke(view, new[] { Sim, (object)20 }), (Rect)targetBounds.Invoke(view, null),
+                "The first callout targets the real Parrillero Premium hire card.");
+            float readyTime = (float)Sim.GetType().GetProperty("TimeRemaining", PublicInstance).GetValue(Sim, null);
+            yield return new WaitForSecondsRealtime(.12f);
+            Assert.That((float)Sim.GetType().GetProperty("TimeRemaining", PublicInstance).GetValue(Sim, null),
+                Is.EqualTo(readyTime).Within(.001f));
+            SaveLevelFiveTutorialCapture("step-1-premium-vacio");
+
+            Rect firstButton = (Rect)viewType.GetMethod("LevelFiveSpecialistsTutorialPrimaryBounds", PrivateInstance).Invoke(view, null);
+            dispatch.Invoke(view, new object[] { 21 }); // Background hire controls are modal-blocked.
+            Assert.AreEqual("Ready", Phase);
+            Assert.AreEqual(0, PlayerPrefs.GetInt(levelFiveTutorialCompletedKey, 0));
+            yield return Click(firstButton.center.x, firstButton.center.y);
+            Assert.AreEqual(1, viewType.GetField("levelFiveSpecialistsTutorialStep", PrivateInstance).GetValue(view));
+            yield return null;
+
+            Assert.AreEqual("El Fernet lo entrega\nel Fernetero.",
+                ((string[])viewType.GetField("LevelFiveSpecialistsTutorialHeadlines", StaticPrivate).GetValue(null))[1]);
+            Assert.AreEqual("Meta: 65 Fernets.\nContratalo en esta tarjeta.",
+                ((string[])viewType.GetField("LevelFiveSpecialistsTutorialExplanations", StaticPrivate).GetValue(null))[1]);
+            Assert.Greater(((Rect)targetBounds.Invoke(view, null)).width, 0f,
+                "The Fernetero card remains visible and has a nonzero target during the Ready tutorial.");
+            Assert.AreEqual((Rect)cardBounds.Invoke(view, new[] { Sim, (object)21 }), (Rect)targetBounds.Invoke(view, null),
+                "The second callout targets the real Fernetero hire card.");
+            SaveLevelFiveTutorialCapture("step-2-fernetero-fernet");
+
+            Rect finalButton = (Rect)viewType.GetMethod("LevelFiveSpecialistsTutorialPrimaryBounds", PrivateInstance).Invoke(view, null);
+            yield return Click(finalButton.center.x, finalButton.center.y);
+            Assert.AreEqual("Playing", Phase, "The final SIGUIENTE starts Level 5 after both specialist callouts.");
+            Assert.IsFalse((bool)viewType.GetField("levelFiveSpecialistsTutorialActive", PrivateInstance).GetValue(view));
+            Assert.AreEqual(1, PlayerPrefs.GetInt(levelFiveTutorialCompletedKey, 0),
+                "Store the UI-only completion marker only after a successful start.");
+        }
+
+        [UnityTest]
+        public IEnumerator SkippingLevelFiveSpecialistsTutorialStartsAndRemembersIt()
+        {
+            object save = gameType.GetField("save", PrivateInstance).GetValue(game);
+            save.GetType().GetField("unlockedLevel").SetValue(save, 4);
+            Type viewType = view.GetType();
+            viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, true);
+            MethodInfo dispatch = viewType.GetMethod("DispatchAction", PrivateInstance);
+            dispatch.Invoke(view, new object[] { 34 });
+            StockSelectedLevel();
+            dispatch.Invoke(view, new object[] { 160 });
+
+            Assert.IsTrue((bool)viewType.GetField("levelFiveSpecialistsTutorialActive", PrivateInstance).GetValue(view));
+            Rect skip = (Rect)viewType.GetMethod("LevelFiveSpecialistsTutorialSkipBounds", PrivateInstance).Invoke(view, null);
+            yield return Click(skip.center.x, skip.center.y);
+            Assert.AreEqual("Playing", Phase, "SALTAR starts the match immediately.");
+            Assert.AreEqual(1, PlayerPrefs.GetInt(levelFiveTutorialCompletedKey, 0),
+                "Skipping also records completion only after the round starts.");
+        }
+
+        [UnityTest]
+        public IEnumerator DirectReadyStartOpensLevelFiveSpecialistsTutorial()
+        {
+            object save = gameType.GetField("save", PrivateInstance).GetValue(game);
+            save.GetType().GetField("unlockedLevel").SetValue(save, 4);
+            Type viewType = view.GetType();
+            viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, true);
+            MethodInfo dispatch = viewType.GetMethod("DispatchAction", PrivateInstance);
+            dispatch.Invoke(view, new object[] { 34 });
+            StockSelectedLevel();
+            viewType.GetField("marketActive", PrivateInstance).SetValue(view, false);
+            viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, false);
+            dispatch.Invoke(view, new object[] { 1 });
+            Assert.IsTrue((bool)viewType.GetField("levelFiveSpecialistsTutorialActive", PrivateInstance).GetValue(view));
+            Assert.AreEqual("Ready", Phase);
+            Assert.AreEqual(0, PlayerPrefs.GetInt(levelFiveTutorialCompletedKey, 0));
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator LevelSixRacingTutorialExplainsActiveKitchenMozoAndAngryCue()
+        {
+            Type viewType = view.GetType();
+            object save = gameType.GetField("save", PrivateInstance).GetValue(game);
+            save.GetType().GetField("unlockedLevel").SetValue(save, 5);
+            viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, true);
+            MethodInfo dispatch = viewType.GetMethod("DispatchAction", PrivateInstance);
+            dispatch.Invoke(view, new object[] { 35 }); // Level 6: Racing.
+
+            Assert.AreEqual(5, Sim.GetType().GetProperty("LevelIndex", PublicInstance).GetValue(Sim, null));
+            Assert.IsTrue((bool)viewType.GetField("marketActive", PrivateInstance).GetValue(view),
+                "Racing retains its existing Mercado/stock gate.");
+            dispatch.Invoke(view, new object[] { 160 }); // Missing stock must not show or complete the tutorial.
+            Assert.IsFalse((bool)viewType.GetField("levelSixRacingTutorialActive", PrivateInstance).GetValue(view));
+            Assert.IsTrue((bool)viewType.GetField("marketActive", PrivateInstance).GetValue(view));
+            Assert.AreEqual(0, PlayerPrefs.GetInt(levelSixTutorialCompletedKey, 0));
+
+            StockSelectedLevel();
+            Assert.IsTrue((bool)Get("CanStartRound"));
+            dispatch.Invoke(view, new object[] { 160 }); // JUGAR PARTIDO.
+            Assert.IsTrue((bool)viewType.GetField("levelSixRacingTutorialActive", PrivateInstance).GetValue(view));
+            Assert.AreEqual(0, viewType.GetField("levelSixRacingTutorialStep", PrivateInstance).GetValue(view));
+            Assert.AreEqual("Ready", Phase, "The tutorial must keep the round timer stopped.");
+            Assert.IsTrue((bool)Sim.GetType().GetProperty("UsesActiveCooks", PublicInstance).GetValue(Sim, null));
+            Assert.AreEqual("En Racing, la cocina\npasa a ser activa.",
+                ((string[])viewType.GetField("LevelSixRacingTutorialHeadlines", StaticPrivate).GetValue(null))[0]);
+            Assert.AreEqual("Normal y Premium cocinan\nun sándwich y lo dejan en mesa.",
+                ((string[])viewType.GetField("LevelSixRacingTutorialExplanations", StaticPrivate).GetValue(null))[0]);
+
+            MethodInfo targetBounds = viewType.GetMethod("LevelSixRacingTutorialTargetBounds", PrivateInstance);
+            MethodInfo cardBounds = viewType.GetMethod("ResponsiveUpgradeCardBounds", PrivateInstance);
+            Assert.Greater(((Rect)targetBounds.Invoke(view, null)).width, 0f,
+                "The Parrillero card is available as the first real tutorial target.");
+            Assert.AreEqual((Rect)cardBounds.Invoke(view, new[] { Sim, (object)2 }), (Rect)targetBounds.Invoke(view, null));
+            float readyTime = (float)Sim.GetType().GetProperty("TimeRemaining", PublicInstance).GetValue(Sim, null);
+            yield return new WaitForSecondsRealtime(.12f);
+            Assert.That((float)Sim.GetType().GetProperty("TimeRemaining", PublicInstance).GetValue(Sim, null),
+                Is.EqualTo(readyTime).Within(.001f));
+            SaveLevelSixTutorialCapture("step-1-active-cooks");
+
+            Rect firstButton = (Rect)viewType.GetMethod("LevelSixRacingTutorialPrimaryBounds", PrivateInstance).Invoke(view, null);
+            dispatch.Invoke(view, new object[] { 21 }); // Background controls remain modal-blocked.
+            Assert.AreEqual("Ready", Phase);
+            Assert.AreEqual(0, PlayerPrefs.GetInt(levelSixTutorialCompletedKey, 0));
+            yield return Click(firstButton.center.x, firstButton.center.y);
+            Assert.AreEqual(1, viewType.GetField("levelSixRacingTutorialStep", PrivateInstance).GetValue(view));
+            yield return null;
+
+            Assert.AreEqual("El Mozo recoge y entrega\ncada sándwich.",
+                ((string[])viewType.GetField("LevelSixRacingTutorialHeadlines", StaticPrivate).GetValue(null))[1]);
+            Assert.AreEqual("Enojo: su sándwich no está\nlisto. Al retirarlo, se calma.",
+                ((string[])viewType.GetField("LevelSixRacingTutorialExplanations", StaticPrivate).GetValue(null))[1]);
+            Assert.AreEqual((Rect)cardBounds.Invoke(view, new[] { Sim, (object)22 }), (Rect)targetBounds.Invoke(view, null),
+                "The second callout points at the real Mozo hire card.");
+            SaveLevelSixTutorialCapture("step-2-mozo-wait-cue");
+
+            Rect finalButton = (Rect)viewType.GetMethod("LevelSixRacingTutorialPrimaryBounds", PrivateInstance).Invoke(view, null);
+            yield return Click(finalButton.center.x, finalButton.center.y);
+            Assert.AreEqual("Playing", Phase, "The last SIGUIENTE starts Racing after both callouts.");
+            Assert.IsFalse((bool)viewType.GetField("levelSixRacingTutorialActive", PrivateInstance).GetValue(view));
+            Assert.AreEqual(1, PlayerPrefs.GetInt(levelSixTutorialCompletedKey, 0),
+                "Persist the local UI-only marker only after the match starts successfully.");
+        }
+
+        [UnityTest]
+        public IEnumerator SkippingLevelSixRacingTutorialStartsAndRemembersIt()
+        {
+            object save = gameType.GetField("save", PrivateInstance).GetValue(game);
+            save.GetType().GetField("unlockedLevel").SetValue(save, 5);
+            Type viewType = view.GetType();
+            viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, true);
+            MethodInfo dispatch = viewType.GetMethod("DispatchAction", PrivateInstance);
+            dispatch.Invoke(view, new object[] { 35 });
+            StockSelectedLevel();
+            dispatch.Invoke(view, new object[] { 160 });
+
+            Assert.IsTrue((bool)viewType.GetField("levelSixRacingTutorialActive", PrivateInstance).GetValue(view));
+            Rect skip = (Rect)viewType.GetMethod("LevelSixRacingTutorialSkipBounds", PrivateInstance).Invoke(view, null);
+            yield return Click(skip.center.x, skip.center.y);
+            Assert.AreEqual("Playing", Phase, "SALTAR starts the match immediately.");
+            Assert.AreEqual(1, PlayerPrefs.GetInt(levelSixTutorialCompletedKey, 0));
+        }
+
+        [UnityTest]
+        public IEnumerator DirectReadyStartOpensLevelSixRacingTutorial()
+        {
+            object save = gameType.GetField("save", PrivateInstance).GetValue(game);
+            save.GetType().GetField("unlockedLevel").SetValue(save, 5);
+            Type viewType = view.GetType();
+            viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, true);
+            MethodInfo dispatch = viewType.GetMethod("DispatchAction", PrivateInstance);
+            dispatch.Invoke(view, new object[] { 35 });
+            StockSelectedLevel();
+            viewType.GetField("marketActive", PrivateInstance).SetValue(view, false);
+            viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, false);
+            dispatch.Invoke(view, new object[] { 1 });
+            Assert.IsTrue((bool)viewType.GetField("levelSixRacingTutorialActive", PrivateInstance).GetValue(view));
+            Assert.AreEqual("Ready", Phase);
+            Assert.AreEqual(0, PlayerPrefs.GetInt(levelSixTutorialCompletedKey, 0));
+            yield return null;
+        }
+
+        private static void SaveLevelFiveTutorialCapture(string name)
+        {
+            Texture2D capture = ScreenCapture.CaptureScreenshotAsTexture();
+            try { System.IO.File.WriteAllBytes("/private/tmp/hcyp-level-five-specialists-" + name + ".png", capture.EncodeToPNG()); }
+            finally { UnityEngine.Object.Destroy(capture); }
+        }
+
+        private static void SaveLevelSixTutorialCapture(string name)
+        {
+            Texture2D capture = ScreenCapture.CaptureScreenshotAsTexture();
+            try { System.IO.File.WriteAllBytes("/private/tmp/hcyp-level-six-racing-" + name + ".png", capture.EncodeToPNG()); }
+            finally { UnityEngine.Object.Destroy(capture); }
+        }
+
+        private static void SaveLevelFourTutorialCapture(string name)
+        {
+            Texture2D capture = ScreenCapture.CaptureScreenshotAsTexture();
+            try { System.IO.File.WriteAllBytes("/private/tmp/hcyp-level-four-specialists-" + name + ".png", capture.EncodeToPNG()); }
+            finally { UnityEngine.Object.Destroy(capture); }
+        }
+
+        private static void SaveLevelThreeTutorialCapture()
+        {
+            Texture2D capture = ScreenCapture.CaptureScreenshotAsTexture();
+            try { System.IO.File.WriteAllBytes("/private/tmp/hcyp-level-three-paty-tutorial.png", capture.EncodeToPNG()); }
+            finally { UnityEngine.Object.Destroy(capture); }
         }
 
         [UnityTest]
@@ -360,19 +927,28 @@ namespace HayChoriYPaty.Tests
             Rect skipBounds = (Rect)viewType.GetMethod("LevelOneTutorialSkipBounds", PrivateInstance).Invoke(view, null);
             yield return Click(skipBounds.center.x, skipBounds.center.y);
             Assert.AreEqual("Playing", Phase, "Skip continues directly to the match.");
-            Assert.AreEqual(1, PlayerPrefs.GetInt(tutorialCompletedKey, 0));
+            Assert.AreEqual(0, PlayerPrefs.GetInt(tutorialCompletedKey, 0),
+                "Temporary QA repetition must not persist the completion marker.");
             yield return null;
         }
 
         [UnityTest]
-        public IEnumerator CompletedFirstLevelTutorialDoesNotReplay()
+        public IEnumerator TemporaryTutorialOverrideReplaysDespiteCompletionFlag()
         {
             PlayerPrefs.SetInt(tutorialCompletedKey, 1);
             Type viewType = view.GetType();
             viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, true);
             viewType.GetMethod("DispatchAction", PrivateInstance).Invoke(view, new object[] { 30 });
-            Assert.AreEqual("Playing", Phase, "After completion, the existing direct-start flow is unchanged.");
-            Assert.IsFalse((bool)viewType.GetField("levelOneTutorialActive", PrivateInstance).GetValue(view));
+            Assert.IsTrue((bool)viewType.GetField("levelOneTutorialActive", PrivateInstance).GetValue(view),
+                "The temporary QA override must show the tutorial even if an old completion marker exists.");
+            Assert.AreEqual(0, viewType.GetField("levelOneTutorialStep", PrivateInstance).GetValue(view));
+            Assert.AreEqual("Ready", Phase, "The round stays stopped until the tutorial is completed or skipped.");
+
+            int skipAction = (int)viewType.GetField("LevelOneTutorialSkipAction", StaticPrivate).GetRawConstantValue();
+            viewType.GetMethod("DispatchAction", PrivateInstance).Invoke(view, new object[] { skipAction });
+            Assert.AreEqual("Playing", Phase, "Skipping still starts the round.");
+            Assert.AreEqual(1, PlayerPrefs.GetInt(tutorialCompletedKey, 0),
+                "The testing override must leave the prior marker unchanged.");
             yield return null;
         }
 
@@ -838,6 +1414,26 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
+        public IEnumerator LevelSelectorHidesAccountAndMarketShortcutsButKeepsHubAccount()
+        {
+            Type viewType = view.GetType();
+            viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, true);
+            viewType.GetField("hubActive", PrivateInstance).SetValue(view, false);
+
+            Assert.IsFalse((bool)viewType.GetProperty("AccountMenuVisible", PublicInstance).GetValue(view),
+                "The Firebase account shortcut and panel are not part of level selection.");
+            MethodInfo hit = viewType.GetMethod("HitLevelSelectorAction", PrivateInstance);
+            Assert.AreEqual(0, hit.Invoke(view, new object[] { new Vector2(470f, 28f) }),
+                "The former top-right Mercado shortcut has no selector action.");
+
+            viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, false);
+            viewType.GetField("hubActive", PrivateInstance).SetValue(view, true);
+            Assert.IsTrue((bool)viewType.GetProperty("AccountMenuVisible", PublicInstance).GetValue(view),
+                "The account entry remains available from the main hub.");
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator LevelSelectorTouchDragScrollsTheCampaign()
         {
             Time.timeScale = 0f;
@@ -849,6 +1445,58 @@ namespace HayChoriYPaty.Tests
             handle.Invoke(view, new object[] { Pixel(270f, 400f), false, false });
             Assert.Greater((float)scroll.GetValue(view), 0f, "A vertical touch drag moves the selector");
             handle.Invoke(view, new object[] { Pixel(270f, 420f), false, true });
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator AndroidSelectorTouchScrollReachesLosRedondosWithoutActivatingCards()
+        {
+            Time.timeScale = 0f;
+            object save = gameType.GetField("save", PrivateInstance).GetValue(game);
+            save.GetType().GetField("unlockedLevel").SetValue(save, 10);
+
+            Type viewType = view.GetType();
+            viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, true);
+            MethodInfo touchScroll = viewType.GetMethod("HandleLevelSelectorTouchScroll", PrivateInstance);
+            MethodInfo maxScrollMethod = viewType.GetMethod("LevelSelectorMaxScroll", StaticPrivate);
+            MethodInfo viewportMethod = viewType.GetMethod("LevelSelectorViewportBounds", StaticPrivate);
+            MethodInfo cardBoundsMethod = viewType.GetMethod("LevelSelectCardBounds", StaticPrivate);
+            MethodInfo hitLevelMethod = viewType.GetMethod("HitLevelSelectorAction", PrivateInstance);
+            FieldInfo scroll = viewType.GetField("levelSelectScroll", PrivateInstance);
+            PropertyInfo suppressNativeTap = viewType.GetProperty("SuppressLevelSelectorNativeTap", PrivateInstance);
+
+            float canvasHeight = (float)viewType.GetField("logicalCanvasHeight", PrivateInstance).GetValue(view);
+            float verticalScale = canvasHeight / 960f;
+            Rect viewport = (Rect)viewportMethod.Invoke(null, new object[] { canvasHeight });
+            float startY = (viewport.y + viewport.height * .9f) / verticalScale;
+            float endY = (viewport.y + viewport.height * .1f) / verticalScale;
+            float maxScroll = (float)maxScrollMethod.Invoke(null, new object[] { canvasHeight });
+            Assert.Greater(maxScroll, 0f, "The campaign list extends below the visible viewport.");
+
+            for (int swipe = 0; swipe < 20 && (float)scroll.GetValue(view) < maxScroll; swipe++)
+            {
+                float before = (float)scroll.GetValue(view);
+                touchScroll.Invoke(view, new object[] { Pixel(270f, startY), true, true, false });
+                touchScroll.Invoke(view, new object[] { Pixel(270f, endY), false, true, false });
+                Assert.IsTrue((bool)suppressNativeTap.GetValue(view),
+                    "A recognized drag must suppress a native IMGUI click for the dragged card.");
+                touchScroll.Invoke(view, new object[] { Pixel(270f, endY), false, false, true });
+                Assert.Greater((float)scroll.GetValue(view), before, "Every upward swipe advances the list.");
+            }
+
+            Assert.That((float)scroll.GetValue(view), Is.EqualTo(maxScroll).Within(.01f),
+                "Repeated mobile swipes must reach the end of the eleven-level campaign.");
+            Assert.IsTrue((bool)viewType.GetField("levelSelectActive", PrivateInstance).GetValue(view));
+            Assert.IsFalse((bool)viewType.GetField("marketActive", PrivateInstance).GetValue(view),
+                "Scrolling must not accidentally select/open a card.");
+            Assert.AreEqual("Ready", Phase, "Scrolling must not start a round.");
+
+            Rect losRedondos = (Rect)cardBoundsMethod.Invoke(null, new object[] { 10 });
+            losRedondos.y -= maxScroll;
+            Assert.LessOrEqual(losRedondos.y, viewport.yMax);
+            Assert.GreaterOrEqual(losRedondos.yMax, viewport.y);
+            Assert.AreEqual(40, hitLevelMethod.Invoke(view, new object[] { losRedondos.center }),
+                "The last tile, Los Redondos, is reachable as a normal level-selection target.");
             yield return null;
         }
 

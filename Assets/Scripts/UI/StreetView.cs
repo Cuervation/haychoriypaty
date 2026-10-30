@@ -123,16 +123,16 @@ namespace HayChoriYPaty
         private const float HudChipInset = 2f * HudBandScale;
         private const float HudQuotaCardInset = HudChipInset * .5f * HudQuotaCardEnlargement;
         private const float HudQuotaCounterRightInset = 4f * HudBandScale * HudQuotaCardEnlargement;
-        private const TextAnchor HudQuotaCounterTextAlignment = TextAnchor.MiddleRight;
-        private const float HudChipTextTopInset = 1f * HudBandScale;
+        private const TextAnchor HudQuotaCounterTextAlignment = TextAnchor.MiddleCenter;
         private const float HudChipTextHeightInset = 3f * HudBandScale;
         private const float HudQuotaBaseCardHeight = (HudQuotaBaseGridHeight - HudObjectiveGap - HudChipInset) * .5f;
         private const float HudQuotaCardHeight = HudQuotaBaseCardHeight * HudQuotaCardScale;
         private const float HudQuotaCardBaseWidth = 84f;
         private const float HudQuotaCardWidth = HudQuotaCardBaseWidth * HudQuotaCardEnlargement;
+        private const int HudQuotaColumnsPerGroup = 2;
+        private const float HudQuotaColumnSpacing = 12f;
         private const int HudQuotaSolidProductCount = 4;
-        private const float HudQuotaGridHeight = HudQuotaCardHeight * HudQuotaSolidProductCount
-            + HudObjectiveGap * (HudQuotaSolidProductCount - 1);
+        private const float HudQuotaGridHeight = HudQuotaCardHeight * 2f + HudObjectiveGap;
         private const float HudQuotaIconMaxSize = (HudQuotaBaseCardHeight - HudChipInset * 2f) * HudQuotaCardScale;
         private static readonly Rect HudBar = new Rect(0, 0, 540,
             HudTopPadding + HudStateRowHeight + HudBottomPadding);
@@ -299,7 +299,8 @@ namespace HayChoriYPaty
         {
             bool ready = !levelSelectActive && sim.Phase == RoundPhase.Ready;
             bool play = VictoryTransitionActive || (!levelSelectActive && sim.Phase == RoundPhase.Playing);
-            bool showCards = play || (ready && CatalogUpgradeActions(sim).Length <= 3);
+            bool showCards = play || (ready && (CatalogUpgradeActions(sim).Length <= 3 ||
+                levelFourSpecialistsTutorialActive || levelFiveSpecialistsTutorialActive || levelSixRacingTutorialActive));
             return bottomBleed > 0f
                 ? BuildResponsiveFooterLayoutWithBottomBleed(sim, canvasHeight, showCards, ready, bottomBleed)
                 : BuildResponsiveFooterLayout(sim, canvasHeight, showCards, ready);
@@ -330,7 +331,41 @@ namespace HayChoriYPaty
         private const int LevelSelectorBackAction = 8, VictoryExitAction = 9, RiotReturnAction = 15, LevelSelectFirstAction = 30;
         private const int HubPlayAction = 200, HubMarketAction = 201, HubBadgesAction = 202, HubRankingAction = 203, HubAccountAction = 204;
         private const int BadgeBackAction = 205, RankingBackAction = 206;
+        private const int HubSettingsAction = 207, HubSettingsMusicAction = 208, HubSettingsBackAction = 209;
+        private const int HubTopMusicAction = 210;
+        private const string HubMusicEnabledPlayerPrefKey = "HayChoriYPaty.Hub.MusicEnabled";
+        private static readonly Rect HubSettingsPanelBounds = new Rect(48, 300, 444, 360);
+        private static readonly Rect HubSettingsMusicButtonBounds = new Rect(76, 410, 388, 96);
+        private static readonly Rect HubSettingsBackButtonBounds = new Rect(126, 520, 288, 96);
+        private const float HubSettingsButtonWidth = 48f, HubSettingsButtonHeight = 48f;
+        private const float HubTopMusicButtonSize = 44f, HubTopControlsGap = 8f;
+        // Shared with FirebasePlayerSession so CUENTA and the music control stay aligned.
+        private const float HubAccountButtonRightInset = 126f, HubAccountButtonWidth = 110f;
+        private const float HubAccountButtonTop = 16f, HubAccountButtonHeight = 32f;
+        private enum HubControlIconKind { Settings, Music, Muted }
+        private static readonly GUIContent HubSettingsButtonContent = new GUIContent("", "Abrir configuración");
+        private static readonly GUIContent HubMusicOnButtonContent = new GUIContent("", "Silenciar música");
+        private static readonly GUIContent HubMusicOffButtonContent = new GUIContent("", "Activar música");
+        private static readonly int[] HubArtworkActions =
+            { HubRankingAction, HubBadgesAction, HubMarketAction, HubPlayAction };
+        private static readonly Vector2[] HubSpeakerPolygon =
+        {
+            new Vector2(10f, 24f), new Vector2(21f, 24f),
+            new Vector2(37f, 12f), new Vector2(37f, 52f),
+            new Vector2(21f, 40f), new Vector2(10f, 40f)
+        };
         private const string LevelOneTutorialCompletedKey = "HayChoriYPaty.LevelOneTutorial.Completed.v2";
+        private const string LevelTwoCocacoleroTutorialCompletedKey = "HayChoriYPaty.LevelTwoCocacoleroTutorial.Completed.v1";
+        private const string LevelThreePatyTutorialCompletedKey = "HayChoriYPaty.LevelThreePatyTutorial.Completed.v1";
+        private const string LevelFourSpecialistsTutorialCompletedKey = "HayChoriYPaty.LevelFourSpecialistsTutorial.Completed.v1";
+        private const string LevelFiveSpecialistsTutorialCompletedKey = "HayChoriYPaty.LevelFiveSpecialistsTutorial.Completed.v1";
+        private const string LevelSixRacingTutorialCompletedKey = "HayChoriYPaty.LevelSixRacingTutorial.Completed.v1";
+        // Editor-only QA override. Player builds must retain the once-only tutorial behavior.
+#if UNITY_EDITOR
+        private const bool RepeatLevelOneTutorialForTesting = true;
+#else
+        private const bool RepeatLevelOneTutorialForTesting = false;
+#endif
         private const int LevelOneTutorialPrimaryAction = 300, LevelOneTutorialSkipAction = 301;
         private const float LevelOneTutorialBubbleWidth = 320f;
         private const float LevelOneTutorialBubbleHeight = 140f;
@@ -350,27 +385,71 @@ namespace HayChoriYPaty
             "El costo aparece en esta tarjeta.",
             "El próximo costo aparece\nen esta tarjeta."
         };
+        private static readonly string[] LevelTwoCocacoleroTutorialHeadlines = {
+            "En Nueva Chicago,\nla Coca tiene su meta.",
+            "Para entregar Coca,\ncontratá al Cocacolero."
+        };
+        private static readonly string[] LevelTwoCocacoleroTutorialExplanations = {
+            "Completá 200 entregas\ndurante el partido.",
+            "El costo aparece en esta tarjeta.\nContratalo al empezar."
+        };
+        private const string LevelThreePatyTutorialHeadline = "En Vélez también\nvendés Patys.";
+        private const string LevelThreePatyTutorialExplanation = "Meta: 120 entregas.\nCada Paty suma $5.";
+        private static readonly string[] LevelFourSpecialistsTutorialHeadlines = {
+            "La Bondiola la entrega\nel Parrillero Premium.",
+            "La cerveza la entrega\nel Cocacolero."
+        };
+        private static readonly string[] LevelFourSpecialistsTutorialExplanations = {
+            "Meta: 60 Bondiolas.\nContratalo en esta tarjeta.",
+            "Meta: 75 cervezas.\nContratalo en esta tarjeta."
+        };
+        private static readonly string[] LevelFiveSpecialistsTutorialHeadlines = {
+            "El Vacío lo entrega\nel Parrillero Premium.",
+            "El Fernet lo entrega\nel Fernetero."
+        };
+        private static readonly string[] LevelFiveSpecialistsTutorialExplanations = {
+            "Meta: 65 Vacíos.\nContratalo en esta tarjeta.",
+            "Meta: 65 Fernets.\nContratalo en esta tarjeta."
+        };
+        private static readonly string[] LevelSixRacingTutorialHeadlines = {
+            "En Racing, la cocina\npasa a ser activa.",
+            "El Mozo recoge y entrega\ncada sándwich."
+        };
+        private static readonly string[] LevelSixRacingTutorialExplanations = {
+            "Normal y Premium cocinan\nun sándwich y lo dejan en mesa.",
+            "Enojo: su sándwich no está\nlisto. Al retirarlo, se calma."
+        };
         private const float LevelSelectorCardHeight = 184f, LevelSelectorCardGap = 12f;
         private static readonly Rect LevelSelectorViewport = new Rect(14f, 154f, W - 28f, 706f);
         private float levelSelectScroll, levelSelectPointerDownY, levelSelectPointerDownScroll;
         private bool levelSelectPointerHeld, levelSelectDragging;
+        private float levelSelectTouchDownY, levelSelectTouchDownScroll;
+        private bool levelSelectTouchHeld, levelSelectTouchDragging;
+        private int levelSelectIgnoreNativeTapUntilFrame = -1;
         private const int ReadyLevelSelectorAction = 19;
         private const int MarketBackAction = 70, MarketOtherAction = 190;
+        private const int MarketIngredientsTabAction = 191, MarketExtrasTabAction = 192, MarketTicketRedeemAction = 220;
+        private const float MarketTicketCardHeight = 108f, MarketTicketCardGap = 8f, MarketExtrasNoticeHeight = 38f;
         private const int MarketMinusAction = 80, MarketPlusAction = 100, MarketPlusTenAction = 120;
         private const int MarketBuyAction = 140, MarketMissingAction = 150, MarketPlayAction = 160;
         private const int MarketRowMissingAction = 170, MarketExpandAction = 180;
-        private const int MarketCloseAction = 161, ResultLevelsAction = 163;
+        private const int ResultLevelsAction = 163;
         private const int ChulengoMultiplyAction = 164, ChulengoCollectAction = 165;
         private static readonly Rect ReadyLevelSelector = new Rect(161, 905, 218, 44);
         private bool marketActive, marketFromSelector;
+        private int marketTab;
         private bool marketOtherExpanded;
         private int marketExpandedIngredient = -1;
         private GUIStyle marketLabelStyle;
         private readonly Sprite[] marketIngredientSprites = new Sprite[10];
+        private readonly Texture2D[] marketFreshMeatTextures = new Texture2D[10];
         private Texture2D marketFernetBottle, marketCocaLarge, marketBreadCommon, marketBreadBurger;
         private readonly int[] marketPendingPacks = new int[10];
         private float marketScroll, marketPointerDownY, marketPointerDownScroll, marketLastPurchaseTime = -10f;
         private bool marketDragging, marketPointerHeld;
+        private float marketTouchDownY, marketTouchDownScroll;
+        private bool marketTouchHeld, marketTouchDragging;
+        private int marketIgnoreNativeTapUntilFrame = -1;
         private string marketMessage = "";
         private static readonly Rect LevelSelectTitle = new Rect(54, 88, 432, 58);
         private static readonly Rect LevelSelectBack = new Rect(139, 870, 262, 66);
@@ -381,6 +460,9 @@ namespace HayChoriYPaty
         private static readonly Rect VictoryExit = new Rect(.195f, .839f, .62f, .151f);
         private const string IntroBackdropResource = "street-cover-user-v5";
         private const string HubBackdropResource = "street-hub-stadium-v1";
+        private const string HubMusicResourcePath = "Audio/Muchachos_16bit_20pct_mas_lento_LOOP";
+        private const float HubMusicVolume = 0.35f;
+        private const string HubMusicObjectName = "Hub Background Music";
         private static readonly Vector2 HubArtworkSize = new Vector2(841, 1870);
         private const string RiotBackdropResource = "street-riot-environment-v1";
         private const string RiotFanAtlasResource = "street-riot-fans-v1";
@@ -390,6 +472,10 @@ namespace HayChoriYPaty
         private const float RiotFanAtlasRowSplitY = 493f;
         private static readonly Rect RiotReturnButton = new Rect(88, 858, 364, 66);
         private StreetGame game;
+        private AudioSource hubMusicAudioSource;
+        private AudioClip hubMusicClip;
+        private bool hubMusicLoadWarningLogged;
+        private Texture2D hubSettingsGearIcon, hubMusicOnIcon, hubMusicOffIcon;
         private int VisualLevelIndex => game != null && game.Sim != null ? game.Sim.LevelIndex : 0;
         private Texture2D backdrop, chicagoBackground, velezBackground, velezGrill, people, items, parrillero, parrilleroDiagonal, cocacolero, laterCocacolero, parrilleroIcon, upgradeWood, speedArrows, largeGrill, gameCoin, muralArt, allBoysCrest, chicagoCrest, cocaBottle, beverageBarrel, chicagoGrill;
         private Texture2D[] levelCrests;
@@ -433,9 +519,18 @@ namespace HayChoriYPaty
         private int introPreviewBarKey = -1;
         private bool introActive;
         private bool levelSelectActive;
-        private bool hubActive, badgesActive, rankingActive;
+        private bool hubActive, badgesActive, rankingActive, settingsActive;
         private bool levelOneTutorialActive;
         private int levelOneTutorialStep;
+        private bool levelTwoCocacoleroTutorialActive;
+        private int levelTwoCocacoleroTutorialStep;
+        private bool levelThreePatyTutorialActive;
+        private bool levelFourSpecialistsTutorialActive;
+        private int levelFourSpecialistsTutorialStep;
+        private bool levelFiveSpecialistsTutorialActive;
+        private int levelFiveSpecialistsTutorialStep;
+        private bool levelSixRacingTutorialActive;
+        private int levelSixRacingTutorialStep;
         private float introStarted;
         private bool splashClockStarted;
         private bool riotScreenActive;
@@ -808,6 +903,12 @@ namespace HayChoriYPaty
             yield return LoadStartupResourceAsync<Texture2D>("ModularKitchen/Art/coca-2500ml-display-v1", loaded => marketCocaLarge = loaded);
             yield return LoadStartupResourceAsync<Texture2D>("ModularKitchen/Art/market-bread-common-v1", loaded => marketBreadCommon = loaded);
             yield return LoadStartupResourceAsync<Texture2D>("ModularKitchen/Art/market-bread-burger-v1", loaded => marketBreadBurger = loaded);
+            foreach (int id in new[] { 4, 5 })
+            {
+                int ingredientId = id;
+                yield return LoadStartupResourceAsync<Texture2D>(MarketFreshMeatResource(ingredientId),
+                    loaded => marketFreshMeatTextures[ingredientId] = loaded);
+            }
             yield return LoadStartupResourceAsync<Texture2D>(VictoryPopupResource, loaded => victoryPopup = loaded);
             yield return LoadStartupResourceAsync<Texture2D>(RiotBackdropResource, loaded => riotBackdrop = loaded);
             yield return LoadStartupResourceAsync<Texture2D>(RiotFanAtlasResource, loaded => riotFanAtlas = loaded);
@@ -865,6 +966,15 @@ namespace HayChoriYPaty
             levelSelectActive = false;
             levelOneTutorialActive = false;
             levelOneTutorialStep = 0;
+            levelTwoCocacoleroTutorialActive = false;
+            levelTwoCocacoleroTutorialStep = 0;
+            levelThreePatyTutorialActive = false;
+            levelFourSpecialistsTutorialActive = false;
+            levelFourSpecialistsTutorialStep = 0;
+            levelFiveSpecialistsTutorialActive = false;
+            levelFiveSpecialistsTutorialStep = 0;
+            levelSixRacingTutorialActive = false;
+            levelSixRacingTutorialStep = 0;
             introStarted = Time.unscaledTime;
             splashClockStarted = false;
             tiny = small = text = title = header = amount = invisible = menuTitle = levelTitle = marketLabelStyle = null;
@@ -877,7 +987,10 @@ namespace HayChoriYPaty
         }
         private void OnDisable()
         {
+            if (hubMusicAudioSource != null) hubMusicAudioSource.Stop();
+            ReleaseHubAmbientEffectsResources();
             ReleaseHubCharacterAnimationsResources();
+            ReleaseHubControlIcons();
             if (startupResourceRoutine != null) StopCoroutine(startupResourceRoutine);
             startupResourceRoutine = null;
             startupArtReady = false;
@@ -941,8 +1054,76 @@ namespace HayChoriYPaty
                 if (variant != null) Destroy(variant);
             premiumWorker = premiumDiagonal = fernetWorker = fernetWorkerLater = mozoWorker = null;
         }
+        private static bool HubMusicEnabled() =>
+            PlayerPrefs.GetInt(HubMusicEnabledPlayerPrefKey, 1) != 0;
+
+        private static void SetHubMusicEnabled(bool enabled)
+        {
+            PlayerPrefs.SetInt(HubMusicEnabledPlayerPrefKey, enabled ? 1 : 0);
+            PlayerPrefs.Save();
+        }
+
+        private void ToggleHubMusic()
+        {
+            SetHubMusicEnabled(!HubMusicEnabled());
+            UpdateHubMusic();
+        }
+
+        private static bool ShouldPlayHubMusic(bool hub, bool intro, bool market, bool levelSelect,
+            bool badges, bool ranking, bool result)
+        {
+            return hub && !intro && !market && !levelSelect && !badges && !ranking && !result;
+        }
+
+        private void UpdateHubMusic()
+        {
+            bool shouldPlay = HubMusicEnabled() && ShouldPlayHubMusic(hubActive, introActive, marketActive, levelSelectActive,
+                badgesActive, rankingActive, game != null && game.ShowChulengoResult);
+            if (!shouldPlay)
+            {
+                if (hubMusicAudioSource != null) hubMusicAudioSource.Stop();
+                return;
+            }
+
+            if (hubMusicClip == null)
+            {
+                hubMusicClip = Resources.Load<AudioClip>(HubMusicResourcePath);
+                if (hubMusicClip == null)
+                {
+                    if (!hubMusicLoadWarningLogged)
+                    {
+                        Debug.LogWarning("Could not load the barrio hub music at Resources/" + HubMusicResourcePath);
+                        hubMusicLoadWarningLogged = true;
+                    }
+                    return;
+                }
+            }
+
+            if (hubMusicAudioSource == null)
+            {
+                Transform child = transform.Find(HubMusicObjectName);
+                GameObject audioObject = child != null ? child.gameObject : new GameObject(HubMusicObjectName);
+                if (child == null) audioObject.transform.SetParent(transform, false);
+                hubMusicAudioSource = audioObject.GetComponent<AudioSource>();
+                if (hubMusicAudioSource == null) hubMusicAudioSource = audioObject.AddComponent<AudioSource>();
+            }
+
+            ConfigureHubMusicSource(hubMusicAudioSource, hubMusicClip);
+            if (!hubMusicAudioSource.isPlaying) hubMusicAudioSource.Play();
+        }
+
+        private static void ConfigureHubMusicSource(AudioSource source, AudioClip clip)
+        {
+            if (source.clip != clip) source.clip = clip;
+            source.playOnAwake = false;
+            source.loop = true;
+            source.spatialBlend = 0f;
+            source.volume = HubMusicVolume;
+        }
+
         private void Update()
         {
+            UpdateHubMusic();
             // The branded presentation belongs to startup, not to the authenticated game session.
             // Let it complete while Firebase resolves; game actions remain gated separately.
             if (introActive && startupArtReady)
@@ -955,7 +1136,30 @@ namespace HayChoriYPaty
             if (introActive && !game.ShowChulengoResult) return;
 #if ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
 #if UNITY_ANDROID && !UNITY_EDITOR
-            // Normal Android buttons remain native IMGUI; only the modal skip uses this pointer path.
+            // Android taps remain native IMGUI, but native buttons do not provide a scroll container.
+            // Track touch drags separately; taps still dispatch through the native GUI controls below.
+            if (levelSelectActive && !game.ShowChulengoResult)
+            {
+                Touchscreen touch = Touchscreen.current;
+                if (touch != null)
+                {
+                    var press = touch.primaryTouch.press;
+                    if (press.isPressed || press.wasReleasedThisFrame)
+                        HandleLevelSelectorTouchScroll(touch.primaryTouch.position.ReadValue(),
+                            press.wasPressedThisFrame, press.isPressed, press.wasReleasedThisFrame);
+                }
+            }
+            if (marketActive && !game.ShowChulengoResult)
+            {
+                Touchscreen marketTouch = Touchscreen.current;
+                if (marketTouch != null)
+                {
+                    var press = marketTouch.primaryTouch.press;
+                    if (press.isPressed || press.wasReleasedThisFrame)
+                        HandleMarketTouchScroll(marketTouch.primaryTouch.position.ReadValue(),
+                            press.wasPressedThisFrame, press.isPressed, press.wasReleasedThisFrame);
+                }
+            }
             if (VictoryTransitionActive || victorySkipHeld)
 #endif
             {
@@ -966,6 +1170,82 @@ namespace HayChoriYPaty
             }
 #endif
         }
+        private void HandleLevelSelectorTouchScroll(Vector2 pixel, bool down, bool held, bool up)
+        {
+            if (!levelSelectActive || game == null) return;
+            Rect viewport = CanvasViewport(new Vector2(Screen.width, Screen.height), Screen.safeArea);
+            if (viewport.width <= 0f) return;
+            logicalCanvasHeight = CanvasLogicalHeight(viewport);
+            layoutVerticalScale = logicalCanvasHeight / H;
+            Vector2 point = ScreenToLayoutPoint(pixel, new Vector2(Screen.width, Screen.height), viewport);
+            point.y *= layoutVerticalScale;
+
+            if (down)
+            {
+                levelSelectTouchHeld = LevelSelectorViewportBounds(logicalCanvasHeight).Contains(point);
+                levelSelectTouchDownY = point.y;
+                levelSelectTouchDownScroll = levelSelectScroll;
+                levelSelectTouchDragging = false;
+                levelSelectIgnoreNativeTapUntilFrame = -1;
+            }
+            if (held && levelSelectTouchHeld)
+            {
+                float delta = levelSelectTouchDownY - point.y;
+                if (Mathf.Abs(delta) > 8f) levelSelectTouchDragging = true;
+                if (levelSelectTouchDragging)
+                    levelSelectScroll = Mathf.Clamp(levelSelectTouchDownScroll + delta, 0f,
+                        LevelSelectorMaxScroll(logicalCanvasHeight));
+            }
+            if (up)
+            {
+                if (levelSelectTouchDragging)
+                    levelSelectIgnoreNativeTapUntilFrame = Time.frameCount + 1;
+                levelSelectTouchHeld = false;
+                levelSelectTouchDragging = false;
+            }
+        }
+        private bool SuppressLevelSelectorNativeTap => levelSelectActive &&
+            (levelSelectTouchDragging || Time.frameCount <= levelSelectIgnoreNativeTapUntilFrame);
+        private void HandleMarketTouchScroll(Vector2 pixel, bool down, bool held, bool up)
+        {
+            if (!marketActive || game == null || game.Sim == null || game.ShowChulengoResult) return;
+            Vector2 screenSize = new Vector2(Screen.width, Screen.height);
+            Rect viewport = CanvasViewport(screenSize, Screen.safeArea);
+            if (viewport.width <= 0f) return;
+            logicalCanvasHeight = CanvasLogicalHeight(viewport);
+            layoutVerticalScale = logicalCanvasHeight / H;
+            Vector2 point = ScreenToLayoutPoint(pixel, screenSize, viewport);
+            point.y *= layoutVerticalScale;
+            UpdateMarketTouchScroll(point, down, held, up);
+        }
+        private void UpdateMarketTouchScroll(Vector2 point, bool down, bool held, bool up)
+        {
+            if (!marketActive || game == null || game.Sim == null || game.ShowChulengoResult) return;
+            Rect body = MarketBodyBounds();
+            if (down)
+            {
+                marketTouchHeld = body.Contains(point);
+                marketTouchDownY = point.y;
+                marketTouchDownScroll = marketScroll;
+                marketTouchDragging = false;
+                marketIgnoreNativeTapUntilFrame = -1;
+            }
+            if (held && marketTouchHeld)
+            {
+                float delta = marketTouchDownY - point.y;
+                if (Mathf.Abs(delta) > 8f) marketTouchDragging = true;
+                if (marketTouchDragging)
+                    marketScroll = Mathf.Clamp(marketTouchDownScroll + delta, 0f, MarketMaxScroll());
+            }
+            if (up)
+            {
+                if (marketTouchDragging) marketIgnoreNativeTapUntilFrame = Time.frameCount + 1;
+                marketTouchHeld = false;
+                marketTouchDragging = false;
+            }
+        }
+        private bool SuppressMarketNativeTap => marketActive &&
+            (marketTouchDragging || Time.frameCount <= marketIgnoreNativeTapUntilFrame);
         private static Rect CanvasViewport(Vector2 size, Rect safe)
         {
             if(safe.xMax>size.x+1||safe.yMax>size.y+1) safe=new Rect(0,0,size.x,size.y);
@@ -1099,11 +1379,46 @@ namespace HayChoriYPaty
                 if (LevelOneTutorialSkipBounds().Contains(p)) return LevelOneTutorialSkipAction;
                 return LevelOneTutorialPrimaryBounds().Contains(p) ? LevelOneTutorialPrimaryAction : 0;
             }
+            if (levelTwoCocacoleroTutorialActive)
+            {
+                if (LevelTwoCocacoleroTutorialSkipBounds().Contains(p)) return LevelOneTutorialSkipAction;
+                return LevelTwoCocacoleroTutorialPrimaryBounds().Contains(p) ? LevelOneTutorialPrimaryAction : 0;
+            }
+            if (levelThreePatyTutorialActive)
+            {
+                if (LevelThreePatyTutorialSkipBounds().Contains(p)) return LevelOneTutorialSkipAction;
+                return LevelThreePatyTutorialPrimaryBounds().Contains(p) ? LevelOneTutorialPrimaryAction : 0;
+            }
+            if (levelFourSpecialistsTutorialActive)
+            {
+                if (LevelFourSpecialistsTutorialSkipBounds().Contains(p)) return LevelOneTutorialSkipAction;
+                return LevelFourSpecialistsTutorialPrimaryBounds().Contains(p) ? LevelOneTutorialPrimaryAction : 0;
+            }
+            if (levelFiveSpecialistsTutorialActive)
+            {
+                if (LevelFiveSpecialistsTutorialSkipBounds().Contains(p)) return LevelOneTutorialSkipAction;
+                return LevelFiveSpecialistsTutorialPrimaryBounds().Contains(p) ? LevelOneTutorialPrimaryAction : 0;
+            }
+            if (levelSixRacingTutorialActive)
+            {
+                if (LevelSixRacingTutorialSkipBounds().Contains(p)) return LevelOneTutorialSkipAction;
+                return LevelSixRacingTutorialPrimaryBounds().Contains(p) ? LevelOneTutorialPrimaryAction : 0;
+            }
             if (badgesActive) { p.y *= layoutVerticalScale; return BadgeBackBounds(logicalCanvasHeight).Contains(p) ? BadgeBackAction : 0; }
             if (rankingActive) { p.y *= layoutVerticalScale; return RankingBackBounds(logicalCanvasHeight).Contains(p) ? RankingBackAction : 0; }
             if (hubActive && !marketActive)
             {
-                foreach (int action in new[] { HubAccountAction, HubRankingAction, HubBadgesAction, HubMarketAction, HubPlayAction })
+                if (settingsActive)
+                {
+                    if (HubSettingsMusicButtonBounds.Contains(p)) return HubSettingsMusicAction;
+                    if (HubSettingsBackButtonBounds.Contains(p)) return HubSettingsBackAction;
+                    return 0;
+                }
+                if (HubSettingsButtonLayoutBounds(new Vector2(Screen.width, Screen.height), Screen.safeArea).Contains(p))
+                    return HubSettingsAction;
+                if (HubTopMusicButtonLayoutBounds(new Vector2(Screen.width, Screen.height), Screen.safeArea).Contains(p))
+                    return HubTopMusicAction;
+                foreach (int action in HubArtworkActions)
                     if (HubArtworkActionBounds(action).Contains(p)) return action;
                 return 0;
             }
@@ -1137,11 +1452,13 @@ namespace HayChoriYPaty
         {
             if (VictoryTransitionActive || victorySkipHeld || game == null) return;
             var firebaseSession = Cloud.FirebasePlayerSession.Instance;
-            if (firebaseSession != null && firebaseSession.BlocksGameInput)
+            bool isHubSettingsAction = hubActive &&
+                (a == HubSettingsAction || a == HubSettingsMusicAction || a == HubSettingsBackAction || a == HubTopMusicAction);
+            if (firebaseSession != null && firebaseSession.BlocksGameInput && !isHubSettingsAction)
             {
                 if (firebaseSession.AccountMenuOpen) return;
-                // Do not silently dead-end Jugar (or another hub destination) when login is
-                // required: bring up the account panel without leaving the hub.
+                // Game destinations still require Firebase; local hub controls remain accessible
+                // without an account and do not alter the authentication gate.
                 if (hubActive) firebaseSession.OpenAccountMenu();
                 return;
             }
@@ -1155,7 +1472,7 @@ namespace HayChoriYPaty
                     : a == ChulengoCollectAction ? game.TryCollectVictoryReward()
                     : a == VictoryExitAction && !game.HasPendingChulengo ? game.NextLevel()
                     : a == ResultLevelsAction && !game.HasPendingChulengo ? game.ReturnToLevels() : false;
-                if (chulengoOk && a == VictoryExitAction) { marketActive = true; marketFromSelector = true; marketOtherExpanded = false; marketMessage = ""; }
+                if (chulengoOk && a == VictoryExitAction) { marketActive = true; marketFromSelector = true; marketTab = 0; marketOtherExpanded = false; marketMessage = ""; }
                 if (chulengoOk && a == ResultLevelsAction) { marketActive = false; levelSelectActive = true; levelSelectScroll = 0f; }
                 if (a == ChulengoMultiplyAction || a == ChulengoCollectAction || a == VictoryExitAction || a == ResultLevelsAction)
                 { lastAction = a; feedbackUntil = Time.unscaledTime + .22f; feedbackScale = chulengoOk ? 1.04f : .97f; }
@@ -1171,24 +1488,134 @@ namespace HayChoriYPaty
                     {
                         levelOneTutorialActive = false;
                         levelOneTutorialStep = 0;
-                        PlayerPrefs.SetInt(LevelOneTutorialCompletedKey, 1);
-                        PlayerPrefs.Save();
+                        if (!RepeatLevelOneTutorialForTesting)
+                        {
+                            PlayerPrefs.SetInt(LevelOneTutorialCompletedKey, 1);
+                            PlayerPrefs.Save();
+                        }
                     }
                 }
                 else if (a == LevelOneTutorialPrimaryAction && levelOneTutorialStep < 3)
                     levelOneTutorialStep++;
                 return;
             }
+            if (levelTwoCocacoleroTutorialActive)
+            {
+                if (a == LevelOneTutorialSkipAction ||
+                    (a == LevelOneTutorialPrimaryAction && levelTwoCocacoleroTutorialStep == 1))
+                {
+                    if (game.TryStartRound())
+                    {
+                        levelTwoCocacoleroTutorialActive = false;
+                        levelTwoCocacoleroTutorialStep = 0;
+                        PlayerPrefs.SetInt(LevelTwoCocacoleroTutorialCompletedKey, 1);
+                        PlayerPrefs.Save();
+                        marketActive = false;
+                        hubActive = false;
+                        levelSelectActive = false;
+                    }
+                }
+                else if (a == LevelOneTutorialPrimaryAction && levelTwoCocacoleroTutorialStep == 0)
+                    levelTwoCocacoleroTutorialStep++;
+                return;
+            }
+            if (levelThreePatyTutorialActive)
+            {
+                if (a == LevelOneTutorialSkipAction || a == LevelOneTutorialPrimaryAction)
+                {
+                    if (game.TryStartRound())
+                    {
+                        levelThreePatyTutorialActive = false;
+                        PlayerPrefs.SetInt(LevelThreePatyTutorialCompletedKey, 1);
+                        PlayerPrefs.Save();
+                        marketActive = false;
+                        hubActive = false;
+                        levelSelectActive = false;
+                    }
+                }
+                return;
+            }
+            if (levelFourSpecialistsTutorialActive)
+            {
+                if (a == LevelOneTutorialSkipAction ||
+                    (a == LevelOneTutorialPrimaryAction && levelFourSpecialistsTutorialStep == 1))
+                {
+                    if (game.TryStartRound())
+                    {
+                        levelFourSpecialistsTutorialActive = false;
+                        levelFourSpecialistsTutorialStep = 0;
+                        PlayerPrefs.SetInt(LevelFourSpecialistsTutorialCompletedKey, 1);
+                        PlayerPrefs.Save();
+                        marketActive = false;
+                        hubActive = false;
+                        levelSelectActive = false;
+                    }
+                }
+                else if (a == LevelOneTutorialPrimaryAction && levelFourSpecialistsTutorialStep == 0)
+                    levelFourSpecialistsTutorialStep++;
+                return;
+            }
+            if (levelFiveSpecialistsTutorialActive)
+            {
+                if (a == LevelOneTutorialSkipAction ||
+                    (a == LevelOneTutorialPrimaryAction && levelFiveSpecialistsTutorialStep == 1))
+                {
+                    if (game.TryStartRound())
+                    {
+                        levelFiveSpecialistsTutorialActive = false;
+                        levelFiveSpecialistsTutorialStep = 0;
+                        PlayerPrefs.SetInt(LevelFiveSpecialistsTutorialCompletedKey, 1);
+                        PlayerPrefs.Save();
+                        marketActive = false;
+                        hubActive = false;
+                        levelSelectActive = false;
+                    }
+                }
+                else if (a == LevelOneTutorialPrimaryAction && levelFiveSpecialistsTutorialStep == 0)
+                    levelFiveSpecialistsTutorialStep++;
+                return;
+            }
+            if (levelSixRacingTutorialActive)
+            {
+                if (a == LevelOneTutorialSkipAction ||
+                    (a == LevelOneTutorialPrimaryAction && levelSixRacingTutorialStep == 1))
+                {
+                    if (game.TryStartRound())
+                    {
+                        levelSixRacingTutorialActive = false;
+                        levelSixRacingTutorialStep = 0;
+                        PlayerPrefs.SetInt(LevelSixRacingTutorialCompletedKey, 1);
+                        PlayerPrefs.Save();
+                        marketActive = false;
+                        hubActive = false;
+                        levelSelectActive = false;
+                    }
+                }
+                else if (a == LevelOneTutorialPrimaryAction && levelSixRacingTutorialStep == 0)
+                    levelSixRacingTutorialStep++;
+                return;
+            }
             if (hubActive && !marketActive)
             {
-                if (a == HubPlayAction)
+                if (a == HubSettingsAction)
+                    settingsActive = true;
+                else if (a == HubTopMusicAction && !settingsActive)
+                    ToggleHubMusic();
+                else if (settingsActive)
+                {
+                    if (a == HubSettingsMusicAction)
+                        ToggleHubMusic();
+                    else if (a == HubSettingsBackAction)
+                        settingsActive = false;
+                }
+                else if (a == HubPlayAction)
                 {
                     hubActive = false; levelSelectActive = true;
                     levelSelectScroll = 0f;
                 }
                 else if (a == HubMarketAction)
                 {
-                    marketActive = true; marketFromSelector = false; marketMessage = "";
+                    marketActive = true; marketFromSelector = false; marketTab = 0; marketMessage = "";
                     marketScroll = 0; marketOtherExpanded = false; marketExpandedIngredient = -1;
                 }
                 else if (a == HubBadgesAction) { hubActive = false; badgesActive = true; }
@@ -1208,7 +1635,6 @@ namespace HayChoriYPaty
             }
             if (levelSelectActive)
             {
-                if (a == MarketCloseAction) { levelSelectActive=false; marketActive=true; marketFromSelector=true; marketMessage=""; marketScroll=0; marketOtherExpanded=false; marketExpandedIngredient=-1; return; }
                 if (a == LevelSelectorBackAction)
                 {
                     levelSelectActive = false;
@@ -1228,7 +1654,8 @@ namespace HayChoriYPaty
                             if (game.CanStartRound)
                             {
                                 marketMessage = "";
-                                if (PlayerPrefs.GetInt(LevelOneTutorialCompletedKey, 0) == 0)
+                                if (RepeatLevelOneTutorialForTesting ||
+                                    PlayerPrefs.GetInt(LevelOneTutorialCompletedKey, 0) == 0)
                                 {
                                     levelOneTutorialActive = true;
                                     levelOneTutorialStep = 0;
@@ -1237,7 +1664,7 @@ namespace HayChoriYPaty
                             }
                             else { marketMessage="Falta stock para iniciar. Revisá Mercado."; levelSelectActive=true; }
                         }
-                        else { marketFromSelector = true; marketActive = true; marketMessage = ""; marketScroll = 0; marketOtherExpanded = false; marketExpandedIngredient = -1; }
+                        else { marketFromSelector = true; marketActive = true; marketTab = 0; marketMessage = ""; marketScroll = 0; marketOtherExpanded = false; marketExpandedIngredient = -1; }
                     }
                     lastAction = a; feedbackUntil = Time.unscaledTime + 0.22f; feedbackScale = selectionSucceeded ? 1.04f : 0.97f;
                     return;
@@ -1247,6 +1674,22 @@ namespace HayChoriYPaty
             if (marketActive)
             {
                 if (a == MarketBackAction) { marketActive=false; marketMessage=game.CanStartRound?"Stock suficiente para jugar.":"Falta stock para iniciar. Revisá Mercado."; if(marketFromSelector)levelSelectActive=true; return; }
+                if (a == MarketIngredientsTabAction || a == MarketExtrasTabAction)
+                {
+                    int nextTab = a == MarketIngredientsTabAction ? 0 : 1;
+                    if (marketTab != nextTab) { marketTab = nextTab; marketScroll = 0f; marketMessage = ""; }
+                    return;
+                }
+                if (a >= MarketTicketRedeemAction && a < MarketTicketRedeemAction + 5)
+                {
+                    StreetWorkerRole role = (StreetWorkerRole)(a - MarketTicketRedeemAction);
+                    bool success = game.TryRedeemTicketWorker(role, game.TicketRedemptionOperationId(role));
+                    marketMessage = success ? "¡CANJE REALIZADO! Tu trabajador está reservado para el próximo partido."
+                        : game.TicketBalance < 3 ? "Te faltan " + System.Math.Max(0L, 3L - game.TicketBalance) + " tickets para canjear."
+                        : game.Sim.LevelIndex < 5 || !game.TicketExtrasUnlocked ? "Desbloqueá Racing y elegí un nivel 6 o superior."
+                        : "No se pudo guardar el canje; el saldo no cambió.";
+                    return;
+                }
                 if (a == MarketOtherAction && MarketIngredientIds(false).Length > 0) { marketOtherExpanded = !marketOtherExpanded; marketScroll = Mathf.Clamp(marketScroll, 0, MarketMaxScroll()); return; }
                 if (a >= MarketExpandAction && a < MarketExpandAction + 10)
                 {
@@ -1287,7 +1730,66 @@ namespace HayChoriYPaty
                     for(int id=0;id<StreetIngredientCatalog.Names.Length;id++)if(game.Market.MissingPacks(game.Sim,id)>0)bought|=game.BuyMissingIngredient(id);
                     marketMessage=bought?"Compras mínimas realizadas":"No hay faltantes pendientes";return;
                 }
-                if(a==MarketPlayAction){marketMessage=game.TryStartRound()?"":"Falta stock para iniciar";if(game.Sim.Phase==RoundPhase.Playing){marketActive=false;hubActive=false;levelSelectActive=false;}return;}
+                if (a == MarketPlayAction)
+                {
+                    if (game.CanStartRound && game.Sim.LevelIndex == 2 &&
+                        PlayerPrefs.GetInt(LevelThreePatyTutorialCompletedKey, 0) == 0)
+                    {
+                        marketMessage = "";
+                        marketActive = false;
+                        hubActive = false;
+                        levelSelectActive = false;
+                        levelThreePatyTutorialActive = true;
+                        return;
+                    }
+                    if (game.CanStartRound && game.Sim.LevelIndex == 3 &&
+                        PlayerPrefs.GetInt(LevelFourSpecialistsTutorialCompletedKey, 0) == 0)
+                    {
+                        marketMessage = "";
+                        marketActive = false;
+                        hubActive = false;
+                        levelSelectActive = false;
+                        levelFourSpecialistsTutorialActive = true;
+                        levelFourSpecialistsTutorialStep = 0;
+                        return;
+                    }
+                    if (game.CanStartRound && game.Sim.LevelIndex == 4 &&
+                        PlayerPrefs.GetInt(LevelFiveSpecialistsTutorialCompletedKey, 0) == 0)
+                    {
+                        marketMessage = "";
+                        marketActive = false;
+                        hubActive = false;
+                        levelSelectActive = false;
+                        levelFiveSpecialistsTutorialActive = true;
+                        levelFiveSpecialistsTutorialStep = 0;
+                        return;
+                    }
+                    if (game.CanStartRound && game.Sim.LevelIndex == 5 &&
+                        PlayerPrefs.GetInt(LevelSixRacingTutorialCompletedKey, 0) == 0)
+                    {
+                        marketMessage = "";
+                        marketActive = false;
+                        hubActive = false;
+                        levelSelectActive = false;
+                        levelSixRacingTutorialActive = true;
+                        levelSixRacingTutorialStep = 0;
+                        return;
+                    }
+                    if (game.CanStartRound && game.Sim.LevelIndex == 1 &&
+                        PlayerPrefs.GetInt(LevelTwoCocacoleroTutorialCompletedKey, 0) == 0)
+                    {
+                        marketMessage = "";
+                        marketActive = false;
+                        hubActive = false;
+                        levelSelectActive = false;
+                        levelTwoCocacoleroTutorialActive = true;
+                        levelTwoCocacoleroTutorialStep = 0;
+                        return;
+                    }
+                    marketMessage = game.TryStartRound() ? "" : "Falta stock para iniciar";
+                    if (game.Sim.Phase == RoundPhase.Playing) { marketActive = false; hubActive = false; levelSelectActive = false; }
+                    return;
+                }
             }
             bool ok = true;
             if (a == ReadyLevelSelectorAction && game.Sim.Phase == RoundPhase.Ready)
@@ -1296,7 +1798,55 @@ namespace HayChoriYPaty
                 levelSelectScroll = 0f;
                 return;
             }
-            if (a==1) game.TryStartRound(); else if (a==2) ok=game.TryHireParrillero(); else if (a==3) ok=game.TryUpgradeSpeed(); else if (a==HireCocacoleroAction || a==HirePremiumAction || a==HireFerneteroAction) ok=game.TryHire(RoleForAction(a)); else if (a==HireMozoAction) ok=game.TryHireMozo();
+            if (a == 1)
+            {
+                if (game.Sim.LevelIndex == 2 && game.CanStartRound &&
+                    PlayerPrefs.GetInt(LevelThreePatyTutorialCompletedKey, 0) == 0)
+                {
+                    levelThreePatyTutorialActive = true;
+                    marketActive = false;
+                    hubActive = false;
+                    levelSelectActive = false;
+                }
+                else if (game.Sim.LevelIndex == 3 && game.CanStartRound &&
+                    PlayerPrefs.GetInt(LevelFourSpecialistsTutorialCompletedKey, 0) == 0)
+                {
+                    levelFourSpecialistsTutorialActive = true;
+                    levelFourSpecialistsTutorialStep = 0;
+                    marketActive = false;
+                    hubActive = false;
+                    levelSelectActive = false;
+                }
+                else if (game.Sim.LevelIndex == 4 && game.CanStartRound &&
+                    PlayerPrefs.GetInt(LevelFiveSpecialistsTutorialCompletedKey, 0) == 0)
+                {
+                    levelFiveSpecialistsTutorialActive = true;
+                    levelFiveSpecialistsTutorialStep = 0;
+                    marketActive = false;
+                    hubActive = false;
+                    levelSelectActive = false;
+                }
+                else if (game.Sim.LevelIndex == 5 && game.CanStartRound &&
+                    PlayerPrefs.GetInt(LevelSixRacingTutorialCompletedKey, 0) == 0)
+                {
+                    levelSixRacingTutorialActive = true;
+                    levelSixRacingTutorialStep = 0;
+                    marketActive = false;
+                    hubActive = false;
+                    levelSelectActive = false;
+                }
+                else if (game.Sim.LevelIndex == 1 && game.CanStartRound &&
+                    PlayerPrefs.GetInt(LevelTwoCocacoleroTutorialCompletedKey, 0) == 0)
+                {
+                    levelTwoCocacoleroTutorialActive = true;
+                    levelTwoCocacoleroTutorialStep = 0;
+                    marketActive = false;
+                    hubActive = false;
+                    levelSelectActive = false;
+                }
+                else game.TryStartRound();
+            }
+            else if(a==2) ok=game.TryHireParrillero(); else if(a==3) ok=game.TryUpgradeSpeed(); else if (a==HireCocacoleroAction || a==HirePremiumAction || a==HireFerneteroAction) ok=game.TryHire(RoleForAction(a)); else if (a==HireMozoAction) ok=game.TryHireMozo();
             else if (a == RiotReturnAction && game.Sim.Phase == RoundPhase.Lost)
             {
                 ok = game.ReturnToLevels();
@@ -1339,13 +1889,18 @@ namespace HayChoriYPaty
                 (phase == RoundPhase.Ready && catalogActionCount <= 3);
         }
 
-        public bool AccountMenuVisible => !introActive && (hubActive || levelSelectActive || badgesActive || rankingActive || marketActive);
-        public bool HubAccountActionRendered => hubActive && !marketActive && !levelSelectActive && !badgesActive && !rankingActive;
+        public bool AccountMenuVisible => !introActive && (hubActive || badgesActive || rankingActive || marketActive);
+        public bool HubAccountActionRendered => false;
 
         private void OnGUI()
         {
             if (game == null) return;
-            if (!startupArtReady) { DrawStartupLoadingFallback(); return; }
+            if (!startupArtReady)
+            {
+                // Show the real cover as soon as it is available; do not interpose a generic loading screen.
+                DrawIntroScreen(coverArt, Color.white, ScaleMode.ScaleAndCrop);
+                return;
+            }
             Styles(); Rect v=CanvasViewport(new Vector2(Screen.width,Screen.height),Screen.safeArea); if(v.width<=0)return;
             logicalCanvasHeight = CanvasLogicalHeight(v);
             layoutVerticalScale = logicalCanvasHeight / H;
@@ -1469,7 +2024,9 @@ namespace HayChoriYPaty
             DrawCounters(sim);
             // The same footer geometry drives rendering, touch targets and the decorative pennant gap.
             int[] catalogActions = CatalogUpgradeActions(sim);
-            if (VictoryTransitionActive || ShouldDrawUpgradeCards(sim.Phase, catalogActions.Length))
+            if (VictoryTransitionActive || levelFourSpecialistsTutorialActive || levelFiveSpecialistsTutorialActive ||
+                levelSixRacingTutorialActive ||
+                ShouldDrawUpgradeCards(sim.Phase, catalogActions.Length))
                 for (int i = 0; i < catalogActions.Length; i++)
                 {
                     int action = catalogActions[i];
@@ -1482,13 +2039,19 @@ namespace HayChoriYPaty
                 }
             if (sim.Phase == RoundPhase.Ready)
             {
-                if (levelOneTutorialActive) DrawLevelBadge(game.SelectedLevel, footer.LevelBadge);
+                if (levelOneTutorialActive || levelTwoCocacoleroTutorialActive || levelThreePatyTutorialActive ||
+                    levelFourSpecialistsTutorialActive || levelFiveSpecialistsTutorialActive || levelSixRacingTutorialActive) DrawLevelBadge(game.SelectedLevel, footer.LevelBadge);
                 else ReadyPanel(footer);
             }
             else if (VictoryTransitionActive) DrawVictoryTransition();
             else if(sim.Phase==RoundPhase.Won||sim.Phase==RoundPhase.Lost) ResultPanel();
             else DrawLevelBadge(sim.LevelIndex, footer.LevelBadge);
             if (levelOneTutorialActive) DrawLevelOneTutorial();
+            else if (levelTwoCocacoleroTutorialActive) DrawLevelTwoCocacoleroTutorial();
+            else if (levelThreePatyTutorialActive) DrawLevelThreePatyTutorial();
+            else if (levelFourSpecialistsTutorialActive) DrawLevelFourSpecialistsTutorial();
+            else if (levelFiveSpecialistsTutorialActive) DrawLevelFiveSpecialistsTutorial();
+            else if (levelSixRacingTutorialActive) DrawLevelSixRacingTutorial();
             GUI.color=old;GUI.matrix=m;
         }
         private static Rect ScreenBounds(Vector2 size) => new Rect(0, 0, size.x, size.y);
@@ -2263,8 +2826,9 @@ namespace HayChoriYPaty
                     Mathf.RoundToInt(HudStatusValueFontSize * statusScale));
                 DrawHudNumber(HudStatusTextBounds(1, cutoutGap), FormatRemainingTime(sim.TimeRemaining),
                     Mathf.RoundToInt(HudClockFontSize * statusScale));
+                int quotaFontSize = HudQuotaCounterFontSizeFor(sim, cutoutGap);
                 for (int slot = 0; slot < hudQuotaProductCount; slot++)
-                    DrawQuotaChip(sim, slot, HudQuotaCellBounds(slot, hudQuotaProductIds, hudQuotaProductCount, cutoutGap));
+                    DrawQuotaChip(sim, slot, HudQuotaCellBounds(slot, hudQuotaProductIds, hudQuotaProductCount, cutoutGap), quotaFontSize);
             }
             finally { GUI.matrix = previous; GUI.color = color; layoutVerticalScale = previousVertical; }
         }
@@ -2333,10 +2897,16 @@ namespace HayChoriYPaty
             return count;
         }
 
+        private static int HudQuotaRowsInColumn(int[] productIds, int productCount, int column)
+        {
+            int count = HudQuotaCountInColumn(productIds, productCount, column);
+            return count <= 0 ? 0 : Mathf.CeilToInt(count / (float)HudQuotaColumnsPerGroup);
+        }
+
         private static Rect HudQuotaGridBounds(Rect cutoutGap, int[] productIds, int productCount)
         {
-            int solidRows = HudQuotaCountInColumn(productIds, productCount, 0);
-            int liquidRows = HudQuotaCountInColumn(productIds, productCount, 1);
+            int solidRows = HudQuotaRowsInColumn(productIds, productCount, 0);
+            int liquidRows = HudQuotaRowsInColumn(productIds, productCount, 1);
             int rows = Mathf.Max(solidRows, liquidRows);
             float height = rows <= 0 ? 0f : rows * HudQuotaCardHeight + (rows - 1) * HudObjectiveGap;
             return new Rect(HudQuotaColumnInset, HudBarHeightFor(cutoutGap) + HudObjectiveGap,
@@ -2361,12 +2931,15 @@ namespace HayChoriYPaty
             if (productIds == null || slot < 0 || slot >= productCount || slot >= productIds.Length) return Rect.zero;
             int productId = productIds[slot];
             int column = HudQuotaColumnForProduct(productId);
-            int row = 0;
+            int groupIndex = 0;
             for (int i = 0; i < slot; i++)
-                if (HudQuotaColumnForProduct(productIds[i]) == column) row++;
+                if (HudQuotaColumnForProduct(productIds[i]) == column) groupIndex++;
             float availableWidth = W - HudQuotaColumnInset * 2f;
-            float width = Mathf.Min(HudQuotaCardWidth, availableWidth * .5f);
-            float x = column == 0 ? HudQuotaColumnInset : W - HudQuotaColumnInset - width;
+            float width = Mathf.Min(HudQuotaCardWidth, (availableWidth - HudQuotaColumnSpacing) / HudQuotaColumnsPerGroup);
+            float groupWidth = width * HudQuotaColumnsPerGroup + HudQuotaColumnSpacing;
+            float groupX = column == 0 ? HudQuotaColumnInset : W - HudQuotaColumnInset - groupWidth;
+            float x = groupX + groupIndex % HudQuotaColumnsPerGroup * (width + HudQuotaColumnSpacing);
+            int row = groupIndex / HudQuotaColumnsPerGroup;
             float y = HudBarHeightFor(cutoutGap) + HudObjectiveGap + row * (HudQuotaCardHeight + HudObjectiveGap);
             return new Rect(x, y, width, HudQuotaCardHeight);
         }
@@ -2382,7 +2955,25 @@ namespace HayChoriYPaty
         private static Color HudQuotaCardColor(bool complete) =>
             complete ? new Color(.025f, .34f, .40f, .65f) : new Color(.025f, .09f, .24f, .65f);
 
-        private void DrawQuotaChip(StreetSimulation sim, int slot, Rect bounds)
+        private int HudQuotaCounterFontSizeFor(StreetSimulation sim, Rect cutoutGap)
+        {
+            int sharedFontSize = HudQuotaCounterFontSize;
+            for (int slot = 0; slot < hudQuotaProductCount; slot++)
+            {
+                Rect card = HudQuotaCellBounds(slot, hudQuotaProductIds, hudQuotaProductCount, cutoutGap);
+                if (card.width <= 0f || card.height <= 0f) continue;
+                int product = sim.GetAvailableProduct(slot);
+                float iconSize = Mathf.Min(HudQuotaIconMaxSize, card.height - HudQuotaCardInset * 2f);
+                Rect icon = new Rect(card.x + HudQuotaCardInset, card.center.y - iconSize * .5f, iconSize, iconSize);
+                Rect counter = HudQuotaCounterBounds(card, icon);
+                string value = sim.GetProductDelivered(product) + "/" + sim.GetProductGoal(product);
+                sharedFontSize = Mathf.Min(sharedFontSize,
+                    HudNumberFitFontSize(hudNumber, counter, value, HudQuotaCounterFontSize));
+            }
+            return sharedFontSize;
+        }
+
+        private void DrawQuotaChip(StreetSimulation sim, int slot, Rect bounds, int sharedFontSize)
         {
             if (bounds.width <= 0f || bounds.height <= 0f) return;
             int product = sim.GetAvailableProduct(slot);
@@ -2406,15 +2997,15 @@ namespace HayChoriYPaty
             Rect icon = new Rect(bounds.x + HudQuotaCardInset, bounds.center.y - iconSize * .5f, iconSize, iconSize);
             DrawHudIcon(icon, product);
             Rect counter = HudQuotaCounterBounds(bounds, icon);
-            int fontSize = HudQuotaCounterFontSize;
-            DrawHudNumber(counter, delivered + "/" + goal, fontSize, HudQuotaCounterTextAlignment);
+            DrawHudNumber(counter, delivered + "/" + goal, sharedFontSize, HudQuotaCounterTextAlignment);
         }
         private static Rect HudQuotaCounterBounds(Rect card, Rect icon)
         {
             float x = icon.xMax + HudQuotaCardInset;
-            return new Rect(x, card.y + HudChipTextTopInset * HudQuotaCardEnlargement,
+            float verticalInset = HudChipTextHeightInset * HudQuotaCardEnlargement * .5f;
+            return new Rect(x, card.y + verticalInset,
                 Mathf.Max(0f, card.xMax - HudQuotaCounterRightInset - x),
-                Mathf.Max(0f, card.height - HudChipTextHeightInset * HudQuotaCardEnlargement));
+                Mathf.Max(0f, card.height - verticalInset * 2f));
         }
         private void DrawHudIcon(Rect slot, int itemId)
         {
@@ -2435,6 +3026,24 @@ namespace HayChoriYPaty
             int seconds = Mathf.Max(0, Mathf.CeilToInt(remaining));
             return (seconds / 60) + ":" + (seconds % 60).ToString("00");
         }
+        private static int HudNumberFitFontSize(GUIStyle style, Rect bounds, string value, int preferredFontSize)
+        {
+            int originalSize = style.fontSize;
+            try
+            {
+                int baseFontSize = Mathf.Max(12, preferredFontSize);
+                style.fontSize = baseFontSize;
+                Vector2 needed = style.CalcSize(new GUIContent(value));
+                float fitWidth = (bounds.width - 4f) / Mathf.Max(1f, needed.x);
+                float fitHeight = (bounds.height - 2f) / Mathf.Max(1f, needed.y);
+                float fitScale = Mathf.Min(1f, fitWidth, fitHeight);
+                return fitScale < 1f
+                    ? Mathf.Max(12, Mathf.FloorToInt(baseFontSize * fitScale))
+                    : baseFontSize;
+            }
+            finally { style.fontSize = originalSize; }
+        }
+
         private void DrawHudNumber(Rect bounds, string value, int preferredFontSize = 40,
             TextAnchor alignment = TextAnchor.MiddleCenter)
         {
@@ -2442,14 +3051,7 @@ namespace HayChoriYPaty
             TextAnchor originalAlignment = hudNumber.alignment;
             Color originalTextColor = hudNumber.normal.textColor;
             hudNumber.alignment = alignment;
-            int baseFontSize = Mathf.Max(12, preferredFontSize);
-            hudNumber.fontSize = baseFontSize;
-            Vector2 needed = hudNumber.CalcSize(new GUIContent(value));
-            float fitWidth = (bounds.width - 4f) / Mathf.Max(1f, needed.x);
-            float fitHeight = (bounds.height - 2f) / Mathf.Max(1f, needed.y);
-            float fitScale = Mathf.Min(1f, fitWidth, fitHeight);
-            if (fitScale < 1f)
-                hudNumber.fontSize = Mathf.Max(12, Mathf.FloorToInt(baseFontSize * fitScale));
+            hudNumber.fontSize = HudNumberFitFontSize(hudNumber, bounds, value, preferredFontSize);
             hudNumber.normal.textColor = new Color(.005f, .025f, .11f);
             for (int y = -1; y <= 1; y++)
             for (int x = -1; x <= 1; x++)
@@ -2768,43 +3370,119 @@ namespace HayChoriYPaty
             DrawIntroProgress(elapsed);
             GUI.color = Color.white;
         }
-        private void DrawStartupLoadingFallback()
-        {
-            Matrix4x4 previousMatrix = GUI.matrix;
-            Color previousColor = GUI.color;
-            GUI.matrix = Matrix4x4.identity;
-            GUI.color = new Color(.025f, .12f, .22f, 1f);
-            GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
-            GUI.color = Color.white;
-            float scale = Mathf.Min(Screen.width / 540f, Screen.height / 960f);
-            GUI.matrix = Matrix4x4.TRS(new Vector3((Screen.width - 540f * scale) * .5f,
-                (Screen.height - 960f * scale) * .5f), Quaternion.identity, Vector3.one * scale);
-            var label = new GUIStyle(GUI.skin.label)
-            {
-                fontSize = 23,
-                alignment = TextAnchor.MiddleCenter,
-                fontStyle = FontStyle.Bold
-            };
-            label.normal.textColor = Color.white;
-            GUI.Label(new Rect(24, 420, 492, 60), "PREPARANDO EL BARRIO...", label);
-            Rect track = new Rect(120, 500, 300, 18);
-            GUI.color = new Color(.02f, .08f, .15f, 1f);
-            GUI.DrawTexture(track, Texture2D.whiteTexture);
-            GUI.color = new Color(.10f, .73f, .94f, 1f);
-            GUI.DrawTexture(new Rect(track.x, track.y, track.width * startupLoadProgress, track.height), Texture2D.whiteTexture);
-            GUI.color = previousColor;
-            GUI.matrix = previousMatrix;
-        }
-
         private void DrawHubScreen()
         {
-            DrawIntroScreen(hubBackdrop != null ? hubBackdrop : coverArt, Color.white, ScaleMode.ScaleAndCrop);
+            Texture2D artwork = hubBackdrop != null ? hubBackdrop : coverArt;
+            // Use the same illustration as one full-bleed background at every resolution.
+            // ScaleAndCrop preserves its proportions and avoids both colored bars and duplicates.
+            DrawIntroScreen(artwork, Color.white, ScaleMode.ScaleAndCrop);
+
+            if (settingsActive)
+            {
+                DrawHubSettingsOverlay();
+                return;
+            }
+
+            DrawHubAmbientEffects();
             DrawHubCharacterAnimations();
-            DrawHubHotspot(HubAccountAction);
             DrawHubHotspot(HubRankingAction);
             DrawHubHotspot(HubBadgesAction);
             DrawHubHotspot(HubMarketAction);
             DrawHubHotspot(HubPlayAction);
+            DrawHubSettingsButton();
+            DrawHubTopMusicButton();
+        }
+
+        private void DrawHubSettingsButton()
+        {
+            Matrix4x4 previousMatrix = GUI.matrix;
+            float previousVerticalScale = layoutVerticalScale;
+            try
+            {
+                GUI.matrix = Matrix4x4.identity;
+                layoutVerticalScale = 1f;
+                Rect bounds = HubSettingsButtonScreenBounds(
+                    new Vector2(Screen.width, Screen.height), Screen.safeArea);
+                DrawHubIconButton(bounds, HubSettingsAction,
+                    GetHubControlIcon(HubControlIconKind.Settings), HubSettingsButtonContent);
+            }
+            finally
+            {
+                GUI.matrix = previousMatrix;
+                layoutVerticalScale = previousVerticalScale;
+            }
+        }
+
+        private void DrawHubTopMusicButton()
+        {
+            Matrix4x4 previousMatrix = GUI.matrix;
+            float previousVerticalScale = layoutVerticalScale;
+            try
+            {
+                GUI.matrix = Matrix4x4.identity;
+                layoutVerticalScale = 1f;
+                Rect bounds = HubTopMusicButtonScreenBounds(
+                    new Vector2(Screen.width, Screen.height), Screen.safeArea);
+                bool musicEnabled = HubMusicEnabled();
+                DrawHubIconButton(bounds, HubTopMusicAction,
+                    GetHubControlIcon(musicEnabled ? HubControlIconKind.Music : HubControlIconKind.Muted),
+                    musicEnabled ? HubMusicOnButtonContent : HubMusicOffButtonContent);
+            }
+            finally
+            {
+                GUI.matrix = previousMatrix;
+                layoutVerticalScale = previousVerticalScale;
+            }
+        }
+
+        private void DrawHubIconButton(Rect bounds, int action, Texture2D icon, GUIContent buttonContent)
+        {
+            if (bounds.width <= 0f || bounds.height <= 0f) return;
+            DrawStandardButton(bounds, action, string.Empty, true, null, null, buttonContent);
+            if (icon == null) return;
+            Rect drawn = StandardButtonVisualBounds(bounds, pressedAction == action);
+            float iconSize = Mathf.Min(drawn.width, drawn.height) * .72f;
+            Color previousColor = GUI.color;
+            try
+            {
+                GUI.color = Color.white;
+                GUI.DrawTexture(new Rect(drawn.center.x - iconSize * .5f, drawn.center.y - iconSize * .5f,
+                    iconSize, iconSize), icon, ScaleMode.ScaleToFit, true);
+            }
+            finally { GUI.color = previousColor; }
+        }
+
+        private void DrawHubSettingsOverlay()
+        {
+            DrawIntroScreen(Texture2D.whiteTexture, new Color(0f, 0f, 0f, .62f), ScaleMode.StretchToFill);
+            Rect panel = HubSettingsPanelBounds;
+            FillRect(panel, new Color(.018f, .075f, .145f, .98f));
+            Color accent = new Color(.20f, .79f, 1f, 1f);
+            FillRect(new Rect(panel.x, panel.y, panel.width, 4f), accent);
+            FillRect(new Rect(panel.x, panel.yMax - 4f, panel.width, 4f), accent);
+            FillRect(new Rect(panel.x, panel.y, 4f, panel.height), accent);
+            FillRect(new Rect(panel.xMax - 4f, panel.y, 4f, panel.height), accent);
+
+            Styles();
+            GUIStyle heading = new GUIStyle(menuTitle)
+            {
+                fontSize = 31,
+                alignment = TextAnchor.MiddleCenter,
+                wordWrap = false
+            };
+            heading.normal.textColor = Color.white;
+            GUIStyle caption = new GUIStyle(text)
+            {
+                fontSize = 19,
+                alignment = TextAnchor.MiddleCenter,
+                wordWrap = false
+            };
+            caption.normal.textColor = new Color(.84f, .94f, 1f);
+            Label(new Rect(panel.x + 18f, panel.y + 20f, panel.width - 36f, 52f), "AJUSTES", heading);
+            Label(new Rect(panel.x + 18f, panel.y + 77f, panel.width - 36f, 30f), "MÚSICA DEL BARRIO", caption);
+            DrawStandardButton(HubSettingsMusicButtonBounds, HubSettingsMusicAction,
+                HubMusicEnabled() ? "MÚSICA: ACTIVADA" : "MÚSICA: DESACTIVADA");
+            DrawStandardButton(HubSettingsBackButtonBounds, HubSettingsBackAction, "VOLVER AL BARRIO");
         }
         private void DrawHubHotspot(int action)
         {
@@ -2816,26 +3494,228 @@ namespace HayChoriYPaty
         {
             switch (action)
             {
-                case HubAccountAction: return new Rect(12, 5, 230, 160);
-                case HubRankingAction: return new Rect(523, 150, 322, 160);
-                case HubPlayAction: return new Rect(112, 610, 352, 174);
-                case HubMarketAction: return new Rect(105, 1034, 355, 183);
-                case HubBadgesAction: return new Rect(535, 1032, 385, 188);
+                // Four visible hotspots remapped to the single 841x1870 vertical 9:20 master.
+                // Account/login remains available from JUGAR's Firebase gate, not as a separate icon.
+                case HubRankingAction: return new Rect(467, 448, 288, 143);
+                case HubPlayAction: return new Rect(100, 859, 315, 155);
+                case HubMarketAction: return new Rect(94, 1238, 317, 164);
+                case HubBadgesAction: return new Rect(479, 1236, 344, 168);
                 default: return Rect.zero;
             }
         }
         private Rect HubArtworkActionBounds(int action) => HubArtworkRectToLayout(
             HubArtActionSourceRect(action), HubArtworkSize, new Vector2(Screen.width, Screen.height), Screen.safeArea);
+        private static Rect HubSettingsButtonScreenBounds(Vector2 screenSize, Rect safeArea)
+        {
+            Rect viewport = CanvasViewport(screenSize, safeArea);
+            if (viewport.width < HubSettingsButtonWidth + 16f || viewport.height < HubSettingsButtonHeight + 54f)
+                return Rect.zero;
+            // Keep the gear on the upper-left safe edge, apart from the illustration hotspots.
+            return new Rect(viewport.xMin + 8f, viewport.yMin + 54f,
+                HubSettingsButtonWidth, HubSettingsButtonHeight);
+        }
+        internal static Rect HubAccountButtonScreenBounds(Vector2 screenSize) =>
+            new Rect(screenSize.x - HubAccountButtonRightInset, HubAccountButtonTop,
+                HubAccountButtonWidth, HubAccountButtonHeight);
+
+        private static Rect HubTopMusicButtonScreenBounds(Vector2 screenSize, Rect safeArea)
+        {
+            Rect viewport = CanvasViewport(screenSize, safeArea);
+            if (viewport.width < HubTopMusicButtonSize + 16f || viewport.height < HubTopMusicButtonSize + 16f)
+                return Rect.zero;
+            Rect account = HubAccountButtonScreenBounds(screenSize);
+            float x = Mathf.Min(account.xMin - HubTopControlsGap - HubTopMusicButtonSize,
+                viewport.xMax - 8f - HubTopMusicButtonSize);
+            float y = Mathf.Max(account.center.y - HubTopMusicButtonSize * .5f, viewport.yMin + 8f);
+            if (x < viewport.xMin + 8f || y + HubTopMusicButtonSize > viewport.yMax - 8f) return Rect.zero;
+            Rect result = new Rect(x, y, HubTopMusicButtonSize, HubTopMusicButtonSize);
+            for (int pass = 0; pass < HubArtworkActions.Length; pass++)
+            {
+                bool moved = false;
+                foreach (int action in HubArtworkActions)
+                {
+                    Rect hotspot = HubArtworkActionScreenBounds(action, screenSize);
+                    if (!result.Overlaps(hotspot)) continue;
+                    result.y = hotspot.yMax + HubTopControlsGap;
+                    moved = true;
+                }
+                if (!moved) break;
+            }
+            if (result.y + result.height > viewport.yMax - 8f ||
+                result.Overlaps(HubSettingsButtonScreenBounds(screenSize, safeArea))) return Rect.zero;
+            return result;
+        }
+
+        private static Rect HubTopMusicButtonLayoutBounds(Vector2 screenSize, Rect safeArea) =>
+            HubScreenRectToLayout(HubTopMusicButtonScreenBounds(screenSize, safeArea), screenSize, safeArea);
+
+        private static Rect HubSettingsButtonLayoutBounds(Vector2 screenSize, Rect safeArea)
+        {
+            return HubScreenRectToLayout(HubSettingsButtonScreenBounds(screenSize, safeArea), screenSize, safeArea);
+        }
+
+        private static Rect HubScreenRectToLayout(Rect screenBounds, Vector2 screenSize, Rect safeArea)
+        {
+            Rect viewport = CanvasViewport(screenSize, safeArea);
+            if (viewport.width <= 0f || viewport.height <= 0f || screenBounds.width <= 0f || screenBounds.height <= 0f)
+                return Rect.zero;
+            float scaleX = viewport.width / W, scaleY = viewport.height / H;
+            return new Rect((screenBounds.x - viewport.xMin) / scaleX,
+                (screenBounds.y - viewport.yMin) / scaleY,
+                screenBounds.width / scaleX, screenBounds.height / scaleY);
+        }
+
+        private Texture2D GetHubControlIcon(HubControlIconKind kind)
+        {
+            switch (kind)
+            {
+                case HubControlIconKind.Settings:
+                    if (hubSettingsGearIcon == null) hubSettingsGearIcon = CreateHubControlIconTexture(kind);
+                    return hubSettingsGearIcon;
+                case HubControlIconKind.Music:
+                    if (hubMusicOnIcon == null) hubMusicOnIcon = CreateHubControlIconTexture(kind);
+                    return hubMusicOnIcon;
+                default:
+                    if (hubMusicOffIcon == null) hubMusicOffIcon = CreateHubControlIconTexture(HubControlIconKind.Muted);
+                    return hubMusicOffIcon;
+            }
+        }
+
+        private static Texture2D CreateHubControlIconTexture(HubControlIconKind kind)
+        {
+            const int size = 64;
+            var pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+                pixels[y * size + x] = HubControlIconPixel(kind, new Vector2(x + .5f, y + .5f));
+
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            {
+                name = "Hub " + kind + " control icon",
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp,
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            texture.SetPixels(pixels);
+            texture.Apply(false, false);
+            return texture;
+        }
+
+        private static Color HubControlIconPixel(HubControlIconKind kind, Vector2 point)
+        {
+            Color outline = new Color(.025f, .075f, .15f, 1f);
+            Color white = new Color(1f, .99f, .94f, 1f);
+            if (kind == HubControlIconKind.Settings)
+            {
+                Vector2 center = new Vector2(32f, 32f);
+                Vector2 offset = point - center;
+                float radius = offset.magnitude;
+                float angle = Mathf.Atan2(offset.y, offset.x);
+                float outside = 21f + (Mathf.Cos(angle * 8f) > .72f ? 5f : 0f);
+                if (radius < 8.5f || radius > outside + 1f) return Color.clear;
+                return radius < 10f || radius > outside - 1.8f ? outline : white;
+            }
+
+            bool insideSpeaker = HubPointInIconPolygon(point, HubSpeakerPolygon);
+            float speakerEdge = HubIconPolygonEdgeDistance(point, HubSpeakerPolygon);
+            if (kind == HubControlIconKind.Muted)
+            {
+                float muteLine = HubIconSegmentDistance(point, new Vector2(15f, 49f), new Vector2(50f, 14f));
+                if (muteLine <= 1.8f) return new Color(1f, .43f, .35f, 1f);
+                if (muteLine <= 4f) return outline;
+            }
+            if (speakerEdge <= 2f) return outline;
+            if (insideSpeaker) return white;
+
+            if (kind == HubControlIconKind.Music)
+            {
+                Vector2 arcCenter = new Vector2(28f, 32f);
+                for (int i = 0; i < 2; i++)
+                {
+                    float radius = i == 0 ? 18f : 26f;
+                    float arcDistance = HubIconArcDistance(point, arcCenter, radius, .82f);
+                    if (arcDistance <= .75f) return white;
+                    if (arcDistance <= 2f) return outline;
+                }
+                return Color.clear;
+            }
+            return Color.clear;
+        }
+
+        private static bool HubPointInIconPolygon(Vector2 point, Vector2[] vertices)
+        {
+            bool inside = false;
+            for (int i = 0, j = vertices.Length - 1; i < vertices.Length; j = i++)
+            {
+                Vector2 a = vertices[i], b = vertices[j];
+                bool crosses = (a.y > point.y) != (b.y > point.y) &&
+                    point.x < (b.x - a.x) * (point.y - a.y) / (b.y - a.y) + a.x;
+                if (crosses) inside = !inside;
+            }
+            return inside;
+        }
+
+        private static float HubIconPolygonEdgeDistance(Vector2 point, Vector2[] vertices)
+        {
+            float distance = float.MaxValue;
+            for (int i = 0; i < vertices.Length; i++)
+                distance = Mathf.Min(distance,
+                    HubIconSegmentDistance(point, vertices[i], vertices[(i + 1) % vertices.Length]));
+            return distance;
+        }
+
+        private static float HubIconSegmentDistance(Vector2 point, Vector2 start, Vector2 end)
+        {
+            Vector2 segment = end - start;
+            float t = Mathf.Clamp01(Vector2.Dot(point - start, segment) / Mathf.Max(.001f, segment.sqrMagnitude));
+            return Vector2.Distance(point, start + segment * t);
+        }
+
+        private static float HubIconArcDistance(Vector2 point, Vector2 center, float radius, float halfAngle)
+        {
+            Vector2 offset = point - center;
+            if (Mathf.Abs(Mathf.Atan2(offset.y, offset.x)) <= halfAngle)
+                return Mathf.Abs(offset.magnitude - radius);
+            Vector2 first = center + new Vector2(Mathf.Cos(halfAngle), -Mathf.Sin(halfAngle)) * radius;
+            Vector2 last = center + new Vector2(Mathf.Cos(halfAngle), Mathf.Sin(halfAngle)) * radius;
+            return Mathf.Min(Vector2.Distance(point, first), Vector2.Distance(point, last));
+        }
+
+        private void ReleaseHubControlIcons()
+        {
+            if (hubSettingsGearIcon != null) Destroy(hubSettingsGearIcon);
+            if (hubMusicOnIcon != null) Destroy(hubMusicOnIcon);
+            if (hubMusicOffIcon != null) Destroy(hubMusicOffIcon);
+            hubSettingsGearIcon = hubMusicOnIcon = hubMusicOffIcon = null;
+        }
+        private static Rect HubArtworkScreenBounds(Vector2 artSize, Vector2 screenSize)
+        {
+            if (artSize.x <= 0f || artSize.y <= 0f || screenSize.x <= 0f || screenSize.y <= 0f) return Rect.zero;
+            // Match ScaleMode.ScaleAndCrop over the physical screen. The virtual image may extend
+            // beyond one edge, but the same master always covers the entire screen without bars.
+            float artScale = Mathf.Max(screenSize.x / artSize.x, screenSize.y / artSize.y);
+            float drawnWidth = artSize.x * artScale, drawnHeight = artSize.y * artScale;
+            return new Rect((screenSize.x - drawnWidth) * .5f,
+                (screenSize.y - drawnHeight) * .5f, drawnWidth, drawnHeight);
+        }
+        private static Rect HubArtworkActionScreenBounds(int action, Vector2 screenSize)
+        {
+            Rect source = HubArtActionSourceRect(action);
+            Rect artwork = HubArtworkScreenBounds(HubArtworkSize, screenSize);
+            if (source.width <= 0f || source.height <= 0f || artwork.width <= 0f) return Rect.zero;
+            float scale = artwork.width / HubArtworkSize.x;
+            return new Rect(artwork.xMin + source.x * scale, artwork.yMin + source.y * scale,
+                source.width * scale, source.height * scale);
+        }
         private static Rect HubArtworkRectToLayout(Rect artRect, Vector2 artSize, Vector2 screenSize, Rect safeArea)
         {
             if (artSize.x <= 0f || artSize.y <= 0f || screenSize.x <= 0f || screenSize.y <= 0f) return Rect.zero;
-            float artScale = Mathf.Max(screenSize.x / artSize.x, screenSize.y / artSize.y);
-            float drawnWidth = artSize.x * artScale, drawnHeight = artSize.y * artScale;
-            Rect screenRect = new Rect((screenSize.x - drawnWidth) * .5f + artRect.x * artScale,
-                (screenSize.y - drawnHeight) * .5f + artRect.y * artScale,
-                artRect.width * artScale, artRect.height * artScale);
             Rect viewport = CanvasViewport(screenSize, safeArea);
-            if (viewport.width <= 0f || viewport.height <= 0f) return Rect.zero;
+            Rect artwork = HubArtworkScreenBounds(artSize, screenSize);
+            if (viewport.width <= 0f || viewport.height <= 0f || artwork.width <= 0f || artwork.height <= 0f) return Rect.zero;
+            float artScale = artwork.width / artSize.x;
+            Rect screenRect = new Rect(artwork.xMin + artRect.x * artScale,
+                artwork.yMin + artRect.y * artScale, artRect.width * artScale, artRect.height * artScale);
             float scaleX = viewport.width / W, scaleY = viewport.height / H;
             float xMin = Mathf.Clamp((screenRect.xMin - viewport.xMin) / scaleX, 0f, W);
             float xMax = Mathf.Clamp((screenRect.xMax - viewport.xMin) / scaleX, 0f, W);
@@ -2932,7 +3812,6 @@ namespace HayChoriYPaty
             Rect viewport = LevelSelectorViewportBounds(logicalCanvasHeight);
             DrawLevelSelectorBackdrop();
             DrawLevelSelectorHeading();
-            DrawStandardButton(MarketSelectorBounds(), MarketCloseAction, "MERCADO");
             Event evt = Event.current;
             if (evt.type == EventType.ScrollWheel)
             {
@@ -2986,7 +3865,6 @@ namespace HayChoriYPaty
         }
 
         private static Rect MarketBackBounds() => new Rect(12, 10, 132, 50);
-        private static Rect MarketSelectorBounds() => new Rect(W - 118f, 12f, 106f, 32f);
         private const float MarketObjectiveTop = 202f;
         private const float MarketCompactRowHeight = 104f, MarketPurchaseHeight = 64f, MarketOthersHeight = 48f;
         private static readonly Color MarketInk = new Color(.20f, .08f, .025f);
@@ -3043,7 +3921,17 @@ namespace HayChoriYPaty
         }
         private static Rect MarketEconomyBounds(int productCount) =>
             new Rect(46, MarketObjectiveTop + MarketObjectiveBandHeight(productCount) + 8f, W - 92, 58f);
-        private static float MarketBodyTop(int productCount) => MarketEconomyBounds(productCount).yMax + 10f;
+        private static Rect MarketTabsBounds(int productCount) =>
+            new Rect(14f, MarketEconomyBounds(productCount).yMax + 7f, W - 28f, 42f);
+        private static Rect MarketTabBounds(int tab, int productCount)
+        {
+            Rect strip = MarketTabsBounds(productCount);
+            float gap = 8f, width = (strip.width - gap) * .5f;
+            return new Rect(strip.x + Mathf.Clamp(tab, 0, 1) * (width + gap), strip.y, width, strip.height);
+        }
+        private Rect MarketTabsBounds() => MarketTabsBounds(game.Sim.ProductCount);
+        private Rect MarketTabBounds(int tab) => MarketTabBounds(tab, game.Sim.ProductCount);
+        private static float MarketBodyTop(int productCount) => MarketTabsBounds(productCount).yMax + 8f;
         private int[] MarketIngredientIds(bool required)
         {
             // All Boys' opening market is intentionally limited to its two required products.
@@ -3077,11 +3965,26 @@ namespace HayChoriYPaty
         }
         private float MarketContentHeight()
         {
+            if (marketTab == 1)
+                return game.TicketExtrasUnlocked ? MarketExtrasNoticeHeight + 8f +
+                    5f * MarketTicketCardHeight + 4f * MarketTicketCardGap : MarketBodyBounds().height;
             float height = 0f;
             foreach (int id in MarketVisibleIngredients()) height += MarketRowHeight(id);
             if (MarketIngredientIds(false).Length > 0) height += MarketOthersHeight;
             return height;
         }
+        private Rect MarketExtrasNoticeBounds() =>
+            new Rect(16f, MarketBodyBounds().y - marketScroll, W - 32f, MarketExtrasNoticeHeight);
+        private Rect MarketTicketCardBounds(int slot)
+        {
+            Rect body = MarketBodyBounds();
+            if (slot < 0 || slot >= 5) return Rect.zero;
+            return new Rect(body.x, body.y + MarketExtrasNoticeHeight + 8f + slot * (MarketTicketCardHeight + MarketTicketCardGap) - marketScroll,
+                body.width, MarketTicketCardHeight);
+        }
+        private static Rect MarketTicketRedeemButtonBounds(Rect card) =>
+            new Rect(card.xMax - 151f, card.y + 25f, 140f, 58f);
+        private Rect MarketTicketRedeemButtonBounds(int slot) => MarketTicketRedeemButtonBounds(MarketTicketCardBounds(slot));
         private float MarketMaxScroll() => Mathf.Max(0, MarketContentHeight() - MarketBodyBounds().height);
         private Rect MarketRowBounds(int slot)
         {
@@ -3112,16 +4015,30 @@ namespace HayChoriYPaty
         private int HitMarketAction(Vector2 p)
         {
             if (MarketBackBounds().Contains(p)) return MarketBackAction;
-            if (MarketBuyMissingBounds(logicalCanvasHeight).Contains(p)) return MarketCanBuyMissing() ? MarketMissingAction : 0;
+            if (MarketTabBounds(0).Contains(p)) return MarketIngredientsTabAction;
+            if (MarketTabBounds(1).Contains(p)) return MarketExtrasTabAction;
             if (MarketPlayBounds().Contains(p)) return MarketPlayAction;
+            if (marketTab == 0 && MarketBuyMissingBounds(logicalCanvasHeight).Contains(p)) return MarketCanBuyMissing() ? MarketMissingAction : 0;
             Rect body = MarketBodyBounds();
             if (!body.Contains(p)) return 0;
-            if (MarketIngredientIds(false).Length > 0 && MarketOthersBounds().Contains(p)) return MarketOtherAction;
+            if (marketTab == 1)
+            {
+                if (!game.TicketExtrasUnlocked) return 0;
+                for (int role = 0; role < 5; role++)
+                {
+                    Rect card = MarketTicketCardBounds(role), button = MarketTicketRedeemButtonBounds(card);
+                    if (MarketFullyVisibleInViewport(card, body) && button.Contains(p) && game.CanRedeemTicketWorker((StreetWorkerRole)role))
+                        return MarketTicketRedeemAction + role;
+                }
+                return 0;
+            }
+            Rect othersBounds = MarketOthersBounds();
+            if (MarketIngredientIds(false).Length > 0 && MarketFullyVisibleInViewport(othersBounds, body) && othersBounds.Contains(p)) return MarketOtherAction;
             int[] visible = MarketVisibleIngredients();
             for (int slot = 0; slot < visible.Length; slot++)
             {
                 int id = visible[slot]; Rect row = MarketRowBounds(slot);
-                if (!row.Contains(p) || !game.Market.IsIngredientUnlocked(id, game.UnlockedLevel)) continue;
+                if (!MarketFullyVisibleInViewport(row, body) || !row.Contains(p) || !game.Market.IsIngredientUnlocked(id, game.UnlockedLevel)) continue;
                 if (id == MarketExpandedId() && MarketPurchaseControlsVisible(row, body))
                     foreach (int action in new[] { MarketMinusAction, MarketPlusAction, MarketPlusTenAction, MarketBuyAction, MarketRowMissingAction })
                         if (MarketPurchaseControlBounds(row, action).Contains(p)) return action + id;
@@ -3129,6 +4046,8 @@ namespace HayChoriYPaty
             }
             return 0;
         }
+        private static bool MarketFullyVisibleInViewport(Rect content, Rect viewport) =>
+            content.yMin >= viewport.yMin && content.yMax <= viewport.yMax;
         private Rect MarketPlayBounds() => new Rect(22, logicalCanvasHeight - 80, W - 44, 66);
         private void MarketRevealIngredient(int id)
         {
@@ -3153,9 +4072,18 @@ namespace HayChoriYPaty
             DrawMarketObjectiveCards(game.Sim);
             Rect economy = MarketEconomyBounds(game.Sim.ProductCount);
             DrawMarketBluePanel(economy, new Color(.012f, .075f, .25f, .98f));
-            if (gameCoin != null) GUI.DrawTexture(new Rect(economy.x + 12, economy.y + 11, 36, 36), gameCoin, ScaleMode.ScaleToFit, true);
-            MarketText(new Rect(economy.x + 54, economy.y + 12, 210, 32), "SALDO DISPONIBLE", 18, Color.white, TextAnchor.MiddleLeft);
-            MarketText(new Rect(economy.x + 267, economy.y + 7, economy.width - 278, 44), FormatMarketMoney(game.Market.BalanceCents), 38, MarketGold, TextAnchor.MiddleRight);
+            if (marketTab == 0)
+            {
+                if (gameCoin != null) GUI.DrawTexture(new Rect(economy.x + 12, economy.y + 11, 36, 36), gameCoin, ScaleMode.ScaleToFit, true);
+                MarketText(new Rect(economy.x + 54, economy.y + 12, 210, 32), "SALDO DISPONIBLE", 18, Color.white, TextAnchor.MiddleLeft);
+                MarketText(new Rect(economy.x + 267, economy.y + 7, economy.width - 278, 44), FormatMarketMoney(game.Market.BalanceCents), 38, MarketGold, TextAnchor.MiddleRight);
+            }
+            else
+            {
+                MarketText(new Rect(economy.x + 14, economy.y + 12, 230, 32), "MIS TICKETS", 21, Color.white, TextAnchor.MiddleLeft);
+                MarketText(new Rect(economy.x + 250, economy.y + 7, economy.width - 264, 44), game.TicketBalance.ToString(), 40, MarketGold, TextAnchor.MiddleRight);
+            }
+            DrawMarketTabs();
             Rect body = MarketBodyBounds();
             Event evt = Event.current;
             if (evt.type == EventType.ScrollWheel)
@@ -3165,23 +4093,32 @@ namespace HayChoriYPaty
                 if (body.Contains(point)) { marketScroll = Mathf.Clamp(marketScroll + evt.delta.y * 24f, 0, MarketMaxScroll()); evt.Use(); }
             }
             marketScroll = Mathf.Clamp(marketScroll, 0, MarketMaxScroll());
-            int[] visible = MarketVisibleIngredients();
             GUI.BeginGroup(body);
             try
             {
-                for (int slot = 0; slot < visible.Length; slot++)
+                if (marketTab == 0)
                 {
-                    Rect row = MarketRowBounds(slot);
-                    if (row.yMax <= body.y || row.y >= body.yMax) continue;
-                    bool showControls = MarketPurchaseControlsVisible(row, body);
-                    row.x -= body.x; row.y -= body.y;
-                    DrawMarketIngredientRow(row, visible[slot], showControls);
+                    int[] visible = MarketVisibleIngredients();
+                    for (int slot = 0; slot < visible.Length; slot++)
+                    {
+                        Rect row = MarketRowBounds(slot);
+                        // Never render a clipped card: ingredient names, figures, and controls stay intact.
+                        if (!MarketFullyVisibleInViewport(row, body)) continue;
+                        bool showControls = MarketPurchaseControlsVisible(row, body);
+                        row.x -= body.x; row.y -= body.y;
+                        DrawMarketIngredientRow(row, visible[slot], showControls);
+                    }
+                    if (MarketIngredientIds(false).Length > 0)
+                    {
+                        Rect others = MarketOthersBounds();
+                        if (MarketFullyVisibleInViewport(others, body))
+                        {
+                            others.x -= body.x; others.y -= body.y;
+                            DrawMarketOthers(others);
+                        }
+                    }
                 }
-                if (MarketIngredientIds(false).Length > 0)
-                {
-                    Rect others = MarketOthersBounds(); others.x -= body.x; others.y -= body.y;
-                    DrawMarketOthers(others);
-                }
+                else DrawMarketExtrasBody(body);
             }
             finally { GUI.EndGroup(); }
             DrawMarketScrollBar(body);
@@ -3191,8 +4128,87 @@ namespace HayChoriYPaty
                 DrawMarketBluePanel(messageBounds, new Color(.015f, .12f, .38f, .96f));
                 MarketText(new Rect(messageBounds.x + 6, messageBounds.y, messageBounds.width - 12, messageBounds.height), marketMessage, 14, Color.white);
             }
-            DrawMarketEconomyFooter();
+            if (marketTab == 0) DrawMarketEconomyFooter(); else DrawMarketExtrasFooter();
             DrawMarketPlayButton(MarketPlayBounds(), "JUGAR PARTIDO", game.CanStartRound);
+        }
+        private void DrawMarketTabs()
+        {
+            for (int tab = 0; tab < 2; tab++)
+                DrawStandardButton(MarketTabBounds(tab), tab == 0 ? MarketIngredientsTabAction : MarketExtrasTabAction,
+                    tab == 0 ? "INGREDIENTES" : "EXTRAS");
+            Rect selected = MarketTabBounds(marketTab);
+            FillRect(new Rect(selected.x + 10f, selected.yMax - 4f, selected.width - 20f, 4f), MarketGold);
+        }
+        private void DrawMarketExtrasBody(Rect body)
+        {
+            if (!game.TicketExtrasUnlocked)
+            {
+                Rect panel = new Rect(14f, body.y + Mathf.Max(12f, (body.height - 116f) * .5f), W - 28f, 116f);
+                DrawMarketBluePanel(panel, new Color(.012f, .075f, .25f, .98f));
+                MarketText(new Rect(panel.x + 10f, panel.y + 12f, panel.width - 20f, 38f), "EXTRAS SE DESBLOQUEA EN RACING", 21, MarketGold);
+                MarketText(new Rect(panel.x + 16f, panel.y + 54f, panel.width - 32f, 46f), "Juntá tickets con cada victoria.\nCanjeá desde el nivel 6.", 17, Color.white);
+                return;
+            }
+            Rect notice = MarketExtrasNoticeBounds();
+            if (MarketFullyVisibleInViewport(notice, body))
+            {
+                Rect localNotice = new Rect(notice.x - body.x, notice.y - body.y, notice.width, notice.height);
+                DrawMarketBluePanel(localNotice, new Color(.012f, .075f, .25f, .96f));
+                string message = game.Sim.LevelIndex >= 5 ? "CADA TRABAJADOR CUESTA 3 TICKETS" : "SE CANJEA AL PREPARAR NIVEL 6 O SUPERIOR";
+                MarketText(new Rect(localNotice.x + 8f, localNotice.y + 2f, localNotice.width - 16f, localNotice.height - 4f), message, 17, Color.white);
+            }
+            for (int index = 0; index < 5; index++)
+            {
+                Rect card = MarketTicketCardBounds(index);
+                if (!MarketFullyVisibleInViewport(card, body)) continue;
+                Rect local = new Rect(card.x - body.x, card.y - body.y, card.width, card.height);
+                DrawMarketBluePanel(local, MarketIce);
+                StreetWorkerRole role = (StreetWorkerRole)index;
+                DrawMarketTicketWorker(local, role);
+                float textX = local.x + 82f;
+                MarketText(new Rect(textX, local.y + 10f, 232f, 26f), TicketRoleName(role), 21, MarketBlueInk, TextAnchor.MiddleLeft);
+                MarketText(new Rect(textX, local.y + 38f, 232f, 20f), "COSTO: 3 TICKETS", 15, MarketRoyalBlue, TextAnchor.MiddleLeft);
+                MarketText(new Rect(textX, local.y + 65f, 232f, 24f), "RESERVADOS: " + game.PendingTicketWorkers(role), 15, MarketBlueInk, TextAnchor.MiddleLeft);
+                bool canRedeem = game.CanRedeemTicketWorker(role);
+                string caption = game.Sim.LevelIndex < 5 ? "NIVEL 6+" : game.TicketBalance < 3
+                    ? "FALTAN " + System.Math.Max(0L, 3L - game.TicketBalance) + " TICKETS" : "CANJEAR";
+                DrawStandardButton(MarketTicketRedeemButtonBounds(local), MarketTicketRedeemAction + index, caption, canRedeem);
+            }
+        }
+        private void DrawMarketTicketWorker(Rect card, StreetWorkerRole role)
+        {
+            Texture2D texture = null;
+            Rect source = Rect.zero;
+            int level = game.Sim.LevelIndex;
+            switch (role)
+            {
+                case StreetWorkerRole.Parrillero: texture = parrillero; source = ParrilleroPoses[0]; break;
+                case StreetWorkerRole.Cocacolero: texture = CocacoleroArtForLevel(level); source = CocacoleroPoseForLevel(level, 0); break;
+                case StreetWorkerRole.ParrilleroPremium: texture = premiumWorker; source = ParrilleroPoses[0]; break;
+                case StreetWorkerRole.Fernetero:
+                    texture = UsesMatchedCocacoleroArt(level) ? fernetWorkerLater : fernetWorker;
+                    source = UsesMatchedCocacoleroArt(level) ? MatchedCocacoleroPoses[0] : ChicagoCocacoleroPoses[0];
+                    break;
+                case StreetWorkerRole.Mozo: texture = mozoWorker; source = ParrilleroPoses[0]; break;
+            }
+            if (texture == null || source.width <= 0f || source.height <= 0f) return;
+            Rect slot = new Rect(card.x + 10f, card.y + 7f, 62f, card.height - 14f);
+            float scale = Mathf.Min(slot.width / source.width, slot.height / source.height);
+            Vector2 size = new Vector2(source.width * scale, source.height * scale);
+            Rect fitted = new Rect(slot.center - size * .5f, size);
+            DrawRaw(fitted, texture, source, true, false);
+        }
+        private static string TicketRoleName(StreetWorkerRole role) => role == StreetWorkerRole.Parrillero ? "PARRILLERO"
+            : role == StreetWorkerRole.Cocacolero ? "COCACOLERO" : role == StreetWorkerRole.ParrilleroPremium ? "PARRILLERO PREMIUM"
+            : role == StreetWorkerRole.Fernetero ? "FERNETERO" : "MOZO";
+        private void DrawMarketExtrasFooter()
+        {
+            Rect footer = MarketEconomyFooterBounds(logicalCanvasHeight);
+            DrawMarketBluePanel(footer, new Color(.012f, .075f, .25f));
+            long reserved = 0;
+            for (int role = 0; role < 5; role++) reserved += game.PendingTicketWorkers((StreetWorkerRole)role);
+            MarketText(new Rect(footer.x + 12f, footer.y + 9f, footer.width - 24f, 23f), "TRABAJADORES RESERVADOS", 15, Color.white, TextAnchor.MiddleLeft);
+            MarketText(new Rect(footer.x + 12f, footer.y + 31f, footer.width - 24f, 25f), reserved.ToString(), 25, MarketGold, TextAnchor.MiddleLeft);
         }
         private Texture2D MarketSceneArt()
         {
@@ -3301,10 +4317,15 @@ namespace HayChoriYPaty
                 }
                 // Row expansion never buys anything. On Android the hit surface is limited to its compact face.
                 bool prior = GUI.enabled;
-                if (GUI.Button(new Rect(row.x, row.y, row.width, faceHeight), "", invisible)) NativeAction(MarketExpandAction + id);
+                if (GUI.Button(new Rect(row.x, row.y, row.width, faceHeight), "", invisible) && !SuppressMarketNativeTap)
+                NativeAction(MarketExpandAction + id);
                 GUI.enabled = prior;
             }
         }
+        private static string MarketFreshMeatResource(int id) => id == 4
+            ? "ModularKitchen/Art/meat-bondiola-whole-v1_Raw"
+            : id == 5 ? "ModularKitchen/Art/meat-vacio-whole-v1_Raw" : null;
+
         private static Rect MarketIngredientIconBounds(Rect row, float faceHeight)
         {
             float size = Mathf.Min(faceHeight < 100f ? 62f : 78f, Mathf.Max(0f, faceHeight - 24f));
@@ -3332,6 +4353,13 @@ namespace HayChoriYPaty
         }
         private void DrawMarketIngredientIcon(Rect bounds, int id)
         {
+            Texture2D updatedMeat = id >= 0 && id < marketFreshMeatTextures.Length ? marketFreshMeatTextures[id] : null;
+            if (updatedMeat != null)
+            {
+                GUI.DrawTexture(FitMarketIngredientIcon(bounds, new Vector2(updatedMeat.width, updatedMeat.height)),
+                    updatedMeat, ScaleMode.StretchToFill, true);
+                return;
+            }
             Texture2D standalone = id == 1 ? marketBreadCommon : id == 3 ? marketBreadBurger
                 : id == 8 ? marketFernetBottle : id == 9 ? marketCocaLarge : null;
             if (standalone != null)
@@ -3360,7 +4388,7 @@ namespace HayChoriYPaty
             for (int i = 0; i < Mathf.Min(3, others.Length); i++) DrawMarketIngredientIcon(new Rect(bounds.x + 10 + i * 34, bounds.y + 8, 30, 30), others[i]);
             MarketText(new Rect(bounds.x + 118, bounds.y + 7, bounds.width - 156, 32), "OTROS INGREDIENTES", 18, Color.white, TextAnchor.MiddleLeft);
             MarketText(new Rect(bounds.xMax - 38, bounds.y + 6, 28, 32), marketOtherExpanded ? "−" : "+", 28, Color.white);
-            if (GUI.Button(bounds, "", invisible)) NativeAction(MarketOtherAction);
+            if (GUI.Button(bounds, "", invisible) && !SuppressMarketNativeTap) NativeAction(MarketOtherAction);
         }
         private void DrawMarketEconomyFooter()
         {
@@ -3448,13 +4476,27 @@ namespace HayChoriYPaty
             }
             FillRect(new Rect(bounds.x + 12, bounds.y + 12, bounds.width - 24, bounds.height - 24), face);
         }
+        private static int FitMarketTextFontSize(GUIStyle style, string value, int preferredSize, Vector2 bounds)
+        {
+            if (style == null || preferredSize <= 0) return Mathf.Max(1, preferredSize);
+            style.wordWrap = false;
+            style.padding = new RectOffset();
+            style.margin = new RectOffset();
+            string content = value ?? string.Empty;
+            for (int candidate = preferredSize; candidate > 1; candidate--)
+            {
+                style.fontSize = candidate;
+                Vector2 measured = style.CalcSize(new GUIContent(content));
+                if (measured.x <= Mathf.Max(1f, bounds.x - 2f) && measured.y <= Mathf.Max(1f, bounds.y - 2f))
+                    return candidate;
+            }
+            return 1;
+        }
         private void MarketText(Rect bounds, string value, int size, Color color, TextAnchor alignment = TextAnchor.MiddleCenter)
         {
-            if (marketLabelStyle == null) marketLabelStyle = new GUIStyle(menuTitle) { padding = new RectOffset(), wordWrap = false };
+            if (marketLabelStyle == null) marketLabelStyle = new GUIStyle(menuTitle) { padding = new RectOffset(), margin = new RectOffset(), wordWrap = false };
             marketLabelStyle.alignment = alignment;
-            marketLabelStyle.fontSize = size;
-            float measured = marketLabelStyle.CalcSize(new GUIContent(value)).x;
-            marketLabelStyle.fontSize = Mathf.Max(12, Mathf.FloorToInt(size * Mathf.Min(1f, Mathf.Max(1f, bounds.width - 2f) / Mathf.Max(1f, measured))));
+            marketLabelStyle.fontSize = FitMarketTextFontSize(marketLabelStyle, value, size, bounds.size);
             marketLabelStyle.normal.textColor = color;
             GUI.Label(bounds, value, marketLabelStyle);
         }
@@ -3645,20 +4687,37 @@ namespace HayChoriYPaty
         {
             if (!viewResourcesReady || introActive) return;
             levelSelectActive = false; levelOneTutorialActive = false; levelOneTutorialStep = 0;
+            levelTwoCocacoleroTutorialActive = false; levelTwoCocacoleroTutorialStep = 0;
+            levelThreePatyTutorialActive = false;
+            levelFourSpecialistsTutorialActive = false; levelFourSpecialistsTutorialStep = 0;
+            levelFiveSpecialistsTutorialActive = false; levelFiveSpecialistsTutorialStep = 0;
             marketActive = false; badgesActive = false; rankingActive = false; hubActive = true;
             marketFromSelector = false; pressedAction = 0;
         }
 
+#if UNITY_EDITOR
+        private static void ClearLevelOneTutorialMarkerForTesting()
+        {
+            if (!RepeatLevelOneTutorialForTesting || !PlayerPrefs.HasKey(LevelOneTutorialCompletedKey)) return;
+            PlayerPrefs.DeleteKey(LevelOneTutorialCompletedKey);
+            PlayerPrefs.Save();
+        }
+#endif
+
         private void OpenHubFromIntro()
         {
             if (!introActive) return;
+#if UNITY_EDITOR
+            ClearLevelOneTutorialMarkerForTesting();
+#endif
             introActive = false; levelSelectActive = false; marketActive = false;
-            badgesActive = false; rankingActive = false; hubActive = true; marketFromSelector = false;
+            badgesActive = false; rankingActive = false; settingsActive = false;
+            hubActive = true; marketFromSelector = false;
             pressedAction = 0;
         }
 
         private void DrawStandardButton(Rect bounds, int action, string caption, bool enabled = true,
-            System.Action activated = null, Texture2D leadingIcon = null)
+            System.Action activated = null, Texture2D leadingIcon = null, GUIContent buttonContent = null)
         {
             bool interactive = enabled && GUI.enabled;
             bool pressed = interactive && pressedAction == action;
@@ -3696,7 +4755,8 @@ namespace HayChoriYPaty
                             letters.width, letters.height), caption, borderStyle);
                 GUI.Label(letters, caption, captionStyle);
                 GUI.enabled = interactive;
-                if (GUI.Button(hitBounds, "", invisible)) { if (activated != null) activated(); else NativeAction(action); }
+                if (GUI.Button(hitBounds, buttonContent ?? GUIContent.none, invisible) && !SuppressLevelSelectorNativeTap && !SuppressMarketNativeTap)
+                { if (activated != null) activated(); else NativeAction(action); }
             }
             finally
             {
@@ -3727,12 +4787,17 @@ namespace HayChoriYPaty
         {
             int original = style.fontSize;
             int preferred = Mathf.Max(11, Mathf.RoundToInt(38f * bounds.height / 92f));
+            float width = Mathf.Max(1f, bounds.width - 24f * bounds.height / 92f);
+            float height = Mathf.Max(1f, bounds.height - 8f * bounds.height / 92f);
             try
             {
-                style.fontSize = preferred;
-                float width = Mathf.Max(1f, bounds.width - 24f * bounds.height / 92f);
-                float measured = style.CalcSize(new GUIContent(caption)).x;
-                return measured > width ? Mathf.Max(11, Mathf.FloorToInt(preferred * width / measured)) : preferred;
+                for (int candidate = preferred; candidate > 11; candidate--)
+                {
+                    style.fontSize = candidate;
+                    Vector2 measured = style.CalcSize(new GUIContent(caption));
+                    if (measured.x <= width && measured.y <= height) return candidate;
+                }
+                return 11;
             }
             finally { style.fontSize = original; }
         }
@@ -4365,7 +5430,7 @@ namespace HayChoriYPaty
                 cocacoleroArt = UsesMatchedCocacoleroArt(levelIndex) && fernetWorkerLater != null ? fernetWorkerLater : fernetWorker;
             Vector2 movement=w.Target-w.Position;
             StreetWorkerPose workerPose = StreetWorkerAnimation.Sample(w);
-            if (w.State == StreetWorkerState.ToStation && StreetWorkerProjection.CocaBarrelPresentationOffset(game.Sim, w) > .01f)
+            if (StreetWorkerProjection.IsFinalBarrelDrinkApproach(game.Sim, w))
                 movement = new Vector2(0f, 1f);
             moving = workerPose.Moving;
             int frame=moving?SelectParrilleroWalkFrame(movement,workerPose.Frame):0;
@@ -4377,6 +5442,8 @@ namespace HayChoriYPaty
             float stationOffset = 98f * (layoutVerticalScale - 1f) / Mathf.Max(.01f, layoutVerticalScale);
             bob += stationOffset;
             Vector2 displayPosition = StreetWorkerProjection.PresentationPosition(game.Sim, w);
+            if (w.State == StreetWorkerState.Pickup)
+                displayPosition.y += StreetWorkerProjection.BarrelDrinkPickupBodyLift(game.Sim, w);
             float presentationScale = StreetWorkerProjection.PresentationScale(game.Sim, w);
             Rect workerRect=new Rect(displayPosition.x-45*presentationScale,displayPosition.y-98*presentationScale+bob*presentationScale,90*presentationScale,98*presentationScale);
             if(isCocacolero)
@@ -4388,11 +5455,11 @@ namespace HayChoriYPaty
                     frame=x>y?9+phase:(movement.y>0?1+phase:5+phase);
                 }
                 bool flip=game.Sim.LevelIndex==1
-                    ? (w.State == StreetWorkerState.Pickup ? (w.Product == 4
+                    ? (w.State == StreetWorkerState.Pickup ? ((w.Product == 4 || w.Product == 6)
                         ? false
                         : !StreetWorkstationLayout.PickupReachesRight(w.Product, game.Sim.HasParrilleroPremium))
                         : ChicagoWorkerFlip(true,frame,movement,false))
-                    : w.State == StreetWorkerState.Pickup ? (w.Product == 4
+                    : w.State == StreetWorkerState.Pickup ? ((w.Product == 4 || w.Product == 6)
                         ? false
                         : !StreetWorkstationLayout.PickupReachesRight(w.Product, game.Sim.HasParrilleroPremium))
                         : moving && Mathf.Abs(movement.x)>Mathf.Abs(movement.y) && movement.x<0;
@@ -4789,6 +5856,319 @@ namespace HayChoriYPaty
             LevelOneTutorialSkipBounds(LevelOneTutorialPanelBounds(), layoutVerticalScale);
         private static Rect LevelOneTutorialSkipBounds(Rect panel, float verticalScale) =>
             new Rect(panel.center.x - 42f, panel.y + 188f / Mathf.Max(.01f, verticalScale), 84f, 26f);
+
+        private Rect LevelTwoCocacoleroTutorialPanelBounds()
+        {
+            Rect target = LevelTwoCocacoleroTutorialTargetBounds();
+            float width = Mathf.Min(LevelOneTutorialBubbleWidth, W - 28f);
+            float x = Mathf.Clamp(target.center.x - width * .5f, 14f, W - width - 14f);
+            float vertical = Mathf.Max(.01f, layoutVerticalScale);
+            float y = levelTwoCocacoleroTutorialStep == 0
+                ? target.yMax + 56f / vertical
+                : target.yMin - 260f / vertical;
+            return new Rect(x, y, width, LevelOneTutorialBubbleHeight);
+        }
+        private Rect LevelTwoCocacoleroTutorialPrimaryBounds() =>
+            LevelOneTutorialPrimaryBounds(LevelTwoCocacoleroTutorialPanelBounds(), layoutVerticalScale);
+        private Rect LevelTwoCocacoleroTutorialSkipBounds() =>
+            LevelOneTutorialSkipBounds(LevelTwoCocacoleroTutorialPanelBounds(), layoutVerticalScale);
+        private Rect LevelTwoCocacoleroTutorialTargetBounds()
+        {
+            if (game == null || game.Sim == null) return Rect.zero;
+            if (levelTwoCocacoleroTutorialStep == 1)
+                return ResponsiveUpgradeCardBounds(game.Sim, HireCocacoleroAction);
+            Rect gap = TopHudCutoutBounds(new Vector2(Screen.width, Screen.height), Screen.cutouts);
+            int count = Mathf.Min(game.Sim.ProductCount, hudQuotaProductIds.Length);
+            for (int slot = 0; slot < count; slot++)
+                hudQuotaProductIds[slot] = game.Sim.GetAvailableProduct(slot);
+            hudQuotaProductCount = count;
+            for (int slot = 0; slot < count; slot++)
+                if (hudQuotaProductIds[slot] == 4)
+                    return HudScreenRectToSafeCanvas(HudQuotaCellBounds(slot, hudQuotaProductIds, count, gap));
+            return Rect.zero;
+        }
+        private void DrawLevelTwoCocacoleroTutorial()
+        {
+            DrawIntroScreen(Texture2D.whiteTexture, LevelOneTutorialBackdropDimColor(), ScaleMode.StretchToFill);
+            Rect panel = LevelTwoCocacoleroTutorialPanelBounds();
+            Rect target = LevelTwoCocacoleroTutorialTargetBounds();
+            bool targetAbove = levelTwoCocacoleroTutorialStep == 0;
+            float vertical = Mathf.Max(.01f, layoutVerticalScale);
+            const float tailWidth = 42f;
+            float baseX = targetAbove ? target.center.x : panel.xMax - 30f;
+            baseX = Mathf.Clamp(baseX, panel.x + tailWidth * .5f, panel.xMax - tailWidth * .5f);
+            Vector2 tip = new Vector2(target.center.x, targetAbove ? target.yMax : target.yMin);
+            Rect bubblePanel = new Rect(panel.x, panel.y * vertical, panel.width, panel.height);
+            Vector2 bubbleTip = new Vector2(tip.x, tip.y * vertical);
+            Rect bubbleBounds = LevelOneTutorialBubbleDrawBounds(bubblePanel, bubbleTip, baseX, tailWidth, targetAbove);
+            if (levelOneTutorialBubbleTexture == null || levelOneTutorialBubbleTextureStep != levelTwoCocacoleroTutorialStep ||
+                !levelOneTutorialBubbleTexturePanel.Equals(bubblePanel) || !levelOneTutorialBubbleTextureTip.Equals(bubbleTip) ||
+                !Mathf.Approximately(levelOneTutorialBubbleTextureTailWidth, tailWidth) ||
+                levelOneTutorialBubbleTextureTailAbove != targetAbove)
+            {
+                if (levelOneTutorialBubbleTexture != null) Destroy(levelOneTutorialBubbleTexture);
+                levelOneTutorialBubbleTexture = CreateLevelOneTutorialBubbleTexture(bubblePanel, bubbleTip, baseX, tailWidth, targetAbove);
+                levelOneTutorialBubbleTextureStep = levelTwoCocacoleroTutorialStep;
+                levelOneTutorialBubbleTexturePanel = bubblePanel;
+                levelOneTutorialBubbleTextureTip = bubbleTip;
+                levelOneTutorialBubbleTextureTailWidth = tailWidth;
+                levelOneTutorialBubbleTextureTailAbove = targetAbove;
+            }
+            GUI.DrawTexture(bubbleBounds, levelOneTutorialBubbleTexture, ScaleMode.StretchToFill, true);
+            Rect headlineBounds = new Rect(panel.x + 18f, panel.y + 12f / vertical, panel.width - 36f, 58f);
+            DrawTutorialText(headlineBounds, LevelTwoCocacoleroTutorialHeadlines[levelTwoCocacoleroTutorialStep],
+                levelOneTutorialTitleStyle, 25, 20);
+            Rect explanationBounds = new Rect(panel.x + 18f, panel.y + 72f / vertical, panel.width - 36f, 40f);
+            DrawTutorialText(explanationBounds, LevelTwoCocacoleroTutorialExplanations[levelTwoCocacoleroTutorialStep],
+                levelOneTutorialBodyStyle, 19, 16);
+            DrawStandardButton(LevelTwoCocacoleroTutorialPrimaryBounds(), LevelOneTutorialPrimaryAction, "SIGUIENTE");
+            Rect skipBounds = LevelTwoCocacoleroTutorialSkipBounds();
+            FillRect(skipBounds, new Color(1f, .98f, .94f, .94f));
+            Rect skip = LayoutRect(skipBounds);
+            GUI.Label(skip, "SALTAR", levelOneTutorialSkipStyle);
+            if (GUI.Button(skip, "", invisible)) NativeAction(LevelOneTutorialSkipAction);
+        }
+
+        private Rect LevelThreePatyTutorialTargetBounds()
+        {
+            if (game == null || game.Sim == null) return Rect.zero;
+            Rect gap = TopHudCutoutBounds(new Vector2(Screen.width, Screen.height), Screen.cutouts);
+            int count = Mathf.Min(game.Sim.ProductCount, hudQuotaProductIds.Length);
+            for (int slot = 0; slot < count; slot++)
+                hudQuotaProductIds[slot] = game.Sim.GetAvailableProduct(slot);
+            hudQuotaProductCount = count;
+            for (int slot = 0; slot < count; slot++)
+                if (hudQuotaProductIds[slot] == 1)
+                    return HudScreenRectToSafeCanvas(HudQuotaCellBounds(slot, hudQuotaProductIds, count, gap));
+            return Rect.zero;
+        }
+        private Rect LevelThreePatyTutorialPanelBounds()
+        {
+            Rect target = LevelThreePatyTutorialTargetBounds();
+            float width = Mathf.Min(LevelOneTutorialBubbleWidth, W - 28f);
+            float x = Mathf.Clamp(target.center.x - width * .5f, 14f, W - width - 14f);
+            float vertical = Mathf.Max(.01f, layoutVerticalScale);
+            return new Rect(x, target.yMax + 56f / vertical, width, LevelOneTutorialBubbleHeight);
+        }
+        private Rect LevelThreePatyTutorialPrimaryBounds() =>
+            LevelOneTutorialPrimaryBounds(LevelThreePatyTutorialPanelBounds(), layoutVerticalScale);
+        private Rect LevelThreePatyTutorialSkipBounds() =>
+            LevelOneTutorialSkipBounds(LevelThreePatyTutorialPanelBounds(), layoutVerticalScale);
+        private void DrawLevelThreePatyTutorial()
+        {
+            DrawIntroScreen(Texture2D.whiteTexture, LevelOneTutorialBackdropDimColor(), ScaleMode.StretchToFill);
+            Rect panel = LevelThreePatyTutorialPanelBounds();
+            Rect target = LevelThreePatyTutorialTargetBounds();
+            const bool targetAbove = true;
+            const float tailWidth = 42f;
+            float vertical = Mathf.Max(.01f, layoutVerticalScale);
+            float baseX = Mathf.Clamp(target.center.x, panel.x + tailWidth * .5f, panel.xMax - tailWidth * .5f);
+            Vector2 tip = new Vector2(target.center.x, target.yMax);
+            Rect bubblePanel = new Rect(panel.x, panel.y * vertical, panel.width, panel.height);
+            Vector2 bubbleTip = new Vector2(tip.x, tip.y * vertical);
+            Rect bubbleBounds = LevelOneTutorialBubbleDrawBounds(bubblePanel, bubbleTip, baseX, tailWidth, targetAbove);
+            if (levelOneTutorialBubbleTexture == null || levelOneTutorialBubbleTextureStep != 0 ||
+                !levelOneTutorialBubbleTexturePanel.Equals(bubblePanel) || !levelOneTutorialBubbleTextureTip.Equals(bubbleTip) ||
+                !Mathf.Approximately(levelOneTutorialBubbleTextureTailWidth, tailWidth) ||
+                levelOneTutorialBubbleTextureTailAbove != targetAbove)
+            {
+                if (levelOneTutorialBubbleTexture != null) Destroy(levelOneTutorialBubbleTexture);
+                levelOneTutorialBubbleTexture = CreateLevelOneTutorialBubbleTexture(bubblePanel, bubbleTip, baseX, tailWidth, targetAbove);
+                levelOneTutorialBubbleTextureStep = 0;
+                levelOneTutorialBubbleTexturePanel = bubblePanel;
+                levelOneTutorialBubbleTextureTip = bubbleTip;
+                levelOneTutorialBubbleTextureTailWidth = tailWidth;
+                levelOneTutorialBubbleTextureTailAbove = targetAbove;
+            }
+            GUI.DrawTexture(bubbleBounds, levelOneTutorialBubbleTexture, ScaleMode.StretchToFill, true);
+            Rect headlineBounds = new Rect(panel.x + 18f, panel.y + 12f / vertical, panel.width - 36f, 58f);
+            DrawTutorialText(headlineBounds, LevelThreePatyTutorialHeadline, levelOneTutorialTitleStyle, 25, 20);
+            Rect explanationBounds = new Rect(panel.x + 18f, panel.y + 72f / vertical, panel.width - 36f, 40f);
+            DrawTutorialText(explanationBounds, LevelThreePatyTutorialExplanation, levelOneTutorialBodyStyle, 19, 16);
+            DrawStandardButton(LevelThreePatyTutorialPrimaryBounds(), LevelOneTutorialPrimaryAction, "SIGUIENTE");
+            Rect skipBounds = LevelThreePatyTutorialSkipBounds();
+            FillRect(skipBounds, new Color(1f, .98f, .94f, .94f));
+            Rect skip = LayoutRect(skipBounds);
+            GUI.Label(skip, "SALTAR", levelOneTutorialSkipStyle);
+            if (GUI.Button(skip, "", invisible)) NativeAction(LevelOneTutorialSkipAction);
+        }
+
+        private Rect LevelFourSpecialistsTutorialTargetBounds()
+        {
+            if (game == null || game.Sim == null) return Rect.zero;
+            int action = levelFourSpecialistsTutorialStep == 0 ? HirePremiumAction : HireCocacoleroAction;
+            return ResponsiveUpgradeCardBounds(game.Sim, action);
+        }
+        private Rect LevelFourSpecialistsTutorialPanelBounds()
+        {
+            Rect target = LevelFourSpecialistsTutorialTargetBounds();
+            float width = Mathf.Min(LevelOneTutorialBubbleWidth, W - 28f);
+            float x = Mathf.Clamp(target.center.x - width * .5f, 14f, W - width - 14f);
+            float vertical = Mathf.Max(.01f, layoutVerticalScale);
+            return new Rect(x, target.yMin - 260f / vertical, width, LevelOneTutorialBubbleHeight);
+        }
+        private Rect LevelFourSpecialistsTutorialPrimaryBounds() =>
+            LevelOneTutorialPrimaryBounds(LevelFourSpecialistsTutorialPanelBounds(), layoutVerticalScale);
+        private Rect LevelFourSpecialistsTutorialSkipBounds() =>
+            LevelOneTutorialSkipBounds(LevelFourSpecialistsTutorialPanelBounds(), layoutVerticalScale);
+        private void DrawLevelFourSpecialistsTutorial()
+        {
+            DrawIntroScreen(Texture2D.whiteTexture, LevelOneTutorialBackdropDimColor(), ScaleMode.StretchToFill);
+            Rect panel = LevelFourSpecialistsTutorialPanelBounds();
+            Rect target = LevelFourSpecialistsTutorialTargetBounds();
+            const bool targetAbove = false;
+            const float tailWidth = 42f;
+            float vertical = Mathf.Max(.01f, layoutVerticalScale);
+            float baseX = Mathf.Clamp(target.center.x, panel.x + tailWidth * .5f, panel.xMax - tailWidth * .5f);
+            Vector2 tip = new Vector2(target.center.x, target.yMin);
+            Rect bubblePanel = new Rect(panel.x, panel.y * vertical, panel.width, panel.height);
+            Vector2 bubbleTip = new Vector2(tip.x, tip.y * vertical);
+            Rect bubbleBounds = LevelOneTutorialBubbleDrawBounds(bubblePanel, bubbleTip, baseX, tailWidth, targetAbove);
+            if (levelOneTutorialBubbleTexture == null || levelOneTutorialBubbleTextureStep != levelFourSpecialistsTutorialStep ||
+                !levelOneTutorialBubbleTexturePanel.Equals(bubblePanel) || !levelOneTutorialBubbleTextureTip.Equals(bubbleTip) ||
+                !Mathf.Approximately(levelOneTutorialBubbleTextureTailWidth, tailWidth) ||
+                levelOneTutorialBubbleTextureTailAbove != targetAbove)
+            {
+                if (levelOneTutorialBubbleTexture != null) Destroy(levelOneTutorialBubbleTexture);
+                levelOneTutorialBubbleTexture = CreateLevelOneTutorialBubbleTexture(bubblePanel, bubbleTip, baseX, tailWidth, targetAbove);
+                levelOneTutorialBubbleTextureStep = levelFourSpecialistsTutorialStep;
+                levelOneTutorialBubbleTexturePanel = bubblePanel;
+                levelOneTutorialBubbleTextureTip = bubbleTip;
+                levelOneTutorialBubbleTextureTailWidth = tailWidth;
+                levelOneTutorialBubbleTextureTailAbove = targetAbove;
+            }
+            GUI.DrawTexture(bubbleBounds, levelOneTutorialBubbleTexture, ScaleMode.StretchToFill, true);
+            Rect headlineBounds = new Rect(panel.x + 18f, panel.y + 12f / vertical, panel.width - 36f, 58f);
+            DrawTutorialText(headlineBounds, LevelFourSpecialistsTutorialHeadlines[levelFourSpecialistsTutorialStep],
+                levelOneTutorialTitleStyle, 25, 20);
+            Rect explanationBounds = new Rect(panel.x + 18f, panel.y + 72f / vertical, panel.width - 36f, 40f);
+            DrawTutorialText(explanationBounds, LevelFourSpecialistsTutorialExplanations[levelFourSpecialistsTutorialStep],
+                levelOneTutorialBodyStyle, 19, 16);
+            DrawStandardButton(LevelFourSpecialistsTutorialPrimaryBounds(), LevelOneTutorialPrimaryAction, "SIGUIENTE");
+            Rect skipBounds = LevelFourSpecialistsTutorialSkipBounds();
+            FillRect(skipBounds, new Color(1f, .98f, .94f, .94f));
+            Rect skip = LayoutRect(skipBounds);
+            GUI.Label(skip, "SALTAR", levelOneTutorialSkipStyle);
+            if (GUI.Button(skip, "", invisible)) NativeAction(LevelOneTutorialSkipAction);
+        }
+
+        private Rect LevelFiveSpecialistsTutorialTargetBounds()
+        {
+            if (game == null || game.Sim == null) return Rect.zero;
+            int action = levelFiveSpecialistsTutorialStep == 0 ? HirePremiumAction : HireFerneteroAction;
+            return ResponsiveUpgradeCardBounds(game.Sim, action);
+        }
+        private Rect LevelFiveSpecialistsTutorialPanelBounds()
+        {
+            Rect target = LevelFiveSpecialistsTutorialTargetBounds();
+            float width = Mathf.Min(LevelOneTutorialBubbleWidth, W - 28f);
+            float x = Mathf.Clamp(target.center.x - width * .5f, 14f, W - width - 14f);
+            float vertical = Mathf.Max(.01f, layoutVerticalScale);
+            return new Rect(x, target.yMin - 260f / vertical, width, LevelOneTutorialBubbleHeight);
+        }
+        private Rect LevelFiveSpecialistsTutorialPrimaryBounds() =>
+            LevelOneTutorialPrimaryBounds(LevelFiveSpecialistsTutorialPanelBounds(), layoutVerticalScale);
+        private Rect LevelFiveSpecialistsTutorialSkipBounds() =>
+            LevelOneTutorialSkipBounds(LevelFiveSpecialistsTutorialPanelBounds(), layoutVerticalScale);
+        private void DrawLevelFiveSpecialistsTutorial()
+        {
+            DrawIntroScreen(Texture2D.whiteTexture, LevelOneTutorialBackdropDimColor(), ScaleMode.StretchToFill);
+            Rect panel = LevelFiveSpecialistsTutorialPanelBounds();
+            Rect target = LevelFiveSpecialistsTutorialTargetBounds();
+            const bool targetAbove = false;
+            const float tailWidth = 42f;
+            float vertical = Mathf.Max(.01f, layoutVerticalScale);
+            float baseX = Mathf.Clamp(target.center.x, panel.x + tailWidth * .5f, panel.xMax - tailWidth * .5f);
+            Vector2 tip = new Vector2(target.center.x, target.yMin);
+            Rect bubblePanel = new Rect(panel.x, panel.y * vertical, panel.width, panel.height);
+            Vector2 bubbleTip = new Vector2(tip.x, tip.y * vertical);
+            Rect bubbleBounds = LevelOneTutorialBubbleDrawBounds(bubblePanel, bubbleTip, baseX, tailWidth, targetAbove);
+            if (levelOneTutorialBubbleTexture == null || levelOneTutorialBubbleTextureStep != levelFiveSpecialistsTutorialStep ||
+                !levelOneTutorialBubbleTexturePanel.Equals(bubblePanel) || !levelOneTutorialBubbleTextureTip.Equals(bubbleTip) ||
+                !Mathf.Approximately(levelOneTutorialBubbleTextureTailWidth, tailWidth) ||
+                levelOneTutorialBubbleTextureTailAbove != targetAbove)
+            {
+                if (levelOneTutorialBubbleTexture != null) Destroy(levelOneTutorialBubbleTexture);
+                levelOneTutorialBubbleTexture = CreateLevelOneTutorialBubbleTexture(bubblePanel, bubbleTip, baseX, tailWidth, targetAbove);
+                levelOneTutorialBubbleTextureStep = levelFiveSpecialistsTutorialStep;
+                levelOneTutorialBubbleTexturePanel = bubblePanel;
+                levelOneTutorialBubbleTextureTip = bubbleTip;
+                levelOneTutorialBubbleTextureTailWidth = tailWidth;
+                levelOneTutorialBubbleTextureTailAbove = targetAbove;
+            }
+            GUI.DrawTexture(bubbleBounds, levelOneTutorialBubbleTexture, ScaleMode.StretchToFill, true);
+            Rect headlineBounds = new Rect(panel.x + 18f, panel.y + 12f / vertical, panel.width - 36f, 58f);
+            DrawTutorialText(headlineBounds, LevelFiveSpecialistsTutorialHeadlines[levelFiveSpecialistsTutorialStep],
+                levelOneTutorialTitleStyle, 25, 20);
+            Rect explanationBounds = new Rect(panel.x + 18f, panel.y + 72f / vertical, panel.width - 36f, 40f);
+            DrawTutorialText(explanationBounds, LevelFiveSpecialistsTutorialExplanations[levelFiveSpecialistsTutorialStep],
+                levelOneTutorialBodyStyle, 19, 16);
+            DrawStandardButton(LevelFiveSpecialistsTutorialPrimaryBounds(), LevelOneTutorialPrimaryAction, "SIGUIENTE");
+            Rect skipBounds = LevelFiveSpecialistsTutorialSkipBounds();
+            FillRect(skipBounds, new Color(1f, .98f, .94f, .94f));
+            Rect skip = LayoutRect(skipBounds);
+            GUI.Label(skip, "SALTAR", levelOneTutorialSkipStyle);
+            if (GUI.Button(skip, "", invisible)) NativeAction(LevelOneTutorialSkipAction);
+        }
+
+        private Rect LevelSixRacingTutorialTargetBounds()
+        {
+            if (game == null || game.Sim == null) return Rect.zero;
+            int action = levelSixRacingTutorialStep == 0 ? 2 : HireMozoAction;
+            return ResponsiveUpgradeCardBounds(game.Sim, action);
+        }
+        private Rect LevelSixRacingTutorialPanelBounds()
+        {
+            Rect target = LevelSixRacingTutorialTargetBounds();
+            float width = Mathf.Min(LevelOneTutorialBubbleWidth, W - 28f);
+            float x = Mathf.Clamp(target.center.x - width * .5f, 14f, W - width - 14f);
+            float vertical = Mathf.Max(.01f, layoutVerticalScale);
+            return new Rect(x, target.yMin - 260f / vertical, width, LevelOneTutorialBubbleHeight);
+        }
+        private Rect LevelSixRacingTutorialPrimaryBounds() =>
+            LevelOneTutorialPrimaryBounds(LevelSixRacingTutorialPanelBounds(), layoutVerticalScale);
+        private Rect LevelSixRacingTutorialSkipBounds() =>
+            LevelOneTutorialSkipBounds(LevelSixRacingTutorialPanelBounds(), layoutVerticalScale);
+        private void DrawLevelSixRacingTutorial()
+        {
+            DrawIntroScreen(Texture2D.whiteTexture, LevelOneTutorialBackdropDimColor(), ScaleMode.StretchToFill);
+            Rect panel = LevelSixRacingTutorialPanelBounds();
+            Rect target = LevelSixRacingTutorialTargetBounds();
+            const bool targetAbove = false;
+            const float tailWidth = 42f;
+            float vertical = Mathf.Max(.01f, layoutVerticalScale);
+            float baseX = Mathf.Clamp(target.center.x, panel.x + tailWidth * .5f, panel.xMax - tailWidth * .5f);
+            Vector2 tip = new Vector2(target.center.x, target.yMin);
+            Rect bubblePanel = new Rect(panel.x, panel.y * vertical, panel.width, panel.height);
+            Vector2 bubbleTip = new Vector2(tip.x, tip.y * vertical);
+            Rect bubbleBounds = LevelOneTutorialBubbleDrawBounds(bubblePanel, bubbleTip, baseX, tailWidth, targetAbove);
+            if (levelOneTutorialBubbleTexture == null || levelOneTutorialBubbleTextureStep != levelSixRacingTutorialStep ||
+                !levelOneTutorialBubbleTexturePanel.Equals(bubblePanel) || !levelOneTutorialBubbleTextureTip.Equals(bubbleTip) ||
+                !Mathf.Approximately(levelOneTutorialBubbleTextureTailWidth, tailWidth) ||
+                levelOneTutorialBubbleTextureTailAbove != targetAbove)
+            {
+                if (levelOneTutorialBubbleTexture != null) Destroy(levelOneTutorialBubbleTexture);
+                levelOneTutorialBubbleTexture = CreateLevelOneTutorialBubbleTexture(bubblePanel, bubbleTip, baseX, tailWidth, targetAbove);
+                levelOneTutorialBubbleTextureStep = levelSixRacingTutorialStep;
+                levelOneTutorialBubbleTexturePanel = bubblePanel;
+                levelOneTutorialBubbleTextureTip = bubbleTip;
+                levelOneTutorialBubbleTextureTailWidth = tailWidth;
+                levelOneTutorialBubbleTextureTailAbove = targetAbove;
+            }
+            GUI.DrawTexture(bubbleBounds, levelOneTutorialBubbleTexture, ScaleMode.StretchToFill, true);
+            Rect headlineBounds = new Rect(panel.x + 18f, panel.y + 12f / vertical, panel.width - 36f, 58f);
+            DrawTutorialText(headlineBounds, LevelSixRacingTutorialHeadlines[levelSixRacingTutorialStep],
+                levelOneTutorialTitleStyle, 25, 20);
+            Rect explanationBounds = new Rect(panel.x + 18f, panel.y + 72f / vertical, panel.width - 36f, 40f);
+            DrawTutorialText(explanationBounds, LevelSixRacingTutorialExplanations[levelSixRacingTutorialStep],
+                levelOneTutorialBodyStyle, 19, 16);
+            DrawStandardButton(LevelSixRacingTutorialPrimaryBounds(), LevelOneTutorialPrimaryAction, "SIGUIENTE");
+            Rect skipBounds = LevelSixRacingTutorialSkipBounds();
+            FillRect(skipBounds, new Color(1f, .98f, .94f, .94f));
+            Rect skip = LayoutRect(skipBounds);
+            GUI.Label(skip, "SALTAR", levelOneTutorialSkipStyle);
+            if (GUI.Button(skip, "", invisible)) NativeAction(LevelOneTutorialSkipAction);
+        }
 
         private string LevelOneTutorialPrimaryCaption() => "SIGUIENTE";
         private Rect LevelOneTutorialTargetBounds()
@@ -5426,9 +6806,13 @@ namespace HayChoriYPaty
             }
             else
             {
-                VictoryText(VictorySlot(frame, new Rect(.15f, .75f, .70f, .043f)),
+                VictoryText(VictorySlot(frame, new Rect(.15f, .745f, .70f, .040f)),
                     "PREMIO FINAL: " + FormatMarketMoney(game.ChulengoFinalRewardCents),
-                    Mathf.RoundToInt(20f * fontScale), brown, TextAnchor.MiddleCenter);
+                    Mathf.RoundToInt(19f * fontScale), brown, TextAnchor.MiddleCenter);
+                if (game.TicketRewardAppliedForCurrentVictory)
+                    VictoryText(VictorySlot(frame, new Rect(.10f, .790f, .80f, .035f)),
+                        "¡GANASTE 1 TICKET! · SALDO: " + game.TicketBalance,
+                        Mathf.RoundToInt(17f * fontScale), new Color(.08f, .42f, .17f), TextAnchor.MiddleCenter);
             }
         }
         private static readonly string[] ProductShortNames = { "CHO", "PAT", "BON", "VAC", "COC", "FER", "CER" };
@@ -5530,21 +6914,23 @@ namespace HayChoriYPaty
             string line4="REPOSICIÓN: "+FormatMarketMoney(r.progressionBonusCents);
             string line5="INGRESO NUEVO: "+FormatMarketMoney(r.earnedCents);
             string line6="SALDO ACTUAL: "+FormatMarketMoney(r.totalBalanceCents);
-            string[] lines={line1,line2,line4,line3,line5,line6};
+            string line7=game.TicketRewardAppliedForCurrentVictory?"¡GANASTE 1 TICKET! · SALDO: "+game.TicketBalance:"";
+            string[] lines={line1,line2,line4,line3,line5,line6,line7};
             int oldSize=small.fontSize;
             TextAnchor oldAlignment=small.alignment;
             bool oldWordWrap=small.wordWrap;
             float row=bounds.height/lines.Length;
-            Color oldColor=small.normal.textColor;small.normal.textColor=new Color(.24f,.10f,.035f);
+            Color oldColor=small.normal.textColor;
             small.alignment=TextAnchor.MiddleLeft;
             small.wordWrap=false;
-            float textX=bounds.x+bounds.width*.31f;
-            float textWidth=bounds.width*.66f;
+            float textX=bounds.x+bounds.width*.22f;
+            float textWidth=bounds.width*.76f;
             for(int i=0;i<lines.Length;i++)
             {
                 Rect lineBounds=new Rect(textX,bounds.y+row*i,textWidth,row);
                 small.fontSize=13;
                 while(small.fontSize>10 && small.CalcSize(new GUIContent(lines[i])).x>lineBounds.width) small.fontSize--;
+                small.normal.textColor = i == 6 && !string.IsNullOrEmpty(lines[i]) ? new Color(.08f,.42f,.17f) : new Color(.24f,.10f,.035f);
                 Label(lineBounds,lines[i],small);
             }
             small.normal.textColor=oldColor;

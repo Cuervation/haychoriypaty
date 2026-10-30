@@ -28,7 +28,7 @@ namespace HayChoriYPaty
         private sealed class Visual
         {
             public Transform Root;
-            public SpriteRenderer Torso, LeftLeg, RightLeg, Fingers, CookingPose;
+            public SpriteRenderer Torso, LeftLeg, RightLeg, Fingers, CookingPose, AngryCue;
             public Vector2 Palm;
             public int ProductOrder;
         }
@@ -49,6 +49,8 @@ namespace HayChoriYPaty
         private readonly Texture2D extension, premiumExtension, fernetExtension;
         private readonly Texture2D cookingPoses;
         private Texture2D premiumCookingPoses;
+        private Texture2D angryCueTexture;
+        private Sprite angryCueSprite;
         private Texture2D normal, diagonal, premium, premiumDiagonal, drink, fernet, mozo, mozoDiagonal, mozoExtension;
         private Texture2D mozoSource, mozoDiagonalSource;
         private bool matched;
@@ -137,6 +139,29 @@ namespace HayChoriYPaty
             int count = Mathf.Min(StreetKitchenLayout.MaxCookStationsPerGrill, simulation.WorkerCount(worker.Role));
             Vector2 anchor = simulation.KitchenLayout.GrillWorkPosition(product, worker.CookStationIndex, count);
             return Vector2.Distance(worker.Position, anchor) <= 1f;
+        }
+        internal static bool NeedsMozoWaitingForSandwichAngryCue(StreetSimulation simulation, StreetWorker worker)
+        {
+            if (simulation == null || worker == null || simulation.Kitchen == null ||
+                !simulation.UsesActiveCooks || simulation.Phase != RoundPhase.Playing ||
+                worker.Role != StreetWorkerRole.Mozo || worker.State != StreetWorkerState.Idle ||
+                worker.ReturningToWaitPosition || worker.CarriedItemId > 0 ||
+                Vector2.Distance(worker.Position, worker.WaitPosition) > 1f) return false;
+
+            return simulation.HasUnservedMozoSandwichDemandWithoutReadyPickup(worker);
+        }
+
+        internal static StreetFacing MozoWaitingGrillFacing(StreetSimulation simulation, StreetWorker worker,
+            StreetFacing fallback)
+        {
+            if (simulation == null || worker == null || simulation.KitchenLayout == null) return fallback;
+            Rect normalGrill = simulation.KitchenLayout.BoundsForProduct(0);
+            Rect premiumGrill = simulation.KitchenLayout.BoundsForProduct(2);
+            Vector2 target = normalGrill.center;
+            if (premiumGrill.width > 0f &&
+                (normalGrill.width <= 0f || (premiumGrill.center - worker.Position).sqrMagnitude <
+                    (normalGrill.center - worker.Position).sqrMagnitude)) target = premiumGrill.center;
+            return StreetWorkerAnimation.ResolveFacing(target - worker.Position, fallback);
         }
         private static bool TryCookingPresentationTarget(StreetSimulation simulation, StreetWorker worker,
             out int product, out int slot, out Vector2 target)
@@ -233,9 +258,9 @@ namespace HayChoriYPaty
             Vector2 position = worker.Position;
             if (simulation == null) return position;
 
-            // Align the frontal worker's ground plane near the barrel base, not its drawn rim.
-            // This is presentation-only: the worker's route and pickup anchor stay untouched.
-            position.y += CocaBarrelPresentationOffset(simulation, worker);
+            // Keep the rendered root on the real route while walking. A route-distance-dependent
+            // vertical correction changed the projected travel vector and looked like acceleration.
+            // The stationary reach is handled on the upper-body cutout instead.
 
             // Share the contact correction between native sprites and the legacy IMGUI fallback,
             // fading it over the route so ToGrill/ToTable state changes cannot teleport the worker.
@@ -249,34 +274,26 @@ namespace HayChoriYPaty
             return position;
         }
 
-        private const float CocaBarrelTransitionDistance = 48f;
+        private const float BarrelDrinkApproachFacingDistance = 48f;
 
-        internal static float CocaBarrelPresentationOffset(StreetSimulation simulation, StreetWorker worker)
+        internal static bool IsFinalBarrelDrinkApproach(StreetSimulation simulation, StreetWorker worker)
         {
             if (simulation == null || worker == null || worker.Role != StreetWorkerRole.Cocacolero ||
-                worker.Product != 4) return 0f;
-            Rect barrel = simulation.KitchenLayout.BoundsForProduct(4);
+                worker.State != StreetWorkerState.ToStation || (worker.Product != 4 && worker.Product != 6)) return false;
+            return RemainingRouteDistance(worker, simulation.KitchenLayout.PickupPosition(worker.Product)) <=
+                BarrelDrinkApproachFacingDistance;
+        }
+
+        internal static float BarrelDrinkPickupBodyLift(StreetSimulation simulation, StreetWorker worker)
+        {
+            if (simulation == null || worker == null || worker.Role != StreetWorkerRole.Cocacolero ||
+                worker.State != StreetWorkerState.Pickup || (worker.Product != 4 && worker.Product != 6)) return 0f;
+            Rect barrel = simulation.KitchenLayout.BoundsForProduct(worker.Product);
             if (barrel.width <= 0f) return 0f;
-            float blend;
-            if (worker.State == StreetWorkerState.Pickup) blend = 1f;
-            else if (worker.State == StreetWorkerState.ToStation)
-            {
-                float remaining = RemainingRouteDistance(worker, simulation.KitchenLayout.PickupPosition(4));
-                blend = 1f - Mathf.Clamp01(remaining / CocaBarrelTransitionDistance);
-            }
-            else if (worker.State == StreetWorkerState.ToCounter)
-            {
-                Vector2 destination = worker.Route != null && worker.Route.Length > 0
-                    ? worker.Route[worker.Route.Length - 1] : worker.Target;
-                float remaining = RemainingRouteDistance(worker, destination);
-                float travelled = Mathf.Max(0f, worker.RouteDistance - remaining);
-                blend = 1f - Mathf.Clamp01(travelled / CocaBarrelTransitionDistance);
-            }
-            else return 0f;
-            if (blend <= 0f) return 0f;
-            // Linear route-distance blending preserves the same final ground plane without
-            // the ease-in/ease-out speed spike caused by the former 48-unit SmoothStep.
-            return Mathf.Max(0f, barrel.height - 24f) * blend;
+            // Animate only while stopped. The torso reaches over the barrel while the feet/root
+            // remain fixed; the zero-at-ends curve also avoids a jump when walking resumes.
+            float reach = Mathf.Sin(Mathf.Clamp01(worker.PickupProgress) * Mathf.PI);
+            return Mathf.Max(0f, barrel.height - 24f) * reach;
         }
         internal static float PresentationScale(StreetSimulation simulation, StreetWorker worker)
         {
@@ -386,6 +403,7 @@ namespace HayChoriYPaty
             var v = new Visual { Root = go.transform };
             v.Torso = Part(v.Root,"Torso"); v.LeftLeg = Part(v.Root,"LeftLeg"); v.RightLeg = Part(v.Root,"RightLeg"); v.Fingers = Part(v.Root,"GripFingers");
             v.CookingPose = Part(v.Root,"CookingPose"); v.CookingPose.enabled = false;
+            v.AngryCue = Part(v.Root,"MozoEmptySandwichAngryCue"); v.AngryCue.enabled = false;
             workers.Add(id,v); return v;
         }
         private float Scale(Art art) => Mathf.Min(Width / art.Bounds.width, Height / art.Bounds.height);
@@ -403,6 +421,78 @@ namespace HayChoriYPaty
             return (bounds.height - CookingPoseHairTopInsetPixels[index]) * spriteScale;
         }
         internal bool CookingPoseAvailable => cookingPoses != null;
+        private Sprite EnsureMozoAngryCueSprite()
+        {
+            if (angryCueSprite != null) return angryCueSprite;
+            const int size = 64;
+            Color32[] pixels = new Color32[size * size];
+            PaintCueCircle(pixels, size, 31.5f, 31.5f, 30.5f, new Color32(0x5A, 0x17, 0x18, 0xFF));
+            PaintCueCircle(pixels, size, 31.5f, 31.5f, 27.5f, new Color32(0xEF, 0x4A, 0x3D, 0xFF));
+            PaintCueCircle(pixels, size, 22f, 43f, 4.1f, new Color32(0xFF, 0x86, 0x71, 0x95));
+            PaintCueSegment(pixels, size, new Vector2(13f, 50f), new Vector2(28f, 42f), 3.8f, new Color32(0x32, 0x10, 0x12, 0xFF));
+            PaintCueSegment(pixels, size, new Vector2(51f, 50f), new Vector2(36f, 42f), 3.8f, new Color32(0x32, 0x10, 0x12, 0xFF));
+            PaintCueCircle(pixels, size, 22.5f, 35f, 2.8f, new Color32(0x25, 0x0D, 0x0E, 0xFF));
+            PaintCueCircle(pixels, size, 40.5f, 35f, 2.8f, new Color32(0x25, 0x0D, 0x0E, 0xFF));
+            PaintCueSegment(pixels, size, new Vector2(20f, 19f), new Vector2(32f, 25f), 2.4f, new Color32(0x32, 0x10, 0x12, 0xFF));
+            PaintCueSegment(pixels, size, new Vector2(32f, 25f), new Vector2(44f, 19f), 2.4f, new Color32(0x32, 0x10, 0x12, 0xFF));
+
+            angryCueTexture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            {
+                name = "Worker_Mozo_EmptySandwich_AngryCue",
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp,
+                hideFlags = HideFlags.DontSave
+            };
+            angryCueTexture.SetPixels32(pixels);
+            angryCueTexture.Apply(false, true);
+            angryCueSprite = Sprite.Create(angryCueTexture, new Rect(0f, 0f, size, size),
+                new Vector2(.5f, .5f), 100f, 0, SpriteMeshType.FullRect);
+            angryCueSprite.name = "Worker_Mozo_EmptySandwich_AngryCue_Sprite";
+            angryCueSprite.hideFlags = HideFlags.DontSave;
+            return angryCueSprite;
+        }
+        private static void PaintCueCircle(Color32[] pixels, int size, float cx, float cy, float radius, Color32 color)
+        {
+            int minX = Mathf.Max(0, Mathf.FloorToInt(cx - radius - 1f));
+            int maxX = Mathf.Min(size - 1, Mathf.CeilToInt(cx + radius + 1f));
+            int minY = Mathf.Max(0, Mathf.FloorToInt(cy - radius - 1f));
+            int maxY = Mathf.Min(size - 1, Mathf.CeilToInt(cy + radius + 1f));
+            for (int y = minY; y <= maxY; y++)
+                for (int x = minX; x <= maxX; x++)
+                {
+                    float distance = Vector2.Distance(new Vector2(x + .5f, y + .5f), new Vector2(cx, cy));
+                    BlendCuePixel(pixels, y * size + x, color, Mathf.Clamp01(radius + .5f - distance));
+                }
+        }
+        private static void PaintCueSegment(Color32[] pixels, int size, Vector2 start, Vector2 end, float width, Color32 color)
+        {
+            int minX = Mathf.Max(0, Mathf.FloorToInt(Mathf.Min(start.x, end.x) - width));
+            int maxX = Mathf.Min(size - 1, Mathf.CeilToInt(Mathf.Max(start.x, end.x) + width));
+            int minY = Mathf.Max(0, Mathf.FloorToInt(Mathf.Min(start.y, end.y) - width));
+            int maxY = Mathf.Min(size - 1, Mathf.CeilToInt(Mathf.Max(start.y, end.y) + width));
+            Vector2 delta = end - start;
+            float lengthSquared = Mathf.Max(.0001f, delta.sqrMagnitude);
+            for (int y = minY; y <= maxY; y++)
+                for (int x = minX; x <= maxX; x++)
+                {
+                    Vector2 point = new Vector2(x + .5f, y + .5f);
+                    float t = Mathf.Clamp01(Vector2.Dot(point - start, delta) / lengthSquared);
+                    float distance = Vector2.Distance(point, start + delta * t);
+                    BlendCuePixel(pixels, y * size + x, color, Mathf.Clamp01(width * .5f + .5f - distance));
+                }
+        }
+        private static void BlendCuePixel(Color32[] pixels, int index, Color32 color, float coverage)
+        {
+            if (coverage <= 0f) return;
+            Color destination = pixels[index];
+            Color source = color;
+            float sourceAlpha = source.a * coverage;
+            float outAlpha = sourceAlpha + destination.a * (1f - sourceAlpha);
+            if (outAlpha <= .0001f) return;
+            Color result = (source * sourceAlpha + destination * (destination.a * (1f - sourceAlpha))) / outAlpha;
+            result.a = outAlpha;
+            pixels[index] = result;
+        }
         private void DrawPart(SpriteRenderer renderer, Art art, Rect source, Vector2 local, int order, float scaleMultiplier = 1f)
         {
             renderer.sprite = Slice(art.Texture, source); renderer.flipX = art.Flip;
@@ -426,9 +516,10 @@ namespace HayChoriYPaty
                 if (!v.Root.gameObject.activeSelf) v.Root.gameObject.SetActive(true);
                 Vector2 displayPosition = PresentationPosition(sim, w);
                 float presentationScale = PresentationScale(sim, w);
+                bool showAngryCue = NeedsMozoWaitingForSandwichAngryCue(sim, w);
                 StreetWorkerPose pose = StreetWorkerAnimation.Sample(w, IsIdleAtGrill(sim, w));
-                if (w.State == StreetWorkerState.ToStation && CocaBarrelPresentationOffset(sim, w) > .01f)
-                    pose.Facing = StreetFacing.Down;
+                if (showAngryCue) pose.Facing = MozoWaitingGrillFacing(sim, w, pose.Facing);
+                if (IsFinalBarrelDrinkApproach(sim, w)) pose.Facing = StreetFacing.Down;
                 int contact = pose.Frame >= 2 ? 1 : 0;
                 bool hasCookingPose = pose.Cooking && cookingPoses != null &&
                     TryCookingPresentationTarget(sim, w, out _, out _, out _);
@@ -436,12 +527,12 @@ namespace HayChoriYPaty
                 // Only the integrated cooking atlas needs its own transparent-foot crop correction.
                 if (pose.WorkingAtGrill && hasCookingPose)
                     displayPosition.y += CookingPoseFootInset(pose.CookingFrame) / Mathf.Max(.01f, verticalScale);
-                bool cocaBarrelPickup = pose.PickingUp && w.Role == StreetWorkerRole.Cocacolero &&
-                    w.Product == 4;
+                bool barrelDrinkPickup = pose.PickingUp && w.Role == StreetWorkerRole.Cocacolero &&
+                    (w.Product == 4 || w.Product == 6);
                 Art upper = pose.Carrying ? Carry(w,pose.Facing) : Walk(w,pose.Facing,contact,pose.Moving);
                 if (pose.Cooking) upper = Original(w, 0, false);
                 if (pose.PickingUp)
-                    upper = cocaBarrelPickup
+                    upper = barrelDrinkPickup
                         ? Carry(w, StreetFacing.Down)
                         : Beverage(w) ? Carry(w,pose.Facing)
                             : Original(w,11, w.Position.x < sim.KitchenLayout.BoundsForProduct(w.Product).center.x);
@@ -453,13 +544,15 @@ namespace HayChoriYPaty
                 // without leaving a gap when the cook transitions back to gait/carry poses.
                 float splitRatio = Waist + WaistOverlap;
                 float split = upper.Bounds.height * splitRatio;
-                float reach = pose.PickingUp ? Mathf.Sin(pose.PickupProgress * Mathf.PI) * Height * (cocaBarrelPickup ? -.08f : .20f) : 0f;
-                float upperBottom = upper.Bounds.height * (1f-splitRatio) * upperScale - pose.Bob * presentationScale - reach * presentationScale;
+                float reach = pose.PickingUp ? Mathf.Sin(pose.PickupProgress * Mathf.PI) * Height * (barrelDrinkPickup ? -.08f : .20f) : 0f;
+                float barrelBodyLift = barrelDrinkPickup ? BarrelDrinkPickupBodyLift(sim, w) : 0f;
+                float upperBottom = upper.Bounds.height * (1f-splitRatio) * upperScale - pose.Bob * presentationScale -
+                    reach * presentationScale - barrelBodyLift * presentationScale;
                 // A tiny x-based tie-break makes same-row workers deterministic without overriding y-depth.
                 int depth = (sim.UsesActiveCooks ? SceneDepth(displayPosition.y * verticalScale)
                     : -5000 + Mathf.RoundToInt(displayPosition.y * verticalScale)) + RowSortBias(sim, w, displayPosition);
                 int upperOrder = depth + 2;
-                if (cocaBarrelPickup)
+                if (barrelDrinkPickup)
                 {
                     Rect barrel = sim.KitchenLayout.BoundsForProduct(w.Product);
                     int barrelDepth = sim.UsesActiveCooks ? SceneDepth(barrel.yMax * verticalScale) : 0;
@@ -495,6 +588,14 @@ namespace HayChoriYPaty
                     // depth keeps the grill in front where the two silhouettes naturally overlap.
                     DrawPart(v.CookingPose, cooked, cooked.Bounds, Vector2.zero, depth+2, presentationScale);
                 }
+                v.AngryCue.enabled = showAngryCue;
+                if (showAngryCue)
+                {
+                    v.AngryCue.sprite = EnsureMozoAngryCueSprite();
+                    v.AngryCue.transform.localPosition = new Vector3(0f, 1.15f, 0f);
+                    v.AngryCue.transform.localScale = Vector3.one * .40f;
+                    v.AngryCue.sortingOrder = depth + 14;
+                }
                 float handX = (upper.Palm.x-.5f)*upper.Bounds.width*upperScale;
                 if (upper.Flip) handX = -handX;
                 float handY = -(1f-upper.Palm.y)*upper.Bounds.height*upperScale + pose.Bob * presentationScale + (pose.PickingUp ? reach * presentationScale : 0f);
@@ -523,6 +624,8 @@ namespace HayChoriYPaty
             foreach (Sprite sprite in sprites.Values) if (sprite != null) UnityEngine.Object.Destroy(sprite);
             if (premiumExtension != null) UnityEngine.Object.Destroy(premiumExtension);
             if (premiumCookingPoses != null) UnityEngine.Object.Destroy(premiumCookingPoses);
+            if (angryCueSprite != null) UnityEngine.Object.Destroy(angryCueSprite);
+            if (angryCueTexture != null) UnityEngine.Object.Destroy(angryCueTexture);
             if (fernetExtension != null) UnityEngine.Object.Destroy(fernetExtension);
             DestroyMozoVariants();
             workers.Clear();sprites.Clear();

@@ -2,9 +2,17 @@
 
 ## Alcance vigente — 2026-10-27
 
-La presentación conserva la portada animada vigente (logo, tres frases y barra de progreso compacta de 118×6 unidades lógicas). Se muestra antes del hub, sin requerir que Firebase haya terminado el acceso. Al completar la duración mínima y la carga de recursos, avanza automáticamente a la pantalla principal. Ya no existe una portada Firebase independiente.
+La presentación conserva la portada animada vigente (logo, tres frases y barra de progreso compacta de 118×6 unidades lógicas). Se muestra antes del hub, sin requerir que Firebase haya terminado el acceso. Al completar la duración mínima y la carga de recursos, avanza automáticamente a la pantalla principal. Ya no existe una portada Firebase independiente. Durante la carga inicial solo se muestra el arte de portada cuando ya está disponible; no se intercala la pantalla genérica azul «PREPARANDO EL BARRIO...».
 
-La autenticación Firebase sigue siendo obligatoria para perfiles, progreso y juego. El acceso Google se abre dentro del hub, desde CUENTA; si se pulsa JUGAR con sesión no lista, se muestra ese panel en lugar de dejar el botón sin respuesta. Tras autenticarse y resolver perfil/consentimiento/conflicto, se vuelve al hub; solo entonces JUGAR abre el selector. La selección del primer nivel conserva el tutorial inicial y sus existencias/condiciones; los demás niveles mantienen el paso por Mercado y JUGAR PARTIDO. Ningún botón inicia una ronda sin el gate Firebase y el flujo normal de preparación.
+La autenticación Firebase sigue siendo obligatoria para perfiles, progreso y juego. El acceso Google se abre dentro del hub desde el flujo de JUGAR: si se pulsa sin sesión lista, aparece el panel CUENTA en vez de dejar el botón sin respuesta. La ilustración no muestra un botón/avatar independiente de CUENTA. Tras autenticarse y resolver perfil/consentimiento/conflicto, se vuelve al hub; solo entonces JUGAR abre el selector. La selección del primer nivel conserva el tutorial inicial y sus existencias/condiciones; los demás niveles mantienen el paso por Mercado y JUGAR PARTIDO. Ningún botón inicia una ronda sin el gate Firebase y el flujo normal de preparación.
+
+## Música de fondo del hub — delta 2026-10-27
+
+La pista proporcionada Muchachos_16bit_20pct_mas_lento_LOOP.wav acompaña en loop únicamente la pantalla principal del barrio. Se inicia al entrar al hub y se detiene al abrir Mercado, selector, Insignias, Ranking, presentación, partida o resultado; permanece activa si se abre el modal de Cuenta sobre el hub. Es audio 2D con volumen moderado y compresión Vorbis, conservando el estéreo original.
+
+- [x] Reproducción en loop condicionada al estado visible del hub, sin solaparse con otras páginas del juego.
+- [x] AudioSource 2D, sin autoplay, y detención también al deshabilitar StreetView.
+- [ ] Escucha/revisión de loop en Unity: **NOT_RUN** (el editor/MCP no estuvo disponible en esta sesión).
 
 El hub es una escena ilustrada vertical, vista elevada de una calle de partido: se ve parte del estadio, viviendas/vereda, hinchas y un control policial donde se revisan DNI. Los puestos ilustrados funcionan como hotspots, dentro de los límites de su arte y respetando el área segura del canvas:
 
@@ -14,9 +22,69 @@ El hub es una escena ilustrada vertical, vista elevada de una calle de partido: 
 | Almacén/supermercado | MERCADO | Pantalla Mercado existente; comprar sigue sujeto a saldo/stock/gates actuales. |
 | Vendedor ambulante de camisetas | INSIGNIAS | Colección de21insignias por ventas acumuladas:500/2500/5000 para cada uno de los7productos, derivadas de estadísticas del perfil Firebase (ver delta vigente abajo). Sin premios nuevos. |
 | Tablero del estadio | RANKING | Muestra canchas desbloqueadas y canchas ya ganadas en el perfil propio, y aclara que el ranking global está pendiente. No consulta ni expone una lista pública de otros jugadores: el contrato Firebase actual no autoriza ese acceso. |
-| Avatar/engranaje | CUENTA | Reutiliza el estado/modal Firebase/Google existente para iniciar sesión o cerrar sesión; no modifica la obligación de autenticación. |
 
-Las páginas nuevas vuelven al hub; se reutiliza IMGUI y las rutas/mercado existentes, no se agrega un segundo framework de UI ni servicios. El arte del hub es 941×1672 y sus hitboxes se mapean de la composición full-bleed a la safe area con coordenadas GUI top-origin.
+Las páginas nuevas vuelven al hub; se reutiliza IMGUI y las rutas/mercado existentes, sin agregar otro framework ni servicios. Se mantiene el mismo master ilustrado vertical de 841×1870 a todas las resoluciones, dibujado una sola vez a pantalla completa con `ScaleAndCrop`: conserva proporciones y recorta solo el exceso necesario para llenar cada relación de aspecto. No se pintan márgenes ni se repiten, desaturan o generan variantes del arte. Los cuatro hotspots visibles (JUGAR, MERCADO, INSIGNIAS y RANKING) se remapean al recorte visible y permanecen dentro del área segura. En la franja superior, la ruedita reemplaza el rótulo AJUSTES y abre una capa local disponible también sin sesión Firebase; conserva el control para activar/desactivar la música y volver al barrio. Un botón de altavoz a la izquierda de CUENTA ofrece el mismo cambio de música en un toque, muestra ondas cuando está activa y una marca de silencio al apagarla, y permanece sincronizado con el panel. Ambos controles quedan dentro del área segura y fuera de los hotspots ilustrados. La preferencia es local y no altera progreso, autenticación ni reglas de juego.
+
+## Extensión vertical del hub — 2026-10-27
+
+- [x] Un solo master de 841×1870 reemplaza la imagen anterior dentro del mismo recurso/GUID. Continúa cielo/estadio arriba y calle/hinchas abajo; no hay variantes por resolución.
+- [x] El master coincide con la relación 9:20 de 575×1280 y se muestra completo; en otras relaciones se contiene proporcionalmente, sin recorte ni estiramiento, y el sobrante se rellena con azul marino uniforme (sin variantes ni copias recortadas del arte).
+- [x] Hotspots de Ranking, Jugar, Mercado e Insignias remapeados al master extendido y siguen la misma transformación de pantalla; no hay un hotspot independiente de Cuenta.
+- [x] Geometría EditMode ejecutada en Unity 6000.6.3f1: **8/8 PASS** en 360×800, 575×1280, 1080×1920, 1080×2340, 1080×2400, 1200×2670, 1536×2048 y 2048×2732; también comprueba que los cuatro hotspots quedan dentro de la composición y que no existe un rectángulo de acción de Cuenta.
+- [x] Capturas reales de Game View PlayMode revisadas en **575×1280, 1080×1920 y 1536×2048**: **3/3 PASS**. La primera relación muestra la ilustración completa; en teléfono estándar y tablet el mismo arte queda contenido, nítido y sin deformación, y el crop tenue del propio arte rellena los lados. Recibos PNG: `/private/tmp/hcyp-hub-responsive-qa-20261027/captures-{575x1280,1080x1920,1536x2048}/hub-playmode-*.png`.
+- [x] Flujo de acceso verificado: **1/1 PASS**; sin sesión, JUGAR abre CUENTA; una vez Ready, JUGAR abre el selector. No se reintroduce un botón separado.
+- [ ] Verificación en dispositivos físicos con notch y tablets: **NOT_RUN**; la comprobación de tablet fue Game View 1536×2048, no un dispositivo Android físico.
+- Nota de validación de recursos: el test `NewStreetAssetsAndGoldCoinKeepNativeResolution` ejecutó 13 casos (7 PASS / 6 FAIL). Los seis fallos llegan al assert de formato Android: espera `RGBA32`, aunque el importador configurado reporta `ETC2_RGBA8`; ocurre también en otros cinco recursos y no señala dimensiones, carga o relación de aspecto. Se preservó el `.meta` existente y no se alteró esa compresión en este ajuste.
+
+## Imagen a pantalla completa y ajustes — 2026-10-29
+
+- [x] La ruedita reemplaza el rótulo AJUSTES en la parte superior izquierda; abre el panel independiente dentro del área segura, separado de CUENTA y de los cuatro hotspots.
+- [x] Un botón superior de altavoz, a la izquierda de CUENTA, alterna la misma preferencia persistente; distingue visualmente música activa y silencio y sigue abriendo el panel para el resto de ajustes.
+- [x] El panel funciona antes del login y conserva el hub; la música puede apagarse/encenderse al instante y la elección persiste localmente. JUGAR y su gate Firebase no cambian.
+- [x] Se presenta una sola vez el mismo master a pantalla completa con recorte proporcional para cubrir; no hay bandas de color ni repetición del arte.
+- [x] Matriz geométrica ampliada a 19 resoluciones portrait con safe-area sintéticas; chequeo estático independiente de cobertura total, hotspots visibles, targets de toque y no solapamiento: **PASS**.
+- [x] La geometría de ambos iconos conserva targets de al menos 44 px, evita CUENTA/hotspots y remapea la región táctil con el mismo viewport en las 19 resoluciones: **PASS en evaluación estática de la matriz**.
+- [ ] Ejecución de las pruebas Unity y revisión visual/capturas multirresolución: **BLOCKED / NOT_RUN**. El job EditMode devolvió `succeeded` pero `total: 0`; la lectura de recursos del Editor reportó la sesión desconectada. No se declara PASS de Unity ni de UI visual.
+- [ ] Dispositivos físicos con notch/tablet: **NOT_RUN** en este cambio.
+- Arte no regenerado: el master existente mantiene 841×1870; solo cambia su escalado/mapeo responsivo, sin modificar ni reimportar el recurso.
+
+## Animación de personajes originales — delta 2026-10-29 (fase 1; aceptación pendiente)
+
+Se probó únicamente el vendedor del puesto de camisetas, sin reemplazar el master `street-hub-stadium-v1` ni cambiar navegación, hotspots o sistemas de juego. La fase sigue abierta y no habilita incorporar los siguientes grupos hasta que el vendedor pase la revisión visual.
+
+- [x] Derivadas dos capas auxiliares de 100×100 px (brazo/mano segmentados y parche local de fondo) exclusivamente desde el master; recursos en `Assets/Art/Street/Resources/StreetHubCharacters/`.
+- [x] Animación temporal y aleatoria limitada al brazo; el dibujo base no se sobreimprime cuando está en reposo.
+- [x] El test `SellerWaveCutoutRendersAndRestoresInTheFullHubGameView` terminó **1/1 PASS** y produjo capturas full Game View a **1080×1920**.
+- [x] La revisión de la primera captura en movimiento encontró **FAIL visual**: se duplicaba el brazo al rotarlo en el canvas escalado. Captura: `/var/folders/bf/q6_2cmvn6ls9pc5h5g7thj8r0000gn/T/hcyp-street-hub-view-tests/hub-seller-wave-up-playmode-1080x1920.png`.
+- [x] Se corrigió la composición de rotación para el espacio lógico local y se ajustaron los importadores de las dos texturas (sin mipmaps, sin resampleo NPOT, alpha limpio); **la corrección todavía no tiene una captura Unity posterior**.
+- [ ] Aceptación visual actual del vendedor: **BLOCKED** por desconexión de Unity MCP; deben revisarse las poses después de la corrección contra reposo, oclusión y restauración.
+- [ ] Capturas/chequeo geométrico en otras resoluciones y safe areas: **NOT_RUN** en esta fase.
+- [ ] Android físico/perfil de rendimiento: **NOT_RUN**.
+- [ ] Policías, personaje del almacén y chicos: **NOT_IMPLEMENTED**; esperar a que el vendedor pase primero.
+
+SHA-256 del master antes y después del trabajo: `0573cc633b2d7aa2bfdde5433d1c1a01b75665b66310fc6e4924ce9e7305c098` (sin cambios).
+
+## Animación ambiental del barrio — delta 2026-10-29
+
+El hub conserva el master vertical vigente de **841×1870** sin redibujarlo ni modificar su archivo. Los efectos se dibujan encima, usando el mismo mapeo ScaleAndCrop/safe-area del arte y sin cambiar navegación ni hitboxes:
+
+- [x] Tres hojas pequeñas amarillas/verdes caen de forma ocasional en el cielo visible con variación de recorrido, giro y tamaño.
+- [x] Humo muy tenue y brasas/chispas mínimas quedan localizados sobre la parrilla; el brillo de la estrella de RANKING y el barrido de JUGAR son breves y tienen temporizadores independientes.
+- [x] Los recursos de overlay se crean una sola vez mientras se usa el hub, se reutilizan sin arreglos/lecturas de píxeles por frame y se liberan al deshabilitar StreetView. El reloj de efectos avanza solo mientras el hub se dibuja.
+- [x] Las anclas de humo, brasas, Ranking y JUGAR pasan la prueba EditMode focalizada en seis relaciones portrait: 360×800, 575×1280, 1080×1920, 1080×2400, 1200×2670 y 1536×2048; la misma prueba asegura que los cuatro rectángulos de hotspots no cambian.
+- [x] Unity 6000.6.3f1: prueba EditMode de anclas **1/1 PASS**; prueba de navegación/hotspots PlayMode **1/1 PASS**; captura full Game View PlayMode con reloj de efectos mayor a 15 s **1/1 PASS**. Las dos capturas revisadas a 1080×1920 muestran el master actual al abrir el hub y después de 18 s de ciclo, sin cortes ni duplicación del arte. PNG: Path.GetTempPath()/hcyp-street-hub-view-tests/ (hub-ambient-initial-playmode-1080x1920 y hub-ambient-cycle-playmode-1080x1920).
+- [ ] Banderas del estadio y camisetas del puesto derecho permanecen estáticas: están integradas en el master y no hay máscaras/capas limpias; recortarlas/desplazarlas duplicaría bordes.
+- [ ] Perfil de rendimiento en Android físico y revisión en dispositivo: NOT_RUN. La matriz de seis relaciones es de geometría EditMode; la captura visual real fue solo 1080×1920.
+- Arte no modificado por este delta (SHA-256 antes/después: 0573cc633b2d7aa2bfdde5433d1c1a01b75665b66310fc6e4924ce9e7305c098). El recurso ya tenía cambios locales respecto de HEAD al iniciar esta tarea; se preservó tal cual.
+
+## Refuerzo moderado de animaciones ambientales — 2026-10-30
+
+Por pedido del usuario se refuerzan los efectos que ya estaban en el hub, manteniendo el master/arte de fondo, anclas, escala/safe-area, navegación y hotspots. Se pasa de 3 a 4 hojas algo mayores, humo máximo de alpha 0,105 a 0,135, brasas de alpha 0,026–0,072 a 0,04–0,09 y destellos/barrido algo más brillantes y frecuentes. Los ciclos siguen siendo breves y escalonados. No se reactivan ni se cambian los movimientos superpuestos de personajes; banderas y camisetas continúan estáticas por falta de máscaras limpias.
+
+- [x] Unity 6000.6.3f1: `AmbientImageAnchorsRemainVisibleAcrossPortraitCropsWithoutChangingHotspots` **1/1 EditMode PASS** (seis tamaños portrait, anclas de todos los efectos, hotspots intactos).
+- [x] `AmbientOverlaysRenderInTheFullHubGameView` **1/1 PlayMode PASS**, reloj ambiental >15 s; capturas full Game View inicial/ciclo **1080×1920** revisadas en `/var/folders/bf/q6_2cmvn6ls9pc5h5g7thj8r0000gn/T/hcyp-street-hub-view-tests/`.
+- [x] `NeighborhoodCharactersStayStillDuringAShortHubVisit` **1/1 PlayMode PASS**: sin renderer/rig de personajes durante 6,5 s; capturas inicial/final revisadas en el mismo directorio.
+- [ ] Android físico y rendimiento: **NOT_RUN**; captura Unity Editor/Game View no equivale a validación en teléfono.
 
 ## Aceptación histórica del hub (0.2.64)
 
@@ -64,3 +132,23 @@ Se integraron los cinco grupos de capas/reemplazo previstos: vendedor, tres poli
 - [x] Unity 6000.6.3f1: `HubCharacterBehaviorTests` había pasado **7/7 EditMode**; la repetición posterior a este retoque visual no llegó a iniciar en Unity MCP (timeout de inicialización; no es un resultado de pruebas). Captura de poses **1/1 PlayMode PASS** a **1080×1920** y **1/1 PASS** a **1080×2400**.
 - [x] En ambas resoluciones, la revisión visual independiente **PASS** para vendedor (master/rest/wave/restauración), integridad de policías y personaje del almacén, unión/manga del brazo de festejo del chico, y mano visible del gesto de la chica. Sin seam ni duplicación evidente. A 1080×1920 el encuadre portrait existente recorta la zona inferior; a 1080×2400 se ve más cuerpo sin deriva geométrica. Capturas en `Path.GetTempPath()/hcyp-street-hub-view-tests/` (`hub-seller-{original-master,patched-rest,wave-up,restored}-playmode-*` y `hub-characters-group-gestures-playmode-*`).
 - [ ] Android físico y perfil de rendimiento: **NOT_RUN**; la aceptación visual de capturas no equivale a QA de dispositivo.
+
+## Legibilidad de las animaciones del barrio — ajuste local 2026-10-30
+
+El usuario informó que no veía las animaciones después de instalar la APK. La inspección del provenance confirma que la build instalada sí se compiló desde HEAD `688af0b`, donde ya existían `DrawHubCharacterAnimations` y los recursos `StreetHubCharacters/`; `global-metadata.dat` contiene ambos marcadores. El problema identificado era de legibilidad: el primer gesto podía esperar 3–18 s y varios desplazamientos eran de solo 1–3 px del master.
+
+- [x] Se redujeron las pausas aleatorias para que vendedor, policía, almacenero y chicos comiencen gestos durante una visita breve al hub.
+- [x] Se agregó movimiento sutil continuo en reposo y se aumentó la amplitud de los gestos, sin mover el master, hitboxes, navegación ni reglas.
+- [x] Se añadió `DefaultGesturesBecomeVisibleDuringAShortHubVisit` como regresión para que todos los grupos tengan actividad en una visita breve.
+- [x] `DefaultGesturesBecomeVisibleDuringAShortHubVisit`: **1/1 EditMode PASS**.
+- [x] `NeighborhoodCharactersAnimateDuringAShortHubVisit`: **1/1 PlayMode PASS**; comprobó actividad de vendedor, al menos un policía, almacenero y chicos durante 6,5 s; capturas inicial/final **revisadas a 1080×1920**. `SellerWaveCutoutRendersAndRestoresInTheFullHubGameView`: **1/1 PlayMode PASS** tras ampliar los gestos.
+- [ ] Re-run de los ocho casos de `HubCharacterBehaviorTests`: Unity MCP se desconectó sin devolver conteos (**unknown**, no se declara PASS).
+- [ ] La corrección se compiló en `HayChoriYPaty-0.2.77-code79-hub-visible-20261030.apk`, pero su instalación/QA en Android permanece **NOT_RUN** porque ADB ya no detecta el teléfono.
+
+## Pausa temporal de movimientos de personajes — 2026-10-30
+
+A pedido del usuario se pausan los reemplazos articulados y todos los movimientos superpuestos de vendedor, policías, almacenero y chicos: el rig se considera visualmente insatisfactorio por ahora. El master ilustrado vuelve a ser la única representación de esos personajes y queda quieto. Se conserva el código/arte auxiliar para un rediseño posterior, pero el runtime no carga ni dibuja esos rigs; también libera una instancia previa si la pausa se activa con el hub abierto. Los efectos ambientales independientes (hojas/humo/brasa/brillos) y los hotspots del hub no cambian. No afecta movimiento de mozos/cocineros durante las partidas.
+
+- [x] El hub no instancia el renderer/rig de personajes y muestra el master estático.
+- [ ] PlayMode `NeighborhoodCharactersStayStillDuringAShortHubVisit`, con captura de Game View inicial y tras 6,5 s: **BLOCKED**; Unity MCP perdió la sesión al esperar `command_result` y `editor_state` volvió a informar `ping not answered`.
+- [ ] Nueva APK e instalación: **NOT_RUN**; requieren pedido explícito. La APK instalada no incorpora esta pausa de código fuente.

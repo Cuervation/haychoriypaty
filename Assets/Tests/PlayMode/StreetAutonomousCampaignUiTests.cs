@@ -211,6 +211,11 @@ namespace HayChoriYPaty.Tests
             Assert.Greater((float)Get(sim, "Elapsed"), before, "The match must advance after the UI starts it.");
             Assert.Greater(((ICollection)Get(sim, "Customers")).Count, 0, "The running match must spawn customers.");
             Assert.Greater(memorySnapshots.Count, 0, "Persistence must remain in the memory-only delegate.");
+            if (Application.isBatchMode)
+            {
+                TestContext.WriteLine("Visual screenshot skipped in batch mode; operational assertions above completed.");
+                yield break;
+            }
             yield return new WaitForEndOfFrame();
             Texture2D capture = ScreenCapture.CaptureScreenshotAsTexture();
             Assert.NotNull(capture);
@@ -537,11 +542,14 @@ namespace HayChoriYPaty.Tests
             }
 
             yield return WaitForMenu();
-            yield return Click(InvokeViewRect("HubArtworkActionBounds", 200).center); // Visible JUGAR hotspot on the current hub.
             if (levelIndex == 0)
-                yield return Click(InvokeStaticRectNoArgs("MarketSelectorBounds").center); // Level 1 stock inspection.
-            else
-                yield return SelectLevelThroughUi(levelIndex);
+            {
+                yield return Click(InvokeViewRect("HubArtworkActionBounds", 201).center); // Mercado remains available from the hub.
+                Assert.IsTrue((bool)Get(view, "marketActive"));
+                yield return Click(InvokeStaticRectNoArgs("MarketBackBounds").center); // Return to the barrio before selecting a level.
+            }
+            yield return Click(InvokeViewRect("HubArtworkActionBounds", 200).center); // Visible JUGAR hotspot on the current hub.
+            if (levelIndex != 0) yield return SelectLevelThroughUi(levelIndex);
 
             object sim = Get(game, "Sim"), market = Get(game, "Market");
             Assert.AreEqual(levelIndex, Get(sim, "LevelIndex"), "The UI card must select the requested club.");
@@ -646,6 +654,12 @@ namespace HayChoriYPaty.Tests
                     "Mode B must begin with the project's real new-game Mercado balance.");
 
             yield return WaitForMenu();
+            if (!resumeFromLevel6 && !resumeFromLevel7)
+            {
+                yield return Click(InvokeViewRect("HubArtworkActionBounds", 201).center); // Mercado stays on the hub, not the selector.
+                Assert.IsTrue((bool)Get(view, "marketActive"));
+                yield return Click(InvokeStaticRectNoArgs("MarketBackBounds").center);
+            }
             yield return Click(InvokeViewRect("HubArtworkActionBounds", 200).center); // Visible JUGAR hotspot on the current hub.
             if (resumeFromLevel6 || resumeFromLevel7)
             {
@@ -653,8 +667,6 @@ namespace HayChoriYPaty.Tests
                 yield return SelectLevelThroughUi(resumeLevelIndex);
                 Assert.AreEqual(resumeLevelIndex, Get(game, "SelectedLevel"), "The unlocked level must be selected through its visible card.");
             }
-            else
-                yield return Click(InvokeStaticRectNoArgs("MarketSelectorBounds").center); // Real Mercado access for All Boys.
 
             int levelIndex = resumeLevelIndex;
             bool stopCampaign = false;

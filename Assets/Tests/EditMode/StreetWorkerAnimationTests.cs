@@ -12,7 +12,31 @@ namespace HayChoriYPaty.Tests
         private const BindingFlags PublicInstance = BindingFlags.Public | BindingFlags.Instance;
         private static Type Runtime(string name) => Type.GetType("HayChoriYPaty." + name + ", Assembly-CSharp", true);
         private static object Facing(string name) => Enum.Parse(Runtime("StreetFacing"), name);
-        private static object Call(string method, params object[] args) => Runtime("StreetWorkerAnimation").GetMethod(method, PublicStatic).Invoke(null, args);
+        private static object Call(string method, params object[] args)
+        {
+            MethodInfo target = null;
+            foreach (MethodInfo candidate in Runtime("StreetWorkerAnimation").GetMethods(PublicStatic))
+            {
+                if (candidate.Name != method) continue;
+                ParameterInfo[] parameters = candidate.GetParameters();
+                if (parameters.Length != args.Length) continue;
+                bool compatible = true;
+                for (int i = 0; i < parameters.Length; i++)
+                {
+                    Type parameterType = parameters[i].ParameterType;
+                    if (args[i] == null)
+                    {
+                        if (parameterType.IsValueType && Nullable.GetUnderlyingType(parameterType) == null) { compatible = false; break; }
+                    }
+                    else if (!parameterType.IsInstanceOfType(args[i])) { compatible = false; break; }
+                }
+                if (!compatible) continue;
+                if (target != null) throw new AmbiguousMatchException("StreetWorkerAnimation." + method + " for the supplied argument types.");
+                target = candidate;
+            }
+            if (target == null) throw new MissingMethodException("StreetWorkerAnimation." + method);
+            return target.Invoke(null, args);
+        }
         private static object Field(object value, string name) => value.GetType().GetField(name, PublicInstance).GetValue(value);
         private static void Set(object value, string name, object contents) =>
             value.GetType().GetProperty(name, PublicInstance).GetSetMethod(true).Invoke(value, new[] { contents });
@@ -59,12 +83,12 @@ namespace HayChoriYPaty.Tests
             Set(worker, "TravelDistance", 40f);
             Set(worker, "StepDistance", 1f);
             Set(worker, "AnimationTime", 0f);
-            object pose = Call("Sample", worker);
+            object pose = Call("Sample", worker, false);
             Assert.AreEqual(Facing("Right"), Field(pose, "Facing"));
             Assert.AreEqual(2, Field(pose, "Frame"));
             Assert.IsTrue((bool)Field(pose, "Moving"));
             Set(worker, "AnimationTime", 1000f);
-            object clockChangedPose = Call("Sample", worker);
+            object clockChangedPose = Call("Sample", worker, false);
             Assert.AreEqual(Field(pose, "Frame"), Field(clockChangedPose, "Frame"));
             Assert.AreEqual(Field(pose, "Bob"), Field(clockChangedPose, "Bob"));
             Type roleType = Runtime("StreetWorkerRole");
@@ -74,7 +98,7 @@ namespace HayChoriYPaty.Tests
                 foreach (string state in new[] { "ToStation", "Pickup", "ToCounter", "Handoff" })
                 {
                     Set(worker, "State", Enum.Parse(stateType, state));
-                    object rolePose = Call("Sample", worker);
+                    object rolePose = Call("Sample", worker, false);
                     string expectedFacing = role == "Cocacolero" && state == "Pickup" ? "Down" : "Right";
                     Assert.AreEqual(Facing(expectedFacing), Field(rolePose, "Facing"), role + " / " + state);
                     Assert.AreEqual(2, Field(rolePose, "Frame"), role + " / " + state);
@@ -144,7 +168,7 @@ namespace HayChoriYPaty.Tests
             Set(worker, "State", Enum.Parse(Runtime("StreetWorkerState"), state));
             Set(worker, "FacingVector", Vector2.up);
             Set(worker, "StepDistance", 0f);
-            object pose = Call("Sample", worker);
+            object pose = Call("Sample", worker, false);
             Assert.IsFalse((bool)Field(pose, "Moving"));
             Assert.AreEqual(0f, (float)Field(pose, "Bob"));
         }
@@ -160,13 +184,13 @@ namespace HayChoriYPaty.Tests
             foreach (string state in new[] { "Idle", "Cooking" })
             {
                 Set(worker, "State", Enum.Parse(Runtime("StreetWorkerState"), state));
-                object pose = Call("Sample", worker);
+                object pose = Call("Sample", worker, state == "Idle");
                 Assert.AreEqual(Facing("Down"), Field(pose, "Facing"), role + " must face the player at the grill.");
                 Assert.That(Mathf.Abs((float)Field(pose, "Bob")), Is.GreaterThan(.001f), role + " should have a subtle idle/cooking breath.");
                 Assert.LessOrEqual(Mathf.Abs((float)Field(pose, "Bob")), 1.2f);
             }
             Set(worker, "State", Enum.Parse(Runtime("StreetWorkerState"), "ToGrill"));
-            object walking = Call("Sample", worker);
+            object walking = Call("Sample", worker, false);
             Assert.AreEqual(Facing("Right"), Field(walking, "Facing"), "Travel keeps its directional gait.");
         }
 
@@ -178,13 +202,13 @@ namespace HayChoriYPaty.Tests
             Set(worker, "CarriedItemId", 0);
             Set(worker, "StepDistance", 0f);
             Set(worker, "PickupProgress", .5f);
-            object reaching = Call("Sample", worker);
+            object reaching = Call("Sample", worker, false);
             Assert.IsTrue((bool)Field(reaching, "PickingUp"));
             Assert.IsFalse((bool)Field(reaching, "Moving"));
             Assert.IsFalse((bool)Field(reaching, "Carrying"));
             Assert.AreEqual(.5f, (float)Field(reaching, "PickupProgress"));
             Set(worker, "CarriedItemId", 12);
-            object taken = Call("Sample", worker);
+            object taken = Call("Sample", worker, false);
             Assert.IsFalse((bool)Field(taken, "PickingUp"));
             Assert.IsTrue((bool)Field(taken, "Carrying"));
         }
@@ -198,13 +222,13 @@ namespace HayChoriYPaty.Tests
             Set(worker, "CarriedItemId", 0);
             Set(worker, "FacingVector", Vector2.right);
 
-            object pickup = Call("Sample", worker);
+            object pickup = Call("Sample", worker, false);
             Assert.IsTrue((bool)Field(pickup, "PickingUp"));
             Assert.AreEqual(Facing("Down"), Field(pickup, "Facing"),
                 "The Cocacolero must use the existing front-facing reach pose regardless of its last route direction.");
 
             Set(worker, "State", Enum.Parse(Runtime("StreetWorkerState"), "ToCounter"));
-            Assert.AreEqual(Facing("Right"), Field(Call("Sample", worker), "Facing"),
+            Assert.AreEqual(Facing("Right"), Field(Call("Sample", worker, false), "Facing"),
                 "Once pickup ends, route-based facing should resume normally.");
         }
 
@@ -216,9 +240,9 @@ namespace HayChoriYPaty.Tests
             object worker = Activator.CreateInstance(Runtime("StreetWorker"), true);
             Set(worker, "State", Enum.Parse(Runtime("StreetWorkerState"), state));
             Set(worker, "CarriedItemId", 0);
-            Assert.IsFalse((bool)Field(Call("Sample", worker), "Carrying"));
+            Assert.IsFalse((bool)Field(Call("Sample", worker, false), "Carrying"));
             Set(worker, "CarriedItemId", 1);
-            Assert.IsTrue((bool)Field(Call("Sample", worker), "Carrying"));
+            Assert.IsTrue((bool)Field(Call("Sample", worker, false), "Carrying"));
         }
     }
 }

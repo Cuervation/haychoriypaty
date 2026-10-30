@@ -1,8 +1,79 @@
-## 2026-10-29 — River/Boca U opening configuration
+## 2026-10-30 — Refuerzo moderado de animaciones ambientales del hub
 
-At the user's request, River (LevelIndex 7) and Boca (8) start with $800, one free normal Parrillero, no other free starters, ×1.00 and 340 seconds. Club-specific quotas, economy, hire/speed costs and presentation remain distinct. River U recorded 2/10 wins without three consecutive wins; Boca has not been separately tested.
+Se reforzaron los efectos existentes, sin tocar el master ni reactivar los rigs de personajes: cuatro hojas mayores y más regulares, humo (alpha máximo 0,135 vs 0,105), brasas (0,04–0,09 vs 0,026–0,072), chispa, estrella de Ranking y barrido de JUGAR algo más intensos/frecuentes. Banderas/camisetas siguen estáticas por falta de máscaras limpias; navegación/hotspots no cambian.
 
-**Static consistency: PASS** — runtime defaults/fallback, Main scene serialization, opening-balance rows and focused start/retry assertions align; `git diff --check` passes for the committed selection. **Unity EditMode/build: BLOCKED / NOT_RUN** — Unity MCP has no active editor session and the checkout still has `Library/EditorInstance.json` plus `Temp/UnityLockfile`; no second Unity editor was launched.
+Unity 6000.6.3f1: anclas portrait/hotspots **1/1 EditMode PASS**; `AmbientOverlaysRenderInTheFullHubGameView` y `NeighborhoodCharactersStayStillDuringAShortHubVisit` **2/2 PlayMode PASS**. Capturas full Game View inicial/ciclo y personajes, 1080×1920, revisadas en `/var/folders/bf/q6_2cmvn6ls9pc5h5g7thj8r0000gn/T/hcyp-street-hub-view-tests/`.
+
+APK Development IL2CPP/ARM64 Main-only **0.2.78/code80** compilada desde Editor activo: **301,66 s, 0 errores/6 advertencias**. Artefacto `Builds/Android/Archive/HayChoriYPaty-0.2.78-code80-hub-ambient-20261030.apk`, 391.562.418 bytes, SHA-256 `efe84a44b4c4209fc620e508ea823e7aab4191ef3c498cd5cda97867bd7534d0`; ZIP/alineación/firma v2/metadata version-package-ABI PASS. No instalada ni probada en dispositivo. Sin commit/push.
+
+## 2026-10-30 — Tutorial de cocina activa en Nivel 6
+
+En la primera preparación elegible de Racing (índice 5), el tutorial explica que Parrillero/Premium cocinan unidades y las dejan en mesa, que el Mozo recoge y entrega, y qué significa el cue de enojo cuando falta listo el sándwich pedido. Incluye targets reales y un marcador local solo tras iniciar; no cambia el gameplay ni el gate de Mercado.
+
+Unity 6000.6.3f1: PlayMode focalizado **3/3 PASS** (gate de stock, dos pasos/targets, bloqueo modal/Ready congelado, saltar, inicio directo y marcador). Capturas Game View reales **1080×1920** de ambos pasos revisadas; texto legible y tarjetas visibles: `/private/tmp/hcyp-level-six-racing-step-1-active-cooks.png`, `/private/tmp/hcyp-level-six-racing-step-2-mozo-wait-cue.png`. Sin prueba física ni APK, instalación, commit o push.
+
+## 2026-10-30 — Diagnóstico de animación ambiental incluida en APK
+
+Ante el reporte de que no se ve en el teléfono, se revisó el fuente y el artefacto archivado `HayChoriYPaty-0.2.77-code79-hub-visible-20261030.apk` (425.727.167 bytes; SHA-256 `615dad2c275ddf6ccee792db7d811155c1f6dd0b8fa91a199911ebd8cf90cbda`). El `global-metadata.dat` incluye `DrawHubAmbientEffects`, `HubAmbientOverlay`, `DrawLeaves`, `DrawSmoke` y `DrawEmbers`; en `DrawHubScreen` el overlay se dibuja mientras el hub está visible, separado del rig de personajes pausado. Esto confirma inclusión del código en la APK de archivo, no legibilidad visual suficiente ni identidad del binario actualmente ejecutándose. Los efectos son muy discretos (humo: alpha máx. 0,105; brasas: 0,026–0,072; 3 hojas de 14×20 px del master) y aparecen por ciclos; banderas/camisetas siguen estáticas por limitación documentada. No se pudo consultar el teléfono ahora: el ADB incluido en Unity no logró iniciar su daemon (`Operation not permitted`). Sin build, instalación ni revisión nueva de dispositivo en este diagnóstico.
+
+## 2026-10-30 — Pausa temporal de movimientos de personajes del barrio
+
+Por pedido del usuario, se desactivó el rig articulado del vendedor, policías, almacenero y chicos; el master original queda estático mientras se rediseñan los movimientos. Los recursos/código auxiliar quedan preservados; efectos ambientales, navegación y movimiento gameplay no cambian. Se sustituyó la prueba de “gestos visibles” por `NeighborhoodCharactersStayStillDuringAShortHubVisit`, que verifica que el rig no se cargue durante 6,5 s y captura Game View inicial/final. La compilación del Editor quedó idle, pero no se pudo recuperar la consola ni ejecutar PlayMode: Unity MCP informó `ping not answered` y desconexión mientras esperaba `command_result` (**BLOCKED**, sin inferir PASS). Sin APK ni instalación nuevos; la APK instalada permanece en versión anterior. Ver `features/home-hub.md`.
+
+## 2026-10-30 — Enojo del Mozo ligado a la demanda que no puede retirar
+
+La regla anterior apagaba el emoji ante cualquier sándwich libre, aunque no coincidiera con el pedido pendiente. Ahora un Mozo idle en el puesto se enoja cuando hay demanda de sándwich en atención y no puede recoger una unidad cocida de los productos pedidos; un producto ajeno a la demanda no lo calma. Cuando aparece stock coincidente, la simulación lo asigna y el cue se oculta al iniciar la ruta a la mesa. La lógica no muestra enojo por falta de pedidos ni por líneas ya asignadas a otro Mozo; no cambia producción/ventas/economía.
+
+Unity 6000.6.3f1: `MozoShowsAngryCueOnlyWhenPendingSandwichDemandHasNoReadyPickup` **1/1 PlayMode PASS**; captura de proyección revisada a1080×1920. El fixture completo `StreetWorkerProjectionTests` ejecutó10 casos y falló4 en verificaciones de cocción, spread/ocultamiento de workers y pose de bebida, no en el cue; no se declara aprobado completo. No se generó APK ni se instaló esta corrección; la APK 0.2.77 instalada conserva la versión anterior de la regla.
+
+## 2026-10-30 — Aumentar la visibilidad de las animaciones del barrio
+
+La APK 0.2.77/code79 instalada en el Motorola sí compiló el código del hub (HEAD `688af0b`, metadata IL2CPP con `DrawHubCharacterAnimations` y `StreetHubCharacters/`), pero las pausas previas podían ser 3–18 s y varios gestos movían apenas 1–3 px. En la fuente local reduje pausas, añadí respiración/balanceo perceptible en reposo y amplié gestos; sin cambios al master ni a la navegación. `DefaultGesturesBecomeVisibleDuringAShortHubVisit` **1/1 EditMode PASS**; `NeighborhoodCharactersAnimateDuringAShortHubVisit` y `SellerWaveCutoutRendersAndRestoresInTheFullHubGameView` **2/2 PlayMode PASS**, capturas inicial/final revisadas a 1080×1920. El re-run del conjunto de ocho casos desconectó el plugin y quedó `unknown`, sin contarse como aprobado. APK `Builds/Android/Archive/HayChoriYPaty-0.2.77-code79-hub-visible-20261030.apk` compilada: 425.727.167 bytes, SHA-256 `615dad2c275ddf6ccee792db7d811155c1f6dd0b8fa91a199911ebd8cf90cbda`, 0 errores/5 advertencias; ZIP, zipalign, firma v2 y package/version/ABI PASS. Instalación NOT_RUN: ADB mostró lista de dispositivos vacía y devolvió `device not found` para el Motorola. Sin nueva instalación ni commit/push.
+
+## 2026-10-30 — APK Android con señal de espera del Mozo
+
+Compilada APK Development IL2CPP/ARM64, Main-only, desde el Editor activo: BuildPipeline **PASS** (330,33 s, 0 errores/6 advertencias). Artefacto `Builds/Android/Archive/HayChoriYPaty-0.2.77-code79-mozo-angry-20261030.apk`; ZIP/zipalign/firma v2/metadata package-version-ABI validados y marcadores de la señal presentes en global-metadata. No instalada ni probada en dispositivo. Reejecución PlayMode **NOT_RUN** por desconexión del plugin MCP; test focalizado previo PASS 1/1 el 29/10. Ver `features/android-prototype.md`.
+
+## 2026-10-30 — Tutorial de Vacío y Fernet en Nivel 5
+
+En la primera entrada elegible a Independiente (índice 4), el tutorial de dos pasos informa que el Vacío (meta 65) lo entrega el Parrillero Premium y el Fernet (meta 65) el Fernetero; cada indicación señala su tarjeta real. Conserva el gate de stock, Ready y SIGUIENTE/SALTAR, con marcador local solo después de iniciar.
+
+Unity 6000.6.3f1: PlayMode **7/7 PASS** (tres pruebas nuevas de Nivel 5 y regresiones de Nivel 3–4). Capturas Game View **1080×1920** de ambos pasos revisadas: tarjetas visibles, flechas alineadas y texto legible. Sin prueba física, APK, Git remoto ni instalación.
+
+## 2026-10-30 — Tutorial de Bondiola y cerveza en Nivel 4
+
+En la primera entrada elegible a Ferro (índice 3), el tutorial de dos pasos explica que la Bondiola (meta 60) se entrega con Parrillero Premium y la cerveza (meta 75) con Cocacolero, señalando las tarjetas reales de contratación. Conserva el gate de stock, Ready y los inicios **SIGUIENTE/SALTAR**; el marcador local versionado solo se guarda tras un inicio exitoso. Sin cambios al juego/economía.
+
+Unity 6000.6.3f1: PlayMode **7/7 PASS** (tres pruebas nuevas del Nivel 4 y regresiones de niveles 1–3): stock gate, tarjetas reales, bloqueo modal, Ready congelado, SIGUIENTE, SALTAR, inicio directo y marcador tras inicio exitoso. Capturas Game View **1080×1920** revisadas: ambas tarjetas especialistas visibles, texto legible y flechas alineadas. Sin prueba física, APK, Git remoto o instalación.
+
+## 2026-10-30 — Tutorial de Paty en Nivel 3
+
+En la primera entrada elegible a Vélez (índice 2), el tutorial ahora señala la cuota HUD Paty por ID de producto y comunica meta 120/precio $5. Conserva el gate de stock, bloquea controles, deja Ready sin iniciar el reloj y comienza con SIGUIENTE/SALTAR; el marcador local se guarda solo después de empezar con éxito. No cambia balance ni compras.
+
+Unity 6000.6.3f1: PlayMode **5/5 PASS** (dos pruebas nuevas del Nivel 3; regresiones de Nivel 2 2/2 y Floresta 1/1). La captura Unity Game View **1080×1920** se revisó: texto y flecha a la cuota Paty legibles/alineados. Sin prueba física, APK, Git remoto o instalación.
+
+## 2026-10-29 — Ruedita de ajustes y silencio rápido en el hub
+
+Se reemplazó el botón de texto AJUSTES por una ruedita y se agregó junto a CUENTA un botón de altavoz que conmuta la misma preferencia local, actualiza el loop inmediatamente y muestra ondas/silencio según su estado. El panel existente conserva el ajuste completo y queda sincronizado; no cambia el arte ni el gate de Firebase.
+
+**Geometría estática: PASS** en las 19 resoluciones portrait del contrato: ambos objetivos miden al menos 44 px, respetan el viewport seguro, no cubren CUENTA ni hotspots, y dibujo/hitbox comparten transformación. Se añadieron pruebas EditMode de iconos/estados y geometría, y PlayMode de toggle local antes de login; están **NOT_RUN**.
+
+**Unity visual: BLOCKED / NOT_RUN.** Unity MCP informa `instance_count: 0` y `no_unity_session`; la lista de procesos del contenedor no estuvo disponible (`sysmond service not found`). No se abrió otro Editor ni se construyó/instaló APK.
+
+## 2026-10-29 — APK Development River/Boca U
+
+Generada `Builds/Android/HayChoriYPaty-0.2.77-code79-river-boca-U.apk` desde snapshot aislado del working tree activo: Unity 6000.6.3f1, Main-only, Development IL2CPP/ARM64, 0 errores / 5 advertencias. ZIP, zipalign, firma v2 y metadata PASS; SHA-256 `09eb33faf6a35bc5a271efc8503569b2ec13715c8917deb464bfaa194cf2d7e3`. Preferences locales restauradas desde HEAD; Analytics queda desactivado. Editor interactivo sigue abierto, aunque Unity MCP no detectó sesión. Tests y gameplay smoke **NOT_RUN**. Instalación **PASS** en Motorola Edge 60 Fusion (`ZY22MBNWRB`) con `adb install -r`; version 0.2.77/code79 y `firstInstallTime` conservado (`2026-10-03 18:49:24`), datos preservados. Build y provenance ignorados por Git; no hubo commit nuevo.
+
+## 2026-10-28 — San Lorenzo baja a cinco minutos
+## 2026-10-29 — Rediseño responsive del hub y acceso a Ajustes
+Se añadió un botón AJUSTES independiente y un panel local para la música del barrio, accesibles sin sesión. Tras la aclaración del usuario, el master existente ahora cubre la pantalla completa una sola vez con `ScaleAndCrop`: sin franjas azules, copias laterales ni variantes de arte. La geometría estática pasa en 19 tamaños portrait para cobertura, hotspots visibles, targets de toque y no solapamiento; `git diff --check` también pasó en archivos intencionales. Unity Editor/MCP sigue bloqueado: el job EditMode reportó `succeeded` pero ejecutó `total: 0`, y la lectura de recursos devolvió sesión desconectada. Compilación Unity, ejecución real de tests y capturas quedan BLOCKED/NOT_RUN. No se regeneró el master ni se tocó APK, instalación, progreso o configuración global.
+
+
+A pedido del usuario, únicamente la duración de San Lorenzo (LevelIndex 6) bajó de 345 s a 300 s. Se actualizaron ambos defaults de `StreetSimulation`, la serialización `Main.unity` y las expectativas de las regresiones all-level/J; cuotas, roster J, $250, precios, costos y los otros diez tiempos permanecen intactos. La adopción J a 345 s y sus partidas quedan como evidencia histórica, no evidencia de esta variante de 300 s.
+
+**Validación Unity: BLOCKED / NOT_RUN.** Unity MCP detectó una única instancia correcta (Unity 6000.6.3f1, proyecto activo), pero el recurso de estado devolvió “ping not answered”; el `run_tests` focalizado de cinco casos regresó `TimeoutError`; un `telemetry_ping` y los reintentos de `editor_state` y `read_console` tampoco recuperaron el puente. No se reinició el Editor. Pendiente repetir los cinco tests cuando responda y no declarar validado visualmente ni por Unity hasta entonces.
+
+**Chequeo estático: PASS.** Los dos defaults y la serialización Main coinciden con la lista de once tiempos; las expectativas de regresión incluyen 300 s para LevelIndex 6 y tiempos intactos para los demás. `git diff --check` pasó en los archivos intencionales. Sin APK, Git remoto ni instalación.
 
 ## 2026-10-27 — Ensayo de balance de San Lorenzo
 
@@ -12,6 +83,18 @@ Unity 6000.6.3f1: **14/14 PASS** en la selección EditMode focalizada (`/private
 La comprobación aislada del skip del harness ante checkpoint ausente es **NOT_RUN**: Unity CLI detectó el proyecto ya abierto en el Editor y no generó XML. No se cerró ni reinició el Editor.
 
 Las cinco partidas reales de San Lorenzo son **BLOCKED / NOT_RUN**, no simuladas: la campaña guardada solo desbloquea Racing y el intento auténtico de Racing usado como puente terminó en derrota; no existe checkpoint válido que desbloquee LevelIndex6. El límite se documenta sin inventar partidos. La auditoría del 21-10 sigue siendo la línea base (0/25; mejor intento faltó29 con metas anteriores). No atribuir causalidad al Mozo por separado de las seis cuotas que aumentaron. Recomendación provisional: dejar intacto el ensayo en la rama para continuar la medición; no ratificar el balance ni hacer más ajustes hasta completar cinco partidas reales. Detalle en [sección 11 de la auditoría](../docs/audits/2026-10-21-live-balance/INFORME_COMPLETO_TODOS_LOS_NIVELES.md). Sin APK, instalación, commit o push.
+
+## 2026-10-27 — Reparado el scroll táctil del selector Android
+
+Se encontró que `StreetView.Update` dejaba el touch del selector fuera de la ruta de entrada Android (la rama nativa solo atendía la transición de victoria), aunque había scroll con mouse/PlayMode. Ahora el selector observa el arrastre táctil en Android, mantiene el tap nativo de IMGUI para las tarjetas/controles y cancela el click accidental al completar un swipe. No cambia desbloqueos, selección, economía ni partidas guardadas.
+
+PlayMode focalizado **4/4 PASS**: una secuencia de touch simulada en Editor recorre la ruta táctil nueva hasta la última tarjeta Los Redondos sin seleccionar durante el gesto ni iniciar la ronda; se mantienen swipe del path existente, selección de los once clubes y bloqueo de niveles no desbloqueados. Evidencia XML: `/private/tmp/hcyp-selector-mobile-scroll-20261027.xml`. Esto no sustituye un build Android ni una prueba física, ambos **NOT_RUN**; hace falta una APK nueva para comprobarlo en el teléfono.
+
+## 2026-10-27 — Tutorial de Nivel 1 repetible para QA
+
+Se activó temporalmente `RepeatLevelOneTutorialForTesting`: cada selección de Floresta/Nivel 1 que ya puede iniciar la partida muestra el tutorial incluso si existe el marcador v2. **SIGUIENTE** final y **SALTAR** siguen iniciando la ronda, pero no escriben, borran ni cambian el marcador. El override no afecta los otros niveles ni partida/mercado/Firebase; desactivarlo restaura la conducta de una sola vez.
+
+Unity 6000.6.3f1, PlayMode focalizado: **3/3 PASS** (`FirstLevelTutorialExplainsHudAndStartsOnFinalSiguiente`, `SkippingFirstLevelTutorialStartsRound`, `TemporaryTutorialOverrideReplaysDespiteCompletionFlag`), con assertions para ambos estados previos del marcador. XML: `/private/tmp/hcyp-tutorial-repeat-override-20261027-rerun.xml`. No se generó APK ni se instaló; el APK 0.2.76/code78 actualmente instalado no contiene este cambio.
 
 ## 2026-10-27 — Portada alineada y APK 0.2.76/code78
 
@@ -475,6 +558,12 @@ The first full EditMode sweep exposed real late-level funding failures. Kept pro
 ## Previous Android install — 0.2.27/code29 (2026-10-12)
 
 Installed Development ARM64 APK on Motorola Edge 60 Fusion after the user requested installation. Build succeeded with 0 errors/1 warning; APK verification passed. Broad tests remain red (EditMode 391/403; PlayMode 44/50), so this is for user device review, not a claim that all gameplay is certified. No Game View/native launch review or Git push was performed. Receipt: `features/android-prototype.md`.
+
+## Per-delivery soft-pop — focused EditMode verified, audible playback pending (2026-10-27)
+
+Moved the existing soft-pop trigger from whole-ticket completion to each successful real product-unit handoff. The new `StreetSimulation.ProductUnitDelivered` event is separate from the retained once-per-ticket `OrderCompleted` event; audio throttling was removed so valid rapid deliveries are not skipped. The mixed five-unit ticket regression now asserts five delivery signals and one final order-completion signal.
+
+**Validation:** Unity 6000.6.3f1 in an isolated working-tree copy compiled and passed `HayChoriYPaty.Tests.StreetSimulationTests.VelezParrilleroOwnsBothFoodLinesAndCocacoleroWorksInParallelOnCoca` (**1/1**). `git diff --check` passed. This was not a full suite; audible playback/gameplay listening remains unverified. No APK, install, commit or push was performed.
 
 ## Whole-order delivery sound — source implemented, runtime verification pending (2026-10-11)
 
@@ -1415,3 +1504,11 @@ La pantalla Mercado/stock adoptó una skin azul/celeste: paneles marino con bord
 ## Selector de canchas en una página — 2026-10-26
 
 StreetView ahora muestra los once niveles en una grilla scrollable de dos columnas, con VOLVER fijo y MERCADO junto al título. Las miniaturas/murales se conservan; el panel informativo usa crema/navy con acento por color de club y los bloqueados ya no oscurecen su ilustración. Contrato actualizado en specs/visual-reference.md. Unity compiló código y tests. EditMode selector 1/1 PASS; PlayMode scroll/selección/bloqueo 3/3 PASS. La batería completa StreetPointerTests terminó 34/47 PASS, 9 FAIL y 4 SKIP; entre ellos el test de transición del nivel 1 espera Playing sin completar el inicio, falla que también se reproduce aislada y no cambia con este retoque visual. Requiere revisión aparte; no se ajustó stock ni reglas de arranque. Captura Game View/revisión visual y dispositivo: NOT_RUN. git diff --check pasó.
+
+## 2026-10-29 — River y Boca adoptan la apertura U
+
+A pedido del usuario, River (LevelIndex 7) y Boca (8) inician con $800, 340 s, un Parrillero normal gratis, sin otros starters y velocidad ×1.00. Las cuotas, economía de productos, precios de contratación/velocidad y tema de cada club se mantienen; la política de compra LegacySpeed3ThenRoster_v1 permanece solo en el harness de auditoría. River U tuvo 2/10 victorias y no una racha de tres; la configuración es una adopción explícita del usuario, no evidencia de balance robusto ni de aceptación humana, y Boca aún no fue probada por separado.
+
+**Chequeo estático: PASS.** Defaults del runtime, fallback de duración, Main.unity y regresiones all-level/escena coinciden; se agregó una regresión de inicio y retry para ambos niveles. git diff --check pasó en los seis archivos intencionales.
+
+**Unity EditMode: NOT_RUN / BLOCKED.** El Unity Editor 6000.6.3f1 era la instancia activa correcta, pero al validar los cambios Unity MCP dejó de responder a get_editor_state y read_console (“ping not answered”). No se reinició el Editor ni se abrió otra instancia. Repetir los tests focalizados cuando vuelva el puente.

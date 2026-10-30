@@ -1,6 +1,10 @@
 ## 2026-10-29 — Adopt River's U opening setup for River and Boca
 
-At the user's request, set River and Boca to the River U experiment's start: $800 per attempt, one free normal Parrillero, no other free starters, ×1.00, and 340 seconds. Preserve their distinct quotas and all role/speed price curves. The isolated River U experiment produced 2/10 wins without a three-win streak; treat this as a provisional user-directed balance choice, not proven robust balance. `LegacySpeed3ThenRoster_v1` remains an audit purchase policy, not shipped automation.
+At the user's request, set River and Boca to the River U experiment's start: $800 per attempt, one free normal Parrillero, no other free starters, ×1.00, and 340 seconds. Preserve their distinct quotas and all role/speed price curves. The isolated River U experiment produced 2/10 wins without a three-win streak; treat this as a provisional user-directed balance choice, not proven robust balance. LegacySpeed3ThenRoster_v1 remains an audit purchase policy, not shipped automation.
+
+## 2026-10-29 — Rotar recortes de personajes en el canvas lógico del hub
+
+Para las capas derivadas del vendedor, componer la rotación local después de la matriz de escala del canvas (`GUI.matrix * T(pivot) * R * T(-pivot)`), no con una rotación screen-space sobre el rectángulo lógico. La primera captura mostró desplazamiento/doble brazo al usar `GUIUtility.RotateAroundPivot`; el arreglo requiere nueva captura Game View antes de aceptarlo o animar otros personajes.
 
 ## 2026-10-24 — Match Vacío to Bondiola footprint
 
@@ -330,3 +334,9 @@ The user approved reducing the requested enlargement to 10%. Keep the six whole 
 ## 2026-10-24 — Botones glossy preservando cotas y seguridad del playfield
 
 Usar medallones circulares y acabado azul glossy según referencia; mantener dimensiones/hitboxes de tarjetas y la distribución general. Los banderines no deben dibujarse sobre cards ni área activa: consumir solo el espacio libre, y ocultarse si no queda banda segura (por ejemplo, seis acciones en 1080×1920). Tradeoff aceptado para esta iteración: preservar legibilidad/controles y juego antes que superponer decoración; solicitar criterio visual posterior si se prefiere desplazar/reducir otras secciones para recuperar la bandera.
+
+## 2026-10-29 — Hub sin copias laterales; ajustes locales
+Se conserva el master 841×1870 y se contiene una sola vez en el área segura; los márgenes reciben un color sólido en lugar de duplicar y atenuar el arte. La entrada AJUSTES ofrece inicialmente el control solicitado de música del hub con preferencia local, sin mezclarlo con Cuenta/Firebase ni alterar progreso.
+
+## 2026-10-29 — Corrección del encuadre del hub
+Aclaración posterior del usuario: mantener exactamente la misma ilustración a todas las resoluciones, sin relleno azul ni repetición del arte. Dibujar el master una sola vez a pantalla completa con `ScaleAndCrop`, conservando proporción y recortando solo lo necesario para cubrir. No generar variantes ni modificar el recurso fuente.

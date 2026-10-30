@@ -16,6 +16,7 @@ namespace HayChoriYPaty.Tests
         private static object Get(object obj,string name) => obj.GetType().GetProperty(name,Instance).GetValue(obj);
         private static object Field(object obj,string name) => obj.GetType().GetField(name,Instance).GetValue(obj);
         private static void Set(object obj,string name,object value) => obj.GetType().GetProperty(name,Instance).GetSetMethod(true).Invoke(obj,new[]{value});
+        private static void SetField(object obj,string name,object value) => obj.GetType().GetField(name,Instance).SetValue(obj,value);
         private static void SaveProjectionCapture(object renderer, string name)
         {
             RenderTexture target = (RenderTexture)Get(renderer, "BackgroundTexture");
@@ -130,6 +131,112 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
+        public IEnumerator MozoShowsAngryCueOnlyWhenPendingSandwichDemandHasNoReadyPickup()
+        {
+            var root = new GameObject("Angry Mozo cue acceptance");
+            try
+            {
+                object balance = Activator.CreateInstance(T("StreetBalance"));
+                T("StreetBalance").GetField("customerArrivalSeconds", Instance).SetValue(balance, 10000f);
+                object sim = Activator.CreateInstance(T("StreetSimulation"), new object[] { balance, 5, 5f, 0, 1, 0 });
+                Call(sim, "StartRound");
+                IList workers = (IList)Get(sim, "Workers");
+                object normalCook = null, premiumCook = null, mozo = null;
+                foreach (object worker in workers)
+                {
+                    string role = Get(worker, "Role").ToString();
+                    if (role == "Parrillero") normalCook = worker;
+                    else if (role == "ParrilleroPremium") premiumCook = worker;
+                    else if (role == "Mozo") mozo = worker;
+                }
+                Assert.IsNotNull(normalCook);
+                Assert.IsNotNull(premiumCook);
+                Assert.IsNotNull(mozo);
+                Assert.That(Vector2.Distance((Vector2)Get(mozo, "Position"), (Vector2)Get(mozo, "WaitPosition")), Is.LessThan(.01f));
+
+                MethodInfo needsCue = T("StreetWorkerProjection").GetMethod("NeedsMozoWaitingForSandwichAngryCue",
+                    BindingFlags.Static | BindingFlags.NonPublic);
+                MethodInfo grillFacing = T("StreetWorkerProjection").GetMethod("MozoWaitingGrillFacing",
+                    BindingFlags.Static | BindingFlags.NonPublic);
+                Assert.IsNotNull(needsCue);
+                Assert.IsNotNull(grillFacing);
+                object kitchen = Get(sim, "Kitchen");
+                Assert.IsFalse((bool)needsCue.Invoke(null, new[] { sim, mozo }),
+                    "No angry cue is shown when no customer is waiting for a sandwich.");
+                Assert.IsFalse((bool)needsCue.Invoke(null, new[] { sim, normalCook }), "Cooks never get the Mozo's waiting cue.");
+                Assert.IsFalse((bool)needsCue.Invoke(null, new[] { sim, premiumCook }), "Premium cooks never get the Mozo's waiting cue.");
+
+                Assert.IsTrue((bool)Call(sim, "SpawnCustomer", 0, 1));
+                object customer = ((IList)Get(sim, "Customers"))[0];
+                Set(customer, "Position", Get(customer, "Target"));
+                Set(customer, "State", Enum.Parse(T("StreetCustomerState"), "Waiting"));
+                Assert.IsTrue((bool)needsCue.Invoke(null, new[] { sim, mozo }));
+
+                Call(kitchen, "Add", 1, Enum.Parse(T("StreetFoodState"), "Cooked"),
+                    Enum.Parse(T("StreetFoodLocation"), "Table"), 0);
+                Assert.IsTrue((bool)needsCue.Invoke(null, new[] { sim, mozo }),
+                    "A ready Paty does not satisfy a waiting Chori order or clear this Mozo's cue.");
+
+                Set(mozo, "State", Enum.Parse(T("StreetWorkerState"), "ToStation"));
+                Assert.IsFalse((bool)needsCue.Invoke(null, new[] { sim, mozo }), "The cue is hidden while the Mozo is working/transiting.");
+                Set(mozo, "State", Enum.Parse(T("StreetWorkerState"), "Idle"));
+                SetField(mozo, "ReturningToWaitPosition", true);
+                Assert.IsFalse((bool)needsCue.Invoke(null, new[] { sim, mozo }), "The cue is hidden on the return trip to the wait post.");
+                SetField(mozo, "ReturningToWaitPosition", false);
+                Set(mozo, "State", Enum.Parse(T("StreetWorkerState"), "ToCounter"));
+                Set(mozo, "CarriedItemId", 999);
+                Assert.IsFalse((bool)needsCue.Invoke(null, new[] { sim, mozo }), "A Mozo carrying a unit never shows the empty-supply cue.");
+                Set(mozo, "State", Enum.Parse(T("StreetWorkerState"), "Idle"));
+                Set(mozo, "CarriedItemId", 0);
+
+                object layout = Get(sim, "KitchenLayout");
+                Vector2 normalGrill = ((Rect)Call(layout, "BoundsForProduct", 0)).center;
+                Vector2 premiumGrill = ((Rect)Call(layout, "BoundsForProduct", 2)).center;
+                Vector2 targetGrill = Vector2.Distance((Vector2)Get(mozo, "Position"), normalGrill) <=
+                    Vector2.Distance((Vector2)Get(mozo, "Position"), premiumGrill) ? normalGrill : premiumGrill;
+                MethodInfo resolveFacing = T("StreetWorkerAnimation").GetMethod("ResolveFacing", BindingFlags.Static | BindingFlags.Public);
+                object expectedFacing = resolveFacing.Invoke(null, new object[] { targetGrill - (Vector2)Get(mozo, "Position"),
+                    Enum.Parse(T("StreetFacing"), "Down") });
+                Assert.AreEqual(expectedFacing, grillFacing.Invoke(null, new[] { sim, mozo, Enum.Parse(T("StreetFacing"), "Down") }),
+                    "While frustrated, the Mozo's rendered idle pose looks toward the nearest grill.");
+
+                Component renderer = root.AddComponent(T("StreetKitchenRenderer"));
+                Texture2D normal = Resources.Load<Texture2D>("street-parrillero");
+                Texture2D diagonal = Resources.Load<Texture2D>("street-parrillero-diagonal-v1");
+                Texture2D beverage = Resources.Load<Texture2D>("street-cocacolero-levels3-5-v1");
+                Call(renderer, "Prepare", sim, 1f, 960f);
+                Call(renderer, "PrepareWorkers", normal, diagonal, normal, diagonal, beverage, beverage, true);
+                Assert.IsTrue((bool)Get(renderer, "WorkersReady"));
+                object projection = Field(renderer, "workerProjection");
+                IDictionary visuals = (IDictionary)Field(projection, "workers");
+                SpriteRenderer normalCue = (SpriteRenderer)Field(visuals[(int)Get(normalCook, "Id")], "AngryCue");
+                SpriteRenderer premiumCue = (SpriteRenderer)Field(visuals[(int)Get(premiumCook, "Id")], "AngryCue");
+                SpriteRenderer mozoCue = (SpriteRenderer)Field(visuals[(int)Get(mozo, "Id")], "AngryCue");
+                Assert.IsFalse(normalCue.enabled);
+                Assert.IsFalse(premiumCue.enabled);
+                Assert.IsTrue(mozoCue.enabled);
+                Assert.IsNotNull(mozoCue.sprite);
+                Assert.AreEqual("MozoEmptySandwichAngryCue", mozoCue.gameObject.name);
+                Assert.That(mozoCue.transform.localPosition.y, Is.GreaterThan(1f), "The emoji sits above the Mozo's head.");
+                Assert.That(mozoCue.sortingOrder, Is.GreaterThan(((SpriteRenderer)Field(visuals[(int)Get(mozo, "Id")], "Torso")).sortingOrder));
+                yield return null;
+                yield return null;
+                SaveProjectionCapture(renderer, "mozo-anger-no-matching-pickup-960");
+
+                Call(kitchen, "Add", 0, Enum.Parse(T("StreetFoodState"), "Cooked"),
+                    Enum.Parse(T("StreetFoodLocation"), "Table"), 0);
+                Assert.IsFalse((bool)needsCue.Invoke(null, new[] { sim, mozo }),
+                    "A ready sandwich matching the waiting order can be picked up.");
+                Call(sim, "Step", .05f);
+                Assert.AreEqual("ToStation", Get(mozo, "State").ToString(),
+                    "The available order unit dispatches this Mozo toward its table slot.");
+                Call(renderer, "PrepareWorkers", normal, diagonal, normal, diagonal, beverage, beverage, true);
+                Assert.IsFalse(mozoCue.enabled, "The cue disappears as soon as this Mozo starts toward its pickup.");
+            }
+            finally { UnityEngine.Object.Destroy(root); }
+        }
+
+        [UnityTest]
         public IEnumerator NativeWorkersHaveFourGaitsAndPhysicallyHoldEveryProductAtBothPortraitScales()
         {
             var root=new GameObject("Native worker acceptance");
@@ -201,10 +308,10 @@ namespace HayChoriYPaty.Tests
                             Call(renderer,"PrepareWorkers",normal,diagonal,normal,diagonal,beverage,beverage,true);
                             float expectedReach = product == 4 ? -.0784f : .196f;
                             Assert.That(idleReachY-torso.transform.localPosition.y, Is.EqualTo(expectedReach).Within(.002f),
-                                "At peak dwell, the empty-handed torso must reach toward the barrel without changing beer presentation.");
+                                "At peak dwell, the empty-handed torso reaches toward the barrel.");
                             Vector2 reachingPalm=(Vector2)Field(workerVisual,"Palm");
                             Assert.That(reachingPalm.y-idlePalm.y, Is.EqualTo(product == 4 ? -7.84f : 19.6f).Within(.02f),
-                                "The hand anchor must follow the visible reach instead of staying at the carry pose.");
+                                "The hand anchor follows the visible reach instead of staying at the carry pose.");
                             if (product == 4)
                             {
                                 yield return null; yield return null;
@@ -264,13 +371,13 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
-        public IEnumerator ChicagoCocacoleroPickupIsFrontalAndGroundedAtBarrel()
+        public IEnumerator CocacoleroPickupIsFrontalAndGroundedAtBothBarrels()
         {
-            var root = new GameObject("Chicago Cocacolero barrel-side reach preview");
+            var root = new GameObject("Cocacolero Coca and beer barrel pickup preview");
             try
             {
                 object sim = Activator.CreateInstance(T("StreetSimulation"), new object[]
-                    { Activator.CreateInstance(T("StreetBalance")), 1, 5f, 0, 1, 0 });
+                    { Activator.CreateInstance(T("StreetBalance")), 5, 5f, 0, 1, 0 });
                 Call(sim, "StartRound");
                 Set(sim, "Coins", 10000);
                 Assert.IsTrue((bool)Call(sim, "TryHire", Enum.Parse(T("StreetWorkerRole"), "Cocacolero")));
@@ -278,7 +385,7 @@ namespace HayChoriYPaty.Tests
                 object cocaWorker = null;
                 foreach (object candidate in workers)
                     if (Get(candidate, "Role").ToString() == "Cocacolero") { cocaWorker = candidate; break; }
-                Assert.IsNotNull(cocaWorker, "Chicago must include its hired Cocacolero.");
+                Assert.IsNotNull(cocaWorker, "The selected catalog must include its hired Cocacolero.");
 
                 var workerType = T("StreetWorker");
                 Vector2 routeStart = (Vector2)Get(cocaWorker, "Position");
@@ -301,60 +408,6 @@ namespace HayChoriYPaty.Tests
                     "The presentation blend must use the actual assigned route length.");
 
                 object layout = Get(sim, "KitchenLayout");
-                Rect barrel = (Rect)Call(layout, "BoundsForProduct", 4);
-                Vector2 pickup = (Vector2)Call(layout, "PickupPosition", 4);
-                float fullOffsetMagnitude = Mathf.Max(0f, barrel.height - 24f);
-                Set(cocaWorker, "Product", 4);
-                Set(cocaWorker, "State", Enum.Parse(T("StreetWorkerState"), "Pickup"));
-                Set(cocaWorker, "Position", pickup);
-                Set(cocaWorker, "Target", pickup);
-                Set(cocaWorker, "StepDistance", 0f);
-                Set(cocaWorker, "CarriedItemId", 0);
-                Set(cocaWorker, "PickupProgress", .5f);
-                workerType.GetField("Route", Instance).SetValue(cocaWorker, Array.Empty<Vector2>());
-                workerType.GetField("RouteIndex", Instance).SetValue(cocaWorker, 0);
-                Set(cocaWorker, "RouteDistance", 0f);
-                Vector2 heldPosition = PresentedPosition(sim, cocaWorker);
-                MethodInfo offsetMethod = T("StreetWorkerProjection").GetMethod("CocaBarrelPresentationOffset",
-                    BindingFlags.Static | BindingFlags.NonPublic);
-                Set(cocaWorker, "State", Enum.Parse(T("StreetWorkerState"), "ToStation"));
-                workerType.GetField("Route", Instance).SetValue(cocaWorker, new[] { pickup });
-                Set(cocaWorker, "RouteDistance", 64f);
-                Set(cocaWorker, "Position", pickup + Vector2.left * 48f);
-                float noApproachOffset = (float)offsetMethod.Invoke(null, new[] { sim, cocaWorker });
-                Set(cocaWorker, "Position", pickup + Vector2.left * 36f);
-                float quarterOffset = (float)offsetMethod.Invoke(null, new[] { sim, cocaWorker });
-                Set(cocaWorker, "Position", pickup + Vector2.left * 24f);
-                float halfOffset = (float)offsetMethod.Invoke(null, new[] { sim, cocaWorker });
-                Set(cocaWorker, "Position", pickup + Vector2.left * 12f);
-                Vector2 approachPosition = PresentedPosition(sim, cocaWorker);
-                float threeQuarterOffset = (float)offsetMethod.Invoke(null, new[] { sim, cocaWorker });
-                Set(cocaWorker, "Position", pickup);
-                float fullApproachOffset = (float)offsetMethod.Invoke(null, new[] { sim, cocaWorker });
-                Assert.That(noApproachOffset, Is.EqualTo(0f).Within(.01f));
-                Assert.That(quarterOffset, Is.EqualTo(fullOffsetMagnitude * .25f).Within(.01f));
-                Assert.That(halfOffset - quarterOffset, Is.EqualTo(fullOffsetMagnitude * .25f).Within(.01f),
-                    "Equal traveled distances within the final 48 units must apply equal offsets, avoiding an arrival speed spike.");
-                Assert.That(threeQuarterOffset - halfOffset, Is.EqualTo(fullOffsetMagnitude * .25f).Within(.01f));
-                Assert.That(fullApproachOffset - threeQuarterOffset, Is.EqualTo(fullOffsetMagnitude * .25f).Within(.01f));
-                Set(cocaWorker, "State", Enum.Parse(T("StreetWorkerState"), "ToCounter"));
-                workerType.GetField("Route", Instance).SetValue(cocaWorker, new[] { pickup + Vector2.right * 64f });
-                Set(cocaWorker, "RouteDistance", 64f);
-                Set(cocaWorker, "Target", pickup + Vector2.right * 64f);
-                Set(cocaWorker, "Position", pickup + Vector2.right * 12f);
-                Vector2 departurePosition = PresentedPosition(sim, cocaWorker);
-                float departureOffset = (float)offsetMethod.Invoke(null, new[] { sim, cocaWorker });
-                Set(cocaWorker, "Position", pickup + Vector2.right * 48f);
-                float departureEndOffset = (float)offsetMethod.Invoke(null, new[] { sim, cocaWorker });
-                Assert.That(approachPosition.x, Is.EqualTo(pickup.x - 12f).Within(.01f));
-                Assert.That(departurePosition.x, Is.EqualTo(pickup.x + 12f).Within(.01f));
-                Assert.That(heldPosition.y, Is.EqualTo(barrel.yMax - 24f).Within(.01f));
-                Assert.That(approachPosition.y - pickup.y, Is.InRange(0.01f, fullOffsetMagnitude));
-                Assert.That(departureOffset, Is.InRange(0.01f, fullOffsetMagnitude));
-                Assert.That(Mathf.Abs(departurePosition.y - heldPosition.y), Is.LessThan(fullOffsetMagnitude));
-                Set(cocaWorker, "State", Enum.Parse(T("StreetWorkerState"), "Pickup"));
-                Set(cocaWorker, "Position", pickup);
-
                 var renderer = root.AddComponent(T("StreetKitchenRenderer"));
                 Texture2D normal = Resources.Load<Texture2D>("street-parrillero");
                 Texture2D diagonal = Resources.Load<Texture2D>("street-parrillero-diagonal-v1");
@@ -362,27 +415,172 @@ namespace HayChoriYPaty.Tests
                 Call(renderer, "Prepare", sim, 1f, 960f);
                 Call(renderer, "PrepareWorkers", normal, diagonal, normal, diagonal, beverage, beverage, true);
                 Assert.IsTrue((bool)Get(renderer, "WorkersReady"));
-
                 IDictionary views = (IDictionary)Field(Field(renderer, "workerProjection"), "workers");
-                object visual = views[(int)Get(cocaWorker, "Id")];
-                var torso = (SpriteRenderer)Field(visual, "Torso");
-                Transform workerRoot = (Transform)Field(visual, "Root");
-                float renderedFootX = workerRoot.localPosition.x * 100f + 270f;
-                Assert.That(renderedFootX, Is.EqualTo(pickup.x).Within(.01f));
-                Assert.That(480f - workerRoot.localPosition.y * 100f, Is.EqualTo(barrel.yMax - 24f).Within(.01f));
-                Assert.IsFalse(torso.flipX);
-                Transform propsRoot = ((GameObject)Field(renderer, "propsRoot")).transform;
-                Transform chicagoBarrelRoot = propsRoot.Find("station:Station_CocaBarrel");
-                Assert.NotNull(chicagoBarrelRoot);
-                Assert.Less(((SpriteRenderer)Field(visual,"LeftLeg")).sortingOrder,
-                    chicagoBarrelRoot.GetComponentInChildren<SpriteRenderer>(true).sortingOrder,
-                    "The lower body remains behind the barrel front while the upper reach stays visible.");
-                Assert.Less(torso.sortingOrder, chicagoBarrelRoot.GetComponentInChildren<SpriteRenderer>(true).sortingOrder,
-                    "The barrel hides the body instead of drawing the worker through its front.");
+                foreach (int product in new[] { 4, 6 })
+                {
+                    Rect barrel = (Rect)Call(layout, "BoundsForProduct", product);
+                    Assert.That(barrel.width, Is.GreaterThan(0f), "The selected level must have the actual Coca/beer barrel.");
+                    Set(cocaWorker, "Product", product);
+                    Vector2 pickup = (Vector2)Call(sim, "PickupPositionForWorker", cocaWorker);
+                    Vector2 centeredSafePickup = (Vector2)Call(layout, "PickupPosition", product);
+                    Assert.That(pickup.x, Is.EqualTo(centeredSafePickup.x).Within(.01f),
+                        "A single Cocacolero must use the centered safe barrel anchor, not lane 0 of a fixed three-lane spread.");
+                    float fullOffsetMagnitude = Mathf.Max(0f, barrel.height - 24f);
+                    Set(cocaWorker, "State", Enum.Parse(T("StreetWorkerState"), "Pickup"));
+                    Set(cocaWorker, "Position", pickup);
+                    Set(cocaWorker, "Target", pickup);
+                    Set(cocaWorker, "StepDistance", 0f);
+                    Set(cocaWorker, "CarriedItemId", 0);
+                    Set(cocaWorker, "PickupProgress", .5f);
+                    workerType.GetField("Route", Instance).SetValue(cocaWorker, Array.Empty<Vector2>());
+                    workerType.GetField("RouteIndex", Instance).SetValue(cocaWorker, 0);
+                    Set(cocaWorker, "RouteDistance", 0f);
+                    Vector2 heldPosition = PresentedPosition(sim, cocaWorker);
+                    MethodInfo bodyLiftMethod = T("StreetWorkerProjection").GetMethod("BarrelDrinkPickupBodyLift",
+                        BindingFlags.Static | BindingFlags.NonPublic);
+                    Set(cocaWorker, "State", Enum.Parse(T("StreetWorkerState"), "ToStation"));
+                    workerType.GetField("Route", Instance).SetValue(cocaWorker, new[] { pickup });
+                    Set(cocaWorker, "RouteDistance", 64f);
+                    Set(cocaWorker, "Position", pickup + Vector2.left * 48f);
+                    Vector2 startApproachPosition = PresentedPosition(sim, cocaWorker);
+                    Set(cocaWorker, "Position", pickup + Vector2.left * 12f);
+                    Vector2 approachPosition = PresentedPosition(sim, cocaWorker);
+                    Set(cocaWorker, "Position", pickup);
+                    Vector2 arrivedPosition = PresentedPosition(sim, cocaWorker);
+                    Set(cocaWorker, "State", Enum.Parse(T("StreetWorkerState"), "ToCounter"));
+                    workerType.GetField("Route", Instance).SetValue(cocaWorker, new[] { pickup + Vector2.right * 64f });
+                    Set(cocaWorker, "RouteDistance", 64f);
+                    Set(cocaWorker, "Target", pickup + Vector2.right * 64f);
+                    Set(cocaWorker, "Position", pickup + Vector2.right * 12f);
+                    Vector2 departurePosition = PresentedPosition(sim, cocaWorker);
+                    Assert.That(heldPosition.y, Is.EqualTo(pickup.y).Within(.01f));
+                    Assert.That(startApproachPosition.y, Is.EqualTo(pickup.y).Within(.01f));
+                    Assert.That(approachPosition.y, Is.EqualTo(pickup.y).Within(.01f));
+                    Assert.That(arrivedPosition.y, Is.EqualTo(pickup.y).Within(.01f));
+                    Assert.That(departurePosition.y, Is.EqualTo(pickup.y).Within(.01f));
+                    Assert.That(approachPosition.x, Is.EqualTo(pickup.x - 12f).Within(.01f));
+                    Assert.That(departurePosition.x, Is.EqualTo(pickup.x + 12f).Within(.01f));
+                    Assert.That((float)bodyLiftMethod.Invoke(null, new[] { sim, cocaWorker }), Is.EqualTo(0f).Within(.01f),
+                        "The torso lift must be absent from every moving state.");
+                    // Both products keep the same frontal facing while their root stays on the actual route.
+                    Set(cocaWorker, "State", Enum.Parse(T("StreetWorkerState"), "ToStation"));
+                    workerType.GetField("Route", Instance).SetValue(cocaWorker, new[] { pickup });
+                    workerType.GetField("RouteIndex", Instance).SetValue(cocaWorker, 0);
+                    Set(cocaWorker, "RouteDistance", 64f);
+                    Set(cocaWorker, "Position", pickup + Vector2.left * 12f);
+                    Set(cocaWorker, "Target", pickup);
+                    Set(cocaWorker, "StepDistance", 1f);
+                    Call(renderer, "PrepareWorkers", normal, diagonal, normal, diagonal, beverage, beverage, true);
+                    object visual = views[(int)Get(cocaWorker, "Id")];
+                    var torso = (SpriteRenderer)Field(visual, "Torso");
+                    Transform workerRoot = (Transform)Field(visual, "Root");
+                    Assert.IsFalse(torso.flipX, "The final approach must face forward for both barrels.");
+                    float approachFootX = workerRoot.localPosition.x * 100f + 270f;
+                    float approachFootY = (480f - workerRoot.localPosition.y * 100f);
+                    Assert.That(approachFootX, Is.EqualTo(pickup.x - 12f).Within(.01f));
+                    Assert.That(approachFootY, Is.EqualTo(pickup.y).Within(.02f),
+                        "The rendered root must follow the exact route position during approach.");
 
-                yield return null;
-                yield return null;
-                SaveProjectionCapture(renderer, "cocacolero-barrel-pickup-chicago-960");
+                    Set(cocaWorker, "State", Enum.Parse(T("StreetWorkerState"), "Pickup"));
+                    Set(cocaWorker, "Position", pickup);
+                    Set(cocaWorker, "StepDistance", 0f);
+                    Set(cocaWorker, "PickupProgress", 0f);
+                    workerType.GetField("Route", Instance).SetValue(cocaWorker, Array.Empty<Vector2>());
+                    workerType.GetField("RouteIndex", Instance).SetValue(cocaWorker, 0);
+                    Set(cocaWorker, "RouteDistance", 0f);
+                    Call(renderer, "PrepareWorkers", normal, diagonal, normal, diagonal, beverage, beverage, true);
+                    Assert.IsTrue((bool)Get(renderer, "WorkersReady"));
+                    Assert.AreSame(Resources.Load<Texture2D>("street-worker-direction-extension-v1"), torso.sprite.texture,
+                        "Coca and beer must share the frontal reach art.");
+                    float restTorsoY = torso.transform.localPosition.y;
+                    Vector2 idlePalm = (Vector2)Field(visual, "Palm");
+                    Set(cocaWorker, "PickupProgress", .5f);
+                    Call(renderer, "PrepareWorkers", normal, diagonal, normal, diagonal, beverage, beverage, true);
+                    float footX = workerRoot.localPosition.x * 100f + 270f;
+                    float footY = 480f - workerRoot.localPosition.y * 100f;
+                    Assert.That(footX, Is.EqualTo(pickup.x).Within(.01f));
+                    Assert.That(footY, Is.EqualTo(pickup.y).Within(.01f));
+                    Assert.IsFalse(torso.flipX);
+                    Assert.That(torso.transform.localPosition.y - restTorsoY,
+                        Is.EqualTo(.0784f - fullOffsetMagnitude * .01f).Within(.003f),
+                        "Only the upper-body reach moves over the barrel; the root and feet stay grounded.");
+                    Vector2 reachingPalm = (Vector2)Field(visual, "Palm");
+                    Assert.That(reachingPalm.y - idlePalm.y, Is.EqualTo(-7.84f).Within(.02f),
+                        "Both barrel pickups must animate the same empty-hand reach.");
+                    Transform propsRoot = ((GameObject)Field(renderer, "propsRoot")).transform;
+                    string stationName = product == 4 ? "Station_CocaBarrel" : "Station_BeerBarrel";
+                    Transform barrelRoot = propsRoot.Find("station:" + stationName);
+                    Assert.NotNull(barrelRoot);
+                    Assert.Less(((SpriteRenderer)Field(visual,"LeftLeg")).sortingOrder,
+                        barrelRoot.GetComponentInChildren<SpriteRenderer>(true).sortingOrder,
+                        "The lower body remains behind either barrel front while the upper reach stays visible.");
+                    Assert.Less(torso.sortingOrder, barrelRoot.GetComponentInChildren<SpriteRenderer>(true).sortingOrder,
+                        "Either barrel hides the body instead of drawing the worker through its front.");
+
+                    yield return null;
+                    yield return null;
+                    SaveProjectionCapture(renderer, product == 4
+                        ? "cocacolero-coca-barrel-pickup-960" : "cocacolero-beer-barrel-pickup-960");
+                }
+            }
+            finally { UnityEngine.Object.Destroy(root); }
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator CocacoleroBarrelAccessLanesMatchTheActualHiredWorkerCount()
+        {
+            var root = new GameObject("Cocacolero barrel access lane count");
+            try
+            {
+                object sim = Activator.CreateInstance(T("StreetSimulation"), new object[]
+                    { Activator.CreateInstance(T("StreetBalance")), 5, 5f, 0, 1, 0 });
+                Call(sim, "StartRound");
+                Set(sim, "Coins", 10000);
+                Type roleType = T("StreetWorkerRole");
+                object role = Enum.Parse(roleType, "Cocacolero");
+                Assert.IsTrue((bool)Call(sim, "TryHire", role));
+                Assert.IsTrue((bool)Call(sim, "TryHire", role));
+
+                IList workers = (IList)Get(sim, "Workers");
+                var cocacoleros = new List<object>();
+                foreach (object worker in workers)
+                    if (Get(worker, "Role").ToString() == "Cocacolero") cocacoleros.Add(worker);
+                Assert.AreEqual(2, cocacoleros.Count);
+                object layout = Get(sim, "KitchenLayout");
+                object customer = Activator.CreateInstance(T("StreetCustomer"));
+                foreach (object worker in cocacoleros)
+                {
+                    SetField(worker, "Customer", customer);
+                    Set(worker, "State", Enum.Parse(T("StreetWorkerState"), "ToStation"));
+                }
+
+                // If the workers serve different beverages, each is alone at its own barrel.
+                Set(cocacoleros[0], "Product", 4);
+                Set(cocacoleros[1], "Product", 6);
+                foreach (object worker in cocacoleros)
+                {
+                    int product = (int)Get(worker, "Product");
+                    Vector2 actual = (Vector2)Call(sim, "PickupPositionForWorker", worker);
+                    Vector2 centered = (Vector2)Call(layout, "PickupPosition", product);
+                    Assert.That(actual.x, Is.EqualTo(centered.x).Within(.01f),
+                        "Each barrel with just one assigned worker keeps that worker on its centered safe anchor.");
+                }
+
+                foreach (int product in new[] { 4, 6 })
+                {
+                    Set(cocacoleros[0], "Product", product);
+                    Set(cocacoleros[1], "Product", product);
+                    Vector2 first = (Vector2)Call(sim, "PickupPositionForWorker", cocacoleros[0]);
+                    Vector2 second = (Vector2)Call(sim, "PickupPositionForWorker", cocacoleros[1]);
+                    Vector2 expectedFirst = (Vector2)Call(layout, "PickupPosition", product, 0, 2);
+                    Vector2 expectedSecond = (Vector2)Call(layout, "PickupPosition", product, 1, 2);
+                    Assert.That(first.x, Is.EqualTo(expectedFirst.x).Within(.01f),
+                        "The first hired worker should use the left point of the two-lane spread.");
+                    Assert.That(second.x, Is.EqualTo(expectedSecond.x).Within(.01f),
+                        "The second hired worker should use the right point of the two-lane spread.");
+                    Assert.AreNotEqual(first.x, second.x, "Concurrent workers must not share a barrel anchor.");
+                }
             }
             finally { UnityEngine.Object.Destroy(root); }
             yield return null;

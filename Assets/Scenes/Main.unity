@@ -616,10 +616,10 @@ MonoBehaviour:
     - 210
     - 240
     - 260
-    - 270
-    - 340
-    - 340
     - 300
+    - 340
+    - 340
+    - 360
     - 315
     florestaFinishAtDeadline: 0
   selectedLevel: 0

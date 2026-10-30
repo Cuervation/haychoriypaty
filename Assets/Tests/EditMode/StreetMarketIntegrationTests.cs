@@ -14,9 +14,24 @@ namespace HayChoriYPaty.Tests
         private static object Get(object value, string name) => value.GetType().GetProperty(name, Public).GetValue(value);
         private static object Call(object value, string name, params object[] args)
         {
+            MethodInfo match = null;
             foreach (MethodInfo method in value.GetType().GetMethods(Public))
-                if (method.Name == name && method.GetParameters().Length == args.Length) return method.Invoke(value, args);
-            throw new MissingMethodException(name);
+            {
+                if (method.Name != name) continue;
+                ParameterInfo[] parameters = method.GetParameters();
+                if (parameters.Length != args.Length) continue;
+                bool compatible = true;
+                for (int i = 0; i < parameters.Length; i++)
+                    if (args[i] == null
+                        ? parameters[i].ParameterType.IsValueType && Nullable.GetUnderlyingType(parameters[i].ParameterType) == null
+                        : !parameters[i].ParameterType.IsInstanceOfType(args[i]))
+                    { compatible = false; break; }
+                if (!compatible) continue;
+                if (match != null) throw new AmbiguousMatchException(value.GetType().FullName + "." + name);
+                match = method;
+            }
+            if (match == null) throw new MissingMethodException(value.GetType().FullName, name);
+            return match.Invoke(value, args);
         }
         private static void Set(object value, string name, object data) => value.GetType()
             .GetField("<" + name + ">k__BackingField", Private).SetValue(value, data);
@@ -75,7 +90,8 @@ namespace HayChoriYPaty.Tests
                 bool activeCooks = (bool)Get(sim, "UsesActiveCooks");
                 for (int product = 0; product < 7; product++)
                 {
-                    if (activeCooks && product < 4) continue; // Racing+ sandwich recipes bypass Market stock.
+                    if (((activeCooks || level == 2) && product < 4) || product == 4 || product == 6) continue;
+                    // Active-cook and Vélez sandwiches, plus Coca/beer barrels, are inexhaustible Market-independent servings.
                     int delivered = (int)Call(sim, "GetProductDelivered", product);
                     int[] recipe = (int[])Runtime("StreetIngredientCatalog").GetMethod("Recipe").Invoke(null, new object[] { product });
                     foreach (int ingredient in recipe) consumed[ingredient] += delivered;

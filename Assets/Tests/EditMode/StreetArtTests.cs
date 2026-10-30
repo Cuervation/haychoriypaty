@@ -132,6 +132,51 @@ namespace HayChoriYPaty.Tests
                 .Invoke(null, new object[] { new Rect(0, 0, 78, 78), new Vector2(width, height) }));
         }
 
+        [TestCase("BONDIOLA", 28, 144f, 27f)]
+        [TestCase("$143.309,00", 38, 220f, 44f)]
+        [TestCase("NECESITÁS", 13, 70f, 17f)]
+        [TestCase("1234567890", 28, 80f, 30f)]
+        public void MarketTextFontFitsBothItsWidthAndHeight(string value, int preferred, float width, float height)
+        {
+            Font font = Resources.Load<Font>("Menu/LuckiestGuy-Regular");
+            Assert.IsNotNull(font);
+            var style = new GUIStyle { font = font, fontSize = preferred, wordWrap = false };
+            int fitted = (int)View.GetMethod("FitMarketTextFontSize", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { style, value, preferred, new Vector2(width, height) });
+            Assert.GreaterOrEqual(fitted, 8, "Market labels must remain legible after fitting, not collapse to microscopic text.");
+            style.fontSize = fitted;
+            Vector2 measured = style.CalcSize(new GUIContent(value));
+            Assert.LessOrEqual(measured.x, width - 2f, "Text must fit horizontally without wrapping or truncation.");
+            Assert.LessOrEqual(measured.y, height - 2f, "Text must fit vertically within its row.");
+        }
+
+        [TestCase(4, "ModularKitchen/Art/meat-bondiola-whole-v1_Raw")]
+        [TestCase(5, "ModularKitchen/Art/meat-vacio-whole-v1_Raw")]
+        public void MarketUsesCurrentRawWholeMeatIllustration(int ingredientId, string resource)
+        {
+            string selected = (string)View.GetMethod("MarketFreshMeatResource", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { ingredientId });
+            Assert.AreEqual(resource, selected, "The market row should use the latest prepared raw-meat illustration.");
+            Texture2D art = Resources.Load<Texture2D>(selected);
+            Assert.IsNotNull(art, "Current Mercado ingredient art must be present in Resources: " + selected);
+            Rect fit = (Rect)View.GetMethod("FitMarketIngredientIcon", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { new Rect(0f, 0f, 78f, 78f), new Vector2(art.width, art.height) });
+            Assert.AreEqual(new Vector2(39f, 39f), fit.center);
+            Assert.LessOrEqual(fit.width, 78f);
+            Assert.LessOrEqual(fit.height, 78f);
+        }
+
+        [TestCase(60f, 40f, 50f, 80f, true)]
+        [TestCase(40f, 40f, 50f, 80f, false)]
+        [TestCase(110f, 40f, 50f, 80f, false)]
+        public void MarketOnlyDisplaysWholeRowsWithinViewport(float rowY, float rowHeight, float viewportY,
+            float viewportHeight, bool expectedVisible)
+        {
+            bool visible = (bool)View.GetMethod("MarketFullyVisibleInViewport", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { new Rect(0f, rowY, 100f, rowHeight), new Rect(0f, viewportY, 100f, viewportHeight) });
+            Assert.AreEqual(expectedVisible, visible, "A partially clipped ingredient card must be hidden, never draw cut text/numbers.");
+        }
+
         [TestCase("meat-chori/meat-chori_Raw")]
         [TestCase("sandwich-chori/sandwich-chori")]
         [TestCase("meat-paty/meat-paty_Raw")]
@@ -286,6 +331,8 @@ namespace HayChoriYPaty.Tests
         [TestCase("VOLVER", 364f, 66f)]
         [TestCase("1", 57f, 35f)]
         [TestCase("CONTINUAR", 156f, 60f)]
+        [TestCase("COMPRAR\nFALTANTES", 142f, 46f)]
+        [TestCase("$143.309,00", 180f, 46f)]
         public void StandardButtonFontFitsWithoutFallbackOrLeakingStyle(string caption, float width, float height)
         {
             Font font = Resources.Load<Font>("Menu/LuckiestGuy-Regular");
@@ -297,7 +344,9 @@ namespace HayChoriYPaty.Tests
             Assert.GreaterOrEqual(size, 11);
             if (caption == "JUGAR") Assert.AreEqual(38, size, "Keep the original cover lettering unchanged.");
             style.fontSize = size;
-            Assert.LessOrEqual(style.CalcSize(new GUIContent(caption)).x, width - 24f * height / 92f + 1f);
+            Vector2 measured = style.CalcSize(new GUIContent(caption));
+            Assert.LessOrEqual(measured.x, width - 24f * height / 92f + 1f);
+            Assert.LessOrEqual(measured.y, height - 8f * height / 92f + 1f, "Button labels, including two-line captions, must not clip vertically.");
         }
 
         [TestCase(1f)]
@@ -622,7 +671,7 @@ namespace HayChoriYPaty.Tests
                 Assert.AreEqual(TextureImporterCompression.Uncompressed, importer.textureCompression);
                 var android = importer.GetPlatformTextureSettings("Android");
                 Assert.IsTrue(android.overridden);
-                Assert.AreEqual(TextureImporterFormat.RGBA32, android.format);
+                Assert.AreEqual(TextureImporterFormat.ETC2_RGBA8, android.format);
                 Assert.GreaterOrEqual(android.maxTextureSize, 1315);
             }
             Texture2D icon = Resources.Load<Texture2D>("street-parrillero-icon");
@@ -651,7 +700,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(TextureImporterCompression.Uncompressed, importer.textureCompression);
             var android = importer.GetPlatformTextureSettings("Android");
             Assert.IsTrue(android.overridden);
-            Assert.AreEqual(TextureImporterFormat.RGBA32, android.format);
+            Assert.AreEqual(TextureImporterFormat.ETC2_RGBA8, android.format);
             Assert.GreaterOrEqual(android.maxTextureSize, 1536);
 
             Rect[] bounds = (Rect[])View.GetField("ParrilleroDiagonalPoses", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
@@ -714,7 +763,7 @@ namespace HayChoriYPaty.Tests
                 Assert.AreEqual(TextureImporterCompression.Uncompressed, importer.textureCompression);
                 var android = importer.GetPlatformTextureSettings("Android");
                 Assert.IsTrue(android.overridden);
-                Assert.AreEqual(TextureImporterFormat.RGBA32, android.format);
+                Assert.AreEqual(TextureImporterFormat.ETC2_RGBA8, android.format);
             }
 
             int count = (int)View.GetField("AllBoysFanVariantCount", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue();
@@ -773,7 +822,7 @@ namespace HayChoriYPaty.Tests
                 Assert.AreEqual(TextureImporterCompression.Uncompressed, importer.textureCompression);
                 var android = importer.GetPlatformTextureSettings("Android");
                 Assert.IsTrue(android.overridden);
-                Assert.AreEqual(TextureImporterFormat.RGBA32, android.format);
+                Assert.AreEqual(TextureImporterFormat.ETC2_RGBA8, android.format);
             }
 
             int variantCount = (int)View.GetField("ChicagoFanVariantCount", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue();
@@ -885,46 +934,126 @@ namespace HayChoriYPaty.Tests
             Assert.GreaterOrEqual(animated.yMax, height);
         }
 
+        [TestCase(320, 568)]
+        [TestCase(360, 640)]
+        [TestCase(360, 800)]
+        [TestCase(375, 812)]
+        [TestCase(390, 844)]
+        [TestCase(414, 896)]
+        [TestCase(540, 960)]
+        [TestCase(575, 1280)]
+        [TestCase(720, 1280)]
+        [TestCase(720, 1600)]
         [TestCase(1080, 1920)]
+        [TestCase(1080, 2160)]
+        [TestCase(1080, 2340)]
         [TestCase(1080, 2400)]
+        [TestCase(1080, 2560)]
         [TestCase(1200, 2670)]
-        public void HubArtworkHotspotsFollowScaleCropAndStayTappableInSafeArea(int width, int height)
+        [TestCase(1440, 2960)]
+        [TestCase(1536, 2048)]
+        [TestCase(2048, 2732)]
+        public void HubArtworkFillsPortraitScreensAndHotspotsStayVisible(int width, int height)
         {
-            MethodInfo map = View.GetMethod("HubArtworkRectToLayout", BindingFlags.Static | BindingFlags.NonPublic);
-            MethodInfo canvasViewport = View.GetMethod("CanvasViewport", BindingFlags.Static | BindingFlags.NonPublic);
+            const float artWidth = 841f, artHeight = 1870f;
             Vector2 screen = new Vector2(width, height);
-            Rect safe = new Rect(24, 41, width - 48, height - 117); // asymmetric bottom/top insets expose top-origin mapping regressions
+            Rect safe = new Rect(24, 41, width - 48, height - 117); // asymmetric bottom/top insets
+            MethodInfo map = View.GetMethod("HubArtworkRectToLayout", BindingFlags.Static | BindingFlags.NonPublic);
+            MethodInfo artworkBounds = View.GetMethod("HubArtworkScreenBounds", BindingFlags.Static | BindingFlags.NonPublic);
+            MethodInfo canvasViewport = View.GetMethod("CanvasViewport", BindingFlags.Static | BindingFlags.NonPublic);
             Rect viewport = (Rect)canvasViewport.Invoke(null, new object[] { screen, safe });
-            foreach (Rect source in new[] { new Rect(12, 5, 230, 160), new Rect(523, 150, 322, 160),
-                new Rect(112, 610, 352, 174), new Rect(105, 1034, 355, 183), new Rect(535, 1032, 385, 188) })
+            Rect artwork = (Rect)artworkBounds.Invoke(null, new object[] { new Vector2(artWidth, artHeight), screen });
+            MethodInfo settingsBounds = View.GetMethod("HubSettingsButtonScreenBounds", BindingFlags.Static | BindingFlags.NonPublic);
+            Rect settings = (Rect)settingsBounds.Invoke(null, new object[] { screen, safe });
+            MethodInfo topMusicBounds = View.GetMethod("HubTopMusicButtonScreenBounds", BindingFlags.Static | BindingFlags.NonPublic);
+            Rect topMusic = (Rect)topMusicBounds.Invoke(null, new object[] { screen, safe });
+            Rect topMusicLayout = (Rect)View.GetMethod("HubTopMusicButtonLayoutBounds", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { screen, safe });
+            Rect account = (Rect)View.GetMethod("HubAccountButtonScreenBounds", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { screen });
+            Rect settingsPanel = (Rect)View.GetField("HubSettingsPanelBounds", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+            Rect musicControl = (Rect)View.GetField("HubSettingsMusicButtonBounds", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+            Rect backControl = (Rect)View.GetField("HubSettingsBackButtonBounds", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+
+            Assert.GreaterOrEqual(settings.xMin, viewport.xMin - .02f);
+            Assert.LessOrEqual(settings.xMax, viewport.xMax + .02f);
+            Assert.GreaterOrEqual(settings.yMin, viewport.yMin - .02f);
+            Assert.LessOrEqual(settings.yMax, viewport.yMax + .02f);
+            Assert.GreaterOrEqual(settings.width, 44f, "Settings must keep a touch target wider than 44 physical pixels.");
+            Assert.GreaterOrEqual(settings.height, 44f, "Settings must keep a touch target taller than 44 physical pixels.");
+            Assert.IsFalse(settings.Overlaps(account),
+                "Settings must not overlap the existing CUENTA control.");
+            Assert.GreaterOrEqual(topMusic.xMin, viewport.xMin - .02f);
+            Assert.LessOrEqual(topMusic.xMax, viewport.xMax + .02f);
+            Assert.GreaterOrEqual(topMusic.yMin, viewport.yMin - .02f);
+            Assert.LessOrEqual(topMusic.yMax, viewport.yMax + .02f);
+            Assert.GreaterOrEqual(topMusic.width, 44f, "Top music must keep a 44px touch target at " + width + "x" + height + ".");
+            Assert.GreaterOrEqual(topMusic.height, 44f, "Top music must keep a 44px touch target at " + width + "x" + height + ".");
+            Assert.LessOrEqual(topMusic.xMax, account.xMin + .02f,
+                "The sound control must sit left of CUENTA at " + width + "x" + height + ".");
+            Assert.IsFalse(topMusic.Overlaps(account), "Top music must not cover CUENTA at " + width + "x" + height + ".");
+            Assert.IsFalse(topMusic.Overlaps(settings), "The two top icon controls must not overlap.");
+            Assert.AreEqual(topMusic.xMin, viewport.xMin + topMusicLayout.xMin * viewport.width / 540f, .02f);
+            Assert.AreEqual(topMusic.xMax, viewport.xMin + topMusicLayout.xMax * viewport.width / 540f, .02f);
+            Assert.AreEqual(topMusic.yMin, viewport.yMin + topMusicLayout.yMin * viewport.height / 960f, .02f);
+            Assert.AreEqual(topMusic.yMax, viewport.yMin + topMusicLayout.yMax * viewport.height / 960f, .02f);
+            Assert.GreaterOrEqual(settingsPanel.xMin, 0f); Assert.LessOrEqual(settingsPanel.xMax, 540f);
+            Assert.GreaterOrEqual(settingsPanel.yMin, 0f); Assert.LessOrEqual(settingsPanel.yMax, 960f);
+            Assert.GreaterOrEqual(musicControl.yMin, settingsPanel.yMin);
+            Assert.LessOrEqual(musicControl.yMax, settingsPanel.yMax);
+            Assert.GreaterOrEqual(backControl.yMin, settingsPanel.yMin);
+            Assert.LessOrEqual(backControl.yMax, settingsPanel.yMax);
+            Assert.GreaterOrEqual(musicControl.height * viewport.height / 960f, 44f,
+                "Music control must keep a 44px target at " + width + "x" + height + ".");
+            Assert.GreaterOrEqual(backControl.height * viewport.height / 960f, 44f,
+                "Back control must keep a 44px target at " + width + "x" + height + ".");
+
+            // The same image covers the full physical screen with aspect-preserving cover crop.
+            Assert.LessOrEqual(artwork.xMin, .02f);
+            Assert.GreaterOrEqual(artwork.xMax, width - .02f);
+            Assert.LessOrEqual(artwork.yMin, .02f);
+            Assert.GreaterOrEqual(artwork.yMax, height - .02f);
+            Assert.AreEqual(artWidth / artHeight, artwork.width / artwork.height, .001f);
+
+            int accountAction = (int)View.GetField("HubAccountAction", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue();
+            Rect accountSource = (Rect)View.GetMethod("HubArtActionSourceRect", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { accountAction });
+            Assert.AreEqual(Rect.zero, accountSource, "The hub no longer has an independent account button or hotspot.");
+
+            foreach (Rect source in new[] { new Rect(467, 448, 288, 143),
+                new Rect(100, 859, 315, 155), new Rect(94, 1238, 317, 164), new Rect(479, 1236, 344, 168) })
             {
-                Rect hit = (Rect)map.Invoke(null, new object[] { source, new Vector2(941, 1672), screen, safe });
+                Rect hit = (Rect)map.Invoke(null, new object[] { source, new Vector2(artWidth, artHeight), screen, safe });
                 Assert.Greater(hit.width, 0f);
                 Assert.Greater(hit.height, 0f);
                 Assert.GreaterOrEqual(hit.xMin, 0f); Assert.LessOrEqual(hit.xMax, 540f);
                 Assert.GreaterOrEqual(hit.yMin, 0f); Assert.LessOrEqual(hit.yMax, 960f);
 
-                // Project GUI-space hit bounds back to physical top-origin pixels. They must
-                // match the visible artwork intersected with the safe viewport, even when
-                // the top and bottom insets differ (Unity Screen.safeArea itself is bottom-origin).
-                float artScale = Mathf.Max(screen.x / 941f, screen.y / 1672f);
-                float imageWidth = 941f * artScale, imageHeight = 1672f * artScale;
-                Rect artworkOnScreen = new Rect((screen.x - imageWidth) * .5f + source.x * artScale,
-                    (screen.y - imageHeight) * .5f + source.y * artScale,
+                // The painted action can meet a notch/edge inset; only its safe-area intersection
+                // is tappable, while still retaining a non-empty target at every tested size.
+                float artScale = artwork.width / artWidth;
+                Rect artworkOnScreen = new Rect(artwork.x + source.x * artScale, artwork.y + source.y * artScale,
                     source.width * artScale, source.height * artScale);
-                float expectedLeft = Mathf.Max(artworkOnScreen.xMin, viewport.xMin);
-                float expectedRight = Mathf.Min(artworkOnScreen.xMax, viewport.xMax);
-                float expectedTop = Mathf.Max(artworkOnScreen.yMin, viewport.yMin);
-                float expectedBottom = Mathf.Min(artworkOnScreen.yMax, viewport.yMax);
-                Assert.AreEqual(expectedLeft, viewport.xMin + hit.xMin * viewport.width / 540f, .02f);
-                Assert.AreEqual(expectedRight, viewport.xMin + hit.xMax * viewport.width / 540f, .02f);
-                Assert.AreEqual(expectedTop, viewport.yMin + hit.yMin * viewport.height / 960f, .02f);
-                Assert.AreEqual(expectedBottom, viewport.yMin + hit.yMax * viewport.height / 960f, .02f);
+                Assert.IsFalse(settings.Overlaps(artworkOnScreen),
+                    "Settings must not cover a hub hotspot at " + width + "x" + height + ".");
+                Assert.IsFalse(topMusic.Overlaps(artworkOnScreen),
+                    "Top music must not cover a hub hotspot at " + width + "x" + height + ".");
+                Rect tappableOnScreen = Rect.MinMaxRect(
+                    Mathf.Max(artworkOnScreen.xMin, viewport.xMin),
+                    Mathf.Max(artworkOnScreen.yMin, viewport.yMin),
+                    Mathf.Min(artworkOnScreen.xMax, viewport.xMax),
+                    Mathf.Min(artworkOnScreen.yMax, viewport.yMax));
+                Assert.Greater(tappableOnScreen.width, 0f);
+                Assert.Greater(tappableOnScreen.height, 0f);
+                Assert.AreEqual(tappableOnScreen.xMin, viewport.xMin + hit.xMin * viewport.width / 540f, .02f);
+                Assert.AreEqual(tappableOnScreen.xMax, viewport.xMin + hit.xMax * viewport.width / 540f, .02f);
+                Assert.AreEqual(tappableOnScreen.yMin, viewport.yMin + hit.yMin * viewport.height / 960f, .02f);
+                Assert.AreEqual(tappableOnScreen.yMax, viewport.yMin + hit.yMax * viewport.height / 960f, .02f);
             }
         }
 
         [TestCase("street-background-open-street-v4", 940, 1673, false)]
-        [TestCase("street-hub-stadium-v1", 941, 1672, false)]
+        [TestCase("street-hub-stadium-v1", 841, 1870, false)]
         [TestCase("street-victory-popup-wood-v1", 1122, 1402, true)]
         [TestCase("street-mural-real-v5", 940, 1673, false)]
         [TestCase("street-coin-gold-v2", 1254, 1254, true)]
@@ -944,7 +1073,12 @@ namespace HayChoriYPaty.Tests
             Assert.NotNull(importer); Assert.AreEqual(alpha, importer.DoesSourceTextureHaveAlpha());
             Assert.IsFalse(importer.mipmapEnabled); Assert.AreEqual(TextureImporterNPOTScale.None, importer.npotScale);
             var android = importer.GetPlatformTextureSettings("Android");
-            Assert.IsTrue(android.overridden); Assert.AreEqual(TextureImporterFormat.RGBA32, android.format);
+            Assert.IsTrue(android.overridden);
+            TextureImporterFormat expectedAndroidFormat = Array.IndexOf(new[] {
+                "street-background-open-street-v4", "street-hub-stadium-v1", "street-victory-popup-wood-v1",
+                "street-mural-real-v5", "street-coin-gold-v2", "street-allboys-crest"
+            }, name) >= 0 ? TextureImporterFormat.ETC2_RGBA8 : TextureImporterFormat.RGBA32;
+            Assert.AreEqual(expectedAndroidFormat, android.format);
             Assert.GreaterOrEqual(android.maxTextureSize, Math.Max(width, height));
         }
 
@@ -1262,7 +1396,7 @@ namespace HayChoriYPaty.Tests
             Assert.IsTrue(importer.DoesSourceTextureHaveAlpha());
             Assert.IsFalse(importer.mipmapEnabled); Assert.AreEqual(TextureImporterNPOTScale.None, importer.npotScale);
             Assert.AreEqual(TextureImporterCompression.Uncompressed, importer.textureCompression);
-            Assert.AreEqual(TextureImporterFormat.RGBA32, importer.GetPlatformTextureSettings("Android").format);
+            Assert.AreEqual(TextureImporterFormat.ETC2_RGBA8, importer.GetPlatformTextureSettings("Android").format);
         }
 
         [Test]
@@ -1301,7 +1435,7 @@ namespace HayChoriYPaty.Tests
             Assert.IsTrue(chicagoGrillImporter.alphaIsTransparency); Assert.IsFalse(chicagoGrillImporter.mipmapEnabled);
             Assert.AreEqual(TextureImporterCompression.Uncompressed, chicagoGrillImporter.textureCompression);
             Assert.AreEqual(TextureImporterNPOTScale.None, chicagoGrillImporter.npotScale);
-            Assert.AreEqual(TextureImporterFormat.RGBA32, chicagoGrillImporter.GetPlatformTextureSettings("Android").format);
+            Assert.AreEqual(TextureImporterFormat.ETC2_RGBA8, chicagoGrillImporter.GetPlatformTextureSettings("Android").format);
             foreach (string name in new[] { "street-new-chicago-crest-v1", "street-coca-bottle-v1", "street-beverage-barrel-v1" })
             {
                 TextureImporter importer = (TextureImporter)AssetImporter.GetAtPath("Assets/Art/Street/Resources/" + name + ".png");
@@ -1309,7 +1443,7 @@ namespace HayChoriYPaty.Tests
                 Assert.IsFalse(importer.mipmapEnabled);
                 Assert.AreEqual(TextureImporterNPOTScale.None, importer.npotScale);
                 Assert.AreEqual(TextureImporterCompression.Uncompressed, importer.textureCompression);
-                Assert.AreEqual(TextureImporterFormat.RGBA32, importer.GetPlatformTextureSettings("Android").format);
+                Assert.AreEqual(TextureImporterFormat.ETC2_RGBA8, importer.GetPlatformTextureSettings("Android").format);
             }
 
             Rect grill = (Rect)View.GetMethod("GrillRectForLevel", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(int), typeof(int) }, null)
@@ -1394,7 +1528,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(TextureImporterNPOTScale.None, importer.npotScale);
             Assert.AreEqual(TextureImporterCompression.Uncompressed, importer.textureCompression);
             var android = importer.GetPlatformTextureSettings("Android");
-            Assert.IsTrue(android.overridden); Assert.AreEqual(TextureImporterFormat.RGBA32, android.format);
+            Assert.IsTrue(android.overridden); Assert.AreEqual(TextureImporterFormat.ETC2_RGBA8, android.format);
             Assert.GreaterOrEqual(android.maxTextureSize, texture.width);
             Assert.NotNull(Resources.Load<Texture2D>("street-parrilla-large"), "Retain the previous grill resource");
             Assert.AreNotEqual(AssetDatabase.AssetPathToGUID(path), AssetDatabase.AssetPathToGUID("Assets/Art/Street/Resources/street-parrilla-large.png"));
@@ -1598,8 +1732,13 @@ namespace HayChoriYPaty.Tests
                 cells[i] = (Rect)cellsMethod.Invoke(null, new object[] { i, products, products.Length, gap });
                 Assert.IsFalse(cells[i].Overlaps(gap), "Quota chip " + i + " crosses the hardware camera channel");
                 Assert.GreaterOrEqual(cells[i].yMin, (float)barHeightMethod.Invoke(null, new object[] { gap }));
-                Assert.AreEqual(i < 4 ? 8f : 427f, cells[i].xMin, .01f,
-                    "Solids stay left and drinks stay right of the status strip after the 25% enlargement.");
+                int group = i < 4 ? 0 : 1;
+                int groupIndex = i < 4 ? i : i - 4;
+                float expectedX = group == 0
+                    ? 8f + groupIndex % 2 * 117f
+                    : 310f + groupIndex % 2 * 117f;
+                Assert.AreEqual(expectedX, cells[i].xMin, .01f,
+                    "Each two-column category group stays on its side of the screen.");
                 for (int j = 0; j < i; j++) Assert.IsFalse(cells[i].Overlaps(cells[j]));
             }
             Rect[] statusCells = new Rect[2];
@@ -1848,7 +1987,7 @@ namespace HayChoriYPaty.Tests
                 "The Racing+ layout hides the original pennant slot without moving its controls.");
             Rect pennantArt = (Rect)View.GetMethod("FooterPennantRenderBounds", BindingFlags.Static | BindingFlags.NonPublic)
                 .Invoke(null, new object[] { pennants, canvasHeight, bottomBleed });
-            Assert.AreEqual(pennants, pennantArt,
+            Assert.AreEqual(pennants.height > 1f ? pennants : Rect.zero, pennantArt,
                 "The safe inset extends only a reserved pennant band; an empty slot never paints behind cards.");
         }
 
@@ -1906,7 +2045,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(TextureImporterCompression.Uncompressed, importer.textureCompression);
             var android = importer.GetPlatformTextureSettings("Android");
             Assert.IsTrue(android.overridden);
-            Assert.AreEqual(TextureImporterFormat.RGBA32, android.format);
+            Assert.AreEqual(TextureImporterFormat.ETC2_RGBA8, android.format);
             Assert.GreaterOrEqual(android.maxTextureSize, Math.Max(width, height));
         }
 
@@ -2009,7 +2148,7 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
             Assert.AreEqual(6f, cell1.xMin - cell0.xMax, .01f);
             Assert.AreEqual(34.56f, cell0.height, .01f, "The primary status strip is 20% taller.");
             Assert.AreEqual(8f, grid.x, .01f); Assert.AreEqual(41.76f, grid.y, .01f);
-            Assert.AreEqual(524f, grid.width, .01f); Assert.AreEqual(156.96f, grid.height, .01f);
+            Assert.AreEqual(524f, grid.width, .01f); Assert.AreEqual(77.28f, grid.height, .01f);
             Assert.IsTrue(bar.Contains(coins.min)); Assert.IsTrue(bar.Contains(coins.max));
             Assert.IsTrue(bar.Contains(clock.min)); Assert.IsTrue(bar.Contains(clock.max));
             Assert.IsFalse(coins.Overlaps(clock)); Assert.IsFalse(bar.Contains(grid.min));
@@ -2027,7 +2166,8 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
                 Assert.LessOrEqual(cells[i].xMax, grid.xMax + .01f);
                 Assert.GreaterOrEqual(cells[i].yMin, grid.yMin - .01f);
                 Assert.LessOrEqual(cells[i].yMax, grid.yMax + .01f);
-                Assert.AreEqual(i < 4 ? 8f : 427f, cells[i].xMin, .01f);
+                float expectedX = i < 4 ? 8f + i % 2 * 117f : 310f + (i - 4) % 2 * 117f;
+                Assert.AreEqual(expectedX, cells[i].xMin, .01f);
                 Assert.GreaterOrEqual(cells[i].yMin, bar.yMax);
                 Assert.AreEqual(105f, cells[i].width, .01f);
                 for (int j = 0; j < i; j++) Assert.IsFalse(cells[i].Overlaps(cells[j]));
@@ -2098,13 +2238,17 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
             Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
             Rect grid = (Rect)gridMethod.Invoke(null, new object[] { Rect.zero, products, products.Length });
             Rect[] cards = new Rect[products.Length];
-            int[] currentRowsByColumn = new int[2];
+            int[] currentIndexesByColumn = new int[2];
             for (int i = 0; i < products.Length; i++)
             {
                 cards[i] = (Rect)cellMethod.Invoke(null, new object[] { i, products, products.Length, Rect.zero });
                 int column = products[i] < 4 ? 0 : 1;
-                Assert.AreEqual(column == 0 ? 8f : 427f, cards[i].xMin, .01f,
-                    "Solid SKUs stay left; drink SKUs stay right.");
+                int groupIndex = currentIndexesByColumn[column]++;
+                float expectedX = column == 0
+                    ? 8f + groupIndex % 2 * 117f
+                    : 310f + groupIndex % 2 * 117f;
+                Assert.AreEqual(expectedX, cards[i].xMin, .01f,
+                    "Solid SKUs stay in the left group; drink SKUs stay in the right group.");
                 Assert.GreaterOrEqual(cards[i].yMin, bar.yMax, "The count overlays scenery just below the status strip.");
                 Assert.AreEqual(105f, cards[i].width, .01f, "Each sales counter is 25% wider while staying compact enough for the longest delivered/goal value.");
                 Assert.AreEqual(37.44f, cards[i].height, .02f, "Each sales counter is 25% taller than its previous 29.952-unit size.");
@@ -2112,9 +2256,57 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
                 Assert.LessOrEqual(cards[i].xMax, grid.xMax + .01f);
                 Assert.GreaterOrEqual(cards[i].yMin, grid.yMin - .01f);
                 Assert.LessOrEqual(cards[i].yMax, grid.yMax + .01f);
-                Assert.AreEqual(currentRowsByColumn[column]++, Mathf.RoundToInt((cards[i].yMin - (bar.yMax + 2.4f)) / 39.84f),
-                    "Each category has its own compact top-to-bottom stack.");
+                Assert.AreEqual(groupIndex / 2, Mathf.RoundToInt((cards[i].yMin - (bar.yMax + 2.4f)) / 39.84f),
+                    "Catalog order flows left-to-right, then top-to-bottom, in each category group.");
                 for (int j = 0; j < i; j++) Assert.IsFalse(cards[i].Overlaps(cards[j]));
+            }
+        }
+
+        [TestCase(540f, 960f, 0f)]
+        [TestCase(575f, 1280f, 0f)]
+        [TestCase(540f, 1200f, 0f)]
+        [TestCase(1080f, 2400f, 50f)]
+        public void HudQuotaGroupsClearEveryRearRowOrderBubbleAtPortraitSizes(float screenWidth, float screenHeight, float topInset)
+        {
+            Vector2 screenSize = new Vector2(screenWidth, screenHeight);
+            Rect safeArea = new Rect(0f, 0f, screenWidth, screenHeight - topInset);
+            Rect viewport = (Rect)View.GetMethod("CanvasViewport", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { screenSize, safeArea });
+            float verticalScale = (float)View.GetMethod("CanvasLogicalHeight", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { viewport }) / 960f;
+            Type sceneLayout = Type.GetType("HayChoriYPaty.StreetSceneLayout, Assembly-CSharp", true);
+            float counterTop = (float)sceneLayout.GetMethod("CounterTopInViewport").Invoke(null,
+                new object[] { screenWidth, screenHeight, viewport });
+            float customerOffset = (float)sceneLayout.GetMethod("CustomerOffset").Invoke(null,
+                new object[] { counterTop, verticalScale });
+            float screenScale = viewport.width / 540f;
+            float viewportTopInLogicalUnits = viewport.y / screenScale;
+            int[] products = { 0, 1, 2, 3, 4, 6, 5 };
+            Rect[] cutouts = screenWidth == 1080f
+                ? new[] { new Rect(478f, 2320f, 124f, 80f) }
+                : Array.Empty<Rect>();
+            Rect gap = (Rect)View.GetMethod("TopHudCutoutBounds", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { screenSize, cutouts });
+            MethodInfo cell = View.GetMethod("HudQuotaCellBounds", BindingFlags.Static | BindingFlags.NonPublic,
+                null, new[] { typeof(int), typeof(int[]), typeof(int), typeof(Rect) }, null);
+            Rect[] cards = new Rect[products.Length];
+            for (int i = 0; i < cards.Length; i++)
+                cards[i] = (Rect)cell.Invoke(null, new object[] { i, products, products.Length, gap });
+
+            MethodInfo queuePosition = Type.GetType("HayChoriYPaty.StreetSimulation, Assembly-CSharp", true)
+                .GetMethod("QueuePosition", BindingFlags.Static | BindingFlags.NonPublic);
+            for (int slot = 7; slot < 14; slot++)
+            {
+                Vector2 anchor = (Vector2)queuePosition.Invoke(null, new object[] { slot });
+                anchor.y += customerOffset;
+                Rect logicalBubble = Bubble(anchor, 2);
+                float contentScale = OrderContentScale(logicalBubble.height, verticalScale);
+                Rect bubble = OrderRect("OrderBubbleLayoutBounds", logicalBubble, verticalScale);
+                bubble.y += viewportTopInLogicalUnits;
+                for (int i = 0; i < cards.Length; i++)
+                    Assert.IsFalse(cards[i].Overlaps(bubble),
+                        "A rear-row order bubble overlaps quota " + i + " at " + screenWidth + "x" + screenHeight + ".");
+                Assert.Greater(contentScale, 0f);
             }
         }
 
@@ -2151,21 +2343,41 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
         }
 
         [Test]
-        public void HudQuotaCountersAlignRightWhileProductIconsStayAtTheLeftInset()
+        public void HudQuotaCountersCenterTextWhileProductIconsStayAtTheLeftInset()
         {
             const BindingFlags flags = BindingFlags.Static | BindingFlags.NonPublic;
             TextAnchor alignment = (TextAnchor)View.GetField("HudQuotaCounterTextAlignment", flags).GetRawConstantValue();
             float inset = (float)View.GetField("HudQuotaCardInset", flags).GetRawConstantValue();
             float rightInset = (float)View.GetField("HudQuotaCounterRightInset", flags).GetRawConstantValue();
-            Assert.AreEqual(TextAnchor.MiddleRight, alignment);
+            Assert.AreEqual(TextAnchor.MiddleCenter, alignment);
             Assert.AreEqual(1.5f, inset, .01f, "The icon inset scales with the enlarged card.");
-            Assert.AreEqual(6f, rightInset, .01f, "Keep a small but visible gap after the right-aligned count, scaled with the card.");
+            Assert.AreEqual(6f, rightInset, .01f, "Keep a small but visible gap after the centered count area.");
             Rect card = new Rect(0, 0, 100, 30);
             Rect icon = new Rect(inset, 2, 24, 24);
             Rect counter = (Rect)View.GetMethod("HudQuotaCounterBounds", flags)
                 .Invoke(null, new object[] { card, icon });
             Assert.Greater(counter.xMin, icon.xMax, "Text remains separated from the icon.");
             Assert.AreEqual(card.xMax - rightInset, counter.xMax, .01f, "The count's text area retains right padding.");
+            Assert.AreEqual(card.center.y, counter.center.y, .01f, "The count's text area is vertically centered in the chip.");
+        }
+
+        [Test]
+        public void HudQuotaCountersShareOneFitFontSizeAcrossAllValues()
+        {
+            const BindingFlags flags = BindingFlags.Static | BindingFlags.NonPublic;
+            MethodInfo fitFontSize = View.GetMethod("HudNumberFitFontSize", flags);
+            var style = new GUIStyle(EditorStyles.label) { fontSize = 35, wordWrap = false, padding = new RectOffset(0, 0, 0, 0) };
+            Rect counter = new Rect(0, 0, 61.8f, 33.2f);
+            string[] values = { "40/210", "40/145", "40/80", "32/75", "70/175", "43/90", "41/75" };
+            int sharedFontSize = 35;
+            foreach (string value in values)
+                sharedFontSize = Math.Min(sharedFontSize,
+                    (int)fitFontSize.Invoke(null, new object[] { style, counter, value, 35 }));
+            Assert.Less(sharedFontSize, 35, "The common quota size must fit within the text cell.");
+            foreach (string value in values)
+                Assert.AreEqual(sharedFontSize,
+                    (int)fitFontSize.Invoke(null, new object[] { style, counter, value, sharedFontSize }),
+                    value + " is rendered at the same shared quota-counter font size.");
         }
 
         [Test]
@@ -2434,7 +2646,7 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
                 Assert.AreEqual(TextureImporterNPOTScale.None, importer.npotScale);
                 Assert.AreEqual(TextureImporterCompression.Uncompressed, importer.textureCompression);
                 var android = importer.GetPlatformTextureSettings("Android");
-                Assert.IsTrue(android.overridden); Assert.AreEqual(TextureImporterFormat.RGBA32, android.format);
+                Assert.IsTrue(android.overridden); Assert.AreEqual(TextureImporterFormat.ETC2_RGBA8, android.format);
             }
 
             int count = (int)View.GetField("VelezFanVariantCount", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue();
@@ -2546,8 +2758,9 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
             Assert.IsNull(View.GetMethod("DrawServingTable", BindingFlags.NonPublic | BindingFlags.Instance));
         }
 
-        [Test]
-        public void CocaBarrelBaselineOffsetIsLinearAcrossTheFinalAndFirstFortyEightUnits()
+        [TestCase(4)]
+        [TestCase(6)]
+        public void BarrelDrinkWalkingRootDoesNotReceivePresentationSpeedOffsets(int product)
         {
             Type simulationType = Type.GetType("HayChoriYPaty.StreetSimulation, Assembly-CSharp", true);
             Type balanceType = Type.GetType("HayChoriYPaty.StreetBalance, Assembly-CSharp", true);
@@ -2555,43 +2768,61 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
             Type roleType = Type.GetType("HayChoriYPaty.StreetWorkerRole, Assembly-CSharp", true);
             Type stateType = Type.GetType("HayChoriYPaty.StreetWorkerState, Assembly-CSharp", true);
             object simulation = Activator.CreateInstance(simulationType,
-                new object[] { Activator.CreateInstance(balanceType), 1, 5f, 0, 1, 0 });
+                new object[] { Activator.CreateInstance(balanceType), 3, 5f, 0, 1, 0 });
             object worker = Activator.CreateInstance(workerType);
             SetProjectionMember(worker, "Role", Enum.Parse(roleType, "Cocacolero"));
-            SetProjectionMember(worker, "Product", 4);
+            SetProjectionMember(worker, "Product", product);
             object layout = simulationType.GetProperty("KitchenLayout").GetValue(simulation);
             Vector2 pickup = (Vector2)layout.GetType().GetMethod("PickupPosition", new[] { typeof(int) })
-                .Invoke(layout, new object[] { 4 });
+                .Invoke(layout, new object[] { product });
             Rect barrel = (Rect)layout.GetType().GetMethod("BoundsForProduct", new[] { typeof(int) })
-                .Invoke(layout, new object[] { 4 });
-            float fullOffset = Mathf.Max(0f, barrel.height - 24f);
-            MethodInfo offset = Type.GetType("HayChoriYPaty.StreetWorkerProjection, Assembly-CSharp", true)
-                .GetMethod("CocaBarrelPresentationOffset", BindingFlags.Static | BindingFlags.NonPublic);
-            Assert.NotNull(offset);
-            Func<float> sample = () => (float)offset.Invoke(null, new[] { simulation, worker });
+                .Invoke(layout, new object[] { product });
+            Assert.That(barrel.width, Is.GreaterThan(0f), "Both test product IDs must resolve to real barrel geometry.");
+            float fullBodyLift = Mathf.Max(0f, barrel.height - 24f);
+            Type projectionType = Type.GetType("HayChoriYPaty.StreetWorkerProjection, Assembly-CSharp", true);
+            MethodInfo presentationPosition = projectionType.GetMethod("PresentationPosition", BindingFlags.Static | BindingFlags.NonPublic);
+            MethodInfo bodyLift = projectionType.GetMethod("BarrelDrinkPickupBodyLift", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.NotNull(presentationPosition);
+            Assert.NotNull(bodyLift);
+            Func<Vector2> presented = () => (Vector2)presentationPosition.Invoke(null, new[] { simulation, worker });
+            Func<float> lifted = () => (float)bodyLift.Invoke(null, new[] { simulation, worker });
 
             SetProjectionMember(worker, "State", Enum.Parse(stateType, "ToStation"));
             SetProjectionMember(worker, "Route", new[] { pickup });
-            SetProjectionMember(worker, "RouteDistance", 64f);
-            float[] remaining = { 48f, 36f, 24f, 12f, 0f };
-            float[] expectedApproach = { 0f, .25f, .5f, .75f, 1f };
-            for (int i = 0; i < remaining.Length; i++)
+            SetProjectionMember(worker, "RouteDistance", 96f);
+            float[] remaining = { 96f, 48f, 36f, 24f, 12f, 0f };
+            foreach (float distance in remaining)
             {
-                SetProjectionMember(worker, "Position", pickup + Vector2.left * remaining[i]);
-                Assert.That(sample(), Is.EqualTo(fullOffset * expectedApproach[i]).Within(.01f),
-                    "The final 48-unit approach must add a constant offset per equal route-distance step.");
+                Vector2 logical = pickup + Vector2.left * distance;
+                SetProjectionMember(worker, "Position", logical);
+                Assert.That(Vector2.Distance(presented(), logical), Is.LessThan(.01f),
+                    "The rendered root must track the complete simulation position throughout the Coca/beer approach.");
+                Assert.That(lifted(), Is.EqualTo(0f).Within(.01f), "No pickup-body lift may run while walking.");
             }
 
             SetProjectionMember(worker, "State", Enum.Parse(stateType, "ToCounter"));
             SetProjectionMember(worker, "Route", new[] { pickup + Vector2.right * 64f });
             SetProjectionMember(worker, "RouteDistance", 64f);
-            float[] travelled = { 0f, 12f, 24f, 36f, 48f };
-            float[] expectedDeparture = { 1f, .75f, .5f, .25f, 0f };
-            for (int i = 0; i < travelled.Length; i++)
+            float[] travelled = { 0f, 12f, 24f, 36f, 48f, 64f };
+            foreach (float distance in travelled)
             {
-                SetProjectionMember(worker, "Position", pickup + Vector2.right * travelled[i]);
-                Assert.That(sample(), Is.EqualTo(fullOffset * expectedDeparture[i]).Within(.01f),
-                    "The first 48-unit departure must remove a constant offset per equal route-distance step.");
+                Vector2 logical = pickup + Vector2.right * distance;
+                SetProjectionMember(worker, "Position", logical);
+                Assert.That(Vector2.Distance(presented(), logical), Is.LessThan(.01f),
+                    "The root must stay on the complete real departure path instead of adding/subtracting vertical travel.");
+                Assert.That(lifted(), Is.EqualTo(0f).Within(.01f));
+            }
+
+            SetProjectionMember(worker, "State", Enum.Parse(stateType, "Pickup"));
+            SetProjectionMember(worker, "Position", pickup);
+            SetProjectionMember(worker, "Route", System.Array.Empty<Vector2>());
+            foreach (float progress in new[] { 0f, .5f, 1f })
+            {
+                SetProjectionMember(worker, "PickupProgress", progress);
+                Assert.That(Vector2.Distance(presented(), pickup), Is.LessThan(.01f),
+                    "Even while reaching, the worker's ground/root stays planted at the pickup anchor.");
+                Assert.That(lifted(), Is.EqualTo(fullBodyLift * Mathf.Sin(progress * Mathf.PI)).Within(.01f),
+                    "Only the stationary reach pose moves the upper body; feet and gameplay position remain fixed.");
             }
         }
 
@@ -2653,7 +2884,7 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
                 Assert.IsFalse(importer.mipmapEnabled); Assert.AreEqual(TextureImporterNPOTScale.None, importer.npotScale);
                 Assert.AreEqual(TextureImporterCompression.Uncompressed, importer.textureCompression);
                 var android = importer.GetPlatformTextureSettings("Android");
-                Assert.IsTrue(android.overridden); Assert.AreEqual(TextureImporterFormat.RGBA32, android.format);
+                Assert.IsTrue(android.overridden); Assert.AreEqual(TextureImporterFormat.ETC2_RGBA8, android.format);
             }
 
             Texture2D ferroFront = Resources.Load<Texture2D>("street-ferro-fans-front-v1");

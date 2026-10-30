@@ -244,7 +244,9 @@ namespace HayChoriYPaty
                 left = center - minSpread * .5f;
                 right = center + minSpread * .5f;
             }
-            float x = count == 1 ? barrel.center.x : Mathf.Lerp(left, right, index / (float)(count - 1));
+            float safeCenter = Mathf.Clamp(barrel.center.x, StreetWorkstationLayout.WorkerHalfWidth,
+                StreetSceneLayout.Width - StreetWorkstationLayout.WorkerHalfWidth);
+            float x = count == 1 ? safeCenter : Mathf.Lerp(left, right, index / (float)(count - 1));
             return new Vector2(x, barrel.yMin - (BarrelY - BarrelPickupY));
         }
 

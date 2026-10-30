@@ -16,7 +16,11 @@ namespace HayChoriYPaty.Tests
         Type gt, vt;
         string key, previous;
         bool hadSave;
+        string tutorialKey;
+        bool hadTutorialMarker;
+        int previousTutorialMarker;
         float oldScale;
+        int gameViewWidth = 1080, gameViewHeight = 1920;
 #if UNITY_EDITOR
         UnityEditor.EditorWindow gameWindow;
         PropertyInfo selectedSize;
@@ -24,6 +28,10 @@ namespace HayChoriYPaty.Tests
         int previousSize, addedSize;
         void SetPortraitView()
         {
+            if (int.TryParse(Environment.GetEnvironmentVariable("HCYP_GAMEVIEW_WIDTH"), out int requestedWidth) && requestedWidth >= 320)
+                gameViewWidth = requestedWidth;
+            if (int.TryParse(Environment.GetEnvironmentVariable("HCYP_GAMEVIEW_HEIGHT"), out int requestedHeight) && requestedHeight >= 480)
+                gameViewHeight = requestedHeight;
             const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
             Assembly editor = typeof(UnityEditor.EditorWindow).Assembly;
             gameWindow = UnityEditor.EditorWindow.GetWindow(editor.GetType("UnityEditor.GameView"));
@@ -34,7 +42,7 @@ namespace HayChoriYPaty.Tests
             object groupKind = registryType.GetProperty("currentGroupType", flags).GetValue(registry);
             sizeGroup = registryType.GetMethod("GetGroup", flags).Invoke(registry, new[] { groupKind });
             Type kind = editor.GetType("UnityEditor.GameViewSizeType");
-            object size = Activator.CreateInstance(editor.GetType("UnityEditor.GameViewSize"), new object[] { Enum.Parse(kind, "FixedResolution"), 1080, 1920, "Temporary hub QA" });
+            object size = Activator.CreateInstance(editor.GetType("UnityEditor.GameViewSize"), new object[] { Enum.Parse(kind, "FixedResolution"), gameViewWidth, gameViewHeight, "Temporary hub QA" });
             sizeGroup.GetType().GetMethod("AddCustomSize", flags).Invoke(sizeGroup, new[] { size });
             addedSize = (int)sizeGroup.GetType().GetMethod("GetTotalCount", flags).Invoke(sizeGroup, null) - 1;
             selectedSize.SetValue(gameWindow, addedSize); gameWindow.Repaint();
@@ -58,20 +66,26 @@ namespace HayChoriYPaty.Tests
         IEnumerator Capture(string name)
         {
             string folder = Environment.GetEnvironmentVariable("HCYP_CAPTURE_DIR");
-            if (string.IsNullOrEmpty(folder)) yield break;
+            if (string.IsNullOrEmpty(folder))
+                folder = Path.Combine(Path.GetTempPath(), "hcyp-street-hub-view-tests");
             Directory.CreateDirectory(folder);
             yield return null;
             yield return new WaitForEndOfFrame();
             Texture2D capture = ScreenCapture.CaptureScreenshotAsTexture();
             Assert.NotNull(capture);
-            Assert.AreEqual(1080, capture.width); Assert.AreEqual(1920, capture.height);
-            File.WriteAllBytes(Path.Combine(folder, name + ".png"), capture.EncodeToPNG());
+            Assert.AreEqual(gameViewWidth, capture.width); Assert.AreEqual(gameViewHeight, capture.height);
+            string resolutionName = name.Replace("1080x1920", gameViewWidth + "x" + gameViewHeight);
+            File.WriteAllBytes(Path.Combine(folder, resolutionName + ".png"), capture.EncodeToPNG());
             UnityEngine.Object.Destroy(capture);
         }
         [UnitySetUp] public IEnumerator SetUp()
         {
             gt = Type.GetType("HayChoriYPaty.StreetGame, Assembly-CSharp", true);
             vt = Type.GetType("HayChoriYPaty.StreetView, Assembly-CSharp", true);
+            tutorialKey = (string)vt.GetField("LevelOneTutorialCompletedKey",
+                BindingFlags.NonPublic | BindingFlags.Static).GetRawConstantValue();
+            hadTutorialMarker = PlayerPrefs.HasKey(tutorialKey);
+            previousTutorialMarker = hadTutorialMarker ? PlayerPrefs.GetInt(tutorialKey) : 0;
             key = (string)gt.GetField("ProgressKey").GetValue(null);
             hadSave = PlayerPrefs.HasKey(key); previous = hadSave ? PlayerPrefs.GetString(key) : null;
             object seed = Activator.CreateInstance(gt.GetNestedType("SaveData", BindingFlags.Public));
@@ -81,7 +95,7 @@ namespace HayChoriYPaty.Tests
 #if UNITY_EDITOR
             SetPortraitView();
             yield return null; yield return null;
-            Assert.AreEqual(1080, Screen.width); Assert.AreEqual(1920, Screen.height);
+            Assert.AreEqual(gameViewWidth, Screen.width); Assert.AreEqual(gameViewHeight, Screen.height);
 #endif
             root = new GameObject("Temporary hub integration test");
             root.AddComponent<Camera>(); root.AddComponent<AudioListener>();
@@ -94,6 +108,8 @@ namespace HayChoriYPaty.Tests
             if (accountRoot != null) UnityEngine.Object.Destroy(accountRoot);
             yield return null;
             if (hadSave) PlayerPrefs.SetString(key, previous); else PlayerPrefs.DeleteKey(key);
+            if (hadTutorialMarker) PlayerPrefs.SetInt(tutorialKey, previousTutorialMarker);
+            else PlayerPrefs.DeleteKey(tutorialKey);
             PlayerPrefs.Save(); Time.timeScale = oldScale;
 #if UNITY_EDITOR
             if (sizeGroup != null)
@@ -103,6 +119,69 @@ namespace HayChoriYPaty.Tests
             }
 #endif
         }
+        [Test] public void StartupDoesNotDefineTheUnrequestedGenericLoadingScreen()
+        {
+            Assert.IsNull(vt.GetMethod("DrawStartupLoadingFallback", P),
+                "Startup should not draw the separate generic PREPARANDO EL BARRIO screen.");
+        }
+
+        [UnityTest] public IEnumerator AmbientOverlaysRenderInTheFullHubGameView()
+        {
+            float deadline = Time.realtimeSinceStartup + 30f;
+            while (!(bool)Field("viewResourcesReady") && Time.realtimeSinceStartup < deadline) yield return null;
+            Assert.IsTrue((bool)Field("viewResourcesReady"), "Hub artwork must be loaded before the capture.");
+            Assert.NotNull(Field("hubBackdrop"), "The existing hub illustration remains the full-screen background.");
+
+            vt.GetField("introActive", P).SetValue(view, false);
+            vt.GetField("hubActive", P).SetValue(view, true);
+            vt.GetField("settingsActive", P).SetValue(view, false);
+            vt.GetField("marketActive", P).SetValue(view, false);
+            vt.GetField("badgesActive", P).SetValue(view, false);
+            vt.GetField("rankingActive", P).SetValue(view, false);
+
+            yield return null;
+            yield return Capture("hub-ambient-initial-playmode-1080x1920");
+            yield return new WaitForSecondsRealtime(18f);
+            Assert.IsTrue((bool)Field("hubActive"), "Ambient effects remain limited to the visible hub.");
+            object overlay = Field("hubAmbientOverlay");
+            Assert.NotNull(overlay, "The overlay renderer should exist only after the hub has been drawn.");
+            FieldInfo animationClock = overlay.GetType().GetField("animationTime", P);
+            Assert.NotNull(animationClock);
+            Assert.Greater((float)animationClock.GetValue(overlay), 15f, "The ambient cycles advance while the hub is visible.");
+            yield return Capture("hub-ambient-cycle-playmode-1080x1920");
+        }
+
+        [UnityTest] public IEnumerator NeighborhoodCharactersStayStillDuringAShortHubVisit()
+        {
+            float loadDeadline = Time.realtimeSinceStartup + 30f;
+            while (!(bool)Field("viewResourcesReady") && Time.realtimeSinceStartup < loadDeadline) yield return null;
+            Assert.IsTrue((bool)Field("viewResourcesReady"), "Hub artwork must load before the static character view is checked.");
+
+            vt.GetField("introActive", P).SetValue(view, false);
+            vt.GetField("hubActive", P).SetValue(view, true);
+            vt.GetField("settingsActive", P).SetValue(view, false);
+            vt.GetField("marketActive", P).SetValue(view, false);
+            vt.GetField("badgesActive", P).SetValue(view, false);
+            vt.GetField("rankingActive", P).SetValue(view, false);
+            Assert.IsNull(Field("hubCharacterScene"), "The paused character rig must not load or replace the still artwork.");
+            yield return Capture("hub-characters-static-initial-playmode-1080x1920");
+
+            yield return new WaitForSecondsRealtime(6.5f);
+            Assert.IsTrue((bool)Field("hubActive"), "The hub remains visible for the whole observation window.");
+            Assert.IsNull(Field("hubCharacterScene"), "No character rig or movement should start during the visit.");
+            yield return Capture("hub-characters-static-after-6s-playmode-1080x1920");
+        }
+
+        [UnityTest] public IEnumerator StartupShowsTheRealCoverWhileOtherAssetsLoad()
+        {
+            float deadline = Time.realtimeSinceStartup + 10f;
+            while (Field("coverArt") == null && Time.realtimeSinceStartup < deadline) yield return null;
+            Assert.NotNull(Field("coverArt"), "The startup cover should become available during the first resource batch.");
+            Assert.IsFalse((bool)Field("startupArtReady"),
+                "The cover-only interval should occur while the remaining first-batch assets are loading.");
+            yield return Capture("startup-cover-during-resource-load-1080x1920");
+        }
+
         [UnityTest] public IEnumerator StartupPresentationAndHubRenderBeforeFirebaseActivatesThePlayer()
         {
             float deadline = Time.realtimeSinceStartup + 20f;
@@ -126,7 +205,8 @@ namespace HayChoriYPaty.Tests
             Assert.IsFalse((bool)Field("introActive"));
             Assert.IsTrue((bool)Field("hubActive"), "The hub must appear before Firebase login.");
             Assert.IsFalse((bool)gt.GetProperty("IsPlayerActive").GetValue(game));
-            Assert.IsTrue((bool)vt.GetProperty("HubAccountActionRendered").GetValue(view));
+            Assert.IsFalse((bool)vt.GetProperty("HubAccountActionRendered").GetValue(view),
+                "No separate account button is shown on the hub.");
             yield return Capture("hub-before-auth-1080x1920");
         }
 
@@ -145,8 +225,30 @@ namespace HayChoriYPaty.Tests
             FieldInfo editorGate = gt.GetField("AllowEditorTestInitialization", BindingFlags.Public | BindingFlags.Static);
             bool previousEditorGate = (bool)editorGate.GetValue(null);
             editorGate.SetValue(null, false);
+            string musicKey = (string)vt.GetField("HubMusicEnabledPlayerPrefKey",
+                BindingFlags.NonPublic | BindingFlags.Static).GetRawConstantValue();
+            bool hadMusicPreference = PlayerPrefs.HasKey(musicKey);
+            int previousMusicPreference = PlayerPrefs.GetInt(musicKey, 1);
             try
             {
+            PlayerPrefs.SetInt(musicKey, 1);
+            int topMusicAction = (int)vt.GetField("HubTopMusicAction",
+                BindingFlags.NonPublic | BindingFlags.Static).GetRawConstantValue();
+            Dispatch(topMusicAction); // The icon toggles locally without opening the settings panel or Firebase gate.
+            Assert.IsFalse((bool)vt.GetMethod("HubMusicEnabled", BindingFlags.NonPublic | BindingFlags.Static).Invoke(null, null));
+            Assert.IsFalse((bool)Field("settingsActive"));
+            Assert.IsFalse((bool)sessionType.GetProperty("AccountMenuOpen").GetValue(session));
+            Dispatch(topMusicAction);
+            Assert.IsTrue((bool)vt.GetMethod("HubMusicEnabled", BindingFlags.NonPublic | BindingFlags.Static).Invoke(null, null));
+
+            Dispatch(207); // Settings are local and available before Firebase login.
+            Assert.IsTrue((bool)Field("settingsActive"));
+            Assert.IsFalse((bool)sessionType.GetProperty("AccountMenuOpen").GetValue(session));
+            Dispatch(208);
+            Assert.IsFalse((bool)vt.GetMethod("HubMusicEnabled", BindingFlags.NonPublic | BindingFlags.Static).Invoke(null, null));
+            Dispatch(209);
+            Assert.IsFalse((bool)Field("settingsActive"));
+
             Dispatch(200); // Jugar while signed out should direct the player to Cuenta, not silently fail.
             Assert.IsTrue((bool)sessionType.GetProperty("AccountMenuOpen").GetValue(session));
             Assert.IsTrue((bool)Field("hubActive"));
@@ -165,7 +267,13 @@ namespace HayChoriYPaty.Tests
             object sim = gt.GetProperty("Sim").GetValue(game);
             Assert.AreEqual("Ready", sim.GetType().GetProperty("Phase").GetValue(sim).ToString());
             }
-            finally { editorGate.SetValue(null, previousEditorGate); }
+            finally
+            {
+                if (hadMusicPreference) PlayerPrefs.SetInt(musicKey, previousMusicPreference);
+                else PlayerPrefs.DeleteKey(musicKey);
+                PlayerPrefs.Save();
+                editorGate.SetValue(null, previousEditorGate);
+            }
         }
 
         [UnityTest] public IEnumerator AutomaticIntroThenHubPointerDestinationsAndBack()
@@ -186,7 +294,13 @@ namespace HayChoriYPaty.Tests
             Assert.IsTrue((bool)Field("hubActive"));
             Assert.AreEqual(before, (float)remaining.GetValue(sim), .01f, "Intro cannot consume round time.");
             yield return Capture("hub-playmode-1080x1920");
-            Assert.IsTrue((bool)vt.GetProperty("HubAccountActionRendered").GetValue(view));
+            Assert.IsFalse((bool)vt.GetProperty("HubAccountActionRendered").GetValue(view),
+                "No separate account button is shown on the hub.");
+            Dispatch(207);
+            Assert.IsTrue((bool)Field("settingsActive"));
+            yield return Capture("hub-settings-1080x1920");
+            Dispatch(209);
+            Assert.IsFalse((bool)Field("settingsActive"));
             ClickAction(202); Assert.IsTrue((bool)Field("badgesActive"));
             object save = gt.GetField("save", P).GetValue(game);
             object statistics = save.GetType().GetField("statistics").GetValue(save);

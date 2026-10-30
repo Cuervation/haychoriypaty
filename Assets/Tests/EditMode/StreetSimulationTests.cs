@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEditor.SceneManagement;
@@ -32,6 +33,12 @@ namespace HayChoriYPaty.Tests
             if (coins > 0) Set(sim, "Coins", coins); // Synthetic fixture balance, not resumed save data.
             return sim;
         }
+        private static int StartingCoinsForLevel(object balance, int level)
+        {
+            MethodInfo getter = balance.GetType().GetMethod("GetStartingCoins", new[] { typeof(int) });
+            Assert.NotNull(getter, "The configured per-level starting balance remains the source of truth.");
+            return (int)getter.Invoke(balance, new object[] { level });
+        }
         private static object Get(object instance, string property)
         {
             Type type = instance.GetType();
@@ -43,10 +50,28 @@ namespace HayChoriYPaty.Tests
         }
         private static object Call(object instance, string method, params object[] args)
         {
-            MethodInfo target = null;
+            var matches = new List<MethodInfo>();
             foreach (MethodInfo candidate in instance.GetType().GetMethods(Instance))
-                if (candidate.Name == method && candidate.GetParameters().Length == args.Length) { target = candidate; break; }
-            return target.Invoke(instance, args);
+            {
+                if (candidate.Name != method) continue;
+                ParameterInfo[] parameters = candidate.GetParameters();
+                if (parameters.Length != args.Length) continue;
+                bool compatible = true;
+                for (int i = 0; i < parameters.Length; i++)
+                {
+                    Type parameterType = parameters[i].ParameterType;
+                    if (args[i] == null)
+                    {
+                        if (parameterType.IsValueType && Nullable.GetUnderlyingType(parameterType) == null) { compatible = false; break; }
+                    }
+                    else if (!parameterType.IsInstanceOfType(args[i])) { compatible = false; break; }
+                }
+                if (compatible) matches.Add(candidate);
+            }
+            if (matches.Count == 0) throw new MissingMethodException(instance.GetType().FullName, method);
+            if (matches.Count > 1) throw new AmbiguousMatchException(instance.GetType().FullName + "." + method + " for argument types " +
+                string.Join(", ", Array.ConvertAll(args, arg => arg == null ? "null" : arg.GetType().Name)));
+            return matches[0].Invoke(instance, args);
         }
         private static void Start(object sim)
         {
@@ -131,6 +156,8 @@ namespace HayChoriYPaty.Tests
         private static Rect KitchenFootprint(object layout, int product) => (Rect)KitchenLayout.GetMethod("FootprintForProduct").Invoke(layout, new object[] { product });
         private static Rect KitchenGrillBounds(object layout, int product) => (Rect)KitchenLayout.GetMethod("GrillBoundsForProduct").Invoke(layout, new object[] { product });
         private static Vector2 KitchenPickupPosition(object layout, int product) => (Vector2)KitchenLayout.GetMethod("PickupPosition", new[] { typeof(int) }).Invoke(layout, new object[] { product });
+        private static Vector2 PickupPositionForWorker(object sim, object worker) => (Vector2)sim.GetType()
+            .GetMethod("PickupPositionForWorker", Hidden).Invoke(sim, new[] { worker });
         private static Vector2[] KitchenShortestRoute(object layout, Vector2 start, Vector2 destination) =>
             (Vector2[])KitchenLayout.GetMethod("FindShortestSafeRoute").Invoke(layout, new object[] { start, destination });
         private static Rect KitchenWorkerFootBounds(Vector2 position) => new Rect(position.x - 18f, position.y - 12f, 36f, 12f);
@@ -263,7 +290,8 @@ namespace HayChoriYPaty.Tests
                             firstDeliveryPosition = feet;
                             firstDeliveryAtHandoff = true;
                             Assert.AreEqual(new Vector2(target.x, ExpectedHandoffY(target.y)), feet, "The next unit starts where the first was handed to this customer.");
-                            Vector2[] nextTrip = KitchenShortestRoute(kitchenLayout, firstDeliveryPosition, KitchenPickupPosition(kitchenLayout, product));
+                            Vector2 pickup = PickupPositionForWorker(sim, worker);
+                            Vector2[] nextTrip = KitchenShortestRoute(kitchenLayout, firstDeliveryPosition, pickup);
                             Assert.Greater(nextTrip.Length, 0);
                             Assert.AreEqual(nextTrip[0], Get(worker, "Target"), "A successive unit starts from the prior handoff position.");
                             if (column == 0) Assert.Greater(Vector2.Distance(firstDeliveryPosition, new Vector2(433f, WorkerServiceY)), 1f,
@@ -279,7 +307,7 @@ namespace HayChoriYPaty.Tests
                         if (state == "Pickup")
                         {
                             picked = true;
-                            Assert.AreEqual(KitchenPickupPosition(kitchenLayout, product), feet);
+                            Assert.AreEqual(PickupPositionForWorker(sim, worker), feet);
                             Assert.AreEqual(0, Get(worker, "CarriedItemId"), "No drink/product is held before the station pickup completes.");
                             if ((float)Get(worker, "PickupProgress") > 0f) pickupProgressObserved = true;
                         }
@@ -292,7 +320,8 @@ namespace HayChoriYPaty.Tests
                             Assert.NotNull(carriedUnit);
                             Assert.AreEqual("Carried", Get(carriedUnit, "Location").ToString());
                             Assert.AreEqual(workerId, Get(carriedUnit, "WorkerId"));
-                            Vector2[] independentReturn = KitchenShortestRoute(kitchenLayout, KitchenPickupPosition(kitchenLayout, product), new Vector2(target.x, ExpectedHandoffY(target.y)));
+                            Vector2 pickup = PickupPositionForWorker(sim, worker);
+                            Vector2[] independentReturn = KitchenShortestRoute(kitchenLayout, pickup, new Vector2(target.x, ExpectedHandoffY(target.y)));
                             Assert.Greater(independentReturn.Length, 0);
                             Vector2[] activeReturn = (Vector2[])Get(worker, "Route");
                             CollectionAssert.AreEqual(independentReturn, activeReturn, "The return trip is recalculated from pickup to this customer's handoff.");
@@ -331,16 +360,18 @@ namespace HayChoriYPaty.Tests
             Vector2 center = KitchenPickupPosition(layout, 4);
             MethodInfo pickupForWorker = simType.GetMethod("PickupPositionForWorker", Hidden);
             Assert.NotNull(pickupForWorker);
-
-            Vector2[] points = new Vector2[2];
-            int found = 0;
-            foreach (object worker in workers)
+            Type customerType = Type.GetType("HayChoriYPaty.StreetCustomer, Assembly-CSharp", true);
+            object[] cocaWorkers = workers.Cast<object>().Where(worker => Get(worker, "Role").ToString() == "Cocacolero").ToArray();
+            Assert.AreEqual(2, cocaWorkers.Length);
+            for (int i = 0; i < cocaWorkers.Length; i++)
             {
-                if (Get(worker, "Role").ToString() != "Cocacolero") continue;
-                Set(worker, "Product", 4);
-                points[found++] = (Vector2)pickupForWorker.Invoke(sim, new[] { worker });
+                Set(cocaWorkers[i], "Product", 4);
+                SetField(cocaWorkers[i], "Customer", Activator.CreateInstance(customerType));
+                Set(cocaWorkers[i], "CustomerId", i + 1);
+                Set(cocaWorkers[i], "State", Enum.Parse(Type.GetType("HayChoriYPaty.StreetWorkerState, Assembly-CSharp", true), "ToStation"));
             }
-            Assert.AreEqual(2, found);
+
+            Vector2[] points = cocaWorkers.Select(worker => (Vector2)pickupForWorker.Invoke(sim, new[] { worker })).ToArray();
             if (expectCentered)
             {
                 Assert.AreEqual(center, points[0]);
@@ -349,9 +380,9 @@ namespace HayChoriYPaty.Tests
             else
             {
                 MethodInfo spread = KitchenLayout.GetMethod("PickupPosition", new[] { typeof(int), typeof(int), typeof(int) });
-                Assert.AreEqual(spread.Invoke(layout, new object[] { 4, 0, 3 }), points[0]);
-                Assert.AreEqual(spread.Invoke(layout, new object[] { 4, 1, 3 }), points[1]);
-                Assert.AreNotEqual(points[0], points[1], "Later levels keep the existing multi-worker barrel access spread.");
+                Assert.AreEqual(spread.Invoke(layout, new object[] { 4, 0, 2 }), points[0]);
+                Assert.AreEqual(spread.Invoke(layout, new object[] { 4, 1, 2 }), points[1]);
+                Assert.AreNotEqual(points[0], points[1], "Later levels keep separate lanes for simultaneous same-barrel workers.");
             }
         }
 
@@ -380,10 +411,10 @@ namespace HayChoriYPaty.Tests
 
             object layout = Get(sim, "KitchenLayout");
             object kitchen = Get(sim, "Kitchen");
-            Assert.AreEqual(KitchenPickupPosition(layout, 4),
-                KitchenLayout.GetMethod("BarrelPickupPosition").Invoke(layout, new object[] { 4 }));
-            Assert.AreEqual(KitchenPickupPosition(layout, 6),
-                KitchenLayout.GetMethod("BarrelPickupPosition").Invoke(layout, new object[] { 6 }));
+            MethodInfo barrelPickup = KitchenLayout.GetMethod("BarrelPickupPosition", new[] { typeof(int) });
+            Assert.NotNull(barrelPickup);
+            Assert.AreEqual(KitchenPickupPosition(layout, 4), barrelPickup.Invoke(layout, new object[] { 4 }));
+            Assert.AreEqual(KitchenPickupPosition(layout, 6), barrelPickup.Invoke(layout, new object[] { 6 }));
 
             bool bothActive = false, cocaPickupProgress = false, beerPickupProgress = false;
             int coinsBefore = (int)Get(sim, "Coins");
@@ -521,31 +552,40 @@ object sim = Make(level: 2);
             Assert.AreEqual(parrilleroId, Get(Call(customer, "GetOrderLine", 1), "OwnerWorkerId"));
             Assert.AreEqual(Get(cocacolero, "Id"), Get(Call(customer, "GetOrderLine", 2), "OwnerWorkerId"));
             Assert.AreEqual(0, Get(Call(customer, "GetOrderLine", 1), "Reserved"), "Paty is owned by the Parrillero but waits while its Chori trip completes.");
-            int completedOrderSignals = 0;
+            int completedOrderSignals = 0, deliveredItemSignals = 0;
             Action completedOrderHandler = () => completedOrderSignals++;
+            Action deliveredItemHandler = () => deliveredItemSignals++;
             EventInfo orderCompleted = simType.GetEvent("OrderCompleted");
+            EventInfo productUnitDelivered = simType.GetEvent("ProductUnitDelivered");
+            Assert.IsNotNull(productUnitDelivered, "The simulation exposes one event per successfully delivered unit.");
             orderCompleted.AddEventHandler(sim, completedOrderHandler);
+            productUnitDelivered.AddEventHandler(sim, deliveredItemHandler);
 
             for (int i = 0; i < 800 && (int)Get(sim, "Delivered") < 5; i++)
             {
                 Step(sim, .02f);
+                Assert.AreEqual((int)Get(sim, "Delivered"), deliveredItemSignals,
+                    "Every successful unit handoff emits exactly one delivery signal.");
                 if ((int)Get(sim, "Delivered") < 5)
                 {
-                    Assert.AreEqual(0, completedOrderSignals, "No cue is emitted while any requested unit remains undelivered.");
+                    Assert.AreEqual(0, completedOrderSignals, "Ticket completion is not signaled while any requested unit remains undelivered.");
                     Assert.IsTrue(Customers(sim).Contains(customer), "The mixed customer must wait for both specialties.");
                     Assert.AreNotEqual("Leaving", Get(customer, "State").ToString());
                 }
             }
             Assert.AreEqual(5, Get(sim, "Delivered"));
-            Assert.AreEqual(1, completedOrderSignals, "A mixed ticket emits the presentation cue once, after its final successful unit.");
-            orderCompleted.RemoveEventHandler(sim, completedOrderHandler);
+            Assert.AreEqual(5, deliveredItemSignals, "A five-unit mixed ticket emits a cue signal for every delivered unit.");
+            Assert.AreEqual(1, completedOrderSignals, "A mixed ticket emits one completion event only after its final successful unit.");
             Assert.AreEqual(2, Get(sim, "ChoriDelivered"));
             Assert.AreEqual(2, Get(sim, "CocaDelivered"));
             for (int i = 0; i < 3; i++) Assert.AreEqual(0, Get(Call(customer, "GetOrderLine", i), "Remaining"));
             Assert.AreEqual(25, Get(sim, "Coins"));
             Step(sim, .35f); // Receiving finishes only after the final unit; then the customer begins leaving.
             Assert.AreEqual("Leaving", Get(customer, "State").ToString());
-            Assert.AreEqual(1, completedOrderSignals, "The completed ticket cannot emit a duplicate cue on later simulation steps.");
+            Assert.AreEqual(5, deliveredItemSignals, "A completed ticket emits no extra unit signals on later simulation steps.");
+            Assert.AreEqual(1, completedOrderSignals, "The completed ticket emits no duplicate completion event on later simulation steps.");
+            productUnitDelivered.RemoveEventHandler(sim, deliveredItemHandler);
+            orderCompleted.RemoveEventHandler(sim, completedOrderHandler);
         }
 
         [Test]
@@ -765,9 +805,9 @@ object sim = Make(level: 2);
             object balance = NewBalance(); Tune(balance, "maxCustomers", 1); Tune(balance, "levelProductCounts", new[] { 1, 1, 5, 6, 7 });
             object sim = Make(level: 1, balance: balance); Call(sim, "SetPrice", 0f);
             Assert.AreEqual(5f, Get(sim, "Price"));
-            Start(sim); Spawn(sim, 0, 1); Step(sim, 8f);
+            Start(sim); int openingCoins = (int)Get(sim, "Coins"); Spawn(sim, 0, 1); Step(sim, 8f);
             Assert.Greater((int)Get(sim, "Delivered"), 0);
-            Assert.AreEqual((int)Get(sim, "Delivered") * 5, Get(sim, "Coins"));
+            Assert.AreEqual(openingCoins + (int)Get(sim, "Delivered") * 5, Get(sim, "Coins"));
             Assert.AreEqual((int)Get(sim, "Delivered") * 5, Get(sim, "CoinsEarned"));
         }
 
@@ -827,7 +867,7 @@ object sim = Make(level: 2);
                     if (state == "Pickup")
                     {
                         picked[role] = true;
-                        Assert.AreEqual(KitchenPickupPosition(kitchenLayout, role == 0 ? 0 : 4), position);
+                        Assert.AreEqual(PickupPositionForWorker(sim, worker), position);
                         Assert.AreEqual(role == 0 ? 0 : 4, Get(worker, "Product"));
                     }
                     if (state == "ToCounter") carried[role] = true;
@@ -1078,11 +1118,12 @@ var sim = Make(level: 1); Start(sim); Set(sim, "Coins", 10000);
         public void EveryLevelStartAndRestartDiscardCoinsButStillEarnIncome(int level)
         {
             object sim = Make(coins: 123, level: level); Start(sim);
-            Assert.AreEqual(0, Get(sim, "Coins"));
+            int configuredOpening = StartingCoinsForLevel(Get(sim, "balance"), level);
+            Assert.AreEqual(configuredOpening, Get(sim, "Coins"));
             Spawn(sim, 0, 1); Step(sim, 8f);
-            Assert.Greater((int)Get(sim, "Coins"), 0, "Real handoffs still earn coins within the attempt");
+            Assert.Greater((int)Get(sim, "Coins"), configuredOpening, "Real handoffs still earn coins within the attempt");
             Start(sim);
-            Assert.AreEqual(0, Get(sim, "Coins"));
+            Assert.AreEqual(configuredOpening, Get(sim, "Coins"));
         }
 
         [Test]
@@ -1334,7 +1375,8 @@ object b = NewBalance(); TuneAllProductGoals(b, level, 1);
         [Test]
         public void AllLevelsNormalizeLegacyPricesAndKeepFlorestaResetRules()
         {
-            object sim = Activator.CreateInstance(simType, new object[] { NewBalance(), 0, 60f, 123, 3, 4 });
+            object balance = NewBalance();
+            object sim = Activator.CreateInstance(simType, new object[] { balance, 0, 60f, 123, 3, 4 });
             Assert.AreEqual(5f, Get(sim, "Price"));
             Assert.IsFalse((bool)Get(sim, "CanEditPrices"));
             Call(sim, "SetPrice", 0f); Call(sim, "SetProductPrice", 0, 60f);
@@ -1343,7 +1385,7 @@ object b = NewBalance(); TuneAllProductGoals(b, level, 1);
             Assert.AreEqual(0, Get(sim, "SpeedLevel"));
             Assert.That((float)Get(sim, "WorkRate"), Is.EqualTo(1f).Within(.0001f));
             Call(sim, "SelectLevel", 1); Call(sim, "SetPrice", 17f);
-            Assert.AreEqual(0, Get(sim, "Coins"));
+            Assert.AreEqual(StartingCoinsForLevel(balance, 1), Get(sim, "Coins"));
             Assert.IsFalse((bool)Get(sim, "CanEditPrices")); Assert.AreEqual(5f, Get(sim, "Price"));
             Call(sim, "SelectLevel", 0); Assert.AreEqual(5f, Get(sim, "Price"));
         }
@@ -1502,7 +1544,7 @@ object balance = NewBalance();
             Assert.AreEqual(1f, Get(restored, "WorkRate"));
             Assert.AreEqual(1, Get(restored, "ParrilleroCount")); Assert.AreEqual(0, Get(restored, "CocacoleroCount"));
             Assert.AreEqual(10000, Get(restored, "Coins"), "The explicit test-balance API is unchanged");
-            Start(restored); Assert.AreEqual(0, Get(restored, "Coins"));
+            Start(restored); Assert.AreEqual(StartingCoinsForLevel(b, 1), Get(restored, "Coins"));
         }
 
         [Test]
@@ -1794,6 +1836,7 @@ public void LaterLevelPurchasesResumeAtTheNextTableTier()
         {
             object balance = NewBalance(); Tune(balance, "maxCustomers", 1);
             object sim = Make(level: 1, balance: balance); Start(sim);
+            int openingCoins = (int)Get(sim, "Coins");
             object customer = SpawnOrder(sim, new[] { 0, 4 }, new[] { 2, 1 }); SetWaiting(customer);
             object worker = ((IList)Get(sim, "Workers"))[0]; HiddenCall(sim, "Assign", worker);
             object chori = Call(customer, "GetOrderLine", 0);
@@ -1802,7 +1845,7 @@ public void LaterLevelPurchasesResumeAtTheNextTableTier()
             HiddenCall(sim, "AdvanceCustomers", 120f);
             Assert.AreEqual("Waiting", Get(customer, "State").ToString());
             Assert.AreEqual(ownerId, Get(chori, "OwnerWorkerId")); Assert.AreEqual(1, Get(chori, "Reserved"));
-            Assert.AreEqual(0, Get(sim, "Delivered")); Assert.AreEqual(0, Get(sim, "Coins"));
+            Assert.AreEqual(0, Get(sim, "Delivered")); Assert.AreEqual(openingCoins, Get(sim, "Coins"));
             Assert.AreEqual(0, Get(sim, "CustomersLost"));
         }
 
@@ -2103,7 +2146,7 @@ string[] names = (string[])simType.GetField("LevelNames", BindingFlags.Public | 
         {
 string[] expectedNames = { "Racing Club / Avellaneda", "San Lorenzo / Boedo", "River Plate / Núñez", "Boca Juniors / La Boca", "Sindicato de Camioneros / Plaza de Mayo", "Los Redondos / Tandil" };
             int[] expectedGoals = { 850, 1020, 1050, 1150, 1300, 1450 };
-            float[] expectedDurations = { 260f, 270f, 340f, 340f, 300f, 315f };
+            float[] expectedDurations = { 260f, 300f, 340f, 340f, 360f, 315f };
             float[] expectedDemand = { 1.65f, 1.815f, 1.9965f, 2.19615f, 2.415765f, 2.6573415f };
             string[] names = (string[])simType.GetField("LevelNames", BindingFlags.Public | BindingFlags.Static).GetValue(null);
             object balance = NewBalance();
@@ -2142,7 +2185,7 @@ StrategyRun run = SimulateStrategy(10, 1337, "D");
             Tune(balance, "levelProductIds", new[] { "0", "0,4", "0,1,4", "0,1,2,4,6", "0,1,2,3,4,6,5" });
             object sim = Make(level: level, balance: balance);
             Assert.AreEqual(goal, Get(sim, "Goal"));
-            Assert.AreEqual(level == 5 ? 260f : level == 6 ? 270f : (level == 7 || level == 8) ? 340f : level == 10 ? 315f : 300f, Get(sim, "TimeRemaining"));
+            Assert.AreEqual(level == 5 ? 260f : level == 6 ? 300f : (level == 7 || level == 8) ? 340f : level == 9 ? 360f : level == 10 ? 315f : 300f, Get(sim, "TimeRemaining"));
             Assert.AreEqual(7, Get(sim, "ProductCount"));
             Start(sim); Assert.DoesNotThrow(() => Step(sim, 1f));
         }
@@ -2171,7 +2214,7 @@ object sim = Make(level: level);
                 new[] {210,145,80,75,175,75,90}, new[] {230,175,110,95,205,90,115},
                 new[] {250,180,110,95,210,90,115}, new[] {275,195,120,110,225,100,125},
                 new[] {310,220,135,125,255,110,145}, new[] {345,245,150,140,285,120,165} };
-            float[] durations = {120f,150f,180f,210f,240f,260f,270f,340f,340f,300f,315f};
+            float[] durations = {120f,150f,180f,210f,240f,260f,300f,340f,340f,300f,315f};
             int[] openingCoins = {0,10,0,0,0,250,250,800,800,500,2000};
             for (int level = 0; level < 11; level++)
             {
@@ -2187,9 +2230,9 @@ object sim = Make(level: level);
             }
         }
 
-        [TestCase(7)]
-        [TestCase(8)]
-        public void RiverAndBocaStartAndRestartWithCopiedUConfiguration(int level)
+        [TestCase(7, 0, 60)]
+        [TestCase(8, 1, 65)]
+        public void RiverAndBocaStartAndRestartWithUConfigurationAndBocaMozo(int level, int expectedMozoCount, int firstPaidMozoCost)
         {
             object balance = NewBalance();
             object sim = Make(level: level, balance: balance);
@@ -2201,7 +2244,15 @@ object sim = Make(level: level);
             Assert.AreEqual(0, Get(sim, "CocacoleroCount"));
             Assert.AreEqual(0, Get(sim, "ParrilleroPremiumCount"));
             Assert.AreEqual(0, Get(sim, "FerneteroCount"));
-            Assert.AreEqual(0, Get(sim, "MozoCount"));
+            Assert.AreEqual(expectedMozoCount, Get(sim, "MozoCount"));
+            Assert.AreEqual(firstPaidMozoCost, Get(sim, "MozoHireCost"), "Free Boca staffing must not consume the first paid Mozo tier.");
+            if (level == 8)
+            {
+                object mozo = Enum.Parse(Type.GetType("HayChoriYPaty.StreetWorkerRole, Assembly-CSharp", true), "Mozo");
+                Assert.IsTrue((bool)Call(sim, "TryHire", mozo));
+                Assert.AreEqual(2, Get(sim, "MozoCount"));
+                Assert.AreEqual(165, Get(sim, "MozoHireCost"), "The next Boca Mozo keeps the role-local ×2.5 tier.");
+            }
             Assert.AreEqual(0, Get(sim, "SpeedLevel"));
             Assert.AreEqual(1f, Get(sim, "WorkRate"));
             Assert.AreEqual(0, Get(sim, "CoinsEarned"));
@@ -2213,15 +2264,65 @@ object sim = Make(level: level);
 
             Assert.AreEqual(800, Get(sim, "Coins"));
             Assert.AreEqual(340f, Get(sim, "TimeRemaining"));
-            Assert.AreEqual(1, Get(sim, "StaffCount"));
+            Assert.AreEqual(1 + expectedMozoCount, Get(sim, "StaffCount"));
             Assert.AreEqual(1, Get(sim, "ParrilleroCount"));
+            Assert.AreEqual(expectedMozoCount, Get(sim, "MozoCount"), "Retry restores only Boca's free Mozo and discards paid hires.");
+            Assert.AreEqual(firstPaidMozoCost, Get(sim, "MozoHireCost"));
             Assert.AreEqual(0, Get(sim, "SpeedLevel"));
             Assert.AreEqual(1f, Get(sim, "WorkRate"));
+
+            object levelSelection = Make(level: 7, balance: balance);
+            Assert.IsTrue((bool)Call(levelSelection, "SelectLevel", 8));
+            Assert.AreEqual(2, Get(levelSelection, "StaffCount"));
+            Assert.AreEqual(1, Get(levelSelection, "MozoCount"), "Selecting Boca installs its free starter exactly once.");
+            Assert.AreEqual(65, Get(levelSelection, "MozoHireCost"));
+            Assert.IsTrue((bool)Call(levelSelection, "SelectLevel", 7));
+            Assert.AreEqual(1, Get(levelSelection, "StaffCount"));
+            Assert.AreEqual(0, Get(levelSelection, "MozoCount"), "River remains unchanged after changing back from Boca.");
         }
 
+        [Test]
+        public void CamionerosStartsWith360SecondsFreeCocacoleroAndMozo()
+        {
+            object balance = NewBalance();
+            object sim = Make(level: 8, balance: balance);
+            Assert.IsTrue((bool)Call(sim, "SelectLevel", 9));
+            Start(sim);
+
+            Assert.AreEqual(500, Get(sim, "Coins"));
+            Assert.AreEqual(360f, Get(sim, "TimeRemaining"));
+            Assert.AreEqual(1, Get(sim, "ParrilleroCount"));
+            Assert.AreEqual(1, Get(sim, "CocacoleroCount"));
+            Assert.AreEqual(0, Get(sim, "ParrilleroPremiumCount"));
+            Assert.AreEqual(0, Get(sim, "FerneteroCount"));
+            Assert.AreEqual(1, Get(sim, "MozoCount"));
+            Assert.AreEqual(3, Get(sim, "StaffCount"));
+            Assert.AreEqual(60, Get(sim, "CocacoleroHireCost"), "The free Cocacolero must not consume Camioneros' first paid Coca tier.");
+            Assert.AreEqual(70, Get(sim, "MozoHireCost"), "The free Mozo must not consume Camioneros' first paid Mozo tier.");
+
+            Type roleType = Type.GetType("HayChoriYPaty.StreetWorkerRole, Assembly-CSharp", true);
+            object cocacolero = Enum.Parse(roleType, "Cocacolero");
+            object mozo = Enum.Parse(roleType, "Mozo");
+            Assert.IsTrue((bool)Call(sim, "TryHire", cocacolero));
+            Assert.IsTrue((bool)Call(sim, "TryHire", mozo));
+            Assert.AreEqual(150, Get(sim, "CocacoleroHireCost"));
+            Assert.AreEqual(175, Get(sim, "MozoHireCost"));
+
+            object nextAttempt = Make(level: 8, balance: balance);
+            Assert.IsTrue((bool)Call(nextAttempt, "SelectLevel", 9));
+            Start(nextAttempt);
+            Assert.AreEqual(500, Get(nextAttempt, "Coins"));
+            Assert.AreEqual(360f, Get(nextAttempt, "TimeRemaining"));
+            Assert.AreEqual(3, Get(nextAttempt, "StaffCount"), "A new Camioneros attempt restores only the three free starters.");
+            Assert.AreEqual(1, Get(nextAttempt, "ParrilleroCount"));
+            Assert.AreEqual(1, Get(nextAttempt, "CocacoleroCount"));
+            Assert.AreEqual(1, Get(nextAttempt, "MozoCount"));
+            Assert.AreEqual(60, Get(nextAttempt, "CocacoleroHireCost"));
+            Assert.AreEqual(70, Get(nextAttempt, "MozoHireCost"));
+        }
 
         [Test]
-        public void MainSceneUsesUpdatedSanLorenzoGoalsAndMatchingMarketMinimumStock()
+        public void MainSceneUsesSanLorenzoConfigurationJAndMatchingMarketMinimumStock()
         {
             var previous = SceneManager.GetActiveScene();
             var scene = SceneManager.GetSceneByPath("Assets/Scenes/Main.unity");
@@ -2245,13 +2346,17 @@ object sim = Make(level: level);
                     new[] {210,145,80,75,175,75,90}, new[] {230,175,110,95,205,90,115},
                     new[] {250,180,110,95,210,90,115}, new[] {275,195,120,110,225,100,125},
                     new[] {310,220,135,125,255,110,145}, new[] {345,245,150,140,285,120,165} };
-                float[] expectedDurations = {120f,150f,180f,210f,240f,260f,270f,295f,300f,300f,315f};
-                int[] expectedOpeningCoins = {0,10,0,0,0,250,250,250,250,500,2000};
+                float[] expectedDurations = {120f,150f,180f,210f,240f,260f,300f,340f,340f,360f,315f};
+                int[] expectedOpeningCoins = {0,10,0,0,0,250,250,800,800,500,2000};
                 object sanLorenzo = null;
                 for (int level = 0; level < 11; level++)
                 {
                     object sim = Make(level: level, balance: balance);
                     int total = 0;
+                    Assert.AreEqual(level == 6 ? 2 : 1, Get(sim, "ParrilleroCount"), "Main normal roster at level " + (level + 1));
+                    Assert.AreEqual(level == 5 || level == 6 || level == 8 || level == 9 ? 1 : 0, Get(sim, "MozoCount"), "Main Mozo roster at level " + (level + 1));
+                    Assert.AreEqual(level == 9 ? 1 : 0, Get(sim, "CocacoleroCount"), "Main Cocacolero roster at level " + (level + 1));
+                    Assert.AreEqual(level == 5 ? 1 : 0, Get(sim, "ParrilleroPremiumCount"), "Main Premium roster at level " + (level + 1));
                     Assert.AreEqual(expectedDurations[level], Get(sim, "TimeRemaining"), "Main duration at level " + (level + 1));
                     Assert.AreEqual(expectedOpeningCoins[level], Call(balance, "GetStartingCoins", level), "Main opening coins at level " + (level + 1));
                     for (int product = 0; product < 7; product++)
@@ -2269,8 +2374,8 @@ object sim = Make(level: level);
                 Assert.IsNotNull(sanLorenzo);
                 Start(sanLorenzo);
                 Assert.AreEqual(250, Get(sanLorenzo, "Coins"));
-                Assert.AreEqual(270f, Get(sanLorenzo, "TimeRemaining"));
-                Assert.AreEqual(1, Get(sanLorenzo, "ParrilleroCount"));
+                Assert.AreEqual(300f, Get(sanLorenzo, "TimeRemaining"));
+                Assert.AreEqual(2, Get(sanLorenzo, "ParrilleroCount"));
                 Assert.AreEqual(1, Get(sanLorenzo, "MozoCount"));
                 Assert.AreEqual(0, Get(sanLorenzo, "ParrilleroPremiumCount"));
                 Assert.AreEqual(0, Get(sanLorenzo, "SpeedLevel"));
@@ -2281,6 +2386,46 @@ object sim = Make(level: level);
                 CollectionAssert.AreEqual(new[] {230,435,175,175,110,95,205,115,90,90},
                     (int[])Call(market, "RequiredUnits", sanLorenzo),
                     "Mercado's existing quota-derived requirements must update without changing recipes or consumption.");
+            }
+            finally
+            {
+                if (opened && scene.IsValid()) EditorSceneManager.CloseScene(scene, true);
+                if (previous.IsValid() && previous.isLoaded) SceneManager.SetActiveScene(previous);
+            }
+        }
+
+        [Test]
+        public void MainSceneCamionerosStartsWith360SecondsAndThreeFreeWorkers()
+        {
+            var previous = SceneManager.GetActiveScene();
+            var scene = SceneManager.GetSceneByPath("Assets/Scenes/Main.unity");
+            bool opened = !scene.IsValid() || !scene.isLoaded;
+            try
+            {
+                if (opened) scene = EditorSceneManager.OpenScene("Assets/Scenes/Main.unity", OpenSceneMode.Additive);
+                Type gameType = Type.GetType("HayChoriYPaty.StreetGame, Assembly-CSharp", true);
+                Component game = null;
+                foreach (var root in scene.GetRootGameObjects())
+                    foreach (Component candidate in root.GetComponentsInChildren(gameType, true))
+                    {
+                        Assert.IsNull(game, "Main must contain only one StreetGame.");
+                        game = candidate;
+                    }
+                Assert.IsNotNull(game);
+                object balance = gameType.GetProperty("Balance", BindingFlags.Instance | BindingFlags.Public).GetValue(game, null);
+                float[] durations = (float[])balanceType.GetField("levelDurations", Instance).GetValue(balance);
+                Assert.AreEqual(360f, durations[9], "Serialized Main duration for Camioneros must match its official setting.");
+
+                object sim = Make(level: 9, balance: balance);
+                Start(sim);
+                Assert.AreEqual(500, Get(sim, "Coins"));
+                Assert.AreEqual(360f, Get(sim, "TimeRemaining"));
+                Assert.AreEqual(1, Get(sim, "ParrilleroCount"));
+                Assert.AreEqual(1, Get(sim, "CocacoleroCount"));
+                Assert.AreEqual(0, Get(sim, "ParrilleroPremiumCount"));
+                Assert.AreEqual(0, Get(sim, "FerneteroCount"));
+                Assert.AreEqual(1, Get(sim, "MozoCount"));
+                Assert.AreEqual(3, Get(sim, "StaffCount"));
             }
             finally
             {
@@ -2361,7 +2506,7 @@ object sim = Make(level: level);
             for (int level = 0; level < 11; level++)
             {
                 object sim = Make(level: level); Start(sim);
-                int expectedStartingStaff = 1 + (level == 5 ? 2 : level == 6 ? 1 : 0);
+                int expectedStartingStaff = 1 + (level == 5 || level == 6 ? 2 : 0) + (level == 8 ? 1 : 0);
                 Assert.AreEqual(expectedStartingStaff, Get(sim, "StaffCount"),
                     "Only the officially configured free starters should be present in level " + level);
                 var expected = new HashSet<int>();

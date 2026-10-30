@@ -806,8 +806,20 @@ namespace HayChoriYPaty.Tests
         public void LatestDepositPolicyDoesNotChangeLegacyOrDrinkPickup(bool active, int product, string role)
         {
             object kitchen = Make(new[] { product }, active);
-            object first = Units(kitchen).Cast<object>().First(x => (int)Get(x, "Product") == product && Get(x, "Location").ToString() == "Table");
-            Assert.AreSame(first, Call(kitchen, "TryTake", product, EnumValue(roleType, role), 100));
+            var candidates = Units(kitchen).Cast<object>()
+                .Where(x => (int)Get(x, "Product") == product && Get(x, "Location").ToString() == "Table")
+                .ToArray();
+            Assert.IsNotEmpty(candidates);
+            object expected = candidates[0];
+            if (!active && product < 4)
+            {
+                int baseSlots = (int)Call(kitchen, "TableCapacity", product ^ 1) > 0 ? 6 : 12;
+                expected = candidates.OrderByDescending(x => (int)Get(x, "Slot") / baseSlots)
+                    .ThenBy(x => (int)Get(x, "Slot") % baseSlots)
+                    .ThenBy(x => (int)Get(x, "Id")).First();
+            }
+            Assert.AreSame(expected, Call(kitchen, "TryTake", product, EnumValue(roleType, role), 100),
+                "Legacy stacks take top-layer, front-to-back; drinks keep their stable table order.");
         }
 
         [TestCase(0)]
@@ -1042,7 +1054,7 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void RealMarketIngredientsAreReleasedOnCookCancellationAndConsumedOnlyAtSale()
+        public void ActiveLevelSandwichCookingAndSaleBypassMarketIngredientConsumption()
         {
             object balance = MakeActiveBalance(5, 1000);
             object sim = Activator.CreateInstance(simulationType, new object[] { balance, 5, 5f, 0, 1, 0 });
@@ -1078,8 +1090,8 @@ namespace HayChoriYPaty.Tests
             Assert.IsNotNull(Call(kitchen, "ReserveTableUnit", 0, 3));
             Assert.IsNotNull(Call(kitchen, "TryTake", 0, EnumValue(roleType, "Mozo"), 3));
             Assert.IsTrue((bool)Call(kitchen, "Consume", cookedId, 0, 3));
-            Assert.AreEqual(chorizoBefore - 1, Call(market, "Units", 0));
-            Assert.AreEqual(breadBefore - 1, Call(market, "Units", 1));
+            Assert.AreEqual(chorizoBefore, Call(market, "Units", 0), "Racing+ sandwich recipes do not consume Market stock at handoff.");
+            Assert.AreEqual(breadBefore, Call(market, "Units", 1), "Racing+ sandwich recipes do not consume Market stock at handoff.");
         }
 
         [Test]
@@ -1100,13 +1112,14 @@ namespace HayChoriYPaty.Tests
             object normal = Activator.CreateInstance(simulationType, new object[] { normalBalance, 5, 5f, 0, 1, 0 });
             Call(normal, "StartRound");
             SetArrivalFarFuture(normal);
-            int[] normalDelivered = (int[])simulationType.GetField("deliveredByProduct", PrivateInstance).GetValue(normal);
-            normalDelivered[1] = (int)Call(normal, "GetProductGoal", 1);
             Step(normal, 81);
             object normalCook = Workers(normal)[0];
-            Assert.IsTrue((bool)Get(normalCook, "VisualCooking"));
-            Assert.AreEqual(1, Get(normalCook, "VisualCookingProduct"));
-            Assert.AreEqual(0, Get(normalCook, "CookingItemId"));
+            object normalKitchen = Get(normal, "Kitchen");
+            Assert.IsFalse((bool)Call(normal, "IsProductAvailable", 0));
+            Assert.Greater((int)Call(normalKitchen, "SupplyCount", 1), 0, "The one enabled normal recipe remains real production.");
+            Assert.AreEqual(0, (int)Call(normal, "GetProductDelivered", 1), "The test has no customer to consume the cooked item.");
+            Assert.IsFalse(Units(normalKitchen).Cast<object>().Any(unit => (int)Get(unit, "Product") == 0),
+                "An unavailable normal companion is never fabricated.");
 
             object premiumBalance = MakeActiveBalance(5, 100000);
             string[] premiumCatalogs = (string[])simulationBalanceType.GetField("levelProductIds", PublicInstance).GetValue(premiumBalance);
@@ -1114,13 +1127,14 @@ namespace HayChoriYPaty.Tests
             object premium = Activator.CreateInstance(simulationType, new object[] { premiumBalance, 5, 5f, 0, 1, 0 });
             Call(premium, "StartRound");
             SetArrivalFarFuture(premium);
-            int[] premiumDelivered = (int[])simulationType.GetField("deliveredByProduct", PrivateInstance).GetValue(premium);
-            premiumDelivered[3] = (int)Call(premium, "GetProductGoal", 3);
             Step(premium, 81);
             object premiumCook = Workers(premium).Cast<object>().First(worker => Get(worker, "Role").ToString() == "ParrilleroPremium");
-            Assert.IsTrue((bool)Get(premiumCook, "VisualCooking"));
-            Assert.AreEqual(3, Get(premiumCook, "VisualCookingProduct"));
-            Assert.AreEqual(0, Get(premiumCook, "CookingItemId"));
+            object premiumKitchen = Get(premium, "Kitchen");
+            Assert.IsFalse((bool)Call(premium, "IsProductAvailable", 2));
+            Assert.Greater((int)Call(premiumKitchen, "SupplyCount", 3), 0, "The one enabled Premium recipe remains real production.");
+            Assert.AreEqual(0, (int)Call(premium, "GetProductDelivered", 3), "The test has no customer to consume the cooked item.");
+            Assert.IsFalse(Units(premiumKitchen).Cast<object>().Any(unit => (int)Get(unit, "Product") == 2),
+                "An unavailable Premium companion is never fabricated.");
         }
 
         [Test]
@@ -1131,8 +1145,12 @@ namespace HayChoriYPaty.Tests
             {
                 object sim = Activator.CreateInstance(simulationType, new object[] { balance, level, 5f, 0, 1, 0 });
                 Assert.AreEqual(level >= 5, (bool)Get(sim, "UsesActiveCooks"), "Unexpected active cook mode at level index " + level);
-                Assert.AreEqual(level == 5 || level == 6 ? 1 : 0, Get(sim, "MozoCount"),
-                    "Only Racing and San Lorenzo receive a free starter Mozo; no other level changes.");
+                Assert.AreEqual(level == 6 ? 2 : 1, Get(sim, "ParrilleroCount"), "Only San Lorenzo starts with two free normal cooks.");
+                Assert.AreEqual(level == 5 ? 1 : 0, Get(sim, "ParrilleroPremiumCount"), "Only Racing keeps its free Premium.");
+                Assert.AreEqual(level == 9 ? 1 : 0, Get(sim, "CocacoleroCount"), "Only Camioneros starts with a free Cocacolero.");
+                Assert.AreEqual(0, Get(sim, "FerneteroCount"));
+                Assert.AreEqual(level == 5 || level == 6 || level == 8 || level == 9 ? 1 : 0, Get(sim, "MozoCount"),
+                    "Racing, San Lorenzo, Boca, and Camioneros receive one free Mozo; all other levels remain unchanged.");
             }
             object early = Activator.CreateInstance(simulationType, new object[] { balance, 4, 5f, 0, 1, 0 });
             object active = Activator.CreateInstance(simulationType, new object[] { balance, 5, 5f, 0, 1, 0 });
@@ -1221,7 +1239,7 @@ namespace HayChoriYPaty.Tests
             object balance = Activator.CreateInstance(simulationBalanceType);
             object sim = Activator.CreateInstance(simulationType, new object[] { balance, 6, 5f, 0, 1, 0 });
             object mozo = EnumValue(roleType, "Mozo");
-            Assert.AreEqual(1, Get(sim, "ParrilleroCount"));
+            Assert.AreEqual(2, Get(sim, "ParrilleroCount"));
             Assert.AreEqual(1, Get(sim, "MozoCount"));
             Assert.AreEqual(0, Get(sim, "ParrilleroPremiumCount"), "San Lorenzo must not receive a free Premium Parrillero.");
             Assert.AreEqual(55, Get(sim, "MozoHireCost"), "The free starter must not consume San Lorenzo's first paid $55 hire.");
@@ -1229,7 +1247,7 @@ namespace HayChoriYPaty.Tests
             Call(sim, "StartRound");
             Assert.AreEqual(250, Get(sim, "Coins"));
             Assert.AreEqual(0, Get(sim, "CoinsEarned"), "The free starter does not count as earned or spent money.");
-            Assert.AreEqual(270f, Get(sim, "TimeRemaining"));
+            Assert.AreEqual(300f, Get(sim, "TimeRemaining"));
             Assert.AreEqual(0, Get(sim, "SpeedLevel"), "No purchased speed upgrade means ×1.00.");
             Assert.AreEqual(1f, Get(sim, "WorkRate"));
             Assert.AreEqual(1f, Get(sim, "CookWorkRate"));
@@ -1247,7 +1265,7 @@ namespace HayChoriYPaty.Tests
 
             Call(sim, "StartRound");
             Assert.AreEqual(250, Get(sim, "Coins"));
-            Assert.AreEqual(1, Get(sim, "ParrilleroCount"));
+            Assert.AreEqual(2, Get(sim, "ParrilleroCount"));
             Assert.AreEqual(1, Get(sim, "MozoCount"), "Retry discards hired Mozos and restores exactly one free starter.");
             Assert.AreEqual(0, Get(sim, "ParrilleroPremiumCount"));
             Assert.AreEqual(0, Get(sim, "SpeedLevel"));
@@ -1259,9 +1277,72 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(1, Get(levelSelection, "ParrilleroPremiumCount"), "Selecting Racing retains its existing free Premium Parrillero.");
             Assert.AreEqual(50, Get(levelSelection, "MozoHireCost"), "Racing's first paid Mozo cost is unchanged.");
             Assert.IsTrue((bool)Call(levelSelection, "SelectLevel", 6));
+            Assert.AreEqual(2, Get(levelSelection, "ParrilleroCount"), "Returning to San Lorenzo restores its two normal starters.");
             Assert.AreEqual(1, Get(levelSelection, "MozoCount"), "Returning to San Lorenzo cannot duplicate the starter.");
             Assert.AreEqual(0, Get(levelSelection, "ParrilleroPremiumCount"));
             Assert.AreEqual(55, Get(levelSelection, "MozoHireCost"));
+        }
+
+        [Test]
+        public void SanLorenzoConfigurationJKeepsPaidParrilleroCurveAndResetsEveryAttempt()
+        {
+            object balance = Activator.CreateInstance(simulationBalanceType);
+            object sim = Activator.CreateInstance(simulationType, new object[] { balance, 6, 5f, 0, 1, 0 });
+            object normal = EnumValue(roleType, "Parrillero");
+            Assert.AreEqual(2, Get(sim, "ParrilleroCount"));
+            Assert.AreEqual(45, Get(sim, "ParrilleroHireCost"));
+            for (int attempt = 0; attempt < 3; attempt++)
+            {
+                Call(sim, "StartRound");
+                Assert.AreEqual(2, Get(sim, "ParrilleroCount"));
+                Assert.AreEqual(1, Get(sim, "MozoCount"));
+                Assert.AreEqual(0, Get(sim, "ParrilleroPremiumCount"));
+                Assert.AreEqual(250, Get(sim, "Coins"));
+                Assert.AreEqual(0, Get(sim, "CoinsEarned"));
+                Assert.AreEqual(300f, Get(sim, "TimeRemaining"));
+                Assert.AreEqual(0, Get(sim, "SpeedLevel"));
+                Assert.AreEqual(45, Get(sim, "ParrilleroHireCost"));
+                Assert.IsTrue((bool)Call(sim, "TryHire", normal));
+                Assert.AreEqual(3, Get(sim, "ParrilleroCount"));
+                Assert.AreEqual(205, Get(sim, "Coins"));
+                Assert.AreEqual(115, Get(sim, "ParrilleroHireCost"));
+                Assert.IsTrue((bool)Call(sim, "TryHire", normal));
+                Assert.AreEqual(4, Get(sim, "ParrilleroCount"));
+                Assert.AreEqual(90, Get(sim, "Coins"));
+                Assert.AreEqual(225, Get(sim, "ParrilleroHireCost"));
+                Assert.IsFalse((bool)Call(sim, "TryHire", normal), "Real funds still gate paid hires.");
+                Assert.IsTrue((bool)Call(sim, "TryUpgradeSpeed"));
+                Assert.AreEqual(1, Get(sim, "SpeedLevel"));
+            }
+        }
+
+        [Test]
+        public void SanLorenzoConfigurationJBothInitialParrillerosCookRealUnits()
+        {
+            object balance = Activator.CreateInstance(simulationBalanceType);
+            object sim = Activator.CreateInstance(simulationType, new object[] { balance, 6, 5f, 0, 1, 0 });
+            Call(sim, "StartRound");
+            SetArrivalFarFuture(sim);
+            object[] normals = Workers(sim).Cast<object>().Where(w => Get(w, "Role").ToString() == "Parrillero").ToArray();
+            Assert.AreEqual(2, normals.Length);
+            Assert.AreNotEqual(Get(normals[0], "CookStationIndex"), Get(normals[1], "CookStationIndex"));
+            var observedCooks = new HashSet<int>();
+            var observedUnits = new HashSet<int>();
+            for (int tick = 0; tick < 800 && observedCooks.Count < 2; tick++)
+            {
+                Call(sim, "Step", .05f);
+                foreach (object cook in normals)
+                {
+                    int itemId = (int)Get(cook, "CookingItemId");
+                    if (itemId <= 0 || (bool)Get(cook, "VisualCooking")) continue;
+                    if (observedCooks.Add((int)Get(cook, "Id"))) observedUnits.Add(itemId);
+                }
+            }
+            Assert.AreEqual(2, observedCooks.Count, "Both free cooks must enter the real production system without a hire.");
+            Assert.AreEqual(2, observedUnits.Count, "The initial cooks reserve distinct real food units.");
+            Assert.AreEqual(250, Get(sim, "Coins"));
+            Assert.AreEqual(0, Get(sim, "CoinsEarned"));
+            Assert.AreEqual(0, Get(sim, "Delivered"));
         }
 
         [TestCase(5)]
@@ -1560,7 +1641,7 @@ namespace HayChoriYPaty.Tests
             for (int product = 0; product < 7; product++) Assert.AreEqual(1, Call(sim, "GetProductDelivered", product), "Incorrect count for product " + product);
             Assert.AreEqual(0, Get(sim, "SpeedLevel"), "A fresh attempt remains at x1.00 until speed is purchased.");
             Assert.AreEqual(1f, Get(sim, "WorkRate"));
-            Assert.AreEqual(1, Get(sim, "ParrilleroCount"), "A fresh attempt starts with exactly one Parrillero.");
+            Assert.AreEqual(level == 6 ? 2 : 1, Get(sim, "ParrilleroCount"), "Fresh attempts use the level-specific free normal roster.");
             Assert.AreEqual(1, Get(sim, "ParrilleroPremiumCount"), "One Premium Parrillero must support products 2 and 3.");
         }
 
@@ -1877,10 +1958,10 @@ namespace HayChoriYPaty.Tests
         public void UnassignedWorkerReturnsToItsOwnSafeWaitingPoint(int level, string roleName)
         {
             object sim = MakeActiveSimulation(level, 0);
+            Call(sim, "StartRound");
             object worker = level == 5 && roleName == "Mozo"
                 ? Workers(sim).Cast<object>().First(candidate => Get(candidate, "Role").ToString() == "Mozo")
                 : AddWorkerForTest(sim, roleName);
-            Call(sim, "StartRound");
             SetArrivalFarFuture(sim);
             SetWorker(worker, "Position", new Vector2(200f, LayoutConstant(sceneLayoutType, "WorkerServiceY")));
             SetWorker(worker, "Target", new Vector2(200f, LayoutConstant(sceneLayoutType, "WorkerServiceY")));

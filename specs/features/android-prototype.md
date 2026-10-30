@@ -1,3 +1,71 @@
+# Entrega Android — 2026-10-30: Camioneros y últimos cambios, 0.2.79/code81
+
+APK Development IL2CPP/ARM64 compilada desde el Editor Unity 6000.6.3f1 del checkout activo, con `Assets/Scenes/Main.unity` como única escena explícita. Build job `build-0238554307`: **Succeeded en 325,93 s; 0 errores / 5 advertencias**. Player Settings avanzaron de 0.2.78/code80 a **0.2.79/code81**; se preservó la preferencia local ajena `runInBackground: 1`.
+
+Artefacto ignorado por Git: `Builds/Android/Archive/HayChoriYPaty-0.2.79-code81-camioneros-20261030.apk`, **391.562.650 bytes**, SHA-256 `d91ddf34a9ea37dc553d9705a04d7e5b655aa42e92d7f642aead48d4c4ec328d`. Package `com.haychoriypaty.game`, versionName `0.2.79`, versionCode `81`, min API 26/target 36, ABI `arm64-v8a`. **PASS:** ZIP íntegro, `zipalign -c -v 4`, APK Signature Scheme v2 y metadata de paquete/versión/ABI; `global-metadata.dat` contiene marcadores de Camioneros, ambientación del barrio y canje de tickets. El manifiesto conserva Firebase Analytics desactivado y la recolección de Google ad-ID deshabilitada. Firma Android Debug; no es firma para Play Store.
+
+Los cambios de Camioneros (360 s y Parrillero normal + Mozo + Cocacolero gratis) tenían **4/4** comprobaciones Unity focalizadas PASS antes de esta compilación. La APK incluye el estado actual del checkout. **Instalada como actualización** en el Motorola Edge 60 Fusion (`ZY22MBNWRB`) con `adb install -r` el 2026-10-30 a las 15:11:19; PackageManager confirma versionCode81/versionName0.2.79 y `firstInstallTime=2026-10-03 18:49:24`, sin desinstalar ni limpiar datos. No se abrió la app ni se hizo smoke test/gameplay; Firebase real y validación funcional Android **NOT_RUN**. No hubo commit/push.
+
+---
+
+# Entrega Android — 2026-10-30: refuerzo de animaciones ambientales, 0.2.78/code80
+
+APK nueva Development IL2CPP/ARM64, `Assets/Scenes/Main.unity` solamente, Unity 6000.6.3f1 desde el Editor activo. Build job `build-092b508973`: **Succeeded, 301,66 s, 0 errores / 6 advertencias**. Player Settings avanzan a `0.2.78/code80`, preservando el cambio local ajeno `runInBackground: 1`.
+
+Artefacto ignorado por Git: `Builds/Android/Archive/HayChoriYPaty-0.2.78-code80-hub-ambient-20261030.apk`, **391.562.418 bytes**, SHA-256 `efe84a44b4c4209fc620e508ea823e7aab4191ef3c498cd5cda97867bd7534d0`. Package `com.haychoriypaty.game`, min API 26/target 36, ABI `arm64-v8a`. **PASS:** ZIP íntegro, `zipalign -c -v 4`, firma APK v2 y metadata version/package/ABI; `global-metadata.dat` incluye `DrawHubAmbientEffects`, `HubAmbientOverlay`, `DrawLeaves`, `DrawSmoke` y `DrawEmbers`. Certificado Android Debug, no es firma para Play Store.
+
+Validación Unity: anclas/hotspots **1/1 EditMode PASS**; captura de efectos **1/1 PlayMode PASS** y permanencia estática de personajes **1/1 PlayMode PASS**. Capturas full Game View inicial/ciclo y personajes estáticos, 1080×1920, revisadas en `/var/folders/bf/q6_2cmvn6ls9pc5h5g7thj8r0000gn/T/hcyp-street-hub-view-tests/`. **No instalada**; no hubo comprobación Android física/rendimiento, ni commit/push.
+
+---
+
+# Entrega Android — 2026-10-30: visibilidad de animaciones del barrio, 0.2.77/code79
+
+APK Development IL2CPP/ARM64, escena `Assets/Scenes/Main.unity`, Unity 6000.6.3f1; build job `build-852709f291` desde Editor activo con working tree corregido. BuildPipeline **Succeeded en 66,26 s; 0 errores / 5 advertencias**. Player Settings siguen en `0.2.77/code79`; no se subió `versionCode`.
+
+APK `Builds/Android/Archive/HayChoriYPaty-0.2.77-code79-hub-visible-20261030.apk`: **425.727.167 bytes**, SHA-256 `615dad2c275ddf6ccee792db7d811155c1f6dd0b8fa91a199911ebd8cf90cbda`. Package `com.haychoriypaty.game`, versionName `0.2.77`, versionCode `79`, min API26/target36, ABI `arm64-v8a`. **PASS:** ZIP íntegro, `zipalign -c -v 4`, firma APK v2 y metadata package/version/ABI; metadata IL2CPP incluye el renderer de personajes y su raíz de recursos. Debug-signed, no Play Store.
+
+Unity 6000.6.3f1: `DefaultGesturesBecomeVisibleDuringAShortHubVisit` **1/1 EditMode PASS**; `NeighborhoodCharactersAnimateDuringAShortHubVisit` **1/1 PlayMode PASS** con captura inicial y al cumplir 6,5 s, y `SellerWaveCutoutRendersAndRestoresInTheFullHubGameView` **1/1 PlayMode PASS**. Capturas revisadas a 1080×1920 en `Path.GetTempPath()/hcyp-street-hub-view-tests/`. Un re-run de los ocho tests de comportamiento terminó con desconexión del plugin y sin conteos (`unknown`); no se cuenta como validado.
+
+Instalación de este APK **NOT_RUN**: después del build, `adb devices -l` no encontró `ZY22MBNWRB` y `adb install -r` devolvió `device not found`. La build anterior quedó instalada como actualización a las 12:03 y sus datos no se limpiaron; no se ha instalado esta corrección ni hecho QA Android. Sin commit/push.
+
+---
+
+# Entrega Android — 2026-10-30: señal de espera del Mozo, 0.2.77/code79
+
+APK Development IL2CPP/ARM64, escena `Assets/Scenes/Main.unity`, Unity 6000.6.3f1. Compilada desde el Editor activo en `/Users/celestino/HayChoriYPaty`, branch `codex/street-automation`, HEAD `688af0b` más el working tree cargado. BuildPipeline **Succeeded en 330,33 s; 0 errores / 6 advertencias**. Se usó una ruta de salida nueva; Player Settings quedaron en `0.2.77/code79`.
+
+APK `Builds/Android/Archive/HayChoriYPaty-0.2.77-code79-mozo-angry-20261030.apk`: **425.727.167 bytes**, SHA-256 `e47483383828e5326f182d595f7e7717c3e1fe06a5048427070bd5a6e42b8a36`. Package `com.haychoriypaty.game`, versionName `0.2.77`, versionCode `79`, min API26/target36, ABI `arm64-v8a`. **PASS:** ZIP íntegro, `zipalign -c -v 4`, firma APK v2 y metadatos de paquete/versión/ABI. Los metadatos IL2CPP incluyen `MozoEmptySandwichAngryCue`, `Worker_Mozo_EmptySandwich_AngryCue` y `Worker_Mozo_EmptySandwich_AngryCue_Sprite`. Firma Android Debug, no Play Store.
+
+La repetición de `MozoShowsAngryCueAtTheWaitPostOnlyWhenNoSandwichIsReady` no produjo resultado: Unity MCP se desconectó mientras aguardaba `command_result`; para esta build se registra **NOT_RUN**. La prueba focalizada previa sigue documentada PASS 1/1 el 2026-10-29 en el contrato de Mozos. **Instalación posterior PASS** el 2026-10-30 a las 12:03 en Motorola Edge 60 Fusion (`ZY22MBNWRB`) mediante `adb install -r`: PackageManager confirma 0.2.77/code79, conserva `firstInstallTime=2026-10-03 18:49:24` y actualiza `lastUpdateTime=2026-10-30 12:03:04`; no se borraron datos. No se abrió el juego ni se hizo QA visual/gameplay físico. El APK fue construido desde HEAD `688af0b`, que ya incluye `DrawHubCharacterAnimations` y los assets de barrio; su metadata IL2CPP contiene `DrawHubCharacterAnimations` y `StreetHubCharacters/`. No hubo commit/push. Tras el reporte del usuario, el código local se ajustó para reducir las pausas y aumentar el movimiento; esa corrección aún no fue probada ni incluida en otra APK.
+
+---
+
+# Entrega Android — 2026-10-29: River y Boca configuración U, 0.2.77/code79
+
+APK Development IL2CPP/ARM64, escena `Assets/Scenes/Main.unity`, Unity 6000.6.3f1. BuildPipeline **Succeeded en 486,84 s; 0 errores / 5 advertencias**. Se compiló un snapshot aislado del working tree activo (base `9db076a`), con `ProjectSettings.asset` y `GvhProjectSettings.xml` restaurados desde HEAD para excluir `runInBackground` y Analytics locales; se excluyeron las escenas temporales `Assets/InitTestScene*.unity`. El Editor interactivo quedó abierto en el checkout activo, pero Unity MCP no detectó sesión; por eso se usó el snapshot en batch. **Tests: NOT_RUN.** Instalación **PASS** en Motorola Edge 60 Fusion (`ZY22MBNWRB`) con `adb install -r`; PackageManager confirma 0.2.77/code79 y `firstInstallTime` conservado (`2026-10-03 18:49:24`), sin borrar datos. No se lanzó la app; gameplay smoke **NOT_RUN**.
+
+APK `Builds/Android/HayChoriYPaty-0.2.77-code79-river-boca-U.apk`: **388.421.132 bytes**, SHA-256 `09eb33faf6a35bc5a271efc8503569b2ec13715c8917deb464bfaa194cf2d7e3`. Package `com.haychoriypaty.game`, versionName `0.2.77`, versionCode `79`, min API26/target36, ABI `arm64-v8a`. **PASS:** ZIP íntegro, `zipalign -c -v 4`, firma APK v2 y metadata package/version/ABI. Firebase Analytics desactivado en el snapshot; firma Android Debug, no Play Store. Provenance junto al APK; ambos ignorados por Git. Sin cambios de código ni commit en esta entrega.
+
+---
+
+# Entrega Android — 2026-10-28: configuración J de San Lorenzo, 0.2.77/code79
+
+APK Development IL2CPP/ARM64 generada con Unity 6000.6.3f1 desde el checkout activo, escena Main únicamente, con la configuración J de San Lorenzo ya adoptada (345s, dos Parrilleros normales y un Mozo inicial gratuito, $250, sin Premium). BuildPipeline: **Succeeded en 391,42 s; 0 errores / 6 advertencias**. No se ejecutó la suite en esta compilación; la validación focalizada de la adopción J ya había pasado 122/122 EditMode y revisión independiente 6/6.
+
+APK `Builds/Android/Archive/HayChoriYPaty-0.2.77-code79-sanlorenzo-J.apk`: **388.432.468 bytes**, SHA-256 `aeea071fcbc676e00e9770a7f269b149ffcf40d00cb5617d7162c220a3823c38`. Package `com.haychoriypaty.game`, versionName `0.2.77`, versionCode `79`, min API26/target36, ABI `arm64-v8a`. **PASS:** ZIP, `zipalign -c -v 4`, APK Signature Scheme v2 y metadata verificados; Analytics desactivado y ad-ID collection deshabilitada en el manifiesto. Firma Android Debug, no Play Store. Instalada como actualización en Motorola Edge 60 Fusion (ZY22MBNWRB) con adb install -r el 2026-10-28. PackageManager conserva firstInstallTime 2026-10-03 18:49:24; no se desinstaló ni borraron datos. No se abrió ni se hizo gameplay smoke. Sin commit/push.
+
+---
+
+# Entrega Android — 2026-10-27: APK del working tree actual 0.2.77/code79
+
+Se generó una Development Android APK Main-only con Unity 6000.6.3f1, IL2CPP/ARM64, desde una copia aislada del working tree actual de codex/street-automation (commit base cde6c8930b545f3b6b96c7cbe13f4bf58a09b422, incluyendo los cambios locales de código y assets presentes al iniciar la compilación). La copia dejó fuera Library, builds/logs anteriores, capturas, recovery y escenas temporales de pruebas; ProjectSettings.asset y GvhProjectSettings.xml se restauraron desde HEAD para no incluir las preferencias locales (runInBackground y Firebase Analytics). No se modificó el checkout activo ni el APK anterior.
+
+Unity BuildPipeline: **Succeeded en 1023,92 s; 0 errores / 6 advertencias**. Las advertencias son de análisis del código actual (UAC0005, CS0162 y cuatro UAC0009); una advertencia obsoleta del helper temporal del build no forma parte del BuildReport. La suite no se ejecutó en esta compilación; las pruebas focalizadas del agarre Coca/cerveza habían pasado previamente 2/2 EditMode y 1/1 PlayMode. Esta entrega no repitió esas pruebas.
+
+APK Builds/Android/HayChoriYPaty-0.2.77-code79-current-tree.apk: **388.406.228 bytes**, SHA-256 **81f92dba6e78b10142f1d97856cee7625786c881627ab0a99084439b2551dc00**. Paquete com.haychoriypaty.game, versionName 0.2.77, versionCode 79, min API26/target36, ABI arm64-v8a. **PASS:** ZIP íntegro, zipalign -c -v 4, firma APK v2 y metadatos de paquete/versión/ABI; Firebase Analytics y recolección del Google ad-ID están desactivadas en el manifiesto. Firma Android Debug, no válida para Play Store. El APK anterior HayChoriYPaty-0.2.77-Firebase.apk no se reemplazó. **Instalación en dispositivo PASS:** instalada como actualización en Motorola Edge 60 Fusion mediante adb install -r; firstInstallTime se conservó (2026-10-03 18:49:24) y no se borraron datos. No se abrió ni se hizo prueba de gameplay en esta instalación; no hubo commit ni push. El APK y su provenance/logs están en Builds/Android/ (ignorado por Git).
+
+---
+
 # Entrega Android — 2026-10-27: balance San Lorenzo 0.2.77/code79
 
 APK Development IL2CPP/ARM64, escena `Assets/Scenes/Main.unity`, construida desde el commit limpio `18d97b6` en una copia aislada; el Editor del checkout original permaneció abierto e intacto, y los cambios locales ajenos (incluido `runInBackground: 1`) no se incluyeron. Unity 6000.6.3f1 BuildPipeline: **Succeeded, 0 errores / 5 advertencias** (18m 1.9s de BuildReport). El primer `Unity build --execute-method FirebaseAndroidBuildLauncher.Queue` solo dejó el estado `scheduled` y no produjo APK aunque el CLI devolvió éxito; se verificó la ausencia del archivo y se completó con una entrada temporal sincrónica que esperó el BuildPipeline real. La entrada temporal no forma parte del repositorio.

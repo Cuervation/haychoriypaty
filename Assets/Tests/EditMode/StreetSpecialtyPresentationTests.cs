@@ -109,13 +109,13 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(legacyNormal.position,normal.position);Assert.AreEqual(legacyPremium.position,premium.position);
             Assert.AreEqual((float)layoutType.GetField("ActivePlayfieldBottom").GetValue(null),
                 (float)layoutType.GetProperty("PlayfieldBottom").GetValue(active));
-            Rect grill=(Rect)layoutType.GetMethod("GrillBoundsForProduct").Invoke(active,new object[]{0});
+            Rect grill=(Rect)layoutType.GetMethod("GrillBoundsForProduct",new[]{typeof(int)}).Invoke(active,new object[]{0});
             Assert.AreEqual(70f,grill.yMin-normal.yMax,.01f,"Expanded walk-through gap");
 
             Vector2 home=new Vector2(433,(float)Runtime("StreetSceneLayout").GetField("WorkerServiceY").GetRawConstantValue());
-            MethodInfo route=layoutType.GetMethod("FindShortestSafeRoute");
-            MethodInfo work=layoutType.GetMethod("GrillWorkPosition");
-            MethodInfo deposit=layoutType.GetMethod("DepositPosition");
+            MethodInfo route=layoutType.GetMethod("FindShortestSafeRoute",new[]{typeof(Vector2),typeof(Vector2)});
+            MethodInfo work=layoutType.GetMethod("GrillWorkPosition",new[]{typeof(int),typeof(int),typeof(int)});
+            MethodInfo deposit=layoutType.GetMethod("DepositPosition",new[]{typeof(int)});
             // The restored original prep row separates production from service. Use the real
             // hired cooks' grill-side starts, not the historical counter-side delivery home.
             object cookSim=Simulation(7);
@@ -137,7 +137,7 @@ namespace HayChoriYPaty.Tests
             }
             for(int product=0;product<7;product++)
             {
-                Vector2 pickup=(Vector2)layoutType.GetMethod("PickupPosition").Invoke(active,new object[]{product});
+                Vector2 pickup=(Vector2)layoutType.GetMethod("PickupPosition",new[]{typeof(int)}).Invoke(active,new object[]{product});
                 Assert.NotNull(route.Invoke(active,new object[]{home,pickup}),"Home→pickup product "+product);
             }
 

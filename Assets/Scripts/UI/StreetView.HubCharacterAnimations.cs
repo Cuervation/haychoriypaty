@@ -8,12 +8,21 @@ namespace HayChoriYPaty
     {
         private const string HubCharacterResourceRoot = "StreetHubCharacters/";
         private HubCharacterScene hubCharacterScene;
+        // The segmented neighborhood character rigs are temporarily paused while their movement is redesigned.
+        // The original characters remain visible, still, in the hub master artwork.
+        private bool hubCharacterAnimationLayersEnabled = false;
 #if UNITY_EDITOR
         private bool bypassHubCharactersForTesting;
 #endif
 
         private void DrawHubCharacterAnimations()
         {
+            if (!hubCharacterAnimationLayersEnabled)
+            {
+                // If the hub was already open during a script reload, dispose any previously loaded rig overlays.
+                ReleaseHubCharacterAnimationsResources();
+                return;
+            }
 #if UNITY_EDITOR
             if (bypassHubCharactersForTesting) return;
 #endif
@@ -158,6 +167,7 @@ namespace HayChoriYPaty
             private bool loadAttempted, resourcesValid;
             private HubCharacterBehavior behavior;
             private int lastUpdatedFrame = -1;
+            private float animationClock;
 #if UNITY_EDITOR
             private float forcedSellerAngle = float.NaN;
             private readonly Dictionary<HubCharacterId, HubCharacterState> forcedStates = new Dictionary<HubCharacterId, HubCharacterState>();
@@ -215,7 +225,9 @@ namespace HayChoriYPaty
             {
                 if (lastUpdatedFrame == Time.frameCount) return;
                 lastUpdatedFrame = Time.frameCount;
-                behavior.Tick(Mathf.Clamp(Time.unscaledDeltaTime, 0f, .1f), owner.hubActive && !owner.settingsActive);
+                float dt = Mathf.Clamp(Time.unscaledDeltaTime, 0f, .1f);
+                behavior.Tick(dt, owner.hubActive && !owner.settingsActive);
+                animationClock += dt;
             }
 
             private HubCharacterState State(HubCharacterId id)
@@ -277,18 +289,21 @@ namespace HayChoriYPaty
             private void DrawSeller()
             {
                 HubCharacterState state = State(HubCharacterId.Seller); float e = Pulse(state);
+                float idle = Mathf.Sin(animationClock * 2.1f);
                 DrawPart(seller, seller.Part("seated_legs"), new Rect(581,1066,125,74), -2f * e, new Vector2(639,1078));
-                DrawPart(seller, seller.Part("torso"), new Rect(580,1002,114,91), 1.4f * Mathf.Sin(state.Elapsed * 1.5f));
-                DrawPart(seller, seller.Part("head"), new Rect(592,966,74,68), state.Action == HubCharacterAction.Look ? 3.2f * e : 0f, new Vector2(630,1017));
+                Rect torso = new Rect(580,1002,114,91); torso.y += idle * 2.4f;
+                DrawPart(seller, seller.Part("torso"), torso, 2.4f * Mathf.Sin(animationClock * 1.5f));
+                Rect head = new Rect(592,966,74,68); head.y += idle * 1.2f;
+                DrawPart(seller, seller.Part("head"), head, state.Action == HubCharacterAction.Look ? 7f * e : idle * 2.6f, new Vector2(630,1017));
                 float armAngle = 0f;
 #if UNITY_EDITOR
                 if (!float.IsNaN(forcedSellerAngle)) armAngle = forcedSellerAngle;
                 else
 #endif
-                if (state.Action == HubCharacterAction.Wave) armAngle = -32f * e;
-                else if (state.Action == HubCharacterAction.Cheer) armAngle = -42f * e;
+                if (state.Action == HubCharacterAction.Wave) armAngle = -48f * e;
+                else if (state.Action == HubCharacterAction.Cheer) armAngle = -52f * e;
                 if (state.Action == HubCharacterAction.Approve)
-                    DrawPart(seller, seller.Part("thumb_arm"), new Rect(652,1017,51,63), -8f * e, new Vector2(662,1031));
+                    DrawPart(seller, seller.Part("thumb_arm"), new Rect(652,1017,51,63), -14f * e, new Vector2(662,1031));
                 else if (state.Action == HubCharacterAction.Wave || state.Action == HubCharacterAction.Cheer)
                     DrawPart(seller, seller.Part("thumb_alt"), new Rect(650,1015,51,65), armAngle, new Vector2(661,1030));
                 else
@@ -306,34 +321,39 @@ namespace HayChoriYPaty
                 for (int i = 0; i < ids.Length; i++)
                 {
                     HubCharacterState state = State(ids[i]); float e = Pulse(state);
-                    DrawPart(police, police.Part("legs_" + sides[i]), legs[i], state.Action == HubCharacterAction.Shift ? (i == 1 ? 2f : -2f) * e : 0f);
-                    Rect torso = torsos[i]; torso.y += state.Action == HubCharacterAction.Shift ? -1.5f * e : 0f;
+                    float idle = Mathf.Sin(animationClock * 1.7f + i * 1.9f);
+                    DrawPart(police, police.Part("legs_" + sides[i]), legs[i], state.Action == HubCharacterAction.Shift ? (i == 1 ? 5f : -5f) * e : idle * 1.7f);
+                    Rect torso = torsos[i]; torso.y += state.Action == HubCharacterAction.Shift ? -4f * e : idle * 2.2f;
                     DrawPart(police, police.Part("torso_" + sides[i]), torso);
-                    DrawPart(police, police.Part("head_" + sides[i]), heads[i], state.Action == HubCharacterAction.Look ? 3f * e : 0f);
+                    DrawPart(police, police.Part("head_" + sides[i]), heads[i], state.Action == HubCharacterAction.Look ? 8f * e : idle * 2.8f);
                 }
             }
 
             private void DrawStore()
             {
                 HubCharacterState state = State(HubCharacterId.Store); float e = Pulse(state);
-                Rect legs = new Rect(205,1552,76,81); if (state.Action == HubCharacterAction.Step) legs.y -= 2f * e;
+                float idle = Mathf.Sin(animationClock * 2f + .7f);
+                Rect legs = new Rect(205,1552,76,81); legs.y += idle * 1.8f; if (state.Action == HubCharacterAction.Step) legs.y -= 4f * e;
                 DrawPart(store, store.Part("paired_legs"), legs);
-                DrawPart(store, store.Part("torso_bag"), new Rect(201,1475,80,86), state.Action == HubCharacterAction.Interact ? -1.5f * e : 0f);
-                DrawPart(store, store.Part("head"), new Rect(205,1419,75,72), state.Action == HubCharacterAction.Look ? 4f * e : 0f, new Vector2(241,1475));
-                DrawPart(store, store.Part("arm_down"), new Rect(186,1485,30,55), state.Action == HubCharacterAction.Interact ? 22f * e : 0f, new Vector2(208,1495));
+                Rect torso = new Rect(201,1475,80,86); torso.y += idle * 2.2f;
+                DrawPart(store, store.Part("torso_bag"), torso, state.Action == HubCharacterAction.Interact ? -3f * e : idle * 1.8f);
+                Rect head = new Rect(205,1419,75,72); head.y += idle * 1.1f;
+                DrawPart(store, store.Part("head"), head, state.Action == HubCharacterAction.Look ? 8f * e : idle * 2.2f, new Vector2(241,1475));
+                DrawPart(store, store.Part("arm_down"), new Rect(186,1485,30,55), state.Action == HubCharacterAction.Interact ? 34f * e : idle * 2f, new Vector2(208,1495));
                 DrawPart(store, store.Part("arm_right"), new Rect(265,1480,26,52));
             }
 
             private void DrawBoy()
             {
                 HubCharacterState state = State(HubCharacterId.Boy); float e = Pulse(state);
-                float step = state.Action == HubCharacterAction.Walk ? Mathf.Sin(state.Progress01 * Mathf.PI * 4f) * 3f * e : 0f;
+                float step = state.Action == HubCharacterAction.Walk ? Mathf.Sin(state.Progress01 * Mathf.PI * 4f) * 8f * e : Mathf.Sin(animationClock * 2.3f) * 1.7f;
                 DrawPart(boy, boy.Part("leg_left"), new Rect(467,1650 + step,45,88));
                 DrawPart(boy, boy.Part("leg_right"), new Rect(520,1650 - step,43,88));
                 DrawPart(boy, boy.Part("shorts"), new Rect(475,1623,77,55));
-                DrawPart(boy, boy.Part("torso"), new Rect(474,1551,84,87), state.Action == HubCharacterAction.Cheer ? -3f * e : 0f);
-                DrawPart(boy, boy.Part("head"), new Rect(481,1497,74,68), state.Action == HubCharacterAction.Look ? 3f * e : 0f, new Vector2(516,1552));
-                DrawPart(boy, boy.Part("arm_left"), new Rect(460,1556,39,70), state.Action == HubCharacterAction.Cheer ? -16f * e : 0f, new Vector2(489,1568));
+                Rect torso = new Rect(474,1551,84,87); torso.y += Mathf.Sin(animationClock * 2.3f + .4f) * 2f;
+                DrawPart(boy, boy.Part("torso"), torso, state.Action == HubCharacterAction.Cheer ? -5f * e : 0f);
+                DrawPart(boy, boy.Part("head"), new Rect(481,1497,74,68), state.Action == HubCharacterAction.Look ? 7f * e : Mathf.Sin(animationClock * 1.8f) * 2.5f, new Vector2(516,1552));
+                DrawPart(boy, boy.Part("arm_left"), new Rect(460,1556,39,70), state.Action == HubCharacterAction.Cheer ? -32f * e : 0f, new Vector2(489,1568));
                 if (state.Action == HubCharacterAction.Cheer)
                     // Keep the original striped sleeve attached to the cheering arm.
                     DrawPart(boy, boy.Part("arm_right"), new Rect(548,1542,40,66), -58f * e, new Vector2(554,1567));
@@ -344,18 +364,20 @@ namespace HayChoriYPaty
             private void DrawGirl()
             {
                 HubCharacterState state = State(HubCharacterId.Girl); float e = Pulse(state);
-                float step = state.Action == HubCharacterAction.Walk ? Mathf.Sin(state.Progress01 * Mathf.PI * 4f + Mathf.PI) * 3f * e : 0f;
+                float step = state.Action == HubCharacterAction.Walk ? Mathf.Sin(state.Progress01 * Mathf.PI * 4f + Mathf.PI) * 8f * e : Mathf.Sin(animationClock * 2.3f + Mathf.PI) * 1.7f;
                 DrawPart(girl, girl.Part("calves"), new Rect(685,1637 + step,72,100));
-                DrawPart(girl, girl.Part("hips"), new Rect(672,1599,76,71));
+                Rect hips = new Rect(672,1599,76,71); hips.y += Mathf.Sin(animationClock * 2.3f + Mathf.PI) * 2f;
+                DrawPart(girl, girl.Part("hips"), hips);
                 DrawPart(girl, girl.Part("backpack"), new Rect(682,1542,59,77));
-                DrawPart(girl, girl.Part("torso"), new Rect(675,1539,79,85));
+                Rect torso = new Rect(675,1539,79,85); torso.y += Mathf.Sin(animationClock * 2.3f + Mathf.PI) * 2f;
+                DrawPart(girl, girl.Part("torso"), torso);
                 // Hair sits behind the arm rig; drawing it last masks the pointing hand.
-                DrawPart(girl, girl.Part("hair"), new Rect(664,1493,94,88), state.Action == HubCharacterAction.Look ? -3.2f * e : 1.2f * Mathf.Sin(state.Elapsed * 3f));
+                DrawPart(girl, girl.Part("hair"), new Rect(664,1493,94,88), state.Action == HubCharacterAction.Look ? -7f * e : 3f * Mathf.Sin(animationClock * 2.3f));
                 if (state.Action == HubCharacterAction.Cheer)
                     DrawPart(girl, girl.Part("arm_pointing"), new Rect(729,1538,65,83), -8f * e, new Vector2(746,1555));
                 else
-                    DrawPart(girl, girl.Part("arm_right"), new Rect(730,1548,48,72), state.Action == HubCharacterAction.Walk ? 7f * Mathf.Sin(state.Progress01 * Mathf.PI * 4f) * e : 0f, new Vector2(746,1560));
-                DrawPart(girl, girl.Part("arm_left"), new Rect(653,1550,40,72), state.Action == HubCharacterAction.Walk ? -7f * Mathf.Sin(state.Progress01 * Mathf.PI * 4f) * e : 0f, new Vector2(683,1560));
+                    DrawPart(girl, girl.Part("arm_right"), new Rect(730,1548,48,72), state.Action == HubCharacterAction.Walk ? 16f * Mathf.Sin(state.Progress01 * Mathf.PI * 4f) * e : 0f, new Vector2(746,1560));
+                DrawPart(girl, girl.Part("arm_left"), new Rect(653,1550,40,72), state.Action == HubCharacterAction.Walk ? -16f * Mathf.Sin(state.Progress01 * Mathf.PI * 4f) * e : 0f, new Vector2(683,1560));
             }
 
 #if UNITY_EDITOR

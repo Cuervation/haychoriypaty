@@ -78,7 +78,7 @@ namespace HayChoriYPaty
         public string[] levelProductIds = { "0", "0,4", "0,1,4", "0,1,2,4,6", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5" };
         [HideInInspector, Tooltip("Legacy aggregate goals retained for serialized-scene compatibility; individual levelBalances are authoritative.")]
         public int[] levelGoals = { 200, 200, 65, 85, 110, 121, 133, 146, 161, 177, 195 };
-        public float[] levelDurations = { 120f, 150f, 180f, 210f, 240f, 260f, 270f, 340f, 340f, 300f, 315f };
+        public float[] levelDurations = { 120f, 150f, 180f, 210f, 240f, 260f, 300f, 340f, 340f, 360f, 315f };
         [Tooltip("Official per-level goals, role hire base costs, speed-cost multiplier, and opening attempt balance.")]
         public StreetLevelBalance[] levelBalances = CreateOfficialLevelBalances();
 
@@ -205,7 +205,7 @@ namespace HayChoriYPaty
         public float AnimationTime { get; internal set; }
         internal float ReceiveRemaining;
         internal int Slot;
-        internal bool DeliverySoundPlayed;
+        internal bool OrderCompletionRecorded;
         internal bool WasServed;
 
         public StreetOrderLine GetOrderLine(int index) => index >= 0 && index < orderLines.Count ? orderLines[index] : null;
@@ -317,12 +317,13 @@ namespace HayChoriYPaty
         };
         private static readonly float[] DefaultDemandMultipliers = { 1f, 1.1f, 1.2f, 1.35f, 1.5f, 1.65f, 1.815f, 1.9965f, 2.19615f, 2.415765f, 2.6573415f };
         private static readonly int[] DefaultSpeedCosts = { 5, 10, 15, 20, 30, 45, 65, 90, 125 };
-        private static readonly float[] DefaultDurations = { 120f, 150f, 180f, 210f, 240f, 260f, 270f, 340f, 340f, 300f, 315f };
+        private static readonly float[] DefaultDurations = { 120f, 150f, 180f, 210f, 240f, 260f, 300f, 340f, 340f, 360f, 315f };
         private const int MaxHireCost = int.MaxValue - int.MaxValue % 5;
         private readonly StreetBalance balance;
         private readonly int[][] availableProductsByLevel;
         private readonly List<StreetCustomer> customers = new List<StreetCustomer>();
         private readonly List<StreetWorker> workers = new List<StreetWorker>();
+        private readonly int[] ticketWorkersByRole = new int[5];
         private readonly List<StreetSale> sales = new List<StreetSale>();
         private float arrival;
         private int nextCustomer = 1, nextWorker = 1, nextSale = 1;
@@ -332,6 +333,9 @@ namespace HayChoriYPaty
         private System.Random random;
         private IStreetKitchenStock ingredientStock;
 
+        /// <summary>Fires once for each item unit successfully handed to a customer.</summary>
+        public event Action ProductUnitDelivered;
+        /// <summary>Fires once after every line and quantity in a customer's ticket is delivered.</summary>
         public event Action OrderCompleted;
 
         public RoundPhase Phase { get; private set; } = RoundPhase.Ready;
@@ -415,16 +419,20 @@ namespace HayChoriYPaty
             // This legacy query now reports the representable count range, not a gameplay cap.
             return HasRole(role) ? int.MaxValue : 0;
         }
+        private int StartingParrilleroCount => LevelIndex == 6 ? 2 : 1;
+        private int StartingCocacoleroCount => LevelIndex == 9 ? 1 : 0;
+        private bool StartsWithFreeMozo => LevelIndex == 5 || LevelIndex == 6 || LevelIndex == 8 || LevelIndex == 9;
+
         public int HireCostForRole(StreetWorkerRole role)
         {
             if (!HasRole(role)) return 0;
-            long paidNumber = role == StreetWorkerRole.Parrillero
-                ? Math.Max(1, WorkerCount(role)) // The opening Parrillero is free.
-                : role == StreetWorkerRole.ParrilleroPremium && LevelIndex == 5
-                    ? Math.Max(1, WorkerCount(role)) // Racing's opening Premium Parrillero is free.
-                    : role == StreetWorkerRole.Mozo && (LevelIndex == 5 || LevelIndex == 6)
-                        ? Math.Max(1, WorkerCount(role)) // Racing and San Lorenzo opening Mozos are free.
-                        : (long)WorkerCount(role) + 1;
+            long freeBaseline = role == StreetWorkerRole.Parrillero ? StartingParrilleroCount
+                : role == StreetWorkerRole.Cocacolero ? StartingCocacoleroCount
+                : role == StreetWorkerRole.ParrilleroPremium && LevelIndex == 5 ? 1
+                : role == StreetWorkerRole.Mozo && StartsWithFreeMozo ? 1 : 0;
+            int roleIndex = (int)role;
+            long ticketWorkers = roleIndex >= 0 && roleIndex < ticketWorkersByRole.Length ? ticketWorkersByRole[roleIndex] : 0;
+            long paidNumber = Math.Max(1L, (long)WorkerCount(role) - freeBaseline - ticketWorkers + 1);
             int baseCost = balance.GetHireBaseCost(LevelIndex, role);
             if (baseCost <= 0) return 0;
 
@@ -566,16 +574,42 @@ namespace HayChoriYPaty
             KitchenLayout = new StreetKitchenLayout(availableProductsByLevel[LevelIndex], UsesActiveCooks);
         }
 
-        public void StartRound()
+        public void StartRound() { StartRound(new long[5]); }
+
+        public bool CanStartRoundWithTicketWorkers(long[] roleCounts)
         {
+            if (Phase != RoundPhase.Ready || roleCounts == null || roleCounts.Length != 5) return false;
+            long total = StartingParrilleroCount;
+            total += StartingCocacoleroCount;
+            if (LevelIndex == 5 && HasRole(StreetWorkerRole.ParrilleroPremium)) total++;
+            if (StartsWithFreeMozo && HasRole(StreetWorkerRole.Mozo)) total++;
+            for (int role = 0; role < roleCounts.Length; role++)
+            {
+                long count = roleCounts[role];
+                if (count < 0 || (count > 0 && !HasRole((StreetWorkerRole)role)) || count > int.MaxValue - total) return false;
+                total += count;
+            }
+            return total < int.MaxValue; // nextWorker is an int; do not wrap its stable worker IDs.
+        }
+
+        public bool StartRound(long[] ticketRoleCounts)
+        {
+            if (!CanStartRoundWithTicketWorkers(ticketRoleCounts)) return false;
             customers.Clear(); sales.Clear();
             Coins = balance.GetStartingCoins(LevelIndex); CoinsEarned = 0; // Opening balance is a configured attempt grant, not earned revenue.
             Elapsed = 0f; Delivered = 0; customersAttended = ordersCompleted = 0;
             Array.Clear(deliveredByProduct, 0, deliveredByProduct.Length);
-            // Every round entry is a fresh attempt, regardless of selected club.
+            // Every round entry is a fresh attempt; ticket workers augment, never replace, its baseline.
             ResetTeamAndSpeed();
+            for (int role = 0; role < ticketRoleCounts.Length; role++)
+                for (long count = 0; count < ticketRoleCounts[role]; count++)
+                {
+                    AddWorker((StreetWorkerRole)role);
+                    ticketWorkersByRole[role]++;
+                }
             foreach (StreetWorker worker in workers) ResetWorker(worker);
             arrival = 0f; Phase = RoundPhase.Playing;
+            return true;
         }
         public void BindIngredientStock(IStreetKitchenStock stock)
         {
@@ -726,12 +760,34 @@ namespace HayChoriYPaty
             return index % Mathf.Max(1, accessCount);
         }
 
+        private void BarrelDrinkAccess(StreetWorker worker, out int accessIndex, out int accessCount)
+        {
+            int index = 0, count = 1;
+            foreach (StreetWorker other in workers)
+            {
+                if (other == worker || other.Role != worker.Role || other.Product != worker.Product ||
+                    other.Customer == null ||
+                    (other.State != StreetWorkerState.ToStation && other.State != StreetWorkerState.Pickup)) continue;
+                count++;
+                if (other.Id < worker.Id) index++;
+            }
+            accessCount = Mathf.Clamp(count, 1, 3);
+            accessIndex = index % accessCount;
+        }
+
         private Vector2 PickupPositionForWorker(StreetWorker worker)
         {
             // In levels 2 and 3 the Coca barrel is exposed on its own; keep every Cocacolero
             // on the centered approach instead of spreading access points sideways.
             if (worker.Product == 4 && (LevelIndex == 1 || LevelIndex == 2))
                 return KitchenLayout.PickupPosition(worker.Product);
+            if (worker.Product == 4 || worker.Product == 6)
+            {
+                // Reserve lanes only among workers currently approaching/reaching this same
+                // product. One worker at each barrel stays centered independently.
+                BarrelDrinkAccess(worker, out int accessIndex, out int accessCount);
+                return KitchenLayout.PickupPosition(worker.Product, accessIndex, accessCount);
+            }
             return KitchenLayout.PickupPosition(worker.Product, WorkerAccessIndex(worker, 3), 3);
         }
         private void StepSlice(float dt)
@@ -1359,6 +1415,47 @@ namespace HayChoriYPaty
             return StreetSpecialties.IsDeliveryResponsible(worker.Role, product, UsesActiveCooks);
         }
 
+        internal bool HasUnservedMozoSandwichDemandWithoutReadyPickup(StreetWorker worker)
+        {
+            if (worker == null || worker.Role != StreetWorkerRole.Mozo || !UsesActiveCooks || Kitchen == null)
+                return false;
+
+            bool hasDemandWithoutPickup = false;
+            for (int customerIndex = 0; customerIndex < customers.Count; customerIndex++)
+            {
+                StreetCustomer customer = customers[customerIndex];
+                if (customer.State != StreetCustomerState.Waiting || !IsAtCounter(customer)) continue;
+
+                // Dispatch never steals a customer's sandwich line from another Mozo.
+                bool ownedByAnotherMozo = false;
+                for (int lineIndex = 0; lineIndex < customer.OrderLineCount; lineIndex++)
+                {
+                    StreetOrderLine line = customer.GetOrderLine(lineIndex);
+                    if (line.Remaining > 0 && IsWorkerResponsibleFor(worker, line.Product) &&
+                        line.OwnerWorkerId != 0 && line.OwnerWorkerId != worker.Id)
+                    {
+                        ownedByAnotherMozo = true;
+                        break;
+                    }
+                }
+                if (ownedByAnotherMozo) continue;
+
+                for (int lineIndex = 0; lineIndex < customer.OrderLineCount; lineIndex++)
+                {
+                    StreetOrderLine line = customer.GetOrderLine(lineIndex);
+                    if (!IsWorkerResponsibleFor(worker, line.Product) || line.Remaining <= line.Reserved ||
+                        (line.OwnerWorkerId != 0 && line.OwnerWorkerId != worker.Id)) continue;
+
+                    hasDemandWithoutPickup = true;
+                    // Only stock matching an outstanding sandwich order can give this Mozo work.
+                    // An unrelated ready product must not hide the empty-pickup cue.
+                    if (Kitchen.AvailableTableCount(line.Product, worker.Id) > 0) return false;
+                }
+            }
+
+            return hasDemandWithoutPickup;
+        }
+
         private void ClaimAndDispatch(StreetWorker worker, StreetCustomer customer, StreetOrderLine line)
         {
             if (worker.Role == StreetWorkerRole.Mozo && Kitchen.ReserveTableUnit(line.Product, worker.Id) == null) return;
@@ -1491,6 +1588,7 @@ namespace HayChoriYPaty
                 int amount = Mathf.Max(0, Mathf.RoundToInt(GetProductPrice(worker.Product)));
                 Coins += amount; CoinsEarned += amount; sales.Add(new StreetSale { Id = nextSale++, Amount = amount, Position = worker.Position });
                 if (sales.Count > 40) sales.RemoveAt(0);
+                ProductUnitDelivered?.Invoke();
 
                 if (line.Remaining > 0 && Kitchen.HasSupply(worker.Product))
                 {
@@ -1521,9 +1619,9 @@ namespace HayChoriYPaty
                         return;
                     }
                 }
-                if (!customer.DeliverySoundPlayed && customer.PendingOrderLineCount == 0 && customer.Reserved == 0)
+                if (!customer.OrderCompletionRecorded && customer.PendingOrderLineCount == 0 && customer.Reserved == 0)
                 {
-                    customer.DeliverySoundPlayed = true;
+                    customer.OrderCompletionRecorded = true;
                     ordersCompleted++;
                     OrderCompleted?.Invoke();
                 }
@@ -1632,11 +1730,13 @@ namespace HayChoriYPaty
             nextCookQueueTicket = 0;
             Kitchen = new StreetKitchenProduction(balance.kitchen, availableProductsByLevel[LevelIndex], ingredientStock, UsesActiveCooks, !UsesActiveCooks && LevelIndex == 2);
             workers.Clear();
+            Array.Clear(ticketWorkersByRole, 0, ticketWorkersByRole.Length);
             nextWorker = 1;
             SpeedLevel = 0; // Zero purchased upgrades means the displayed speed is x1.00.
-            AddWorker();
+            for (int i = 0; i < StartingParrilleroCount; i++) AddWorker();
+            for (int i = 0; i < StartingCocacoleroCount; i++) AddWorker(StreetWorkerRole.Cocacolero);
             if (LevelIndex == 5 && HasRole(StreetWorkerRole.ParrilleroPremium)) AddWorker(StreetWorkerRole.ParrilleroPremium);
-            if ((LevelIndex == 5 || LevelIndex == 6) && HasRole(StreetWorkerRole.Mozo)) AddWorker(StreetWorkerRole.Mozo);
+            if (StartsWithFreeMozo && HasRole(StreetWorkerRole.Mozo)) AddWorker(StreetWorkerRole.Mozo);
         }
         private void AddWorker() { AddWorker(StreetWorkerRole.Parrillero); }
         private void AddWorker(StreetWorkerRole role)

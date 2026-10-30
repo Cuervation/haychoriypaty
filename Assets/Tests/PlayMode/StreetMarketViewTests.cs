@@ -80,9 +80,11 @@ namespace HayChoriYPaty.Tests
         public IEnumerator MarketEntryAndQuantitySelectionRequireExplicitDebouncedPurchase()
         {
             viewType.GetField("levelSelectActive", Priv).SetValue(view, true);
-            Dispatch(161); // The selector's single Mercado button.
+            Dispatch(31); // Select level 2; selector opens the unified Mercado screen.
             Assert.IsTrue((bool)viewType.GetField("marketActive", Priv).GetValue(view));
-            Assert.IsNull(viewType.GetField("marketTab", Priv), "There is no separate stock-screen tab.");
+            FieldInfo marketTab = viewType.GetField("marketTab", Priv);
+            Assert.IsNotNull(marketTab, "Ingredients and Extras are tabs inside the same Market screen.");
+            Assert.AreEqual(0, (int)marketTab.GetValue(view), "Market opens on INGREDIENTES.");
             Assert.AreEqual(0, (int)viewType.GetMethod("HitMarketAction", Priv).Invoke(view, new object[] { new Vector2(462, 35) }),
                 "The old HELADERA header button is gone.");
 
@@ -279,6 +281,54 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
+        public IEnumerator PartiallyClippedMarketRowCannotBeActivated()
+        {
+            Assert.IsTrue((bool)gameType.GetMethod("SelectLevel", Pub).Invoke(game, new object[] { 9 }));
+            viewType.GetField("marketActive", Priv).SetValue(view, true);
+            viewType.GetField("logicalCanvasHeight", Priv).SetValue(view, 960f);
+            viewType.GetField("marketScroll", Priv).SetValue(view, 0f);
+
+            Rect body = (Rect)viewType.GetMethod("MarketBodyBounds", Priv).Invoke(view, null);
+            Rect clipped = (Rect)viewType.GetMethod("MarketRowBounds", Priv).Invoke(view, new object[] { 2 });
+            Assert.Less(clipped.yMin, body.yMax);
+            Assert.Greater(clipped.yMax, body.yMax, "The third row is intentionally only partly visible before scrolling.");
+            Assert.IsTrue(body.Contains(clipped.center), "The hit point would have been accepted by the old partial-row behavior.");
+            int action = (int)viewType.GetMethod("HitMarketAction", Priv).Invoke(view, new object[] { clipped.center });
+            Assert.AreEqual(0, action, "A cropped card must not activate or expand when its label is partly hidden.");
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator MarketFingerDragScrollsIngredientListAndSuppressesNativeTaps()
+        {
+            Assert.IsTrue((bool)gameType.GetMethod("SelectLevel", Pub).Invoke(game, new object[] { 9 }));
+            viewType.GetField("marketActive", Priv).SetValue(view, true);
+            viewType.GetField("logicalCanvasHeight", Priv).SetValue(view, 960f);
+            viewType.GetField("marketScroll", Priv).SetValue(view, 0f);
+
+            Rect body = (Rect)viewType.GetMethod("MarketBodyBounds", Priv).Invoke(view, null);
+            MethodInfo maxScroll = viewType.GetMethod("MarketMaxScroll", Priv);
+            MethodInfo updateTouch = viewType.GetMethod("UpdateMarketTouchScroll", Priv);
+            PropertyInfo suppressNativeTap = viewType.GetProperty("SuppressMarketNativeTap", Priv);
+            Assert.Greater((float)maxScroll.Invoke(view, null), 0f, "The seven-product market list exceeds its viewport.");
+
+            Vector2 start = body.center;
+            Vector2 fingerMovedUp = new Vector2(start.x, start.y - 180f);
+            updateTouch.Invoke(view, new object[] { start, true, true, false });
+            updateTouch.Invoke(view, new object[] { fingerMovedUp, false, true, false });
+            Assert.Greater((float)viewType.GetField("marketScroll", Priv).GetValue(view), 0f,
+                "Dragging upward with a finger advances the ingredient list.");
+            Assert.IsTrue((bool)suppressNativeTap.GetValue(view), "A drag must not activate an IMGUI purchase button.");
+
+            long purchaseId = (long)Market.GetType().GetProperty("NextPurchaseId", Pub).GetValue(Market, null);
+            updateTouch.Invoke(view, new object[] { fingerMovedUp, false, false, true });
+            Assert.IsTrue((bool)suppressNativeTap.GetValue(view), "Suppress the release-frame IMGUI click after a drag.");
+            Assert.AreEqual(purchaseId, (long)Market.GetType().GetProperty("NextPurchaseId", Pub).GetValue(Market, null),
+                "Scrolling never confirms a purchase.");
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator FirstLevelMarketDoesNotUnlockPurchasing()
         {
             object save=gameType.GetField("save",Priv).GetValue(game);
@@ -384,7 +434,69 @@ namespace HayChoriYPaty.Tests
             Assert.IsFalse((bool)gameType.GetMethod("Retry", Pub).Invoke(game, null));
         }
 
+        [UnityTest]
+        public IEnumerator MarketTabsAndExtrasCardsRemainInTheScrollableSafeViewportAtPortraitHeights()
+        {
+            Assert.IsTrue((bool)gameType.GetMethod("SelectLevel", Pub).Invoke(game, new object[] { 5 }));
+            viewType.GetField("marketActive", Priv).SetValue(view, true);
+            viewType.GetField("logicalCanvasHeight", Priv).SetValue(view, 960f);
+            MethodInfo tabBounds = viewType.GetMethod("MarketTabBounds", PrivStatic);
+            MethodInfo hitMarket = viewType.GetMethod("HitMarketAction", Priv);
+            Rect extrasTab = (Rect)tabBounds.Invoke(null, new object[] { 1, 7 });
+            Assert.AreEqual(192, (int)hitMarket.Invoke(view, new object[] { extrasTab.center }));
+            Dispatch(192);
+            Assert.AreEqual(1, (int)viewType.GetField("marketTab", Priv).GetValue(view));
+
+            MethodInfo bodyMethod = viewType.GetMethod("MarketBodyBounds", Priv);
+            MethodInfo cardMethod = viewType.GetMethod("MarketTicketCardBounds", Priv);
+            MethodInfo redeemButton = viewType.GetMethod("MarketTicketRedeemButtonBounds", Priv);
+            MethodInfo fullyVisible = viewType.GetMethod("MarketFullyVisibleInViewport", PrivStatic);
+            float[] heights = { 960f, 1170f, 1200f };
+            foreach (float height in heights)
+            {
+                viewType.GetField("logicalCanvasHeight", Priv).SetValue(view, height);
+                Rect tabs = (Rect)viewType.GetMethod("MarketTabsBounds", PrivStatic).Invoke(null, new object[] { 7 });
+                Rect body = (Rect)bodyMethod.Invoke(view, null);
+                Rect footer = (Rect)viewType.GetMethod("MarketEconomyFooterBounds", PrivStatic).Invoke(null, new object[] { height });
+                Assert.LessOrEqual(tabs.yMax, body.y, "Tabs never overlap the scroll viewport.");
+                Assert.LessOrEqual(body.yMax, footer.y, "Cards never overlap the fixed purchase/play footer.");
+                viewType.GetField("marketScroll", Priv).SetValue(view, 0f);
+                float maximum = (float)viewType.GetMethod("MarketMaxScroll", Priv).Invoke(view, null);
+                Assert.Greater(maximum, 0f, "All five Extras cards share the existing scroll mechanism.");
+                Rect lastAtTop = (Rect)cardMethod.Invoke(view, new object[] { 4 });
+                Assert.IsFalse((bool)fullyVisible.Invoke(null, new object[] { lastAtTop, body }), "A clipped worker card cannot be acted on.");
+                Rect blockedButton = (Rect)redeemButton.Invoke(view, new object[] { 4 });
+                Assert.AreEqual(0, (int)hitMarket.Invoke(view, new object[] { blockedButton.center }));
+
+                viewType.GetField("marketScroll", Priv).SetValue(view, maximum);
+                body = (Rect)bodyMethod.Invoke(view, null);
+                Rect lastCard = (Rect)cardMethod.Invoke(view, new object[] { 4 });
+                Assert.IsTrue((bool)fullyVisible.Invoke(null, new object[] { lastCard, body }), "The last worker card is reachable without clipping.");
+                Rect canje = (Rect)redeemButton.Invoke(view, new object[] { 4 });
+                Assert.AreEqual(224, (int)hitMarket.Invoke(view, new object[] { canje.center }));
+            }
+            Dispatch(224);
+            Assert.AreEqual(7L, GetGame("TicketBalance"));
+            Assert.AreEqual("¡CANJE REALIZADO! Tu trabajador está reservado para el próximo partido.",
+                viewType.GetField("marketMessage", Priv).GetValue(view));
+            Assert.AreEqual(1L, (long)gameType.GetMethod("PendingTicketWorkers", Pub).Invoke(game, new[] { Enum.Parse(Type.GetType("HayChoriYPaty.StreetWorkerRole, Assembly-CSharp", true), "Mozo") }));
+            yield return null;
+        }
+
 #if UNITY_EDITOR
+        private IEnumerator WaitForStreetViewResources()
+        {
+            FieldInfo ready = viewType.GetField("viewResourcesReady", Priv);
+            for (int frame = 0; frame < 600 && !(bool)ready.GetValue(view); frame++) yield return null;
+            Assert.IsTrue((bool)ready.GetValue(view), "StreetView's asynchronous startup art must finish before capturing Market.");
+            viewType.GetField("introActive", Priv).SetValue(view, false);
+            viewType.GetField("hubActive", Priv).SetValue(view, false);
+            viewType.GetField("levelSelectActive", Priv).SetValue(view, false);
+            viewType.GetField("badgesActive", Priv).SetValue(view, false);
+            viewType.GetField("rankingActive", Priv).SetValue(view, false);
+            viewType.GetField("marketActive", Priv).SetValue(view, true);
+        }
+
         [UnityTest]
         public IEnumerator CaptureRoundedBlueMarket()
         {
@@ -402,6 +514,7 @@ namespace HayChoriYPaty.Tests
         [UnityTest]
         public IEnumerator CaptureUnifiedMarketLevelsAtPortraitGameViewSizes()
         {
+            yield return WaitForStreetViewResources();
             viewType.GetField("marketActive", Priv).SetValue(view, true);
             viewType.GetField("levelSelectActive", Priv).SetValue(view, false);
             int[] levels = { 1, 3, 9 };
@@ -511,6 +624,19 @@ namespace HayChoriYPaty.Tests
                     yield return null; yield return new WaitForEndOfFrame();
                     SaveCurrentGameViewCapture($"mercado-compra-nivel-{level:00}-{width}x{height}");
                 }
+                viewType.GetField("marketTab", Priv).SetValue(view, 1);
+                viewType.GetField("marketScroll", Priv).SetValue(view, 0f);
+                yield return null; yield return new WaitForEndOfFrame();
+                SaveCurrentGameViewCapture($"extras-superior-nivel-{level:00}-{width}x{height}");
+                float extrasScroll = (float)viewType.GetMethod("MarketMaxScroll", Priv).Invoke(view, null);
+                viewType.GetField("marketScroll", Priv).SetValue(view, extrasScroll * .5f);
+                yield return null; yield return new WaitForEndOfFrame();
+                SaveCurrentGameViewCapture($"extras-medio-nivel-{level:00}-{width}x{height}");
+                viewType.GetField("marketScroll", Priv).SetValue(view, extrasScroll);
+                yield return null; yield return new WaitForEndOfFrame();
+                SaveCurrentGameViewCapture($"extras-inferior-nivel-{level:00}-{width}x{height}");
+                viewType.GetField("marketTab", Priv).SetValue(view, 0);
+                viewType.GetField("marketScroll", Priv).SetValue(view, 0f);
             }
             finally
             {

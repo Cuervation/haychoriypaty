@@ -104,6 +104,9 @@ namespace HayChoriYPaty.Tests
                 Assert.AreEqual(openingAttemptCoins + (int)Get(sim, "CoinsEarned") - hireSpend - upgradeSpend, (int)Get(sim, "Coins"),
                     "Attempt-cash conservation for L" + (expectedLevel + 1) + ": opening coins + real sales - paid hires - speed upgrades = leftover.");
                 Assert.IsTrue((bool)Call(game, "ProcessRoundResult"), "Terminal result must settle and persist via StreetGame.");
+                if (phase == "Won")
+                    Assert.IsTrue((bool)Call(game, "TryCollectVictoryReward"),
+                        "The cash-only audit resolves the standard x1 Chulengo choice before reconciling posted income.");
                 market = Get(game, "Market");
                 object data = Get(market, "Data");
                 object result = Get(data, "lastResult");

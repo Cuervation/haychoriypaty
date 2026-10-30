@@ -22,6 +22,24 @@ namespace HayChoriYPaty.Tests
         private static object Layout(object simulation) => Get(simulation, "KitchenLayout");
         private static object FullLayout() => Layout(Simulation(4));
 
+        private static int ExpectedInitialSandwichStock(object sim, int product)
+        {
+            if (product < 0 || product >= 4 || (bool)Get(sim, "UsesActiveCooks") || !(bool)Call(sim, "IsProductAvailable", product)) return 0;
+            int first = product < 2 ? 0 : 2, second = first + 1;
+            bool firstAvailable = (bool)Call(sim, "IsProductAvailable", first);
+            bool secondAvailable = (bool)Call(sim, "IsProductAvailable", second);
+            int count = (firstAvailable ? 1 : 0) + (secondAvailable ? 1 : 0);
+            if (count == 0) return 0;
+            object balance = Get(Get(sim, "Kitchen"), "Balance");
+            string capacityField = first == 0 ? "normalTableCapacity" : "premiumTableCapacity";
+            int configured = (int)balance.GetType().GetField(capacityField, BindingFlags.Public | BindingFlags.Instance).GetValue(balance);
+            int each = configured / count, remainder = configured % count;
+            int initial = each + (product == first && remainder > 0 ? 1 :
+                product == second && firstAvailable && remainder > 1 ? 1 : 0);
+            int physicalCapacity = (int)Call(Get(sim, "Kitchen"), "TableCapacity", product);
+            return Mathf.Min(initial, physicalCapacity);
+        }
+
         private static object Call(object target, string name, params object[] args)
         {
             MethodInfo method = null;
@@ -292,11 +310,21 @@ namespace HayChoriYPaty.Tests
                         if (location == "Table") listedTable++;
                         if (location == "Grill") listedGrill++;
                     }
-                    Assert.AreEqual(level >= 5 && p < 4 ? 0 : capacities[p], listedTable, "L" + level + " initial table count for product " + p);
+                    int expectedInitialTable = p < 4 ? ExpectedInitialSandwichStock(sim, p) : capacities[p];
+                    Assert.AreEqual(expectedInitialTable, listedTable, "L" + level + " initial table count for product " + p);
                     Assert.AreEqual(level >= 5 ? 0 : grills[p], listedGrill, "L" + level + " initial grill count for product " + p);
                 }
                 Assert.AreEqual(18, grills[0] + grills[1], "Normal grill has 18 real meat units when available.");
-                if (grills[2] + grills[3] > 0) Assert.AreEqual(7, grills[2] + grills[3], "Premium grill has seven real meat units.");
+                bool bondiola = (bool)Call(sim, "IsProductAvailable", 2);
+                bool vacio = (bool)Call(sim, "IsProductAvailable", 3);
+                if (bondiola && vacio)
+                {
+                    Assert.AreEqual(6, grills[2], "Whole Bondiola uses its authored 3x2 grid.");
+                    Assert.AreEqual(4, grills[3], "Whole Vacío fills the remaining compact 2x2 grid.");
+                    Assert.AreEqual(10, grills[2] + grills[3]);
+                }
+                else if (bondiola) Assert.AreEqual(6, grills[2], "Whole Bondiola uses its authored 3x2 grid.");
+                else if (vacio) Assert.AreEqual(7, grills[3], "Vacío alone uses the full premium grill.");
             }
         }
 
@@ -396,14 +424,14 @@ namespace HayChoriYPaty.Tests
                     {
                         fernetBottles++;
                         fernetByRow[row]++;
-                        Assert.AreEqual(tableHeight * .25f * 3f * .93f * .90f, height, .02f,
-                            "Fernet tabletop bottles are 10% smaller than their previous size.");
+                        Assert.AreEqual(tableHeight * .25f * 3f * .93f * .90f * .95f, height, .02f,
+                            "Fernet tabletop bottles keep the established 10% and latest 5% scale reductions.");
                     }
                     if (spriteRenderer.sprite.name == "coca-2500ml-display-v1")
                     {
                         cocaBottles++;
                         cocaByRow[row]++;
-                        Assert.AreEqual(tableHeight * .333f * 3f * .76f * .95f, height, .02f,
+                        Assert.AreEqual(tableHeight * .333f * 3f * .76f * .95f * .97f, height, .02f,
                             "The tabletop Coca is 5% smaller than its previous .76 multiplier.");
                     }
                 }
@@ -1078,7 +1106,7 @@ namespace HayChoriYPaty.Tests
             AssertPrefab("Station_FernetTable", "empty-table", 1);
             AssertPrefab("Station_BeerBarrel", "blue-barrel", 2);
             AssertPrefab("Station_CocaBarrel", "blue-barrel", 2);
-            string[] singles = { "empty-grill", "empty-table", "food-table-plank", "food-table-trestle", "blue-barrel", "sandwich-chori", "sandwich-paty", "sandwich-bondiola", "sandwich-vacio", "coca", "beer", "fernet", "ice", "smoke", "heat" };
+            string[] singles = { "empty-grill", "empty-table", "food-table-folding-v2", "blue-barrel", "sandwich-chori", "sandwich-paty", "sandwich-bondiola", "sandwich-vacio", "coca", "beer", "fernet", "ice", "smoke", "heat" };
             foreach (string name in singles)
             {
                 string path = "Assets/Resources/ModularKitchen/Art/" + name + ".png";
@@ -1089,7 +1117,8 @@ namespace HayChoriYPaty.Tests
                 Assert.AreEqual(TextureImporterNPOTScale.None, importer.npotScale, "Original sprite aspect must not be resampled to a different power-of-two ratio.");
                 Assert.IsTrue(importer.mipmapEnabled, "High resolution food minification needs mipmaps to avoid sparkle.");
                 Assert.AreEqual(FilterMode.Trilinear, importer.filterMode);
-                Assert.AreEqual(1, Resources.LoadAll<Sprite>("ModularKitchen/Sprites/" + name).Length, name);
+                string spriteResourceName = name == "food-table-folding-v2" ? "food-table-plank" : name;
+                Assert.AreEqual(1, Resources.LoadAll<Sprite>("ModularKitchen/Sprites/" + spriteResourceName).Length, spriteResourceName);
             }
             foreach (string name in new[] { "Food_Chori", "Food_Paty", "Food_Bondiola", "Food_Vacio", "Sandwich_Chori", "Sandwich_Paty", "Sandwich_Bondiola", "Sandwich_Vacio", "Drink_Coca", "Drink_Beer", "Drink_Fernet", "Prop_Ice", "Effect_Smoke", "Effect_Heat" })
             {

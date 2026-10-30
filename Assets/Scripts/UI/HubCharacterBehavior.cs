@@ -17,16 +17,16 @@ namespace HayChoriYPaty
 
     public sealed class HubCharacterBehaviorSettings
     {
-        public float SellerGapMin = 8f;
-        public float SellerGapMax = 18f;
-        public float PoliceGapMin = 8f;
-        public float PoliceGapMax = 16f;
-        public float StoreGapMin = 5f;
-        public float StoreGapMax = 12f;
-        public float KidsGapMin = 3f;
-        public float KidsGapMax = 9f;
-        public float GestureDurationMin = 1.1f;
-        public float GestureDurationMax = 2.1f;
+        public float SellerGapMin = 2.8f;
+        public float SellerGapMax = 5f;
+        public float PoliceGapMin = 2.5f;
+        public float PoliceGapMax = 5.5f;
+        public float StoreGapMin = 2.4f;
+        public float StoreGapMax = 4.8f;
+        public float KidsGapMin = 1.8f;
+        public float KidsGapMax = 4f;
+        public float GestureDurationMin = 1.2f;
+        public float GestureDurationMax = 2f;
         public float EventDuration = 2.4f;
     }
 
@@ -158,15 +158,15 @@ namespace HayChoriYPaty
         {
             var result = new HubCharacterBehaviorSettings();
             result.SellerGapMin = NonNegative(source.SellerGapMin, 8f);
-            result.SellerGapMax = Math.Max(result.SellerGapMin, NonNegative(source.SellerGapMax, 18f));
+            result.SellerGapMax = Math.Max(result.SellerGapMin, NonNegative(source.SellerGapMax, 5f));
             result.PoliceGapMin = NonNegative(source.PoliceGapMin, 8f);
-            result.PoliceGapMax = Math.Max(result.PoliceGapMin, NonNegative(source.PoliceGapMax, 16f));
+            result.PoliceGapMax = Math.Max(result.PoliceGapMin, NonNegative(source.PoliceGapMax, 5.5f));
             result.StoreGapMin = NonNegative(source.StoreGapMin, 5f);
-            result.StoreGapMax = Math.Max(result.StoreGapMin, NonNegative(source.StoreGapMax, 12f));
+            result.StoreGapMax = Math.Max(result.StoreGapMin, NonNegative(source.StoreGapMax, 4.8f));
             result.KidsGapMin = NonNegative(source.KidsGapMin, 3f);
-            result.KidsGapMax = Math.Max(result.KidsGapMin, NonNegative(source.KidsGapMax, 9f));
-            result.GestureDurationMin = Math.Max(.01f, NonNegative(source.GestureDurationMin, 1.1f));
-            result.GestureDurationMax = Math.Max(result.GestureDurationMin, NonNegative(source.GestureDurationMax, 2.1f));
+            result.KidsGapMax = Math.Max(result.KidsGapMin, NonNegative(source.KidsGapMax, 4f));
+            result.GestureDurationMin = Math.Max(.01f, NonNegative(source.GestureDurationMin, 1.2f));
+            result.GestureDurationMax = Math.Max(result.GestureDurationMin, NonNegative(source.GestureDurationMax, 2f));
             result.EventDuration = Math.Max(.01f, NonNegative(source.EventDuration, 2.4f));
             return result;
         }

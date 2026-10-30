@@ -25,7 +25,6 @@ namespace HayChoriYPaty
         }
         private int HitLevelSelectorAction(Vector2 point)
         {
-            if (MarketSelectorBounds().Contains(point)) return MarketCloseAction;
             if (LevelSelectorBackBounds(logicalCanvasHeight).Contains(point)) return LevelSelectorBackAction;
             if (!LevelSelectorViewportBounds(logicalCanvasHeight).Contains(point)) return 0;
             for (int i = 0; i < StreetSimulation.LevelNames.Length; i++)
@@ -177,7 +176,7 @@ namespace HayChoriYPaty
                 unlocked ? "DISPONIBLE" : "BLOQUEADO", Mathf.RoundToInt(13f * scale),
                 Color.white, TextAnchor.MiddleCenter);
 
-            if (unlocked && GUI.Button(LayoutRect(bounds), "", invisible))
+            if (unlocked && GUI.Button(LayoutRect(bounds), "", invisible) && !SuppressLevelSelectorNativeTap)
                 NativeAction(LevelSelectFirstAction + index);
         }
 

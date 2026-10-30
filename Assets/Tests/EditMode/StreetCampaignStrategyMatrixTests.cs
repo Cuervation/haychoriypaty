@@ -177,6 +177,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual("Won", Get(sim, "Phase").ToString(), "Use an actual simulation victory, not a mocked settlement.");
             Call(market, "SettleAttempt", sim);
             object nextLevel = NewSimulation(balance, 1);
+            Call(market, "GrantFirstUnlockStockBonus", nextLevel, true);
             long missingStockCost = (long)Call(market, "MinimumPurchaseCostCents", nextLevel);
             long availableBalance = (long)Get(market, "BalanceCents");
             Assert.GreaterOrEqual(availableBalance, missingStockCost,
