@@ -56,3 +56,11 @@ Evidencia local final: `/private/tmp/hcyp-sales-badges/persisted/` (XML, logs y 
 ### Empaquetado del delta — 2026-10-23
 
 APK0.2.65/code67 generada: Main-only Development IL2CPP/ARM64,0errores/1warning,447,19s; ZIP/alineación/firma/bindingsMain verificados y revisión independiente PASS. Fuente197c3a3 publicada,32+1tests reutilizados sin cambios. Artefacto `/private/tmp/HayChoriYPaty-0.2.65-code67-insignias.apk`,354.357.269bytes,SHA256 `98ca84f89eeb6e12635c6ad034234e907309642f7b3f9d1172c232e9b11170b0`. No instalada, sin roundtripFirebase real nuevo. Esto actualiza el estado de empaquetado indicado en la evidencia local anterior.
+
+## Animación del barrio — integración y revisión visual 2026-10-30
+
+Se integraron los cinco grupos de capas/reemplazo previstos: vendedor, tres policías, personaje del almacén y chicos. Se preserva el master de 841×1870 (SHA-256 `0573cc633b2d7aa2bfdde5433d1c1a01b75665b66310fc6e4924ce9e7305c098`); sus zonas limpiadas se superponen con partes articuladas. Los manifiestos usan UV normalizados y el runtime admite que Unity downsamplee la textura (p. ej. atlas fuente 720×720 importado en 512×512).
+
+- [x] Unity 6000.6.3f1: `HubCharacterBehaviorTests` había pasado **7/7 EditMode**; la repetición posterior a este retoque visual no llegó a iniciar en Unity MCP (timeout de inicialización; no es un resultado de pruebas). Captura de poses **1/1 PlayMode PASS** a **1080×1920** y **1/1 PASS** a **1080×2400**.
+- [x] En ambas resoluciones, la revisión visual independiente **PASS** para vendedor (master/rest/wave/restauración), integridad de policías y personaje del almacén, unión/manga del brazo de festejo del chico, y mano visible del gesto de la chica. Sin seam ni duplicación evidente. A 1080×1920 el encuadre portrait existente recorta la zona inferior; a 1080×2400 se ve más cuerpo sin deriva geométrica. Capturas en `Path.GetTempPath()/hcyp-street-hub-view-tests/` (`hub-seller-{original-master,patched-rest,wave-up,restored}-playmode-*` y `hub-characters-group-gestures-playmode-*`).
+- [ ] Android físico y perfil de rendimiento: **NOT_RUN**; la aceptación visual de capturas no equivale a QA de dispositivo.

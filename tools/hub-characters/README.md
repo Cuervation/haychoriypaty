@@ -1,0 +1,7 @@
+# Hub character art pipeline (2026-10-30)
+
+- Input master: `street-hub-stadium-v1.png`, 841×1870; SHA-256 `0573cc633b2d7aa2bfdde5433d1c1a01b75665b66310fc6e4924ce9e7305c098` (read only).
+- Input sources in `source/` are preserved original outputs of the built-in ImageGen tool: `cleaned-hub.png` is a same-size clean background draft; `seller.png`, `police.png`, `store.png`, `boy.png`, `girl.png` are transparent-part atlases made against crops from that master. Prompts followed the requested character identities, back/three-quarter views, outfit colors, cartoon linework, separated body components and genuine transparent alpha.
+- `prepare_assets.py` uses only Pillow for offline alpha-masked, localized clean-plate patches and atlas downsampling. It checks dimensions and never writes the original master. Runtime uses precomputed RGBA files; no image-processing work or texture allocation occurs per frame.
+- Runtime assets are in `Assets/Art/Street/Resources/StreetHubCharacters/{Seller,Police,StoreCharacter,Boy,Girl}/`. Full-resolution generated masters are duplicated under `Assets/Art/Street/HubCharacterSource/` as non-Resources source assets for Unity provenance; they are not runtime references.
+- Current generated background mask polygons/assembly are candidates until full Unity Game View review confirms that every original target silhouette is removed, adjacent fans/products/store contents remain intact, and the new segmented parts align with no visible joins/duplicates.

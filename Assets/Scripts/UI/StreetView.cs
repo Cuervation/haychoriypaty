@@ -381,7 +381,7 @@ namespace HayChoriYPaty
         private static readonly Rect VictoryExit = new Rect(.195f, .839f, .62f, .151f);
         private const string IntroBackdropResource = "street-cover-user-v5";
         private const string HubBackdropResource = "street-hub-stadium-v1";
-        private static readonly Vector2 HubArtworkSize = new Vector2(941, 1672);
+        private static readonly Vector2 HubArtworkSize = new Vector2(841, 1870);
         private const string RiotBackdropResource = "street-riot-environment-v1";
         private const string RiotFanAtlasResource = "street-riot-fans-v1";
         private const string RiotImpactCloudResource = "street-riot-fight-cloud-v1";
@@ -877,6 +877,7 @@ namespace HayChoriYPaty
         }
         private void OnDisable()
         {
+            ReleaseHubCharacterAnimationsResources();
             if (startupResourceRoutine != null) StopCoroutine(startupResourceRoutine);
             startupResourceRoutine = null;
             startupArtReady = false;
@@ -2798,6 +2799,7 @@ namespace HayChoriYPaty
         private void DrawHubScreen()
         {
             DrawIntroScreen(hubBackdrop != null ? hubBackdrop : coverArt, Color.white, ScaleMode.ScaleAndCrop);
+            DrawHubCharacterAnimations();
             DrawHubHotspot(HubAccountAction);
             DrawHubHotspot(HubRankingAction);
             DrawHubHotspot(HubBadgesAction);
