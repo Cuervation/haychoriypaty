@@ -2460,7 +2460,35 @@ namespace HayChoriYPaty
                     backdrop, StreetSceneLayout.CleanCounterSideSource, true, true);
             }
             DrawGameplayMural(canvasHeight, verticalScale);
+            DrawFerroOppositeSidewalk(canvasHeight, verticalScale);
+            DrawLosRedondosOppositeSidewalk(canvasHeight, verticalScale);
             DrawClubPennants(canvasHeight, verticalScale, safeViewport, safePennants);
+        }
+
+        private void DrawFerroOppositeSidewalk(float canvasHeight, float verticalScale)
+        {
+            if (VisualLevelIndex != 3 || ferroBackground == null) return;
+            Rect destination = StreetSceneLayout.FerroOppositeSidewalkBounds(canvasHeight, verticalScale);
+            Rect source = StreetSceneLayout.FerroOppositeSidewalkSource(new Vector2(ferroBackground.width, ferroBackground.height));
+            if (destination.width <= 0f || destination.height <= 0f || source.width <= 0f || source.height <= 0f) return;
+
+            // This existing Ferro-background crop contains the wall foot, tiled opposite sidewalk,
+            // curb and a little road. Keep it as a scenery-only layer: the crowd is drawn later and
+            // occludes it naturally, while the source's lower curb lands at the unchanged root counter.
+            DrawRawCover(destination, ferroBackground, source);
+        }
+
+        private void DrawLosRedondosOppositeSidewalk(float canvasHeight, float verticalScale)
+        {
+            if (VisualLevelIndex != 10 || losRedondosBackground == null) return;
+            Rect destination = StreetSceneLayout.LosRedondosOppositeSidewalkBounds(canvasHeight, verticalScale);
+            Rect source = StreetSceneLayout.LosRedondosOppositeSidewalkSource(
+                new Vector2(losRedondosBackground.width, losRedondosBackground.height));
+            if (destination.width <= 0f || destination.height <= 0f || source.width <= 0f || source.height <= 0f) return;
+
+            // Reuse the existing level art's tiled opposite sidewalk and curb as scenery only.
+            // The queue is rendered later in front of it, and its lower edge meets the shared counter.
+            DrawRawCover(destination, losRedondosBackground, source);
         }
 
         private void DrawGameplayMural(float canvasHeight, float verticalScale)

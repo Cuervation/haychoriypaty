@@ -242,6 +242,58 @@ namespace HayChoriYPaty.Tests
             Assert.Less(counter.yMax, 400f * canvasHeight / 960f, "Workers' feet stay on the operator side");
         }
 
+        [TestCase(960f)] [TestCase(1200f)] [TestCase(1360f)]
+        public void FerroOppositeSidewalkUsesOriginalTileAndCurbCropWithoutMovingSharedCounter(float canvasHeight)
+        {
+            Type layout = Type.GetType("HayChoriYPaty.StreetSceneLayout, Assembly-CSharp", true);
+            float verticalScale = canvasHeight / 960f;
+            Rect bounds = (Rect)layout.GetMethod("FerroOppositeSidewalkBounds").Invoke(null,
+                new object[] { canvasHeight, verticalScale });
+            float counterTop = (float)layout.GetMethod("CounterTop").Invoke(null, new object[] { canvasHeight });
+            float sidewalkHeight = (float)layout.GetField("FerroOppositeSidewalkHeight").GetRawConstantValue();
+            Assert.AreEqual(0f, bounds.x, .001f);
+            Assert.AreEqual(540f, bounds.width, .001f);
+            Assert.AreEqual(counterTop, bounds.yMax, .001f,
+                "The independent scenery layer must stop at the existing shared counter edge.");
+            Assert.AreEqual(sidewalkHeight * verticalScale, bounds.height, .001f);
+
+            Texture2D art = Resources.Load<Texture2D>("street-background-ferro-v2");
+            Assert.NotNull(art);
+            Rect source = (Rect)layout.GetMethod("FerroOppositeSidewalkSource").Invoke(null,
+                new object[] { new Vector2(art.width, art.height) });
+            float importScale = art.height / 1672f;
+            Assert.AreEqual(new Rect(0f, 700f * importScale, art.width, 180f * importScale), source,
+                "Reuse only the original source strip containing wall base, sidewalk tiles and curb.");
+            Assert.GreaterOrEqual(source.yMin, 0f);
+            Assert.LessOrEqual(source.yMax, art.height);
+        }
+
+        [TestCase(960f)] [TestCase(1200f)] [TestCase(1360f)]
+        public void LosRedondosOppositeSidewalkUsesOriginalTileAndCurbCropWithoutMovingSharedCounter(float canvasHeight)
+        {
+            Type layout = Type.GetType("HayChoriYPaty.StreetSceneLayout, Assembly-CSharp", true);
+            float verticalScale = canvasHeight / 960f;
+            Rect bounds = (Rect)layout.GetMethod("LosRedondosOppositeSidewalkBounds").Invoke(null,
+                new object[] { canvasHeight, verticalScale });
+            float counterTop = (float)layout.GetMethod("CounterTop").Invoke(null, new object[] { canvasHeight });
+            float sidewalkHeight = (float)layout.GetField("LosRedondosOppositeSidewalkHeight").GetRawConstantValue();
+            Assert.AreEqual(0f, bounds.x, .001f);
+            Assert.AreEqual(540f, bounds.width, .001f);
+            Assert.AreEqual(counterTop, bounds.yMax, .001f,
+                "The independent scenery layer must stop at the existing shared counter edge.");
+            Assert.AreEqual(sidewalkHeight * verticalScale, bounds.height, .001f);
+
+            Texture2D art = Resources.Load<Texture2D>("street-background-losredondos-v1");
+            Assert.NotNull(art);
+            Rect source = (Rect)layout.GetMethod("LosRedondosOppositeSidewalkSource").Invoke(null,
+                new object[] { new Vector2(art.width, art.height) });
+            float importScale = art.height / 1672f;
+            Assert.AreEqual(new Rect(0f, 680f * importScale, art.width, 180f * importScale), source,
+                "Reuse the original source strip containing Los Redondos' tiled sidewalk and curb.");
+            Assert.GreaterOrEqual(source.yMin, 0f);
+            Assert.LessOrEqual(source.yMax, art.height);
+        }
+
         [TestCase(1)] [TestCase(2)] [TestCase(3)] [TestCase(4)]
         [TestCase(5)] [TestCase(6)] [TestCase(7)] [TestCase(8)] [TestCase(9)] [TestCase(10)]
         public void ClubMuralAndAtmosphereConfigureArtWithoutDefiningPerspective(int level)

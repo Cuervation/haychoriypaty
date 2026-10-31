@@ -358,6 +358,18 @@ The user found the remaining-time label too small. Give its digital text nearly 
 
 Use original green/white Ferro and red/white Independiente cartoon identities with twelve full-body outfits per club in the active atlases. The same deterministic customer variant is used in front, walking and angry/swinging poses, never as a clothing overlay. Differentiate their backgrounds: Ferro’s Caballito/Ricardo Etcheverri perimeter; Independiente’s red stadium perimeter in Avellaneda. The aligned four-bay grill, ready sandwich table, beer-can barrel and 1-liter Fernet prep trestle follow the established Argentine street-stall cartoon treatment. Official apparel sources informed categories and palettes; the current art is not an exact product replica or a verified per-item mapping (see `specs/status.md`). No source photo is embedded.
 
+### Ferro gameplay — vereda de enfrente — 2026-10-31
+
+LevelIndex3 now adds a separate scenery-only band immediately above the shared counter, using the existing Ferro background’s wall-foot, tiled-sidewalk and curb crop. It is drawn behind the waiting crowd, fits the 540-unit root width, and ends at the same `StreetSceneLayout.CounterTop`; it does not move the queue, counter, workers, stations or routes. Use runtime-import texture dimensions when mapping the crop because Unity’s imported texture can differ from the source PNG dimensions.
+
+**Acceptance:** focused EditMode crop/geometry cases at canvas heights 960, 1200 and 1360 **3/3 PASS**. Full Game View review **BLOCKED**: the Level 4 PlayMode capture test stopped with a Test Runner `NullReferenceException` and `ExitPlayModeTask` instant-step error before producing a fresh screenshot. Do not treat older Ferro captures or the earlier concept preview as visual verification of this implementation.
+
+### Los Redondos gameplay — vereda de enfrente — 2026-10-31
+
+LevelIndex10 receives the same scenery-only far-sidewalk treatment: reuse the original `street-background-losredondos-v1` tiled-pavement/curb crop (source rows 680–860), draw it across the 540-unit root width in the 104-unit band immediately above the shared counter, and render the crowd in front. Scale crop coordinates against the runtime imported texture height. Preserve the club wall/mural, counter, queue rows, anchors, station positions and all gameplay geometry.
+
+**Acceptance:** `LosRedondosOppositeSidewalkUsesOriginalTileAndCurbCropWithoutMovingSharedCounter` passed **3/3 EditMode** at canvas heights 960, 1200 and 1360. A fresh full Game View capture was **NOT_RUN**; do not infer it from a source-art crop or the Ferro screenshot.
+
 ## Independent specialty upgrade row — 2026-10-06
 Reuse original wood/iron card, chevrons, Parrillero portrait and red-apron Cocacolero atlas. Specialist levels with drinks render three156×120cards at x24/192/360, y710 with12pixel gaps; Floresta keeps original two234×120cards. Titles span the compact card top, portrait/chevrons sit left, role count or multiplier/+10% above the brass price plaque on the right. Internal offsets retain uniform scale while each card anchors responsively; touch bounds match artwork height after inverse Y transform. No new assets. Live1220×2712 captures reviewed in ignored Logs/Acceptance/IndependentHUD-20261006; 2800 and MAX fit independently. This is editor evidence, not a physical-phone run.
 

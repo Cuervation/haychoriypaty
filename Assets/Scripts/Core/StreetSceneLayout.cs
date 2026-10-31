@@ -8,7 +8,11 @@ namespace HayChoriYPaty
         public const float Width = 540f, Height = 960f;
         public const float WorkerServiceY = 400f;
         public const float CustomerHeight = 76f, CustomerHiddenLegHeight = 32f;
+        public const float FerroOppositeSidewalkHeight = 104f;
+        public const float LosRedondosOppositeSidewalkHeight = 104f;
         public static readonly Vector2 ReferenceBackdropSize = new Vector2(940, 1673);
+        public static readonly Vector2 FerroBackdropSize = new Vector2(941, 1672);
+        public static readonly Vector2 LosRedondosBackdropSize = new Vector2(941, 1672);
         public static readonly Rect CounterSource = new Rect(0, 548, 940, 108);
         public static readonly Rect MuralBounds = new Rect(0, 0, Width, 118);
 
@@ -78,6 +82,32 @@ namespace HayChoriYPaty
             Rect background = BackgroundBounds(canvasHeight);
             return new Rect(background.x, CounterTop(canvasHeight), background.width,
                 CounterFrontBottom(canvasHeight) - CounterTop(canvasHeight));
+        }
+        /// <summary>Ferro's separate far-sidewalk band sits behind the crowd and stops at the shared counter.</summary>
+        public static Rect FerroOppositeSidewalkBounds(float canvasHeight, float verticalScale)
+        {
+            float height = FerroOppositeSidewalkHeight * Mathf.Max(.01f, verticalScale);
+            float bottom = CounterTop(canvasHeight);
+            return new Rect(0f, Mathf.Max(0f, bottom - height), Width, Mathf.Min(height, bottom));
+        }
+        /// <summary>Original crop containing Ferro's wall foot, tiled pavement and curb in top-origin pixel coordinates.</summary>
+        public static Rect FerroOppositeSidewalkSource(Vector2 textureSize)
+        {
+            float scale = textureSize.y / FerroBackdropSize.y;
+            return new Rect(0f, 700f * scale, textureSize.x, 180f * scale);
+        }
+        /// <summary>Los Redondos' separate far-sidewalk band ends at the unchanged shared counter.</summary>
+        public static Rect LosRedondosOppositeSidewalkBounds(float canvasHeight, float verticalScale)
+        {
+            float height = LosRedondosOppositeSidewalkHeight * Mathf.Max(.01f, verticalScale);
+            float bottom = CounterTop(canvasHeight);
+            return new Rect(0f, Mathf.Max(0f, bottom - height), Width, Mathf.Min(height, bottom));
+        }
+        /// <summary>Original Los Redondos tiled-sidewalk, curb and road crop in top-origin texture pixels.</summary>
+        public static Rect LosRedondosOppositeSidewalkSource(Vector2 textureSize)
+        {
+            float scale = textureSize.y / LosRedondosBackdropSize.y;
+            return new Rect(0f, 680f * scale, textureSize.x, 180f * scale);
         }
         public static float CustomerOffset(float counterTop, float verticalScale)
         {

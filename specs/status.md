@@ -1,3 +1,15 @@
+## 2026-10-31 — Vereda de enfrente para Los Redondos
+
+Se añadió al Nivel 11 una franja escenográfica de vereda/cordón tomada del fondo original de Los Redondos. Se dibuja detrás de la hinchada, termina en el borde compartido del mostrador y no cambia filas, anclas, estaciones ni rutas. El recorte se escala con las dimensiones de textura importadas por Unity.
+
+**Validación:** `LosRedondosOppositeSidewalkUsesOriginalTileAndCurbCropWithoutMovingSharedCounter` pasó **3/3 EditMode** (960, 1200 y 1360). Captura y revisión full Game View **NOT_RUN**; no se generó APK ni se instaló en un dispositivo.
+
+## 2026-10-31 — Vereda de enfrente para Ferro
+
+Se añadió al Nivel 4 una capa de vereda tiled con cordón, reutilizando un recorte del fondo original de Ferro. Se dibuja detrás de la hinchada y termina en el borde común del mostrador; no altera perspectiva, filas, anclas, estaciones ni rutas.
+
+Unity 6000.6.3f1: `FerroOppositeSidewalkUsesOriginalTileAndCurbCropWithoutMovingSharedCounter` **3/3 EditMode PASS** a alturas 960/1200/1360. La compilación/importación no mostró errores C# nuevos. La captura full Game View de Level 4 quedó **BLOCKED**: `Level04_Ferro_MarketAndMultiRoleUi_InMemoryOnly` falló antes de resultados con `NullReferenceException`, `An unexpected error happened while running tests` y `Too many instant steps ... ExitPlayModeTask`; no se obtuvo PNG actual. No se generó APK ni se hizo instalación o push.
+
 ## 2026-10-30 — Refuerzo moderado de animaciones ambientales del hub
 
 Se reforzaron los efectos existentes, sin tocar el master ni reactivar los rigs de personajes: cuatro hojas mayores y más regulares, humo (alpha máximo 0,135 vs 0,105), brasas (0,04–0,09 vs 0,026–0,072), chispa, estrella de Ranking y barrido de JUGAR algo más intensos/frecuentes. Banderas/camisetas siguen estáticas por falta de máscaras limpias; navegación/hotspots no cambian.
