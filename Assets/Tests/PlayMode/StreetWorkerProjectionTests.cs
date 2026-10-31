@@ -131,6 +131,94 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
+        public IEnumerator SixCooksPerSpecialtyRenderWaitersAtTheirOwnGrill()
+        {
+            var root = new GameObject("Separate normal and Premium cook waiting queues");
+            Texture2D premium = null, premiumDiagonal = null;
+            try
+            {
+                object sim = Activator.CreateInstance(T("StreetSimulation"), new object[]
+                    { Activator.CreateInstance(T("StreetBalance")), 8, 5f, 0, 1, 0 });
+                Call(sim, "StartRound");
+                Set(sim, "Coins", 100000);
+                foreach (string roleName in new[] { "Parrillero", "ParrilleroPremium" })
+                {
+                    object role = Enum.Parse(T("StreetWorkerRole"), roleName);
+                    while ((int)Call(sim, "WorkerCount", role) < 6)
+                        Assert.IsTrue((bool)Call(sim, "TryHire", role));
+                }
+
+                IList workers = (IList)Get(sim, "Workers");
+                var cooks = new List<object>();
+                foreach (object worker in workers)
+                    if (Get(worker, "Role").ToString().StartsWith("Parrillero")) cooks.Add(worker);
+                workers.Clear();
+                foreach (object worker in cooks) workers.Add(worker);
+                Assert.AreEqual(12, workers.Count);
+                object layout = Get(sim, "KitchenLayout");
+                var waiting = new List<object>();
+                foreach (string roleName in new[] { "Parrillero", "ParrilleroPremium" })
+                {
+                    int product = roleName == "Parrillero" ? 0 : 2;
+                    int index = 0;
+                    foreach (object worker in cooks)
+                    {
+                        if (Get(worker, "Role").ToString() != roleName) continue;
+                        bool queued = index >= 4;
+                        Vector2 point = queued ? (Vector2)Call(layout, "CookQueuePosition", product, index - 4, 2)
+                            : (Vector2)Call(layout, "GrillWorkPosition", product, index, 4);
+                        Set(worker, "State", Enum.Parse(T("StreetWorkerState"), "Idle"));
+                        Set(worker, "CookStationIndex", queued ? -1 : index);
+                        Set(worker, "Position", point); Set(worker, "Target", point); Set(worker, "WaitPosition", point);
+                        Set(worker, "VisualCooking", !queued); Set(worker, "VisualCookingProduct", queued ? -1 : product);
+                        Set(worker, "CookingProgress", .5f); Set(worker, "CookingCycleProgress", .5f);
+                        if (queued) waiting.Add(worker);
+                        index++;
+                    }
+                }
+
+                var renderer = root.AddComponent(T("StreetKitchenRenderer"));
+                Call(renderer, "Prepare", sim, 1f, 960f);
+                Texture2D normal = Resources.Load<Texture2D>("street-parrillero");
+                Texture2D diagonal = Resources.Load<Texture2D>("street-parrillero-diagonal-v1");
+                Texture2D beverage = Resources.Load<Texture2D>("street-cocacolero-levels3-5-v1");
+                const BindingFlags staticPrivate = BindingFlags.Static | BindingFlags.NonPublic;
+                MethodInfo variant = T("StreetWorkerAppearance").GetMethod("CreateVariant", BindingFlags.Static | BindingFlags.Public);
+                object premiumRole = Enum.Parse(T("StreetWorkerRole"), "ParrilleroPremium");
+                premium = (Texture2D)variant.Invoke(null, new object[] { normal, premiumRole,
+                    T("StreetView").GetField("ParrilleroPoses", staticPrivate).GetValue(null), new Vector2(1315, 1197) });
+                premiumDiagonal = (Texture2D)variant.Invoke(null, new object[] { diagonal, premiumRole,
+                    T("StreetView").GetField("ParrilleroDiagonalPoses", staticPrivate).GetValue(null), new Vector2(1536, 1024) });
+                Assert.NotNull(premium); Assert.NotNull(premiumDiagonal);
+                Call(renderer, "PrepareWorkers", normal, diagonal, premium, premiumDiagonal, beverage, beverage, true);
+                IDictionary views = (IDictionary)Field(Field(renderer, "workerProjection"), "workers");
+                Assert.AreEqual(12, views.Count, "Both six-cook specialties remain visible.");
+                Assert.AreEqual(4, waiting.Count);
+                foreach (object worker in waiting)
+                {
+                    int product = Get(worker, "Role").ToString() == "Parrillero" ? 0 : 2;
+                    Rect grill = (Rect)Call(layout, "GrillBoundsForProduct", product);
+                    Transform workerRoot = (Transform)Field(views[(int)Get(worker, "Id")], "Root");
+                    float renderedX = workerRoot.localPosition.x / .01f + 270f;
+                    Assert.AreEqual(((Vector2)Get(worker, "Position")).x, renderedX, .001f);
+                    Assert.GreaterOrEqual(renderedX - 30f, grill.xMin - .01f);
+                    Assert.LessOrEqual(renderedX + 30f, grill.xMax + .01f,
+                        "Each waiting cook must render at its own grill, not its specialty table or the other grill.");
+                }
+                yield return null;
+                yield return null;
+                SaveProjectionCapture(renderer, "cook-queues-own-grills-960");
+            }
+            finally
+            {
+                UnityEngine.Object.Destroy(root);
+                if (premium != null) UnityEngine.Object.Destroy(premium);
+                if (premiumDiagonal != null) UnityEngine.Object.Destroy(premiumDiagonal);
+            }
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator MozoShowsAngryCueOnlyWhenPendingSandwichDemandHasNoReadyPickup()
         {
             var root = new GameObject("Angry Mozo cue acceptance");

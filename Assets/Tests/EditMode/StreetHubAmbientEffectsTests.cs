@@ -7,6 +7,23 @@ namespace HayChoriYPaty.Tests
     public sealed class StreetHubAmbientEffectsTests
     {
         [Test]
+        public void AmbientActivityTriplesDensityOpacityAndFrequencyWithoutUnboundedAlpha()
+        {
+            const BindingFlags flags = BindingFlags.Static | BindingFlags.NonPublic;
+            System.Type view = System.Type.GetType("HayChoriYPaty.StreetView, Assembly-CSharp", true);
+            Assert.AreEqual(3, view.GetField("HubAmbientActivityMultiplier", flags).GetRawConstantValue());
+            System.Type overlay = view.GetNestedType("HubAmbientOverlay", BindingFlags.NonPublic);
+            Assert.AreEqual(12, overlay.GetField("LeafCount", flags).GetRawConstantValue());
+            Assert.AreEqual(9, overlay.GetField("SmokeCount", flags).GetRawConstantValue());
+            MethodInfo opacity = view.GetMethod("HubAmbientOpacity", flags);
+            MethodInfo interval = view.GetMethod("HubAmbientInterval", flags);
+            Assert.AreEqual(.405f, (float)opacity.Invoke(null, new object[] { .135f }), .0001f);
+            Assert.AreEqual(.27f, (float)opacity.Invoke(null, new object[] { .09f }), .0001f);
+            Assert.AreEqual(1f, opacity.Invoke(null, new object[] { .8f }));
+            Assert.AreEqual(2f, interval.Invoke(null, new object[] { 6f }));
+        }
+
+        [Test]
         public void AmbientImageAnchorsRemainVisibleAcrossPortraitCropsWithoutChangingHotspots()
         {
             const BindingFlags StaticPrivate = BindingFlags.Static | BindingFlags.NonPublic;

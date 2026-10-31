@@ -128,7 +128,7 @@ namespace HayChoriYPaty.Tests
         {
             object sim = Simulation(5), layout = Layout(sim);
             int queued = teamSize - 4;
-            foreach (int product in new[] { 0, 2 })
+            foreach (int product in new[] { 0, 1, 2, 3 })
             {
                 var points = new HashSet<Vector2>();
                 Vector2 deposit = (Vector2)Call(layout, "DepositPosition", product);
@@ -138,6 +138,13 @@ namespace HayChoriYPaty.Tests
                     Vector2 waiting = (Vector2)Call(layout, "CookQueuePosition", product, index, queued);
                     Assert.IsTrue(points.Add(waiting), "Every queued worker needs its own staging position.");
                     Assert.IsFalse(grill.Contains(waiting), "The wait zone must not occupy the working grill.");
+                    Assert.GreaterOrEqual(waiting.x - 30f, grill.xMin - .01f,
+                        "The entire queued cook must remain inside its own grill's horizontal span.");
+                    Assert.LessOrEqual(waiting.x + 30f, grill.xMax + .01f,
+                        "A waiting cook must not spill into the other specialty's grill.");
+                    Rect otherGrill = (Rect)Call(layout, "GrillBoundsForProduct", product < 2 ? 2 : 0);
+                    Assert.IsFalse(waiting.x >= otherGrill.xMin && waiting.x <= otherGrill.xMax,
+                        "Normal and Premium waiting zones must never swap or mix.");
                     Assert.IsNotNull(Call(layout, "FindShortestSafeRoute", deposit, waiting), "Table→queue route must be safe.");
                     Assert.IsNotNull(Call(layout, "FindShortestSafeRoute", waiting,
                         Call(layout, "GrillWorkPosition", product, 0, 4)), "Queue→grill route must be safe.");
@@ -456,6 +463,13 @@ namespace HayChoriYPaty.Tests
                 MethodInfo displayPosition = rendererType.GetMethod("FernetDrinkDisplayPosition", BindingFlags.NonPublic | BindingFlags.Static);
                 Assert.NotNull(displayPosition);
                 float bottleZoneLeft = bounds.xMax - bounds.width * .61f - bounds.height * .10f;
+                Vector2 firstCup = (Vector2)displayPosition.Invoke(null, new object[] { layout, 0 });
+                Assert.AreEqual(bounds.x + bounds.width * (.26f + .009f), firstCup.x, .001f,
+                    "The prepared-cup group is inset slightly from the tabletop's left edge.");
+                float originalFirstRowY = bounds.y + bounds.height * .35f * .12f - 16f;
+                float oneRowTowardGrill = bounds.height * .35f * .16f;
+                Assert.AreEqual(originalFirstRowY + oneRowTowardGrill + 5f, firstCup.y, .001f,
+                    "The cup display moves five additional layout pixels toward the foreground grill.");
                 for (int slot = 0; slot < 45; slot++)
                 {
                     Vector2 position = (Vector2)displayPosition.Invoke(null, new object[] { layout, slot });

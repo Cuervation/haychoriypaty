@@ -1,3 +1,13 @@
+# Entrega Android — 2026-10-30: ambiente por capas, roster Los Redondos, 0.2.80/code82
+
+APK Development IL2CPP/ARM64 generada desde Unity6000.6.3f1 en el checkout activo, escena única explícita `Assets/Scenes/Main.unity`. Player Settings avanzaron a versionName `0.2.80`, AndroidBundleVersionCode `82` para permitir actualizar el0.2.79 anterior sin eliminar datos; package `com.haychoriypaty.game`, min API26,target36,ARM64. Build job `build-bf7cdbf1ed`: **Succeeded,393.844899s,0 errores/6advertencias**.
+
+Artefacto `Builds/Android/Archive/HayChoriYPaty-0.2.80-code82-layered-environment-20261030.apk`, **396,681,910 bytes**, SHA-256 `9c7e4d01ead82d04f6f6915b866a1df14b9fdf8b6e119f695ea9bbf248527b4a`. **PASS** ZIP íntegro, `zipalign -c -v 4`, firma APK Signature Scheme v2, Package/Name/Code/ABI verificados. IL2CPP metadata contiene `DrawHubLayeredEnvironment`, `CreateBirdSilhouette` y `Los Redondos / Tandil`. `aapt` confirma Analytics Firebase desactivado (`firebase_analytics_collection_deactivated=true`) y colección Ad-ID deshabilitada (`google_analytics_adid_collection_enabled=false`); permission AD_ID permanece en merged manifest por dependencia. Android Debug firmado (no Play Store release). Development APK mantiene bono temporal +30 tickets, retirar antes de distribución release.
+
+Incluye las capas ambientales validadas independientemente con capturas full Game View1920/2400 y las demás modificaciones locales presentes al construir, entre ellas partida inicial de Los Redondos. Unity:7/7EditMode+1/1PlayMode focalizados PASS para el hub; sin añadir APK/device checks. **APK no instalada**, no se lanzó juego ni se borraron datos; Android gameplay/rendimiento NOT_RUN. Sin Git push.
+
+---
+
 # Entrega Android — 2026-10-30: corrección visual del ticket Chulengo, 0.2.79/code81
 
 APK Development IL2CPP/ARM64 generada desde el Editor activo Unity 6000.6.3f1 del checkout vigente, con `Assets/Scenes/Main.unity` como única escena explícita. Build job `build-1523f7f8fa`: **Succeeded en 322,13 s; 0 errores / 6 advertencias**. Se conservaron Player Settings en **0.2.79/code81** (`runInBackground: 1` sigue siendo una preferencia local ajena).

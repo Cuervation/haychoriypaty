@@ -5,6 +5,9 @@ namespace HayChoriYPaty
 {
     public sealed partial class StreetView
     {
+        private const int HubAmbientActivityMultiplier = 3;
+        private static float HubAmbientOpacity(float baseline) => Mathf.Clamp01(baseline * HubAmbientActivityMultiplier);
+        private static float HubAmbientInterval(float baseline) => baseline / HubAmbientActivityMultiplier;
         private HubAmbientOverlay hubAmbientOverlay;
 
         private void DrawHubAmbientEffects()
@@ -44,8 +47,8 @@ namespace HayChoriYPaty
 
         private sealed class HubAmbientOverlay
         {
-            private const int LeafCount = 4;
-            private const int SmokeCount = 3;
+            private const int LeafCount = 4 * HubAmbientActivityMultiplier;
+            private const int SmokeCount = 3 * HubAmbientActivityMultiplier;
             private readonly StreetView owner;
             private readonly System.Random random = new System.Random();
             private readonly FallingLeaf[] leaves = new FallingLeaf[LeafCount];
@@ -57,7 +60,7 @@ namespace HayChoriYPaty
             private Texture2D buttonSweep;
             private float animationTime;
             private int lastUpdatedFrame = -1;
-            private float nextSparkAt = 2.8f;
+            private float nextSparkAt = .25f;
             private float sparkStartedAt = -1f;
             private float sparkDuration;
             private float sparkX;
@@ -90,17 +93,17 @@ namespace HayChoriYPaty
                 this.owner = owner;
                 for (int i = 0; i < leaves.Length; i++)
                 {
-                    FallingLeaf leaf = new FallingLeaf { nextStartAt = i * 1.9f + Range(0f, .9f) };
+                    FallingLeaf leaf = new FallingLeaf { nextStartAt = i < HubAmbientActivityMultiplier ? 0f : (i - HubAmbientActivityMultiplier) * .15f };
                     leaves[i] = leaf;
                 }
                 for (int i = 0; i < smoke.Length; i++)
                 {
-                    SmokePuff puff = new SmokePuff { nextStartAt = i * .75f + Range(0f, .25f) };
+                    SmokePuff puff = new SmokePuff { nextStartAt = i * HubAmbientInterval(.75f) };
                     smoke[i] = puff;
                 }
                 for (int i = 0; i < emberPhases.Length; i++) emberPhases[i] = Range(0f, Mathf.PI * 2f);
-                nextRankingShineAt = Range(6f, 11f);
-                nextPlaySweepAt = Range(7f, 12f);
+                nextRankingShineAt = HubAmbientInterval(Range(6f, 11f));
+                nextPlaySweepAt = HubAmbientInterval(Range(7f, 12f));
             }
 
             public void Draw()
@@ -215,7 +218,7 @@ namespace HayChoriYPaty
                     float distance = Mathf.Abs(u - center);
                     float band = Mathf.Clamp01(1f - distance / .30f);
                     float edge = Mathf.Sin(Mathf.PI * v);
-                    float alpha = band * edge * .25f;
+                    float alpha = band * edge * HubAmbientOpacity(.25f);
                     pixels[y * width + x] = new Color(1f, .91f, .67f, alpha);
                 }
                 texture.SetPixels(pixels);
@@ -258,7 +261,9 @@ namespace HayChoriYPaty
                         leaf.phase = Range(0f, Mathf.PI * 2f);
                         leaf.angle = Range(-100f, 100f);
                         leaf.spin = Range(-95f, 95f);
-                        leaf.size = Range(.90f, 1.30f);
+                        leaf.size = Range(1.15f, 1.65f);
+                        // Seed the first wave mid-flight: entering the hub must never look like a still image.
+                        if (animationTime < .1f) leaf.startAt -= leaf.duration * Range(.2f, .6f);
                         leaf.textureIndex = random.Next(0, leafTextures.Length);
                     }
 
@@ -266,7 +271,7 @@ namespace HayChoriYPaty
                     if (progress >= 1f)
                     {
                         leaf.active = false;
-                        leaf.nextStartAt = animationTime + Range(2.5f, 5.5f);
+                        leaf.nextStartAt = animationTime + HubAmbientInterval(Range(2.5f, 5.5f));
                         leaves[i] = leaf;
                         continue;
                     }
@@ -306,21 +311,22 @@ namespace HayChoriYPaty
                         puff.duration = Range(2.4f, 3.2f);
                         puff.x = Range(223f, 271f);
                         puff.startY = Range(736f, 766f);
-                        puff.rise = Range(30f, 48f);
+                        puff.rise = Range(42f, 67f);
                         puff.drift = Range(-9f, 9f);
-                        puff.size = Range(28f, 40f);
+                        puff.size = Range(38f, 54f);
+                        if (animationTime < .1f) puff.startAt -= puff.duration * .4f;
                     }
 
                     float progress = (animationTime - puff.startAt) / puff.duration;
                     if (progress >= 1f)
                     {
                         puff.active = false;
-                        puff.nextStartAt = animationTime + Range(.35f, 1.0f);
+                        puff.nextStartAt = animationTime + HubAmbientInterval(Range(.35f, 1.0f));
                         smoke[i] = puff;
                         continue;
                     }
 
-                    float alpha = Mathf.Sin(progress * Mathf.PI) * .135f;
+                    float alpha = Mathf.Sin(progress * Mathf.PI) * HubAmbientOpacity(.135f);
                     float width = puff.size * Mathf.Lerp(.70f, 1.22f, progress);
                     float y = puff.startY - puff.rise * progress;
                     float x = puff.x + puff.drift * progress + Mathf.Sin(progress * 4.8f + i) * 4f;
@@ -335,7 +341,7 @@ namespace HayChoriYPaty
                 for (int i = 0; i < emberPoints.Length; i++)
                 {
                     float pulse = .5f + .5f * Mathf.Sin(animationTime * (2.2f + i * .19f) + emberPhases[i]);
-                    float alpha = .04f + pulse * .05f;
+                    float alpha = HubAmbientOpacity(.04f + pulse * .05f);
                     float size = 12f + pulse * 7f;
                     Vector2 point = emberPoints[i];
                     DrawSourceTexture(softDisc, new Rect(point.x - size * .5f, point.y - size * .5f, size, size),
@@ -351,7 +357,7 @@ namespace HayChoriYPaty
                     sparkDuration = Range(.36f, .52f);
                     sparkX = Range(68f, 145f);
                     sparkY = Range(795f, 807f);
-                    nextSparkAt = animationTime + Range(3.0f, 5.6f);
+                    nextSparkAt = animationTime + HubAmbientInterval(Range(3.0f, 5.6f));
                 }
                 if (sparkStartedAt < 0f) return;
                 float progress = (animationTime - sparkStartedAt) / sparkDuration;
@@ -368,14 +374,14 @@ namespace HayChoriYPaty
                 {
                     rankingShineStartedAt = animationTime;
                     rankingShineDuration = Range(.55f, .80f);
-                    nextRankingShineAt = animationTime + Range(6f, 11f);
+                    nextRankingShineAt = animationTime + HubAmbientInterval(Range(6f, 11f));
                 }
                 if (rankingShineStartedAt < 0f) return;
                 float progress = (animationTime - rankingShineStartedAt) / rankingShineDuration;
                 if (progress >= 1f) { rankingShineStartedAt = -1f; return; }
-                float alpha = Mathf.Sin(progress * Mathf.PI) * .28f;
+                float alpha = Mathf.Sin(progress * Mathf.PI) * HubAmbientOpacity(.28f);
                 DrawSourceTexture(softDisc, new Rect(519f, 467f, 46f, 44f), new Color(1f, .79f, .25f, alpha));
-                float glint = Mathf.Sin(progress * Mathf.PI) * .42f;
+                float glint = Mathf.Sin(progress * Mathf.PI) * HubAmbientOpacity(.42f);
                 DrawSourceTexture(Texture2D.whiteTexture, new Rect(537f, 471f, 1.5f, 29f), new Color(1f, .91f, .57f, glint));
             }
 
@@ -385,7 +391,7 @@ namespace HayChoriYPaty
                 {
                     playSweepStartedAt = animationTime;
                     playSweepDuration = Range(1.0f, 1.3f);
-                    nextPlaySweepAt = animationTime + Range(7f, 12f);
+                    nextPlaySweepAt = animationTime + HubAmbientInterval(Range(7f, 12f));
                 }
                 if (playSweepStartedAt < 0f) return;
                 float progress = (animationTime - playSweepStartedAt) / playSweepDuration;

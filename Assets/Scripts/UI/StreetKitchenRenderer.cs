@@ -27,6 +27,9 @@ namespace HayChoriYPaty
         private const float FernetBottleDisplayWidthFraction = .61f;
         private const float FernetBottleBackRowOffsetFraction = .10f;
         private const float FernetDrinkFirstColumnFraction = .26f, FernetDrinkColumnStepFraction = -.088f;
+        private const float FernetDrinkInwardInsetFraction = .009f;
+        private const float FernetDrinkTabletopDepthFraction = .35f, FernetDrinkRowStepFraction = .16f;
+        private const float FernetDrinkTowardGrillOffset = 5f;
         private const string PrefabRoot = "ModularKitchen/Prefabs/";
         private const string SpriteRoot = "ModularKitchen/Sprites/";
         private const string WholeBondiolaResource = "ModularKitchen/Art/meat-bondiola-whole-v1_";
@@ -547,10 +550,15 @@ namespace HayChoriYPaty
             int layer = index / 15;
             int column = item % 3;
             int row = item / 3;
-            float x = table.x + table.width * (FernetDrinkFirstColumnFraction + FernetDrinkColumnStepFraction * column);
+            float x = table.x + table.width * (FernetDrinkFirstColumnFraction + FernetDrinkColumnStepFraction * column
+                + FernetDrinkInwardInsetFraction);
             float layerX = layer == 1 ? (column % 2 == 0 ? .75f : -.75f)
                 : layer == 2 ? (column % 2 == 0 ? -.75f : .75f) : 0f;
-            float y = table.y + table.height * .35f * (.12f + .16f * row) - 16f + layer * 1.5f;
+            // One tabletop row-step toward the foreground grill, with a small inset from
+            // the left edge so the cup group rests more securely on the tabletop.
+            float rowStep = table.height * FernetDrinkTabletopDepthFraction * FernetDrinkRowStepFraction;
+            float y = table.y + table.height * FernetDrinkTabletopDepthFraction * (.12f + FernetDrinkRowStepFraction * row)
+                - 16f + rowStep + FernetDrinkTowardGrillOffset + layer * 1.5f;
             return new Vector2(x + layerX, y);
         }
 

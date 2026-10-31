@@ -12,9 +12,10 @@ namespace HayChoriYPaty.Tests
         private const BindingFlags PublicInstance = BindingFlags.Instance | BindingFlags.Public;
         private const BindingFlags AnyInstance = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
         private const BindingFlags PrivateInstance = BindingFlags.Instance | BindingFlags.NonPublic;
+        private const BindingFlags PrivateStatic = BindingFlags.Static | BindingFlags.NonPublic;
         private const BindingFlags PublicStatic = BindingFlags.Static | BindingFlags.Public;
         private Type gameType, saveType, marketDataType, ticketDataType, matchType, roleType;
-        private bool oldEditorInitialization, persistSucceeds = true;
+        private bool oldEditorInitialization, oldTemporaryStartupTicketGrantApplied, persistSucceeds = true;
         private string persistedJson;
         private readonly List<GameObject> hosts = new List<GameObject>();
 
@@ -29,6 +30,9 @@ namespace HayChoriYPaty.Tests
             roleType = Runtime("StreetWorkerRole");
             oldEditorInitialization = (bool)gameType.GetField("AllowEditorTestInitialization", PublicStatic).GetValue(null);
             gameType.GetField("AllowEditorTestInitialization", PublicStatic).SetValue(null, false);
+            FieldInfo startupGrant = gameType.GetField("temporaryStartupTicketGrantAppliedThisProcess", PrivateStatic);
+            oldTemporaryStartupTicketGrantApplied = (bool)startupGrant.GetValue(null);
+            startupGrant.SetValue(null, false);
             persistSucceeds = true;
             persistedJson = null;
         }
@@ -39,6 +43,8 @@ namespace HayChoriYPaty.Tests
             foreach (GameObject instance in hosts) if (instance != null) UnityEngine.Object.DestroyImmediate(instance);
             hosts.Clear();
             gameType.GetField("AllowEditorTestInitialization", PublicStatic).SetValue(null, oldEditorInitialization);
+            gameType.GetField("temporaryStartupTicketGrantAppliedThisProcess", PrivateStatic)
+                .SetValue(null, oldTemporaryStartupTicketGrantApplied);
         }
 
         private static Type Runtime(string name) => Type.GetType("HayChoriYPaty." + name + ", Assembly-CSharp", true);
@@ -46,6 +52,7 @@ namespace HayChoriYPaty.Tests
         private static object Field(object instance, string name) => instance.GetType().GetField(name, AnyInstance).GetValue(instance);
         private static void Put(object instance, string name, object value) => instance.GetType().GetField(name, AnyInstance).SetValue(instance, value);
         private static object Invoke(object instance, string name, params object[] args) => instance.GetType().GetMethod(name, PublicInstance).Invoke(instance, args);
+        private object InvokePrivateStatic(string name, params object[] args) => gameType.GetMethod(name, PrivateStatic).Invoke(null, args);
         private static object Role(Type type, string name) => Enum.Parse(type, name);
 
         private Delegate PersistDelegate()
@@ -102,6 +109,45 @@ namespace HayChoriYPaty.Tests
         }
 
         private static string Json(object value) => JsonUtility.ToJson(value);
+
+        [Test]
+        public void TemporaryDevelopmentStartupGrantAddsThirtyOnlyOnceAndPreservesTheTicketLedger()
+        {
+            object tickets = Tickets(7, 3);
+
+            Assert.IsFalse((bool)InvokePrivateStatic("ShouldGrantTemporaryStartupTickets"),
+                "The temporary grant must stay off in the Unity Editor, even if Editor diagnostics are enabled.");
+            Assert.IsTrue((bool)InvokePrivateStatic("TryApplyTemporaryStartupTicketGrant", tickets));
+            Assert.AreEqual(37L, Field(tickets, "balance"));
+            Assert.AreEqual(40L, Field(tickets, "totalEarned"));
+            Assert.AreEqual(3L, Field(tickets, "totalSpent"));
+            Assert.IsTrue((bool)Invoke(tickets, "IsValid"));
+
+            Assert.IsFalse((bool)InvokePrivateStatic("TryApplyTemporaryStartupTicketGrant", tickets),
+                "Further player activations in the same process must not stack another grant.");
+            Assert.AreEqual(37L, Field(tickets, "balance"));
+            Assert.AreEqual(40L, Field(tickets, "totalEarned"));
+        }
+
+        [Test]
+        public void TemporaryDevelopmentStartupGrantCanRollbackAfterPersistenceFailureAndRejectOverflow()
+        {
+            object tickets = Tickets(4, 3);
+            Assert.IsTrue((bool)InvokePrivateStatic("TryApplyTemporaryStartupTicketGrant", tickets));
+            InvokePrivateStatic("UndoTemporaryStartupTicketGrant", tickets);
+            Assert.AreEqual(4L, Field(tickets, "balance"));
+            Assert.AreEqual(7L, Field(tickets, "totalEarned"));
+            Assert.IsTrue((bool)Invoke(tickets, "IsValid"));
+            Assert.IsTrue((bool)InvokePrivateStatic("TryApplyTemporaryStartupTicketGrant", tickets),
+                "A failed startup save must leave the process grant available for retry.");
+
+            gameType.GetField("temporaryStartupTicketGrantAppliedThisProcess", PrivateStatic).SetValue(null, false);
+            object nearOverflow = Tickets(long.MaxValue - 1, 0);
+            Assert.IsFalse((bool)InvokePrivateStatic("TryApplyTemporaryStartupTicketGrant", nearOverflow));
+            Assert.AreEqual(long.MaxValue - 1, Field(nearOverflow, "balance"));
+            Assert.AreEqual(long.MaxValue - 1, Field(nearOverflow, "totalEarned"));
+            Assert.IsTrue((bool)Invoke(nearOverflow, "IsValid"));
+        }
 
         private void SelectLevel(object game, int level)
         {

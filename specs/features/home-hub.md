@@ -86,6 +86,44 @@ Por pedido del usuario se refuerzan los efectos que ya estaban en el hub, manten
 - [x] `NeighborhoodCharactersStayStillDuringAShortHubVisit` **1/1 PlayMode PASS**: sin renderer/rig de personajes durante 6,5 s; capturas inicial/final revisadas en el mismo directorio.
 - [ ] Android físico y rendimiento: **NOT_RUN**; captura Unity Editor/Game View no equivale a validación en teléfono.
 
+## Actividad ambiental ×3 — 2026-10-30
+
+Reemplaza el refuerzo moderado anterior a pedido del usuario, que seguía percibiendo el barrio estático en el teléfono. Se conservan el master, la navegación, los hotspots y la pausa de rigs/personajes; no se modifican economía ni partidas.
+
+- Densidad simultánea: **4 → 12 hojas**, **3 → 9 emisiones de humo**, con pools fijos reutilizados.
+- Humo máximo **0,135 → 0,405** de alpha; brasas **0,04–0,09 → 0,12–0,27**. Hojas y humo algo mayores, con más recorrido vertical del humo.
+- Esperas de reaparición de hojas/humo y ciclos de chispas/Ranking/JUGAR divididos por **3**; mayor brillo de Ranking y barrido JUGAR, con alpha siempre acotado a 1.
+- Primera oleada de hojas/humo precalentada para que haya movimiento desde la entrada, sin varios segundos de imagen quieta. Se mantiene el reloj no escalado y exclusivo del hub.
+
+Aceptación focalizada en el Editor Unity 6000.6.3f1 existente:
+- **PASS 2/2 EditMode**: multiplicador/densidad/alpha/intervalos y anclas en seis tamaños portrait, con los cuatro hotspots intactos.
+- **PASS 1/1 PlayMode**: tras una visita breve hay al menos ocho hojas y seis emisiones activas, reloj >15 s aun con `Time.timeScale = 0`, sin instanciar rigs de personajes; fixture restaura tiempo/guardado/tamaño de Game View.
+- **PASS visual acotado**: capturas full Game View **1080×1920** a 3 y 4 s revisadas; las hojas cambian de posición, el fondo conserva su composición y botones/textos siguen legibles. Evidencia: `Path.GetTempPath()/hcyp-street-hub-view-tests/hub-ambient-triple-{3s,4s}-playmode-1080x1920.png`.
+- **NOT_RUN**: nueva APK, instalación y rendimiento/visual Android físico. La APK ticket-corrected 0.2.79/code81 instalada antes de este cambio **no contiene este refuerzo ×3**. No hubo commit/push.
+
+## Ambiente por capas separadas — pedido 2026-10-30 (en implementación)
+
+Autorizadas seis familias nuevas: banderas del estadio, camisetas colgadas, bordes de toldos, sombras lentas de nubes sobre la calle, pájaros lejanos y variación cálida suave de luces del almacén. Los personajes/rigs siguen pausados. Conservar master original, cuatro hotspots, CUENTA/ajustes/audio y gameplay; las sustituciones visuales usan fondo limpiado más primer plano transparente en recursos separados, nunca mover un recorte opaco con el objeto original visible detrás. El refuerzo ambiental ×3 anterior se conserva.
+
+Criterios obligatorios de esta entrega:
+1. Capas nuevas separadas y clean plate detrás de banderas, camisetas y bordes de toldos; master original/GUID intactos. Inspección visual sin huecos ni duplicaciones.
+2. Las seis familias varían con el tiempo no escalado durante una visita breve al hub, con fases independientes, sin reactivar personajes ni animar texto/UI.
+3. Usar el mismo mapeo del master sin deformar/duplicar el fondo, conservar hitboxes y composición en 1080×1920 y 1080×2400.
+4. Recursos y pools reutilizados, reloj solo en hub, liberación al deshabilitar; sin servicios/dependencias ni asignaciones de arrays/texturas por frame.
+5. Pruebas EditMode de recursos/mapeo/temporización y PlayMode con capturas reales; revisión independiente contra los criterios. APK/instalación/rendimiento Android NOT_RUN sin pedido.
+
+Estado actual tras **nueva ronda explícita de corrección solicitada por el usuario: PASS en Unity**, revisión independiente incluida; sin certificar Android. El defecto era pasar rectángulos full-bleed por `LayoutRect` (multiplica y pero no height), que truncaba fondos/primeros planos en pantallas altas. El renderer ahora usa el mismo `HubArtworkScreenBounds` del master en píxeles físicos, escala uniforme y `GUI.matrix` identity local, restaurada al salir. No se modifica el mapeo global de UI/hitboxes. Pájaros con silueta curva y cuerpo cacheada una vez, en vez de trazos rectos; texturas destruidas al liberar.
+
+- **PASS — criterio1:** master SHA256 original preservado; capas/clean plate separados; capturas full Game View sin cabeza duplicada, huecos, fragmentos ni doble borde de toldos.
+- **PASS — criterio2:** poses0/2/5 muestran banderas/camisetas/toldos con movimiento y aves reconocibles en vuelo; sombras y brillo cálido permanecen sutiles (no bloqueante). Muestras deterministas de familias y reloj no escalado aprobados; rigs siguen null, no se anima texto/UI.
+- **PASS — criterio3:** comparación independiente en1080×1920 y1080×2400, camisetas proporcionadas/vendedor visible/composición conservada; cuatro hotspots mantienen su acción. Dos nuevas regresiones verifican ancho y altura a la misma escala física y continuidad de bordes.
+- **PASS — criterio4:** recursos cacheados y reutilizados, sin arrays/texturas por frame; PlayMode confirma reloj detenido fuera del hub y destrucción de patches y silueta de pájaro al liberar.
+- **PASS — criterio5:** **7/7 EditMode +1/1 PlayMode únicos** focalizados. JobEditMode `b83da6601bd74c539fd8c28e0de74f97`; PlayMode final `0209ac5a03fa4af4b806beb8c4fdef26` (rerun con aserción adicional de liberación del pájaro; no sumar como otro caso). Consola sin errorCS; revisión independiente de8capturas PASS. Una desconexión MCP intermedia se recuperó con ping en el mismo Editor; no se reinició ni abrió otra instancia.
+
+Evidencia real: `Logs/Acceptance/HubLayers-20261030/final/hub-layered-{master,phase-0,phase-2,phase-5}-playmode-1080x{1920,2400}.png`. La primera ronda anterior se detuvo correctamente tras dos ciclos FAIL; esta nueva autorización y evidencia reemplazan ese estado, no convierten los intentos anteriores en aprobados.
+
+APK/instalación/Git **NOT_RUN**; la APK instalada no incluye estas capas. Procedencia de arte: `docs/art/hub-environment-layers-20261030.md`. No confundir este pedido con las antiguas máscaras de personajes pausadas.
+
 ## Aceptación histórica del hub (0.2.64)
 
 - [x] Portada sin botones superpuestos y barra de progreso pequeña; pasa automáticamente al hub.

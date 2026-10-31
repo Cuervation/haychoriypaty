@@ -44,6 +44,8 @@ namespace HayChoriYPaty
         private string activeAttemptId;
         private long attemptHireSpendCents, attemptSpeedSpendCents;
         private readonly long[] attemptHiresByRole = new long[5];
+        private const long TemporaryStartupTicketGrant = 30L;
+        private static bool temporaryStartupTicketGrantAppliedThisProcess;
 #if UNITY_EDITOR
         /// <summary>Test-only opt-in to the pre-cloud PlayerPrefs boot path.</summary>
         public static bool AllowEditorTestInitialization;
@@ -211,10 +213,38 @@ namespace HayChoriYPaty
                 market.ReconcileLegacyProgressionBalance(nextUnlockedSimulation, save.unlockedLevel);
             }
             InitializeDeliverySound();
+            bool startupTicketGrantApplied = ShouldGrantTemporaryStartupTickets() &&
+                TryApplyTemporaryStartupTicketGrant(save.tickets);
             resultSaved = false;
             playerActive = true;
-            if (!Save()) { playerActive = false; sim = null; market = null; return false; }
+            if (!Save())
+            {
+                if (startupTicketGrantApplied) UndoTemporaryStartupTicketGrant(save.tickets);
+                playerActive = false; sim = null; market = null; return false;
+            }
             return true;
+        }
+
+        private static bool ShouldGrantTemporaryStartupTickets() => !Application.isEditor && Debug.isDebugBuild;
+
+        private static bool TryApplyTemporaryStartupTicketGrant(StreetTicketData tickets)
+        {
+            if (temporaryStartupTicketGrantAppliedThisProcess || tickets == null || !tickets.IsValid() ||
+                tickets.balance > long.MaxValue - TemporaryStartupTicketGrant ||
+                tickets.totalEarned > long.MaxValue - TemporaryStartupTicketGrant) return false;
+
+            tickets.balance += TemporaryStartupTicketGrant;
+            tickets.totalEarned += TemporaryStartupTicketGrant;
+            temporaryStartupTicketGrantAppliedThisProcess = true;
+            return true;
+        }
+
+        private static void UndoTemporaryStartupTicketGrant(StreetTicketData tickets)
+        {
+            if (tickets == null || !temporaryStartupTicketGrantAppliedThisProcess) return;
+            tickets.balance -= TemporaryStartupTicketGrant;
+            tickets.totalEarned -= TemporaryStartupTicketGrant;
+            temporaryStartupTicketGrantAppliedThisProcess = false;
         }
 
         private void Update()

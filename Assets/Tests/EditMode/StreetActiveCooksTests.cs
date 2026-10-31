@@ -1147,10 +1147,10 @@ namespace HayChoriYPaty.Tests
                 Assert.AreEqual(level >= 5, (bool)Get(sim, "UsesActiveCooks"), "Unexpected active cook mode at level index " + level);
                 Assert.AreEqual(level == 6 ? 2 : 1, Get(sim, "ParrilleroCount"), "Only San Lorenzo starts with two free normal cooks.");
                 Assert.AreEqual(level == 5 ? 1 : 0, Get(sim, "ParrilleroPremiumCount"), "Only Racing keeps its free Premium.");
-                Assert.AreEqual(level == 9 ? 1 : 0, Get(sim, "CocacoleroCount"), "Only Camioneros starts with a free Cocacolero.");
+                Assert.AreEqual(level == 9 || level == 10 ? 1 : 0, Get(sim, "CocacoleroCount"), "Camioneros and Los Redondos start with a free Cocacolero.");
                 Assert.AreEqual(0, Get(sim, "FerneteroCount"));
-                Assert.AreEqual(level == 5 || level == 6 || level == 8 || level == 9 ? 1 : 0, Get(sim, "MozoCount"),
-                    "Racing, San Lorenzo, Boca, and Camioneros receive one free Mozo; all other levels remain unchanged.");
+                Assert.AreEqual(level == 5 || level == 6 || level == 8 || level == 9 || level == 10 ? 1 : 0, Get(sim, "MozoCount"),
+                    "Racing, San Lorenzo, Boca, Camioneros, and Los Redondos receive one free Mozo; all other levels remain unchanged.");
             }
             object early = Activator.CreateInstance(simulationType, new object[] { balance, 4, 5f, 0, 1, 0 });
             object active = Activator.CreateInstance(simulationType, new object[] { balance, 5, 5f, 0, 1, 0 });

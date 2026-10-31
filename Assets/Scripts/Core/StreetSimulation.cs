@@ -96,7 +96,7 @@ namespace HayChoriYPaty
                 new StreetLevelBalance(new[] {250,180,110,95,210,90,115}, new[] {50,50,65,55,60}, 10.50f, 800),
                 new StreetLevelBalance(new[] {275,195,120,110,225,100,125}, new[] {55,55,70,65,65}, 13.50f, 800),
                 new StreetLevelBalance(new[] {310,220,135,125,255,110,145}, new[] {60,60,80,70,70}, 17.00f, 500),
-                new StreetLevelBalance(new[] {345,245,150,140,285,120,165}, new[] {70,70,90,80,80}, 21.00f, 2000)
+                new StreetLevelBalance(new[] {345,245,150,140,285,120,165}, new[] {70,70,90,80,80}, 21.00f, 500)
             };
         }
 
@@ -420,8 +420,8 @@ namespace HayChoriYPaty
             return HasRole(role) ? int.MaxValue : 0;
         }
         private int StartingParrilleroCount => LevelIndex == 6 ? 2 : 1;
-        private int StartingCocacoleroCount => LevelIndex == 9 ? 1 : 0;
-        private bool StartsWithFreeMozo => LevelIndex == 5 || LevelIndex == 6 || LevelIndex == 8 || LevelIndex == 9;
+        private int StartingCocacoleroCount => LevelIndex == 9 || LevelIndex == 10 ? 1 : 0;
+        private bool StartsWithFreeMozo => LevelIndex == 5 || LevelIndex == 6 || LevelIndex == 8 || LevelIndex == 9 || LevelIndex == 10;
 
         public int HireCostForRole(StreetWorkerRole role)
         {

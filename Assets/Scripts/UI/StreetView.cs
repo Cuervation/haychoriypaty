@@ -1002,6 +1002,7 @@ namespace HayChoriYPaty
         {
             if (hubMusicAudioSource != null) hubMusicAudioSource.Stop();
             ReleaseHubAmbientEffectsResources();
+            ReleaseHubLayeredEnvironmentResources();
             ReleaseHubCharacterAnimationsResources();
             ReleaseHubControlIcons();
             if (startupResourceRoutine != null) StopCoroutine(startupResourceRoutine);
@@ -3398,6 +3399,7 @@ namespace HayChoriYPaty
                 return;
             }
 
+            DrawHubLayeredEnvironment();
             DrawHubAmbientEffects();
             DrawHubCharacterAnimations();
             DrawHubHotspot(HubRankingAction);

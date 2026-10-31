@@ -2215,7 +2215,7 @@ object sim = Make(level: level);
                 new[] {250,180,110,95,210,90,115}, new[] {275,195,120,110,225,100,125},
                 new[] {310,220,135,125,255,110,145}, new[] {345,245,150,140,285,120,165} };
             float[] durations = {120f,150f,180f,210f,240f,260f,300f,340f,340f,300f,315f};
-            int[] openingCoins = {0,10,0,0,0,250,250,800,800,500,2000};
+            int[] openingCoins = {0,10,0,0,0,250,250,800,800,500,500};
             for (int level = 0; level < 11; level++)
             {
                 object balance = NewBalance(); object sim = Make(level: level, balance: balance); int total = 0;
@@ -2322,6 +2322,49 @@ object sim = Make(level: level);
         }
 
         [Test]
+        public void LosRedondosMatchesCamionerosOpeningCashAndRosterWithoutChangingItsRules()
+        {
+            object balance = NewBalance();
+            object camioneros = Make(level: 9, balance: balance);
+            Start(camioneros);
+            object sim = Make(level: 9, balance: balance);
+            Assert.IsTrue((bool)Call(sim, "SelectLevel", 10));
+            foreach (string field in new[] { "Coins", "ParrilleroCount", "CocacoleroCount", "MozoCount", "ParrilleroPremiumCount", "FerneteroCount", "StaffCount" })
+                Assert.AreEqual(Get(camioneros, field), Get(sim, field), field);
+            Assert.AreEqual(500, Get(sim, "Coins"));
+            Assert.AreEqual(315f, Get(sim, "TimeRemaining"));
+            int[] goals = {345,245,150,140,285,120,165};
+            for (int product = 0; product < 7; product++)
+                Assert.AreEqual(goals[product], Call(sim, "GetProductGoal", product));
+            Assert.AreEqual(70, Get(sim, "CocacoleroHireCost"));
+            Assert.AreEqual(80, Get(sim, "MozoHireCost"));
+            Start(sim);
+            Type role = Type.GetType("HayChoriYPaty.StreetWorkerRole, Assembly-CSharp", true);
+            Assert.IsTrue((bool)Call(sim, "TryHire", Enum.Parse(role, "Cocacolero")));
+            Assert.IsTrue((bool)Call(sim, "TryHire", Enum.Parse(role, "Mozo")));
+            Assert.AreEqual(175, Get(sim, "CocacoleroHireCost"));
+            Assert.AreEqual(200, Get(sim, "MozoHireCost"));
+            // Retries are fresh Ready simulations, as created by StreetGame.
+            sim = Make(level: 10, balance: balance);
+            Start(sim);
+            Assert.AreEqual(500, Get(sim, "Coins"));
+            Assert.AreEqual(0, Get(sim, "CoinsEarned"));
+            Assert.AreEqual(315f, Get(sim, "TimeRemaining"));
+            Assert.AreEqual(3, Get(sim, "StaffCount"));
+            Assert.AreEqual(1, Get(sim, "ParrilleroCount"));
+            Assert.AreEqual(1, Get(sim, "CocacoleroCount"));
+            Assert.AreEqual(1, Get(sim, "MozoCount"));
+            Assert.AreEqual(70, Get(sim, "CocacoleroHireCost"));
+            Assert.AreEqual(80, Get(sim, "MozoHireCost"));
+            object advancing = Make(level: 9, balance: balance);
+            Set(advancing, "Phase", Enum.Parse(Get(advancing, "Phase").GetType(), "Won"));
+            Assert.IsTrue((bool)Call(advancing, "NextLevel"));
+            Assert.AreEqual(10, Get(advancing, "LevelIndex"));
+            Assert.AreEqual(500, Get(advancing, "Coins"));
+            Assert.AreEqual(3, Get(advancing, "StaffCount"));
+        }
+
+        [Test]
         public void MainSceneUsesSanLorenzoConfigurationJAndMatchingMarketMinimumStock()
         {
             var previous = SceneManager.GetActiveScene();
@@ -2347,15 +2390,15 @@ object sim = Make(level: level);
                     new[] {250,180,110,95,210,90,115}, new[] {275,195,120,110,225,100,125},
                     new[] {310,220,135,125,255,110,145}, new[] {345,245,150,140,285,120,165} };
                 float[] expectedDurations = {120f,150f,180f,210f,240f,260f,300f,340f,340f,360f,315f};
-                int[] expectedOpeningCoins = {0,10,0,0,0,250,250,800,800,500,2000};
+                int[] expectedOpeningCoins = {0,10,0,0,0,250,250,800,800,500,500};
                 object sanLorenzo = null;
                 for (int level = 0; level < 11; level++)
                 {
                     object sim = Make(level: level, balance: balance);
                     int total = 0;
                     Assert.AreEqual(level == 6 ? 2 : 1, Get(sim, "ParrilleroCount"), "Main normal roster at level " + (level + 1));
-                    Assert.AreEqual(level == 5 || level == 6 || level == 8 || level == 9 ? 1 : 0, Get(sim, "MozoCount"), "Main Mozo roster at level " + (level + 1));
-                    Assert.AreEqual(level == 9 ? 1 : 0, Get(sim, "CocacoleroCount"), "Main Cocacolero roster at level " + (level + 1));
+                    Assert.AreEqual(level == 5 || level == 6 || level == 8 || level == 9 || level == 10 ? 1 : 0, Get(sim, "MozoCount"), "Main Mozo roster at level " + (level + 1));
+                    Assert.AreEqual(level == 9 || level == 10 ? 1 : 0, Get(sim, "CocacoleroCount"), "Main Cocacolero roster at level " + (level + 1));
                     Assert.AreEqual(level == 5 ? 1 : 0, Get(sim, "ParrilleroPremiumCount"), "Main Premium roster at level " + (level + 1));
                     Assert.AreEqual(expectedDurations[level], Get(sim, "TimeRemaining"), "Main duration at level " + (level + 1));
                     Assert.AreEqual(expectedOpeningCoins[level], Call(balance, "GetStartingCoins", level), "Main opening coins at level " + (level + 1));
@@ -2394,8 +2437,9 @@ object sim = Make(level: level);
             }
         }
 
-        [Test]
-        public void MainSceneCamionerosStartsWith360SecondsAndThreeFreeWorkers()
+        [TestCase(9, 360f)]
+        [TestCase(10, 315f)]
+        public void MainSceneCamionerosAndRedondosStartWithMatchingCashAndWorkers(int level, float duration)
         {
             var previous = SceneManager.GetActiveScene();
             var scene = SceneManager.GetSceneByPath("Assets/Scenes/Main.unity");
@@ -2414,12 +2458,12 @@ object sim = Make(level: level);
                 Assert.IsNotNull(game);
                 object balance = gameType.GetProperty("Balance", BindingFlags.Instance | BindingFlags.Public).GetValue(game, null);
                 float[] durations = (float[])balanceType.GetField("levelDurations", Instance).GetValue(balance);
-                Assert.AreEqual(360f, durations[9], "Serialized Main duration for Camioneros must match its official setting.");
+                Assert.AreEqual(duration, durations[level], "Serialized Main duration must retain each club setting.");
 
-                object sim = Make(level: 9, balance: balance);
+                object sim = Make(level: level, balance: balance);
                 Start(sim);
                 Assert.AreEqual(500, Get(sim, "Coins"));
-                Assert.AreEqual(360f, Get(sim, "TimeRemaining"));
+                Assert.AreEqual(duration, Get(sim, "TimeRemaining"));
                 Assert.AreEqual(1, Get(sim, "ParrilleroCount"));
                 Assert.AreEqual(1, Get(sim, "CocacoleroCount"));
                 Assert.AreEqual(0, Get(sim, "ParrilleroPremiumCount"));
@@ -2465,7 +2509,7 @@ object sim = Make(level: level);
             }
         }
 
-        [TestCase(1, 10)] [TestCase(8, 250)] [TestCase(9, 500)] [TestCase(10, 2000)]
+        [TestCase(1, 10)] [TestCase(8, 250)] [TestCase(9, 500)] [TestCase(10, 500)]
         public void AdjustedOpeningBalanceAppliesOnSelectionAdvanceStartAndRetry(int level, int expectedCoins)
         {
             object selected = Make();

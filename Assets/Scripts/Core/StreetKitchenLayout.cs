@@ -336,6 +336,8 @@ namespace HayChoriYPaty
             Rect grill = GrillBoundsForProduct(product);
             if (grill.width <= 0f) return Vector2.zero;
             int count = Mathf.Max(1, queueCount);
+            // Tables and grills have different columns. Even a two-cook queue must use
+            // its specialty's grill span, never the table edges or the neighboring grill.
             int columns = Mathf.Min(MaxCookStationsPerGrill, count);
             int column = Mathf.Max(0, queueIndex) % columns;
             Vector2 station = GrillWorkPosition(product, column, columns);

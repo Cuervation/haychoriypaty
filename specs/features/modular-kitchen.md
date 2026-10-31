@@ -15,6 +15,15 @@ The user approved the first preview: prepared Fernet cups occupy the left side o
 - [x] Focused EditMode `StreetKitchenPresentationTests.FernetPresentationUses800CcCupAndBottlesBesideFinishedDrinks` passed 1/1; asserts all 45 cup projections stay inside the left zone, 8 bottles stay on the right tabletop, row spacing/base contact and unchanged Fernetero center approach.
 - [x] Focused PlayMode `StreetKitchenRendererTests.FernetTableDisplayKeepsTwoRowsSupportedAndProportional` passed 1/1 and saved native kitchen-camera projection captures at 1080×1920, 1080×2400 and 918×1600 under `Logs/Acceptance/TestRuns/*/FernetTableLeftRight-20261029/`. Captures show the table/kitchen projection only—not the full Game View or a physical device.
 
+### Fernet cup placement follow-up — 2026-10-30
+
+Per the user's follow-up, move the 45 prepared-cup display one tabletop row-step toward the foreground grill and tuck it slightly inward from the table's left edge. Preserve the left/right cup-and-bottle grouping, existing sprite sizes/art, slot IDs/count, table bounds, Fernetero pickup anchor/routes and all gameplay. The small horizontal inset remains bounded by the bottle group's reserved zone.
+
+- [x] Focused EditMode `StreetKitchenPresentationTests.FernetPresentationUses800CcCupAndBottlesBesideFinishedDrinks` passed 1/1, including the row-step/inset and no-overlap assertions.
+- [x] Focused PlayMode `StreetKitchenRendererTests.FernetTableDisplayKeepsTwoRowsSupportedAndProportional` passed 1/1; actual native kitchen-camera captures at 1080×1920, 1080×2400 and 918×1600 were visually inspected under `Logs/Acceptance/TestRuns/{76485793f9ff4ac4b63a7fda868079af,5a0d7512cf72498d829e32ec713f9e25,55cf2dfec8334ffc9761db8143163a22}/FernetTableLeftRight-20261029/`. This is a kitchen projection, not a full Game View or physical-device capture.
+
+**Ajuste adicional de vasos — 2026-10-30:** se suma otro desplazamiento de **+5 unidades lógicas hacia la parrilla/primer plano** (abajo en pantalla), sobre el row-step anterior. Solo cambia Y de los 45 vasos; botellas, mesa, X, tamaños, slots/stock y ruta/pickup se conservan. Validación del ajuste: **1/1 EditMode + 1/1 PlayMode PASS**. Captura de cámara nativa de cocina **1080×1920** revisada en `Logs/Acceptance/TestRuns/2c3b892e3fc6429da35f899f311eb5f9/FernetTableLeftRight-20261029/fernet-cups-left-bottles-right-1080x1920.png`; no es Game View completa ni dispositivo. Nueva APK/instalación **NOT_RUN**.
+
 ## Verified starting baseline / resolved prerequisites
 
 Active checkout `/Users/celestino/HayChoriYPaty`, branch `codex/street-automation`, clean starting commit `ff65e2a`; Unity6000.6.3f1 MCP connected and Main hierarchy inspected. Main is IMGUI StreetGame/StreetView; no current station/food SpriteRenderer prefab instances. Assets/Prefabs contains only .gitkeep; furniture art includes baked food. Legacy GameController/PrototypeView are disabled, not concurrent gameplay.

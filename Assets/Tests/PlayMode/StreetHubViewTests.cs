@@ -26,11 +26,11 @@ namespace HayChoriYPaty.Tests
         PropertyInfo selectedSize;
         object sizeGroup;
         int previousSize, addedSize;
-        void SetPortraitView()
+        void SetPortraitView(bool useEnvironment = true)
         {
-            if (int.TryParse(Environment.GetEnvironmentVariable("HCYP_GAMEVIEW_WIDTH"), out int requestedWidth) && requestedWidth >= 320)
+            if (useEnvironment && int.TryParse(Environment.GetEnvironmentVariable("HCYP_GAMEVIEW_WIDTH"), out int requestedWidth) && requestedWidth >= 320)
                 gameViewWidth = requestedWidth;
-            if (int.TryParse(Environment.GetEnvironmentVariable("HCYP_GAMEVIEW_HEIGHT"), out int requestedHeight) && requestedHeight >= 480)
+            if (useEnvironment && int.TryParse(Environment.GetEnvironmentVariable("HCYP_GAMEVIEW_HEIGHT"), out int requestedHeight) && requestedHeight >= 480)
                 gameViewHeight = requestedHeight;
             const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
             Assembly editor = typeof(UnityEditor.EditorWindow).Assembly;
@@ -141,7 +141,25 @@ namespace HayChoriYPaty.Tests
 
             yield return null;
             yield return Capture("hub-ambient-initial-playmode-1080x1920");
-            yield return new WaitForSecondsRealtime(18f);
+            // Real-time environmental motion must remain visible even while gameplay time is paused.
+            Time.timeScale = 0f;
+            yield return new WaitForSecondsRealtime(3f);
+            object earlyOverlay = Field("hubAmbientOverlay");
+            Assert.NotNull(earlyOverlay);
+            foreach (string pool in new[] { "leaves", "smoke" })
+            {
+                var particles = (Array)earlyOverlay.GetType().GetField(pool, P).GetValue(earlyOverlay);
+                int active = 0;
+                foreach (object particle in particles)
+                    if ((bool)particle.GetType().GetField("active").GetValue(particle)) active++;
+                Assert.GreaterOrEqual(active, pool == "leaves" ? 8 : 6,
+                    "The tripled " + pool + " pool must already be visibly active during a short visit.");
+            }
+            Assert.IsNull(Field("hubCharacterScene"), "Environmental reinforcement must not reactivate the paused character rigs.");
+            yield return Capture("hub-ambient-triple-3s-playmode-1080x1920");
+            yield return new WaitForSecondsRealtime(1f);
+            yield return Capture("hub-ambient-triple-4s-playmode-1080x1920");
+            yield return new WaitForSecondsRealtime(14f);
             Assert.IsTrue((bool)Field("hubActive"), "Ambient effects remain limited to the visible hub.");
             object overlay = Field("hubAmbientOverlay");
             Assert.NotNull(overlay, "The overlay renderer should exist only after the hub has been drawn.");
@@ -149,6 +167,74 @@ namespace HayChoriYPaty.Tests
             Assert.NotNull(animationClock);
             Assert.Greater((float)animationClock.GetValue(overlay), 15f, "The ambient cycles advance while the hub is visible.");
             yield return Capture("hub-ambient-cycle-playmode-1080x1920");
+        }
+
+        [UnityTest] public IEnumerator LayeredEnvironmentRendersCleanIndependentLayersAcrossPortraitViews()
+        {
+            float deadline = Time.realtimeSinceStartup + 40f;
+            while (!(bool)Field("viewResourcesReady") && Time.realtimeSinceStartup < deadline) yield return null;
+            Assert.IsTrue((bool)Field("viewResourcesReady"));
+            vt.GetField("introActive", P).SetValue(view, false);
+            vt.GetField("hubActive", P).SetValue(view, true);
+            vt.GetField("settingsActive", P).SetValue(view, false);
+            vt.GetField("marketActive", P).SetValue(view, false);
+            vt.GetField("badgesActive", P).SetValue(view, false);
+            vt.GetField("rankingActive", P).SetValue(view, false);
+            const BindingFlags all = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
+            MethodInfo bypass = vt.GetMethod("SetHubLayeredEnvironmentBypassedForTesting", all);
+            MethodInfo pose = vt.GetMethod("SetHubLayeredEnvironmentElapsedForTesting", all);
+            Time.timeScale = 0f;
+            foreach (int height in new[] { 1920, 2400 })
+            {
+#if UNITY_EDITOR
+                if (height != gameViewHeight)
+                {
+                    selectedSize.SetValue(gameWindow, previousSize);
+                    sizeGroup.GetType().GetMethod("RemoveCustomSize", all).Invoke(sizeGroup, new object[] { addedSize });
+                    gameViewWidth = 1080; gameViewHeight = height;
+                    SetPortraitView(false);
+                    yield return null; yield return null;
+                }
+#endif
+                bypass.Invoke(view, new object[] { true });
+                yield return Capture("hub-layered-master-playmode-1080x1920");
+                bypass.Invoke(view, new object[] { false });
+                pose.Invoke(view, new object[] { 0f });
+                yield return Capture("hub-layered-phase-0-playmode-1080x1920");
+                Assert.IsTrue((bool)vt.GetProperty("HubLayeredEnvironmentResourcesReadyForTesting", all).GetValue(view));
+                object overlay = Field("hubLayeredEnvironmentRenderer");
+                var patches = (Array)overlay.GetType().GetField("cleanPatches", P).GetValue(overlay);
+                Assert.AreEqual(8, patches.Length);
+                foreach (object patch in patches) Assert.IsNotNull(patch, "Every moving cloth has its own clean backing.");
+                pose.Invoke(view, new object[] { 2.3f });
+                yield return Capture("hub-layered-phase-2-playmode-1080x1920");
+                pose.Invoke(view, new object[] { 5.6f });
+                yield return Capture("hub-layered-phase-5-playmode-1080x1920");
+                Assert.IsNull(Field("hubCharacterScene"), "Environmental motion must leave character rigs paused.");
+                foreach (int action in new[] { 200, 201, 202, 203 })
+                {
+                    Rect bounds = (Rect)vt.GetMethod("HubArtworkActionBounds", P).Invoke(view, new object[] { action });
+                    Assert.AreEqual(action, vt.GetMethod("HitAction", P).Invoke(view, new object[] { bounds.center }));
+                }
+            }
+            object activeOverlay = Field("hubLayeredEnvironmentRenderer");
+            FieldInfo clock = activeOverlay.GetType().GetField("elapsed", P);
+            float before = (float)clock.GetValue(activeOverlay);
+            yield return new WaitForSecondsRealtime(.3f);
+            Assert.Greater((float)clock.GetValue(activeOverlay), before, "The environmental clock is unscaled.");
+            Dispatch(203);
+            float hiddenAt = (float)clock.GetValue(activeOverlay);
+            yield return new WaitForSecondsRealtime(.3f);
+            Assert.AreEqual(hiddenAt, clock.GetValue(activeOverlay), "Clock must stop when another hub page is shown.");
+            var cleanPatches = (Array)activeOverlay.GetType().GetField("cleanPatches", P).GetValue(activeOverlay);
+            UnityEngine.Object firstPatch = (UnityEngine.Object)cleanPatches.GetValue(0);
+            UnityEngine.Object birdTexture = (UnityEngine.Object)activeOverlay.GetType().GetField("birdSilhouette", P).GetValue(activeOverlay);
+            Assert.IsNotNull(birdTexture, "Bird silhouettes must be cached, not recreated as strokes per frame.");
+            vt.GetMethod("ReleaseHubLayeredEnvironmentResources", all).Invoke(view, null);
+            yield return null; yield return null;
+            Assert.IsNull(Field("hubLayeredEnvironmentRenderer"));
+            Assert.IsTrue(firstPatch == null, "Generated backing textures must be destroyed when released.");
+            Assert.IsTrue(birdTexture == null, "The cached bird silhouette must also be destroyed when released.");
         }
 
         [UnityTest] public IEnumerator NeighborhoodCharactersStayStillDuringAShortHubVisit()
