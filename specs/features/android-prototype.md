@@ -1,3 +1,13 @@
+# Entrega Android — 2026-11-01: Huracán Bonus Track 0.2.81/code83
+
+APK Android Development IL2CPP/ARM64, compilada desde el Editor Unity 6000.6.3f1 activo del checkout vigente, con la escena Assets/Scenes/Main.unity explícita. Build job build-e2f77bf4d8: Succeeded, 357.18 s, 0 errores / 5 advertencias. Player Settings: versionName 0.2.81, versionCode 83; paquete com.haychoriypaty.game, min API26/target API36.
+
+Artefacto ignorado por Git: Builds/Android/Archive/HayChoriYPaty-0.2.81-code83-huracan-20261101.apk, 411,941,423 bytes, SHA-256 f3b4b1d2b3f46834b9c6423beb6cbe978c63db4e843780ec5eeb06695128899b. PASS: ZIP íntegro, zipalign -c 4, APK Signature Scheme v2 (apksigner verify), aapt package/version/code/min API/target API, arm64-v8a libraries, manifest debuggable=true y metadata IL2CPP con StreetBonusTrackState, StreetBonusTrackProfile y HuracanBonusLevelId. El manifiesto desactiva Firebase Analytics y la colección Ad-ID, aunque quedan permisos AD-ID procedentes de dependencias. Firma Android Debug; no es release firmado para Play Store.
+
+No se instaló ni inició. Pruebas Unity de gameplay, Game View en dispositivo, Firebase real y simulaciones de balance NOT_RUN; los umbrales Bonus siguen provisionales. Esta build Development conserva el bono temporal QA de +30 tickets; retirarlo antes de cualquier release. APK no versionada; el commit contiene solo el alcance Huracán, no el artefacto.
+
+---
+
 # Entrega Android — 2026-10-30: ambiente por capas, roster Los Redondos, 0.2.80/code82
 
 APK Development IL2CPP/ARM64 generada desde Unity6000.6.3f1 en el checkout activo, escena única explícita `Assets/Scenes/Main.unity`. Player Settings avanzaron a versionName `0.2.80`, AndroidBundleVersionCode `82` para permitir actualizar el0.2.79 anterior sin eliminar datos; package `com.haychoriypaty.game`, min API26,target36,ARM64. Build job `build-bf7cdbf1ed`: **Succeeded,393.844899s,0 errores/6advertencias**.

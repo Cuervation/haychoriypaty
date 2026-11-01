@@ -30,7 +30,7 @@ namespace HayChoriYPaty
             AllBoysCrestResource, ChicagoCrestResource, VelezCrestResource,
             FerroCrestResource, IndependienteCrestResource, RacingCrestResource,
             SanLorenzoCrestResource, RiverCrestResource, BocaCrestResource,
-            CamionerosCrestResource, LosRedondosCrestResource
+            CamionerosCrestResource, LosRedondosCrestResource, null
         };
         private const string VelezFrontFansResource = "street-velez-fans-front-v1";
         private const string VelezWalkingFansResource = "street-velez-fans-walk-v1";
@@ -1385,9 +1385,10 @@ namespace HayChoriYPaty
                 if (game.HasPendingChulengo)
                     return ChulengoMultiplyBounds().Contains(resultPoint) ? ChulengoMultiplyAction
                         : ChulengoCollectBounds().Contains(resultPoint) ? ChulengoCollectAction : 0;
-                return game.Sim.LevelIndex < StreetSimulation.LevelNames.Length - 1 && VictoryExitBounds().Contains(resultPoint)
+                return game.CanAdvanceAfterResult && VictoryExitBounds().Contains(resultPoint)
                     ? VictoryExitAction : ChulengoLevelsBounds().Contains(resultPoint) ? ResultLevelsAction : 0;
             }
+            if (game.IsBonusTrack) return HitBonusTrackAction(p);
             if (marketActive) { p.y *= layoutVerticalScale; return HitMarketAction(p); }
             if (introActive) return 0;
             if (levelOneTutorialActive)
@@ -1460,7 +1461,7 @@ namespace HayChoriYPaty
                 return RiotResultButtonBounds().Contains(new Vector2(p.x, p.y * layoutVerticalScale)) ? RiotReturnAction
                     : ResultLevelsBounds().Contains(new Vector2(p.x, p.y * layoutVerticalScale)) ? ResultLevelsAction : 0;
             return game.Sim.Phase == RoundPhase.Won
-                ? (game.Sim.LevelIndex < StreetSimulation.LevelNames.Length - 1 && VictoryExitBounds().Contains(new Vector2(p.x, p.y * layoutVerticalScale)) ? VictoryExitAction
+                ? (game.CanAdvanceAfterResult && VictoryExitBounds().Contains(new Vector2(p.x, p.y * layoutVerticalScale)) ? VictoryExitAction
                     : ResultLevelsBounds().Contains(new Vector2(p.x, p.y * layoutVerticalScale)) ? ResultLevelsAction : 0)
                 : 0;
         }
@@ -1488,10 +1489,39 @@ namespace HayChoriYPaty
                     : a == ChulengoCollectAction ? game.TryCollectVictoryReward()
                     : a == VictoryExitAction && !game.HasPendingChulengo ? game.NextLevel()
                     : a == ResultLevelsAction && !game.HasPendingChulengo ? game.ReturnToLevels() : false;
-                if (chulengoOk && a == VictoryExitAction) { marketActive = true; marketFromSelector = true; marketTab = 0; marketOtherExpanded = false; marketMessage = ""; }
+                if (chulengoOk && a == VictoryExitAction)
+                {
+                    if (game.Sim.IsBonusTrack) game.TryStartRound();
+                    else { marketActive = true; marketFromSelector = true; marketTab = 0; marketOtherExpanded = false; marketMessage = ""; }
+                }
                 if (chulengoOk && a == ResultLevelsAction) { marketActive = false; levelSelectActive = true; levelSelectScroll = 0f; }
                 if (a == ChulengoMultiplyAction || a == ChulengoCollectAction || a == VictoryExitAction || a == ResultLevelsAction)
                 { lastAction = a; feedbackUntil = Time.unscaledTime + .22f; feedbackScale = chulengoOk ? 1.04f : .97f; }
+                return;
+            }
+            if (game.IsBonusTrack)
+            {
+                if (a >= BonusCardFirstAction && a < BonusCardFirstAction + 3) game.ChooseBonusCard(a - BonusCardFirstAction);
+                else if (a >= BonusWorkerFirstAction && a < BonusWorkerFirstAction + 3)
+                {
+                    System.Collections.Generic.IReadOnlyList<StreetWorkerRole> roles = game.Sim.BonusTrack?.EmergencyRoles;
+                    int index = a - BonusWorkerFirstAction;
+                    if (roles != null && index < roles.Count) game.ChooseBonusEmergencyRole(roles[index]);
+                }
+                else if (a == BonusAguanteAction) game.ActivateBonusAguante();
+                else if (a == BonusRetryAction) game.Retry();
+                else if (a == BonusReturnAction)
+                {
+                    if (game.ReturnToLevels()) { marketActive = false; levelSelectActive = true; levelSelectScroll = 0f; }
+                }
+                else if (a == BonusNextAction && game.CanAdvanceAfterResult)
+                {
+                    if (game.NextLevel())
+                    {
+                        if (game.IsBonusTrack) game.TryStartRound();
+                        else { marketActive = true; marketFromSelector = true; marketOtherExpanded = false; marketMessage = ""; }
+                    }
+                }
                 return;
             }
             if (introActive) return;
@@ -1660,8 +1690,9 @@ namespace HayChoriYPaty
                 }
                 if (a >= LevelSelectFirstAction && a < LevelSelectFirstAction + StreetSimulation.LevelNames.Length)
                 {
-                    int level = a - LevelSelectFirstAction;
-                    bool selectionSucceeded = level <= game.UnlockedLevel && game.SelectLevel(level);
+                    int campaignPosition = a - LevelSelectFirstAction;
+                    int level = StreetSimulation.CampaignLevelAt(campaignPosition);
+                    bool selectionSucceeded = game.IsLevelUnlocked(level) && game.SelectLevel(level);
                     if (selectionSucceeded)
                     {
                         levelSelectActive = false;
@@ -1679,6 +1710,10 @@ namespace HayChoriYPaty
                                 else game.TryStartRound();
                             }
                             else { marketMessage="Falta stock para iniciar. Revisá Mercado."; levelSelectActive=true; }
+                        }
+                        else if (level == StreetSimulation.HuracanBonusLevelId)
+                        {
+                            if (!game.TryStartRound()) levelSelectActive = true;
                         }
                         else { marketFromSelector = true; marketActive = true; marketTab = 0; marketMessage = ""; marketScroll = 0; marketOtherExpanded = false; marketExpandedIngredient = -1; }
                     }
@@ -1870,10 +1905,11 @@ namespace HayChoriYPaty
             }
             else if (a == VictoryExitAction && game.Sim.Phase == RoundPhase.Won)
             {
-                if (game.Sim.LevelIndex < StreetSimulation.LevelNames.Length - 1)
+                if (game.CanAdvanceAfterResult)
                 {
                     ok=game.NextLevel();
-                    if(ok){marketActive=true;marketFromSelector=true;marketOtherExpanded=false;marketMessage="";}
+                    if(ok && game.IsBonusTrack) ok = game.TryStartRound();
+                    else if(ok){marketActive=true;marketFromSelector=true;marketOtherExpanded=false;marketMessage="";}
                 }
                 else ok=false;
             }
@@ -1998,8 +2034,8 @@ namespace HayChoriYPaty
             if (sim.Phase == RoundPhase.Lost)
             {
                 DrawRiotScene();
-                DrawCounters(sim);
-                DrawRiotResult();
+                if (sim.IsBonusTrack) { DrawBonusTrackHud(sim); DrawBonusTrackResultPanel(); }
+                else { DrawCounters(sim); DrawRiotResult(); }
                 GUI.color=old; GUI.matrix=m;
                 return;
             }
@@ -2037,12 +2073,13 @@ namespace HayChoriYPaty
                 Item(new Rect(s.Position.x-27,s.Position.y-86-s.Age*33,23,23),10);
                 Label(new Rect(s.Position.x-3,s.Position.y-86-s.Age*33,48,25),"+"+s.Amount,text);GUI.color=Color.white;
             }
-            DrawCounters(sim);
+            if (sim.IsBonusTrack) DrawBonusTrackHud(sim);
+            else DrawCounters(sim);
             // The same footer geometry drives rendering, touch targets and the decorative pennant gap.
             int[] catalogActions = CatalogUpgradeActions(sim);
-            if (VictoryTransitionActive || levelFourSpecialistsTutorialActive || levelFiveSpecialistsTutorialActive ||
+            if (!sim.IsBonusTrack && (VictoryTransitionActive || levelFourSpecialistsTutorialActive || levelFiveSpecialistsTutorialActive ||
                 levelSixRacingTutorialActive ||
-                ShouldDrawUpgradeCards(sim.Phase, catalogActions.Length))
+                ShouldDrawUpgradeCards(sim.Phase, catalogActions.Length)))
                 for (int i = 0; i < catalogActions.Length; i++)
                 {
                     int action = catalogActions[i];
@@ -2061,7 +2098,7 @@ namespace HayChoriYPaty
             }
             else if (VictoryTransitionActive) DrawVictoryTransition();
             else if(sim.Phase==RoundPhase.Won||sim.Phase==RoundPhase.Lost) ResultPanel();
-            else DrawLevelBadge(sim.LevelIndex, footer.LevelBadge);
+            else if (!sim.IsBonusTrack) DrawLevelBadge(sim.LevelIndex, footer.LevelBadge);
             if (levelOneTutorialActive) DrawLevelOneTutorial();
             else if (levelTwoCocacoleroTutorialActive) DrawLevelTwoCocacoleroTutorial();
             else if (levelThreePatyTutorialActive) DrawLevelThreePatyTutorial();
@@ -3843,12 +3880,16 @@ namespace HayChoriYPaty
             MarketText(new Rect(panel.x + 22, panel.y + 164, panel.width - 44, 58), "EL RANKING GLOBAL LLEGA PRONTO", 23, Color.white);
             MarketText(new Rect(panel.x + 28, panel.y + 218, panel.width - 56, 52), "Todavía no publicamos posiciones de otros hinchas.", 16, new Color(.95f, .87f, .72f));
             MarketText(new Rect(panel.x + 26, panel.y + 295, panel.width - 52, 30), "TU PROGRESO", 19, new Color(1f, .84f, .38f));
-            MarketText(new Rect(panel.x + 26, panel.y + 331, panel.width - 52, 38), "CANCHAS DESBLOQUEADAS: " + (game.UnlockedLevel + 1) + " / " + StreetSimulation.LevelNames.Length, 19, Color.white);
-            string next = game.HasWonLevel(StreetSimulation.LevelNames.Length - 1)
-                ? "TODAS LAS CANCHAS SUPERADAS"
-                : game.UnlockedLevel < StreetSimulation.LevelNames.Length
-                    ? StreetSimulation.LevelDisplayNames[game.UnlockedLevel].Split('/')[0].Trim().ToUpperInvariant()
-                    : "TODAS LAS CANCHAS";
+            int unlockedCount = 0, nextLevel = -1;
+            for (int i = 0; i < StreetSimulation.CampaignOrder.Length; i++)
+            {
+                int levelId = StreetSimulation.CampaignLevelAt(i);
+                if (game.IsLevelUnlocked(levelId)) unlockedCount++;
+                else if (nextLevel < 0) nextLevel = levelId;
+            }
+            MarketText(new Rect(panel.x + 26, panel.y + 331, panel.width - 52, 38), "CANCHAS DESBLOQUEADAS: " + unlockedCount + " / " + StreetSimulation.CampaignOrder.Length, 19, Color.white);
+            string next = nextLevel < 0 ? "TODAS LAS CANCHAS SUPERADAS"
+                : StreetSimulation.LevelDisplayNames[nextLevel].Split('/')[0].Trim().ToUpperInvariant();
             MarketText(new Rect(panel.x + 26, panel.y + 373, panel.width - 52, 48), "PRÓXIMO OBJETIVO: " + next, 16, new Color(.52f, 1f, .47f));
             DrawStandardButton(RankingBackBounds(height), RankingBackAction, "VOLVER AL BARRIO");
         }
@@ -4191,7 +4232,7 @@ namespace HayChoriYPaty
                 Rect panel = new Rect(14f, body.y + Mathf.Max(12f, (body.height - 116f) * .5f), W - 28f, 116f);
                 DrawMarketBluePanel(panel, new Color(.012f, .075f, .25f, .98f));
                 MarketText(new Rect(panel.x + 10f, panel.y + 12f, panel.width - 20f, 38f), "EXTRAS SE DESBLOQUEA EN RACING", 21, MarketGold);
-                MarketText(new Rect(panel.x + 16f, panel.y + 54f, panel.width - 32f, 46f), "Juntá tickets con cada victoria.\nCanjeá desde el nivel 6.", 17, Color.white);
+                MarketText(new Rect(panel.x + 16f, panel.y + 54f, panel.width - 32f, 46f), "Juntá tickets con cada victoria.\nCanjeá desde Racing (nivel 7).", 17, Color.white);
                 return;
             }
             Rect notice = MarketExtrasNoticeBounds();
@@ -4199,7 +4240,7 @@ namespace HayChoriYPaty
             {
                 Rect localNotice = new Rect(notice.x - body.x, notice.y - body.y, notice.width, notice.height);
                 DrawMarketBluePanel(localNotice, new Color(.012f, .075f, .25f, .96f));
-                string message = game.Sim.LevelIndex >= 5 ? "CADA TRABAJADOR CUESTA 3 TICKETS" : "SE CANJEA AL PREPARAR NIVEL 6 O SUPERIOR";
+                string message = game.Sim.LevelIndex >= 5 ? "CADA TRABAJADOR CUESTA 3 TICKETS" : "SE CANJEA AL PREPARAR RACING (NIVEL 7)";
                 MarketText(new Rect(localNotice.x + 8f, localNotice.y + 2f, localNotice.width - 16f, localNotice.height - 4f), message, 17, Color.white);
             }
             for (int index = 0; index < 5; index++)
@@ -4215,7 +4256,7 @@ namespace HayChoriYPaty
                 MarketText(new Rect(textX, local.y + 38f, 232f, 20f), "COSTO: 3 TICKETS", 15, MarketRoyalBlue, TextAnchor.MiddleLeft);
                 MarketText(new Rect(textX, local.y + 65f, 232f, 24f), "RESERVADOS: " + game.PendingTicketWorkers(role), 15, MarketBlueInk, TextAnchor.MiddleLeft);
                 bool canRedeem = game.CanRedeemTicketWorker(role);
-                string caption = game.Sim.LevelIndex < 5 ? "NIVEL 6+" : game.TicketBalance < 3
+                string caption = game.Sim.LevelIndex < 5 ? "NIVEL 7+" : game.TicketBalance < 3
                     ? "FALTAN " + System.Math.Max(0L, 3L - game.TicketBalance) + " TICKETS" : "CANJEAR";
                 DrawStandardButton(MarketTicketRedeemButtonBounds(local), MarketTicketRedeemAction + index, caption, canRedeem);
             }
@@ -4262,7 +4303,9 @@ namespace HayChoriYPaty
                 case 0: return muralArt; case 1: return chicagoBackground; case 2: return velezBackground;
                 case 3: return ferroBackground; case 4: return independienteBackground; case 5: return racingBackground;
                 case 6: return sanLorenzoBackground; case 7: return riverMural; case 8: return bocaBackground;
-                case 9: return camionerosBackground; default: return losRedondosBackground;
+                case 9: return camionerosBackground;
+                case StreetSimulation.HuracanBonusLevelId: return Resources.Load<Texture2D>("street-mural-huracan-master-v1");
+                default: return losRedondosBackground;
             }
         }
         private void DrawMarketClubHeader()
@@ -4281,7 +4324,7 @@ namespace HayChoriYPaty
             string[] club = StreetSimulation.LevelDisplayNames[level].Split('/');
             float captionX = Mathf.Max(120f, badge.xMax + 16f);
             float captionWidth = 506f - captionX;
-            MarketText(new Rect(captionX, 77, captionWidth, 24), "NIVEL " + (level + 1), 19, MarketCyan, TextAnchor.MiddleLeft);
+            MarketText(new Rect(captionX, 77, captionWidth, 24), "NIVEL " + (StreetSimulation.CampaignPositionOf(level) + 1), 19, MarketCyan, TextAnchor.MiddleLeft);
             MarketText(new Rect(captionX, 100, captionWidth, 35), club[0].Trim().ToUpperInvariant(), 29, Color.white, TextAnchor.MiddleLeft);
             MarketText(new Rect(captionX, 136, captionWidth, 23), club.Length > 1 ? club[1].Trim().ToUpperInvariant() : "", 19, new Color(.82f, .94f, 1f), TextAnchor.MiddleLeft);
         }
@@ -7058,6 +7101,11 @@ namespace HayChoriYPaty
             // Physical-screen dimmer covers the HUD and safe-area insets too.
             DrawIntroScreen(Texture2D.whiteTexture, new Color(0f, 0f, 0f, .63f), ScaleMode.StretchToFill);
             // Keep the status HUD crisp above the dimmed playfield, as in the in-game reference.
+            if (game.IsBonusTrack)
+            {
+                DrawBonusTrackResultPanel();
+                return;
+            }
             if (game.ShowChulengoResult) DrawCounters(game.Sim);
             Rect frame = VictoryPopupBounds(logicalCanvasHeight, game.ShowChulengoResult);
             float previousVertical = layoutVerticalScale;
@@ -7101,7 +7149,7 @@ namespace HayChoriYPaty
                     }
                     else
                     {
-                        bool canAdvanceChulengo = game.Sim.LevelIndex < StreetSimulation.LevelNames.Length - 1;
+                        bool canAdvanceChulengo = game.CanAdvanceAfterResult;
                         DrawStandardButton(VictorySlot(frame, VictoryExit), VictoryExitAction,
                             canAdvanceChulengo ? "SIGUIENTE PARTIDO" : "ÚLTIMO NIVEL", canAdvanceChulengo);
                         DrawStandardButton(ChulengoLevelsBounds(), ResultLevelsAction, "NIVELES");
@@ -7116,7 +7164,7 @@ namespace HayChoriYPaty
                 VictoryText(VictorySlot(frame, new Rect(.09f, .398f, .82f, .15f)), sales,
                     Mathf.RoundToInt(17f * fontScale), gold, TextAnchor.MiddleCenter);
                 DrawMarketReceipt(VictorySlot(frame, new Rect(.10f, .55f, .80f, .27f)));
-                bool canAdvance=game.Sim.LevelIndex < StreetSimulation.LevelNames.Length - 1;
+                bool canAdvance=game.CanAdvanceAfterResult;
                 DrawStandardButton(VictorySlot(frame, VictoryExit), VictoryExitAction, canAdvance?"SIGUIENTE PARTIDO":"ÚLTIMO NIVEL", canAdvance);
                 DrawStandardButton(ResultLevelsBounds(), ResultLevelsAction, "NIVELES");
             }

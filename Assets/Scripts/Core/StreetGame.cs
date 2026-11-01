@@ -31,7 +31,7 @@ namespace HayChoriYPaty
         public const string ProgressKey = "HayChoriYPaty.StreetGame.v1";
         private const string SaveKey = ProgressKey;
         [SerializeField] private StreetBalance balance = new StreetBalance();
-        [SerializeField, Range(0, 10)] private int selectedLevel;
+        [SerializeField, Range(0, 11)] private int selectedLevel;
         private StreetSimulation sim;
         private OrderDeliverySound deliverySound;
         private SaveData save;
@@ -54,8 +54,10 @@ namespace HayChoriYPaty
         [System.Serializable]
         public sealed class SaveData
         {
-            public int version = 4;
+            public int version = 5;
             public int unlockedLevel;
+            // `unlockedLevel` remains the original stable-ID frontier; campaign order is separate.
+            public bool huracanUnlocked, legacyRacingUnlocked, racingUnlockedByHuracan;
             public float price = 5f;
             public float[] prices;
             public int coins;
@@ -70,6 +72,7 @@ namespace HayChoriYPaty
             public StreetMarketData market;
             public StreetTicketData tickets;
             public StreetPlayerStatistics statistics = new StreetPlayerStatistics();
+            public StreetBonusTrackProfile bonusTrack = new StreetBonusTrackProfile();
             public string activeAttemptId;
             // Checkpoint for cumulative metrics of a live attempt. It is snapshot-only, never history/outbox.
             public StreetMatchRecord activeAttemptSummary;
@@ -81,6 +84,25 @@ namespace HayChoriYPaty
         public StreetBalance Balance { get { return balance; } }
         public int SelectedLevel { get { return selectedLevel; } }
         public int UnlockedLevel { get { return save == null ? 0 : save.unlockedLevel; } }
+        public bool IsBonusTrack => playerActive && sim != null && sim.IsBonusTrack;
+        public bool CanAdvanceAfterResult
+        {
+            get
+            {
+                if (!playerActive || sim == null || (sim.Phase != RoundPhase.Won && !resumedChulengoResult)) return false;
+                int next = StreetSimulation.NextCampaignLevelId(sim.LevelIndex);
+                return next >= 0 && IsLevelUnlocked(next);
+            }
+        }
+        public bool IsLevelUnlocked(int levelId)
+        {
+            if (save == null || levelId < 0 || levelId >= StreetSimulation.LevelNames.Length) return false;
+            if (levelId == StreetSimulation.HuracanBonusLevelId)
+                return save.huracanUnlocked || save.legacyRacingUnlocked;
+            if (levelId == 5)
+                return save.legacyRacingUnlocked || save.racingUnlockedByHuracan || save.unlockedLevel >= 6;
+            return levelId <= save.unlockedLevel;
+        }
         public bool HasWonLevel(int levelIndex)
         {
             if (save == null || save.statistics == null || levelIndex < 0 || levelIndex >= StreetSimulation.LevelNames.Length ||
@@ -104,10 +126,11 @@ namespace HayChoriYPaty
         }
         public bool HasIncompleteSalesHistory => playerActive && save?.statistics != null && save.statistics.legacyCoverageIncomplete;
         public StreetMarket Market => playerActive ? market : null;
+        public StreetBonusTrackProfile BonusTrackProgress => playerActive ? save?.bonusTrack : null;
         public long TicketBalance => playerActive && save?.tickets != null ? save.tickets.balance : 0L;
         public long TicketTotalEarned => playerActive && save?.tickets != null ? save.tickets.totalEarned : 0L;
         public long TicketTotalSpent => playerActive && save?.tickets != null ? save.tickets.totalSpent : 0L;
-        public bool TicketExtrasUnlocked => playerActive && save != null && save.unlockedLevel >= 5;
+        public bool TicketExtrasUnlocked => playerActive && IsLevelUnlocked(5);
         public string TicketRedemptionOperationId(StreetWorkerRole role)
         {
             int index = (int)role;
@@ -135,7 +158,7 @@ namespace HayChoriYPaty
         public long ChulengoBaseRewardCents => market?.LastResult == null ? 0L : market.LastResult.chulengoBaseRewardCents;
         public long ChulengoFinalRewardCents => market?.LastResult == null ? 0L : market.LastResult.earnedCents;
         public bool CanStartRound => !HasPendingChulengo && !resumedChulengoResult && playerActive && sim != null && sim.Phase == RoundPhase.Ready &&
-            market != null && !market.Data.attemptActive && market.CanMeetRequiredStockWithLevelOneFloor(sim);
+            (sim.IsBonusTrack || (market != null && !market.Data.attemptActive && market.CanMeetRequiredStockWithLevelOneFloor(sim)));
 
         private void OnEnable()
         {
@@ -164,6 +187,8 @@ namespace HayChoriYPaty
             bool missingStatistics = save.statistics == null || string.IsNullOrEmpty(save.statistics.instrumentationStartedAtUtc);
             if (save.statistics == null) save.statistics = new StreetPlayerStatistics();
             save.statistics.Normalize();
+            if (save.bonusTrack == null) save.bonusTrack = new StreetBonusTrackProfile();
+            save.bonusTrack.Normalize();
             if (!InitializeTicketData(save)) return false;
             if (missingStatistics)
             {
@@ -202,7 +227,15 @@ namespace HayChoriYPaty
             market.RecoverLegacyZeroPayoutTransition();
             resumedChulengoResult = save.pendingVictoryMatch != null;
             if (resumedChulengoResult && market.LastResult != null) selectedLevel = market.LastResult.level;
-            selectedLevel = Mathf.Clamp(selectedLevel, 0, save.unlockedLevel);
+            selectedLevel = Mathf.Clamp(selectedLevel, 0, StreetSimulation.LevelNames.Length - 1);
+            if (!IsLevelUnlocked(selectedLevel)) selectedLevel = Mathf.Clamp(save.unlockedLevel, 0, 10);
+            // A Bonus Track interrupted by app closure has no resumable simulation; discard only
+            // its volatile attempt token. It never consumed stock or issued a ticket.
+            if (!market.Data.attemptActive && selectedLevel == StreetSimulation.HuracanBonusLevelId &&
+                !string.IsNullOrEmpty(save.activeAttemptId) && save.pendingMatch == null)
+            {
+                activeAttemptId = save.activeAttemptId = null;
+            }
             sim = new StreetSimulation(balance, selectedLevel, save.price);
             if(save.prices!=null && save.prices.Length==7)for(int i=0;i<7;i++)sim.SetProductPrice(i,save.prices[i]);
             if (save.unlockedLevel > 0)
@@ -261,6 +294,14 @@ namespace HayChoriYPaty
         {
             if (!playerActive || sim == null || market == null) return;
             ProcessRoundResult();
+            if (sim.IsBonusTrack && sim.Phase == RoundPhase.Playing)
+            {
+                activeAttemptId = null;
+                if (save != null) save.activeAttemptId = null;
+                ResetAttemptMetrics();
+                Save();
+                return;
+            }
             if (sim.Phase == RoundPhase.Playing) market.AbortAttempt();
             Save();
         }
@@ -272,6 +313,7 @@ namespace HayChoriYPaty
                 // Persist the pending victory once; a chosen outcome can only retry without changing it.
                 return resultSaved || (resultSaved = Save());
             }
+            if (sim != null && sim.IsBonusTrack) return ProcessBonusTrackResult();
             if ((!playerActive && !suspensionRequested) || sim == null || save == null || resultSaved ||
                 (sim.Phase != RoundPhase.Won && sim.Phase != RoundPhase.Lost)) return false;
             StreetMarketResult receipt = market?.SettleAttempt(sim);
@@ -280,8 +322,10 @@ namespace HayChoriYPaty
             int previousUnlocked = save.unlockedLevel;
             if (sim.Phase == RoundPhase.Won)
             {
-                int nextLevel = sim.LevelIndex + 1;
-                if (market != null && nextLevel < StreetSimulation.LevelNames.Length)
+                int nextLevel = StreetSimulation.NextCampaignLevelId(sim.LevelIndex);
+                if (sim.LevelIndex == 4) save.huracanUnlocked = true;
+                else save.unlockedLevel = Mathf.Max(save.unlockedLevel, Mathf.Min(10, sim.LevelIndex + 1));
+                if (market != null && nextLevel >= 0 && nextLevel != StreetSimulation.HuracanBonusLevelId)
                 {
                     // Keep bounded legacy recovery for older receipts; current victories pay in full.
                     // The normal first-unlock grant covers only the remaining next-stock deficit.
@@ -289,7 +333,6 @@ namespace HayChoriYPaty
                     market.ReconcileLegacyProgressionBalance(nextLevelSimulation, nextLevel);
                     market.GrantFirstUnlockStockBonus(nextLevelSimulation, nextLevel > previousUnlocked);
                 }
-                save.unlockedLevel = Mathf.Max(save.unlockedLevel, Mathf.Min(StreetSimulation.LevelNames.Length - 1, sim.LevelIndex + 1));
             }
             if (receipt.won && !receipt.chulengoManaged)
             {
@@ -307,6 +350,62 @@ namespace HayChoriYPaty
             if (!resultSaved) save.unlockedLevel = previousUnlocked;
             else { ResetAttemptMetrics(); activeAttemptId = null; save.activeAttemptId = null; }
             return resultSaved;
+        }
+
+        private bool ProcessBonusTrackResult()
+        {
+            if ((!playerActive && !suspensionRequested) || sim == null || save == null || save.bonusTrack == null || resultSaved ||
+                sim.Phase != RoundPhase.Won) return false;
+            StreetBonusTrackState attempt = sim.BonusTrack;
+            if (attempt == null) return false;
+            StreetMatchRecord record = save.pendingMatch;
+            if (record == null || record.level != StreetSimulation.HuracanBonusLevelId || record.attemptId != activeAttemptId)
+            {
+                record = BuildBonusMatchRecord(attempt);
+                save.pendingMatch = record;
+            }
+
+            StreetBonusTrackProfile progress = save.bonusTrack;
+            if (progress.lastAttemptId != record.attemptId)
+            {
+                progress.previousBestScore = progress.bestScore;
+                progress.lastAttemptId = record.attemptId;
+                progress.attemptsFinished++;
+                progress.lastScore = record.bonusScore;
+                progress.lastStars = record.bonusStars;
+                progress.lastDeliveries = record.bonusDeliveries;
+                progress.lastOrders = record.bonusCompletedOrders;
+                progress.bestScore = Math.Max(progress.bestScore, record.bonusScore);
+                progress.bestStars = Math.Max(progress.bestStars, record.bonusStars);
+                progress.bestDeliveries = Math.Max(progress.bestDeliveries, record.bonusDeliveries);
+                progress.bestOrders = Math.Max(progress.bestOrders, record.bonusCompletedOrders);
+            }
+
+            if (record.bonusStars > 0)
+            {
+                save.racingUnlockedByHuracan = true;
+                save.unlockedLevel = Mathf.Max(save.unlockedLevel, 5);
+                if (!EnsureVictoryTicketAwarded(record)) return false;
+                if (record.bonusTickets <= 0) record.bonusTickets = 1;
+                if (record.bonusStars == 3 && !progress.threeStarTicketAwarded &&
+                    save.tickets.balance < long.MaxValue && save.tickets.totalEarned < long.MaxValue)
+                {
+                    save.tickets.balance++;
+                    save.tickets.totalEarned++;
+                    progress.threeStarTicketAwarded = true;
+                    record.bonusTickets = Math.Max(2, record.bonusTickets);
+                }
+            }
+            else record.bonusTickets = 0;
+            progress.lastTickets = record.bonusTickets;
+
+            if (!save.statistics.HasApplied(record.attemptId)) save.statistics.ApplyMatch(record);
+            resultSaved = SaveWithMatch(record);
+            if (!resultSaved) return false;
+            ResetAttemptMetrics();
+            activeAttemptId = null;
+            save.activeAttemptId = null;
+            return true;
         }
 
         public bool TryCollectVictoryReward() => playerActive && ResolveVictoryChoice(-1);
@@ -360,7 +459,7 @@ namespace HayChoriYPaty
         public bool SelectLevel(int level)
         {
             if (!playerActive || sim == null || sim.Phase == RoundPhase.Playing || level < 0 ||
-                level >= StreetSimulation.LevelNames.Length || level > UnlockedLevel) return false;
+                level >= StreetSimulation.LevelNames.Length || !IsLevelUnlocked(level)) return false;
             if (!EnsureResultSaved()) return false;
             resumedChulengoResult = false;
             selectedLevel = level;
@@ -378,6 +477,7 @@ namespace HayChoriYPaty
         public bool TryStartRound()
         {
             if (!playerActive || !CanStartRound) return false;
+            if (sim.IsBonusTrack) return TryStartBonusRound();
             long[] ticketGrants = new long[5];
             bool eligibleLevel = sim.LevelIndex >= 5;
             if (eligibleLevel) Array.Copy(save.tickets.pendingWorkersByRole, ticketGrants, ticketGrants.Length);
@@ -423,11 +523,46 @@ namespace HayChoriYPaty
             Save(); return true;
         }
 
+        private bool TryStartBonusRound()
+        {
+            if (!playerActive || sim == null || !sim.IsBonusTrack || !CanStartRound || save.bonusTrack == null) return false;
+            string previousAttempt = save.activeAttemptId;
+            long previousStarted = save.statistics.attemptsStarted;
+            long previousBonusStarted = save.bonusTrack.attemptsStarted;
+            activeAttemptId = Guid.NewGuid().ToString("N");
+            save.activeAttemptId = activeAttemptId;
+            save.statistics.attemptsStarted++;
+            save.bonusTrack.attemptsStarted++;
+            int seed = balance.randomSeed ^ (int)(save.bonusTrack.attemptsStarted * 7919L);
+            if (!Save())
+            {
+                save.statistics.attemptsStarted = previousStarted;
+                save.bonusTrack.attemptsStarted = previousBonusStarted;
+                save.activeAttemptId = activeAttemptId = previousAttempt;
+                return false;
+            }
+            resultSaved = false;
+            if (!sim.StartBonusRound(seed))
+            {
+                save.statistics.attemptsStarted = previousStarted;
+                save.bonusTrack.attemptsStarted = previousBonusStarted;
+                save.activeAttemptId = activeAttemptId = previousAttempt;
+                if (!Save()) FreezeAfterUnpersistedMutation();
+                return false;
+            }
+            Save();
+            return true;
+        }
+
+        public bool ChooseBonusCard(int index) => playerActive && sim != null && sim.ChooseBonusCard(index);
+        public bool ChooseBonusEmergencyRole(StreetWorkerRole role) => playerActive && sim != null && sim.ChooseBonusEmergencyRole(role);
+        public bool ActivateBonusAguante() => playerActive && sim != null && sim.ActivateBonusAguante();
+
         public bool CanRedeemTicketWorker(StreetWorkerRole role)
         {
             int index = (int)role;
             return playerActive && save?.tickets != null && market != null && sim != null &&
-                save.unlockedLevel >= 5 && sim.LevelIndex >= 5 && sim.Phase == RoundPhase.Ready &&
+                save.unlockedLevel >= 5 && sim.LevelIndex >= 5 && !sim.IsBonusTrack && sim.Phase == RoundPhase.Ready &&
                 !HasPendingChulengo && !resumedChulengoResult && !market.Data.attemptActive &&
                 index >= 0 && index < 5 && sim.HasRole(role) && save.tickets.balance >= 3 &&
                 save.tickets.totalSpent <= long.MaxValue - 3 && save.tickets.pendingWorkersByRole[index] < long.MaxValue;
@@ -534,21 +669,40 @@ namespace HayChoriYPaty
         }
         public bool NextLevel()
         {
-            if (!playerActive || sim == null || (sim.Phase != RoundPhase.Won && !resumedChulengoResult) || sim.LevelIndex + 1 >= StreetSimulation.LevelNames.Length) return false;
+            if (!playerActive || sim == null || (sim.Phase != RoundPhase.Won && !resumedChulengoResult)) return false;
             if (!EnsureResultSaved()) return false;
+            int next = StreetSimulation.NextCampaignLevelId(sim.LevelIndex);
+            if (next < 0 || !IsLevelUnlocked(next)) return false;
             resumedChulengoResult = false;
-            selectedLevel = sim.LevelIndex + 1; save.unlockedLevel = Mathf.Max(save.unlockedLevel, selectedLevel);
+            selectedLevel = next;
             ResetAttemptMetrics();
             sim = NewReadySimulation(selectedLevel); InitializeDeliverySound(); Save(); return true;
         }
         public bool Retry()
         {
-            return false; // Retained API for old callers, not a retry mechanic or navigation action.
+            if (!playerActive || sim == null || !sim.IsBonusTrack ||
+                (sim.Phase != RoundPhase.Won && sim.Phase != RoundPhase.Lost) || !EnsureResultSaved()) return false;
+            resultSaved = false;
+            ResetAttemptMetrics();
+            sim = NewReadySimulation(StreetSimulation.HuracanBonusLevelId);
+            InitializeDeliverySound();
+            return TryStartBonusRound();
         }
         public bool ReturnToLevels()
         {
-            if (!playerActive || sim == null || market == null) return false;
+            if (!playerActive || sim == null || (!sim.IsBonusTrack && market == null)) return false;
             if (!EnsureResultSaved()) return false;
+            if (sim.IsBonusTrack && sim.Phase == RoundPhase.Playing)
+            {
+                // Abandonment records no result or reward; the round owns no market stock.
+                activeAttemptId = null;
+                save.activeAttemptId = null;
+                ResetAttemptMetrics();
+                resultSaved = false;
+                sim = NewReadySimulation(selectedLevel);
+                InitializeDeliverySound();
+                return Save();
+            }
             if (sim.Phase == RoundPhase.Playing && market.Data.attemptActive)
             {
                 StreetMatchRecord abandoned = BuildAbandonedMatchRecord();
@@ -559,7 +713,7 @@ namespace HayChoriYPaty
                 if (!SaveWithMatch(abandoned)) { FreezeAfterUnpersistedMutation(); return false; }
                 ResetAttemptMetrics(); activeAttemptId = null; save.activeAttemptId = null;
             }
-            else market.AbortAttempt();
+            else market?.AbortAttempt();
             ResetAttemptMetrics();
             resumedChulengoResult = false;
             resultSaved = false; sim = NewReadySimulation(selectedLevel); InitializeDeliverySound(); Save(); return true;
@@ -609,14 +763,14 @@ namespace HayChoriYPaty
             try
             {
                 // JsonUtility fills omitted fields with defaults; require a real legacy version marker.
-                if (!System.Text.RegularExpressions.Regex.IsMatch(json, "^\\s*\\{\\s*\\\"version\\\"\\s*:\\s*[1-4](?:\\s*[,}])")) return false;
+                if (!System.Text.RegularExpressions.Regex.IsMatch(json, "^\\s*\\{\\s*\\\"version\\\"\\s*:\\s*[1-5](?:\\s*[,}])")) return false;
                 data = MigrateSaveData(JsonUtility.FromJson<SaveData>(json));
                 // Unity serializes inline null DTOs as empty objects; never interpret them as results.
                 if (data != null && StreetMatchRecord.IsAbsent(data.pendingMatch)) data.pendingMatch = null;
                 if (data != null && StreetMatchRecord.IsAbsent(data.pendingVictoryMatch)) data.pendingVictoryMatch = null;
                 if (data != null && StreetMatchRecord.IsAbsent(data.activeAttemptSummary)) data.activeAttemptSummary = null;
-                if (data == null || data.version != 4 || (data.tickets != null && !data.tickets.IsValid())) { data = null; return false; }
-                data.unlockedLevel = Mathf.Clamp(data.unlockedLevel, 0, StreetSimulation.LevelNames.Length - 1);
+                if (data == null || data.version != 5 || (data.tickets != null && !data.tickets.IsValid())) { data = null; return false; }
+                data.unlockedLevel = Mathf.Clamp(data.unlockedLevel, 0, 10);
                 data.price = Mathf.Clamp(data.price, balance.minPrice, balance.maxPrice);
                 data.staff = Mathf.Max(1, data.staff);
                 data.speed = Mathf.Max(0, data.speed);
@@ -644,6 +798,15 @@ namespace HayChoriYPaty
                 data.version = 3;
             }
             if (data.version == 3) data.version = 4; // Market.Initialize performs the one-time stock migration.
+            if (data.version == 4)
+            {
+                // Preserve legacy Racing and later-level access while the visible campaign gains Huracán.
+                data.legacyRacingUnlocked = data.unlockedLevel >= 5;
+                data.huracanUnlocked = data.unlockedLevel >= 5;
+                data.racingUnlockedByHuracan = false;
+                if (data.bonusTrack == null) data.bonusTrack = new StreetBonusTrackProfile();
+                data.version = 5;
+            }
             return data;
         }
 
@@ -728,6 +891,25 @@ namespace HayChoriYPaty
             return record;
         }
 
+        private StreetMatchRecord BuildBonusMatchRecord(StreetBonusTrackState attempt)
+        {
+            string attemptId = string.IsNullOrEmpty(activeAttemptId) ? save.activeAttemptId : activeAttemptId;
+            if (string.IsNullOrEmpty(attemptId)) attemptId = activeAttemptId = save.activeAttemptId = Guid.NewGuid().ToString("N");
+            var record = new StreetMatchRecord
+            {
+                id = attemptId, attemptId = attemptId, utc = DateTime.UtcNow.ToString("o"),
+                level = StreetSimulation.HuracanBonusLevelId, club = StreetSimulation.LevelDisplayNames[StreetSimulation.HuracanBonusLevelId],
+                won = attempt.Stars > 0, result = attempt.Stars > 0 ? "won" : "lost", elapsedSeconds = sim.Elapsed,
+                grossSalesCents = 0, rewardCents = 0, bonusScore = attempt.Score, bonusStars = attempt.Stars,
+                bonusDeliveries = attempt.Deliveries, bonusCompletedOrders = attempt.CompletedOrders, bonusTickets = attempt.TicketsAwardedThisRun,
+                bonusUpgrades = string.Join(" | ", new System.Collections.Generic.List<string>(attempt.ChoiceHistory).ToArray()),
+                customersAttended = sim.CustomersAttended, customersLost = 0, ordersCompleted = attempt.CompletedOrders,
+                salesByProduct = new long[7], stockConsumed = new long[10], stockRemaining = new long[10], hiresByRole = new long[5]
+            };
+            for (int i = 0; i < 7; i++) record.salesByProduct[i] = sim.GetProductDelivered(i);
+            return record;
+        }
+
         private StreetMatchRecord BuildAbandonedMatchRecord()
         {
             int level = Mathf.Clamp(sim.LevelIndex, 0, StreetSimulation.LevelNames.Length - 1);
@@ -772,15 +954,29 @@ namespace HayChoriYPaty
         private bool SaveWithMatch(StreetMatchRecord match)
         {
             if (sim == null || save == null || (!playerActive && !suspensionRequested)) return false;
-            if(save.prices==null || save.prices.Length!=7)save.prices=new float[7];
-            for(int i=0;i<7;i++)save.prices[i]=sim.GetProductPrice(i);
-            save.price = sim.Price; save.coins = sim.Coins; save.staff = sim.StaffCount; save.speed = sim.SpeedLevel;
-            save.workerLevel = sim.LevelIndex; save.parrilleros = sim.ParrilleroCount; save.cocacoleros = sim.CocacoleroCount;
-            save.premiumParrilleros = sim.ParrilleroPremiumCount; save.ferneteros = sim.FerneteroCount; save.mozos = sim.MozoCount;
-            save.unlockedLevel = Mathf.Max(save.unlockedLevel, sim.LevelIndex);
+            if (!sim.IsBonusTrack)
+            {
+                if(save.prices==null || save.prices.Length!=7)save.prices=new float[7];
+                for(int i=0;i<7;i++)save.prices[i]=sim.GetProductPrice(i);
+                save.price = sim.Price; save.coins = sim.Coins; save.staff = sim.StaffCount; save.speed = sim.SpeedLevel;
+                save.workerLevel = sim.LevelIndex; save.parrilleros = sim.ParrilleroCount; save.cocacoleros = sim.CocacoleroCount;
+                save.premiumParrilleros = sim.ParrilleroPremiumCount; save.ferneteros = sim.FerneteroCount; save.mozos = sim.MozoCount;
+                save.unlockedLevel = Mathf.Max(save.unlockedLevel, sim.LevelIndex);
+            }
             save.market = market?.Data ?? save.market;
             if (save.pendingMatch != null && save.pendingMatch.won)
-                save.unlockedLevel = Mathf.Max(save.unlockedLevel, Mathf.Min(StreetSimulation.LevelNames.Length - 1, save.pendingMatch.level + 1));
+            {
+                if (save.pendingMatch.level == 4) save.huracanUnlocked = true;
+                else if (save.pendingMatch.level == StreetSimulation.HuracanBonusLevelId)
+                {
+                    if (save.pendingMatch.bonusStars > 0)
+                    {
+                        save.racingUnlockedByHuracan = true;
+                        save.unlockedLevel = Mathf.Max(save.unlockedLevel, 5);
+                    }
+                }
+                else save.unlockedLevel = Mathf.Max(save.unlockedLevel, Mathf.Min(10, save.pendingMatch.level + 1));
+            }
             StreetMatchRecord pendingToRestore = null;
             StreetMatchRecord summaryToRestore = null;
             string activeAttemptToRestore = null;

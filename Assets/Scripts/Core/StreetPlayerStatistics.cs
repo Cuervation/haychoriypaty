@@ -23,9 +23,9 @@ namespace HayChoriYPaty
         public long hireSpendTotalCents, speedSpendTotalCents, initialFreeCoinsCents, initialFreeMarketBalanceCents;
         public long speedUpgrades, speedSpendCents, attemptsStarted, attemptsFinished, wins, losses, abandons;
         public long customersAttended, customersLost, ordersCompleted, completedProducts;
-        public long[] winsByLevel = new long[11], lossesByLevel = new long[11];
-        public float[] bestWinTimeByLevel = new float[11];
-        public long[] bestGrossCentsByLevel = new long[11], bestUnitsSoldByLevel = new long[11];
+        public long[] winsByLevel = new long[12], lossesByLevel = new long[12];
+        public float[] bestWinTimeByLevel = new float[12];
+        public long[] bestGrossCentsByLevel = new long[12], bestUnitsSoldByLevel = new long[12];
         // Current result retry token; the cloud outbox owns the durable history of acknowledgements.
         public string lastAppliedAttemptId;
         // Recovery token for a live-attempt checkpoint; this never represents a finished result.
@@ -40,10 +40,10 @@ namespace HayChoriYPaty
             AwardProductSalesBadges();
             paidHiresByRole = Normalize(paidHiresByRole, 5);
             hireSpendCentsByRole = Normalize(hireSpendCentsByRole, 5);
-            winsByLevel = Normalize(winsByLevel, 11); lossesByLevel = Normalize(lossesByLevel, 11);
-            bestWinTimeByLevel = Normalize(bestWinTimeByLevel, 11);
-            bestGrossCentsByLevel = Normalize(bestGrossCentsByLevel, 11);
-            bestUnitsSoldByLevel = Normalize(bestUnitsSoldByLevel, 11);
+            winsByLevel = Normalize(winsByLevel, 12); lossesByLevel = Normalize(lossesByLevel, 12);
+            bestWinTimeByLevel = Normalize(bestWinTimeByLevel, 12);
+            bestGrossCentsByLevel = Normalize(bestGrossCentsByLevel, 12);
+            bestUnitsSoldByLevel = Normalize(bestUnitsSoldByLevel, 12);
             speedUpgrades = Math.Max(0, speedUpgrades); speedSpendCents = Math.Max(0, speedSpendCents);
             grossSalesCents = Math.Max(0, grossSalesCents); totalMarketRewardsCents = Math.Max(0, totalMarketRewardsCents);
             ingredientSpendTotalCents = Math.Max(0, ingredientSpendTotalCents);
@@ -65,7 +65,7 @@ namespace HayChoriYPaty
         {
             if (record == null || string.IsNullOrEmpty(record.attemptId) || HasApplied(record.attemptId)) return false;
             Normalize();
-            int level = Clamp(record.level, 0, 10);
+            int level = Clamp(record.level, 0, 11);
             long units = 0;
             for (int i = 0; i < 7; i++) { long n = At(record.salesByProduct, i); deliveredByProduct[i] = Add(deliveredByProduct[i], n); units = Add(units, n); }
             for (int i = 0; i < 10; i++) consumedUnitsByIngredient[i] = Add(consumedUnitsByIngredient[i], At(record.stockConsumed, i));
@@ -154,6 +154,8 @@ namespace HayChoriYPaty
 
         public string id, attemptId, utc;
         public int level;
+        public int bonusScore, bonusStars, bonusDeliveries, bonusCompletedOrders, bonusTickets;
+        public string bonusUpgrades = string.Empty;
         public string club, result;
         public bool won, abandoned;
         public float elapsedSeconds;

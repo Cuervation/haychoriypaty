@@ -47,7 +47,8 @@ service cloud.firestore {
         'utc','level','club','result','won','abandoned','elapsedSeconds','salesByProduct',
         'grossSalesCents','hireSpendCents','speedSpendCents','initialCoinsCents','leftoverCents',
         'halfSalesRewardCents','leftoverBonusCents','progressionBonusCents','rewardCents',
-        'stockConsumed','stockRemaining','hiresByRole','customersAttended','customersLost','ordersCompleted','recordsReached'])
+        'stockConsumed','stockRemaining','hiresByRole','customersAttended','customersLost','ordersCompleted','recordsReached',
+        'bonusScore','bonusStars','bonusDeliveries','bonusCompletedOrders','bonusTickets','bonusUpgrades'])
         && d.utc is string && d.utc.size() <= 64 && d.club is string && d.club.size() <= 128
         && d.elapsedSeconds is number && d.elapsedSeconds >= 0
         && d.won is bool && d.abandoned is bool
@@ -62,7 +63,13 @@ service cloud.firestore {
         && d.rewardCents == d.halfSalesRewardCents + d.leftoverBonusCents + d.progressionBonusCents
         && d.customersAttended is int && d.customersAttended >= 0
         && d.customersLost is int && d.customersLost >= 0 && d.ordersCompleted is int && d.ordersCompleted >= 0
-        && d.recordsReached is int && d.recordsReached >= 0 && d.recordsReached <= 3;
+        && d.recordsReached is int && d.recordsReached >= 0 && d.recordsReached <= 3
+        && d.bonusScore is int && d.bonusScore >= 0
+        && d.bonusStars is int && d.bonusStars >= 0 && d.bonusStars <= 3
+        && d.bonusDeliveries is int && d.bonusDeliveries >= 0
+        && d.bonusCompletedOrders is int && d.bonusCompletedOrders >= 0
+        && d.bonusTickets is int && d.bonusTickets >= 0 && d.bonusTickets <= 2
+        && d.bonusUpgrades is string && d.bonusUpgrades.size() <= 512;
     }
     match /players/{uid}/state/current {
       allow read: if owner(uid);
@@ -101,7 +108,7 @@ service cloud.firestore {
         && matchId.matches('[a-f0-9]{32}') && d.attemptId == matchId
         && d.operationId is string && d.operationId.matches('[a-f0-9]{32}')
         && d.revision is int && d.revision > 0
-        && d.level is int && d.level >= 0 && d.level <= 10
+        && d.level is int && d.level >= 0 && d.level <= 11
         && d.grossSalesCents is int && d.grossSalesCents >= 0
         && d.rewardCents is int && d.rewardCents >= 0
         && d.committedAt == request.time

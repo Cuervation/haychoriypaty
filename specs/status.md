@@ -1,3 +1,9 @@
+## 2026-11-01 — Huracán / Parque Patricios Bonus Track (integrado en fuente; pendiente de aceptación)
+
+Se incorporó Huracán como sexto lugar visible de campaña con ID persistente11, sin desplazar IDs Racing–Los Redondos; hay migración Save v4→v5, modo de 120s, cartas seeded/ponderadas, Aguante, puntos/tickets idempotentes, UI y mural1898×829. Roslyn de Unity6000.6.3f1 compiló runtime y assembly EditMode (**PASS estático**); el suite no se ejecutó. Tres intentos acotados de recuperación de Unity MCP terminaron en `ping not answered`; Game View/capturas y resolución visual **BLOCKED**. Simulaciones de balance/20 corridas por estrategia, reglas Firestore reales y Android gameplay **NOT_RUN**. Los umbrales 3000/6500/10000 son provisionales, no balance final. Evidencia detallada: [contrato](features/huracan-bonus-track.md) y [informe](../INFORME_BONUS_TRACK_HURACAN.md).
+
+APK Development Main-only generada: job build-e2f77bf4d8 Succeeded (357.18 s, 0 errores/5 advertencias); 0.2.81/code83, 411,941,423 bytes, SHA-256 f3b4b1d2b3f46834b9c6423beb6cbe978c63db4e843780ec5eeb06695128899b. ZIP, zipalign4, APK v2, package/version/ABI y metadata Huracán verificados. No se instaló ni abrió; gameplay/visual Android permanece NOT_RUN. Debug-signed, con +30 tickets QA Development; no usar como release.
+
 ## 2026-10-31 — Vereda de enfrente para Los Redondos
 
 Se añadió al Nivel 11 una franja escenográfica de vereda/cordón tomada del fondo original de Los Redondos. Se dibuja detrás de la hinchada, termina en el borde compartido del mostrador y no cambia filas, anclas, estaciones ni rutas. El recorte se escala con las dimensiones de textura importadas por Unity.

@@ -96,14 +96,15 @@ namespace HayChoriYPaty
                 new StreetLevelBalance(new[] {250,180,110,95,210,90,115}, new[] {50,50,65,55,60}, 10.50f, 800),
                 new StreetLevelBalance(new[] {275,195,120,110,225,100,125}, new[] {55,55,70,65,65}, 13.50f, 800),
                 new StreetLevelBalance(new[] {310,220,135,125,255,110,145}, new[] {60,60,80,70,70}, 17.00f, 500),
-                new StreetLevelBalance(new[] {345,245,150,140,285,120,165}, new[] {70,70,90,80,80}, 21.00f, 500)
+                new StreetLevelBalance(new[] {345,245,150,140,285,120,165}, new[] {70,70,90,80,80}, 21.00f, 500),
+                new StreetLevelBalance(new[] {0,0,0,0,0,0,0}, new[] {0,0,0,0,0}, 1f)
             };
         }
 
         public StreetLevelBalance GetLevelBalance(int levelIndex)
         {
             return levelBalances != null && levelIndex >= 0 && levelIndex < levelBalances.Length && levelBalances[levelIndex] != null
-                ? levelBalances[levelIndex] : CreateOfficialLevelBalances()[Mathf.Clamp(levelIndex, 0, 10)];
+                ? levelBalances[levelIndex] : CreateOfficialLevelBalances()[Mathf.Clamp(levelIndex, 0, 11)];
         }
 
         public int GetProductGoal(int levelIndex, int productId)
@@ -111,7 +112,7 @@ namespace HayChoriYPaty
             if (productId < 0 || productId >= 7) return 0;
             StreetLevelBalance row = GetLevelBalance(levelIndex);
             return row.goalsByProductId != null && productId < row.goalsByProductId.Length && row.goalsByProductId[productId] > 0
-                ? row.goalsByProductId[productId] : CreateOfficialLevelBalances()[Mathf.Clamp(levelIndex, 0, 10)].goalsByProductId[productId];
+                ? row.goalsByProductId[productId] : CreateOfficialLevelBalances()[Mathf.Clamp(levelIndex, 0, 11)].goalsByProductId[productId];
         }
 
         public int GetHireBaseCost(int levelIndex, StreetWorkerRole role)
@@ -299,25 +300,27 @@ namespace HayChoriYPaty
         public const float ChicagoCounterServiceY = StreetSceneLayout.WorkerServiceY;
         private const int QueueColumns = 7, QueueSlots = 21;
         public static readonly string[] ProductNames = { "Chori", "Paty", "Bondiola", "Vacío", "Coca 600 ml", "Fernet con Coca 1 L", "Cerveza en lata" };
-        public static readonly string[] LevelNames = { "Floresta / All Boys", "Nueva Chicago", "Liniers - Velez Sarsfield", "Ferro Carril Oeste", "Independiente de Avellaneda", "Racing Club / Avellaneda", "San Lorenzo / Boedo", "River Plate / Núñez", "Boca Juniors / La Boca", "Sindicato de Camioneros / Plaza de Mayo", "Los Redondos / Tandil" };
+        public const int HuracanBonusLevelId = 11;
+        public static readonly int[] CampaignOrder = { 0, 1, 2, 3, 4, HuracanBonusLevelId, 5, 6, 7, 8, 9, 10 };
+        public static readonly string[] LevelNames = { "Floresta / All Boys", "Nueva Chicago", "Liniers - Velez Sarsfield", "Ferro Carril Oeste", "Independiente de Avellaneda", "Racing Club / Avellaneda", "San Lorenzo / Boedo", "River Plate / Núñez", "Boca Juniors / La Boca", "Sindicato de Camioneros / Plaza de Mayo", "Los Redondos / Tandil", "Huracán / Parque Patricios" };
         // Player-facing captions consistently show the club/team first and its neighborhood second.
         // LevelNames remain stable theme keys consumed by ClubVisualTheme.
         public static readonly string[] LevelDisplayNames = {
             "All Boys / Floresta", "Nueva Chicago / Mataderos", "Vélez Sarsfield / Liniers",
             "Ferro / Caballito", "Independiente / Avellaneda", "Racing Club / Avellaneda",
             "San Lorenzo / Boedo", "River Plate / Núñez", "Boca Juniors / La Boca",
-            "Sindicato de Camioneros / Plaza de Mayo", "Los Redondos / Tandil"
+            "Sindicato de Camioneros / Plaza de Mayo", "Los Redondos / Tandil", "Huracán / Parque Patricios"
         };
-        private static readonly int[] DefaultProductCounts = { 1, 2, 3, 5, 7, 7, 7, 7, 7, 7, 7 };
+        private static readonly int[] DefaultProductCounts = { 1, 2, 3, 5, 7, 7, 7, 7, 7, 7, 7, 3 };
         private static readonly int[][] DefaultLevelProducts = {
             new[] { 0 }, new[] { 0, 4 }, new[] { 0, 1, 4 },
             new[] { 0, 1, 2, 4, 6 }, new[] { 0, 1, 2, 3, 4, 6, 5 },
             new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 },
-            new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 }
+            new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 4 }
         };
-        private static readonly float[] DefaultDemandMultipliers = { 1f, 1.1f, 1.2f, 1.35f, 1.5f, 1.65f, 1.815f, 1.9965f, 2.19615f, 2.415765f, 2.6573415f };
+        private static readonly float[] DefaultDemandMultipliers = { 1f, 1.1f, 1.2f, 1.35f, 1.5f, 1.65f, 1.815f, 1.9965f, 2.19615f, 2.415765f, 2.6573415f, 1.65f };
         private static readonly int[] DefaultSpeedCosts = { 5, 10, 15, 20, 30, 45, 65, 90, 125 };
-        private static readonly float[] DefaultDurations = { 120f, 150f, 180f, 210f, 240f, 260f, 300f, 340f, 340f, 360f, 315f };
+        private static readonly float[] DefaultDurations = { 120f, 150f, 180f, 210f, 240f, 260f, 300f, 340f, 340f, 360f, 315f, StreetBonusTrackState.DurationSeconds };
         private const int MaxHireCost = int.MaxValue - int.MaxValue % 5;
         private readonly StreetBalance balance;
         private readonly int[][] availableProductsByLevel;
@@ -332,6 +335,19 @@ namespace HayChoriYPaty
         private float price;
         private System.Random random;
         private IStreetKitchenStock ingredientStock;
+        private StreetBonusTrackState bonusTrack;
+
+        public static int CampaignLevelAt(int position) => position >= 0 && position < CampaignOrder.Length ? CampaignOrder[position] : -1;
+        public static int CampaignPositionOf(int levelId)
+        {
+            for (int i = 0; i < CampaignOrder.Length; i++) if (CampaignOrder[i] == levelId) return i;
+            return -1;
+        }
+        public static int NextCampaignLevelId(int levelId)
+        {
+            int position = CampaignPositionOf(levelId);
+            return position >= 0 && position + 1 < CampaignOrder.Length ? CampaignOrder[position + 1] : -1;
+        }
 
         /// <summary>Fires once for each item unit successfully handed to a customer.</summary>
         public event Action ProductUnitDelivered;
@@ -340,6 +356,8 @@ namespace HayChoriYPaty
 
         public RoundPhase Phase { get; private set; } = RoundPhase.Ready;
         public int LevelIndex { get; private set; }
+        public bool IsBonusTrack => LevelIndex == HuracanBonusLevelId;
+        public StreetBonusTrackState BonusTrack => IsBonusTrack ? bonusTrack : null;
         public float Price { get { return price; } }
         public int Coins { get; private set; }
         public int CoinsEarned { get; private set; }
@@ -368,11 +386,11 @@ namespace HayChoriYPaty
                 return true;
             }
         }
-        public int GetProductGoal(int productId) => IsProductAvailable(productId) ? balance.GetProductGoal(LevelIndex, productId) : 0;
+        public int GetProductGoal(int productId) => !IsBonusTrack && IsProductAvailable(productId) ? balance.GetProductGoal(LevelIndex, productId) : 0;
         public int GetProductDelivered(int productId) => productId >= 0 && productId < deliveredByProduct.Length ? deliveredByProduct[productId] : 0;
         public int GetProductRemaining(int productId) => Mathf.Max(0, GetProductGoal(productId) - GetProductDelivered(productId));
         public bool IsProductGoalComplete(int productId) => GetProductGoal(productId) > 0 && GetProductRemaining(productId) == 0;
-        public float TimeRemaining { get { return Mathf.Max(0f, LevelValue(balance.levelDurations, LevelIndex, DefaultDurations) - Elapsed); } }
+        public float TimeRemaining { get { return Mathf.Max(0f, (IsBonusTrack ? StreetBonusTrackState.DurationSeconds : LevelValue(balance.levelDurations, LevelIndex, DefaultDurations)) - Elapsed); } }
         public int StaffCount { get { return workers.Count; } }
         public StreetWorkerRole NextHireRole
         {
@@ -419,9 +437,9 @@ namespace HayChoriYPaty
             // This legacy query now reports the representable count range, not a gameplay cap.
             return HasRole(role) ? int.MaxValue : 0;
         }
-        private int StartingParrilleroCount => LevelIndex == 6 ? 2 : 1;
-        private int StartingCocacoleroCount => LevelIndex == 9 || LevelIndex == 10 ? 1 : 0;
-        private bool StartsWithFreeMozo => LevelIndex == 5 || LevelIndex == 6 || LevelIndex == 8 || LevelIndex == 9 || LevelIndex == 10;
+        private int StartingParrilleroCount => LevelIndex == 6 || IsBonusTrack ? 2 : 1;
+        private int StartingCocacoleroCount => LevelIndex == 9 || LevelIndex == 10 || IsBonusTrack ? 1 : 0;
+        private bool StartsWithFreeMozo => LevelIndex == 5 || LevelIndex == 6 || LevelIndex == 8 || LevelIndex == 9 || LevelIndex == 10 || IsBonusTrack;
 
         public int HireCostForRole(StreetWorkerRole role)
         {
@@ -489,11 +507,25 @@ namespace HayChoriYPaty
         }
         public bool CanHire { get { return CanHireParrillero; } }
         public bool CanUpgradeSpeed { get { return (Phase == RoundPhase.Ready || Phase == RoundPhase.Playing) && SpeedLevel < MaxSpeedLevel && Coins >= SpeedCost; } }
-        public float WorkRate { get { return 1f + SpeedLevel * balance.speedIncrease; } }
-        public float CookWorkRate { get { return 1f + SpeedLevel * 0.06f; } }
-        private float WorkRateFor(StreetWorkerRole role) =>
-            role == StreetWorkerRole.Parrillero || role == StreetWorkerRole.ParrilleroPremium
-                ? CookWorkRate : WorkRate;
+        public float WorkRate { get { return (1f + SpeedLevel * balance.speedIncrease) * (IsBonusTrack && bonusTrack != null ? bonusTrack.ProductionMultiplier(StreetWorkerRole.Cocacolero) : 1f); } }
+        public float CookWorkRate { get { return (1f + SpeedLevel * 0.06f) * (IsBonusTrack && bonusTrack != null ? bonusTrack.ProductionMultiplier(StreetWorkerRole.Parrillero) : 1f); } }
+        private float WorkRateFor(StreetWorkerRole role)
+        {
+            float rate = role == StreetWorkerRole.Parrillero || role == StreetWorkerRole.ParrilleroPremium
+                ? 1f + SpeedLevel * 0.06f : 1f + SpeedLevel * balance.speedIncrease;
+            return rate * (IsBonusTrack && bonusTrack != null ? bonusTrack.ProductionMultiplier(role) : 1f);
+        }
+        private float MovementRateFor(StreetWorkerRole role)
+        {
+            float rate = role == StreetWorkerRole.Parrillero || role == StreetWorkerRole.ParrilleroPremium
+                ? 1f + SpeedLevel * 0.06f : 1f + SpeedLevel * balance.speedIncrease;
+            return rate * (IsBonusTrack && bonusTrack != null ? bonusTrack.MovementMultiplier(role) : 1f);
+        }
+        private float PickupDelayFor(StreetWorkerRole role, float workRate)
+        {
+            float delay = balance.pickupSeconds / Mathf.Max(.01f, workRate);
+            return delay * (IsBonusTrack && bonusTrack != null ? bonusTrack.PickupTimeMultiplier(role) : 1f);
+        }
         public IReadOnlyList<StreetCustomer> Customers { get { return customers; } }
         public IReadOnlyList<StreetWorker> Workers { get { return workers; } }
         public IReadOnlyList<StreetSale> Sales { get { return sales; } }
@@ -559,6 +591,7 @@ namespace HayChoriYPaty
             this.balance = balance ?? new StreetBalance();
             LevelIndex = Mathf.Clamp(level, 0, LevelNames.Length - 1);
             availableProductsByLevel = BuildAvailableProducts(this.balance);
+            if (IsBonusTrack) bonusTrack = new StreetBonusTrackState(this.balance.randomSeed + LevelIndex * 97);
             RefreshKitchenLayout();
             random = new System.Random(this.balance.randomSeed + LevelIndex * 97);
             // Keep the legacy aggregate price field for compatibility; the official ID table owns unit prices.
@@ -611,6 +644,38 @@ namespace HayChoriYPaty
             arrival = 0f; Phase = RoundPhase.Playing;
             return true;
         }
+        public bool StartBonusRound(int randomSeed)
+        {
+            if (!IsBonusTrack || !StartRound(new long[5])) return false;
+            if (bonusTrack == null) bonusTrack = new StreetBonusTrackState(randomSeed);
+            else bonusTrack.Begin(randomSeed);
+            return true;
+        }
+        public bool ChooseBonusCard(int index) => IsBonusTrack && bonusTrack != null && Phase == RoundPhase.Playing && bonusTrack.ChooseCard(index, this);
+        public bool ChooseBonusEmergencyRole(StreetWorkerRole role) => IsBonusTrack && bonusTrack != null && Phase == RoundPhase.Playing && bonusTrack.ChooseEmergencyRole(role, this);
+        public bool ActivateBonusAguante() => IsBonusTrack && Phase == RoundPhase.Playing && bonusTrack != null && bonusTrack.ActivateAguante();
+        public bool CanAddBonusWorker(StreetWorkerRole role)
+        {
+            if (!IsBonusTrack || Phase == RoundPhase.Lost || Phase == RoundPhase.Won || !HasRole(role)) return false;
+            int count = WorkerCount(role);
+            return role == StreetWorkerRole.Parrillero ? count < StreetKitchenLayout.MaxCookStationsPerGrill
+                : (role == StreetWorkerRole.Cocacolero || role == StreetWorkerRole.Mozo) && count < 3;
+        }
+        public bool AddBonusWorker(StreetWorkerRole role)
+        {
+            if (!CanAddBonusWorker(role)) return false;
+            AddWorker(role);
+            return true;
+        }
+        public StreetWorkerRole[] GetBonusWorkerChoices()
+        {
+            if (!IsBonusTrack) return Array.Empty<StreetWorkerRole>();
+            var roles = new List<StreetWorkerRole>(3);
+            if (CanAddBonusWorker(StreetWorkerRole.Parrillero)) roles.Add(StreetWorkerRole.Parrillero);
+            if (CanAddBonusWorker(StreetWorkerRole.Cocacolero)) roles.Add(StreetWorkerRole.Cocacolero);
+            if (CanAddBonusWorker(StreetWorkerRole.Mozo)) roles.Add(StreetWorkerRole.Mozo);
+            return roles.ToArray();
+        }
         public void BindIngredientStock(IStreetKitchenStock stock)
         {
             if (Phase != RoundPhase.Ready) throw new InvalidOperationException("Bind ingredients before starting the match.");
@@ -651,6 +716,7 @@ namespace HayChoriYPaty
         {
             if (Phase != RoundPhase.Ready || level < 0 || level >= LevelNames.Length) return false;
             LevelIndex = level;
+            bonusTrack = IsBonusTrack ? new StreetBonusTrackState(balance.randomSeed + LevelIndex * 97) : null;
             RefreshKitchenLayout();
             ResetTeamAndSpeed();
             Coins = balance.GetStartingCoins(LevelIndex); CoinsEarned = 0;
@@ -660,8 +726,11 @@ namespace HayChoriYPaty
         }
         public bool NextLevel()
         {
-            if (Phase != RoundPhase.Won || LevelIndex + 1 >= LevelNames.Length) return false;
-            LevelIndex++;
+            if (Phase != RoundPhase.Won) return false;
+            int next = NextCampaignLevelId(LevelIndex);
+            if (next < 0) return false;
+            LevelIndex = next;
+            bonusTrack = IsBonusTrack ? new StreetBonusTrackState(balance.randomSeed + LevelIndex * 97) : null;
             RefreshKitchenLayout();
             ResetTeamAndSpeed();
             Coins = balance.GetStartingCoins(LevelIndex); CoinsEarned = 0;
@@ -673,11 +742,33 @@ namespace HayChoriYPaty
         public void Step(float delta)
         {
             if (Phase != RoundPhase.Playing || delta <= 0f) return;
+            if (IsBonusTrack && bonusTrack != null && bonusTrack.SelectionPending) return;
             float remaining = Mathf.Min(delta, 10f);
             while (remaining > 0f && Phase == RoundPhase.Playing)
             {
-                float dt = Mathf.Min(0.05f, remaining); remaining -= dt;
+                float dt = Mathf.Min(0.05f, remaining);
+                if (IsBonusTrack && bonusTrack != null)
+                {
+                    float nextChoice = Mathf.Min(StreetBonusTrackState.DurationSeconds,
+                        (bonusTrack.ChoiceCount + 1) * 20f);
+                    float untilChoice = Mathf.Max(0f, nextChoice - Elapsed);
+                    dt = Mathf.Min(dt, untilChoice);
+                    if (dt <= 0f)
+                    {
+                        bonusTrack.ReachChoice(this);
+                        if (bonusTrack.SelectionPending) break;
+                        dt = Mathf.Min(0.05f, remaining);
+                    }
+                }
+                remaining -= dt;
                 StepSlice(dt);
+                if (IsBonusTrack && bonusTrack != null && Phase == RoundPhase.Playing &&
+                    bonusTrack.ChoiceCount < StreetBonusTrackState.MaximumChoices &&
+                    Elapsed + .0001f >= (bonusTrack.ChoiceCount + 1) * 20f)
+                {
+                    bonusTrack.ReachChoice(this);
+                    if (bonusTrack.SelectionPending) break;
+                }
             }
         }
 
@@ -796,7 +887,8 @@ namespace HayChoriYPaty
                 CocacoleroCount > 0, FerneteroCount > 0);
             float duration = LevelDuration;
             Elapsed = Mathf.Min(duration, Elapsed + dt);
-            if (Elapsed >= duration) { Phase = GoalReached ? RoundPhase.Won : RoundPhase.Lost; return; }
+            if (IsBonusTrack && bonusTrack != null) bonusTrack.Advance(dt);
+            if (Elapsed >= duration) { Phase = IsBonusTrack ? RoundPhase.Won : GoalReached ? RoundPhase.Won : RoundPhase.Lost; return; }
             arrival -= dt;
             if (arrival <= 0f && customers.Count < DemandCapacity())
             {
@@ -810,7 +902,7 @@ namespace HayChoriYPaty
             AdvanceCustomers(dt);
             AdvanceWorkers(dt);
             for (int i = sales.Count - 1; i >= 0; i--) { sales[i].Age += dt; if (sales[i].Age > 3f) sales.RemoveAt(i); }
-            if (GoalReached) Phase = RoundPhase.Won;
+            if (!IsBonusTrack && GoalReached) Phase = RoundPhase.Won;
         }
 
         private int DemandCapacity()
@@ -866,6 +958,11 @@ namespace HayChoriYPaty
 
         private float ProductDemandWeight(int product)
         {
+            if (IsBonusTrack)
+            {
+                int table = Kitchen.TableCount(product);
+                return Mathf.Clamp(1.05f - table * .025f, .15f, 1.05f);
+            }
             int goal = GetProductGoal(product);
             if (goal <= 0) return .01f;
             int remaining = GetProductRemaining(product);
@@ -920,7 +1017,7 @@ namespace HayChoriYPaty
         private void MoveWorker(StreetWorker worker, float dt)
         {
             Vector2 previous = worker.Position;
-            float speed = balance.workerSpeed * WorkRateFor(worker.Role);
+            float speed = balance.workerSpeed * MovementRateFor(worker.Role);
             worker.Position = Move(previous, worker.Target, speed, dt);
             Vector2 delta = worker.Position - previous;
             worker.StepDistance = delta.magnitude;
@@ -980,7 +1077,7 @@ namespace HayChoriYPaty
                     if (w.Position == w.Target && AdvanceWorkerRoute(w))
                     {
                         w.State = StreetWorkerState.Pickup;
-                        w.Delay = balance.pickupSeconds / workRate;
+                        w.Delay = PickupDelayFor(w.Role, workRate);
                         w.PickupDuration = w.Delay;
                         w.PickupProgress = 0f;
                     }
@@ -995,7 +1092,7 @@ namespace HayChoriYPaty
                         if (item == null)
                         {
                             if (!Kitchen.HasSupply(w.Product)) { CancelAssignment(w); continue; }
-                            w.Delay = balance.pickupSeconds / workRate;
+                            w.Delay = PickupDelayFor(w.Role, workRate);
                             w.PickupDuration = w.Delay;
                             w.PickupProgress = 0f;
                             continue;
@@ -1013,7 +1110,7 @@ namespace HayChoriYPaty
                         // Stop first, turn toward the assigned customer, then use the existing handoff dwell.
                         FaceCustomerAtHandoff(w);
                         w.State = StreetWorkerState.Handoff;
-                        w.Delay = balance.pickupSeconds / workRate;
+                        w.Delay = PickupDelayFor(w.Role, workRate);
                     }
                 }
                 else if (w.State == StreetWorkerState.Handoff)
@@ -1585,9 +1682,13 @@ namespace HayChoriYPaty
                 Delivered++;
                 deliveredByProduct[worker.Product]++;
                 if (!customer.WasServed) { customer.WasServed = true; customersAttended++; }
-                int amount = Mathf.Max(0, Mathf.RoundToInt(GetProductPrice(worker.Product)));
-                Coins += amount; CoinsEarned += amount; sales.Add(new StreetSale { Id = nextSale++, Amount = amount, Position = worker.Position });
-                if (sales.Count > 40) sales.RemoveAt(0);
+                if (IsBonusTrack && bonusTrack != null) bonusTrack.RecordDeliveredUnit();
+                else
+                {
+                    int amount = Mathf.Max(0, Mathf.RoundToInt(GetProductPrice(worker.Product)));
+                    Coins += amount; CoinsEarned += amount; sales.Add(new StreetSale { Id = nextSale++, Amount = amount, Position = worker.Position });
+                    if (sales.Count > 40) sales.RemoveAt(0);
+                }
                 ProductUnitDelivered?.Invoke();
 
                 if (line.Remaining > 0 && Kitchen.HasSupply(worker.Product))
@@ -1623,6 +1724,7 @@ namespace HayChoriYPaty
                 {
                     customer.OrderCompletionRecorded = true;
                     ordersCompleted++;
+                    if (IsBonusTrack && bonusTrack != null) bonusTrack.RecordCompletedOrder();
                     OrderCompleted?.Invoke();
                 }
                 ResetWorker(worker);

@@ -31,7 +31,8 @@ namespace HayChoriYPaty
             {
                 Rect card = LevelSelectCardBounds(i);
                 card.y -= levelSelectScroll;
-                if (i <= game.UnlockedLevel && card.Contains(point)) return LevelSelectFirstAction + i;
+                int levelId = StreetSimulation.CampaignLevelAt(i);
+                if (game.IsLevelUnlocked(levelId) && card.Contains(point)) return LevelSelectFirstAction + i;
             }
             return 0;
         }
@@ -135,18 +136,19 @@ namespace HayChoriYPaty
 
         private void DrawLevelSelectorCardPresentation(int index, Rect baseBounds)
         {
-            bool unlocked = index <= game.UnlockedLevel;
+            int levelId = StreetSimulation.CampaignLevelAt(index);
+            bool unlocked = game.IsLevelUnlocked(levelId);
             Rect bounds = ScaleCardBounds(baseBounds, Mathf.Min(1f, layoutVerticalScale));
-            int key = index * 2 + (unlocked ? 1 : 0);
+            int key = levelId * 2 + (unlocked ? 1 : 0);
             Texture2D surface;
             if (!selectorCardSurfaces.TryGetValue(key, out surface))
             {
-                surface = CreateLevelSelectorCardSurface(index, unlocked);
+                surface = CreateLevelSelectorCardSurface(levelId, unlocked);
                 selectorCardSurfaces.Add(key, surface);
             }
             GUI.DrawTexture(LayoutRect(bounds), surface, ScaleMode.StretchToFill, true);
             float scale = bounds.width / 244f;
-            Texture2D crest = LevelCrestForLevel(index);
+            Texture2D crest = LevelCrestForLevel(levelId);
             if (crest != null)
                 DrawLevelCrest(LayoutRect(new Rect(bounds.x + 11f * scale, bounds.y + 10f * scale,
                     30f * scale, 34f * scale)), crest);
@@ -154,8 +156,9 @@ namespace HayChoriYPaty
             Rect caption = new Rect(bounds.x + 24f * scale, bounds.y + 129f * scale,
                 bounds.width - 34f * scale, 24f * scale);
             SelectorLabel(caption, "NIVEL " + (index + 1), Mathf.RoundToInt(22f * scale), SelectorInk);
-            string name = ClubVisualTheme.ForLevel(index).ClubName.ToUpperInvariant();
-            if (index == 9) name = name.Split('/')[0].Trim();
+            string name = ClubVisualTheme.ForLevel(levelId).ClubName.ToUpperInvariant();
+            if (levelId == 9) name = name.Split('/')[0].Trim();
+            if (levelId == StreetSimulation.HuracanBonusLevelId) name = "HURACÁN · BONUS TRACK";
             SelectorLabel(new Rect(caption.x, bounds.y + 155f * scale, caption.width, 20f * scale),
                 name, Mathf.RoundToInt(15f * scale), SelectorInk);
 

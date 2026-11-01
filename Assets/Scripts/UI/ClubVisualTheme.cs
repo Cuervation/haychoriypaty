@@ -157,7 +157,9 @@ namespace HayChoriYPaty
             new ClubVisualTheme("Sindicato de Camioneros / Plaza de Mayo", new Color32(0, 105, 63, 255), new Color32(245, 242, 234, 255),
                 muralResource: "street-background-camioneros-v1", muralSource: new Rect(0, .10f, 1, .42f), fans: Grid4("street-ferro-fans-front-v2", "street-ferro-fans-walk-v2", "street-ferro-riot-fans-v2", 12)),
             new ClubVisualTheme("Los Redondos / Tandil", new Color32(24, 25, 30, 255), new Color32(180, 38, 48, 255), new Color32(220, 171, 58, 255),
-                muralResource: "street-background-losredondos-v1", muralSource: new Rect(0, .155f, 1, .242f), fans: Grid4("street-losredondos-fans-front-v1", "street-losredondos-fans-walk-v1", "street-losredondos-riot-fans-v1", 12).WithRiotPoseMetrics(RiotMetrics10()))
+                muralResource: "street-background-losredondos-v1", muralSource: new Rect(0, .155f, 1, .242f), fans: Grid4("street-losredondos-fans-front-v1", "street-losredondos-fans-walk-v1", "street-losredondos-riot-fans-v1", 12).WithRiotPoseMetrics(RiotMetrics10())),
+            new ClubVisualTheme("Huracán / Parque Patricios", new Color32(150, 16, 40, 255), new Color32(247, 243, 230, 255),
+                sceneryTint: new Color(1f, .97f, .95f), muralResource: "street-mural-huracan-master-v1", muralSource: new Rect(0, 0, 1, 1))
         };
 
         private static readonly ClubVisualTheme UnknownTheme =
