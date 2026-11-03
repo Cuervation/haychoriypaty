@@ -444,20 +444,23 @@ namespace HayChoriYPaty
         public int HireCostForRole(StreetWorkerRole role)
         {
             if (!HasRole(role)) return 0;
-            long freeBaseline = role == StreetWorkerRole.Parrillero ? StartingParrilleroCount
-                : role == StreetWorkerRole.Cocacolero ? StartingCocacoleroCount
-                : role == StreetWorkerRole.ParrilleroPremium && LevelIndex == 5 ? 1
-                : role == StreetWorkerRole.Mozo && StartsWithFreeMozo ? 1 : 0;
             int roleIndex = (int)role;
             long ticketWorkers = roleIndex >= 0 && roleIndex < ticketWorkersByRole.Length ? ticketWorkersByRole[roleIndex] : 0;
-            long paidNumber = Math.Max(1L, (long)WorkerCount(role) - freeBaseline - ticketWorkers + 1);
-            int baseCost = balance.GetHireBaseCost(LevelIndex, role);
-            if (baseCost <= 0) return 0;
+            return CalculateHireCost(balance, LevelIndex, role, WorkerCount(role), ticketWorkers);
+        }
 
-            // Preserve x1, x2.5 and x5, then extend the fourth-tier x9 curve with
-            // n(n+1)/2-1. Work with exact integer ratios, and saturate only at the
-            // largest positive $5 multiple representable by Coins (not a hire cap).
-            return ComputeHireCost(baseCost, paidNumber);
+        /// <summary>Official hire cost shared with isolated modes without creating or mutating a campaign simulation.</summary>
+        public static int CalculateHireCost(StreetBalance sourceBalance, int levelIndex, StreetWorkerRole role,
+            int roleWorkerCount, long ticketWorkers = 0)
+        {
+            if (sourceBalance == null || roleWorkerCount < 0) return 0;
+            long freeBaseline = role == StreetWorkerRole.Parrillero && (levelIndex == 6 || levelIndex == HuracanBonusLevelId) ? 2
+                : role == StreetWorkerRole.Cocacolero && (levelIndex == 9 || levelIndex == 10 || levelIndex == HuracanBonusLevelId) ? 1
+                : role == StreetWorkerRole.ParrilleroPremium && levelIndex == 5 ? 1
+                : role == StreetWorkerRole.Mozo && (levelIndex == 5 || levelIndex == 6 || levelIndex == 8 || levelIndex == 9 || levelIndex == 10 || levelIndex == HuracanBonusLevelId) ? 1
+                : 0;
+            long paidNumber = Math.Max(1L, (long)roleWorkerCount - freeBaseline - Math.Max(0L, ticketWorkers) + 1);
+            return ComputeHireCost(sourceBalance.GetHireBaseCost(levelIndex, role), paidNumber);
         }
         private static int ComputeHireCost(int baseCost, long paidNumber)
         {
@@ -499,11 +502,16 @@ namespace HayChoriYPaty
         {
             get
             {
-                if (SpeedLevel >= MaxSpeedLevel) return 0;
-                float multiplier = balance.GetLevelBalance(LevelIndex).speedCostMultiplier;
-                int raw = Mathf.CeilToInt(DefaultSpeedCosts[SpeedLevel] * Mathf.Max(0.1f, multiplier));
-                return Mathf.CeilToInt(raw / 5f) * 5;
+                return CalculateSpeedCost(balance, LevelIndex, SpeedLevel);
             }
+        }
+        /// <summary>Official level-scaled speed cost, reusable by isolated modes without a second StreetSimulation.</summary>
+        public static int CalculateSpeedCost(StreetBalance sourceBalance, int levelIndex, int speedLevel)
+        {
+            if (sourceBalance == null || speedLevel < 0 || speedLevel >= DefaultSpeedCosts.Length) return 0;
+            float multiplier = sourceBalance.GetLevelBalance(levelIndex).speedCostMultiplier;
+            int raw = Mathf.CeilToInt(DefaultSpeedCosts[speedLevel] * Mathf.Max(0.1f, multiplier));
+            return Mathf.CeilToInt(raw / 5f) * 5;
         }
         public bool CanHire { get { return CanHireParrillero; } }
         public bool CanUpgradeSpeed { get { return (Phase == RoundPhase.Ready || Phase == RoundPhase.Playing) && SpeedLevel < MaxSpeedLevel && Coins >= SpeedCost; } }
@@ -682,7 +690,8 @@ namespace HayChoriYPaty
             ingredientStock = stock;
         }
         public void SetPrice(float value) { SetProductPrice(0,value); }
-        public float GetProductPrice(int product) { return OfficialProductPrices[Mathf.Clamp(product,0,OfficialProductPrices.Length - 1)]; }
+        public float GetProductPrice(int product) { return OfficialProductPrice(product); }
+        public static float OfficialProductPrice(int product) => OfficialProductPrices[Mathf.Clamp(product, 0, OfficialProductPrices.Length - 1)];
         public void SetProductPrice(int product, float value)
         {
             // Retain the legacy setter for saved callers; official prices are immutable and ID-based.

@@ -12,6 +12,7 @@
 | Cocina modular, stock físico, geometría y proyección | [modular-kitchen.md](features/modular-kitchen.md) (modo base niveles 1–5; Racing+ aplica el delta anterior) |
 | Mercado/Heladera persistentes y compras sin crédito | [market-fridge.md](features/market-fridge.md) |
 | Huracán / Parque Patricios Bonus Track (campaña, cartas y persistencia) | [huracan-bonus-track.md](features/huracan-bonus-track.md) |
+| Tower Defense — Camioneros / Plaza de Mayo (modo independiente, en implementación) | [tower-defense.md](features/tower-defense.md) |
 | Firebase/Google obligatorio, perfiles UID, outbox y estado de integración | [firebase-player.md](features/firebase-player.md) (implementación local, aceptación real pendiente) |
 | Workers, gait y agarre físico | [worker-animation.md](features/worker-animation.md) |
 | Arte/UI y composición | [visual-reference.md](visual-reference.md) (solo si se modifica presentación) |

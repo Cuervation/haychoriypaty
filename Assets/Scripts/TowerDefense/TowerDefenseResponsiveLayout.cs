@@ -1,0 +1,112 @@
+using UnityEngine;
+
+namespace HayChoriYPaty
+{
+    /// <summary>Responsive route bounds and screen-to-world mapping for the portrait safe-area canvas.</summary>
+    public static class TowerDefenseResponsiveLayout
+    {
+        public static bool TryCreate(TowerDefenseLevelConfig source, Camera camera, Rect viewport,
+            float logicalWidth, float logicalHeight, out TowerDefenseLevelConfig runtimeConfig,
+            out TowerDefenseRouteGeometryConfig route, out float worldUnitsPerLogicalPixel,
+            out Vector2 firstServiceZone, out Vector2 secondServiceZone, out string error)
+        {
+            runtimeConfig = null;
+            route = null;
+            worldUnitsPerLogicalPixel = 0f;
+            firstServiceZone = secondServiceZone = Vector2.zero;
+            error = null;
+            if (source == null || camera == null || viewport.width <= 0f || logicalWidth <= 0f || logicalHeight <= 0f)
+            {
+                error = "Tower Defense needs its level config, active camera and a non-empty portrait viewport.";
+                return false;
+            }
+
+            TowerDefenseRouteGeometryConfig authored = source.Route;
+            if (authored == null || authored.RowCount < 3 || authored.RowCount > 9 || authored.RowCount % 2 == 0)
+            {
+                error = "The editable route must have an odd number of rows from 3 through 9.";
+                return false;
+            }
+
+            float canvasScale = viewport.width / logicalWidth;
+            Vector2 origin = LogicalToWorld(camera, viewport, logicalWidth, canvasScale, Vector2.zero);
+            Vector2 onePixel = LogicalToWorld(camera, viewport, logicalWidth, canvasScale, Vector2.right);
+            worldUnitsPerLogicalPixel = Vector2.Distance(origin, onePixel);
+            if (worldUnitsPerLogicalPixel <= 0f || float.IsNaN(worldUnitsPerLogicalPixel) || float.IsInfinity(worldUnitsPerLogicalPixel))
+            {
+                error = "The active camera does not produce a finite screen-to-world scale.";
+                return false;
+            }
+
+            const float horizontalMargin = 16f;
+            const float topReserve = 170f;
+            const float footerReserve = 180f;
+            const float corridorLogical = 56f;
+            float logicalBottom = logicalHeight - footerReserve;
+            float maximumSpacing = (logicalBottom - topReserve - corridorLogical) / (authored.RowCount - 1f);
+            if (maximumSpacing <= corridorLogical)
+            {
+                error = "The Tower Defense route does not fit the available vertical safe area without scaling its art.";
+                return false;
+            }
+
+            float rowSpacingLogical = Mathf.Min(300f, maximumSpacing);
+            float routeHeight = (authored.RowCount - 1) * rowSpacingLogical + corridorLogical;
+            float top = Mathf.Max(topReserve, logicalBottom - routeHeight);
+            Rect logicalBounds = new Rect(horizontalMargin, top, logicalWidth - horizontalMargin * 2f, routeHeight);
+            Vector2 bottomLeft = LogicalToWorld(camera, viewport, logicalWidth, canvasScale,
+                new Vector2(logicalBounds.xMin, logicalBounds.yMax));
+            Vector2 topRight = LogicalToWorld(camera, viewport, logicalWidth, canvasScale,
+                new Vector2(logicalBounds.xMax, logicalBounds.yMin));
+            Rect worldBounds = Rect.MinMaxRect(Mathf.Min(bottomLeft.x, topRight.x), Mathf.Min(bottomLeft.y, topRight.y),
+                Mathf.Max(bottomLeft.x, topRight.x), Mathf.Max(bottomLeft.y, topRight.y));
+
+            float turnLogical = Mathf.Min(60f, rowSpacingLogical * 0.45f);
+            float segmentLogical = logicalWidth - horizontalMargin * 2f - turnLogical * 2f - corridorLogical - 12f;
+            if (segmentLogical <= 0f)
+            {
+                error = "The route cannot fit a horizontal segment and two modular turns at this screen width.";
+                return false;
+            }
+            var lengths = new float[authored.RowCount];
+            for (int i = 0; i < lengths.Length; i++) lengths[i] = segmentLogical * worldUnitsPerLogicalPixel;
+            route = new TowerDefenseRouteGeometryConfig
+            {
+                RowCount = authored.RowCount,
+                SegmentLengths = lengths,
+                CorridorWidth = corridorLogical * worldUnitsPerLogicalPixel,
+                RowSpacing = rowSpacingLogical * worldUnitsPerLogicalPixel,
+                TurnRadius = turnLogical * worldUnitsPerLogicalPixel,
+                PlayableBounds = worldBounds,
+                TurnSegments = authored.TurnSegments
+            };
+
+            runtimeConfig = Object.Instantiate(source);
+            runtimeConfig.name = source.name + " (runtime viewport)";
+            runtimeConfig.ConfigureRoute(route);
+            TowerDefenseRouteGeometryResult geometry = TowerDefenseRouteGeometry.Generate(route);
+            if (geometry == null || !geometry.IsValid)
+            {
+                error = geometry == null ? "Route generator returned no layout." : string.Join("; ", geometry.Validation.Errors);
+                Object.Destroy(runtimeConfig);
+                runtimeConfig = null;
+                return false;
+            }
+
+            firstServiceZone = runtimeConfig.WorkZonePosition(geometry, 0);
+            secondServiceZone = runtimeConfig.WorkZonePosition(geometry, Mathf.Min(1, route.RowCount - 2));
+            return true;
+        }
+
+        public static Vector2 LogicalToWorld(Camera camera, Rect viewport, float logicalWidth,
+            float canvasScale, Vector2 logicalPosition)
+        {
+            float guiX = viewport.x + logicalPosition.x * canvasScale;
+            float guiY = viewport.y + logicalPosition.y * canvasScale;
+            float pixelY = camera.pixelHeight - guiY;
+            float depth = Vector3.Dot(Vector3.zero - camera.transform.position, camera.transform.forward);
+            Vector3 world = camera.ScreenToWorldPoint(new Vector3(guiX, pixelY, depth));
+            return new Vector2(world.x, world.y);
+        }
+    }
+}

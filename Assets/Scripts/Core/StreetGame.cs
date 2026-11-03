@@ -282,13 +282,20 @@ namespace HayChoriYPaty
 
         private void Update()
         {
-            if (!playerActive || sim == null) return;
+            if (!playerActive || sim == null || TowerDefenseGameMode.CampaignStepSuspended) return;
             sim.Step(Time.deltaTime);
             ProcessRoundResult();
         }
-        private void OnApplicationPause(bool paused) { if (paused && (playerActive || suspensionRequested)) { if (playerActive) ProcessRoundResult(); Save(); } }
-        private void OnApplicationQuit() { FinishOrAbort(); }
-        private void OnDisable() { FinishOrAbort(); }
+        private void OnApplicationPause(bool paused)
+        {
+            if (paused && (playerActive || suspensionRequested) && !TowerDefenseGameMode.CampaignStepSuspended)
+            {
+                if (playerActive) ProcessRoundResult();
+                Save();
+            }
+        }
+        private void OnApplicationQuit() { if (!TowerDefenseGameMode.CampaignStepSuspended) FinishOrAbort(); }
+        private void OnDisable() { if (!TowerDefenseGameMode.CampaignStepSuspended) FinishOrAbort(); }
 
         private void FinishOrAbort()
         {

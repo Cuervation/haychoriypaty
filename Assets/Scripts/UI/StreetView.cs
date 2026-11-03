@@ -970,6 +970,7 @@ namespace HayChoriYPaty
 
         private void OnEnable()
         {
+            ResetTowerDefenseUi();
             game = GetComponent<StreetGame>();
             startupArtReady = false;
             viewResourcesReady = false;
@@ -1000,6 +1001,7 @@ namespace HayChoriYPaty
         }
         private void OnDisable()
         {
+            DisposeTowerDefenseUi();
             if (hubMusicAudioSource != null) hubMusicAudioSource.Stop();
             ReleaseHubAmbientEffectsResources();
             ReleaseHubLayeredEnvironmentResources();
@@ -1146,6 +1148,28 @@ namespace HayChoriYPaty
             {
                 if (!splashClockStarted) { introStarted = Time.unscaledTime; splashClockStarted = true; }
                 if (viewResourcesReady && SplashComplete) OpenHubFromIntro();
+            }
+            if (IsTowerDefenseNavigationActive)
+            {
+                UpdateTowerDefenseFrame();
+#if ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
+#if UNITY_ANDROID && !UNITY_EDITOR
+                Touchscreen towerDefenseTouch = Touchscreen.current;
+                if (towerDefenseTouch != null)
+                {
+                    var press = towerDefenseTouch.primaryTouch.press;
+                    if (press.isPressed || press.wasReleasedThisFrame)
+                        HandlePointer(towerDefenseTouch.primaryTouch.position.ReadValue(),
+                            press.wasPressedThisFrame, press.wasReleasedThisFrame);
+                }
+#else
+                var towerDefenseMouse = Mouse.current;
+                if (towerDefenseMouse != null)
+                    HandlePointer(towerDefenseMouse.position.ReadValue(), towerDefenseMouse.leftButton.wasPressedThisFrame,
+                        towerDefenseMouse.leftButton.wasReleasedThisFrame);
+#endif
+#endif
+                return;
             }
             if (!viewResourcesReady || game == null || !game.IsPlayerActive || game.Sim == null) return;
             ObserveVictoryTransition();
@@ -1313,14 +1337,15 @@ namespace HayChoriYPaty
         }
         private void HandlePointer(Vector2 pixel, bool down, bool up)
         {
-            if (game == null || !game.IsPlayerActive || game.Sim == null ||
+            if (game == null || (!IsTowerDefenseNavigationActive && (!game.IsPlayerActive || game.Sim == null)) ||
                 (Cloud.FirebasePlayerSession.Instance != null && Cloud.FirebasePlayerSession.Instance.BlocksGameInput)) return;
             if (ConsumeVictoryTransitionPointer(down, up)) return;
-            Rect v = CanvasViewport(new Vector2(Screen.width,Screen.height),Screen.safeArea);
+            Vector2 pointerScreenSize = IsTowerDefenseNavigationActive ? TowerDefenseRenderSize(Camera.main) : new Vector2(Screen.width, Screen.height);
+            Rect v = CanvasViewport(pointerScreenSize,Screen.safeArea);
             if (v.width <= 0) return;
             logicalCanvasHeight = CanvasLogicalHeight(v);
             layoutVerticalScale = logicalCanvasHeight / H;
-            Vector2 p = ScreenToLayoutPoint(pixel, new Vector2(Screen.width, Screen.height), v);
+            Vector2 p = ScreenToLayoutPoint(pixel, pointerScreenSize, v);
             if (levelSelectActive && !game.ShowChulengoResult)
             {
                 p.y *= layoutVerticalScale;
@@ -1377,6 +1402,7 @@ namespace HayChoriYPaty
         private int HitAction(Vector2 p)
         {
             if (VictoryTransitionActive || victorySkipHeld) return 0;
+            if (IsTowerDefenseNavigationActive) return HitTowerDefenseAction(p);
             if (game.ShowChulengoResult)
             {
                 Vector2 resultPoint = new Vector2(p.x, p.y * layoutVerticalScale);
@@ -1479,6 +1505,7 @@ namespace HayChoriYPaty
                 if (hubActive) firebaseSession.OpenAccountMenu();
                 return;
             }
+            if (HandleTowerDefenseAction(a)) return;
             if (game.ShowChulengoResult)
             {
                 bool lockedRetry = game.HasPendingChulengo && game.ChulengoChoiceLocked;
@@ -1656,8 +1683,9 @@ namespace HayChoriYPaty
                 }
                 else if (a == HubPlayAction)
                 {
-                    hubActive = false; levelSelectActive = true;
-                    levelSelectScroll = 0f;
+                    hubActive = false; levelSelectActive = false;
+                    towerDefenseSelectorActive = true;
+                    TowerDefenseGameMode.SetCampaignStepSuspended(true);
                 }
                 else if (a == HubMarketAction)
                 {
@@ -1953,7 +1981,9 @@ namespace HayChoriYPaty
                 DrawIntroScreen(coverArt, Color.white, ScaleMode.ScaleAndCrop);
                 return;
             }
-            Styles(); Rect v=CanvasViewport(new Vector2(Screen.width,Screen.height),Screen.safeArea); if(v.width<=0)return;
+            Styles();
+            Vector2 viewSize = IsTowerDefenseNavigationActive ? TowerDefenseRenderSize(Camera.main) : new Vector2(Screen.width, Screen.height);
+            Rect v=CanvasViewport(viewSize,Screen.safeArea); if(v.width<=0)return;
             logicalCanvasHeight = CanvasLogicalHeight(v);
             layoutVerticalScale = logicalCanvasHeight / H;
             projectedCounterTopY = StreetSceneLayout.CounterTopInViewport(Screen.width, Screen.height, v);
@@ -1968,6 +1998,11 @@ namespace HayChoriYPaty
                 float loadingElapsed = splashClockStarted ? Time.unscaledTime - introStarted : 0f;
                 DrawIntro(loadingElapsed);
                 GUI.color = old; GUI.matrix = m;
+                return;
+            }
+            if (IsTowerDefenseNavigationActive)
+            {
+                DrawTowerDefenseUi(v);
                 return;
             }
             bool chulengoResult = game.ShowChulengoResult;
