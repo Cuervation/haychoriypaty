@@ -52,6 +52,8 @@ namespace HayChoriYPaty.Tests
         private static object Field(object instance, string name) => instance.GetType().GetField(name, AnyInstance).GetValue(instance);
         private static void Put(object instance, string name, object value) => instance.GetType().GetField(name, AnyInstance).SetValue(instance, value);
         private static object Invoke(object instance, string name, params object[] args) => instance.GetType().GetMethod(name, PublicInstance).Invoke(instance, args);
+        private static object InvokeAny(object instance, string name, params object[] args) =>
+            instance.GetType().GetMethod(name, AnyInstance).Invoke(instance, args);
         private object InvokePrivateStatic(string name, params object[] args) => gameType.GetMethod(name, PrivateStatic).Invoke(null, args);
         private static object Role(Type type, string name) => Enum.Parse(type, name);
 
@@ -239,6 +241,85 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(1L, Invoke(game, "PendingTicketWorkers", role));
             object stats = Field(Field(game, "save"), "statistics");
             Assert.AreEqual(0L, ((long[])Field(stats, "paidHiresByRole"))[0]);
+        }
+
+        [Test]
+        public void CamionerosTowerDefenseUsesCampaignId9SettlementAndUnlocksLosRedondosExactlyOnce()
+        {
+            Type simulationType = Runtime("StreetSimulation");
+            int[] order = (int[])simulationType.GetField("CampaignOrder", PublicStatic).GetValue(null);
+            Assert.AreEqual(12, order.Length);
+            Assert.AreEqual(9, order[10], "Camioneros remains visible slot 11 with its stable ID 9.");
+            Assert.AreEqual(10, order[11], "Los Redondos remains after Camioneros with stable ID 10.");
+
+            object game = NewGame(Json(NewLegacySave(9, null, Tickets(4))));
+            Assert.IsTrue((bool)Invoke(game, "SelectLevel", 9));
+            Assert.IsFalse((bool)Invoke(game, "TryStartRound"), "The traditional Camioneros entry point must be unavailable.");
+            Assert.IsTrue((bool)Invoke(game, "TryStartTowerDefenseRound"));
+
+            object sim = Read(game, "Sim");
+            Assert.AreEqual(9, Read(sim, "LevelIndex"));
+            Assert.IsTrue((bool)Read(sim, "IsExternalCampaignRuntime"));
+            float initialElapsed = (float)Read(sim, "Elapsed");
+            Invoke(sim, "Step", 2f);
+            Assert.AreEqual(initialElapsed, (float)Read(sim, "Elapsed"), "The traditional simulation cannot step under TD.");
+
+            int[] deliveries = new int[7];
+            for (int product = 0; product < deliveries.Length; product++)
+                deliveries[product] = (int)Invoke(sim, "GetProductGoal", product);
+            int[] workers = (int[])Read(sim, "WorkerCountsByRole");
+            Assert.IsTrue((bool)InvokeAny(sim, "ImportTowerDefenseState", 240f, 600, 250, 1, workers,
+                deliveries, 8, 7, true, true));
+            Assert.IsTrue((bool)Invoke(game, "ProcessRoundResult"), "TD must settle through the existing Market/Chulengo path.");
+            Assert.IsTrue((bool)Read(game, "HasPendingChulengo"));
+            Assert.AreEqual(10, Read(game, "UnlockedLevel"));
+            long ticketsBeforeChoice = (long)Read(game, "TicketBalance");
+
+            Assert.IsTrue((bool)Invoke(game, "TryCollectVictoryReward"));
+            Assert.AreEqual(ticketsBeforeChoice + 1, (long)Read(game, "TicketBalance"));
+            Assert.AreEqual(1L, ((long[])Field(Field(Field(game, "save"), "statistics"), "winsByLevel"))[9]);
+            Assert.IsFalse((bool)Invoke(game, "ProcessRoundResult"), "Retrying the terminal result cannot create a second match or ticket.");
+            Assert.AreEqual(ticketsBeforeChoice + 1, (long)Read(game, "TicketBalance"));
+            Assert.IsTrue((bool)Invoke(game, "NextLevel"));
+            Assert.AreEqual(10, Read(Read(game, "Sim"), "LevelIndex"));
+        }
+
+        [Test]
+        public void ExitAtTowerDefenseCompletionSettlesVictoryInsteadOfAbandoning()
+        {
+            object game = NewGame(Json(NewLegacySave(9, null, Tickets(4))));
+            Assert.IsTrue((bool)Invoke(game, "SelectLevel", 9));
+            Assert.IsTrue((bool)Invoke(game, "TryStartTowerDefenseRound"));
+            object campaign = Read(game, "Sim");
+
+            Type configType = Runtime("TowerDefenseLevelConfig");
+            object config = Resources.Load("TowerDefense/Camioneros-PlazaDeMayo", configType);
+            Assert.IsNotNull(config);
+            object route = Read(config, "Route");
+            Type geometryType = Runtime("TowerDefenseRouteGeometry");
+            object geometry = geometryType.GetMethod("Generate", PublicStatic).Invoke(null, new[] { route });
+            Assert.IsTrue((bool)Read(geometry, "IsValid"));
+            Vector2 first = (Vector2)configType.GetMethod("WorkZonePosition", PublicInstance).Invoke(config, new[] { geometry, (object)0 });
+            Vector2 second = (Vector2)configType.GetMethod("WorkZonePosition", PublicInstance).Invoke(config, new[] { geometry, (object)1 });
+            object mode = Activator.CreateInstance(Runtime("TowerDefenseGameMode"), new object[]
+            {
+                config, Read(game, "Balance"), route, 0.02f, first, second,
+                Read(campaign, "WorkerCountsByRole"), Read(campaign, "TicketWorkerCountsByRole"), Read(campaign, "Coins")
+            });
+            Invoke(mode, "Begin");
+            Put(mode, "deliveredByProduct", (int[])Read(mode, "GoalByProduct"));
+            InvokeAny(mode, "UpdateCompletionState");
+            Assert.IsTrue((bool)Read(mode, "HasReachedAllGoals"));
+            Invoke(mode, "Step", 0.02f);
+            Assert.AreEqual("Finished", Read(mode, "Phase").ToString());
+
+            Assert.IsTrue((bool)Invoke(game, "ExitTowerDefenseRound", mode));
+            Assert.IsTrue((bool)Read(game, "HasPendingChulengo"), "A terminal victory must use the common victory settlement, not the abandoned-attempt path.");
+            Assert.IsTrue((bool)Invoke(game, "TryCollectVictoryReward"));
+            object stats = Field(Field(game, "save"), "statistics");
+            Assert.AreEqual(1L, ((long[])Field(stats, "winsByLevel"))[9]);
+            Assert.AreEqual(0L, Field(stats, "abandons"));
+            Invoke(mode, "Stop");
         }
 
         [Test]

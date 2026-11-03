@@ -67,6 +67,8 @@ namespace HayChoriYPaty
         public long BalanceCents { get { return Data.balanceCents; } }
         public long NextPurchaseId { get { return Data.nextPurchaseId; } }
         public StreetMarketResult LastResult { get { return Data.lastResult; } }
+        /// <summary>Actual ingredient units consumed by the active kitchen attempt.</summary>
+        public int[] AttemptConsumedUnits => (int[])attemptConsumed.Clone();
         private readonly Dictionary<int, Reservation> reservations = new Dictionary<int, Reservation>();
         private readonly int[] attemptConsumed = new int[10];
         private readonly int[] consumedProducts = new int[7];

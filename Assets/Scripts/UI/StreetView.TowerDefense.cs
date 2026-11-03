@@ -8,9 +8,6 @@ namespace HayChoriYPaty
 {
     public sealed partial class StreetView
     {
-        private const int TowerDefenseCampaignAction = 7801;
-        private const int TowerDefenseStartAction = 7802;
-        private const int TowerDefenseSelectorHubAction = 7803;
         private const int TowerDefenseSpeedAction = 7810;
         private const int TowerDefensePauseAction = 7811;
         private const int TowerDefenseExitAction = 7812;
@@ -24,7 +21,6 @@ namespace HayChoriYPaty
         private static readonly string[] TowerDefenseHireLabels = { "PARRILLA", "COCA", "PREMIUM", "FERNET", "MOZO" };
         private static readonly string[] TowerDefenseProductLabels = { "CHO", "PAT", "BON", "VAC", "COC", "FER", "CER" };
 
-        private bool towerDefenseSelectorActive;
         private bool towerDefenseActive;
         private string towerDefenseError;
         private TowerDefenseLevelConfig towerDefenseSourceConfig;
@@ -36,7 +32,7 @@ namespace HayChoriYPaty
         private Vector2 towerDefenseScreenSize;
         private Rect towerDefenseSafeArea;
 
-        private bool IsTowerDefenseNavigationActive => towerDefenseSelectorActive || towerDefenseActive;
+        private bool IsTowerDefenseNavigationActive => towerDefenseActive;
 
         private static Vector2 TowerDefenseRenderSize(Camera camera)
         {
@@ -47,7 +43,6 @@ namespace HayChoriYPaty
 
         private void ResetTowerDefenseUi()
         {
-            towerDefenseSelectorActive = false;
             towerDefenseActive = false;
             towerDefenseError = null;
             towerDefenseBackdrop = null;
@@ -59,66 +54,47 @@ namespace HayChoriYPaty
 
         private void DisposeTowerDefenseUi()
         {
-            EndTowerDefenseRun(false);
-            towerDefenseSelectorActive = false;
+            if (towerDefenseMode != null && game != null && game.Sim != null && game.Sim.IsExternalCampaignRuntime)
+                game.PersistTowerDefenseProgress(towerDefenseMode);
+            EndTowerDefenseRun();
             TowerDefenseGameMode.SetCampaignStepSuspended(false);
         }
 
         private bool HandleTowerDefenseAction(int action)
         {
-            if (!towerDefenseSelectorActive && !towerDefenseActive)
-            {
-                if (action != HubPlayAction || !hubActive || marketActive) return false;
-                hubActive = false;
-                levelSelectActive = false;
-                towerDefenseSelectorActive = true;
-                towerDefenseError = null;
-                TowerDefenseGameMode.SetCampaignStepSuspended(true);
-                return true;
-            }
-
-            if (towerDefenseSelectorActive)
-            {
-                if (action == TowerDefenseCampaignAction)
-                {
-                    towerDefenseSelectorActive = false;
-                    levelSelectActive = true;
-                    levelSelectScroll = 0f;
-                    hubActive = false;
-                    TowerDefenseGameMode.SetCampaignStepSuspended(false);
-                }
-                else if (action == TowerDefenseStartAction)
-                {
-                    StartTowerDefenseRun();
-                }
-                else if (action == TowerDefenseSelectorHubAction)
-                {
-                    towerDefenseSelectorActive = false;
-                    hubActive = true;
-                    TowerDefenseGameMode.SetCampaignStepSuspended(false);
-                }
-                return true;
-            }
+            if (!towerDefenseActive) return false;
 
             if (towerDefenseMode == null) return true;
             if (action == TowerDefensePauseAction)
             {
                 if (towerDefenseMode.Phase == TowerDefenseRunPhase.Paused) towerDefenseMode.Resume();
                 else towerDefenseMode.Pause();
+                if (!game.PersistTowerDefenseProgress(towerDefenseMode))
+                    towerDefenseError = "No se pudo guardar el estado de la partida.";
             }
             else if (action == TowerDefenseExitAction)
             {
-                EndTowerDefenseRun(true);
+                if (game.ExitTowerDefenseRound(towerDefenseMode))
+                {
+                    EndTowerDefenseRun();
+                    marketActive = false; marketFromSelector = false; hubActive = false;
+                    levelSelectActive = true; levelSelectScroll = 0f;
+                }
+                else towerDefenseError = "No se pudo guardar la salida de Camioneros.";
             }
             else if (action == TowerDefenseSpeedAction)
             {
-                towerDefenseMode.TryUpgradeSpeed();
+                if (!game.TryUpgradeTowerDefenseSpeed(towerDefenseMode))
+                    towerDefenseError = "No se pudo guardar la mejora.";
             }
             else if (action >= TowerDefenseHireFirstAction && action <= TowerDefenseHireLastAction)
             {
                 int index = action - TowerDefenseHireFirstAction;
                 if (index >= 0 && index < TowerDefenseHireRoles.Length)
-                    towerDefenseMode.TryHire(TowerDefenseHireRoles[index]);
+                {
+                    if (!game.TryHireTowerDefense(towerDefenseMode, TowerDefenseHireRoles[index]))
+                        towerDefenseError = "No se pudo guardar la contratación.";
+                }
             }
             return true;
         }
@@ -127,13 +103,6 @@ namespace HayChoriYPaty
         {
             point.y *= layoutVerticalScale;
             float height = logicalCanvasHeight;
-            if (towerDefenseSelectorActive)
-            {
-                if (TowerDefenseCampaignBounds(height).Contains(point)) return TowerDefenseCampaignAction;
-                if (TowerDefenseStartBounds(height).Contains(point)) return TowerDefenseStartAction;
-                if (TowerDefenseSelectorHubBounds(height).Contains(point)) return TowerDefenseSelectorHubAction;
-                return 0;
-            }
             if (towerDefenseMode == null) return 0;
             if (TowerDefensePauseBounds(height).Contains(point)) return TowerDefensePauseAction;
             if (TowerDefenseExitBounds(height).Contains(point)) return TowerDefenseExitAction;
@@ -149,27 +118,39 @@ namespace HayChoriYPaty
             return 0;
         }
 
-        private void StartTowerDefenseRun()
+        private bool StartTowerDefenseRun()
         {
             towerDefenseError = null;
+            if (game == null || game.Sim == null || game.SelectedLevel != StreetSimulation.TowerDefenseCampaignLevelId ||
+                game.Sim.LevelIndex != StreetSimulation.TowerDefenseCampaignLevelId ||
+                !game.IsLevelUnlocked(StreetSimulation.TowerDefenseCampaignLevelId))
+            {
+                towerDefenseError = "Camioneros Tower Defense requiere seleccionar el nivel 11 desbloqueado.";
+                return false;
+            }
+            if (!game.CanStartRound)
+            {
+                towerDefenseError = "Falta stock para iniciar. Revisá Mercado.";
+                return false;
+            }
             Camera camera = Camera.main;
             if (camera == null)
             {
                 towerDefenseError = "No hay una cámara activa para proyectar el recorrido.";
-                return;
+                return false;
             }
             towerDefenseSourceConfig = Resources.Load<TowerDefenseLevelConfig>("TowerDefense/Camioneros-PlazaDeMayo");
             if (towerDefenseSourceConfig == null)
             {
                 towerDefenseError = "Falta la configuración TowerDefense/Camioneros-PlazaDeMayo.";
-                return;
+                return false;
             }
             towerDefenseBackdrop = Resources.Load<Texture2D>(towerDefenseSourceConfig.BackgroundResource);
             if (towerDefenseBackdrop == null) towerDefenseBackdrop = camionerosBackground;
             if (towerDefenseBackdrop == null)
             {
                 towerDefenseError = "No se pudo cargar el fondo existente de Camioneros / Plaza de Mayo.";
-                return;
+                return false;
             }
 
             Vector2 screenSize = TowerDefenseRenderSize(camera);
@@ -183,21 +164,31 @@ namespace HayChoriYPaty
                     out towerDefenseRuntimeConfig, out route, out worldPerLogicalPixel, out firstZone, out secondZone, out error))
             {
                 towerDefenseError = error;
-                return;
+                return false;
             }
 
             try
             {
+                if (!game.TryStartTowerDefenseRound())
+                {
+                    towerDefenseError = "No se pudo reservar el intento de campaña y sus trabajadores de tickets.";
+                    if (towerDefenseRuntimeConfig != null) Destroy(towerDefenseRuntimeConfig);
+                    towerDefenseRuntimeConfig = null;
+                    return false;
+                }
+                StreetSimulation campaign = game.Sim;
                 towerDefenseMode = new TowerDefenseGameMode(towerDefenseRuntimeConfig, game.Balance, route,
-                    worldPerLogicalPixel, firstZone, secondZone);
+                    worldPerLogicalPixel, firstZone, secondZone, campaign.WorkerCountsByRole,
+                    campaign.TicketWorkerCountsByRole, campaign.Coins);
                 towerDefenseMode.Begin();
                 if (towerDefensePresentation == null)
                     towerDefensePresentation = GetComponent<TowerDefenseWorldPresentation>() ?? gameObject.AddComponent<TowerDefenseWorldPresentation>();
                 if (!towerDefensePresentation.Configure(this, towerDefenseRuntimeConfig, towerDefenseMode, camera,
                         screenSize))
                     throw new InvalidOperationException("No se pudieron ensamblar las vallas y estaciones del nivel.");
+                if (!game.AttachTowerDefenseRuntime(towerDefenseMode))
+                    throw new InvalidOperationException("No se pudo guardar el comienzo de la partida de campaña.");
                 towerDefenseActive = true;
-                towerDefenseSelectorActive = false;
                 hubActive = false;
                 levelSelectActive = false;
                 towerDefenseScreenSize = screenSize;
@@ -205,21 +196,27 @@ namespace HayChoriYPaty
                 logicalCanvasHeight = logicalHeight;
                 layoutVerticalScale = logicalHeight / H;
                 TowerDefenseGameMode.SetCampaignStepSuspended(true);
+                return true;
             }
             catch (Exception exception)
             {
                 Debug.LogError("Tower Defense could not start: " + exception.Message);
                 towerDefenseError = "No se pudo iniciar Tower Defense: " + exception.Message;
-                EndTowerDefenseRun(false);
-                towerDefenseSelectorActive = true;
-                TowerDefenseGameMode.SetCampaignStepSuspended(true);
+                if (towerDefenseMode != null && game.IsTowerDefenseCampaignRun)
+                    game.ExitTowerDefenseRound(towerDefenseMode);
+                EndTowerDefenseRun();
+                return false;
             }
         }
 
-        private void EndTowerDefenseRun(bool returnToSelector)
+        private void EndTowerDefenseRun()
         {
             if (towerDefensePresentation != null) towerDefensePresentation.DisposePresentation();
-            if (towerDefenseMode != null) towerDefenseMode.Stop();
+            if (towerDefenseMode != null)
+            {
+                game?.DetachTowerDefenseRuntime(towerDefenseMode);
+                towerDefenseMode.Stop();
+            }
             towerDefenseMode = null;
             towerDefenseActive = false;
             if (towerDefenseRuntimeConfig != null)
@@ -227,17 +224,7 @@ namespace HayChoriYPaty
                 Destroy(towerDefenseRuntimeConfig);
                 towerDefenseRuntimeConfig = null;
             }
-            if (returnToSelector)
-            {
-                towerDefenseSelectorActive = true;
-                hubActive = false;
-                levelSelectActive = false;
-                TowerDefenseGameMode.SetCampaignStepSuspended(true);
-            }
-            else if (!towerDefenseSelectorActive)
-            {
-                TowerDefenseGameMode.SetCampaignStepSuspended(false);
-            }
+            TowerDefenseGameMode.SetCampaignStepSuspended(false);
         }
 
         private void UpdateTowerDefenseFrame()
@@ -254,6 +241,15 @@ namespace HayChoriYPaty
             if (towerDefenseMode.Phase == TowerDefenseRunPhase.Playing)
                 towerDefenseMode.Step(Time.deltaTime);
             if (towerDefensePresentation != null) towerDefensePresentation.Sync(towerDefenseMode);
+            if (towerDefenseMode.Phase == TowerDefenseRunPhase.Finished)
+            {
+                if (game.CompleteTowerDefenseRound(towerDefenseMode))
+                {
+                    EndTowerDefenseRun();
+                    hubActive = false; marketActive = false; marketFromSelector = false; levelSelectActive = false;
+                }
+                else towerDefenseError = "No se pudo guardar el resultado de Camioneros.";
+            }
         }
 
         private void ReflowTowerDefense(Vector2 screenSize)
@@ -313,22 +309,9 @@ namespace HayChoriYPaty
                 new Vector3(viewport.width / W, viewport.width / W, 1f));
             GUI.color = Color.white;
             EnsureTowerDefenseStyles();
-            if (towerDefenseActive) DrawTowerDefenseHud(logicalHeight);
-            else DrawTowerDefenseModeSelector(logicalHeight);
+            DrawTowerDefenseHud(logicalHeight);
             GUI.matrix = previous;
             GUI.color = oldColor;
-        }
-
-        private void DrawTowerDefenseModeSelector(float height)
-        {
-            DrawTowerDefensePanel(new Rect(30f, height * .21f, W - 60f, height * .51f), new Color(.018f, .07f, .13f, .84f));
-            DrawTowerDefenseLabel(new Rect(48f, height * .24f, W - 96f, 52f), "ELEGÍ TU MODALIDAD", towerDefenseTitle);
-            DrawTowerDefenseLabel(new Rect(56f, height * .32f, W - 112f, 70f), "Tu progreso de campaña y Tower Defense se mantienen por separado.", towerDefenseLabel);
-            DrawStandardButton(TowerDefenseCampaignBounds(height), TowerDefenseCampaignAction, "CAMPAÑA TRADICIONAL");
-            DrawStandardButton(TowerDefenseStartBounds(height), TowerDefenseStartAction, "TOWER DEFENSE · CAMIONEROS");
-            DrawStandardButton(TowerDefenseSelectorHubBounds(height), TowerDefenseSelectorHubAction, "VOLVER AL BARRIO");
-            if (!string.IsNullOrEmpty(towerDefenseError))
-                DrawTowerDefenseLabel(new Rect(38f, height * .76f, W - 76f, 76f), towerDefenseError, towerDefenseSmallLabel);
         }
 
         private void DrawTowerDefenseHud(float height)
@@ -362,7 +345,7 @@ namespace HayChoriYPaty
                 towerDefenseMode.SpeedUpgradeCost > 0 ? "VELOCIDAD $" + towerDefenseMode.SpeedUpgradeCost : "VELOCIDAD MÁX.", canUpgrade);
             DrawStandardButton(pause, TowerDefensePauseAction,
                 towerDefenseMode.Phase == TowerDefenseRunPhase.Paused ? "CONTINUAR" : "PAUSAR", active || towerDefenseMode.Phase == TowerDefenseRunPhase.Paused);
-            DrawStandardButton(exit, TowerDefenseExitAction, "SALIR");
+            DrawStandardButton(exit, TowerDefenseExitAction, "VOLVER A NIVELES");
 
             Rect[] hireBounds = TowerDefenseHireBounds(height);
             for (int i = 0; i < TowerDefenseHireRoles.Length; i++)
@@ -425,9 +408,6 @@ namespace HayChoriYPaty
             GUI.Label(bounds, value, style);
         }
 
-        private static Rect TowerDefenseCampaignBounds(float height) => new Rect(48f, height * .42f, W - 96f, 78f);
-        private static Rect TowerDefenseStartBounds(float height) => new Rect(48f, height * .55f, W - 96f, 78f);
-        private static Rect TowerDefenseSelectorHubBounds(float height) => new Rect(90f, height * .68f, W - 180f, 68f);
         private static Rect TowerDefenseSpeedBounds(float height) => new Rect(12f, height - 150f, 200f, 52f);
         private static Rect TowerDefensePauseBounds(float height) => new Rect(220f, height - 150f, 150f, 52f);
         private static Rect TowerDefenseExitBounds(float height) => new Rect(378f, height - 150f, 150f, 52f);

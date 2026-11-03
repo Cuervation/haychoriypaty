@@ -290,6 +290,7 @@ namespace HayChoriYPaty
     /// <summary>Deterministic, view-independent street-service simulation.</summary>
     public sealed class StreetSimulation
     {
+        public const int TowerDefenseCampaignLevelId = 9;
         public const float FixedProductPrice = 5f; // Legacy common/chori price retained for compatibility.
         public const float FlorestaChoriPrice = FixedProductPrice; // Legacy name retained for compatibility.
         private static readonly float[] OfficialProductPrices = { FixedProductPrice, FixedProductPrice, 10f, 12f, FixedProductPrice, 12f, 7f };
@@ -336,6 +337,7 @@ namespace HayChoriYPaty
         private System.Random random;
         private IStreetKitchenStock ingredientStock;
         private StreetBonusTrackState bonusTrack;
+        private bool externalCampaignRuntime;
 
         public static int CampaignLevelAt(int position) => position >= 0 && position < CampaignOrder.Length ? CampaignOrder[position] : -1;
         public static int CampaignPositionOf(int levelId)
@@ -357,6 +359,8 @@ namespace HayChoriYPaty
         public RoundPhase Phase { get; private set; } = RoundPhase.Ready;
         public int LevelIndex { get; private set; }
         public bool IsBonusTrack => LevelIndex == HuracanBonusLevelId;
+        /// <summary>True only while campaign level 9 is being driven by its Tower Defense runtime.</summary>
+        public bool IsExternalCampaignRuntime => externalCampaignRuntime;
         public StreetBonusTrackState BonusTrack => IsBonusTrack ? bonusTrack : null;
         public float Price { get { return price; } }
         public int Coins { get; private set; }
@@ -426,6 +430,24 @@ namespace HayChoriYPaty
         public bool CanHireFernetero { get { return CanHireRole(StreetWorkerRole.Fernetero); } }
         public bool UsesActiveCooks => LevelIndex >= 5;
         public int MozoCount => WorkerCount(StreetWorkerRole.Mozo);
+        public int[] WorkerCountsByRole
+        {
+            get
+            {
+                var counts = new int[5];
+                for (int role = 0; role < counts.Length; role++) counts[role] = WorkerCount((StreetWorkerRole)role);
+                return counts;
+            }
+        }
+        public long[] TicketWorkerCountsByRole
+        {
+            get
+            {
+                var counts = new long[ticketWorkersByRole.Length];
+                for (int role = 0; role < counts.Length; role++) counts[role] = ticketWorkersByRole[role];
+                return counts;
+            }
+        }
         public bool HasMozo => HasRole(StreetWorkerRole.Mozo);
         public int MozoHireCost => HireCostForRole(StreetWorkerRole.Mozo);
         public bool CanHireMozo => CanHireRole(StreetWorkerRole.Mozo);
@@ -649,7 +671,53 @@ namespace HayChoriYPaty
                     ticketWorkersByRole[role]++;
                 }
             foreach (StreetWorker worker in workers) ResetWorker(worker);
-            arrival = 0f; Phase = RoundPhase.Playing;
+            arrival = 0f; externalCampaignRuntime = false; Phase = RoundPhase.Playing;
+            return true;
+        }
+
+        /// <summary>Marks the already-started stable Camioneros campaign attempt as TD-owned.</summary>
+        internal bool BeginExternalCampaignRuntime()
+        {
+            if (LevelIndex != TowerDefenseCampaignLevelId || Phase != RoundPhase.Playing || externalCampaignRuntime) return false;
+            externalCampaignRuntime = true;
+            return true;
+        }
+
+        /// <summary>Projects the TD-owned run onto the exact campaign simulation held by Mercado.</summary>
+        internal bool ImportTowerDefenseState(float elapsedSeconds, int coins, int coinsEarned, int speedLevel,
+            int[] workerCounts, int[] deliveredByProduct, int attendedCustomers, int completedOrders,
+            bool terminal, bool won)
+        {
+            if (!externalCampaignRuntime || LevelIndex != TowerDefenseCampaignLevelId || Phase != RoundPhase.Playing ||
+                float.IsNaN(elapsedSeconds) || float.IsInfinity(elapsedSeconds) || workerCounts == null || workerCounts.Length != 5 ||
+                deliveredByProduct == null || deliveredByProduct.Length != 7 || attendedCustomers < 0 || completedOrders < 0) return false;
+
+            int totalDelivered = 0;
+            for (int product = 0; product < deliveredByProduct.Length; product++)
+            {
+                if (deliveredByProduct[product] < 0 || (!IsProductAvailable(product) && deliveredByProduct[product] != 0)) return false;
+                totalDelivered = totalDelivered > int.MaxValue - deliveredByProduct[product]
+                    ? int.MaxValue : totalDelivered + deliveredByProduct[product];
+            }
+            for (int role = 0; role < workerCounts.Length; role++) if (workerCounts[role] < 0) return false;
+
+            Elapsed = Mathf.Clamp(elapsedSeconds, 0f, LevelValue(balance.levelDurations, LevelIndex, DefaultDurations));
+            Coins = Mathf.Max(0, coins);
+            CoinsEarned = Mathf.Max(0, coinsEarned);
+            SpeedLevel = Mathf.Max(0, speedLevel);
+            customersAttended = attendedCustomers;
+            ordersCompleted = completedOrders;
+            Delivered = totalDelivered;
+            Array.Copy(deliveredByProduct, this.deliveredByProduct, this.deliveredByProduct.Length);
+
+            // The traditional simulation never steps for this attempt. Mirror the hired/ticket team only
+            // so its existing save projection and campaign statistics describe the real TD run.
+            workers.Clear();
+            nextWorker = 1;
+            for (int role = 0; role < workerCounts.Length; role++)
+                for (int count = 0; count < workerCounts[role]; count++) AddWorker((StreetWorkerRole)role);
+
+            if (terminal) Phase = won ? RoundPhase.Won : RoundPhase.Lost;
             return true;
         }
         public bool StartBonusRound(int randomSeed)
@@ -725,6 +793,7 @@ namespace HayChoriYPaty
         {
             if (Phase != RoundPhase.Ready || level < 0 || level >= LevelNames.Length) return false;
             LevelIndex = level;
+            externalCampaignRuntime = false;
             bonusTrack = IsBonusTrack ? new StreetBonusTrackState(balance.randomSeed + LevelIndex * 97) : null;
             RefreshKitchenLayout();
             ResetTeamAndSpeed();
@@ -739,6 +808,7 @@ namespace HayChoriYPaty
             int next = NextCampaignLevelId(LevelIndex);
             if (next < 0) return false;
             LevelIndex = next;
+            externalCampaignRuntime = false;
             bonusTrack = IsBonusTrack ? new StreetBonusTrackState(balance.randomSeed + LevelIndex * 97) : null;
             RefreshKitchenLayout();
             ResetTeamAndSpeed();
@@ -750,7 +820,7 @@ namespace HayChoriYPaty
 
         public void Step(float delta)
         {
-            if (Phase != RoundPhase.Playing || delta <= 0f) return;
+            if (externalCampaignRuntime || Phase != RoundPhase.Playing || delta <= 0f) return;
             if (IsBonusTrack && bonusTrack != null && bonusTrack.SelectionPending) return;
             float remaining = Mathf.Min(delta, 10f);
             while (remaining > 0f && Phase == RoundPhase.Playing)

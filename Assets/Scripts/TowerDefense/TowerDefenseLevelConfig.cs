@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace HayChoriYPaty
 {
-    /// <summary>Serializable, editable configuration for one independent Tower Defense level.</summary>
+    /// <summary>Serializable configuration for the Tower Defense runtime attached to a campaign level.</summary>
     [CreateAssetMenu(menuName = "Hay Chori y Paty/Tower Defense/Level Config", fileName = "TD-Camioneros-PlazaDeMayo")]
     public sealed class TowerDefenseLevelConfig : ScriptableObject
     {
@@ -30,7 +30,7 @@ namespace HayChoriYPaty
         [SerializeField] private GameObject directionSignPrefab;
         [SerializeField] private Sprite directionArrowSprite;
         [SerializeField] private int[] availableProducts = { 0, 1, 2, 3, 4, 6, 5 };
-        [Tooltip("Multiplier applied to the active campaign customer speed; does not affect the traditional mode.")]
+        [Tooltip("Multiplier applied to Tower Defense fan movement; other campaign levels are unaffected.")]
         [SerializeField, Min(0.05f)] private float fanSpeed = 0.45f;
         [SerializeField, Min(1)] private int maximumFans = 28;
         [Tooltip("Scale applied to Camioneros' official campaign arrival interval.")]
@@ -38,13 +38,13 @@ namespace HayChoriYPaty
         [SerializeField, Min(0.01f)] private float serviceRange = 0.8f;
         [SerializeField] private Vector2 firstWorkZoneOffset;
         [SerializeField] private Vector2 secondWorkZoneOffset;
-        [Tooltip("Free roster copied from the existing Camioneros campaign level; this array is Tower Defense-local.")]
+        [Tooltip("Fallback roster for isolated previews/tests; an integrated campaign run receives its live roster.")]
         [SerializeField] private int[] startingWorkersByRole = { 1, 1, 0, 0, 1 };
 
         public string ModeId => string.IsNullOrWhiteSpace(modeId) ? "tower-defense" : modeId;
         public string LevelId => string.IsNullOrWhiteSpace(levelId) ? CamionerosLevelId : levelId;
         public string DisplayName => string.IsNullOrWhiteSpace(displayName) ? "Camioneros / Plaza de Mayo" : displayName;
-        /// <summary>Source only: reads the existing Camioneros campaign balance without selecting or advancing it.</summary>
+        /// <summary>Campaign level whose current balance drives this runtime and whose stable ID owns progression.</summary>
         public int SourceCampaignLevelId => sourceCampaignLevelId;
         public string BackgroundResource => backgroundResource;
         public TowerDefenseRouteGeometryConfig Route => route;

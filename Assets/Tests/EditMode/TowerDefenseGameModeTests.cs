@@ -65,6 +65,33 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(1, Get<int[]>(mode, "DeliveredByProduct")[0]);
             Assert.AreEqual(1, Get<int>(mode, "CompletedOrdersAtExit"));
             Assert.AreEqual(0, Get<int>(mode, "IncompleteOrdersAtExit"));
+            Assert.AreEqual(1, Get<int>(mode, "CustomersAttended"));
+            Assert.AreEqual(1, Get<int>(mode, "OrdersCompleted"));
+            Assert.AreEqual(5, Get<int>(mode, "CoinsEarned"));
+        }
+
+        [Test]
+        public void CampaignRosterTicketWorkersAndTDSpendingStayInTheCampaignEconomy()
+        {
+            int[] roster = { 2, 2, 0, 0, 1 };
+            long[] ticketWorkers = { 1, 1, 0, 0, 0 };
+            mode = CreateIntegratedMode(0.02f, roster, ticketWorkers, 500);
+            Assert.AreEqual(2, Invoke(mode, "WorkersCount", new[] { Enum.Parse(RuntimeType("StreetWorkerRole"), "Parrillero") }));
+            Assert.AreEqual(2, Invoke(mode, "WorkersCount", new[] { Enum.Parse(RuntimeType("StreetWorkerRole"), "Cocacolero") }));
+
+            object parrillero = Enum.Parse(RuntimeType("StreetWorkerRole"), "Parrillero");
+            int cost = (int)Invoke(mode, "HireCost", new[] { parrillero });
+            int expected = (int)modeType.GetMethod("CalculateHireCost", PublicStatic)
+                .Invoke(null, new[] { balance, (object)9, parrillero, 2, (object)1L });
+            Assert.AreEqual(expected, cost, "Ticket staff must not consume a paid hire tier.");
+
+            Invoke(mode, "Begin");
+            Assert.IsTrue((bool)Invoke(mode, "TryHire", new[] { parrillero }));
+            Assert.AreEqual(1L, Get<long[]>(mode, "HiresByRole")[0]);
+            Assert.AreEqual((long)cost * 100L, Get<long>(mode, "HireSpendCents"));
+            int speedCost = Get<int>(mode, "SpeedUpgradeCost");
+            Assert.IsTrue((bool)Invoke(mode, "TryUpgradeSpeed"));
+            Assert.AreEqual((long)speedCost * 100L, Get<long>(mode, "SpeedSpendCents"));
         }
 
         [Test]
@@ -132,6 +159,21 @@ namespace HayChoriYPaty.Tests
             {
                 throw exception.InnerException;
             }
+        }
+
+        private object CreateIntegratedMode(float pixelScale, int[] workerCounts, long[] ticketWorkers, int startingCoins)
+        {
+            object route = Get<object>(config, "Route");
+            object geometry = geometryType.GetMethod("Generate", PublicStatic).Invoke(null, new[] { route });
+            Assert.IsTrue(Get<bool>(geometry, "IsValid"));
+            Vector2 first = (Vector2)configType.GetMethod("WorkZonePosition", PublicInstance).Invoke(config, new[] { geometry, (object)0 });
+            Vector2 second = (Vector2)configType.GetMethod("WorkZonePosition", PublicInstance).Invoke(config, new[] { geometry, (object)1 });
+            try
+            {
+                return Activator.CreateInstance(modeType, new object[]
+                { config, balance, route, pixelScale, first, second, workerCounts, ticketWorkers, startingCoins });
+            }
+            catch (TargetInvocationException exception) { throw exception.InnerException; }
         }
 
         private static Type RuntimeType(string shortName) => Type.GetType("HayChoriYPaty." + shortName + ", Assembly-CSharp", true);

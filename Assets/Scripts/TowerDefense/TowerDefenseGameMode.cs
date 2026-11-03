@@ -38,6 +38,8 @@ namespace HayChoriYPaty
         public IReadOnlyList<TowerDefenseOrderLine> Order => order;
         public float AnimationTime { get; internal set; }
         public bool IsReceiving { get; internal set; }
+        public bool HasReceivedDelivery { get; internal set; }
+        public bool CompletionCounted { get; internal set; }
         public bool OrderComplete
         {
             get { for (int i = 0; i < order.Count; i++) if (!order[i].IsComplete) return false; return true; }
@@ -100,9 +102,9 @@ namespace HayChoriYPaty
     }
 
     /// <summary>
-    /// Tower Defense-only coordinator. It owns fans, orders, staffing, route delivery and an
-    /// isolated StreetKitchenProduction instance; it reads campaign balance values but never
-    /// calls campaign progression, settlement, selection or persistence.
+    /// Tower Defense-only runtime coordinator. It owns fans, orders, route delivery and a
+    /// dedicated StreetKitchenProduction instance; StreetGame bridges its metrics into campaign
+    /// progression, settlement and persistence.
     /// </summary>
     public sealed class TowerDefenseGameMode
     {
@@ -122,11 +124,17 @@ namespace HayChoriYPaty
         private readonly int[] goalByProduct = new int[7];
         private readonly int[] availableProducts;
         private readonly int[] workerCounts = new int[5];
+        private readonly long[] ticketWorkersByRole = new long[5];
+        private readonly long[] hiresByRole = new long[5];
         private readonly Vector2[] serviceZones = new Vector2[2];
         private float worldUnitsPerLogicalPixel;
         private float elapsed, spawnTimer;
         private int nextFanId = 1, nextWorkerId = 1, speedLevel;
         private int coins;
+        private int coinsEarned;
+        private int customersAttended;
+        private int ordersCompleted;
+        private long hireSpendCents, speedSpendCents;
         private bool stopSpawning;
         private float serviceRange;
         private TowerDefenseRouteGeometryResult routeGeometry;
@@ -153,7 +161,14 @@ namespace HayChoriYPaty
         public int[] DeliveredByProduct => (int[])deliveredByProduct.Clone();
         public int[] GoalByProduct => (int[])goalByProduct.Clone();
         public int Coins => coins;
+        public int CoinsEarned => coinsEarned;
         public int SpeedLevel => speedLevel;
+        public int CustomersAttended => customersAttended;
+        public int OrdersCompleted => ordersCompleted;
+        public long HireSpendCents => hireSpendCents;
+        public long SpeedSpendCents => speedSpendCents;
+        public long[] HiresByRole => (long[])hiresByRole.Clone();
+        public int[] WorkerCountsByRole => (int[])workerCounts.Clone();
         public int MaximumFans => Mathf.Min(config.MaximumFans, Mathf.Clamp(sourceBalance.maxCustomers, 1, 28));
         public int ActiveFanCount => fans.Count;
         public float Elapsed => elapsed;
@@ -172,6 +187,13 @@ namespace HayChoriYPaty
 
         public TowerDefenseGameMode(TowerDefenseLevelConfig levelConfig, StreetBalance campaignBalance,
             TowerDefenseRouteGeometryConfig runtimeRoute, float logicalPixelScale, Vector2 firstServiceZone, Vector2 secondServiceZone)
+            : this(levelConfig, campaignBalance, runtimeRoute, logicalPixelScale, firstServiceZone, secondServiceZone, null, null, -1)
+        {
+        }
+
+        public TowerDefenseGameMode(TowerDefenseLevelConfig levelConfig, StreetBalance campaignBalance,
+            TowerDefenseRouteGeometryConfig runtimeRoute, float logicalPixelScale, Vector2 firstServiceZone, Vector2 secondServiceZone,
+            int[] campaignWorkerCounts, long[] campaignTicketWorkersByRole, int startingCoins)
         {
             config = levelConfig != null ? levelConfig : throw new ArgumentNullException(nameof(levelConfig));
             sourceBalance = campaignBalance != null ? campaignBalance : throw new ArgumentNullException(nameof(campaignBalance));
@@ -192,9 +214,14 @@ namespace HayChoriYPaty
             DurationSeconds = sourceBalance.levelDurations != null && sourceLevel < sourceBalance.levelDurations.Length
                 ? Mathf.Max(1f, sourceBalance.levelDurations[sourceLevel]) : 380f;
             for (int p = 0; p < goalByProduct.Length; p++) goalByProduct[p] = sourceBalance.GetProductGoal(sourceLevel, p);
-            int[] starting = config.StartingWorkersByRole;
-            for (int role = 0; role < workerCounts.Length; role++) workerCounts[role] = role < starting.Length ? Mathf.Max(0, starting[role]) : 0;
-            coins = sourceBalance.GetStartingCoins(sourceLevel);
+            int[] starting = campaignWorkerCounts ?? config.StartingWorkersByRole;
+            for (int role = 0; role < workerCounts.Length; role++)
+            {
+                workerCounts[role] = role < starting.Length ? Mathf.Max(0, starting[role]) : 0;
+                ticketWorkersByRole[role] = campaignTicketWorkersByRole != null && role < campaignTicketWorkersByRole.Length
+                    ? Math.Max(0L, campaignTicketWorkersByRole[role]) : 0L;
+            }
+            coins = startingCoins >= 0 ? startingCoins : sourceBalance.GetStartingCoins(sourceLevel);
             Kitchen = new StreetKitchenProduction(sourceBalance.kitchen, availableProducts, null, true, false);
             random = new System.Random(sourceBalance.randomSeed + sourceLevel * 97 + config.LevelId.GetHashCode());
             BuildWorkers();
@@ -218,7 +245,7 @@ namespace HayChoriYPaty
             if (Phase == TowerDefenseRunPhase.Paused) Phase = TowerDefenseRunPhase.Playing;
         }
 
-        /// <summary>Leave only Tower Defense runtime; the campaign simulation/save remains untouched.</summary>
+        /// <summary>Dispose the volatile runtime; campaign persistence and progression are handled by StreetGame.</summary>
         public void Stop()
         {
             if (activeInstance == this) activeInstance = null;
@@ -241,7 +268,7 @@ namespace HayChoriYPaty
         {
             if (!IsRoleAvailable(role)) return 0;
             return StreetSimulation.CalculateHireCost(sourceBalance, config.SourceCampaignLevelId, role,
-                workerCounts[(int)role]);
+                workerCounts[(int)role], ticketWorkersByRole[(int)role]);
         }
 
         public bool TryHire(StreetWorkerRole role)
@@ -251,6 +278,8 @@ namespace HayChoriYPaty
             int cost = HireCost(role);
             if (cost <= 0 || coins < cost || workerCounts[index] >= int.MaxValue - workers.Count) return false;
             coins -= cost;
+            hireSpendCents = AddCents(hireSpendCents, (long)cost * 100L);
+            hiresByRole[index] = hiresByRole[index] == long.MaxValue ? long.MaxValue : hiresByRole[index] + 1L;
             workerCounts[index]++;
             AddWorker(role, ChooseInitialZone(role));
             return true;
@@ -262,6 +291,7 @@ namespace HayChoriYPaty
         public bool TryUpgradeSpeed()
         {
             if (Phase != TowerDefenseRunPhase.Playing || speedLevel >= MaximumSpeedLevel || coins < SpeedUpgradeCost || SpeedUpgradeCost <= 0) return false;
+            speedSpendCents = AddCents(speedSpendCents, (long)SpeedUpgradeCost * 100L);
             coins -= SpeedUpgradeCost;
             speedLevel++;
             return true;
@@ -555,12 +585,23 @@ namespace HayChoriYPaty
                         }
                         if (fan.RecordDelivery(order.Product))
                         {
+                            if (!fan.HasReceivedDelivery)
+                            {
+                                fan.HasReceivedDelivery = true;
+                                if (customersAttended < int.MaxValue) customersAttended++;
+                            }
                             fan.IsReceiving = true;
                             fan.ReceiveAnimationSeconds = 0.35f;
                             deliveredByProduct[order.Product]++;
                             TotalDelivered++;
-                            coins = coins > int.MaxValue - Mathf.RoundToInt(StreetSimulation.OfficialProductPrice(order.Product))
-                                ? int.MaxValue : coins + Mathf.RoundToInt(StreetSimulation.OfficialProductPrice(order.Product));
+                            int sale = Mathf.RoundToInt(StreetSimulation.OfficialProductPrice(order.Product));
+                            coins = coins > int.MaxValue - sale ? int.MaxValue : coins + sale;
+                            coinsEarned = coinsEarned > int.MaxValue - sale ? int.MaxValue : coinsEarned + sale;
+                            if (fan.OrderComplete && !fan.CompletionCounted)
+                            {
+                                fan.CompletionCounted = true;
+                                if (ordersCompleted < int.MaxValue) ordersCompleted++;
+                            }
                         }
                         break; // One physical unit per worker per service pass; next substep can carry another.
                     }
@@ -716,6 +757,9 @@ namespace HayChoriYPaty
             for (int i = 0; i < availableProducts.Length; i++) if (availableProducts[i] == product) return true;
             return false;
         }
+
+        private static long AddCents(long total, long amount) => amount > 0 && total > long.MaxValue - amount
+            ? long.MaxValue : Math.Max(0L, total) + Math.Max(0L, amount);
 
         private static TowerDefenseRouteGeometryConfig CloneRoute(TowerDefenseRouteGeometryConfig source)
         {

@@ -1683,9 +1683,9 @@ namespace HayChoriYPaty
                 }
                 else if (a == HubPlayAction)
                 {
-                    hubActive = false; levelSelectActive = false;
-                    towerDefenseSelectorActive = true;
-                    TowerDefenseGameMode.SetCampaignStepSuspended(true);
+                    hubActive = false; marketActive = false; levelSelectActive = true;
+                    marketFromSelector = false;
+                    levelSelectScroll = 0f;
                 }
                 else if (a == HubMarketAction)
                 {
@@ -1724,7 +1724,26 @@ namespace HayChoriYPaty
                     if (selectionSucceeded)
                     {
                         levelSelectActive = false;
-                        if (level == 0)
+                        if (level == StreetSimulation.TowerDefenseCampaignLevelId)
+                        {
+                            marketFromSelector = true;
+                            if (game.CanStartRound)
+                            {
+                                if (StartTowerDefenseRun()) marketFromSelector = false;
+                                else
+                                {
+                                    marketMessage = string.IsNullOrEmpty(towerDefenseError)
+                                        ? "No se pudo iniciar Tower Defense." : towerDefenseError;
+                                    levelSelectActive = true;
+                                }
+                            }
+                            else
+                            {
+                                marketActive = true; marketTab = 0; marketMessage = "Prepará Mercado para iniciar Camioneros Tower Defense.";
+                                marketScroll = 0; marketOtherExpanded = false; marketExpandedIngredient = -1;
+                            }
+                        }
+                        else if (level == 0)
                         {
                             if (game.CanStartRound)
                             {
@@ -1811,6 +1830,15 @@ namespace HayChoriYPaty
                 }
                 if (a == MarketPlayAction)
                 {
+                    if (game.Sim.LevelIndex == StreetSimulation.TowerDefenseCampaignLevelId)
+                    {
+                        if (StartTowerDefenseRun())
+                        {
+                            marketActive = false; marketFromSelector = false; hubActive = false; levelSelectActive = false;
+                        }
+                        else marketMessage = string.IsNullOrEmpty(towerDefenseError) ? "Falta stock para iniciar." : towerDefenseError;
+                        return;
+                    }
                     if (game.CanStartRound && game.Sim.LevelIndex == 2 &&
                         PlayerPrefs.GetInt(LevelThreePatyTutorialCompletedKey, 0) == 0)
                     {
