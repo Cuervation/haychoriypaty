@@ -19,7 +19,6 @@ namespace HayChoriYPaty
             StreetWorkerRole.Fernetero, StreetWorkerRole.Mozo
         };
         private static readonly string[] TowerDefenseHireLabels = { "PARRILLA", "COCA", "PREMIUM", "FERNET", "MOZO" };
-        private static readonly string[] TowerDefenseProductLabels = { "CHO", "PAT", "BON", "VAC", "COC", "FER", "CER" };
 
         private bool towerDefenseActive;
         private string towerDefenseError;
@@ -28,6 +27,7 @@ namespace HayChoriYPaty
         private TowerDefenseGameMode towerDefenseMode;
         private TowerDefenseWorldPresentation towerDefensePresentation;
         private Texture2D towerDefenseBackdrop;
+        private Texture2D towerDefenseCrest;
         private GUIStyle towerDefenseLabel, towerDefenseSmallLabel, towerDefenseTitle;
         private Vector2 towerDefenseScreenSize;
         private Rect towerDefenseSafeArea;
@@ -46,6 +46,7 @@ namespace HayChoriYPaty
             towerDefenseActive = false;
             towerDefenseError = null;
             towerDefenseBackdrop = null;
+            towerDefenseCrest = null;
             towerDefenseLabel = towerDefenseSmallLabel = towerDefenseTitle = null;
             towerDefenseScreenSize = Vector2.zero;
             towerDefenseSafeArea = Rect.zero;
@@ -147,6 +148,7 @@ namespace HayChoriYPaty
             }
             towerDefenseBackdrop = Resources.Load<Texture2D>(towerDefenseSourceConfig.BackgroundResource);
             if (towerDefenseBackdrop == null) towerDefenseBackdrop = camionerosBackground;
+            towerDefenseCrest = Resources.Load<Texture2D>("street-camioneros-crest-v1");
             if (towerDefenseBackdrop == null)
             {
                 towerDefenseError = "No se pudo cargar el fondo existente de Camioneros / Plaza de Mayo.";
@@ -297,45 +299,52 @@ namespace HayChoriYPaty
             GUI.color = Color.white;
             Texture2D background = towerDefenseActive ? towerDefenseBackdrop : (hubBackdrop != null ? hubBackdrop : backdrop);
             Vector2 screenSize = TowerDefenseRenderSize(Camera.main);
-            if (background != null)
+            if (!towerDefenseActive && background != null)
                 GUI.DrawTexture(new Rect(0f, 0f, screenSize.x, screenSize.y), background, ScaleMode.ScaleAndCrop, true);
-            else
+            else if (!towerDefenseActive)
                 GUI.DrawTexture(new Rect(0f, 0f, screenSize.x, screenSize.y), Texture2D.blackTexture, ScaleMode.StretchToFill, true);
-            if (towerDefenseActive && towerDefensePresentation != null && towerDefensePresentation.OverlayTexture != null)
-                GUI.DrawTexture(new Rect(0f, 0f, screenSize.x, screenSize.y), towerDefensePresentation.OverlayTexture,
-                    ScaleMode.StretchToFill, true);
-
-            GUI.matrix = Matrix4x4.TRS(new Vector3(viewport.x, viewport.y), Quaternion.identity,
-                new Vector3(viewport.width / W, viewport.width / W, 1f));
-            GUI.color = Color.white;
-            EnsureTowerDefenseStyles();
-            DrawTowerDefenseHud(logicalHeight);
-            GUI.matrix = previous;
-            GUI.color = oldColor;
+            float hitTestVerticalScale = layoutVerticalScale;
+            try
+            {
+                // TD bounds are authored against logicalCanvasHeight; drawing must not apply
+                // the legacy 960-high canvas multiplier a second time.
+                layoutVerticalScale = 1f;
+                GUI.matrix = Matrix4x4.TRS(new Vector3(viewport.x, viewport.y), Quaternion.identity,
+                    new Vector3(viewport.width / W, viewport.width / W, 1f));
+                GUI.color = Color.white;
+                DrawTowerDefenseSceneLayers(logicalHeight);
+                GUI.matrix = previous;
+                if (towerDefenseActive && towerDefensePresentation != null && towerDefensePresentation.OverlayTexture != null)
+                    GUI.DrawTexture(new Rect(0f, 0f, screenSize.x, screenSize.y), towerDefensePresentation.OverlayTexture,
+                        ScaleMode.StretchToFill, true);
+                GUI.matrix = Matrix4x4.TRS(new Vector3(viewport.x, viewport.y), Quaternion.identity,
+                    new Vector3(viewport.width / W, viewport.width / W, 1f));
+                GUI.color = Color.white;
+                EnsureTowerDefenseStyles();
+                DrawTowerDefenseHud(logicalHeight);
+            }
+            finally
+            {
+                layoutVerticalScale = hitTestVerticalScale;
+                GUI.matrix = previous;
+                GUI.color = oldColor;
+            }
         }
 
         private void DrawTowerDefenseHud(float height)
         {
             if (towerDefenseMode == null) return;
-            DrawTowerDefensePanel(new Rect(0f, 0f, W, 70f), new Color(.015f, .045f, .085f, .90f));
-            DrawTowerDefenseLabel(new Rect(14f, 4f, W - 28f, 27f), "CAMIONEROS · PLAZA DE MAYO", towerDefenseSmallLabel);
-            DrawTowerDefenseLabel(new Rect(14f, 38f, 165f, 26f), "MONEDAS  $" + towerDefenseMode.Coins, towerDefenseSmallLabel);
-            DrawTowerDefenseLabel(new Rect(188f, 38f, 130f, 26f), "TIEMPO  " + FormatTowerDefenseTime(towerDefenseMode.TimeRemaining), towerDefenseSmallLabel);
-            DrawTowerDefenseLabel(new Rect(340f, 38f, 185f, 26f), "HINCHAS  " + towerDefenseMode.ActiveFanCount + "/" + towerDefenseMode.MaximumFans, towerDefenseSmallLabel);
+            DrawTowerDefenseCampaignHud();
 
-            DrawTowerDefensePanel(new Rect(0f, 70f, W, 74f), new Color(.03f, .09f, .14f, .78f));
+            float footerTop = height - TowerDefenseResponsiveLayout.FooterReserve;
+            DrawFooterBluePanel(LayoutRect(new Rect(0f, footerTop, W, height - footerTop)), layoutVerticalScale);
+            if (towerDefenseCrest != null)
+                DrawLevelCrest(LayoutRect(new Rect(18f, footerTop + 9f, 34f, 42f)), towerDefenseCrest);
+            DrawTowerDefenseLabel(new Rect(58f, footerTop + 2f, W - 76f, 29f), "CAMIONEROS", towerDefenseTitle);
+            DrawTowerDefenseLabel(new Rect(58f, footerTop + 29f, W - 76f, 22f), "PLAZA DE MAYO", towerDefenseSmallLabel);
+
             int[] delivered = towerDefenseMode.DeliveredByProduct;
             int[] goals = towerDefenseMode.GoalByProduct;
-            float cellWidth = W / 7f;
-            for (int i = 0; i < 7; i++)
-            {
-                float x = i * cellWidth;
-                DrawTowerDefenseLabel(new Rect(x, 79f, cellWidth, 22f), TowerDefenseProductLabels[i], towerDefenseSmallLabel);
-                DrawTowerDefenseLabel(new Rect(x, 103f, cellWidth, 29f), delivered[i] + "/" + goals[i], towerDefenseSmallLabel);
-            }
-
-            float controlsY = height - 155f;
-            DrawTowerDefensePanel(new Rect(0f, controlsY - 8f, W, height - controlsY + 8f), new Color(.012f, .048f, .085f, .92f));
             Rect speed = TowerDefenseSpeedBounds(height);
             Rect pause = TowerDefensePauseBounds(height);
             Rect exit = TowerDefenseExitBounds(height);
@@ -356,7 +365,7 @@ namespace HayChoriYPaty
                 string caption = TowerDefenseHireLabels[i] + (cost > 0 ? " $" + cost : " —");
                 DrawStandardButton(hireBounds[i], TowerDefenseHireFirstAction + i, caption,
                     available && cost > 0 && towerDefenseMode.Coins >= cost);
-                DrawTowerDefenseLabel(new Rect(hireBounds[i].x, hireBounds[i].y + 40f, hireBounds[i].width, 19f),
+                DrawTowerDefenseLabel(new Rect(hireBounds[i].x, hireBounds[i].y + hireBounds[i].height, hireBounds[i].width, 18f),
                     "EQUIPO " + towerDefenseMode.WorkersCount(role), towerDefenseSmallLabel);
             }
 
@@ -372,7 +381,82 @@ namespace HayChoriYPaty
                         towerDefenseSmallLabel);
             }
             if (!string.IsNullOrEmpty(towerDefenseError))
-                DrawTowerDefenseLabel(new Rect(24f, height - 185f, W - 48f, 30f), towerDefenseError, towerDefenseSmallLabel);
+                DrawTowerDefenseLabel(new Rect(24f, height - 189f, W - 48f, 18f), towerDefenseError, towerDefenseSmallLabel);
+        }
+
+        private void DrawTowerDefenseCampaignHud()
+        {
+            Rect cutout = TopHudCutoutBounds(new Vector2(Screen.width, Screen.height), Screen.cutouts);
+            EnsureHudBarTexture(cutout);
+            Rect bar = new Rect(0f, 0f, W, HudBarHeightFor(cutout));
+            Texture2D texture = cutout.width > 0f ? cutoutHudBarTexture : hudBarTexture;
+            if (texture != null) GUI.DrawTexture(LayoutRect(bar), texture, ScaleMode.StretchToFill, true);
+
+            DrawHudIcon(HudCoinIconBounds(cutout), 10);
+            DrawHudNumber(HudStatusTextBounds(0, cutout), towerDefenseMode.Coins.ToString(), HudStatusValueFontSize);
+            DrawHudNumber(HudStatusTextBounds(1, cutout), FormatTowerDefenseTime(towerDefenseMode.TimeRemaining), HudClockFontSize);
+
+            int[] products = towerDefenseRuntimeConfig != null ? towerDefenseRuntimeConfig.AvailableProducts : Array.Empty<int>();
+            int[] delivered = towerDefenseMode.DeliveredByProduct;
+            int[] goals = towerDefenseMode.GoalByProduct;
+            hudQuotaProductCount = Mathf.Min(products.Length, hudQuotaProductIds.Length);
+            for (int i = 0; i < hudQuotaProductCount; i++) hudQuotaProductIds[i] = products[i];
+            int sharedFontSize = HudQuotaCounterFontSize;
+            for (int slot = 0; slot < hudQuotaProductCount; slot++)
+            {
+                int product = hudQuotaProductIds[slot];
+                if (product < 0 || product >= delivered.Length) continue;
+                Rect card = HudQuotaCellBounds(slot, hudQuotaProductIds, hudQuotaProductCount, cutout);
+                if (card.width <= 0f || card.height <= 0f) continue;
+                bool complete = delivered[product] >= goals[product];
+                Color previous = GUI.color;
+                GUI.color = HudQuotaCardColor(complete);
+                if (hudQuotaCardTexture != null) GUI.DrawTexture(LayoutRect(card), hudQuotaCardTexture, ScaleMode.StretchToFill, true);
+                else FillRect(LayoutRect(card), HudQuotaCardColor(complete));
+                if (hudQuotaCardOutlineTexture != null)
+                {
+                    GUI.color = new Color(.45f, .88f, 1f, .65f);
+                    GUI.DrawTexture(LayoutRect(card), hudQuotaCardOutlineTexture, ScaleMode.StretchToFill, true);
+                }
+                GUI.color = previous;
+                float iconSize = Mathf.Min(HudQuotaIconMaxSize, card.height - HudQuotaCardInset * 2f);
+                Rect icon = new Rect(card.x + HudQuotaCardInset, card.center.y - iconSize * .5f, iconSize, iconSize);
+                DrawHudIcon(icon, product);
+                Rect counter = HudQuotaCounterBounds(card, icon);
+                DrawHudNumber(counter, delivered[product] + "/" + goals[product], sharedFontSize, HudQuotaCounterTextAlignment);
+            }
+        }
+
+        private void DrawTowerDefenseSceneLayers(float canvasHeight)
+        {
+            if (backdrop == null || towerDefenseBackdrop == null || canvasHeight <= 0f) return;
+            // Draw within the active safe-area logical canvas, like the route and footer.
+            // Use existing Camioneros mural art all the way to the route so no unrelated
+            // campaign mural can show through behind the HUD.
+            Rect themeSource = ClubVisualTheme.ForLevel(StreetSimulation.TowerDefenseCampaignLevelId).MuralSource;
+            Rect muralSource = new Rect(themeSource.x * towerDefenseBackdrop.width,
+                themeSource.y * towerDefenseBackdrop.height, themeSource.width * towerDefenseBackdrop.width,
+                themeSource.height * towerDefenseBackdrop.height);
+            Rect mural = new Rect(0f, 0f, W, TowerDefenseResponsiveLayout.RouteTopReserve - 24f);
+            DrawRawCover(mural, towerDefenseBackdrop, muralSource);
+
+            float sx = backdrop.width / StreetSceneLayout.ReferenceBackdropSize.x;
+            float sy = backdrop.height / StreetSceneLayout.ReferenceBackdropSize.y;
+            Rect sourceFarSidewalk = new Rect(0f, 150f * sy, backdrop.width, 30f * sy);
+            Rect sourceRoad = new Rect(100f * sx, 200f * sy, 740f * sx, 280f * sy);
+            Rect sourceNearSidewalk = new Rect(100f * sx, 495f * sy, 740f * sx, 50f * sy);
+            float sidewalkTop = mural.yMax;
+            const float farSidewalkHeight = 24f, nearSidewalkHeight = 30f, stallSpaceHeight = 90f;
+            float footerTop = canvasHeight - TowerDefenseResponsiveLayout.FooterReserve;
+            float roadBottom = footerTop - nearSidewalkHeight - stallSpaceHeight;
+            Rect cleanRoad = new Rect(0f, sidewalkTop + farSidewalkHeight, W,
+                Mathf.Max(1f, roadBottom - sidewalkTop - farSidewalkHeight));
+            DrawRawCover(new Rect(0f, sidewalkTop, W, farSidewalkHeight), backdrop, sourceFarSidewalk);
+            DrawRawCover(cleanRoad, backdrop, sourceRoad);
+            DrawRawCover(new Rect(0f, roadBottom, W, nearSidewalkHeight), backdrop, sourceNearSidewalk);
+            Rect sourcePavement = StreetSceneLayout.PavementContinuationSource(
+                new Vector2(backdrop.width, backdrop.height));
+            DrawRawCover(new Rect(0f, roadBottom + nearSidewalkHeight, W, stallSpaceHeight), backdrop, sourcePavement);
         }
 
         private void EnsureTowerDefenseStyles()
@@ -408,16 +492,28 @@ namespace HayChoriYPaty
             GUI.Label(bounds, value, style);
         }
 
-        private static Rect TowerDefenseSpeedBounds(float height) => new Rect(12f, height - 150f, 200f, 52f);
-        private static Rect TowerDefensePauseBounds(float height) => new Rect(220f, height - 150f, 150f, 52f);
-        private static Rect TowerDefenseExitBounds(float height) => new Rect(378f, height - 150f, 150f, 52f);
+        private static Rect[] TowerDefensePrimaryActionBounds(float height)
+        {
+            const float margin = 12f, gap = 6f;
+            float width = (W - margin * 2f - gap * 2f) / 3f;
+            float y = height - 171f;
+            return new[] {
+                new Rect(margin, y, width, 50f),
+                new Rect(margin + width + gap, y, width, 50f),
+                new Rect(margin + (width + gap) * 2f, y, width, 50f)
+            };
+        }
+
+        private static Rect TowerDefenseSpeedBounds(float height) => TowerDefensePrimaryActionBounds(height)[0];
+        private static Rect TowerDefensePauseBounds(float height) => TowerDefensePrimaryActionBounds(height)[1];
+        private static Rect TowerDefenseExitBounds(float height) => TowerDefensePrimaryActionBounds(height)[2];
 
         private static Rect[] TowerDefenseHireBounds(float height)
         {
             const float gap = 4f, margin = 8f;
             float width = (W - margin * 2f - gap * 4f) / 5f;
             var bounds = new Rect[5];
-            for (int i = 0; i < bounds.Length; i++) bounds[i] = new Rect(margin + i * (width + gap), height - 86f, width, 60f);
+            for (int i = 0; i < bounds.Length; i++) bounds[i] = new Rect(margin + i * (width + gap), height - 111f, width, 50f);
             return bounds;
         }
 

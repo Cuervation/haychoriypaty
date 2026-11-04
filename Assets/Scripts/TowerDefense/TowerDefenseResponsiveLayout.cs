@@ -5,6 +5,9 @@ namespace HayChoriYPaty
     /// <summary>Responsive route bounds and screen-to-world mapping for the portrait safe-area canvas.</summary>
     public static class TowerDefenseResponsiveLayout
     {
+        public const float RouteTopReserve = 260f;
+        public const float FooterReserve = 240f;
+
         public static bool TryCreate(TowerDefenseLevelConfig source, Camera camera, Rect viewport,
             float logicalWidth, float logicalHeight, out TowerDefenseLevelConfig runtimeConfig,
             out TowerDefenseRouteGeometryConfig route, out float worldUnitsPerLogicalPixel,
@@ -39,8 +42,10 @@ namespace HayChoriYPaty
             }
 
             const float horizontalMargin = 16f;
-            const float topReserve = 170f;
-            const float footerReserve = 180f;
+            // The campaign's three runs sit below the mural and above its full footer.
+            // Larger generator-only configurations keep their historic compact reservations.
+            float topReserve = authored.RowCount == 3 ? RouteTopReserve : 170f;
+            float footerReserve = authored.RowCount == 3 ? FooterReserve : 180f;
             const float corridorLogical = 56f;
             float logicalBottom = logicalHeight - footerReserve;
             float maximumSpacing = (logicalBottom - topReserve - corridorLogical) / (authored.RowCount - 1f);
