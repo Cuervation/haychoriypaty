@@ -1144,7 +1144,7 @@ namespace HayChoriYPaty.Tests
                 "street-allboys-crest", "street-new-chicago-crest-v1", "street-velez-crest-v1",
                 "street-ferro-crest-v1", "street-independiente-crest-v1", "street-racing-crest-v1",
                 "street-san-lorenzo-crest-v1", "street-river-crest-v1", "street-boca-crest-v1",
-                "street-camioneros-crest-v1", "street-los-redondos-crest-v1"
+                "street-camioneros-crest-v1", "street-los-redondos-crest-v1", "street-huracan-crest-v1"
             };
             Assert.AreEqual(levels.Length, resources.Length, "The crest manifest must stay aligned with the level catalog");
             Assert.AreEqual(expected.Length, resources.Length);
@@ -1190,6 +1190,7 @@ namespace HayChoriYPaty.Tests
 
         [TestCase("street-camioneros-crest-v1")]
         [TestCase("street-los-redondos-crest-v1")]
+        [TestCase("street-huracan-crest-v1")]
         public void OpaqueUserCrestCutoutsRemoveOnlyExteriorLightBackground(string resource)
         {
             Texture2D source = Resources.Load<Texture2D>(resource);
@@ -1277,7 +1278,7 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void AllElevenCrestsHaveEqualVisibleBodyHeightWithoutDistortion()
+        public void AllTwelveCrestsHaveEqualVisibleBodyHeightWithoutDistortion()
         {
             string[] resources = (string[])View.GetField("LevelCrestResourceNames", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
             MethodInfo measure = View.GetMethod("LevelCrestVisibleUv", BindingFlags.Static | BindingFlags.NonPublic);
@@ -1288,7 +1289,7 @@ namespace HayChoriYPaty.Tests
                 Texture2D cutout = null;
                 try
                 {
-                    if (i == 5 || i == 9 || i == 10)
+                    if (i == 5 || i == 9 || i == 10 || i == 11)
                         cutout = (Texture2D)View.GetMethod("CreateLevelCrestCutout", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new object[] { source });
                     Texture2D texture = cutout != null ? cutout : source;
                     Rect uv = (Rect)measure.Invoke(null, new object[] { texture });

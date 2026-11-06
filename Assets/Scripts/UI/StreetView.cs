@@ -25,12 +25,13 @@ namespace HayChoriYPaty
         private const string BocaCrestResource = "street-boca-crest-v1";
         private const string CamionerosCrestResource = "street-camioneros-crest-v1";
         private const string LosRedondosCrestResource = "street-los-redondos-crest-v1";
+        private const string HuracanCrestResource = "street-huracan-crest-v1";
         // Ordered by StreetSimulation.LevelDisplayNames; user-supplied crests are scoped to their levels.
         private static readonly string[] LevelCrestResourceNames = {
             AllBoysCrestResource, ChicagoCrestResource, VelezCrestResource,
             FerroCrestResource, IndependienteCrestResource, RacingCrestResource,
             SanLorenzoCrestResource, RiverCrestResource, BocaCrestResource,
-            CamionerosCrestResource, LosRedondosCrestResource, null
+            CamionerosCrestResource, LosRedondosCrestResource, HuracanCrestResource
         };
         private const string VelezFrontFansResource = "street-velez-fans-front-v1";
         private const string VelezWalkingFansResource = "street-velez-fans-walk-v1";
@@ -494,7 +495,7 @@ namespace HayChoriYPaty
             new System.Collections.Generic.Dictionary<Texture2D, Rect>();
         private readonly System.Collections.Generic.Dictionary<Texture2D, Rect> crestBodyUvs =
             new System.Collections.Generic.Dictionary<Texture2D, Rect>();
-        private static Texture2D racingCrestCutout, camionerosCrestCutout, losRedondosCrestCutout;
+        private static Texture2D racingCrestCutout, camionerosCrestCutout, losRedondosCrestCutout, huracanCrestCutout;
         private Texture2D clubPennantTexture;
         private string clubPennantThemeName;
         private float clubPennantLogicalHeight = -1f;
@@ -658,6 +659,11 @@ namespace HayChoriYPaty
                 if (losRedondosCrestCutout == null) losRedondosCrestCutout = CreateLevelCrestCutout(levelCrests[10]);
                 if (losRedondosCrestCutout != null) levelCrests[10] = losRedondosCrestCutout;
             }
+            if (levelCrests[11] != null)
+            {
+                if (huracanCrestCutout == null) huracanCrestCutout = CreateLevelCrestCutout(levelCrests[11]);
+                if (huracanCrestCutout != null) levelCrests[11] = huracanCrestCutout;
+            }
             crestVisibleUvs.Clear(); crestBodyUvs.Clear();
             for (int i = 0; i < levelCrests.Length; i++)
             {
@@ -811,7 +817,7 @@ namespace HayChoriYPaty
                 ? levelCrests[levelIndex] : null;
         }
 
-        private const int TotalStartupResourceRequests = 66;
+        private const int TotalStartupResourceRequests = 67;
         private Coroutine startupResourceRoutine;
         private int startupResourcesCompleted;
         private float startupLoadProgress, startupLoadStartedAt;

@@ -7,7 +7,7 @@
 - ID persistente nuevo: `11`. La campaña visible se resuelve aparte con `CampaignOrder = [0,1,2,3,4,11,5,6,7,8,9,10]`; Huracán ocupa el sexto lugar sin cambiar IDs, precios ni tickets de los clubes preexistentes.
 - Tras ganar Independiente (ID4) se habilita Huracán. Una estrella o más en Huracán habilita Racing (ID5); Huracán se puede repetir. Los perfiles v4 conservan el límite estable `unlockedLevel` (0–10) y migran a v5 con flags para conservar accesos previos a Racing y habilitar Huracán cuando el viejo progreso ya había llegado a Racing.
 - `winsByLevel`, `lossesByLevel` y métricas de récord se amplían de 11 a 12 slots copiando el prefijo; los IDs anteriores no se desplazan.
-- Huracán usa `street-mural-huracan-master-v1` y paleta bordó/blanco. El asset es 1898×829, igual al mural maestro de Ferro, e importa con el preset de textura existente. No se usan las fotos de referencia directamente ni se reemplaza arte de otros clubes.
+- Huracán usa `street-mural-huracan-master-v1` y paleta bordó/blanco. El asset es 1898×829, igual al mural maestro de Ferro, e importa con el preset de textura existente. El escudo oficial usa la imagen aportada por el usuario (`street-huracan-crest-v1`) y se muestra solo en las superficies comunes asociadas al ID11; su fondo claro exterior se elimina al cargarlo, preservando el arte interior. No se usan las fotos de referencia directamente ni se reemplaza arte de otros clubes.
 
 ## Reglas implementadas
 
@@ -29,6 +29,7 @@
 
 | Criterio | Estado | Evidencia / límite |
 |---|---|---|
+| Escudo oficial suministrado aparece para Huracán ID11, con fondo exterior claro recortado | NOT_RUN | Recurso `street-huracan-crest-v1` añadido al manifiesto; `StreetArtTests` cubre carga, recorte y ajuste. Falta reimportar y ejecutar EditMode/Game View en Unity. |
 | Orden estable y migración v4 | PASS estático | Fuente `StreetSimulation`/`StreetGame`; cobertura nueva `CampaignOrderInsertsHuracanWithoutShiftingStableLevelIds` y `LegacyV4RacingProgressAlsoUnlocksHuracanWithoutMovingTheFrontier`. Falta ejecutar Unity. |
 | Temporización, pausa y roster | PASS estático | Integración en fuente y test `BonusStartsWithFreeTeamAndPausesAtFiveExactChoiceDeadlines`. Falta ejecución. |
 | Puntuación por handoff, Aguante, tickets/idempotencia | PASS estático | Guards/efectos en fuente y casos EditMode relevantes. Falta ejecución. |
