@@ -37,11 +37,9 @@ MonoBehaviour:
   terminalFencePrefab: {fileID: 3412343263549730106, guid: fdf92aa37b642494095a6916e80a192f, type: 3}
   directionSignPrefab: {fileID: 1359721814499061152, guid: 9cf7a7df68e2841c88fe696034ad64a0, type: 3}
   directionArrowSprite: {fileID: 21300000, guid: ef3873967f16248bd8b9a67207f11688, type: 3}
-  availableProducts: 00000000010000000200000003000000040000000600000005000000i
+  availableProducts: 0000000004000000
   fanSpeed: 0.45
-  maximumFans: 28
-  fanSpawnScale: 1
   serviceRange: 0.8
   firstWorkZoneOffset: {x: 0, y: 0}
   secondWorkZoneOffset: {x: 0, y: 0}
-  startingWorkersByRole: 0100000001000000000000000000000001000000i
+  startingWorkersByRole: 0000000000000000000000000000000000000000

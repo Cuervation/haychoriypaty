@@ -242,7 +242,7 @@ namespace HayChoriYPaty.Tests
             string[] productNames = (string[])names.GetValue(null);
             MethodInfo caption = viewType.GetMethod("MarketObjectiveCaption", PrivStatic);
             int[] levelIndices = { 1, 3, 4, 9 }; // Chicago, Ferro, first seven-goal level, Camioneros.
-            int[] expectedCounts = { 2, 5, 7, 7 };
+            int[] expectedCounts = { 2, 5, 7, 2 };
             for (int i = 0; i < levelIndices.Length; i++)
             {
                 Assert.IsTrue((bool)select.Invoke(game, new object[] { levelIndices[i] }));
@@ -256,7 +256,7 @@ namespace HayChoriYPaty.Tests
                     string fullName = productNames[product];
                     int split = fullName.IndexOf(' ');
                     string expectedName = split > 0 ? fullName.Substring(0, split) : fullName;
-                    Assert.AreEqual(expectedName + " ×" + goal,
+                    Assert.AreEqual(expectedName + (levelIndices[i] == 9 ? string.Empty : " ×" + goal),
                         caption.Invoke(null, new object[] { sim, slot, productCount >= 5 }),
                         "card caption preserves the selected level's actual product order/goal");
                 }

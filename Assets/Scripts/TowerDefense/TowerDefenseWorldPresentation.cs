@@ -10,6 +10,8 @@ namespace HayChoriYPaty
     /// </summary>
     public sealed class TowerDefenseWorldPresentation : MonoBehaviour
     {
+        private const float FenceScreenEdgeInsetLogical = 4f;
+
         private sealed class FanView
         {
             public GameObject GameObject;
@@ -62,8 +64,11 @@ namespace HayChoriYPaty
             presentationRoot.layer = presentationLayer;
             fenceGenerator = presentationRoot.AddComponent<TowerDefenseModularFenceGenerator>();
             fenceGenerator.PresentationLayer = presentationLayer;
+            fenceGenerator.SortingOrder = 32;
             fenceGenerator.LevelConfig = runtimeConfig;
             fenceGenerator.FencePanelSprite = Resources.Load<Sprite>("fence-panel-v1");
+            fenceGenerator.SetLogicalPanelSize(mode.WorldUnitsPerLogicalPixel);
+            FitFenceToCameraEdges();
             if (!fenceGenerator.Generate())
             {
                 Debug.LogWarning("Tower Defense fences were not generated: " + fenceGenerator.LatestError);
@@ -82,12 +87,41 @@ namespace HayChoriYPaty
         {
             if (!configured || runtimeConfig == null || presentationRoot == null) return;
             if (fenceGenerator != null) fenceGenerator.LevelConfig = runtimeConfig;
-            if (fenceGenerator != null) fenceGenerator.Generate();
+            if (fenceGenerator != null)
+            {
+                fenceGenerator.SetLogicalPanelSize(mode.WorldUnitsPerLogicalPixel);
+                FitFenceToCameraEdges();
+                fenceGenerator.Generate();
+            }
             for (int i = stationObjects.Count - 1; i >= 0; i--) DestroyPresentationObject(stationObjects[i]);
             stationObjects.Clear();
             CreateStations(runtimeConfig);
             ResizeTarget(screenSize);
             Sync(mode);
+        }
+
+        private void FitFenceToCameraEdges()
+        {
+            if (fenceGenerator == null || sourceCamera == null || mode == null)
+                return;
+
+            Rect cameraPixels = sourceCamera.pixelRect;
+            if (cameraPixels.width <= 0f || cameraPixels.height <= 0f)
+            {
+                fenceGenerator.ClearVisualHorizontalBounds();
+                return;
+            }
+
+            float depth = Vector3.Dot(Vector3.zero - sourceCamera.transform.position, sourceCamera.transform.forward);
+            Vector3 leftEdge = sourceCamera.ScreenToWorldPoint(
+                new Vector3(cameraPixels.xMin, cameraPixels.center.y, depth));
+            Vector3 rightEdge = sourceCamera.ScreenToWorldPoint(
+                new Vector3(cameraPixels.xMax, cameraPixels.center.y, depth));
+            float inset = mode.WorldUnitsPerLogicalPixel * FenceScreenEdgeInsetLogical;
+            if (!fenceGenerator.SetVisualHorizontalBounds(
+                    Mathf.Min(leftEdge.x, rightEdge.x) + inset,
+                    Mathf.Max(leftEdge.x, rightEdge.x) - inset))
+                fenceGenerator.ClearVisualHorizontalBounds();
         }
 
         public void Sync(TowerDefenseGameMode gameMode)
@@ -178,33 +212,26 @@ namespace HayChoriYPaty
 
         private void CreateStations(TowerDefenseLevelConfig runtimeConfig)
         {
-            int[] products = runtimeConfig.AvailableProducts;
-            var first = new List<string>(2);
-            if (Contains(products, 0) || Contains(products, 1))
-            {
-                first.Add("Station_NormalGrill");
-                first.Add("Station_NormalTable");
-            }
-            var second = new List<string>(5);
-            if (Contains(products, 2) || Contains(products, 3))
-            {
-                second.Add("Station_PremiumGrill");
-                second.Add("Station_PremiumTable");
-            }
-            if (Contains(products, 4)) second.Add("Station_CocaBarrel");
-            if (Contains(products, 5)) second.Add("Station_FernetTable");
-            if (Contains(products, 6)) second.Add("Station_BeerBarrel");
-            CreateStationRow(first, mode.RouteGeometry == null ? Vector2.zero : mode.WorkZone(0));
-            CreateStationRow(second, mode.RouteGeometry == null ? Vector2.zero : mode.WorkZone(1));
+            string[] resources = StartingStationResources(runtimeConfig.AvailableProducts);
+            for (int zone = 0; zone < 2; zone++)
+                CreateStationRow(resources, mode.RouteGeometry == null ? Vector2.zero : mode.WorkZone(zone), zone);
         }
 
-        private void CreateStationRow(List<string> resourceNames, Vector2 center)
+        private static string[] StartingStationResources(int[] products)
         {
-            if (resourceNames == null || resourceNames.Count == 0) return;
-            float scale = mode.WorldUnitsPerLogicalPixel * 5.2f;
-            float spacing = Mathf.Max(0.5f, mode.WorldUnitsPerLogicalPixel * 86f);
-            float start = -(resourceNames.Count - 1) * spacing * 0.5f;
-            for (int i = 0; i < resourceNames.Count; i++)
+            var resources = new List<string>(2);
+            if (Contains(products, 0) || Contains(products, 1)) resources.Add("Station_NormalGrill");
+            if (Contains(products, 4)) resources.Add("Station_CocaBarrel");
+            return resources.ToArray();
+        }
+
+        private void CreateStationRow(string[] resourceNames, Vector2 center, int zone)
+        {
+            if (resourceNames == null || resourceNames.Length == 0) return;
+            float worldPerPixel = mode.WorldUnitsPerLogicalPixel;
+            float spacing = worldPerPixel * 140f;
+            float start = -(resourceNames.Length - 1) * spacing * 0.5f;
+            for (int i = 0; i < resourceNames.Length; i++)
             {
                 GameObject prefab = Resources.Load<GameObject>("ModularKitchen/Prefabs/" + resourceNames[i]);
                 if (prefab == null)
@@ -213,8 +240,24 @@ namespace HayChoriYPaty
                     continue;
                 }
                 GameObject station = Instantiate(prefab, presentationRoot.transform, false);
-                station.name = "TD " + resourceNames[i];
+                station.name = "TD zone " + zone + " " + resourceNames[i];
                 station.transform.position = new Vector3(center.x + start + i * spacing, center.y, 0f);
+                float scale = worldPerPixel * 5.2f;
+                if (resourceNames[i] == "Station_NormalGrill")
+                {
+                    // Reuse the campaign's chorizo-loaded grill artwork from frame
+                    // zero. Its illustrated chorizos are display-only, never stock.
+                    Sprite loadedGrill = Resources.Load<Sprite>("street-parrilla-large");
+                    SpriteRenderer renderer = station.GetComponentInChildren<SpriteRenderer>(true);
+                    if (loadedGrill != null && renderer != null)
+                    {
+                        renderer.sprite = loadedGrill;
+                        scale = worldPerPixel * 150f / Mathf.Max(.001f, loadedGrill.bounds.size.x);
+                        // Put the loaded grate in front of the worker's feet rather
+                        // than beneath them, without changing any service route.
+                        station.transform.position += Vector3.down * (worldPerPixel * 18f);
+                    }
+                }
                 station.transform.localScale = Vector3.one * scale;
                 SetLayerRecursively(station, presentationLayer);
                 SetSortingRecursively(station, 12 + i);
@@ -238,19 +281,23 @@ namespace HayChoriYPaty
                     activeFans.Add(fan.Id, fanView);
                 }
                 staleIds.Remove(fan.Id);
-                Sprite sprite = FanSprite(fan.Id, fan.IsReceiving);
+                Vector3 departure = FanDepartureVisual(fan.IsDeparting ? fan.DepartureProgress : 0f);
+                fanView.Renderer.color = new Color(1f, 1f, 1f, departure.z);
+                Sprite sprite = FanSprite(fan.Id, fan.IsReceiving || fan.IsDeparting);
                 if (sprite != null)
                 {
                     fanView.Renderer.sprite = sprite;
-                    // Keep the upright fan sprite inside the 56-pixel corridor: its feet sit
-                    // below the centerline while the top fence remains clear of the head.
-                    float targetHeight = 36f * gameMode.WorldUnitsPerLogicalPixel;
-                    fanView.GameObject.transform.localScale = Vector3.one * (targetHeight / Mathf.Max(0.001f, sprite.bounds.size.y));
+                // Match DrawCustomerBody/DrawFan in regular levels: fit the same atlas
+                // source into a 78 x 76 logical-pixel box without stretching it, then
+                // center that full body between the two route rails.
+                    float targetHeight = FanTargetHeightLogical(sprite.rect.width, sprite.rect.height)
+                        * gameMode.WorldUnitsPerLogicalPixel;
+                    float frameHeight = sprite.rect.height / sprite.pixelsPerUnit;
+                    fanView.GameObject.transform.localScale = Vector3.one * (targetHeight / Mathf.Max(0.001f, frameHeight) * departure.y);
                 }
                 Vector2 position = fan.RouteFollower.Position;
-                float bob = Mathf.Sin(fan.AnimationTime * 8f + fan.Id * 1.7f) * mode.WorldUnitsPerLogicalPixel * 2.2f;
-                fanView.GameObject.transform.position = new Vector3(position.x,
-                    position.y + bob - gameMode.WorldUnitsPerLogicalPixel * 14f, 0f);
+                float bob = fan.IsDeparting ? 0f : Mathf.Sin(fan.AnimationTime * 8f + fan.Id * 1.7f) * mode.WorldUnitsPerLogicalPixel * 2.2f;
+                fanView.GameObject.transform.position = new Vector3(position.x, position.y + bob + departure.x * mode.WorldUnitsPerLogicalPixel, 0f);
                 fanView.Renderer.flipX = fan.RouteFollower.Facing.x < -0.15f;
                 fanView.Renderer.sortingOrder = 32 + Mathf.RoundToInt(-position.y * 12f);
             }
@@ -262,6 +309,19 @@ namespace HayChoriYPaty
                 stale.GameObject.SetActive(false);
                 pooledFans.Push(stale);
             }
+        }
+
+        // x = upward logical pixels, y = scale, z = opacity. Existing fan art only.
+        private static Vector3 FanDepartureVisual(float progress)
+        {
+            float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(progress));
+            return new Vector3(16f * t, 1f - .20f * t, 1f - t);
+        }
+
+        private static float FanTargetHeightLogical(float sourceWidth, float sourceHeight)
+        {
+            return Mathf.Min(StreetSceneLayout.CustomerHeight,
+                78f * sourceHeight / Mathf.Max(0.001f, sourceWidth));
         }
 
         private void SyncWorkers(TowerDefenseGameMode gameMode)

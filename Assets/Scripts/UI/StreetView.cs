@@ -26,12 +26,13 @@ namespace HayChoriYPaty
         private const string CamionerosCrestResource = "street-camioneros-crest-v1";
         private const string LosRedondosCrestResource = "street-los-redondos-crest-v1";
         private const string HuracanCrestResource = "street-huracan-crest-v1";
+        private const string ArgentinosCrestResource = "street-argentinos-crest-v1";
         // Ordered by StreetSimulation.LevelDisplayNames; user-supplied crests are scoped to their levels.
         private static readonly string[] LevelCrestResourceNames = {
             AllBoysCrestResource, ChicagoCrestResource, VelezCrestResource,
             FerroCrestResource, IndependienteCrestResource, RacingCrestResource,
             SanLorenzoCrestResource, RiverCrestResource, BocaCrestResource,
-            CamionerosCrestResource, LosRedondosCrestResource, HuracanCrestResource
+            CamionerosCrestResource, LosRedondosCrestResource, HuracanCrestResource, ArgentinosCrestResource
         };
         private const string VelezFrontFansResource = "street-velez-fans-front-v1";
         private const string VelezWalkingFansResource = "street-velez-fans-walk-v1";
@@ -198,6 +199,7 @@ namespace HayChoriYPaty
         private struct ResponsiveFooterLayout
         {
             public Rect[] UpgradeBounds;
+            public Rect[] BonusChoiceBounds;
             public Rect LevelBadge;
             public Rect ReadySelector;
             // Footer layout coordinates; decorative pennants may extend through the bottom safe inset.
@@ -233,9 +235,14 @@ namespace HayChoriYPaty
             float verticalScale = Mathf.Max(.01f, canvasHeight / H);
             float compactScale = Mathf.Min(1f, verticalScale);
             int[] actions = showUpgrades ? CatalogUpgradeActions(sim) : new int[0];
-            int count = actions.Length;
+            bool showBonusChoices = sim.IsBonusTrack && sim.BonusTrack != null && sim.BonusTrack.SelectionPending;
+            int upgradeCount = actions.Length;
+            int bonusChoiceCount = !showBonusChoices ? 0 : sim.BonusTrack.EmergencyRoleSelectionPending
+                ? sim.BonusTrack.EmergencyRoles.Count : sim.BonusTrack.CurrentCards.Count;
+            int count = showBonusChoices ? bonusChoiceCount : upgradeCount;
             int rows = count == 0 ? 0 : count <= 3 ? 1 : 2;
-            float cardHeight = (count >= 5 ? 100f : count == 4 ? 104f : 120f) * compactScale;
+            float cardHeight = showBonusChoices ? 120f * compactScale
+                : (count >= 5 ? 100f : count == 4 ? 104f : 120f) * compactScale;
             float rowGap = rows > 1 ? 8f * compactScale : 0f;
             float badgeHeight = (count >= 5 ? 20f : count == 4 ? 22f : 26f) * compactScale;
             float sectionGap = (rows > 0 || showReadySelector) ? 6f * compactScale : 0f;
@@ -249,8 +256,9 @@ namespace HayChoriYPaty
             float desiredPennantHeight = 80f * compactScale;
             float availablePennantHeight = Mathf.Max(0f, decorationBottom - stageBottom - topPadding
                 - panelHeight - pennantClearance);
-            // The Racing campaign begins at zero-based index 5; omit decorative pennants from there onward.
-            float pennantHeight = sim.LevelIndex < 5
+            // Levels 1–5 keep their pennants. Huracán is the explicit bonus-track exception;
+            // regular Racing and later campaign levels keep the match scenery unobstructed.
+            float pennantHeight = sim.LevelIndex < 5 || sim.IsBonusTrack
                 ? Mathf.Min(desiredPennantHeight, availablePennantHeight)
                 : 0f;
             float pennantTop = decorationBottom - pennantHeight;
@@ -268,13 +276,31 @@ namespace HayChoriYPaty
             float spareButtonSpace = Mathf.Max(0f, panelBottom - cardTop - buttonBlockHeight);
             cardTop += spareButtonSpace * .5f;
 
-            var cards = new Rect[count];
-            for (int i = 0; i < count; i++)
+            var cards = new Rect[upgradeCount];
+            for (int i = 0; i < upgradeCount; i++)
             {
                 Rect authored = CatalogUpgradeCardBounds(sim, actions[i]);
-                int row = count == 4 ? i / 2 : count == 6 && sim.UsesActiveCooks ? i / 3 : count == 5 && i >= 3 ? 1 : 0;
+                int row = upgradeCount == 4 ? i / 2 : upgradeCount == 6 && sim.UsesActiveCooks ? i / 3 : upgradeCount == 5 && i >= 3 ? 1 : 0;
                 cards[i] = new Rect(authored.x, (cardTop + row * (cardHeight + rowGap)) / verticalScale,
                     authored.width, authored.height);
+            }
+
+            var bonusChoices = new Rect[showBonusChoices ? bonusChoiceCount : 0];
+            if (showBonusChoices)
+            {
+                // Bonus cards and Refuerzo role choices are the hit targets themselves. Reuse
+                // the normal one-row upgrade-card footprint and reserve it before the pennants.
+                float baseChoiceCardGap = bonusChoiceCount <= 2 ? 12f : 9f;
+                float choiceCardGap = baseChoiceCardGap * compactScale;
+                float baseChoiceCardWidth = bonusChoiceCount <= 2
+                    ? (W - 88f - baseChoiceCardGap * Mathf.Max(0, bonusChoiceCount - 1)) / Mathf.Max(1, bonusChoiceCount)
+                    : 156f;
+                float choiceCardWidth = baseChoiceCardWidth * compactScale;
+                float cardStart = (W - (bonusChoiceCount * choiceCardWidth +
+                    Mathf.Max(0, bonusChoiceCount - 1) * choiceCardGap)) * .5f;
+                for (int i = 0; i < bonusChoices.Length; i++)
+                    bonusChoices[i] = new Rect(cardStart + i * (choiceCardWidth + choiceCardGap),
+                        cardTop, choiceCardWidth, cardHeight);
             }
 
             Rect selector = Rect.zero;
@@ -292,7 +318,8 @@ namespace HayChoriYPaty
                 : new Rect(0f, pennantTop, W, 0f);
 
             return new ResponsiveFooterLayout {
-                UpgradeBounds = cards, LevelBadge = badge, ReadySelector = selector, Pennants = pennants
+                UpgradeBounds = cards, BonusChoiceBounds = bonusChoices, LevelBadge = badge,
+                ReadySelector = selector, Pennants = pennants
             };
         }
 
@@ -300,8 +327,10 @@ namespace HayChoriYPaty
         {
             bool ready = !levelSelectActive && sim.Phase == RoundPhase.Ready;
             bool play = VictoryTransitionActive || (!levelSelectActive && sim.Phase == RoundPhase.Playing);
-            bool showCards = play || (ready && (CatalogUpgradeActions(sim).Length <= 3 ||
-                levelFourSpecialistsTutorialActive || levelFiveSpecialistsTutorialActive || levelSixRacingTutorialActive));
+            // Bonus Track uses its lower footer for pending, directly tappable choice cards;
+            // regular catalog upgrades remain exclusive to the campaign levels.
+            bool showCards = !sim.IsBonusTrack && (play || (ready && (CatalogUpgradeActions(sim).Length <= 3 ||
+                levelFourSpecialistsTutorialActive || levelFiveSpecialistsTutorialActive || levelSixRacingTutorialActive)));
             return bottomBleed > 0f
                 ? BuildResponsiveFooterLayoutWithBottomBleed(sim, canvasHeight, showCards, ready, bottomBleed)
                 : BuildResponsiveFooterLayout(sim, canvasHeight, showCards, ready);
@@ -335,6 +364,8 @@ namespace HayChoriYPaty
         private const int HubSettingsAction = 207, HubSettingsMusicAction = 208, HubSettingsBackAction = 209;
         private const int HubTopMusicAction = 210;
         private const string HubMusicEnabledPlayerPrefKey = "HayChoriYPaty.Hub.MusicEnabled";
+        private static readonly Rect HubSettingsArtworkSourceBounds = new Rect(1f, 121f, 40f, 40f);
+        private static readonly Rect HubMusicArtworkSourceBounds = new Rect(714f, 91f, 40f, 40f);
         private static readonly Rect HubSettingsPanelBounds = new Rect(48, 300, 444, 360);
         private static readonly Rect HubSettingsMusicButtonBounds = new Rect(76, 410, 388, 96);
         private static readonly Rect HubSettingsBackButtonBounds = new Rect(126, 520, 288, 96);
@@ -495,7 +526,8 @@ namespace HayChoriYPaty
             new System.Collections.Generic.Dictionary<Texture2D, Rect>();
         private readonly System.Collections.Generic.Dictionary<Texture2D, Rect> crestBodyUvs =
             new System.Collections.Generic.Dictionary<Texture2D, Rect>();
-        private static Texture2D racingCrestCutout, camionerosCrestCutout, losRedondosCrestCutout, huracanCrestCutout;
+        private static Texture2D racingCrestCutout, camionerosCrestCutout, losRedondosCrestCutout,
+            huracanCrestCutout, argentinosCrestCutout;
         private Texture2D clubPennantTexture;
         private string clubPennantThemeName;
         private float clubPennantLogicalHeight = -1f;
@@ -664,6 +696,11 @@ namespace HayChoriYPaty
                 if (huracanCrestCutout == null) huracanCrestCutout = CreateLevelCrestCutout(levelCrests[11]);
                 if (huracanCrestCutout != null) levelCrests[11] = huracanCrestCutout;
             }
+            if (levelCrests[12] != null)
+            {
+                if (argentinosCrestCutout == null) argentinosCrestCutout = CreateLevelCrestCutout(levelCrests[12]);
+                if (argentinosCrestCutout != null) levelCrests[12] = argentinosCrestCutout;
+            }
             crestVisibleUvs.Clear(); crestBodyUvs.Clear();
             for (int i = 0; i < levelCrests.Length; i++)
             {
@@ -817,7 +854,7 @@ namespace HayChoriYPaty
                 ? levelCrests[levelIndex] : null;
         }
 
-        private const int TotalStartupResourceRequests = 67;
+        private const int TotalStartupResourceRequests = 68;
         private Coroutine startupResourceRoutine;
         private int startupResourcesCompleted;
         private float startupLoadProgress, startupLoadStartedAt;
@@ -1009,6 +1046,7 @@ namespace HayChoriYPaty
         {
             DisposeTowerDefenseUi();
             if (hubMusicAudioSource != null) hubMusicAudioSource.Stop();
+            ReleaseHubSignageResources();
             ReleaseHubAmbientEffectsResources();
             ReleaseHubLayeredEnvironmentResources();
             ReleaseHubCharacterAnimationsResources();
@@ -1409,6 +1447,9 @@ namespace HayChoriYPaty
         {
             if (VictoryTransitionActive || victorySkipHeld) return 0;
             if (IsTowerDefenseNavigationActive) return HitTowerDefenseAction(p);
+            // Huracán has its own result panel and actions. A previous club's Chulengo receipt
+            // may still be present in Mercado.LastResult; it must never capture Bonus Track taps.
+            if (game.IsBonusTrack) return HitBonusTrackAction(p);
             if (game.ShowChulengoResult)
             {
                 Vector2 resultPoint = new Vector2(p.x, p.y * layoutVerticalScale);
@@ -1420,7 +1461,6 @@ namespace HayChoriYPaty
                 return game.CanAdvanceAfterResult && VictoryExitBounds().Contains(resultPoint)
                     ? VictoryExitAction : ChulengoLevelsBounds().Contains(resultPoint) ? ResultLevelsAction : 0;
             }
-            if (game.IsBonusTrack) return HitBonusTrackAction(p);
             if (marketActive) { p.y *= layoutVerticalScale; return HitMarketAction(p); }
             if (introActive) return 0;
             if (levelOneTutorialActive)
@@ -1512,6 +1552,33 @@ namespace HayChoriYPaty
                 return;
             }
             if (HandleTowerDefenseAction(a)) return;
+            // Route by the currently rendered mode before inspecting any stale normal-level receipt.
+            if (game.IsBonusTrack)
+            {
+                bool bonusActionSucceeded = false;
+                if (a >= BonusCardFirstAction && a < BonusCardFirstAction + 3) game.ChooseBonusCard(a - BonusCardFirstAction);
+                else if (a >= BonusWorkerFirstAction && a < BonusWorkerFirstAction + 3)
+                {
+                    System.Collections.Generic.IReadOnlyList<StreetWorkerRole> roles = game.Sim.BonusTrack?.EmergencyRoles;
+                    int index = a - BonusWorkerFirstAction;
+                    if (roles != null && index < roles.Count) game.ChooseBonusEmergencyRole(roles[index]);
+                }
+                else if (a == BonusAguanteAction) game.ActivateBonusAguante();
+                else if (a == ResultLevelsAction && (game.Sim.Phase == RoundPhase.Won || game.Sim.Phase == RoundPhase.Lost))
+                {
+                    bonusActionSucceeded = game.ReturnToLevels();
+                    if (bonusActionSucceeded) { marketActive = false; levelSelectActive = true; levelSelectScroll = 0f; }
+                }
+                else if (a == VictoryExitAction && game.Sim.Phase == RoundPhase.Won && game.CanAdvanceAfterResult)
+                {
+                    bonusActionSucceeded = game.NextLevel();
+                    if (bonusActionSucceeded && game.IsBonusTrack) bonusActionSucceeded = game.TryStartRound();
+                    else if (bonusActionSucceeded) { marketActive = true; marketFromSelector = true; marketOtherExpanded = false; marketMessage = ""; }
+                }
+                if (a == ResultLevelsAction || a == VictoryExitAction)
+                { lastAction = a; feedbackUntil = Time.unscaledTime + .22f; feedbackScale = bonusActionSucceeded ? 1.04f : .97f; }
+                return;
+            }
             if (game.ShowChulengoResult)
             {
                 bool lockedRetry = game.HasPendingChulengo && game.ChulengoChoiceLocked;
@@ -1530,31 +1597,6 @@ namespace HayChoriYPaty
                 if (chulengoOk && a == ResultLevelsAction) { marketActive = false; levelSelectActive = true; levelSelectScroll = 0f; }
                 if (a == ChulengoMultiplyAction || a == ChulengoCollectAction || a == VictoryExitAction || a == ResultLevelsAction)
                 { lastAction = a; feedbackUntil = Time.unscaledTime + .22f; feedbackScale = chulengoOk ? 1.04f : .97f; }
-                return;
-            }
-            if (game.IsBonusTrack)
-            {
-                if (a >= BonusCardFirstAction && a < BonusCardFirstAction + 3) game.ChooseBonusCard(a - BonusCardFirstAction);
-                else if (a >= BonusWorkerFirstAction && a < BonusWorkerFirstAction + 3)
-                {
-                    System.Collections.Generic.IReadOnlyList<StreetWorkerRole> roles = game.Sim.BonusTrack?.EmergencyRoles;
-                    int index = a - BonusWorkerFirstAction;
-                    if (roles != null && index < roles.Count) game.ChooseBonusEmergencyRole(roles[index]);
-                }
-                else if (a == BonusAguanteAction) game.ActivateBonusAguante();
-                else if (a == BonusRetryAction) game.Retry();
-                else if (a == BonusReturnAction)
-                {
-                    if (game.ReturnToLevels()) { marketActive = false; levelSelectActive = true; levelSelectScroll = 0f; }
-                }
-                else if (a == BonusNextAction && game.CanAdvanceAfterResult)
-                {
-                    if (game.NextLevel())
-                    {
-                        if (game.IsBonusTrack) game.TryStartRound();
-                        else { marketActive = true; marketFromSelector = true; marketOtherExpanded = false; marketMessage = ""; }
-                    }
-                }
                 return;
             }
             if (introActive) return;
@@ -2167,7 +2209,7 @@ namespace HayChoriYPaty
             }
             else if (VictoryTransitionActive) DrawVictoryTransition();
             else if(sim.Phase==RoundPhase.Won||sim.Phase==RoundPhase.Lost) ResultPanel();
-            else if (!sim.IsBonusTrack) DrawLevelBadge(sim.LevelIndex, footer.LevelBadge);
+            else DrawLevelBadge(sim.LevelIndex, footer.LevelBadge);
             if (levelOneTutorialActive) DrawLevelOneTutorial();
             else if (levelTwoCocacoleroTutorialActive) DrawLevelTwoCocacoleroTutorial();
             else if (levelThreePatyTutorialActive) DrawLevelThreePatyTutorial();
@@ -2469,7 +2511,8 @@ namespace HayChoriYPaty
 
         private void DrawRiotWaitMessage(Rect bounds)
         {
-            const string message = "Los hinchas se cansaron de esperar......";
+            string message = game != null && game.Sim != null && game.Sim.LevelIndex == 9
+                ? "Un hincha llegó a la salida sin su pedido." : "Los hinchas se cansaron de esperar......";
             int fontSize = FitStandardButtonFontSize(menuTitle, message, bounds);
             GUIStyle caption = CreateStandardButtonLabelStyle(menuTitle, fontSize, Color.white);
             GUIStyle outline = CreateStandardButtonLabelStyle(menuTitle, fontSize, new Color(.035f, .075f, .16f));
@@ -2565,48 +2608,50 @@ namespace HayChoriYPaty
                 DrawRaw(StreetSceneLayout.ProjectSourceRect(StreetSceneLayout.BakedSideTableSource, canvasHeight),
                     backdrop, StreetSceneLayout.CleanCounterSideSource, true, true);
             }
-            DrawGameplayMural(canvasHeight, verticalScale);
-            DrawFerroOppositeSidewalk(canvasHeight, verticalScale);
-            DrawLosRedondosOppositeSidewalk(canvasHeight, verticalScale);
+            Rect muralBounds = DrawGameplayMural(canvasHeight, verticalScale);
+            DrawFerroMuralSidewalk(muralBounds);
+            DrawLosRedondosMuralSidewalk(muralBounds);
             DrawClubPennants(canvasHeight, verticalScale, safeViewport, safePennants);
         }
 
-        private void DrawFerroOppositeSidewalk(float canvasHeight, float verticalScale)
+        private void DrawFerroMuralSidewalk(Rect muralBounds)
         {
-            if (VisualLevelIndex != 3 || ferroBackground == null) return;
-            Rect destination = StreetSceneLayout.FerroOppositeSidewalkBounds(canvasHeight, verticalScale);
-            Rect source = StreetSceneLayout.FerroOppositeSidewalkSource(new Vector2(ferroBackground.width, ferroBackground.height));
+            if (VisualLevelIndex != 3 || ferroBackground == null || Screen.width <= 0) return;
+            Rect destination = StreetSceneLayout.FerroMuralSidewalkBounds(muralBounds, Screen.width);
+            Rect source = StreetSceneLayout.FerroMuralSidewalkSource(
+                new Vector2(ferroBackground.width, ferroBackground.height));
             if (destination.width <= 0f || destination.height <= 0f || source.width <= 0f || source.height <= 0f) return;
 
-            // This existing Ferro-background crop contains the wall foot, tiled opposite sidewalk,
-            // curb and a little road. Keep it as a scenery-only layer: the crowd is drawn later and
-            // occludes it naturally, while the source's lower curb lands at the unchanged root counter.
-            DrawRawCover(destination, ferroBackground, source);
+            // Reuse only the sidewalk/curb at the mural foot; stretch it to one thin strip rather
+            // than layering the former full-height curb-and-road crop over the shared ground.
+            DrawRaw(destination, ferroBackground, source, true, false);
         }
 
-        private void DrawLosRedondosOppositeSidewalk(float canvasHeight, float verticalScale)
+        private void DrawLosRedondosMuralSidewalk(Rect muralBounds)
         {
-            if (VisualLevelIndex != 10 || losRedondosBackground == null) return;
-            Rect destination = StreetSceneLayout.LosRedondosOppositeSidewalkBounds(canvasHeight, verticalScale);
-            Rect source = StreetSceneLayout.LosRedondosOppositeSidewalkSource(
+            if (VisualLevelIndex != 10 || losRedondosBackground == null || Screen.width <= 0) return;
+            Rect destination = StreetSceneLayout.LosRedondosMuralSidewalkBounds(muralBounds, Screen.width);
+            Rect source = StreetSceneLayout.LosRedondosMuralSidewalkSource(
                 new Vector2(losRedondosBackground.width, losRedondosBackground.height));
             if (destination.width <= 0f || destination.height <= 0f || source.width <= 0f || source.height <= 0f) return;
 
-            // Reuse the existing level art's tiled opposite sidewalk and curb as scenery only.
-            // The queue is rendered later in front of it, and its lower edge meets the shared counter.
-            DrawRawCover(destination, losRedondosBackground, source);
+            // Match Ferro: stretch one original tile-and-curb crop into a single thin strip
+            // directly below the mural. Do not retain the broad road band or draw a second curb.
+            DrawRaw(destination, losRedondosBackground, source, true, false);
         }
 
-        private void DrawGameplayMural(float canvasHeight, float verticalScale)
+        private Rect DrawGameplayMural(float canvasHeight, float verticalScale)
         {
             ClubVisualTheme theme = ClubVisualTheme.ForLevel(VisualLevelIndex);
             if (!string.IsNullOrEmpty(theme.MuralResource))
-                DrawThemedMural(theme, canvasHeight, verticalScale);
+                return DrawThemedMural(theme, canvasHeight, verticalScale);
             else if (muralArt != null)
             {
                 Rect band = new Rect(0f, HudBar.yMax, W, MuralBounds.height * verticalScale);
                 DrawRawCover(band, muralArt, MuralSource);
+                return band;
             }
+            return Rect.zero;
         }
 
         private void DrawGameplayMuralInScreenSpace()
@@ -2626,14 +2671,14 @@ namespace HayChoriYPaty
             finally { GUI.matrix = previous; GUI.color = previousColor; }
         }
 
-        private void DrawThemedMural(ClubVisualTheme theme, float canvasHeight, float verticalScale)
+        private Rect DrawThemedMural(ClubVisualTheme theme, float canvasHeight, float verticalScale)
         {
             if (clubMuralResource != theme.MuralResource)
             {
                 clubMuralResource = theme.MuralResource;
                 clubMuralTexture = Resources.Load<Texture2D>(clubMuralResource);
             }
-            if (clubMuralTexture == null) return;
+            if (clubMuralTexture == null) return Rect.zero;
             // Fit the complete mural below the fixed HUD, never hide portraits behind it.
             Rect band = new Rect(0, HudBar.yMax, W, MuralBounds.height * verticalScale);
             Rect normalized = theme.MuralSource;
@@ -2655,6 +2700,7 @@ namespace HayChoriYPaty
             else
                 DrawMuralContinuation(clubMuralTexture, source, band);
             DrawRawCover(band, clubMuralTexture, source);
+            return band;
         }
 
         private static void DrawMuralHeaderFromBackdrop(Texture2D texture, Rect muralBand)
@@ -2958,6 +3004,13 @@ namespace HayChoriYPaty
                 layoutVerticalScale = 1f;
                 Vector2 screenSize = new Vector2(Screen.width, Screen.height);
                 Rect cutoutGap = TopHudCutoutBounds(screenSize, Screen.cutouts);
+                if (sim.LevelIndex == 9)
+                {
+                    GUI.matrix = Matrix4x4.Scale(new Vector3(Screen.width / W, Screen.width / W, 1f));
+                    GUI.color = Color.white;
+                    DrawTowerDefenseCoinsHud(sim.Coins);
+                    return;
+                }
                 EnsureHudBarTexture(cutoutGap);
                 hudQuotaProductCount = Mathf.Min(sim.ProductCount, hudQuotaProductIds.Length);
                 for (int slot = 0; slot < hudQuotaProductCount; slot++)
@@ -3533,9 +3586,11 @@ namespace HayChoriYPaty
                 return;
             }
 
-            DrawHubLayeredEnvironment();
+            // This 841×1870 reference is already a complete, tightly composed illustration.
+            // Do not overlay cutouts from the previous master: they covered the flag and wall sign.
             DrawHubAmbientEffects();
             DrawHubCharacterAnimations();
+            DrawHubSignage();
             DrawHubHotspot(HubRankingAction);
             DrawHubHotspot(HubBadgesAction);
             DrawHubHotspot(HubMarketAction);
@@ -3554,7 +3609,12 @@ namespace HayChoriYPaty
                 layoutVerticalScale = 1f;
                 Rect bounds = HubSettingsButtonScreenBounds(
                     new Vector2(Screen.width, Screen.height), Screen.safeArea);
-                DrawHubIconButton(bounds, HubSettingsAction,
+                Vector2 screenSize = new Vector2(Screen.width, Screen.height);
+                if (HubArtworkControlIsVisible(HubSettingsArtworkSourceBounds, screenSize, Screen.safeArea))
+                {
+                    if (GUI.Button(bounds, string.Empty, invisible)) NativeAction(HubSettingsAction);
+                }
+                else DrawHubIconButton(bounds, HubSettingsAction,
                     GetHubControlIcon(HubControlIconKind.Settings), HubSettingsButtonContent);
             }
             finally
@@ -3575,7 +3635,18 @@ namespace HayChoriYPaty
                 Rect bounds = HubTopMusicButtonScreenBounds(
                     new Vector2(Screen.width, Screen.height), Screen.safeArea);
                 bool musicEnabled = HubMusicEnabled();
-                DrawHubIconButton(bounds, HubTopMusicAction,
+                Vector2 screenSize = new Vector2(Screen.width, Screen.height);
+                if (HubArtworkControlIsVisible(HubMusicArtworkSourceBounds, screenSize, Screen.safeArea))
+                {
+                    if (GUI.Button(bounds, string.Empty, invisible)) NativeAction(HubTopMusicAction);
+                    if (!musicEnabled)
+                    {
+                        Rect icon = HubLayeredArtworkScreenRect(HubMusicArtworkSourceBounds, screenSize);
+                        GUI.color = Color.white;
+                        GUI.DrawTexture(icon, GetHubControlIcon(HubControlIconKind.Muted), ScaleMode.ScaleToFit, true);
+                    }
+                }
+                else DrawHubIconButton(bounds, HubTopMusicAction,
                     GetHubControlIcon(musicEnabled ? HubControlIconKind.Music : HubControlIconKind.Muted),
                     musicEnabled ? HubMusicOnButtonContent : HubMusicOffButtonContent);
             }
@@ -3647,23 +3718,19 @@ namespace HayChoriYPaty
             {
                 // Four visible hotspots remapped to the single 841x1870 vertical 9:20 master.
                 // Account/login remains available from JUGAR's Firebase gate, not as a separate icon.
-                case HubRankingAction: return new Rect(467, 448, 288, 143);
-                case HubPlayAction: return new Rect(100, 859, 315, 155);
-                case HubMarketAction: return new Rect(94, 1238, 317, 164);
-                case HubBadgesAction: return new Rect(479, 1236, 344, 168);
+                case HubRankingAction: return new Rect(486f, 447f, 236f, 128f);
+                case HubPlayAction: return new Rect(121f, 837f, 224f, 112f);
+                case HubMarketAction: return new Rect(91f, 1207f, 292f, 104f);
+                case HubBadgesAction: return new Rect(594f, 837f, 242f, 142f);
                 default: return Rect.zero;
             }
         }
         private Rect HubArtworkActionBounds(int action) => HubArtworkRectToLayout(
-            HubArtActionSourceRect(action), HubArtworkSize, new Vector2(Screen.width, Screen.height), Screen.safeArea);
+            HubSignageTouchSourceBounds(action), HubArtworkSize, new Vector2(Screen.width, Screen.height), Screen.safeArea);
         private static Rect HubSettingsButtonScreenBounds(Vector2 screenSize, Rect safeArea)
         {
-            Rect viewport = CanvasViewport(screenSize, safeArea);
-            if (viewport.width < HubSettingsButtonWidth + 16f || viewport.height < HubSettingsButtonHeight + 54f)
-                return Rect.zero;
-            // Keep the gear on the upper-left safe edge, apart from the illustration hotspots.
-            return new Rect(viewport.xMin + 8f, viewport.yMin + 54f,
-                HubSettingsButtonWidth, HubSettingsButtonHeight);
+            return HubArtworkControlTouchBounds(HubSettingsArtworkSourceBounds, screenSize, safeArea,
+                HubSettingsButtonWidth, false);
         }
         internal static Rect HubAccountButtonScreenBounds(Vector2 screenSize) =>
             new Rect(screenSize.x - HubAccountButtonRightInset, HubAccountButtonTop,
@@ -3671,30 +3738,40 @@ namespace HayChoriYPaty
 
         private static Rect HubTopMusicButtonScreenBounds(Vector2 screenSize, Rect safeArea)
         {
+            return HubArtworkControlTouchBounds(HubMusicArtworkSourceBounds, screenSize, safeArea,
+                HubTopMusicButtonSize, true);
+        }
+
+        private static Rect HubArtworkControlTouchBounds(Rect source, Vector2 screenSize, Rect safeArea,
+            float minSize, bool fallbackRight)
+        {
             Rect viewport = CanvasViewport(screenSize, safeArea);
-            if (viewport.width < HubTopMusicButtonSize + 16f || viewport.height < HubTopMusicButtonSize + 16f)
-                return Rect.zero;
+            if (viewport.width < minSize + 16f || viewport.height < minSize + 16f) return Rect.zero;
+            Rect artwork = HubLayeredArtworkScreenRect(source, screenSize);
+            bool visible = artwork.xMin >= viewport.xMin && artwork.xMax <= viewport.xMax &&
+                artwork.yMin >= viewport.yMin && artwork.yMax <= viewport.yMax;
+            float width = Mathf.Max(minSize, artwork.width);
+            float height = Mathf.Max(minSize, artwork.height);
             Rect account = HubAccountButtonScreenBounds(screenSize);
-            float x = Mathf.Min(account.xMin - HubTopControlsGap - HubTopMusicButtonSize,
-                viewport.xMax - 8f - HubTopMusicButtonSize);
-            float y = Mathf.Max(account.center.y - HubTopMusicButtonSize * .5f, viewport.yMin + 8f);
-            if (x < viewport.xMin + 8f || y + HubTopMusicButtonSize > viewport.yMax - 8f) return Rect.zero;
-            Rect result = new Rect(x, y, HubTopMusicButtonSize, HubTopMusicButtonSize);
-            for (int pass = 0; pass < HubArtworkActions.Length; pass++)
-            {
-                bool moved = false;
-                foreach (int action in HubArtworkActions)
-                {
-                    Rect hotspot = HubArtworkActionScreenBounds(action, screenSize);
-                    if (!result.Overlaps(hotspot)) continue;
-                    result.y = hotspot.yMax + HubTopControlsGap;
-                    moved = true;
-                }
-                if (!moved) break;
-            }
-            if (result.y + result.height > viewport.yMax - 8f ||
-                result.Overlaps(HubSettingsButtonScreenBounds(screenSize, safeArea))) return Rect.zero;
-            return result;
+            // Leave extra room beside Ranking on compact 9:16 previews when the artwork's
+            // own lower speaker control has been cropped out.
+            float fallbackMusicCenterX = Mathf.Min(account.xMin - HubTopControlsGap - 22f - width * .5f,
+                viewport.xMax - 8f - width * .5f);
+            float centerX = visible ? artwork.center.x : fallbackRight
+                ? fallbackMusicCenterX : viewport.xMin + 8f + width * .5f;
+            float centerY = visible ? artwork.center.y : viewport.yMin + 8f + height * .5f;
+            centerX = Mathf.Clamp(centerX, viewport.xMin + width * .5f, viewport.xMax - width * .5f);
+            centerY = Mathf.Clamp(centerY, viewport.yMin + height * .5f, viewport.yMax - height * .5f);
+            return new Rect(centerX - width * .5f, centerY - height * .5f, width, height);
+        }
+
+        private static bool HubArtworkControlIsVisible(Rect source, Vector2 screenSize, Rect safeArea)
+        {
+            Rect viewport = CanvasViewport(screenSize, safeArea);
+            Rect artwork = HubLayeredArtworkScreenRect(source, screenSize);
+            return artwork.width > 0f && artwork.height > 0f &&
+                artwork.xMin >= viewport.xMin && artwork.xMax <= viewport.xMax &&
+                artwork.yMin >= viewport.yMin && artwork.yMax <= viewport.yMax;
         }
 
         private static Rect HubTopMusicButtonLayoutBounds(Vector2 screenSize, Rect safeArea) =>
@@ -3851,7 +3928,7 @@ namespace HayChoriYPaty
         }
         private static Rect HubArtworkActionScreenBounds(int action, Vector2 screenSize)
         {
-            Rect source = HubArtActionSourceRect(action);
+            Rect source = HubSignageTouchSourceBounds(action);
             Rect artwork = HubArtworkScreenBounds(HubArtworkSize, screenSize);
             if (source.width <= 0f || source.height <= 0f || artwork.width <= 0f) return Rect.zero;
             float scale = artwork.width / HubArtworkSize.x;
@@ -4223,7 +4300,7 @@ namespace HayChoriYPaty
             DrawMarketBluePanel(new Rect(150, 8, 240, 56), MarketRoyalBlue);
             MarketText(new Rect(164, 10, 212, 50), "MERCADO", 34, Color.white);
             DrawMarketClubHeader();
-            MarketText(new Rect(26, 176, 488, 22), "OBJETIVOS DEL PARTIDO", 18, new Color(.84f, .96f, 1f));
+            MarketText(new Rect(26, 176, 488, 22), game.Sim.LevelIndex == 9 ? "MODO DEFENSE" : "OBJETIVOS DEL PARTIDO", 18, new Color(.84f, .96f, 1f));
             DrawMarketObjectiveCards(game.Sim);
             Rect economy = MarketEconomyBounds(game.Sim.ProductCount);
             DrawMarketBluePanel(economy, new Color(.012f, .075f, .25f, .98f));
@@ -4309,7 +4386,8 @@ namespace HayChoriYPaty
             {
                 Rect localNotice = new Rect(notice.x - body.x, notice.y - body.y, notice.width, notice.height);
                 DrawMarketBluePanel(localNotice, new Color(.012f, .075f, .25f, .96f));
-                string message = game.Sim.LevelIndex >= 5 ? "CADA TRABAJADOR CUESTA 3 TICKETS" : "SE CANJEA AL PREPARAR RACING (NIVEL 7)";
+                string message = game.Sim.LevelIndex == StreetSimulation.TowerDefenseCampaignLevelId ? "CAMIONEROS SE JUEGA SIN TRABAJADORES DE TICKETS"
+                    : game.Sim.LevelIndex >= 5 ? "CADA TRABAJADOR CUESTA 3 TICKETS" : "SE CANJEA AL PREPARAR RACING (NIVEL 7)";
                 MarketText(new Rect(localNotice.x + 8f, localNotice.y + 2f, localNotice.width - 16f, localNotice.height - 4f), message, 17, Color.white);
             }
             for (int index = 0; index < 5; index++)
@@ -4325,7 +4403,8 @@ namespace HayChoriYPaty
                 MarketText(new Rect(textX, local.y + 38f, 232f, 20f), "COSTO: 3 TICKETS", 15, MarketRoyalBlue, TextAnchor.MiddleLeft);
                 MarketText(new Rect(textX, local.y + 65f, 232f, 24f), "RESERVADOS: " + game.PendingTicketWorkers(role), 15, MarketBlueInk, TextAnchor.MiddleLeft);
                 bool canRedeem = game.CanRedeemTicketWorker(role);
-                string caption = game.Sim.LevelIndex < 5 ? "NIVEL 7+" : game.TicketBalance < 3
+                string caption = game.Sim.LevelIndex == StreetSimulation.TowerDefenseCampaignLevelId ? "NO DISPONIBLE"
+                    : game.Sim.LevelIndex < 5 ? "NIVEL 7+" : game.TicketBalance < 3
                     ? "FALTAN " + System.Math.Max(0L, 3L - game.TicketBalance) + " TICKETS" : "CANJEAR";
                 DrawStandardButton(MarketTicketRedeemButtonBounds(local), MarketTicketRedeemAction + index, caption, canRedeem);
             }
@@ -4374,6 +4453,7 @@ namespace HayChoriYPaty
                 case 6: return sanLorenzoBackground; case 7: return riverMural; case 8: return bocaBackground;
                 case 9: return camionerosBackground;
                 case StreetSimulation.HuracanBonusLevelId: return Resources.Load<Texture2D>("street-mural-huracan-master-v1");
+                case StreetSimulation.ArgentinosJuniorsLevelId: return Resources.Load<Texture2D>("street-mural-argentinos-master-v1");
                 default: return losRedondosBackground;
             }
         }
@@ -4399,6 +4479,7 @@ namespace HayChoriYPaty
         }
         private static string MarketClubInitials(int level)
         {
+            if (level == StreetSimulation.ArgentinosJuniorsLevelId) return "AJ";
             string name = StreetSimulation.LevelNames[level];
             string[] words = name.Split(' '); string value = "";
             foreach (string word in words) if (word.Length > 0 && value.Length < 3) value += char.ToUpperInvariant(word[0]);
@@ -4409,10 +4490,19 @@ namespace HayChoriYPaty
             if (sim == null || slot < 0 || slot >= sim.ProductCount) return string.Empty;
             int product = sim.GetAvailableProduct(slot);
             string name = StreetSimulation.ProductNames[product]; int separator = name.IndexOf(' ');
-            return (separator > 0 ? name.Substring(0, separator) : name) + " ×" + sim.GetProductGoal(product);
+            return (separator > 0 ? name.Substring(0, separator) : name) +
+                (sim.LevelIndex == 9 ? string.Empty : " ×" + sim.GetProductGoal(product));
         }
         private void DrawMarketObjectiveCards(StreetSimulation sim)
         {
+            if (sim.LevelIndex == 9)
+            {
+                Rect card = new Rect(26f, 207f, 488f, 76f);
+                DrawMarketBluePanel(card, MarketIce);
+                MarketText(new Rect(36f, 211f, 468f, 30f), "ATENDÉ A LOS 10 HINCHAS", 24, MarketBlueInk);
+                MarketText(new Rect(36f, 244f, 468f, 32f), "Chori y Coca · Que ninguno llegue a la salida", 16, MarketBlueInk);
+                return;
+            }
             for (int slot = 0; slot < sim.ProductCount; slot++)
             {
                 int product = sim.GetAvailableProduct(slot); Rect card = MarketObjectiveCardBounds(slot, sim.ProductCount);
@@ -7147,6 +7237,8 @@ namespace HayChoriYPaty
 
         private static string FormatQuotaSummary(StreetSimulation sim, bool pendingOnly)
         {
+            if (sim.LevelIndex == 9)
+                return pendingOnly ? "UN HINCHA LLEGÓ A LA SALIDA" : "10 HINCHAS ATENDIDOS";
             var entries = new System.Collections.Generic.List<string>(sim.ProductCount);
             for (int slot = 0; slot < sim.ProductCount; slot++)
             {
@@ -7167,14 +7259,14 @@ namespace HayChoriYPaty
 
         private void ResultPanel()
         {
-            // Physical-screen dimmer covers the HUD and safe-area insets too.
-            DrawIntroScreen(Texture2D.whiteTexture, new Color(0f, 0f, 0f, .63f), ScaleMode.StretchToFill);
-            // Keep the status HUD crisp above the dimmed playfield, as in the in-game reference.
             if (game.IsBonusTrack)
             {
                 DrawBonusTrackResultPanel();
                 return;
             }
+            // Physical-screen dimmer covers the HUD and safe-area insets too.
+            DrawIntroScreen(Texture2D.whiteTexture, new Color(0f, 0f, 0f, .63f), ScaleMode.StretchToFill);
+            // Keep the status HUD crisp above the dimmed playfield, as in the in-game reference.
             if (game.ShowChulengoResult) DrawCounters(game.Sim);
             Rect frame = VictoryPopupBounds(logicalCanvasHeight, game.ShowChulengoResult);
             float previousVertical = layoutVerticalScale;
@@ -7226,9 +7318,9 @@ namespace HayChoriYPaty
                     return;
                 }
                 VictoryText(VictorySlot(frame, new Rect(.095f, .149f, .81f, .189f)),
-                    "¡TURNO\nCOMPLETADO!", Mathf.RoundToInt(50f * fontScale), gold, TextAnchor.MiddleCenter);
+                    game.Sim.LevelIndex == 9 ? "¡DEFENSA\nCOMPLETADA!" : "¡TURNO\nCOMPLETADO!", Mathf.RoundToInt(50f * fontScale), gold, TextAnchor.MiddleCenter);
                 VictoryText(VictorySlot(frame, new Rect(.10f, .345f, .80f, .055f)),
-                    victory ? "VENTAS COMPLETADAS" : "FALTAN", Mathf.RoundToInt(23f * fontScale), brown, TextAnchor.MiddleCenter);
+                    game.Sim.LevelIndex == 9 ? "PEDIDOS COMPLETOS" : victory ? "VENTAS COMPLETADAS" : "FALTAN", Mathf.RoundToInt(23f * fontScale), brown, TextAnchor.MiddleCenter);
                 string sales = FormatQuotaSummary(game.Sim, !victory);
                 VictoryText(VictorySlot(frame, new Rect(.09f, .398f, .82f, .15f)), sales,
                     Mathf.RoundToInt(17f * fontScale), gold, TextAnchor.MiddleCenter);

@@ -1293,6 +1293,56 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
+        public IEnumerator HuracanResultUsesNivelesAndSiguientePartidoDespiteStaleChulengoReceipt()
+        {
+            Type viewType = view.GetType();
+            object save = gameType.GetField("save", PrivateInstance).GetValue(game);
+            save.GetType().GetField("huracanUnlocked").SetValue(save, true);
+            save.GetType().GetField("racingUnlockedByHuracan").SetValue(save, true);
+            Assert.IsTrue((bool)CallGame("SelectLevel", 11));
+            Assert.IsTrue((bool)CallGame("TryStartRound"));
+            SetSim("Phase", Enum.Parse(Sim.GetType().GetProperty("Phase", PublicInstance).PropertyType, "Won"));
+
+            object market = Get("Market");
+            object marketData = market.GetType().GetProperty("Data", PublicInstance).GetValue(market, null);
+            FieldInfo lastResult = marketData.GetType().GetField("lastResult");
+            object staleReceipt = Activator.CreateInstance(lastResult.FieldType);
+            lastResult.FieldType.GetField("chulengoManaged").SetValue(staleReceipt, true);
+            lastResult.SetValue(marketData, staleReceipt);
+            Assert.IsFalse((bool)Get("ShowChulengoResult"),
+                "A normal club's previous Chulengo receipt must not classify Huracán's result as a Chulengo screen.");
+
+            viewType.GetField("logicalCanvasHeight", PrivateInstance).SetValue(view, 960f);
+            viewType.GetField("layoutVerticalScale", PrivateInstance).SetValue(view, 1f);
+            MethodInfo levelsBounds = viewType.GetMethod("BonusResultLevelsBounds", PrivateInstance);
+            MethodInfo nextBounds = viewType.GetMethod("BonusResultNextBounds", PrivateInstance);
+            MethodInfo hit = viewType.GetMethod("HitAction", PrivateInstance);
+            MethodInfo dispatch = viewType.GetMethod("DispatchAction", PrivateInstance);
+            int levelsAction = (int)viewType.GetField("ResultLevelsAction", StaticPrivate).GetRawConstantValue();
+            int nextAction = (int)viewType.GetField("VictoryExitAction", StaticPrivate).GetRawConstantValue();
+            Assert.IsNull(viewType.GetField("BonusRetryAction", StaticPrivate), "Huracán no longer exposes REINTENTAR.");
+            Rect levels = (Rect)levelsBounds.Invoke(view, new object[] { 960f });
+            Rect next = (Rect)nextBounds.Invoke(view, new object[] { 960f });
+            Assert.AreEqual(levelsAction, hit.Invoke(view, new object[] { levels.center }), "NIVELES uses the standard result action.");
+            Assert.AreEqual(nextAction, hit.Invoke(view, new object[] { next.center }), "SIGUIENTE PARTIDO uses the standard result action.");
+
+            dispatch.Invoke(view, new object[] { levelsAction });
+            Assert.AreEqual("Ready", Phase);
+            Assert.IsTrue((bool)viewType.GetField("levelSelectActive", PrivateInstance).GetValue(view));
+
+            Assert.IsTrue((bool)CallGame("SelectLevel", 11));
+            Assert.IsTrue((bool)CallGame("TryStartRound"));
+            viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, false);
+            SetSim("Phase", Enum.Parse(Sim.GetType().GetProperty("Phase", PublicInstance).PropertyType, "Won"));
+            Assert.AreEqual(nextAction, hit.Invoke(view, new object[] { next.center }));
+            dispatch.Invoke(view, new object[] { nextAction });
+            Assert.AreEqual(5, Get("SelectedLevel"), "SIGUIENTE PARTIDO advances from Huracán to Racing.");
+            Assert.IsTrue((bool)viewType.GetField("marketActive", PrivateInstance).GetValue(view),
+                "The next regular level opens its Mercado after the result action.");
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator VictoryPopupTouchBoundsReturnToSelectorAndBlockBackgroundUpgrades()
         {
             Type viewType = view.GetType();
@@ -1449,11 +1499,12 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
-        public IEnumerator AndroidSelectorTouchScrollReachesLosRedondosWithoutActivatingCards()
+        public IEnumerator AndroidSelectorTouchScrollReachesArgentinosWithoutActivatingCards()
         {
             Time.timeScale = 0f;
             object save = gameType.GetField("save", PrivateInstance).GetValue(game);
             save.GetType().GetField("unlockedLevel").SetValue(save, 10);
+            save.GetType().GetField("argentinosUnlocked").SetValue(save, true);
 
             Type viewType = view.GetType();
             viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, true);
@@ -1485,18 +1536,18 @@ namespace HayChoriYPaty.Tests
             }
 
             Assert.That((float)scroll.GetValue(view), Is.EqualTo(maxScroll).Within(.01f),
-                "Repeated mobile swipes must reach the end of the eleven-level campaign.");
+                "Repeated mobile swipes must reach the end of the thirteen-level campaign.");
             Assert.IsTrue((bool)viewType.GetField("levelSelectActive", PrivateInstance).GetValue(view));
             Assert.IsFalse((bool)viewType.GetField("marketActive", PrivateInstance).GetValue(view),
                 "Scrolling must not accidentally select/open a card.");
             Assert.AreEqual("Ready", Phase, "Scrolling must not start a round.");
 
-            Rect losRedondos = (Rect)cardBoundsMethod.Invoke(null, new object[] { 10 });
-            losRedondos.y -= maxScroll;
-            Assert.LessOrEqual(losRedondos.y, viewport.yMax);
-            Assert.GreaterOrEqual(losRedondos.yMax, viewport.y);
-            Assert.AreEqual(40, hitLevelMethod.Invoke(view, new object[] { losRedondos.center }),
-                "The last tile, Los Redondos, is reachable as a normal level-selection target.");
+            Rect argentinos = (Rect)cardBoundsMethod.Invoke(null, new object[] { 12 });
+            argentinos.y -= maxScroll;
+            Assert.LessOrEqual(argentinos.y, viewport.yMax);
+            Assert.GreaterOrEqual(argentinos.yMax, viewport.y);
+            Assert.AreEqual(42, hitLevelMethod.Invoke(view, new object[] { argentinos.center }),
+                "The last tile, Argentinos Juniors, is reachable as a normal level-selection target.");
             yield return null;
         }
 

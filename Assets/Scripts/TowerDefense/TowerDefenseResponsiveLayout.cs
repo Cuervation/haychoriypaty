@@ -5,8 +5,12 @@ namespace HayChoriYPaty
     /// <summary>Responsive route bounds and screen-to-world mapping for the portrait safe-area canvas.</summary>
     public static class TowerDefenseResponsiveLayout
     {
-        public const float RouteTopReserve = 260f;
+        public const float RouteTopReserve = 240f;
         public const float FooterReserve = 240f;
+        // The 96px corridor leaves a visible margin around the 78px fan frame.
+        public const float CorridorWidthLogical = 96f;
+        // Display-only clearance for the full-height fence artwork above the footer.
+        public const float VisualStageLift = 24f;
 
         public static bool TryCreate(TowerDefenseLevelConfig source, Camera camera, Rect viewport,
             float logicalWidth, float logicalHeight, out TowerDefenseLevelConfig runtimeConfig,
@@ -46,7 +50,8 @@ namespace HayChoriYPaty
             // Larger generator-only configurations keep their historic compact reservations.
             float topReserve = authored.RowCount == 3 ? RouteTopReserve : 170f;
             float footerReserve = authored.RowCount == 3 ? FooterReserve : 180f;
-            const float corridorLogical = 56f;
+            float corridorLogical = Mathf.Min(CorridorWidthLogical,
+                Mathf.Max(76f, (logicalHeight - footerReserve - topReserve) / 3f - 1f));
             float logicalBottom = logicalHeight - footerReserve;
             float maximumSpacing = (logicalBottom - topReserve - corridorLogical) / (authored.RowCount - 1f);
             if (maximumSpacing <= corridorLogical)
@@ -66,8 +71,7 @@ namespace HayChoriYPaty
             Rect worldBounds = Rect.MinMaxRect(Mathf.Min(bottomLeft.x, topRight.x), Mathf.Min(bottomLeft.y, topRight.y),
                 Mathf.Max(bottomLeft.x, topRight.x), Mathf.Max(bottomLeft.y, topRight.y));
 
-            float turnLogical = Mathf.Min(60f, rowSpacingLogical * 0.45f);
-            float segmentLogical = logicalWidth - horizontalMargin * 2f - turnLogical * 2f - corridorLogical - 12f;
+            float segmentLogical = logicalWidth - horizontalMargin * 2f - corridorLogical - 12f;
             if (segmentLogical <= 0f)
             {
                 error = "The route cannot fit a horizontal segment and two modular turns at this screen width.";
@@ -80,8 +84,9 @@ namespace HayChoriYPaty
                 RowCount = authored.RowCount,
                 SegmentLengths = lengths,
                 CorridorWidth = corridorLogical * worldUnitsPerLogicalPixel,
+                HorizontalCorridorWidth = corridorLogical * .8f * worldUnitsPerLogicalPixel,
                 RowSpacing = rowSpacingLogical * worldUnitsPerLogicalPixel,
-                TurnRadius = turnLogical * worldUnitsPerLogicalPixel,
+                TurnRadius = authored.TurnRadius,
                 PlayableBounds = worldBounds,
                 TurnSegments = authored.TurnSegments
             };

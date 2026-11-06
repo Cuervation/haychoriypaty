@@ -1,4 +1,46 @@
-## 2026-11-03 — Integración parcial de Tower Defense Camioneros
+## 2026-11-06 — Camisetas de la hinchada de Huracán
+
+Se incorporaron seis camisetas Huracán basadas en las referencias del usuario, repetidas entre doce identidades en atlas de festejo/caminata y de derrota; solo cambia el arte del equipo ID11. `ClubVisualTheme` asigna los sprites dedicados, mantiene la escala/lógica existente y mapea el orden fuente caminar→festejar sin editar los PNG. `HuracanThemeUsesItsSixShirtWardrobeForCheeringWalkingAndDefeat` pasó **1/1 EditMode** en Unity 6000.6.3f1; ambos atlas se importaron/cargaron con transparencia y 6×4 celdas. No se capturó una ronda en Game View ni se generó/instaló APK. Ver [contrato Huracán](features/huracan-bonus-track.md).
+
+## 2026-11-05 — Captura Unity de las vallas rectas
+
+Full Game View actual 540×960 revisada: `/private/tmp/hcyp-td-straight-fences-gameview-20261105.png`. Probe aislado **1/1 PlayMode PASS**, nueve hinchas sintéticos con Chori/Coca, render/HUD actuales y vallas ortogonales. No se activó el perfil real ni se escribió progreso. Fuente/meta temporal retiradas y Main restaurada limpia fuera de PlayMode. No es aceptación de campaña completa ni de dispositivo; ver [contrato Tower Defense](features/tower-defense.md).
+
+## 2026-11-05 — Módulos de valla sin invadir el paso
+
+A pedido del usuario se ajusta el mosaico por pierna recta: marcos de 120/60 unidades lógicas quedan contenidos entre sus esquinas, y una conexión menor que 60 comprime uniformemente su módulo para no proyectar un fragmento al carril adyacente. Se agregó `FencePanelsStayOnTheirOwnStraightLegAndShrinkForShortTurnGaps` para cubrir conectores más cortos y la condición de paso libre. `git diff --check` **PASS**. Unity Editor está abierto (lockfile/proceso confirmados), pero no hay canal Unity MCP en esta sesión; Test Runner, compile/Console y Game View de esta variante son `NOT_RUN`. No se abrió otro Editor ni se generó APK.
+
+## 2026-11-05 — Vallas ortogonales en Tower Defense
+
+A pedido del usuario, se reemplazaron las curvas por conectores verticales rectos entre los tramos horizontales. Las piezas de valla mantienen una escala común y orientación horizontal/vertical; se conserva el conteo de muestras por giro para los índices existentes y el `TurnRadius` serializado queda ignorado. Se preservan la ruta, los followers y los colliders continuos; el cálculo responsive ahora reserva el espacio de ruta sin un radio lateral.
+
+Unity 6000.6.3f1: **26/26 EditMode PASS** en geometría, vallas, layout responsive y followers. En el job más amplio hubo **32/33 PASS**; el único fallo fue una `NullReferenceException` de `CampaignRosterTicketWorkersAndTDSpendingStayInTheCampaignEconomy` al buscar `CalculateHireCost` (línea 121, prueba de economía ajena a esta modificación). Un reintento con filtros por métodos exactos no inició ninguna prueba en 120 s. Unity permanece en Main limpia, fuera de PlayMode. Captura Game View y run de campaña **NOT_RUN**; no APK.
+
+## 2026-11-05 — Extremos del vallado de Tower Defense
+
+La entrada de la valla visible llega al borde izquierdo de cámara y la salida al derecho, con un inset de 4 unidades lógicas recalculado en cada reflow. No se desplaza la ruta de hinchas ni los puntos de los `EdgeCollider2D`. Unity 6000.6.3f1: `TowerDefenseModularFenceGeneratorTests` **5/5 EditMode PASS**; probe sintético **1/1 PlayMode PASS**, Game View 540×960 con 15 hinchas, captura `/private/tmp/hcyp-td-fence-edge-gameview-20261105.png`. Main quedó limpia y fuera de PlayMode; probe temporal retirado. No valida la campaña end-to-end ni genera APK. Ver [contrato Tower Defense](features/tower-defense.md).
+
+## 2026-11-03 — Camioneros Tower Defense integrado a la campaña (aceptación pendiente)
+
+La posición visible 11 conserva el ID 9; Los Redondos sigue en ID 10. Hub→selector no ofrece otro modo de Camioneros y la selección ID 9 abre directamente el runtime TD; `StreetGame.TryStartRound` bloquea el inicio tradicional. El arranque TD usa el mismo intento y snapshot de `StreetMarket`, reservas de tickets, GUID/save, simulación ID 9, settlement por `ProcessRoundResult`, ticket idempotente y unlock de campaña. TD importa ventas, monedas, tiempo, roster, hires/mejoras y órdenes al resultado común; salida manual usa la política existente de abandono, salvo que un run ya terminal se liquida como victoria/derrota para evitar una carrera de mismo frame. Sin cambios de schema, IDs ni balance de origen.
+
+Se agregaron `CamionerosTowerDefenseUsesCampaignId9SettlementAndUnlocksLosRedondosExactlyOnce`, `ExitAtTowerDefenseCompletionSettlesVictoryInsteadOfAbandoning` y `CampaignRosterTicketWorkersAndTDSpendingStayInTheCampaignEconomy`; son regresiones fuente, **no ejecutadas**. Revisión independiente de los seis criterios de campaña encontró el cableado en código y no detectó defecto concreto; no equivale a ejecución de tests. El `mcpforunity://instances` mostró una instancia Unity 6000.6.3f1, pero `project_info` falló por desconexión de plugin y `editor_state` por `ping not answered`; no se lanzó ni reinició el editor. Compile/Console, Test Runner, run integrado, save/restart, visual Game View y validación responsive de esta revisión quedan `BLOCKED`/`NOT_RUN`. Ver [contrato](features/tower-defense.md) e [informe](../docs/reports/INTEGRACION_CAMIONEROS_TOWER_DEFENSE.md). Sin commit/push.
+
+## 2026-11-03 — Tower Defense standalone (checkpoint histórico, supersedido)
+
+La entrada y evidencia debajo describen el checkpoint anterior con selector separado, antes de integrar Camioneros como slot de campaña. Las capturas/pruebas standalone no certifican la integración nueva.
+
+## 2026-11-03 — Corrección de tier gratuito y consolidación del balance
+
+`StreetSimulation.CalculateHireCost` ahora excluye el Parrillero inicial gratuito del tier pagado en los once niveles tradicionales; conserva baseline dos para San Lorenzo y Huracán. Se agregó `FreeParrilleroDoesNotConsumePaidHireTierAcrossAllCampaignLevels`. `Main.unity` ahora serializa los once catálogos de producto e incluye explícitamente Los Redondos. No cambiaron cuotas, monedas, tiempos, planteles adoptados, tickets, ventas, Huracán ni el ID/configuración separada de Tower Defense. Racing Fernetero $200 se verificó sin cambio como valor deliberado.
+
+Balance operativo y reporte: [BALANCE_ACTUAL_NIVELES.md](../docs/BALANCE_ACTUAL_NIVELES.md) y [INFORME_CORRECCION_NIVELES.md](../docs/reports/INFORME_CORRECCION_NIVELES.md). Se marcaron como históricos los snapshots de 2026-10-24, Camioneros 360 s de 2026-10-30 y el requisito antiguo de roster uniforme. Auditoría `2026-10-21-live-balance` preservada con advertencia histórica.
+
+**Fuente/escena:** Unity preview de Main confirmó orden `0,1,2,3,4,11,5,6,7,8,9,10`, 11 filas serializadas de `levelProductIds`, 11 duraciones, los balances/metas y el recurso TD propio. Antes de la solicitud de recompilación, el assembly cargado aún devolvía los precios incorrectos del primer Parrillero. Luego se pidió compile mediante Unity MCP (`resulting_state=compiling`), pero el puente se desconectó; no hay evidencia del assembly post-fix.
+
+**Pruebas:** el EditMode job `535103eb89804d4aa72c3bea239fe856` terminó `failed` durante la inicialización: `completed=0`, “tests did not start within timeout”. El segundo job focalizado `9ac8aa4eae8148d6b6530c5e92593741` no devolvió resultados: Unity MCP se desconectó al esperar `command_result`. No hay aserciones post-fix disponibles ni compilación/Console confirmada. Reruns de economía/progresión/save/bonus/TD y factibilidad de campaña fresca quedan **NOT_RUN**. No se tocó progreso guardado, no se generó APK y no se hizo commit/push. `git diff --check` focalizado **PASS**; auditoría estática independiente de configuración/tablas **PASS**.
+
+## 2026-11-03 — Tower Defense standalone (detalle histórico, supersedido por integración de campaña)
 
 Se conectó el selector desde el hub y se implementó el flujo aislado de modo/nivel, ruta S, hinchas animados con pedidos, estaciones y zonas de trabajo, producción/entrega física, HUD responsive y controles. Los valores de nivel y cobro reutilizan el balance/precio oficial de Camioneros; el ciclo de campaña queda suspendido dentro del modo y no se añadió persistencia/settlement propio. También se corrigieron dimensiones de layout con `Camera.pixelWidth/Height`, el clipping del título y el pareo producto/cantidad, y se cambió el muestreo de producto para priorizar cuota/demanda pendiente como la campaña.
 
@@ -6,11 +48,64 @@ Se conectó el selector desde el hub y se implementó el flujo aislado de modo/n
 
 **No aceptado todavía:** Test Runner EditMode job `63eb53210e4b4952b0af1d1380713dd0` no inició casos (`completed=0`, timeout de inicio configurado en 30 s). Campaña tradicional/reentrada+guardado, pasos de trabajadores sin cruzar vallas, la integración completa de siete productos/bebidas, UI Game View a otras relaciones y prueba holística quedan `NOT_RUN`. La captura revela congestión visual con muchas hinchas y continuidad de vallas en curvas por revisar. Consultar [contrato Tower Defense](features/tower-defense.md); no declarar completo.
 
+## 2026-11-02 — Acciones del resultado Huracán
+
+El recibo Chulengo de un partido previo podía capturar el flujo de controles mientras el panel visible era el resultado de Huracán. Ahora se da prioridad al modo Bonus y la pantalla final usa los destinos/acciones comunes `NIVELES` y `SIGUIENTE PARTIDO` (o `ÚLTIMO NIVEL` deshabilitado); se quitó `REINTENTAR`. Regresión PlayMode agregada: `HuracanResultUsesNivelesAndSiguientePartidoDespiteStaleChulengoReceipt`. El Editor quedó compilado sin errores C#, pero el runner no inició la prueba tras dos intentos de 120 s (**NOT_RUN**); no se generó APK ni se probó en el teléfono. Ver [contrato Huracán](features/huracan-bonus-track.md).
+
+## 2026-11-02 — Corrección de stock del outbox Huracán y APK 0.2.82/code84
+
+Tras el despliegue de reglas Huracán, la reintentada real seguía con `PermissionDenied`: además de nivel/campos bonus, la regla vincula el match al stock del estado posterior. Ahora `BuildBonusMatchRecord` guarda el Mercado no consumido y Firestore proyecta `stockRemaining` desde el snapshot inmutable, reparando outboxes previos. Regresión `BonusMatchAndStaleOutboxUseTheCommittedSnapshotInventory` **1/1 EditMode PASS**.
+
+APK Development Main-only IL2CPP/ARM64, Unity 6000.6.3f1, **0.2.82/code84**, build `build-61d1546dbc` **Succeeded, 325.33 s, 0 errores/8 advertencias**. Artefacto `Builds/Android/Archive/HayChoriYPaty-0.2.82-code84-huracan-stock-sync-20261102.apk`, 499,658,953 bytes, SHA-256 `25a5872312a4379fee2cc0e665daa80fc124f87d3a2f5478a3cf3a0125ae7456`. ZIP/zipalign/APK v2/package/version/API/ABI/metadata PASS. Tras la reconexión USB confirmada por el usuario, `adb install -r` devolvió **Success** en Motorola Edge 60 Fusion (`ZY22MBNWRB`); Package Manager confirma `0.2.82/code84`, `lastUpdateTime=2026-11-02 14:18:25` y preserva `firstInstallTime=2026-10-03 18:49:24`. No se desinstaló ni borró cache/datos/cuenta. Smoke físico: Main abrió en foreground, CUENTA mostró Google vinculado, JUGAR abrió el selector con Huracán `DISPONIBLE`, e Insignias mostró **“SINCRONIZADO CON FIREBASE”**; el logcat filtrado `[FirebasePlayerSession]` no mostró errores. Captura `/private/tmp/hcyp-0.2.82-insignias-sync.png`. Esto acredita recuperación del estado/sync al abrir; no se inició ronda, así que el commit terminal y la repetición de Huracán siguen **NOT_RUN** en el teléfono. Aceptación end-to-end todavía pendiente; ver [firebase-player](features/firebase-player.md) y [android-prototype](features/android-prototype.md).
+
+## 2026-11-02 — Diagnóstico y retry de errores Firestore
+
+El cliente ahora registra `FirestoreException.ErrorCode` sin texto sensible y clasifica `Unavailable`, `DeadlineExceeded`, `Cancelled` y `Aborted` como transitorios para el backoff existente; `PermissionDenied` continúa siendo permanente. `FirebasePlayerSessionDiagnosticTests` pasó **7/7 EditMode**. APK Development Android `0.2.81/code83` generada correctamente desde Main (318.86 s, 0 errores/6 advertencias), ZIP/alineación/firma v2/metadata verificados e instalada como actualización en el Motorola Edge 60 Fusion. Package Manager conserva `firstInstallTime=2026-10-03 18:49:24`; la SHA-256 del `base.apk` instalado coincide con el artefacto. No se limpiaron datos. Smoke test en Motorola: actividad Unity en foreground, sin crash, pero panel CUENTA bloquea gameplay; logcat sanitizado registró `firestore-commit / FirestoreException / PermissionDenied`, y un REINTENTAR no lo resolvió. Falta comparar reglas activas con el commit. No se tocaron reglas remotas. Detalles: [diagnóstico Firebase](features/firebase-player.md#diagnóstico-real-android--2026-11-02) y [entrega Android](features/android-prototype.md).
+
 ## 2026-11-01 — Huracán / Parque Patricios Bonus Track (integrado en fuente; pendiente de aceptación)
 
 Se incorporó Huracán como sexto lugar visible de campaña con ID persistente11, sin desplazar IDs Racing–Los Redondos; hay migración Save v4→v5, modo de 120s, cartas seeded/ponderadas, Aguante, puntos/tickets idempotentes, UI y mural1898×829. Roslyn de Unity6000.6.3f1 compiló runtime y assembly EditMode (**PASS estático**); el suite no se ejecutó. Tres intentos acotados de recuperación de Unity MCP terminaron en `ping not answered`; Game View/capturas y resolución visual **BLOCKED**. Simulaciones de balance/20 corridas por estrategia, reglas Firestore reales y Android gameplay **NOT_RUN**. Los umbrales 3000/6500/10000 son provisionales, no balance final. Evidencia detallada: [contrato](features/huracan-bonus-track.md) y [informe](../INFORME_BONUS_TRACK_HURACAN.md).
 
 APK Development Main-only generada: job build-e2f77bf4d8 Succeeded (357.18 s, 0 errores/5 advertencias); 0.2.81/code83, 411,941,423 bytes, SHA-256 f3b4b1d2b3f46834b9c6423beb6cbe978c63db4e843780ec5eeb06695128899b. ZIP, zipalign4, APK v2, package/version/ABI y metadata Huracán verificados. No se instaló ni abrió; gameplay/visual Android permanece NOT_RUN. Debug-signed, con +30 tickets QA Development; no usar como release.
+
+
+## 2026-11-01 — Los Redondos ahora usa la vereda mural de Ferro
+
+A pedido del usuario, el Nivel 11 reemplaza su franja ancha de 104 unidades por la misma banda única de mural que Ferro: pegada al pie del mural y limitada a **25 px renderizados**. Reutiliza filas 680–810 del arte original Los Redondos para conservar baldosa + un cordón y omitir el asfalto; la franja se estira directamente, no se aspect-cropea, y no altera mostrador, cola, estaciones ni rutas.
+
+**Validación:** inspección/fórmula estática 540/1080/2160 px y `git diff --check` focalizado **PASS**. `LosRedondosMuralSidewalkMatchesFerroAsOneCappedStripAtTheMuralEdge` (EditMode, 3 casos) **BLOCKED**: job `e65627cbbd4840e6856f25cdcd68f25a` falló al inicializar y no comenzó ninguna prueba. Después reconecté al Editor ya abierto y capturé el LevelIndex10 real, Unity Play Mode / fase Ready, Game View **1012×1800 PASS**, mostrado inline. El PNG temporal se eliminó luego de mostrarlo. Detuve Play Mode, restauré exactamente el JSON PlayerPrefs y el marcador de tutorial original, y confirmé `selectedLevel=0`, `unlockedLevel=10`, `playerActive=false` y `AllowEditorTestInitialization=false`; no se inició ronda ni se cambiaron datos de progreso. Sin APK nueva ni instalación.
+
+## 2026-11-01 — Instalación de APK Ferro 0.2.81/code83 en Motorola Edge 60 Fusion
+
+A pedido del usuario, instalé la APK recién generada con `adb install -r` en `ZY22MBNWRB`. Resultado **Success**. Package Manager confirma `versionCode=83`, `lastUpdateTime=2026-11-01 13:28:29`; el `firstInstallTime=2026-10-03 18:49:24` se conservó. No se desinstaló ni borraron datos y no se abrió el juego. Android gameplay/performance y revisión visual física **NOT_RUN**.
+
+## 2026-11-01 — APK Development 0.2.81/code83 con veredita de Ferro
+
+Build Android Main-only desde el checkout activo con Unity 6000.6.3f1, Development IL2CPP/ARM64. Job `build-92597ffcc8`: **Succeeded, 101.010826 s, 0 errores/6 advertencias**. APK `Builds/Android/Archive/HayChoriYPaty-0.2.81-code83-ferro-sidewalk-20261101.apk`, **396,691,742 bytes**, SHA-256 `eb44006cc155541d0a3fb1f995865692d4ceb97c1e62fff153168fdb5bd63358`. **PASS:** ZIP íntegro, `zipalign -c 4`, firma APK v2 Android Debug, paquete `com.haychoriypaty.game`, versión0.2.81/code83, min API26/target36/ABI arm64-v8a, Analytics/Ad-ID desactivados, y metadata IL2CPP contiene los tres símbolos de vereda Ferro (`FerroMuralSidewalkBounds`, `FerroMuralSidewalkMaxScreenPixels`, `FerroMuralSidewalkSource`). No Play Store signing.
+
+Al terminar el build todavía no estaba instalada; la instalación posterior quedó registrada arriba. El juego no se abrió. El EditMode focalizado original quedó **BLOCKED** por transición Play Mode; dos repeticiones con el Editor idle (filtro por nombre base y nombre calificado) seleccionaron **0 tests**, por lo que no acreditan PASS (**NOT_RUN**). No se detuvo ni reinició Unity. Captura full Game View y revisión visual/física Android **NOT_RUN**. Bono QA Development +30 tickets todavía presente; remover antes de release.
+
+## 2026-11-01 — Veredita con cordón debajo del mural de Ferro
+
+A pedido del usuario, Ferro reutiliza ahora solo una tira angosta del arte original (baldosa y borde de cordón), pegada al final del mural. Su altura se limita a **25 píxeles renderizados** a cualquier ancho; la calle compartida sigue continua por debajo y no se vuelve a colocar el recorte anterior de 104 unidades con otra transición de pavimento. No se modificaron PNG, otros niveles ni geometría de juego.
+
+**Validación:** compilación/importación Unity sin errores C# nuevos; comprobación ejecutada dentro del Editor para 540/1080/2160 px confirmó 25 px de alto y recorte fuente dentro del recurso **PASS**. El EditMode focalizado quedó **BLOCKED** porque el Editor ya estaba en Play Mode/en transición. Game View completa de Ferro **NOT_RUN**: la vista activa mostraba All Boys/hub y `StreetGame.Sim` era nulo; no se cambió progreso ni estado de juego. Se retiró la captura temporal de diagnóstico. Sin APK ni instalación.
+
+## 2026-10-31 — APK 0.2.81/code83 instalada en Motorola Edge 60 Fusion
+
+A pedido del usuario se instaló `Builds/Android/Archive/HayChoriYPaty-0.2.81-code83-current-local-updates-20261031.apk` mediante `adb install -r` en `ZY22MBNWRB` (`motorola_edge_60_fusion`). Resultado **Success**. Antes: package `com.haychoriypaty.game` versionCode82; después: versionCode83/versionName0.2.81. `firstInstallTime=2026-10-03 18:49:24` se mantuvo; no hubo uninstall ni limpieza de datos. APK no se abrió. Gameplay, rendimiento y revisión visual de veredas en dispositivo **NOT_RUN**. Git no se modificó.
+
+## 2026-10-31 — Corrección visual de la vereda de Ferro según referencia del usuario
+
+La captura adjunta define el objetivo: una sola superficie pública pavimentada continua entre el mural de Ferro y el mostrador compartido. El overlay anterior reutilizaba un recorte alto del fondo Ferro con pie de pared/cordón/calle, creando un segundo borde y un cambio de textura sobre el plano base. Se quitó únicamente esa capa y sus coordenadas/tests específicos; queda el terreno común de `street-background-open-street-v4` detrás de la hinchada. Mural, cola, mostrador, Los Redondos y geometría de gameplay no cambian.
+
+**Validación:** revisión de fuente confirma que ya no se dibuja el crop de Ferro; `git diff --check` de los archivos intencionales pasa. El diff global sigue mostrando espacios al final preexistentes en seis `.meta` de carne (no tocados). Unity MCP lista la instancia/proyecto correcto, pero `editor/state` y `read_console` fallaron con `ping not answered`; no se reinició el Editor. Compilación, prueba y captura Game View **BLOCKED**. La APK 0.2.81/code83 instalada aún contiene el crop anterior; no se compiló ni instaló una APK nueva y no hubo Git push.
+
+## 2026-10-31 — APK de validación local 0.2.81/code83 y regresiones Unity
+
+Continuación de las pruebas pendientes en el checkout activo. Unity 6000.6.3f1, Android/IL2CPP/ARM64, escena `Assets/Scenes/Main.unity` (build explícito Main-only). Se verificó la corrección de espera de Parrilleros normales bajo su mesa y parrilla propia: suite focalizada de **5/5 EditMode + 1/1 PlayMode PASS**. EditMode incluye las variantes de cola 5/6/8, inicio Camioneros con 380 s y equipo normal/Mozo/Cocacolero, y Los Redondos con la misma apertura/roster que Camioneros sin alterar sus reglas. Captura revisada: `/var/folders/bf/q6_2cmvn6ls9pc5h5g7thj8r0000gn/T/hay-chori-cook-queues-own-grills-960.png`; es una proyección aislada de cocina, no Game View completa ni dispositivo. Las pruebas ambientales y de composición ya ejecutadas previamente permanecen registradas en el contrato del hub.
+
+Build job `build-64f4c1ff3e`: **Succeeded, 342.412726 s, 0 errores/8 advertencias**. APK `Builds/Android/Archive/HayChoriYPaty-0.2.81-code83-current-local-updates-20261031.apk`, **396,691,742 bytes**, SHA-256 `b1a57cf18a76c0e37511d48ac73b0e6d1371a704ffea962259d9a6f059ff0232`. ZIP íntegro, `zipalign -c 4`, firma APK v2, paquete `com.haychoriypaty.game`, versionCode83/versionName0.2.81, min API26, target API36 y `arm64-v8a` verificados; metadata IL2CPP contiene `DrawHubLayeredEnvironment`. APK Development/debug-sign; mantiene bono QA temporal +30 tickets, retirar antes de release. No se instaló ni inició; teléfono último conocido 0.2.80/code82. Android gameplay/performance, full Game View visual de veredas y Git push **NOT_RUN**.
 
 ## 2026-10-31 — Vereda de enfrente para Los Redondos
 
@@ -23,6 +118,12 @@ Se añadió al Nivel 11 una franja escenográfica de vereda/cordón tomada del f
 Se añadió al Nivel 4 una capa de vereda tiled con cordón, reutilizando un recorte del fondo original de Ferro. Se dibuja detrás de la hinchada y termina en el borde común del mostrador; no altera perspectiva, filas, anclas, estaciones ni rutas.
 
 Unity 6000.6.3f1: `FerroOppositeSidewalkUsesOriginalTileAndCurbCropWithoutMovingSharedCounter` **3/3 EditMode PASS** a alturas 960/1200/1360. La compilación/importación no mostró errores C# nuevos. La captura full Game View de Level 4 quedó **BLOCKED**: `Level04_Ferro_MarketAndMultiRoleUi_InMemoryOnly` falló antes de resultados con `NullReferenceException`, `An unexpected error happened while running tests` y `Too many instant steps ... ExitPlayModeTask`; no se obtuvo PNG actual. No se generó APK ni se hizo instalación o push.
+
+## 2026-10-31 — Restauración de cuatro filas de hinchas
+
+Se recupera la capacidad de **28 hinchas en 7 columnas × 4 filas**: límite y default de `StreetBalance`, capacidad/slots de la simulación y balance serializado de `Main.unity`. Se agregó una regresión EditMode para admitir 28, rechazar el 29, verificar el mapeo de las cuatro filas y mantener el avance FIFO de la cuarta persona; también se añadió una aserción del límite serializado de Main. El renderer ya contemplaba filas adicionales y conserva sus burbujas solo en las dos primeras. Historial del checkout: el primer commit con la simulación (2026-10-03) ya tenía el tope 21/7×3, así que no hay evidencia versionada de cuándo se perdió una cuarta fila; pudo ser un APK anterior fuera de este Git.
+
+**Validación:** `git diff --check` focalizado pasó. No se pudieron ejecutar EditMode ni revisar Game View portrait: la instancia Unity listada por MCP no respondió a `get_editor_state` (timeout); no se reinició. APK/dispositivo **NOT_RUN**.
 
 ## 2026-10-30 — Refuerzo moderado de animaciones ambientales del hub
 

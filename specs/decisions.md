@@ -340,3 +340,6 @@ Se conserva el master 841×1870 y se contiene una sola vez en el área segura; l
 
 ## 2026-10-29 — Corrección del encuadre del hub
 Aclaración posterior del usuario: mantener exactamente la misma ilustración a todas las resoluciones, sin relleno azul ni repetición del arte. Dibujar el master una sola vez a pantalla completa con `ScaleAndCrop`, conservando proporción y recortando solo lo necesario para cubrir. No generar variantes ni modificar el recurso fuente.
+
+## 2026-11-05 — No invadir el pasillo del Tower Defense con módulos de valla
+Conservar el corredor de hinchas completamente libre entre sus dos límites ortogonales: ningún panel puede prolongarse desde un tramo a la pierna contigua ni bloquear solo parte del paso. Usar 120/60 unidades lógicas como tamaños preferidos; si una conexión recta mide menos de 60, reducir uniformemente esa pieza para que quepa en su propio tramo. Tradeoff: algunos módulos de giro pueden quedar menores que el módulo corto estándar; se prioriza el paso libre y la geometría recta sobre una valla sobredimensionada.

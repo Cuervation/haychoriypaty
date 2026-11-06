@@ -46,7 +46,19 @@ namespace HayChoriYPaty.Tests
                 Assert.That(end.y, Is.EqualTo(start.y).Within(0.001f), "row " + row + " remains horizontal");
 
                 if (row < rowCount - 1)
+                {
+                    Vector2 previous = end;
+                    for (int sample = 1; sample <= 12; sample++)
+                    {
+                        Vector2 connectorPoint = centerline[startIndex + 1 + sample];
+                        Assert.That(connectorPoint.x, Is.EqualTo(end.x).Within(0.001f),
+                            "row " + row + " connector stays on one vertical line");
+                        Assert.Less(connectorPoint.y, previous.y,
+                            "row " + row + " connector advances continuously downward");
+                        previous = connectorPoint;
+                    }
                     startIndex += 1 + 12;
+                }
             }
 
             Assert.That(centerline[0].y, Is.GreaterThan(centerline[centerline.Length - 1].y), "Entry is on the top row and exit is on the bottom row.");
@@ -69,6 +81,9 @@ namespace HayChoriYPaty.Tests
             Assert.That(Vector2.Distance(centerline[0], right[0]), Is.EqualTo(1f).Within(0.001f));
             Assert.That(left[0].y, Is.GreaterThan(centerline[0].y));
             Assert.That(right[0].y, Is.LessThan(centerline[0].y));
+            AssertAxisAlignedPolyline(centerline, "fan route centerline");
+            AssertAxisAlignedPolyline(left, "left fence rail");
+            AssertAxisAlignedPolyline(right, "right fence rail");
         }
 
         [Test]
@@ -106,6 +121,19 @@ namespace HayChoriYPaty.Tests
                 "The configured first segment length is reported unchanged.");
         }
 
+        [Test]
+        public void LegacyTurnRadiusDoesNotBendOrChangeTheOrthogonalRoute()
+        {
+            object tight = MakeConfig(3, new[] { 8f, 8f, 8f }, 4f, 2f, new Rect(-20f, -10f, 40f, 20f), 12);
+            object wide = MakeConfig(3, new[] { 8f, 8f, 8f }, 4f, 2f, new Rect(-20f, -10f, 40f, 20f), 12);
+            Set(tight, "TurnRadius", 0f);
+            Set(wide, "TurnRadius", 1000f);
+            Vector2[] tightPoints = Get<Vector2[]>(Generate(tight), "Centerline");
+            Vector2[] widePoints = Get<Vector2[]>(Generate(wide), "Centerline");
+            CollectionAssert.AreEqual(tightPoints, widePoints,
+                "The legacy serialized radius is ignored; all connectors remain straight.");
+        }
+
         private object MakeConfig(int rowCount, float[] lengths, float rowSpacing, float corridorWidth, Rect bounds, int turnSegments)
         {
             object config = Activator.CreateInstance(configType);
@@ -137,6 +165,17 @@ namespace HayChoriYPaty.Tests
         {
             object validation = Get<object>(result, "Validation");
             Assert.IsTrue(Get<bool>(validation, "IsValid"), string.Join("; ", Get<string[]>(validation, "Errors")));
+        }
+
+        private static void AssertAxisAlignedPolyline(Vector2[] points, string label)
+        {
+            for (int i = 1; i < points.Length; i++)
+            {
+                Vector2 delta = points[i] - points[i - 1];
+                bool horizontal = Mathf.Abs(delta.y) <= 0.001f && Mathf.Abs(delta.x) > 0.001f;
+                bool vertical = Mathf.Abs(delta.x) <= 0.001f && Mathf.Abs(delta.y) > 0.001f;
+                Assert.IsTrue(horizontal || vertical, label + " segment " + (i - 1) + " must be horizontal or vertical.");
+            }
         }
 
         private static void Set(object target, string fieldName, object value)

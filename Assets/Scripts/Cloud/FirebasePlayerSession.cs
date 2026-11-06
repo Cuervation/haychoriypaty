@@ -117,7 +117,11 @@ namespace HayChoriYPaty.Cloud
                 if (IsGoogleUser(auth.CurrentUser)) await ResolvePlayerAsync(ticket);
                 else { State = PlayerSessionState.LoginRequired; message = ""; }
             }
-            catch (Exception) { if (ticket == generation) Fail("No pudimos preparar el acceso. Tu progreso está protegido. Reintentá."); }
+            catch (Exception error)
+            {
+                LogFailure("bootstrap", error);
+                if (ticket == generation) Fail("No pudimos preparar el acceso. Tu progreso está protegido. Reintentá.");
+            }
         }
         private static bool IsGoogleUser(FirebaseUser user) => user != null && !user.IsAnonymous && user.ProviderData.Any(p => p.ProviderId == "google.com");
         public async void SignIn()
@@ -135,7 +139,12 @@ namespace HayChoriYPaty.Cloud
                 await ResolvePlayerAsync(ticket);
                 if (ticket == generation && IsGoogleUser(auth.CurrentUser)) ContinueToGameAfterGoogleSignIn();
             }
-            catch (Exception) { google.Cancel(); if (ticket == generation) { State = PlayerSessionState.LoginRequired; message = "No se pudo iniciar sesión. Podés volver a intentar."; } }
+            catch (Exception error)
+            {
+                LogFailure("google-sign-in", error);
+                google.Cancel();
+                if (ticket == generation) { State = PlayerSessionState.LoginRequired; message = "No se pudo iniciar sesión. Podés volver a intentar."; }
+            }
         }
         private async Task ResolvePlayerAsync(int ticket)
         {
@@ -146,6 +155,7 @@ namespace HayChoriYPaty.Cloud
             try { cloud = await Within(remote.ReadAsync()); }
             catch (Exception error)
             {
+                LogFailure("firestore-read", error);
                 // Only a previously owned durable profile is available offline, never an unowned legacy save.
                 if (ticket == generation && local.State.snapshot != null && IsTransient(error))
                 { Activate(local.State.snapshot); offline = true; return; }
@@ -206,7 +216,11 @@ namespace HayChoriYPaty.Cloud
                 PlayerLocalRepository.ClaimLegacy(root, auth.CurrentUser.UserId);
                 local.SetLegacySource(legacyHash); Activate(legacyJson); SyncPending(); ContinueToGameAfterGoogleSignIn();
             }
-            catch (Exception) { Fail("No pudimos vincular la partida. La copia original sigue protegida."); }
+            catch (Exception error)
+            {
+                LogFailure("legacy-import", error);
+                Fail("No pudimos vincular la partida. La copia original sigue protegida.");
+            }
         }
         public void UseRemotePreservingLocal()
         {
@@ -219,7 +233,11 @@ namespace HayChoriYPaty.Cloud
                 local.AdoptRemote(conflictRemote.snapshot, conflictRemote.revision, true); Activate(local.State.snapshot);
                 conflictRemote = null; ContinueToGameAfterGoogleSignIn();
             }
-            catch (Exception) { Fail("No pudimos cambiar de progreso con seguridad. Conservamos ambas copias."); }
+            catch (Exception error)
+            {
+                LogFailure("conflict-local-adoption", error);
+                Fail("No pudimos cambiar de progreso con seguridad. Conservamos ambas copias.");
+            }
         }
         private void ShowConflict(RemotePlayerState cloud)
         {
@@ -255,12 +273,17 @@ namespace HayChoriYPaty.Cloud
             catch (Exception error)
             {
                 if (ticket != generation || this == null) return;
+                LogFailure("firestore-commit", error);
                 if (ContainsConflict(error))
                 {
                     try { var cloud = await Within(server.ReadAsync()); if (ticket == generation) ShowConflict(cloud); }
-                    catch (Exception) { if (ticket == generation) Fail("No pudimos reconciliar el progreso. Tus datos locales están protegidos."); }
+                    catch (Exception reconcileError)
+                    {
+                        LogFailure("firestore-conflict-reconcile", reconcileError);
+                        if (ticket == generation) Fail("No pudimos reconciliar el progreso. Tus datos locales están protegidos.");
+                    }
                 }
-                else if (!IsTransient(error)) { game?.SuspendPlayer(); Fail("No pudimos sincronizar con seguridad. Tus datos locales están protegidos."); }
+                else if (!IsTransient(error)) HandlePermanentSyncFailure();
                 else
                 {
                     offline = true; retryAt = Time.unscaledTime + retryDelay; retryDelay = Mathf.Min(120, retryDelay * 2);
@@ -269,19 +292,56 @@ namespace HayChoriYPaty.Cloud
             }
             finally { syncing = false; }
         }
+        private void HandlePermanentSyncFailure()
+        {
+            // A terminal commit can fail while StreetView is still on the round. Suspending
+            // clears StreetGame.Sim; move to the account hub before that leaves a blank scene.
+            game?.SuspendPlayer();
+            accountOpen = true;
+            FindAnyObjectByType<StreetView>()?.ReturnToHubAfterAuthenticationRequired();
+            Fail("No pudimos sincronizar con seguridad. Tus datos locales están protegidos.");
+        }
         private static bool ContainsConflict(Exception error) => error is CloudRevisionConflict ||
             (error.InnerException != null && ContainsConflict(error.InnerException));
+        private static void LogFailure(string stage, Exception error)
+        {
+            // Never log Exception.Message/ToString: provider exceptions can contain account identifiers or tokens.
+            Debug.LogError("[FirebasePlayerSession] " + FormatFailureDiagnostic(stage, error));
+        }
+        private static string FormatFailureDiagnostic(string stage, Exception error)
+        {
+            string diagnostic = "stage=" + stage + " exceptionType=" + (error == null ? "Unknown" : error.GetType().Name);
+            FirebaseException firebaseError = FindFirebaseException(error);
+            if (firebaseError != null) diagnostic += " firebaseErrorCode=" + firebaseError.ErrorCode;
+            FirestoreException firestoreError = FindFirestoreException(error);
+            if (firestoreError != null) diagnostic += " firestoreErrorCode=" + firestoreError.ErrorCode;
+            return diagnostic;
+        }
+        private static FirebaseException FindFirebaseException(Exception error)
+        {
+            Exception current = error;
+            for (int depth = 0; current != null && depth < 16; depth++, current = current.InnerException)
+                if (current is FirebaseException firebaseError) return firebaseError;
+            return null;
+        }
+        private static FirestoreException FindFirestoreException(Exception error)
+        {
+            Exception current = error;
+            for (int depth = 0; current != null && depth < 16; depth++, current = current.InnerException)
+                if (current is FirestoreException firestoreError) return firestoreError;
+            return null;
+        }
         private static bool IsTransient(Exception error)
         {
             if (error is TimeoutException) return true;
+            FirestoreException firestoreError = FindFirestoreException(error);
+            if (firestoreError != null) return IsTransient(firestoreError.ErrorCode);
             if (error is FirebaseException firebaseError)
-            {
-                var code = (FirestoreError)firebaseError.ErrorCode;
-                return code == FirestoreError.Unavailable || code == FirestoreError.DeadlineExceeded ||
-                    code == FirestoreError.Cancelled || code == FirestoreError.Aborted;
-            }
+                return IsTransient((FirestoreError)firebaseError.ErrorCode);
             return error.InnerException != null && IsTransient(error.InnerException);
         }
+        private static bool IsTransient(FirestoreError code) => code == FirestoreError.Unavailable ||
+            code == FirestoreError.DeadlineExceeded || code == FirestoreError.Cancelled || code == FirestoreError.Aborted;
         public void OpenAccountMenu()
         {
             // Login, recovery and conflict resolution all live inside the main hub account panel.

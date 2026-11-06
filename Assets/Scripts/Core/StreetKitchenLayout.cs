@@ -341,6 +341,18 @@ namespace HayChoriYPaty
             int columns = Mathf.Min(MaxCookStationsPerGrill, count);
             int column = Mathf.Max(0, queueIndex) % columns;
             Vector2 station = GrillWorkPosition(product, column, columns);
+            if (product < 2 && count == 2)
+            {
+                // The normal table is narrower and offset from its grill. Keep both
+                // waiting normals below their own table, without leaving their grill span.
+                Rect table = BoundsForProduct(product);
+                const float halfBody = 30f;
+                float left = Mathf.Max(54f, Mathf.Max(grill.xMin + halfBody, table.xMin + halfBody));
+                float right = Mathf.Min(StreetSceneLayout.Width - 54f,
+                    Mathf.Min(grill.xMax - halfBody, table.xMax - halfBody));
+                if (table.width > 0f && right >= left)
+                    station.x = Mathf.Lerp(left, right, column);
+            }
             // Queue in the clear apron between the table bases and grill. The old lower lane
             // was separated from the grill by a continuous row of route obstacles.
             return new Vector2(station.x, Mathf.Max(18f, grill.yMin - 55f));

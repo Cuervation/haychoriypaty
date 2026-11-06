@@ -389,3 +389,15 @@ Built-in image_gen edits, transparent_background=true, reference: ConceptArt/Bon
 Built-in image_gen edit of the current hub master, kept at the same runtime resource path `Assets/Art/Street/Resources/street-hub-stadium-v1.png` and existing `.meta`/GUID. Final output is 841×1870 (9:20), SHA-256 `0bd8e513f8069f24a90884fe53a66d5c64aa4cd1029fbb40577d7cdf6303482b`; one resource is reused at all resolutions, without per-size duplicates. The composition extends the sky/tree canopy/stadium above and the neighborhood street, sidewalk and arriving supporters below. At wider aspect ratios it remains proportionally contained, never cropped or stretched.
 
 ImageGen prompt requested approximately 877×1954 (9:20) to match 575×1280 and to extend sky/trees/stadium above and paved street/supporters below, preserving the recognizable central destinations, readable labels and style, with no new UI/text or duplicate scene. The service delivered 841×1870; the central illustration was re-rendered rather than pixel-preserved, so it is a stylistically matched reinterpretation, not a pixel-identical outpaint.
+
+
+## Huracán supporter shirts — six reference looks — 2026-11-06
+
+Built-in ImageGen created two original transparent 1536×1024 atlases from the user's six Huracán shirt references and the existing club-supporter cartoon style. The wardrobe is six red/white/burgundy looks, repeated across twelve varied supporter identities: vintage white/red trim; deep maroon; red with white pinstripes; white with red sleeves; white with a broad red center panel; solid red. Exact sponsors/manufacturer marks were intentionally not copied; each jersey uses a tiny simplified balloon-shaped crest. The clothes are integrated into complete character sprites, not overlays.
+
+- `Resources/street-huracan-fans-paired-v1.png`, 6×4 square cells, 12 variants × cheering/walking poses. Source prompt specified a transparent exact 6×4 sheet, three outfit pairs per row, same identity/outfit for each pair and the six shirt cuts/colors above. The generator placed the RIGHT-facing walk in the first column of each pair and the front cheer in the second; `ClubVisualTheme` uses a pose-reversed paired layout rather than altering the generated pixels.
+- `Resources/street-huracan-riot-fans-v1.png`, 6×4 square cells, same six Huracán kit looks repeated in twelve variants × raised-stick/non-contact swing poses. It follows the existing defeat atlas style; it adds no injuries or gameplay changes.
+- Import metadata uses unique GUIDs and the existing fan-atlas texture settings (alpha, no mipmaps/NPOT rescale, Android atlas import). Original art and metadata for other teams remain unchanged.
+
+SHA-256: paired `659e6c7b02dde392be0a6ae91504d5eb9341762933ceba420e871f70f5ed6251`; defeat `a06a522e5a4e8bc9f78cb329eb3ebad4672b3f049fa278015b2369d16f84f3a0`.
+Generated originals remain under `/Users/celestino/.codex/generated_images/01a1a299-d7fa-7d01-86cc-573fcb9938a5/` as `exec-3c5de039-aebe-4e39-806c-0616e4c33e7e.png` and `exec-6869c31c-c59a-4515-bd5a-643f83911c8b.png`.

@@ -208,6 +208,24 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
+        public void WinningLosRedondosUnlocksArgentinosWithoutMovingLegacyFrontier()
+        {
+            object game = NewGame(Json(NewLegacySave(10, null, Tickets(0))));
+            Assert.IsFalse((bool)Invoke(game, "IsLevelUnlocked", 12), "Access to Los Redondos alone does not unlock Argentinos.");
+            SelectLevel(game, 10);
+            Assert.IsTrue((bool)Invoke(game, "TryStartRound"));
+            ForgeTerminalResult(game, "Won");
+
+            Assert.IsTrue((bool)Invoke(game, "IsLevelUnlocked", 12));
+            Assert.AreEqual(10, Read(game, "UnlockedLevel"), "The persisted frontier remains capped at the final legacy stable ID.");
+            object persisted = JsonUtility.FromJson(persistedJson, saveType);
+            Assert.IsTrue((bool)Field(persisted, "argentinosUnlocked"));
+            Assert.AreEqual(6, Field(persisted, "version"));
+            object reloaded = NewGame(persistedJson);
+            Assert.IsTrue((bool)Invoke(reloaded, "IsLevelUnlocked", 12), "The separate unlock flag survives reload.");
+        }
+
+        [Test]
         public void LegacyUnlockAndRecordedRepeatsMigrateOnceWithoutCountingPendingFirstUnlockVictory()
         {
             long[] wins = new long[11]; wins[0] = 2; wins[1] = 2;
@@ -248,25 +266,38 @@ namespace HayChoriYPaty.Tests
         {
             Type simulationType = Runtime("StreetSimulation");
             int[] order = (int[])simulationType.GetField("CampaignOrder", PublicStatic).GetValue(null);
-            Assert.AreEqual(12, order.Length);
+            Assert.AreEqual(13, order.Length);
             Assert.AreEqual(9, order[10], "Camioneros remains visible slot 11 with its stable ID 9.");
             Assert.AreEqual(10, order[11], "Los Redondos remains after Camioneros with stable ID 10.");
+            Assert.AreEqual(12, order[12], "Argentinos Juniors is appended without shifting established IDs.");
 
-            object game = NewGame(Json(NewLegacySave(9, null, Tickets(4))));
+            long[] reservedForOtherLevels = { 1, 1, 0, 0, 0 };
+            object game = NewGame(Json(NewLegacySave(9, null, Tickets(4, 0, reservedForOtherLevels))));
             Assert.IsTrue((bool)Invoke(game, "SelectLevel", 9));
+            object parrilleroRole = Role(roleType, "Parrillero");
+            Assert.IsFalse((bool)Invoke(game, "CanRedeemTicketWorker", parrilleroRole), "Level 9 cannot take a new ticket redemption.");
+            Assert.IsFalse((bool)Invoke(game, "TryRedeemTicketWorker", parrilleroRole, Invoke(game, "TicketRedemptionOperationId", parrilleroRole)));
             Assert.IsFalse((bool)Invoke(game, "TryStartRound"), "The traditional Camioneros entry point must be unavailable.");
             Assert.IsTrue((bool)Invoke(game, "TryStartTowerDefenseRound"));
 
             object sim = Read(game, "Sim");
             Assert.AreEqual(9, Read(sim, "LevelIndex"));
             Assert.IsTrue((bool)Read(sim, "IsExternalCampaignRuntime"));
+            Assert.AreEqual(2, Read(sim, "ProductCount"), "Camioneros exposes only Chori and Coca in the campaign product surface.");
+            Assert.AreEqual(0, Invoke(sim, "GetAvailableProduct", 0));
+            Assert.AreEqual(4, Invoke(sim, "GetAvailableProduct", 1));
+            Assert.AreEqual(0, Invoke(sim, "GetProductGoal", 0));
+            Assert.AreEqual(0, Invoke(sim, "GetProductGoal", 4));
+            Assert.AreEqual(0, Invoke(sim, "WorkerCount", parrilleroRole), "TD clears the ordinary campaign baseline crew.");
+            Assert.AreEqual(0, Invoke(sim, "WorkerCount", Role(roleType, "Cocacolero")));
+            Assert.AreEqual(1L, Invoke(game, "PendingTicketWorkers", parrilleroRole), "TD leaves reserved ticket workers untouched.");
+            Assert.AreEqual(1L, Invoke(game, "PendingTicketWorkers", Role(roleType, "Cocacolero")));
             float initialElapsed = (float)Read(sim, "Elapsed");
             Invoke(sim, "Step", 2f);
             Assert.AreEqual(initialElapsed, (float)Read(sim, "Elapsed"), "The traditional simulation cannot step under TD.");
 
             int[] deliveries = new int[7];
-            for (int product = 0; product < deliveries.Length; product++)
-                deliveries[product] = (int)Invoke(sim, "GetProductGoal", product);
+            deliveries[0] = 1; // One actual sale is enough; obsolete campaign quotas do not gate TD victory.
             int[] workers = (int[])Read(sim, "WorkerCountsByRole");
             Assert.IsTrue((bool)InvokeAny(sim, "ImportTowerDefenseState", 240f, 600, 250, 1, workers,
                 deliveries, 8, 7, true, true));
@@ -307,18 +338,59 @@ namespace HayChoriYPaty.Tests
                 Read(campaign, "WorkerCountsByRole"), Read(campaign, "TicketWorkerCountsByRole"), Read(campaign, "Coins")
             });
             Invoke(mode, "Begin");
-            Put(mode, "deliveredByProduct", (int[])Read(mode, "GoalByProduct"));
-            InvokeAny(mode, "UpdateCompletionState");
-            Assert.IsTrue((bool)Read(mode, "HasReachedAllGoals"));
-            Invoke(mode, "Step", 0.02f);
+            Assert.IsTrue((bool)Invoke(game, "TryHireTowerDefense", mode, Role(roleType, "Cocacolero"), 0));
+            for (int n = 0; n < 10; n++)
+                Assert.IsTrue((bool)Invoke(mode, "TrySpawnFan", new[] {4}, new[] {1}));
+            for (int n = 0; n < 10; n++) InvokeAny(mode, "DeliverWithinServiceRanges");
+            Put(mode, "elapsed", 500f); // No inherited 380-second terminal or history clamp.
+            Invoke(mode, "Step", .5f);
+            Assert.IsTrue((bool)Read(mode, "HasWon"));
+            Assert.AreEqual(10, Read(mode, "ServedFans"));
             Assert.AreEqual("Finished", Read(mode, "Phase").ToString());
 
             Assert.IsTrue((bool)Invoke(game, "ExitTowerDefenseRound", mode));
+            Assert.Greater((float)Read(campaign, "Elapsed"), 380f);
+            Assert.AreEqual(0f, Read(campaign, "TimeRemaining"));
             Assert.IsTrue((bool)Read(game, "HasPendingChulengo"), "A terminal victory must use the common victory settlement, not the abandoned-attempt path.");
             Assert.IsTrue((bool)Invoke(game, "TryCollectVictoryReward"));
             object stats = Field(Field(game, "save"), "statistics");
             Assert.AreEqual(1L, ((long[])Field(stats, "winsByLevel"))[9]);
             Assert.AreEqual(0L, Field(stats, "abandons"));
+            Invoke(mode, "Stop");
+        }
+
+        [TestCase("CompleteTowerDefenseRound")]
+        [TestCase("ExitTowerDefenseRound")]
+        [TestCase("OnApplicationPause")]
+        public void FirstDefenseEscapeSettlesLossNotAbandonmentExactlyOnce(string entry)
+        {
+            object game = NewGame(Json(NewLegacySave(9, null, Tickets(4))));
+            Assert.IsTrue((bool)Invoke(game, "SelectLevel", 9));
+            Assert.IsTrue((bool)Invoke(game, "TryStartTowerDefenseRound"));
+            object config = Resources.Load("TowerDefense/Camioneros-PlazaDeMayo", Runtime("TowerDefenseLevelConfig"));
+            object route = Read(config, "Route");
+            object geometry = Runtime("TowerDefenseRouteGeometry").GetMethod("Generate", PublicStatic).Invoke(null, new[] {route});
+            Vector2 first = (Vector2)Invoke(config, "WorkZonePosition", geometry, 0);
+            Vector2 second = (Vector2)Invoke(config, "WorkZonePosition", geometry, 1);
+            object mode = Activator.CreateInstance(Runtime("TowerDefenseGameMode"), new object[]
+                {config, Read(game, "Balance"), route, .02f, first, second});
+            Invoke(mode, "Begin");
+            Assert.IsTrue((bool)Invoke(game, "AttachTowerDefenseRuntime", mode));
+            Assert.IsTrue((bool)Invoke(mode, "TrySpawnFan", new[] {4}, new[] {1}));
+            object fan = ((System.Collections.IList)Read(mode, "Fans"))[0];
+            object follower = Read(fan, "RouteFollower");
+            Invoke(follower, "Advance", (float)Read(follower, "TotalDistance") / (float)Read(follower, "Speed") + .1f);
+            Invoke(mode, "Step", .01f);
+            Assert.IsTrue((bool)Read(mode, "HasLost"));
+            if (entry == "OnApplicationPause") InvokeAny(game, entry, true);
+            else Assert.IsTrue((bool)Invoke(game, entry, mode));
+            object stats = Field(Field(game, "save"), "statistics");
+            Assert.AreEqual("Lost", Read(Read(game, "Sim"), "Phase").ToString());
+            Assert.AreEqual(1L, ((long[])Field(stats, "lossesByLevel"))[9]);
+            Assert.AreEqual(0L, Field(stats, "abandons"));
+            Assert.AreEqual(9, Read(game, "UnlockedLevel"));
+            Assert.IsFalse((bool)Invoke(game, "ProcessRoundResult"));
+            Assert.AreEqual(1L, ((long[])Field(stats, "lossesByLevel"))[9]);
             Invoke(mode, "Stop");
         }
 
@@ -421,6 +493,7 @@ namespace HayChoriYPaty.Tests
         {
             for (int level = 5; level <= 10; level++)
             {
+                if (level == 9) continue; // Camioneros uses the separate Tower Defense entry point and starts without ticket workers.
                 long[] pending = new long[5]; pending[0] = 1;
                 object game = NewGame(Json(NewLegacySave(10, null, Tickets(0, 3, pending))));
                 SelectLevel(game, level);
@@ -431,7 +504,9 @@ namespace HayChoriYPaty.Tests
                 int baselineParrilleros = level == 6 ? 2 : 1;
                 Assert.AreEqual(baselineParrilleros + 1, Invoke(sim, "WorkerCount", Role(roleType, "Parrillero")));
                 Assert.AreEqual(level == 5 ? 1 : 0, Invoke(sim, "WorkerCount", Role(roleType, "ParrilleroPremium")));
-                Assert.AreEqual(level == 5 || level == 6 || level == 8 ? 1 : 0, Invoke(sim, "WorkerCount", Role(roleType, "Mozo")));
+                bool startsWithMozo = level == 5 || level == 6 || level == 8 || level == 10;
+                Assert.AreEqual(startsWithMozo ? 1 : 0, Invoke(sim, "WorkerCount", Role(roleType, "Mozo")),
+                    "Level index " + level + " must match its configured free Mozo baseline.");
                 for (int role = 0; role < costs.Length; role++)
                     Assert.AreEqual(costs[role], (int)Invoke(sim, "HireCostForRole", Enum.ToObject(roleType, role)), "Ticket worker must not raise paid tier at level " + level + ", role " + role);
                 Assert.AreEqual(0L, Invoke(game, "PendingTicketWorkers", Role(roleType, "Parrillero")));
@@ -452,11 +527,13 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void V4SnapshotValidationAcceptsTicketsAndRejectsAnInconsistentWallet()
+        public void V6SnapshotValidationAcceptsTicketsAndRejectsAnInconsistentWallet()
         {
             Type repository = Type.GetType("HayChoriYPaty.Cloud.PlayerLocalRepository, Assembly-CSharp", true);
             MethodInfo validate = repository.GetMethod("ValidateSnapshot", PublicStatic);
-            validate.Invoke(null, new object[] { Json(NewLegacySave(10, null, Tickets(3))) });
+            object valid = NewLegacySave(10, null, Tickets(3));
+            Put(valid, "version", 6);
+            validate.Invoke(null, new object[] { Json(valid) });
             object invalid = Tickets(3);
             Put(invalid, "totalSpent", 2L);
             Assert.Throws<TargetInvocationException>(() => validate.Invoke(null, new object[] { Json(NewLegacySave(10, null, invalid)) }));

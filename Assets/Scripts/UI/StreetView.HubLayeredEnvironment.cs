@@ -64,20 +64,45 @@ namespace HayChoriYPaty
         private sealed class HubLayeredEnvironmentRenderer
         {
             private const int ClothSegments = 12;
-            private const float FlagAmplitude = 2.2f;
-            private const float ShirtAmplitude = 1.2f;
-            private const float AwningAmplitude = .75f;
+            private const int AwningHorizontalSegments = 12;
+            private const int AwningVerticalSegments = 2;
+            private const int BirdCount = 4;
+            private const float FlagAmplitude = 7.5f;
+            private const float ShirtAmplitude = 5.5f;
+            private const float AwningAmplitude = 7f;
             private readonly StreetView owner;
+            private readonly System.Random random = new System.Random();
             private readonly float[] flagPhases = { 0f, 1.1f, 2.3f, 3.7f, 4.8f };
             private readonly float[] shirtPhases = { .7f };
             private readonly float[] awningPhases = { 1.6f, 3.1f };
+            private readonly float[] flagFrequencies = { 1.72f, 2.04f, 2.36f, 1.84f, 2.2f };
+            private readonly float[] shirtFrequencies = { 1.93f };
+            private readonly float[] awningFrequencies = { 1.12f, 1.38f };
+            private readonly BirdFlight[] birds = new BirdFlight[BirdCount];
             private Texture2D cleanPlate, flags, shirts, awnings, softDisc, birdSilhouette;
             private float elapsed;
             private int lastFrame = -1;
             private bool loadAttempted;
             private readonly Texture2D[] cleanPatches = new Texture2D[HubLayeredFlagBounds.Length + HubLayeredShirtBounds.Length + HubLayeredAwningBounds.Length];
 
-            public HubLayeredEnvironmentRenderer(StreetView owner) { this.owner = owner; }
+            private struct BirdFlight
+            {
+                public bool active;
+                public float nextStartAt, startAt, duration;
+                public float startX, endX, baseY, arc, wave, phase, scale, wingSpeed;
+            }
+
+            public HubLayeredEnvironmentRenderer(StreetView owner)
+            {
+                this.owner = owner;
+                for (int i = 0; i < birds.Length; i++)
+                {
+                    BirdFlight bird = new BirdFlight { nextStartAt = i == 0 ? .35f : i * 1.65f + Range(0f, .9f) };
+                    birds[i] = bird;
+                }
+            }
+
+            private float Range(float minimum, float maximum) => minimum + (float)random.NextDouble() * (maximum - minimum);
 
             public void Draw()
             {
@@ -93,10 +118,9 @@ namespace HayChoriYPaty
                     // Never expose a moved opaque cutout over the original: every replacement is gated by its clean plate.
                     if (cleanPlate != null)
                     {
-                        DrawClothGroup(flags, HubLayeredFlagBounds, HubLayeredFlagSourceUv, flagPhases, FlagAmplitude, 0, false);
-                        DrawClothGroup(shirts, HubLayeredShirtBounds, HubLayeredShirtSourceUv, shirtPhases, ShirtAmplitude, HubLayeredFlagBounds.Length, false);
-                        DrawClothGroup(awnings, HubLayeredAwningBounds, HubLayeredAwningSourceUv, awningPhases, AwningAmplitude,
-                            HubLayeredFlagBounds.Length + HubLayeredShirtBounds.Length, true);
+                        DrawClothGroup(flags, HubLayeredFlagBounds, HubLayeredFlagSourceUv, flagPhases, flagFrequencies, FlagAmplitude, 0);
+                        DrawClothGroup(shirts, HubLayeredShirtBounds, HubLayeredShirtSourceUv, shirtPhases, shirtFrequencies, ShirtAmplitude, HubLayeredFlagBounds.Length);
+                        DrawAwningGroup();
                     }
                     DrawCloudShadows();
                     DrawDistantBirds();
@@ -128,7 +152,7 @@ namespace HayChoriYPaty
                 birdSilhouette = CreateBirdSilhouette();
             }
 
-            private void DrawClothGroup(Texture2D foreground, Rect[] bounds, Rect[] sourceUvs, float[] phases, float amplitude, int patchOffset, bool pinnedRoof)
+            private void DrawClothGroup(Texture2D foreground, Rect[] bounds, Rect[] sourceUvs, float[] phases, float[] frequencies, float amplitude, int patchOffset)
             {
                 if (foreground == null) return; // Missing layer disables only this group; untouched master remains visible.
                 for (int i = 0; i < bounds.Length; i++)
@@ -136,36 +160,70 @@ namespace HayChoriYPaty
                     if (cleanPatches[patchOffset + i] == null) continue;
                     Rect art = bounds[i];
                     DrawCleanPatch(cleanPatches[patchOffset + i], art);
-                    if (pinnedRoof) DrawPinnedAwning(foreground, art, sourceUvs[i], phases[i], amplitude);
-                    else DrawClothSlices(foreground, art, sourceUvs[i], phases[i], amplitude);
+                    DrawClothSlices(foreground, art, sourceUvs[i], phases[i], frequencies[i], amplitude);
                 }
             }
 
-            private void DrawPinnedAwning(Texture2D texture, Rect art, Rect sourceUv, float phase, float amplitude)
+            private void DrawAwningGroup()
             {
-                // Keep the canopy in one continuous draw to avoid sampling seams; a tiny pivoted sway anchors the roof corner.
-                Rect layout = HubLayeredArtworkScreenRect(art, new Vector2(Screen.width, Screen.height));
-                Matrix4x4 previous = GUI.matrix;
-                Vector2 pinnedCorner = new Vector2(layout.xMin, layout.yMin);
-                float angle = Mathf.Sin(elapsed * 1.7f + phase) * amplitude * .22f;
-                GUI.matrix = Matrix4x4.TRS(pinnedCorner, Quaternion.Euler(0f, 0f, angle), Vector3.one) *
-                             Matrix4x4.TRS(-pinnedCorner, Quaternion.identity, Vector3.one) * previous;
-                DrawTextureRegion(texture, art, sourceUv, new Rect(0f, 0f, 1f, 1f));
-                GUI.matrix = previous;
+                if (awnings == null) return;
+                int patchOffset = HubLayeredFlagBounds.Length + HubLayeredShirtBounds.Length;
+                for (int i = 0; i < HubLayeredAwningBounds.Length; i++)
+                {
+                    if (cleanPatches[patchOffset + i] == null) continue;
+                    Rect art = HubLayeredAwningBounds[i];
+                    DrawCleanPatch(cleanPatches[patchOffset + i], art);
+                    DrawPinnedAwningWaves(awnings, art, HubLayeredAwningSourceUv[i], awningPhases[i], awningFrequencies[i]);
+                }
             }
 
-            private void DrawClothSlices(Texture2D texture, Rect art, Rect sourceUv, float phase, float amplitude)
+            private void DrawPinnedAwningWaves(Texture2D texture, Rect art, Rect sourceUv, float phase, float frequency)
+            {
+                // The roof seam and both side edges stay pinned; only the lower cloth ripples in a small, coherent wave.
+                for (int x = 0; x < AwningHorizontalSegments; x++)
+                {
+                    float x0 = x / (float)AwningHorizontalSegments;
+                    float x1 = (x + 1) / (float)AwningHorizontalSegments;
+                    float centerX = (x0 + x1) * .5f;
+                    for (int y = 0; y < AwningVerticalSegments; y++)
+                    {
+                        float y0 = y / (float)AwningVerticalSegments;
+                        float y1 = (y + 1) / (float)AwningVerticalSegments;
+                        float weight = y0; // 0 at the attached top edge, gradually stronger toward the scalloped hem.
+                        float flex = AwningOffset(centerX, weight, elapsed, phase + y * .31f, frequency);
+                        if (x == 0 || x == AwningHorizontalSegments - 1) flex = 0f;
+                        float overlap = AwningAmplitude / art.height + .005f;
+                        float sampleY0 = Mathf.Max(0f, y0 - overlap);
+                        float sampleY1 = Mathf.Min(1f, y1 + overlap);
+                        Rect piece = new Rect(art.x + art.width * x0, art.y + art.height * sampleY0 + flex,
+                            art.width * (x1 - x0) + .35f, art.height * (sampleY1 - sampleY0));
+                        DrawTextureRegion(texture, piece, sourceUv, new Rect(x0, sampleY0, x1 - x0, sampleY1 - sampleY0));
+                    }
+                }
+            }
+
+            private void DrawClothSlices(Texture2D texture, Rect art, Rect sourceUv, float phase, float frequency, float amplitude)
             {
                 for (int s = 0; s < ClothSegments; s++)
                 {
                     float x0 = s / (float)ClothSegments, x1 = (s + 1) / (float)ClothSegments;
-                    float localFlex = Mathf.Sin(x0 * Mathf.PI) * Mathf.Sin(elapsed * 2.1f + phase + x0 * 5.2f);
-                    float nextFlex = Mathf.Sin(x1 * Mathf.PI) * Mathf.Sin(elapsed * 2.1f + phase + x1 * 5.2f);
+                    float localFlex = Mathf.Sin(x0 * Mathf.PI) * ClothWave(x0, phase, frequency);
+                    float nextFlex = Mathf.Sin(x1 * Mathf.PI) * ClothWave(x1, phase, frequency);
                     float y = (localFlex + nextFlex) * .5f * amplitude;
                     Rect piece = new Rect(art.x + art.width * x0, art.y + y, art.width / ClothSegments + .25f, art.height);
                     DrawTextureRegion(texture, piece, sourceUv, new Rect(x0, 0f, 1f / ClothSegments, 1f));
                 }
             }
+
+            private float ClothWave(float x, float phase, float frequency) => ClothWave(x, phase, frequency, elapsed);
+
+            private static float ClothWave(float x, float phase, float frequency, float time)
+                => Mathf.Sin(time * frequency + phase + x * 5.2f) * .82f +
+                   Mathf.Sin(time * frequency * .61f + phase * .73f + x * 2.9f) * .18f;
+
+            private static float AwningOffset(float x, float normalizedHeight, float time, float phase, float frequency)
+                => Mathf.Sin(Mathf.Clamp01(x) * Mathf.PI) * Mathf.Clamp01(normalizedHeight) *
+                   ClothWave(Mathf.Clamp01(x), phase, frequency, time) * AwningAmplitude;
 
             // Aligned source patch with normalized source UV; dimensions of generated images are intentionally irrelevant.
             private void DrawAlignedPatch(Texture2D texture, Rect art, Rect normalizedPatch)
@@ -204,26 +262,88 @@ namespace HayChoriYPaty
             private void DrawCloudShadows()
             {
                 if (softDisc == null) return;
-                float travel = Mathf.Repeat(elapsed * 4f, 500f);
-                DrawSoftOval(new Rect(260f + travel, 990f, 120f, 24f), .06f);
-                DrawSoftOval(new Rect(450f + Mathf.Repeat(travel + 170f, 300f), 1390f, 135f, 24f), .06f);
+                Vector2 first = CloudPosition(elapsed, 0);
+                Vector2 second = CloudPosition(elapsed, 1);
+                DrawCloudShadow(first, 286f, 82f, .045f);
+                DrawSoftOval(new Rect(first.x + 52f, first.y + 9f, 192f, 65f), .032f);
+                DrawCloudShadow(second, 248f, 76f, .041f);
+                DrawSoftOval(new Rect(second.x - 44f, second.y + 12f, 174f, 58f), .029f);
+            }
+
+            private void DrawCloudShadow(Vector2 center, float width, float height, float alpha)
+                => DrawSoftOval(new Rect(center.x - width * .5f, center.y - height * .5f, width, height), alpha);
+
+            private static Vector2 CloudPosition(float time, int index)
+            {
+                float speed = index == 0 ? 27f : 20f;
+                float offset = index == 0 ? 0f : 485f;
+                float baseY = index == 0 ? 1020f : 1255f;
+                float amplitude = index == 0 ? 150f : 125f;
+                float verticalFrequency = index == 0 ? .38f : .31f;
+                float phase = index * 2.1f;
+                float x = Mathf.Repeat(time * speed + offset, 1120f) - 140f;
+                float y = baseY + Mathf.Sin(time * verticalFrequency + phase) * amplitude;
+                return new Vector2(x, y);
             }
 
             private void DrawDistantBirds()
             {
                 if (birdSilhouette == null) return;
-                float cycle = Mathf.Repeat(elapsed, 18f) / 18f;
-                for (int i = 0; i < 3; i++)
+                for (int i = 0; i < birds.Length; i++)
                 {
-                    float t = Mathf.Repeat(cycle + i / 3f, 1f);
-                    float x = Mathf.Lerp(-20f, 850f, t);
-                    float y = 237f + i * 23f + Mathf.Sin(t * Mathf.PI * 2f) * 5f;
-                    float wingHeight = 10f + Mathf.Sin(elapsed * 5f + i * 1.7f) * 2.5f;
-                    Rect screen = HubLayeredArtworkScreenRect(new Rect(x - 13f, y - wingHeight * .5f, 26f, wingHeight),
+                    BirdFlight bird = birds[i];
+                    if (!bird.active)
+                    {
+                        if (elapsed < bird.nextStartAt) continue;
+                        bird = StartBirdFlight();
+                        bird.startAt = elapsed;
+                    }
+
+                    float progress = (elapsed - bird.startAt) / bird.duration;
+                    if (progress >= 1f)
+                    {
+                        bird.active = false;
+                        bird.nextStartAt = elapsed + Range(1.25f, 4.25f);
+                        birds[i] = bird;
+                        continue;
+                    }
+
+                    Vector2 position = EvaluateBirdPosition(progress, bird.startX, bird.endX, bird.baseY, bird.arc, bird.wave, bird.phase);
+                    float edgeFade = Mathf.Min(Mathf.Clamp01(progress / .12f), Mathf.Clamp01((1f - progress) / .14f));
+                    float wingHeight = (10f + Mathf.Sin(elapsed * bird.wingSpeed + bird.phase) * 2.8f) * bird.scale;
+                    float width = 34f * bird.scale;
+                    Rect screen = HubLayeredArtworkScreenRect(new Rect(position.x - width * .5f, position.y - wingHeight * .5f, width, wingHeight),
                         new Vector2(Screen.width, Screen.height));
-                    GUI.color = new Color(.17f, .22f, .29f, .72f);
+                    GUI.color = new Color(.17f, .22f, .29f, .76f * edgeFade);
                     GUI.DrawTexture(screen, birdSilhouette, ScaleMode.StretchToFill, true);
+                    birds[i] = bird;
                 }
+            }
+
+            private BirdFlight StartBirdFlight()
+            {
+                bool leftToRight = random.Next(0, 2) == 0;
+                return new BirdFlight
+                {
+                    active = true,
+                    duration = Range(7.5f, 13.5f),
+                    startX = leftToRight ? -36f : 877f,
+                    endX = leftToRight ? 877f : -36f,
+                    baseY = Range(175f, 365f),
+                    arc = Range(-24f, 24f),
+                    wave = Range(6f, 18f),
+                    phase = Range(0f, Mathf.PI * 2f),
+                    scale = Range(.66f, 1.12f),
+                    wingSpeed = Range(4.2f, 7.2f)
+                };
+            }
+
+            private static Vector2 EvaluateBirdPosition(float progress, float startX, float endX, float baseY, float arc, float wave, float phase)
+            {
+                float t = Mathf.Clamp01(progress);
+                float x = Mathf.Lerp(startX, endX, t);
+                float y = baseY + Mathf.Sin(t * Mathf.PI) * arc + Mathf.Sin(t * Mathf.PI * 2f + phase) * wave;
+                return new Vector2(x, y);
             }
 
             // Code-native gull silhouette: curved tapered wings and body, cached once (not line dashes).
@@ -250,9 +370,11 @@ namespace HayChoriYPaty
             private void DrawWarmShopPulse()
             {
                 if (softDisc == null) return;
-                float pulse = .05f + (Mathf.Sin(elapsed * .72f) + 1f) * .018f;
-                DrawWarmGlow(new Rect(137f, 1370f, 19f, 25f), pulse);
-                DrawWarmGlow(new Rect(174f, 1372f, 20f, 24f), pulse * .85f);
+                float pulse = .105f + (.5f + .5f * Mathf.Sin(elapsed * .82f)) * .075f;
+                DrawWarmGlow(new Rect(132f, 1359f, 39f, 52f), pulse);
+                DrawWarmGlow(new Rect(174f, 1363f, 37f, 49f), pulse * .82f);
+                float reflection = .048f + (.5f + .5f * Mathf.Sin(elapsed * .56f + 1.7f)) * .026f;
+                DrawWarmGlow(new Rect(102f, 1401f, 130f, 37f), reflection);
             }
 
             private void DrawWarmGlow(Rect art, float alpha)
@@ -332,17 +454,34 @@ namespace HayChoriYPaty
             public void SetElapsedForTesting(float value) { elapsed = Mathf.Max(0f, value); lastFrame = -1; }
             public static Vector2 ClothOffsetForTesting(float normalizedX, float time, float phase, float amplitude)
             {
-                float flex = Mathf.Sin(Mathf.Clamp01(normalizedX) * Mathf.PI) * Mathf.Sin(time * 2.1f + phase + normalizedX * 5.2f);
-                return new Vector2(normalizedX, flex * amplitude);
+                return ClothOffsetForTesting(normalizedX, time, phase, amplitude, 2.1f);
+            }
+            public static Vector2 ClothOffsetForTesting(float normalizedX, float time, float phase, float amplitude, float frequency)
+            {
+                float x = Mathf.Clamp01(normalizedX);
+                float wave = Mathf.Sin(time * frequency + phase + x * 5.2f) * .82f +
+                             Mathf.Sin(time * frequency * .61f + phase * .73f + x * 2.9f) * .18f;
+                return new Vector2(x, Mathf.Sin(x * Mathf.PI) * wave * amplitude);
             }
             public static Vector2 CloudSampleForTesting(float time, int index)
-                => new Vector2(index == 0 ? 260f + Mathf.Repeat(time * 4f, 500f) : 450f + Mathf.Repeat(time * 4f + 170f, 300f), index == 0 ? 990f : 1390f);
+                => CloudPosition(time, index);
             public static Vector2 BirdSampleForTesting(float time, int index)
             {
-                float t = Mathf.Repeat(Mathf.Repeat(time, 18f) / 18f + index / 3f, 1f);
-                return new Vector2(Mathf.Lerp(-20f, 850f, t), 237f + index * 23f + Mathf.Sin(t * Mathf.PI * 2f) * 5f);
+                float duration = 8f + index * 1.45f;
+                float phase = Mathf.Repeat(time + index * 2.65f, duration + 2.5f);
+                float progress = Mathf.Clamp01(phase / duration);
+                float startX = index % 2 == 0 ? -36f : 877f;
+                float endX = index % 2 == 0 ? 877f : -36f;
+                return EvaluateBirdPosition(progress, startX, endX, 185f + index * 39f,
+                    -18f + index * 8f, 7f + index * 2f, index * 1.37f);
             }
-            public static float LightPulseForTesting(float time) => .05f + (Mathf.Sin(time * .72f) + 1f) * .018f;
+            public static float LightPulseForTesting(float time) => .105f + (.5f + .5f * Mathf.Sin(time * .82f)) * .075f;
+            public static int BirdCountForTesting => BirdCount;
+            public static float FlagAmplitudeForTesting => FlagAmplitude;
+            public static float ShirtAmplitudeForTesting => ShirtAmplitude;
+            public static float AwningAmplitudeForTesting => AwningAmplitude;
+            public static float AwningOffsetForTesting(float x, float y, float time, float phase, float frequency)
+                => AwningOffset(x, y, time, phase, frequency);
             public bool ResourcesReadyForTesting => cleanPlate != null && flags != null && shirts != null && awnings != null;
 #endif
         }
@@ -364,6 +503,12 @@ namespace HayChoriYPaty
         internal static Vector2 HubLayeredCloudSampleForTesting(float time, int index) => HubLayeredEnvironmentRenderer.CloudSampleForTesting(time, index);
         internal static Vector2 HubLayeredBirdSampleForTesting(float time, int index) => HubLayeredEnvironmentRenderer.BirdSampleForTesting(time, index);
         internal static float HubLayeredLightPulseForTesting(float time) => HubLayeredEnvironmentRenderer.LightPulseForTesting(time);
+        internal static int HubLayeredBirdCountForTesting => HubLayeredEnvironmentRenderer.BirdCountForTesting;
+        internal static float HubLayeredFlagAmplitudeForTesting => HubLayeredEnvironmentRenderer.FlagAmplitudeForTesting;
+        internal static float HubLayeredShirtAmplitudeForTesting => HubLayeredEnvironmentRenderer.ShirtAmplitudeForTesting;
+        internal static float HubLayeredAwningAmplitudeForTesting => HubLayeredEnvironmentRenderer.AwningAmplitudeForTesting;
+        internal static float HubLayeredAwningOffsetForTesting(float x, float y, float time, float phase, float frequency)
+            => HubLayeredEnvironmentRenderer.AwningOffsetForTesting(x, y, time, phase, frequency);
         internal bool HubLayeredEnvironmentResourcesReadyForTesting => hubLayeredEnvironmentRenderer != null && hubLayeredEnvironmentRenderer.ResourcesReadyForTesting;
 #endif
     }

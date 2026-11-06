@@ -9,6 +9,8 @@ namespace HayChoriYPaty.Tests
 {
     public sealed class StreetArtTests
     {
+        private const int HuracanBonusLevelId = 11;
+
         [Test]
         public void RiverVisualThemeOwnsIndexSevenInTheOfficialCatalog()
         {
@@ -22,10 +24,93 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(2172, header.width); Assert.AreEqual(274, header.height);
             string[] names = (string[])Type.GetType("HayChoriYPaty.StreetSimulation, Assembly-CSharp", true)
                 .GetField("LevelNames").GetValue(null);
-            Assert.AreEqual(11, names.Length);
+            Assert.AreEqual(13, names.Length);
             Assert.AreEqual("River Plate / Núñez", names[7]);
             Assert.AreEqual("Boca Juniors / La Boca", themes.GetProperty("ClubName").GetValue(
                 themes.GetMethod("ForLevel").Invoke(null, new object[] { 8 })));
+        }
+
+        [Test]
+        public void HuracanThemeUsesItsSixShirtWardrobeForCheeringWalkingAndDefeat()
+        {
+            Type themes = Type.GetType("HayChoriYPaty.ClubVisualTheme, Assembly-CSharp", true);
+            object theme = themes.GetMethod("ForLevel").Invoke(null, new object[] { HuracanBonusLevelId });
+            object fans = themes.GetProperty("Fans").GetValue(theme);
+            Assert.NotNull(fans, "Huracán must not fall back to generic All Boys clothing.");
+
+            Type fanType = fans.GetType();
+            Assert.AreEqual(12, fanType.GetProperty("VariantCount").GetValue(fans),
+                "The six supplied shirt looks are represented twice across varied supporter identities.");
+            Assert.AreEqual("street-huracan-fans-paired-v1", fanType.GetProperty("FrontFans").GetValue(fans));
+            Assert.AreEqual("street-huracan-fans-paired-v1", fanType.GetProperty("WalkingFans").GetValue(fans));
+            Assert.AreEqual("street-huracan-riot-fans-v1", fanType.GetProperty("RiotFans").GetValue(fans));
+            Assert.IsTrue((bool)fanType.GetMethod("IsComplete").Invoke(fans, new object[] { true }),
+                "Cheering, walking and defeat art must all be explicitly configured and loadable.");
+
+            Texture2D paired = Resources.Load<Texture2D>("street-huracan-fans-paired-v1");
+            Texture2D riot = Resources.Load<Texture2D>("street-huracan-riot-fans-v1");
+            Assert.NotNull(paired); Assert.NotNull(riot);
+            foreach (Texture2D atlas in new[] { paired, riot })
+            {
+                Assert.AreEqual(1536, atlas.width); Assert.AreEqual(1024, atlas.height);
+                var importer = (TextureImporter)AssetImporter.GetAtPath(
+                    "Assets/Art/Street/Resources/" + atlas.name + ".png");
+                Assert.IsTrue(importer.DoesSourceTextureHaveAlpha());
+                Assert.IsFalse(importer.mipmapEnabled);
+                Assert.AreEqual(TextureImporterNPOTScale.None, importer.npotScale);
+                var decoded = new Texture2D(2, 2);
+                try
+                {
+                    string sourcePath = Application.dataPath + "/Art/Street/Resources/" + atlas.name + ".png";
+                    decoded.LoadImage(System.IO.File.ReadAllBytes(sourcePath));
+                    Color32[] pixels = decoded.GetPixels32();
+                    Assert.Greater(pixels.Count(pixel => pixel.a < 10) / (float)pixels.Length, .40f,
+                        "Transparent space between full-body atlas cells must remain transparent.");
+                }
+                finally { UnityEngine.Object.DestroyImmediate(decoded); }
+            }
+
+            MethodInfo frontSource = fanType.GetMethod("FrontSourceRect");
+            MethodInfo walkSource = fanType.GetMethod("WalkingSourceRect");
+            Assert.AreEqual(256f, ((Rect)frontSource.Invoke(fans, new object[] { paired.width, paired.height, 0 })).x,
+                "The generated sheet puts the cheering pose second in each front/walk pair.");
+            Assert.AreEqual(0f, ((Rect)walkSource.Invoke(fans, new object[] { paired.width, paired.height, 0 })).x,
+                "The generated sheet puts the right-facing walk first in each pair.");
+            for (int variant = 0; variant < 12; variant++)
+            {
+                Rect pose0 = (Rect)fanType.GetMethod("RiotSourceRect").Invoke(fans,
+                    new object[] { riot.width, riot.height, variant, 0 });
+                Rect pose1 = (Rect)fanType.GetMethod("RiotSourceRect").Invoke(fans,
+                    new object[] { riot.width, riot.height, variant, 1 });
+                Assert.AreEqual(256f, pose0.width); Assert.AreEqual(256f, pose0.height);
+                Assert.AreNotEqual(pose0, pose1, "Each supporter needs distinct raised and swing frames.");
+            }
+        }
+
+        [Test]
+        public void ArgentinosJuniorsThemeUsesItsMuralAndDedicatedRedWhiteSupporters()
+        {
+            Type simulation = Type.GetType("HayChoriYPaty.StreetSimulation, Assembly-CSharp", true);
+            Type themes = Type.GetType("HayChoriYPaty.ClubVisualTheme, Assembly-CSharp", true);
+            string[] names = (string[])simulation.GetField("LevelNames").GetValue(null);
+            Assert.AreEqual(13, names.Length);
+            Assert.AreEqual("Argentinos Juniors / La Paternal", names[12]);
+            object theme = themes.GetMethod("ForLevel").Invoke(null, new object[] { 12 });
+            Assert.AreEqual("Argentinos Juniors / La Paternal", themes.GetProperty("ClubName").GetValue(theme));
+            Assert.AreEqual("street-mural-argentinos-master-v1", themes.GetProperty("MuralResource").GetValue(theme));
+            Texture2D mural = Resources.Load<Texture2D>("street-mural-argentinos-master-v1");
+            Assert.NotNull(mural);
+            object fans = themes.GetProperty("Fans").GetValue(theme);
+            Assert.NotNull(fans);
+            Assert.AreEqual(12, fans.GetType().GetProperty("VariantCount").GetValue(fans));
+            Assert.AreEqual("street-argentinos-fans-paired-v2", fans.GetType().GetProperty("FrontFans").GetValue(fans));
+            Assert.AreEqual("street-argentinos-riot-fans-v2", fans.GetType().GetProperty("RiotFans").GetValue(fans));
+            Assert.IsTrue((bool)fans.GetType().GetMethod("IsComplete").Invoke(fans, new object[] { true }));
+            Texture2D paired = Resources.Load<Texture2D>("street-argentinos-fans-paired-v2");
+            Texture2D riot = Resources.Load<Texture2D>("street-argentinos-riot-fans-v2");
+            Assert.NotNull(paired); Assert.NotNull(riot);
+            Assert.AreEqual(1536, paired.width); Assert.AreEqual(1024, paired.height);
+            Assert.AreEqual(1536, riot.width); Assert.AreEqual(1024, riot.height);
         }
 
         [TestCase(false)] [TestCase(true)]
@@ -242,54 +327,53 @@ namespace HayChoriYPaty.Tests
             Assert.Less(counter.yMax, 400f * canvasHeight / 960f, "Workers' feet stay on the operator side");
         }
 
-        [TestCase(960f)] [TestCase(1200f)] [TestCase(1360f)]
-        public void FerroOppositeSidewalkUsesOriginalTileAndCurbCropWithoutMovingSharedCounter(float canvasHeight)
+        [TestCase(540f)] [TestCase(1080f)] [TestCase(2160f)]
+        public void FerroMuralSidewalkIsOneCappedStripAtTheMuralEdge(float screenWidth)
         {
             Type layout = Type.GetType("HayChoriYPaty.StreetSceneLayout, Assembly-CSharp", true);
-            float verticalScale = canvasHeight / 960f;
-            Rect bounds = (Rect)layout.GetMethod("FerroOppositeSidewalkBounds").Invoke(null,
-                new object[] { canvasHeight, verticalScale });
-            float counterTop = (float)layout.GetMethod("CounterTop").Invoke(null, new object[] { canvasHeight });
-            float sidewalkHeight = (float)layout.GetField("FerroOppositeSidewalkHeight").GetRawConstantValue();
-            Assert.AreEqual(0f, bounds.x, .001f);
-            Assert.AreEqual(540f, bounds.width, .001f);
-            Assert.AreEqual(counterTop, bounds.yMax, .001f,
-                "The independent scenery layer must stop at the existing shared counter edge.");
-            Assert.AreEqual(sidewalkHeight * verticalScale, bounds.height, .001f);
+            Rect mural = new Rect(0f, 40f, 540f, 205f);
+            Rect bounds = (Rect)layout.GetMethod("FerroMuralSidewalkBounds").Invoke(null,
+                new object[] { mural, screenWidth });
+            float maxScreenPixels = (float)layout.GetField("FerroMuralSidewalkMaxScreenPixels").GetRawConstantValue();
+            Assert.AreEqual(mural.yMax, bounds.y, .001f, "Keep the thin sidewalk attached to the mural, not as a second street band.");
+            Assert.AreEqual(mural.width, bounds.width, .001f);
+            Assert.AreEqual(maxScreenPixels, bounds.height * screenWidth / 540f, .001f,
+                "The rendered strip must never exceed the requested 25 screen pixels at any width.");
 
             Texture2D art = Resources.Load<Texture2D>("street-background-ferro-v2");
             Assert.NotNull(art);
-            Rect source = (Rect)layout.GetMethod("FerroOppositeSidewalkSource").Invoke(null,
+            Rect source = (Rect)layout.GetMethod("FerroMuralSidewalkSource").Invoke(null,
                 new object[] { new Vector2(art.width, art.height) });
-            float importScale = art.height / 1672f;
-            Assert.AreEqual(new Rect(0f, 700f * importScale, art.width, 180f * importScale), source,
-                "Reuse only the original source strip containing wall base, sidewalk tiles and curb.");
+            Assert.AreEqual(art.width, source.width, .001f);
+            Assert.Greater(source.height, 0f);
             Assert.GreaterOrEqual(source.yMin, 0f);
-            Assert.LessOrEqual(source.yMax, art.height);
+            Assert.LessOrEqual(source.yMax, art.height, "Use only the original narrow sidewalk/curb strip, not broad road texture.");
         }
 
-        [TestCase(960f)] [TestCase(1200f)] [TestCase(1360f)]
-        public void LosRedondosOppositeSidewalkUsesOriginalTileAndCurbCropWithoutMovingSharedCounter(float canvasHeight)
+        [TestCase(540f)] [TestCase(1080f)] [TestCase(2160f)]
+        public void LosRedondosMuralSidewalkMatchesFerroAsOneCappedStripAtTheMuralEdge(float screenWidth)
         {
             Type layout = Type.GetType("HayChoriYPaty.StreetSceneLayout, Assembly-CSharp", true);
-            float verticalScale = canvasHeight / 960f;
-            Rect bounds = (Rect)layout.GetMethod("LosRedondosOppositeSidewalkBounds").Invoke(null,
-                new object[] { canvasHeight, verticalScale });
-            float counterTop = (float)layout.GetMethod("CounterTop").Invoke(null, new object[] { canvasHeight });
-            float sidewalkHeight = (float)layout.GetField("LosRedondosOppositeSidewalkHeight").GetRawConstantValue();
-            Assert.AreEqual(0f, bounds.x, .001f);
-            Assert.AreEqual(540f, bounds.width, .001f);
-            Assert.AreEqual(counterTop, bounds.yMax, .001f,
-                "The independent scenery layer must stop at the existing shared counter edge.");
-            Assert.AreEqual(sidewalkHeight * verticalScale, bounds.height, .001f);
+            Rect mural = new Rect(0f, 80f, 540f, 205f);
+            Rect bounds = (Rect)layout.GetMethod("LosRedondosMuralSidewalkBounds").Invoke(null,
+                new object[] { mural, screenWidth });
+            float maxScreenPixels = (float)layout.GetField("MuralSidewalkMaxScreenPixels").GetRawConstantValue();
+            float ferroMaxScreenPixels = (float)layout.GetField("FerroMuralSidewalkMaxScreenPixels").GetRawConstantValue();
+            Assert.AreEqual(25f, maxScreenPixels);
+            Assert.AreEqual(ferroMaxScreenPixels, maxScreenPixels, .001f,
+                "Los Redondos and Ferro must share the same physical-pixel cap.");
+            Assert.AreEqual(mural.yMax, bounds.y, .001f, "Attach the strip directly to the mural; do not keep a separate band at the counter.");
+            Assert.AreEqual(mural.width, bounds.width, .001f);
+            Assert.AreEqual(maxScreenPixels, bounds.height * screenWidth / 540f, .001f,
+                "The single strip must remain at or below 25 rendered screen pixels.");
 
             Texture2D art = Resources.Load<Texture2D>("street-background-losredondos-v1");
             Assert.NotNull(art);
-            Rect source = (Rect)layout.GetMethod("LosRedondosOppositeSidewalkSource").Invoke(null,
+            Rect source = (Rect)layout.GetMethod("LosRedondosMuralSidewalkSource").Invoke(null,
                 new object[] { new Vector2(art.width, art.height) });
             float importScale = art.height / 1672f;
-            Assert.AreEqual(new Rect(0f, 680f * importScale, art.width, 180f * importScale), source,
-                "Reuse the original source strip containing Los Redondos' tiled sidewalk and curb.");
+            Assert.AreEqual(new Rect(0f, 680f * importScale, art.width, 130f * importScale), source,
+                "Reuse the original tiled sidewalk and one curb, ending before the roadway.");
             Assert.GreaterOrEqual(source.yMin, 0f);
             Assert.LessOrEqual(source.yMax, art.height);
         }
@@ -1041,9 +1125,7 @@ namespace HayChoriYPaty.Tests
             Assert.LessOrEqual(topMusic.yMax, viewport.yMax + .02f);
             Assert.GreaterOrEqual(topMusic.width, 44f, "Top music must keep a 44px touch target at " + width + "x" + height + ".");
             Assert.GreaterOrEqual(topMusic.height, 44f, "Top music must keep a 44px touch target at " + width + "x" + height + ".");
-            Assert.LessOrEqual(topMusic.xMax, account.xMin + .02f,
-                "The sound control must sit left of CUENTA at " + width + "x" + height + ".");
-            Assert.IsFalse(topMusic.Overlaps(account), "Top music must not cover CUENTA at " + width + "x" + height + ".");
+            Assert.IsFalse(topMusic.Overlaps(account), "Top music must not cover the small reference account label at " + width + "x" + height + ".");
             Assert.IsFalse(topMusic.Overlaps(settings), "The two top icon controls must not overlap.");
             Assert.AreEqual(topMusic.xMin, viewport.xMin + topMusicLayout.xMin * viewport.width / 540f, .02f);
             Assert.AreEqual(topMusic.xMax, viewport.xMin + topMusicLayout.xMax * viewport.width / 540f, .02f);
@@ -1072,8 +1154,8 @@ namespace HayChoriYPaty.Tests
                 .Invoke(null, new object[] { accountAction });
             Assert.AreEqual(Rect.zero, accountSource, "The hub no longer has an independent account button or hotspot.");
 
-            foreach (Rect source in new[] { new Rect(467, 448, 288, 143),
-                new Rect(100, 859, 315, 155), new Rect(94, 1238, 317, 164), new Rect(479, 1236, 344, 168) })
+            foreach (Rect source in new[] { new Rect(486, 447, 236, 128),
+                new Rect(121, 837, 224, 112), new Rect(91, 1207, 292, 104), new Rect(594, 837, 242, 142) })
             {
                 Rect hit = (Rect)map.Invoke(null, new object[] { source, new Vector2(artWidth, artHeight), screen, safe });
                 Assert.Greater(hit.width, 0f);
@@ -1117,6 +1199,11 @@ namespace HayChoriYPaty.Tests
         [TestCase("street-boca-crest-v1", 400, 400, true)]
         [TestCase("street-camioneros-crest-v1", 713, 485, false)]
         [TestCase("street-los-redondos-crest-v1", 300, 300, false)]
+        [TestCase("street-mural-argentinos-master-v1", 1897, 829, false)]
+        [TestCase("street-argentinos-fans-paired-v1", 1536, 1024, true)]
+        [TestCase("street-argentinos-riot-fans-v1", 1536, 1024, true)]
+        [TestCase("street-argentinos-fans-paired-v2", 1536, 1024, true)]
+        [TestCase("street-argentinos-riot-fans-v2", 1536, 1024, true)]
         public void NewStreetAssetsAndGoldCoinKeepNativeResolution(string name, int width, int height, bool alpha)
         {
             Texture2D texture = Resources.Load<Texture2D>(name); Assert.NotNull(texture);
@@ -1128,7 +1215,9 @@ namespace HayChoriYPaty.Tests
             Assert.IsTrue(android.overridden);
             TextureImporterFormat expectedAndroidFormat = Array.IndexOf(new[] {
                 "street-background-open-street-v4", "street-hub-stadium-v1", "street-victory-popup-wood-v1",
-                "street-mural-real-v5", "street-coin-gold-v2", "street-allboys-crest"
+                "street-mural-real-v5", "street-coin-gold-v2", "street-allboys-crest", "street-mural-argentinos-master-v1",
+                "street-argentinos-fans-paired-v1", "street-argentinos-riot-fans-v1",
+                "street-argentinos-fans-paired-v2", "street-argentinos-riot-fans-v2"
             }, name) >= 0 ? TextureImporterFormat.ETC2_RGBA8 : TextureImporterFormat.RGBA32;
             Assert.AreEqual(expectedAndroidFormat, android.format);
             Assert.GreaterOrEqual(android.maxTextureSize, Math.Max(width, height));
@@ -1144,7 +1233,8 @@ namespace HayChoriYPaty.Tests
                 "street-allboys-crest", "street-new-chicago-crest-v1", "street-velez-crest-v1",
                 "street-ferro-crest-v1", "street-independiente-crest-v1", "street-racing-crest-v1",
                 "street-san-lorenzo-crest-v1", "street-river-crest-v1", "street-boca-crest-v1",
-                "street-camioneros-crest-v1", "street-los-redondos-crest-v1", "street-huracan-crest-v1"
+                "street-camioneros-crest-v1", "street-los-redondos-crest-v1",
+                "street-huracan-crest-v1", "street-argentinos-crest-v1"
             };
             Assert.AreEqual(levels.Length, resources.Length, "The crest manifest must stay aligned with the level catalog");
             Assert.AreEqual(expected.Length, resources.Length);
@@ -1191,6 +1281,7 @@ namespace HayChoriYPaty.Tests
         [TestCase("street-camioneros-crest-v1")]
         [TestCase("street-los-redondos-crest-v1")]
         [TestCase("street-huracan-crest-v1")]
+        [TestCase("street-argentinos-crest-v1")]
         public void OpaqueUserCrestCutoutsRemoveOnlyExteriorLightBackground(string resource)
         {
             Texture2D source = Resources.Load<Texture2D>(resource);
@@ -1278,18 +1369,19 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void AllTwelveCrestsHaveEqualVisibleBodyHeightWithoutDistortion()
+        public void AvailableCrestsHaveEqualVisibleBodyHeightWithoutDistortion()
         {
             string[] resources = (string[])View.GetField("LevelCrestResourceNames", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
             MethodInfo measure = View.GetMethod("LevelCrestVisibleUv", BindingFlags.Static | BindingFlags.NonPublic);
             MethodInfo fit = View.GetMethod("FitLevelCrest", BindingFlags.Static | BindingFlags.NonPublic);
             for (int i = 0; i < resources.Length; i++)
             {
+                if (string.IsNullOrEmpty(resources[i])) continue;
                 Texture2D source = Resources.Load<Texture2D>(resources[i]);
                 Texture2D cutout = null;
                 try
                 {
-                    if (i == 5 || i == 9 || i == 10 || i == 11)
+                    if (i == 5 || i == 9 || i == 10 || i == 11 || i == 12)
                         cutout = (Texture2D)View.GetMethod("CreateLevelCrestCutout", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new object[] { source });
                     Texture2D texture = cutout != null ? cutout : source;
                     Rect uv = (Rect)measure.Invoke(null, new object[] { texture });
@@ -1333,7 +1425,7 @@ namespace HayChoriYPaty.Tests
         public void LevelSelectorCardsFitPortraitCanvasAndUseTeamMuralResources()
         {
             MethodInfo cardBounds = View.GetMethod("LevelSelectCardBounds", BindingFlags.Static | BindingFlags.NonPublic);
-            Rect[] cards = new Rect[11];
+            Rect[] cards = new Rect[13];
             for (int i = 0; i < cards.Length; i++)
             {
                 cards[i] = (Rect)cardBounds.Invoke(null, new object[] { i });
@@ -1354,8 +1446,9 @@ namespace HayChoriYPaty.Tests
             Assert.Less(cards[6].yMin, viewport.yMax, "A partial fourth row makes the scroll discoverable");
             MethodInfo maxScroll = View.GetMethod("LevelSelectorMaxScroll", BindingFlags.Static | BindingFlags.NonPublic);
             Assert.Greater((float)maxScroll.Invoke(null, new object[] { 960f }), 0f,
-                "All eleven levels exceed the viewport and must be reachable by scrolling");
-            Assert.Greater(cards[10].yMax, 960f, "Campaign tail belongs below the initial viewport");
+                "All thirteen levels exceed the viewport and must be reachable by scrolling");
+            Assert.Greater(cards[12].yMax, 960f, "The Argentinos Juniors campaign tail belongs below the initial viewport");
+            Assert.NotNull(Resources.Load<Texture2D>("street-mural-argentinos-master-v1"), "The final campaign card uses the Argentinos mural.");
 
             Assert.AreEqual("street-mural-real-v5", View.GetField("MuralResource", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue());
             Assert.AreEqual("street-background-chicago-v1", View.GetField("ChicagoBackgroundResource", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue());
@@ -1378,7 +1471,7 @@ namespace HayChoriYPaty.Tests
             Assert.That(back.yMin - viewport.yMax, Is.EqualTo(10f));
             Assert.That(back.yMax, Is.LessThan(canvasHeight));
             Rect card = (Rect)View.GetMethod("LevelSelectCardBounds", BindingFlags.Static | BindingFlags.NonPublic)
-                .Invoke(null, new object[] { 10 });
+                .Invoke(null, new object[] { 12 });
             float scroll = (float)View.GetMethod("LevelSelectorMaxScroll", BindingFlags.Static | BindingFlags.NonPublic)
                 .Invoke(null, new object[] { canvasHeight });
             Assert.That(card.yMax - scroll, Is.LessThanOrEqualTo(viewport.yMax + .01f));
@@ -1863,7 +1956,7 @@ namespace HayChoriYPaty.Tests
         [TestCase(1290, 2796)]
         [TestCase(1440, 3200)]
         [TestCase(1536, 2048)]
-        public void ResponsiveFooterFitsAllElevenLevelsAndKeepsButtonsFlagsAndStageSeparate(int width, int height)
+        public void ResponsiveFooterFitsAllConfiguredLevelsAndKeepsButtonsFlagsAndStageSeparate(int width, int height)
         {
             Vector2 size = new Vector2(width, height);
             Rect safe = new Rect(0f, height * .02f, width, height * .96f);
@@ -1886,10 +1979,13 @@ namespace HayChoriYPaty.Tests
                 object sim = simulationConstructor.Invoke(new object[] { Activator.CreateInstance(balanceType), level, 5f, 0, 1, 0 });
                 object kitchen = simulationType.GetProperty("KitchenLayout").GetValue(sim);
                 float stageBottom = (float)kitchenLayout.GetProperty("PlayfieldBottom").GetValue(kitchen) * verticalScale;
-                object footer = build.Invoke(null, new object[] { sim, canvasHeight, true, false });
+                bool hasFooterUpgradeCards = level != HuracanBonusLevelId;
+                object footer = build.Invoke(null, new object[] { sim, canvasHeight, hasFooterUpgradeCards, false });
                 Type footerType = footer.GetType();
                 Rect[] raw = (Rect[])footerType.GetField("UpgradeBounds").GetValue(footer);
-                int[] actions = (int[])View.GetMethod("CatalogUpgradeActions", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new object[] { sim });
+                int[] actions = hasFooterUpgradeCards
+                    ? (int[])View.GetMethod("CatalogUpgradeActions", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, new object[] { sim })
+                    : new int[0];
                 Assert.AreEqual(actions.Length, raw.Length, "Every Level " + level + " catalog action remains represented.");
                 Rect badge = (Rect)footerType.GetField("LevelBadge").GetValue(footer);
                 Rect drawnBadge = new Rect(badge.x, badge.y * verticalScale, badge.width, badge.height);
@@ -1934,7 +2030,7 @@ namespace HayChoriYPaty.Tests
                     }
                 }
 
-                object ready = build.Invoke(null, new object[] { sim, canvasHeight, raw.Length <= 3, true });
+                object ready = build.Invoke(null, new object[] { sim, canvasHeight, hasFooterUpgradeCards && raw.Length <= 3, true });
                 Rect selector = (Rect)ready.GetType().GetField("ReadySelector").GetValue(ready);
                 Rect drawnSelector = new Rect(selector.x, selector.y * verticalScale, selector.width, selector.height);
                 Assert.GreaterOrEqual(drawnSelector.yMin, stageBottom - .1f);
@@ -1992,7 +2088,7 @@ namespace HayChoriYPaty.Tests
 
         private static float ExpectedResponsivePennantHeight(int levelIndex, int count, bool ready, float canvasHeight, float stageBottom, float bottomBleed)
         {
-            if (levelIndex >= 5) return 0f;
+            if (levelIndex >= 5 && levelIndex != HuracanBonusLevelId) return 0f;
             float compact = Mathf.Min(1f, canvasHeight / 960f);
             int rows = count == 0 ? 0 : count <= 3 ? 1 : 2;
             float cardHeight = (count >= 5 ? 100f : count == 4 ? 104f : 120f) * compact;
@@ -2434,7 +2530,7 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
         }
 
         [Test]
-        public void AllElevenVisibleLevelCaptionsContainTheOfficialTeamAndNeighborhood()
+        public void AllConfiguredVisibleLevelCaptionsContainTheOfficialTeamAndNeighborhood()
         {
             Type simulation = Type.GetType("HayChoriYPaty.StreetSimulation, Assembly-CSharp", true);
             string[] names = (string[])simulation.GetField("LevelDisplayNames").GetValue(null);
@@ -2442,7 +2538,8 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
                 "All Boys / Floresta", "Nueva Chicago / Mataderos", "Vélez Sarsfield / Liniers",
                 "Ferro / Caballito", "Independiente / Avellaneda", "Racing Club / Avellaneda",
                 "San Lorenzo / Boedo", "River Plate / Núñez", "Boca Juniors / La Boca",
-                "Sindicato de Camioneros / Plaza de Mayo", "Los Redondos / Tandil"
+                "Sindicato de Camioneros / Plaza de Mayo", "Los Redondos / Tandil",
+                "Huracán / Parque Patricios", "Argentinos Juniors / La Paternal"
             }, names);
             Type themes = Type.GetType("HayChoriYPaty.ClubVisualTheme, Assembly-CSharp", true);
             MethodInfo forLevel = themes.GetMethod("ForLevel", BindingFlags.Static | BindingFlags.Public);

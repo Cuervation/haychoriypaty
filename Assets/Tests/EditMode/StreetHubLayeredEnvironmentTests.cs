@@ -96,9 +96,30 @@ namespace HayChoriYPaty.Tests
             Vector2 birdA = (Vector2)bird.Invoke(null, new object[] { 0f, 0 });
             Vector2 birdB = (Vector2)bird.Invoke(null, new object[] { 3f, 0 });
             Assert.AreNotEqual(cloudA.x, cloudB.x);
+            Assert.AreNotEqual(cloudA.y, cloudB.y, "Cloud shadows drift across a broader vertical area as well as moving laterally.");
             Assert.AreNotEqual(birdA.x, birdB.x);
+            Assert.AreNotEqual(birdA.y, ((Vector2)bird.Invoke(null, new object[] { 1f, 1 })).y,
+                "Bird flights use distinct heights and trajectories.");
             Assert.AreNotEqual((float)light.Invoke(null, new object[] { 0f }), (float)light.Invoke(null, new object[] { 3f }));
-            Assert.Less((float)light.Invoke(null, new object[] { 0f }), .1f, "Shop light pulse remains restrained.");
+            Assert.Less((float)light.Invoke(null, new object[] { 0f }), .2f, "Shop light and reflection remain restrained despite being easier to see.");
+            Vector2 clothA = (Vector2)cloth.Invoke(null, new object[] { .5f, 1.2f, 0f, 5.8f });
+            Vector2 clothB = (Vector2)cloth.Invoke(null, new object[] { .5f, 1.2f, 2.3f, 5.8f });
+            Assert.AreNotEqual(clothA.y, clothB.y, "Adjacent flags move out of phase rather than as one rigid sheet.");
+            Assert.Greater(Mathf.Abs(clothA.y) + Mathf.Abs(clothB.y), 2f, "Cloth movement must be visible at the artwork scale.");
+            Assert.AreEqual(4, view.GetProperty("HubLayeredBirdCountForTesting", StaticNonPublic).GetValue(null));
+            Assert.Greater((float)view.GetProperty("HubLayeredFlagAmplitudeForTesting", StaticNonPublic).GetValue(null), 7f);
+            Assert.Greater((float)view.GetProperty("HubLayeredShirtAmplitudeForTesting", StaticNonPublic).GetValue(null), 5f);
+            Assert.Greater((float)view.GetProperty("HubLayeredAwningAmplitudeForTesting", StaticNonPublic).GetValue(null), 6.5f);
+            MethodInfo awning = view.GetMethod("HubLayeredAwningOffsetForTesting", StaticNonPublic);
+            Assert.NotNull(awning);
+            float pinnedRoof = (float)awning.Invoke(null, new object[] { .5f, 0f, .6f, 1.6f, 1.38f });
+            float pinnedLeft = (float)awning.Invoke(null, new object[] { 0f, .5f, .6f, 1.6f, 1.38f });
+            float pinnedRight = (float)awning.Invoke(null, new object[] { 1f, .5f, .6f, 1.6f, 1.38f });
+            float lowerHem = (float)awning.Invoke(null, new object[] { .5f, .5f, .6f, 1.6f, 1.38f });
+            Assert.AreEqual(0f, pinnedRoof, .0001f, "The roof seam stays attached.");
+            Assert.AreEqual(0f, pinnedLeft, .0001f, "The left awning edge stays pinned.");
+            Assert.AreEqual(0f, pinnedRight, .0001f, "The right awning edge stays pinned.");
+            Assert.Greater(Mathf.Abs(lowerHem), 2f, "The lower fabric moves perceptibly without shifting its attachments.");
         }
 
         [Test]

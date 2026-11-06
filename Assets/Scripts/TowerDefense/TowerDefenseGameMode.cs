@@ -38,6 +38,8 @@ namespace HayChoriYPaty
         public IReadOnlyList<TowerDefenseOrderLine> Order => order;
         public float AnimationTime { get; internal set; }
         public bool IsReceiving { get; internal set; }
+        public bool IsDeparting { get; internal set; }
+        public float DepartureProgress { get; internal set; }
         public bool HasReceivedDelivery { get; internal set; }
         public bool CompletionCounted { get; internal set; }
         public bool OrderComplete
@@ -108,9 +110,10 @@ namespace HayChoriYPaty
     /// </summary>
     public sealed class TowerDefenseGameMode
     {
+        public const int MaxWorkersPerRolePerZone = 3;
         public const float CampaignStepSliceSeconds = 0.05f;
-        private const int CampaignOrderMaximumLineCount = 3;
-        private const int CampaignOrderMaximumLineQuantity = 4;
+        public const float FanDepartureDurationSeconds = 0.42f;
+        private static readonly int[] OrderProductIds = { 0, 4 };
         private const int MaximumSpeedLevel = 9;
         private static TowerDefenseGameMode activeInstance;
         private static bool campaignStepSuspended;
@@ -119,17 +122,17 @@ namespace HayChoriYPaty
         private readonly StreetBalance sourceBalance;
         private readonly System.Random random;
         private readonly List<TowerDefenseFanState> fans = new List<TowerDefenseFanState>();
+        private readonly List<TowerDefenseFanState> serviceOrder = new List<TowerDefenseFanState>();
         private readonly List<TowerDefenseWorkerState> workers = new List<TowerDefenseWorkerState>();
         private readonly int[] deliveredByProduct = new int[7];
-        private readonly int[] goalByProduct = new int[7];
         private readonly int[] availableProducts;
         private readonly int[] workerCounts = new int[5];
         private readonly long[] ticketWorkersByRole = new long[5];
         private readonly long[] hiresByRole = new long[5];
         private readonly Vector2[] serviceZones = new Vector2[2];
         private float worldUnitsPerLogicalPixel;
-        private float elapsed, spawnTimer;
-        private int nextFanId = 1, nextWorkerId = 1, speedLevel;
+        private float elapsed;
+        private int nextFanId = 1, nextWorkerId = 1, speedLevel, spawnedFans, servedFans;
         private int coins;
         private int coinsEarned;
         private int customersAttended;
@@ -158,8 +161,8 @@ namespace HayChoriYPaty
             for (int i = 0; i < workers.Count; i++) if (workers[i].Role == role) count++;
             return count;
         }
+        public int[] AvailableProducts => (int[])availableProducts.Clone();
         public int[] DeliveredByProduct => (int[])deliveredByProduct.Clone();
-        public int[] GoalByProduct => (int[])goalByProduct.Clone();
         public int Coins => coins;
         public int CoinsEarned => coinsEarned;
         public int SpeedLevel => speedLevel;
@@ -169,16 +172,15 @@ namespace HayChoriYPaty
         public long SpeedSpendCents => speedSpendCents;
         public long[] HiresByRole => (long[])hiresByRole.Clone();
         public int[] WorkerCountsByRole => (int[])workerCounts.Clone();
-        public int MaximumFans => Mathf.Min(config.MaximumFans, Mathf.Clamp(sourceBalance.maxCustomers, 1, 28));
         public int ActiveFanCount => fans.Count;
+        public int SpawnedFans => spawnedFans;
+        public int ServedFans => servedFans;
+        public int TotalFanCount => config.TotalFanCount;
         public float Elapsed => elapsed;
-        public float DurationSeconds { get; }
-        public float TimeRemaining => Mathf.Max(0f, DurationSeconds - elapsed);
         public float ServiceRange => serviceRange;
-        public bool HasReachedAllGoals { get; private set; }
-        public bool TimedOut { get; private set; }
-        public int CompletedOrdersAtExit { get; private set; }
-        public int IncompleteOrdersAtExit { get; private set; }
+        public bool HasWon { get; private set; }
+        public bool HasLost { get; private set; }
+        public int EscapedFans { get; private set; }
         public int TotalDelivered { get; private set; }
         public float WorldUnitsPerLogicalPixel => worldUnitsPerLogicalPixel;
 
@@ -207,22 +209,18 @@ namespace HayChoriYPaty
             serviceZones[0] = firstServiceZone;
             serviceZones[1] = secondServiceZone;
             serviceRange = Mathf.Max(config.ServiceRange, route.RowSpacing * 0.5f + worldUnitsPerLogicalPixel * 4f);
-            availableProducts = config.AvailableProducts;
-            if (availableProducts.Length == 0) throw new ArgumentException("The Tower Defense level must enable at least one product.", nameof(levelConfig));
+            availableProducts = (int[])OrderProductIds.Clone();
 
             int sourceLevel = Mathf.Clamp(config.SourceCampaignLevelId, 0, StreetSimulation.LevelNames.Length - 1);
-            DurationSeconds = sourceBalance.levelDurations != null && sourceLevel < sourceBalance.levelDurations.Length
-                ? Mathf.Max(1f, sourceBalance.levelDurations[sourceLevel]) : 380f;
-            for (int p = 0; p < goalByProduct.Length; p++) goalByProduct[p] = sourceBalance.GetProductGoal(sourceLevel, p);
-            int[] starting = campaignWorkerCounts ?? config.StartingWorkersByRole;
             for (int role = 0; role < workerCounts.Length; role++)
             {
-                workerCounts[role] = role < starting.Length ? Mathf.Max(0, starting[role]) : 0;
-                ticketWorkersByRole[role] = campaignTicketWorkersByRole != null && role < campaignTicketWorkersByRole.Length
-                    ? Math.Max(0L, campaignTicketWorkersByRole[role]) : 0L;
+                // Camioneros TD starts empty by contract. Keep constructor inputs for call-site
+                // compatibility, but never import campaign/ticket workers into this runtime.
+                workerCounts[role] = 0;
+                ticketWorkersByRole[role] = 0L;
             }
             coins = startingCoins >= 0 ? startingCoins : sourceBalance.GetStartingCoins(sourceLevel);
-            Kitchen = new StreetKitchenProduction(sourceBalance.kitchen, availableProducts, null, true, false);
+            Kitchen = new StreetKitchenProduction(sourceBalance.kitchen, availableProducts, null, true, false, true);
             random = new System.Random(sourceBalance.randomSeed + sourceLevel * 97 + config.LevelId.GetHashCode());
             BuildWorkers();
         }
@@ -266,22 +264,40 @@ namespace HayChoriYPaty
 
         public int HireCost(StreetWorkerRole role)
         {
-            if (!IsRoleAvailable(role)) return 0;
+            if (!IsPlaceableRole(role) || !IsRoleAvailable(role)) return 0;
             return StreetSimulation.CalculateHireCost(sourceBalance, config.SourceCampaignLevelId, role,
                 workerCounts[(int)role], ticketWorkersByRole[(int)role]);
         }
 
-        public bool TryHire(StreetWorkerRole role)
+        public int WorkersInZone(StreetWorkerRole role, int zone)
+        {
+            if (zone < 0 || zone >= serviceZones.Length) return 0;
+            int count = 0;
+            for (int i = 0; i < workers.Count; i++)
+                if (workers[i].Role == role && workers[i].ServiceZone == zone) count++;
+            return count;
+        }
+
+        public bool CanPlaceWorker(StreetWorkerRole role, int zone)
+        {
+            return Phase == TowerDefenseRunPhase.Playing && zone >= 0 && zone < serviceZones.Length &&
+                IsPlaceableRole(role) && WorkersInZone(role, zone) < MaxWorkersPerRolePerZone &&
+                HireCost(role) > 0 && coins >= HireCost(role);
+        }
+
+        private static bool IsPlaceableRole(StreetWorkerRole role) =>
+            role == StreetWorkerRole.Parrillero || role == StreetWorkerRole.Cocacolero;
+
+        public bool TryHire(StreetWorkerRole role, int zone)
         {
             int index = (int)role;
-            if (Phase != TowerDefenseRunPhase.Playing || index < 0 || index >= workerCounts.Length || !IsRoleAvailable(role)) return false;
+            if (!CanPlaceWorker(role, zone) || index < 0 || index >= workerCounts.Length || workerCounts[index] >= int.MaxValue - workers.Count) return false;
             int cost = HireCost(role);
-            if (cost <= 0 || coins < cost || workerCounts[index] >= int.MaxValue - workers.Count) return false;
             coins -= cost;
             hireSpendCents = AddCents(hireSpendCents, (long)cost * 100L);
             hiresByRole[index] = hiresByRole[index] == long.MaxValue ? long.MaxValue : hiresByRole[index] + 1L;
             workerCounts[index]++;
-            AddWorker(role, ChooseInitialZone(role));
+            AddWorker(role, zone);
             return true;
         }
 
@@ -313,14 +329,14 @@ namespace HayChoriYPaty
         /// <summary>Deterministic order injection for focused domain tests and authored levels.</summary>
         public bool TrySpawnFan(int[] products, int[] quantities)
         {
-            if (Phase != TowerDefenseRunPhase.Playing || stopSpawning || fans.Count >= MaximumFans ||
+            if (Phase != TowerDefenseRunPhase.Playing || stopSpawning || spawnedFans >= TotalFanCount || fans.Count >= TotalFanCount ||
                 products == null || quantities == null || products.Length < 1 ||
-                products.Length > CampaignOrderMaximumLineCount || products.Length != quantities.Length) return false;
+                products.Length > OrderProductIds.Length || products.Length != quantities.Length) return false;
             int[] safeProducts = new int[products.Length];
             int[] safeQuantities = new int[products.Length];
             for (int i = 0; i < products.Length; i++)
             {
-                if (!ContainsProduct(products[i]) || quantities[i] < 1 || quantities[i] > CampaignOrderMaximumLineQuantity) return false;
+                if (!ContainsProduct(products[i]) || quantities[i] < 1 || quantities[i] > 4) return false;
                 for (int prior = 0; prior < i; prior++) if (products[prior] == products[i]) return false;
                 safeProducts[i] = products[i];
                 safeQuantities[i] = quantities[i];
@@ -357,9 +373,9 @@ namespace HayChoriYPaty
             for (int i = 0; i < workers.Count; i++)
             {
                 TowerDefenseWorkerState worker = workers[i];
-                worker.ServiceZone = ChooseInitialZone(worker.Role);
+                // A placed crew member remains in the area selected by the player after reflow.
                 worker.TargetZone = worker.ServiceZone;
-                worker.Position = ZoneWorkerPosition(worker.Role, worker.ServiceZone, CountPriorWorkers(worker.Role));
+                worker.Position = ZoneWorkerPosition(worker.Role, worker.ServiceZone, CountPriorWorkers(worker.Role, worker.ServiceZone, worker));
                 worker.TransferRoute = Array.Empty<Vector2>();
                 worker.TransferIndex = 0;
                 worker.IsMoving = false;
@@ -368,9 +384,7 @@ namespace HayChoriYPaty
 
         private void StepSlice(float deltaTime)
         {
-            if (!stopSpawning) elapsed = Mathf.Min(DurationSeconds, elapsed + deltaTime);
-            if (elapsed >= DurationSeconds - 0.0001f) TimedOut = true;
-            UpdateCompletionState();
+            elapsed += deltaTime; // Audit only: Tower Defense has no round deadline.
             float cookRate = 1f + speedLevel * 0.06f;
             float beverageRate = 1f + speedLevel * Mathf.Max(0.01f, sourceBalance.speedIncrease);
             Kitchen.Advance(deltaTime, cookRate, beverageRate,
@@ -380,38 +394,26 @@ namespace HayChoriYPaty
                 workerCounts[(int)StreetWorkerRole.Fernetero] > 0);
             AdvanceActiveCooks(deltaTime, cookRate);
             AdvanceFans(deltaTime);
+            if (Phase != TowerDefenseRunPhase.Playing) return;
             AdvanceWorkers(deltaTime);
             DeliverWithinServiceRanges();
-            UpdateCompletionState();
+            if (Phase != TowerDefenseRunPhase.Playing) return;
             if (!stopSpawning)
             {
-                spawnTimer -= deltaTime;
-                if (spawnTimer <= 0f && fans.Count < MaximumFans && HasEntrySpacing())
-                {
-                    SpawnQuotaBalancedFan();
-                    spawnTimer = OfficialSpawnInterval();
-                }
+                if (fans.Count < TotalFanCount && HasEntrySpacing()) SpawnNextFan();
             }
-            if (stopSpawning && fans.Count == 0) Phase = TowerDefenseRunPhase.Finished;
+            UpdateCompletionState();
         }
 
         private void UpdateCompletionState()
         {
-            HasReachedAllGoals = true;
-            for (int i = 0; i < goalByProduct.Length; i++)
-                if (goalByProduct[i] > 0 && deliveredByProduct[i] < goalByProduct[i]) { HasReachedAllGoals = false; break; }
-            if (HasReachedAllGoals || TimedOut) stopSpawning = true;
-        }
-
-        private float OfficialSpawnInterval()
-        {
-            int sourceLevel = Mathf.Clamp(config.SourceCampaignLevelId, 0, StreetSimulation.LevelNames.Length - 1);
-            float pressure = sourceBalance.levelDemandMultipliers != null && sourceLevel < sourceBalance.levelDemandMultipliers.Length
-                ? Mathf.Max(0.1f, sourceBalance.levelDemandMultipliers[sourceLevel]) : 1f;
-            float demandFraction = Mathf.Clamp01((sourceBalance.maxPrice - StreetSimulation.FixedProductPrice) /
-                Mathf.Max(0.01f, sourceBalance.maxPrice - sourceBalance.minPrice));
-            float demandFactor = 0.55f / Mathf.Pow(Mathf.Max(0.08f, demandFraction), Mathf.Max(0.1f, sourceBalance.priceSensitivity));
-            return Mathf.Max(0.05f, sourceBalance.customerArrivalSeconds * demandFactor / pressure * config.FanSpawnScale);
+            if (HasWon || HasLost) return;
+            if (spawnedFans == TotalFanCount && servedFans == TotalFanCount && fans.Count == 0)
+            {
+                stopSpawning = true;
+                HasWon = true;
+                Phase = TowerDefenseRunPhase.Finished;
+            }
         }
 
         private bool HasEntrySpacing()
@@ -422,97 +424,25 @@ namespace HayChoriYPaty
             return true;
         }
 
-        private void SpawnQuotaBalancedFan()
+        private void SpawnNextFan()
         {
-            if (availableProducts.Length == 0 || fans.Count >= MaximumFans || stopSpawning) return;
-            int lineCountLimit = Mathf.Min(CampaignOrderMaximumLineCount, availableProducts.Length);
-            int totalWeight = 0;
-            for (int size = 1; size <= lineCountLimit; size++) totalWeight += lineCountLimit + 2 - size;
-            int roll = random.Next(totalWeight);
-            int lineCount = 1;
-            for (int size = 1; size <= lineCountLimit; size++)
-            {
-                roll -= lineCountLimit + 2 - size;
-                if (roll < 0) { lineCount = size; break; }
-            }
-            var pool = new List<int>(availableProducts);
-            var poolWeights = new List<float>(pool.Count);
-            for (int i = 0; i < pool.Count; i++) poolWeights.Add(ProductDemandWeight(pool[i]));
-            var products = new int[lineCount];
-            var quantities = new int[lineCount];
-            for (int i = 0; i < lineCount; i++)
-            {
-                int selected = WeightedProductIndex(poolWeights);
-                products[i] = pool[selected];
-                quantities[i] = random.Next(1, CampaignOrderMaximumLineQuantity + 1);
-                pool.RemoveAt(selected);
-                poolWeights.RemoveAt(selected);
-            }
-            SortOrderPairs(products, quantities);
-            CreateFan(products, quantities);
-        }
-
-        private int WeightedProductIndex(List<float> weights)
-        {
-            float total = 0f;
-            for (int i = 0; i < weights.Count; i++) total += Mathf.Max(0.01f, weights[i]);
-            float roll = (float)random.NextDouble() * total;
-            for (int i = 0; i < weights.Count; i++)
-            {
-                roll -= Mathf.Max(0.01f, weights[i]);
-                if (roll <= 0f) return i;
-            }
-            return weights.Count - 1;
-        }
-
-        private float ProductDemandWeight(int product)
-        {
-            if (product < 0 || product >= goalByProduct.Length) return 0.01f;
-            int goal = goalByProduct[product];
-            if (goal <= 0) return 0.01f;
-            int remaining = Mathf.Max(0, goal - deliveredByProduct[product]);
-            if (remaining <= 0) return 0.10f; // Completed products stay available for genuine extra sales.
-
-            int alreadyRequested = 0;
-            for (int fanIndex = 0; fanIndex < fans.Count; fanIndex++)
-            {
-                IReadOnlyList<TowerDefenseOrderLine> order = fans[fanIndex].Order;
-                for (int lineIndex = 0; lineIndex < order.Count; lineIndex++)
-                    if (order[lineIndex].Product == product) alreadyRequested += order[lineIndex].Remaining;
-            }
-            int unrequested = Mathf.Max(0, remaining - alreadyRequested);
-            float timeFraction = Mathf.Clamp01(TimeRemaining / Mathf.Max(1f, DurationSeconds));
-            float relativePace = Mathf.Clamp((remaining / (float)goal) / Mathf.Max(0.05f, timeFraction), 0.25f, 4f);
-            float quotaNeed = Mathf.Pow(unrequested / (float)goal, 1.25f);
-            return 0.08f + quotaNeed * relativePace;
-        }
-
-        private static void SortOrderPairs(int[] products, int[] quantities)
-        {
-            // Keep each quantity attached to the product it was sampled for.
-            for (int i = 1; i < products.Length; i++)
-            {
-                int product = products[i];
-                int quantity = quantities[i];
-                int j = i - 1;
-                while (j >= 0 && products[j] > product)
-                {
-                    products[j + 1] = products[j];
-                    quantities[j + 1] = quantities[j];
-                    j--;
-                }
-                products[j + 1] = product;
-                quantities[j + 1] = quantity;
-            }
+            if (stopSpawning || spawnedFans >= TotalFanCount || fans.Count >= TotalFanCount) return;
+            if (random.Next(2) == 0)
+                CreateFan(new[] { 0, 4 }, new[] { random.Next(1, 5), random.Next(1, 5) });
+            else
+                CreateFan(new[] { random.Next(2) == 0 ? 0 : 4 }, new[] { random.Next(1, 5) });
         }
 
         private bool CreateFan(int[] products, int[] quantities)
         {
-            if (routeGeometry == null || routeGeometry.Centerline.Length < 2) return false;
+            if (stopSpawning || spawnedFans >= TotalFanCount || fans.Count >= TotalFanCount ||
+                routeGeometry == null || routeGeometry.Centerline.Length < 2) return false;
             int id = nextFanId++;
             var follower = new TowerDefenseFanRouteFollower(id, routeGeometry.Centerline,
                 sourceBalance.customerSpeed * config.FanSpeed * worldUnitsPerLogicalPixel);
             fans.Add(new TowerDefenseFanState(id, follower, products, quantities));
+            spawnedFans++;
+            if (spawnedFans >= TotalFanCount) stopSpawning = true;
             return true;
         }
 
@@ -524,11 +454,28 @@ namespace HayChoriYPaty
                 fan.AnimationTime += deltaTime;
                 fan.ReceiveAnimationSeconds = Mathf.Max(0f, fan.ReceiveAnimationSeconds - deltaTime);
                 fan.IsReceiving = fan.ReceiveAnimationSeconds > 0f;
+                if (fan.IsDeparting)
+                {
+                    fan.DepartureProgress = Mathf.Clamp01(fan.DepartureProgress + deltaTime / FanDepartureDurationSeconds);
+                    if (fan.DepartureProgress >= 1f)
+                    {
+                        fans.RemoveAt(i);
+                        servedFans++;
+                        UpdateCompletionState();
+                    }
+                    continue;
+                }
                 fan.RouteFollower.Advance(deltaTime);
                 if (!fan.RouteFollower.HasExited) continue;
-                if (fan.OrderComplete) CompletedOrdersAtExit++;
-                else IncompleteOrdersAtExit++;
+                EscapedFans++;
                 fans.RemoveAt(i);
+                if (!fan.OrderComplete)
+                {
+                    HasLost = true;
+                    stopSpawning = true;
+                    Phase = TowerDefenseRunPhase.Finished;
+                    return;
+                }
             }
         }
 
@@ -537,16 +484,12 @@ namespace HayChoriYPaty
             for (int i = 0; i < workers.Count; i++)
             {
                 TowerDefenseWorkerState worker = workers[i];
-                if (worker.Role != StreetWorkerRole.Parrillero && worker.Role != StreetWorkerRole.ParrilleroPremium) continue;
+                if (worker.Role != StreetWorkerRole.Parrillero) continue;
                 if (worker.CookUnitId <= 0)
                 {
-                    int firstProduct = worker.Role == StreetWorkerRole.Parrillero ? 0 : 2;
-                    int selected = firstProduct + worker.NextCookProduct;
-                    StreetFoodUnit unit = Kitchen.ReserveCook(selected, worker.Id);
-                    if (unit == null) unit = Kitchen.ReserveCook(firstProduct + 1 - worker.NextCookProduct, worker.Id);
+                    StreetFoodUnit unit = Kitchen.ReserveCook(0, worker.Id);
                     if (unit == null) continue;
                     worker.CookUnitId = unit.Id;
-                    worker.NextCookProduct = 1 - worker.NextCookProduct;
                 }
                 if (!Kitchen.AdvanceCook(worker.CookUnitId, worker.Id, deltaTime, cookRate)) continue;
                 if (Kitchen.TakeCooked(worker.CookUnitId, worker.Id) && Kitchen.DepositCooked(worker.CookUnitId, worker.Id))
@@ -554,33 +497,31 @@ namespace HayChoriYPaty
             }
         }
 
+        // Route progress, not list order or straight-line distance, determines urgency.
+        // Use a scratch list so targeting does not reorder renderer/customer identities.
         private void DeliverWithinServiceRanges()
         {
-            for (int f = 0; f < fans.Count; f++)
+            serviceOrder.Clear();
+            serviceOrder.AddRange(fans);
+            serviceOrder.Sort(CompareServicePriority);
+            for (int w = 0; w < workers.Count; w++)
             {
-                TowerDefenseFanState fan = fans[f];
-                for (int zone = 0; zone < serviceZones.Length; zone++)
+                TowerDefenseWorkerState worker = workers[w];
+                if (worker.IsMoving) continue;
+                bool delivered = false;
+                for (int f = 0; f < serviceOrder.Count && !delivered; f++)
                 {
-                    if (Vector2.Distance(fan.RouteFollower.Position, serviceZones[zone]) > serviceRange) continue;
+                    TowerDefenseFanState fan = serviceOrder[f];
+                    if (fan.OrderComplete || !IsAdjacentToArea(fan, worker.ServiceZone)) continue;
                     for (int line = 0; line < fan.Order.Count; line++)
                     {
                         TowerDefenseOrderLine order = (TowerDefenseOrderLine)fan.Order[line];
-                        if (order.Remaining <= 0) continue;
-                        StreetWorkerRole role = StreetSpecialties.GetDeliveryRole(order.Product, true);
-                        TowerDefenseWorkerState worker = FindWorkerInZone(role, zone);
-                        if (worker == null)
-                        {
-                            RequestWorkerForZone(role, zone);
-                            continue;
-                        }
-                        if (order.Product < 4 && worker.Role == StreetWorkerRole.Mozo)
-                            Kitchen.ReserveTableUnit(order.Product, worker.Id);
-                        StreetFoodUnit unit = Kitchen.TryTake(order.Product, role, worker.Id);
-                        if (unit == null) { Kitchen.ReleaseTableReservation(worker.Id); continue; }
+                        if (order.Remaining <= 0 || GetDeliveryRole(order.Product) != worker.Role) continue;
+                        StreetFoodUnit unit = Kitchen.TryTake(order.Product, worker.Role, worker.Id);
+                        if (unit == null) continue;
                         if (!Kitchen.Consume(unit.Id, order.Product, worker.Id))
                         {
                             Kitchen.ReturnCarried(unit.Id, worker.Id);
-                            Kitchen.ReleaseTableReservation(worker.Id);
                             continue;
                         }
                         if (fan.RecordDelivery(order.Product))
@@ -601,12 +542,41 @@ namespace HayChoriYPaty
                             {
                                 fan.CompletionCounted = true;
                                 if (ordersCompleted < int.MaxValue) ordersCompleted++;
+                                fan.IsDeparting = true;
+                                fan.DepartureProgress = 0f;
                             }
                         }
-                        break; // One physical unit per worker per service pass; next substep can carry another.
+                        delivered = true; // One physical unit per worker per service pass.
+                        break;
                     }
                 }
             }
+        }
+
+        private static int CompareServicePriority(TowerDefenseFanState a, TowerDefenseFanState b)
+        {
+            int progress = b.RouteFollower.Progress.CompareTo(a.RouteFollower.Progress);
+            return progress != 0 ? progress : a.Id.CompareTo(b.Id);
+        }
+
+        private bool IsAdjacentToArea(TowerDefenseFanState fan, int zone)
+        {
+            if (zone < 0 || zone >= serviceZones.Length || fan.RouteFollower.HasExited) return false;
+            // Each shared area borders its upper/lower horizontal rows and their
+            // own connecting turn. The next connector and third row are not adjacent.
+            int stride = route.TurnSegments + 1;
+            int start = zone * stride, end = (zone + 1) * stride + 1;
+            Vector2[] points = routeGeometry.Centerline;
+            if (end >= points.Length) return false;
+            float from = 0f, to = 0f;
+            for (int i = 1; i <= end; i++)
+            {
+                float length = Vector2.Distance(points[i - 1], points[i]);
+                to += length;
+                if (i <= start) from += length;
+            }
+            float progress = fan.RouteFollower.Progress;
+            return progress >= from && progress <= to;
         }
 
         private void AdvanceWorkers(float deltaTime)
@@ -644,35 +614,6 @@ namespace HayChoriYPaty
                 }
             }
 
-            for (int i = 0; i < workers.Count; i++)
-            {
-                TowerDefenseWorkerState worker = workers[i];
-                if (worker.Role != StreetWorkerRole.Mozo && worker.Role != StreetWorkerRole.Cocacolero && worker.Role != StreetWorkerRole.Fernetero) continue;
-                int target = BestServiceZone(worker.Role);
-                if (target >= 0 && target != worker.TargetZone) RequestWorkerForZone(worker.Role, target);
-            }
-        }
-
-        private int BestServiceZone(StreetWorkerRole role)
-        {
-            int best = -1, bestScore = 0;
-            for (int zone = 0; zone < serviceZones.Length; zone++)
-            {
-                int score = 0;
-                for (int f = 0; f < fans.Count; f++)
-                {
-                    TowerDefenseFanState fan = fans[f];
-                    if (Vector2.Distance(fan.RouteFollower.Position, serviceZones[zone]) > serviceRange + 0.4f) continue;
-                    for (int line = 0; line < fan.Order.Count; line++)
-                    {
-                        TowerDefenseOrderLine order = (TowerDefenseOrderLine)fan.Order[line];
-                        if (order.Remaining > 0 && StreetSpecialties.GetDeliveryRole(order.Product, true) == role)
-                            score += order.Remaining;
-                    }
-                }
-                if (score > bestScore) { best = zone; bestScore = score; }
-            }
-            return best;
         }
 
         private TowerDefenseWorkerState FindWorkerInZone(StreetWorkerRole role, int zone)
@@ -683,42 +624,6 @@ namespace HayChoriYPaty
                 if (worker.Role == role && !worker.IsMoving && worker.ServiceZone == zone) return worker;
             }
             return null;
-        }
-
-        private void RequestWorkerForZone(StreetWorkerRole role, int zone)
-        {
-            if (zone < 0 || zone >= serviceZones.Length) return;
-            TowerDefenseWorkerState chosen = null;
-            for (int i = 0; i < workers.Count; i++)
-            {
-                TowerDefenseWorkerState worker = workers[i];
-                if (worker.Role != role) continue;
-                if (worker.IsMoving) return;
-                chosen = worker;
-                break;
-            }
-            if (chosen == null || chosen.ServiceZone == zone) return;
-            float gateX = FindLeftGateX();
-            Vector2 currentGate = new Vector2(gateX, chosen.Position.y);
-            Vector2 targetGate = new Vector2(gateX, serviceZones[zone].y);
-            chosen.TargetZone = zone;
-            chosen.TransferRoute = new[] { currentGate, targetGate, ZoneWorkerPosition(role, zone, CountPriorWorkers(role)) };
-            chosen.TransferIndex = 0;
-            chosen.IsMoving = true;
-        }
-
-        private float FindLeftGateX()
-        {
-            float minimum = float.PositiveInfinity;
-            IncludeMinimumX(routeGeometry.LeftBoundary, ref minimum);
-            IncludeMinimumX(routeGeometry.RightBoundary, ref minimum);
-            return minimum - worldUnitsPerLogicalPixel * 5f;
-        }
-
-        private static void IncludeMinimumX(Vector2[] points, ref float minimum)
-        {
-            if (points == null) return;
-            for (int i = 0; i < points.Length; i++) if (points[i].x < minimum) minimum = points[i].x;
         }
 
         private void BuildWorkers()
@@ -733,9 +638,24 @@ namespace HayChoriYPaty
 
         private void AddWorker(StreetWorkerRole role, int zone)
         {
-            int index = CountPriorWorkers(role);
+            int index = CountPriorWorkers(role, zone);
             workers.Add(new TowerDefenseWorkerState(nextWorkerId++, role, zone, ZoneWorkerPosition(role, zone, index)));
         }
+
+        private int CountPriorWorkers(StreetWorkerRole role, int zone, TowerDefenseWorkerState current = null)
+        {
+            int count = 0;
+            for (int i = 0; i < workers.Count; i++)
+            {
+                TowerDefenseWorkerState worker = workers[i];
+                if (worker == current) break;
+                if (worker.Role == role && worker.ServiceZone == zone) count++;
+            }
+            return count;
+        }
+
+        private static StreetWorkerRole GetDeliveryRole(int product) =>
+            product >= 0 && product <= 3 ? StreetWorkerRole.Parrillero : StreetSpecialties.GetRequiredWorkerRole(product);
 
         private int CountPriorWorkers(StreetWorkerRole role)
         {
@@ -768,6 +688,7 @@ namespace HayChoriYPaty
                 RowCount = source.RowCount,
                 SegmentLengths = source.SegmentLengths == null ? Array.Empty<float>() : (float[])source.SegmentLengths.Clone(),
                 CorridorWidth = source.CorridorWidth,
+                HorizontalCorridorWidth = source.HorizontalCorridorWidth,
                 RowSpacing = source.RowSpacing,
                 TurnRadius = source.TurnRadius,
                 PlayableBounds = source.PlayableBounds,

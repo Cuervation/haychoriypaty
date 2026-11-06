@@ -8,6 +8,7 @@ namespace HayChoriYPaty
     public sealed class TowerDefenseLevelConfig : ScriptableObject
     {
         public const string CamionerosLevelId = "tower-defense.camioneros.plaza-de-mayo.level-1";
+        public const int CamionerosFansToServe = 10;
 
         [SerializeField] private string modeId = "tower-defense";
         [SerializeField] private string levelId = CamionerosLevelId;
@@ -29,17 +30,14 @@ namespace HayChoriYPaty
         [SerializeField] private GameObject terminalFencePrefab;
         [SerializeField] private GameObject directionSignPrefab;
         [SerializeField] private Sprite directionArrowSprite;
-        [SerializeField] private int[] availableProducts = { 0, 1, 2, 3, 4, 6, 5 };
+        [SerializeField] private int[] availableProducts = { 0, 4 };
         [Tooltip("Multiplier applied to Tower Defense fan movement; other campaign levels are unaffected.")]
         [SerializeField, Min(0.05f)] private float fanSpeed = 0.45f;
-        [SerializeField, Min(1)] private int maximumFans = 28;
-        [Tooltip("Scale applied to Camioneros' official campaign arrival interval.")]
-        [SerializeField, Min(0.1f)] private float fanSpawnScale = 1f;
         [SerializeField, Min(0.01f)] private float serviceRange = 0.8f;
         [SerializeField] private Vector2 firstWorkZoneOffset;
         [SerializeField] private Vector2 secondWorkZoneOffset;
-        [Tooltip("Fallback roster for isolated previews/tests; an integrated campaign run receives its live roster.")]
-        [SerializeField] private int[] startingWorkersByRole = { 1, 1, 0, 0, 1 };
+        [Tooltip("Defense starts without workers; retained for serialized layout compatibility.")]
+        [SerializeField] private int[] startingWorkersByRole = new int[5];
 
         public string ModeId => string.IsNullOrWhiteSpace(modeId) ? "tower-defense" : modeId;
         public string LevelId => string.IsNullOrWhiteSpace(levelId) ? CamionerosLevelId : levelId;
@@ -55,8 +53,7 @@ namespace HayChoriYPaty
         public Sprite DirectionArrowSprite => directionArrowSprite;
         public int[] AvailableProducts => availableProducts == null ? Array.Empty<int>() : (int[])availableProducts.Clone();
         public float FanSpeed => Mathf.Max(0f, fanSpeed);
-        public int MaximumFans => Mathf.Max(1, maximumFans);
-        public float FanSpawnScale => Mathf.Max(0.1f, fanSpawnScale);
+        public int TotalFanCount => CamionerosFansToServe;
         public float ServiceRange => Mathf.Max(0.01f, serviceRange);
         public Vector2 FirstWorkZoneOffset => firstWorkZoneOffset;
         public Vector2 SecondWorkZoneOffset => secondWorkZoneOffset;
@@ -72,6 +69,7 @@ namespace HayChoriYPaty
                 RowCount = runtimeRoute.RowCount,
                 SegmentLengths = runtimeRoute.SegmentLengths == null ? Array.Empty<float>() : (float[])runtimeRoute.SegmentLengths.Clone(),
                 CorridorWidth = runtimeRoute.CorridorWidth,
+                HorizontalCorridorWidth = runtimeRoute.HorizontalCorridorWidth,
                 RowSpacing = runtimeRoute.RowSpacing,
                 TurnRadius = runtimeRoute.TurnRadius,
                 PlayableBounds = runtimeRoute.PlayableBounds,

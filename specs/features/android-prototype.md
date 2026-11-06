@@ -1,3 +1,73 @@
+# Android — 2026-11-06: APK del working tree actual, 0.2.83/code85
+
+APK Development IL2CPP/ARM64, escena única `Assets/Scenes/Main.unity`, Unity 6000.6.3f1. BuildPipeline en copia aislada del checkout vigente (**HEAD `5b178de` + working tree capturado el 2026-11-06**) terminó **Succeeded en 7:52.38, 0 errores / 5 advertencias**. Se excluyeron las escenas temporales sin seguimiento `Assets/InitTestScene*.unity`; en esa copia se restauraron `runInBackground` y `GvhProjectSettings.xml` desde HEAD para no incluir preferencias locales ajenas (incluida la activación local de Analytics). No se alteró el checkout para compilar. Paquete `com.haychoriypaty.game`, versionName `0.2.83`, versionCode `85`, min API26/target API36, ABI `arm64-v8a`.
+
+APK `Builds/Android/Archive/HayChoriYPaty-0.2.83-code85-current-tree-20261106.apk`: **408,286,436 bytes**, SHA-256 `6de2b51a31d2d327ff2382c28efd5a9e52d7f3f9388da7ccc89ad78806d4a485`. **PASS:** ZIP íntegro, `zipalign -c -v 4`, APK Signature Scheme v2 y package/version/API/ABI. Manifiesto Development/debuggable; Firebase Analytics desactivado (`firebase_analytics_collection_deactivated=true`) y recolección de Google ad ID desactivada. Firma Android Debug; no es una release firmada para Play Store. **Instalación física:** `adb install -r` devolvió **Success** en Motorola Edge 60 Fusion (`ZY22MBNWRB`); Package Manager confirma `versionCode=85`/`versionName=0.2.83`, `lastUpdateTime=2026-11-06 09:43:17` y conserva `firstInstallTime=2026-10-03 18:49:24`. Actualización en sitio, sin desinstalar ni borrar datos/caché. La app no se abrió; pruebas EditMode/PlayMode y gameplay smoke **NOT_RUN**.
+
+---
+
+# Android — 2026-11-04: Tower Defense campaign instalada, 0.2.83/code85
+
+APK Development IL2CPP/ARM64, escena única `Assets/Scenes/Main.unity`, Unity 6000.6.3f1. BuildPipeline en copia aislada completó **Succeeded, 447.86 s, 0 errores/8 advertencias**. Package `com.haychoriypaty.game`, versionName `0.2.83`, versionCode `85`, min API26/target API36, ABI `arm64-v8a`.
+
+Artefacto `Builds/Android/Archive/HayChoriYPaty-0.2.83-code85-campaign-tower-defense-20261103.apk`: **399,342,426 bytes**, SHA-256 `d3bd9044d476a3c7bf6e1406602f5b50b3026ae91fb5a0630adddd7f3a681ddb`. **PASS:** ZIP íntegro, `zipalign -c 4`, APK Signature Scheme v2 (Android Debug; no Play Store release), package/version/API/ABI.
+
+**Instalación física:** `adb install -r` devolvió **Success** en Motorola Edge 60 Fusion (`ZY22MBNWRB`). Package Manager confirma `versionCode=85`/`versionName=0.2.83`, `lastUpdateTime=2026-11-04 09:44:01` y preserva `firstInstallTime=2026-10-03 18:49:24`. Actualización en sitio: no se desinstaló ni se borraron datos/caché. La app no se abrió; gameplay smoke test **NOT_RUN**.
+
+---
+
+# Android — 2026-11-02: Huracán footer choices 0.2.83/code85
+
+APK Development IL2CPP/ARM64 generada desde el checkout activo con Unity 6000.6.3f1; se pasó explícitamente solo `Assets/Scenes/Main.unity`. Build job `build-c8a4c00ec2`: **Succeeded, 356.46 s, 0 errores/6 advertencias**. Package `com.haychoriypaty.game`, versionName `0.2.83`, versionCode `85`, min API26/target API36, ABI `arm64-v8a`.
+
+Artefacto ignorado por Git: `Builds/Android/Archive/HayChoriYPaty-0.2.83-code85-huracan-footer-choices-20261102.apk`, **401,166,756 bytes**, SHA-256 `94fe411e897ef6ff7f8d32c67ebf77d1e548996ce8c2928dc11be5133704fa30`. **PASS:** ZIP íntegro, `zipalign -c -v 4`, APK Signature Scheme v2, `aapt` package/version/API/ABI y metadata IL2CPP con `DrawBonusChoiceCards`/`BonusChoiceBounds`; manifest `debuggable=true`, Firebase Analytics desactivado y Ad-ID collection deshabilitada. Firma Android Debug; no Play Store. La prueba focalizada de la implementación previa pasó **3/3 EditMode** y BuildPipeline terminó sin errores.
+
+**Instalación física:** `adb install -r` devolvió **Success** en el Motorola Edge 60 Fusion conectado. Package Manager confirma `versionCode=85`/`versionName=0.2.83`, `lastUpdateTime=2026-11-02 16:16:45` y `firstInstallTime=2026-10-03 18:49:24` preservado. Actualización en sitio, sin desinstalar ni limpiar cache/datos. La app no se lanzó; gameplay/smoke test **NOT_RUN**. El build Development conserva el bono QA temporal de +30 tickets; retirarlo antes de distribuir una release.
+
+---
+
+# Android — 2026-11-02: instalación y smoke test de sync Huracán 0.2.82/code84
+
+APK Development IL2CPP/ARM64 desde Unity 6000.6.3f1 y checkout activo; escena explícita `Assets/Scenes/Main.unity`. Build job `build-61d1546dbc`: **Succeeded, 325.329937 s, 0 errores/8 advertencias**. Package `com.haychoriypaty.game`, versionName `0.2.82`, versionCode `84`, min API26/target API36, ABI `arm64-v8a`.
+
+APK `Builds/Android/Archive/HayChoriYPaty-0.2.82-code84-huracan-stock-sync-20261102.apk`: **499,658,953 bytes**, SHA-256 `25a5872312a4379fee2cc0e665daa80fc124f87d3a2f5478a3cf3a0125ae7456`. **PASS:** ZIP íntegro, `zipalign -c -v 4`, APK Signature Scheme v2 (certificado Android Debug; no Play Store release), `aapt` package/version/API/ABI, `debuggable=true`, Firebase Analytics/ad-ID desactivados en el manifest, metadata IL2CPP contiene `BindMatchInventoryToSnapshot` y `stockRemaining`. El certificado SHA-256 de firma coincide con el APK `0.2.81/code83`, por lo que conserva la identidad de actualización en sitio.
+
+La corrección añade stock no consumido a `BuildBonusMatchRecord` y, para matches de outbox antiguos, proyecta el campo Firestore desde el snapshot inmutable antes de la transacción. `BonusMatchAndStaleOutboxUseTheCommittedSnapshotInventory` pasó **1/1 EditMode**.
+
+**Instalación y smoke físico:** tras la reconexión USB confirmada por el usuario, `adb install -r` devolvió **Success** en Motorola Edge 60 Fusion (`ZY22MBNWRB`). Package Manager confirma `versionCode=84`/`versionName=0.2.82`, `lastUpdateTime=2026-11-02 14:18:25` y preserva `firstInstallTime=2026-10-03 18:49:24` (actualización en sitio; sin desinstalar ni borrar cache/datos/cuenta). Main quedó en foreground; CUENTA mostró la sesión de Google vinculada; JUGAR abrió el selector con **Huracán — DISPONIBLE**. Insignias mostró `SINCRONIZADO CON FIREBASE`, coherente con `ProgressSyncStatus` (no sincronizando, sin operaciones locales pendientes y con revisión confirmada). Logcat filtrado por `[FirebasePlayerSession]` no mostró errores tras la actualización. Evidencia física: `/private/tmp/hcyp-0.2.82-insignias-sync.png` (1220×2712).
+
+**Límite:** no se inició una partida Huracán; no se valida aún en dispositivo el commit terminal de esa ronda ni la entrada/repetición después de completarla. No afirmar aceptación end-to-end del nivel. Conserva el bono temporal Development de +30 tickets, retirar antes de distribuir release.
+
+# Entrega Android — 2026-11-02: Firestore error handling, APK Development 0.2.81/code83
+
+Se añadió diagnóstico `FirestoreException.ErrorCode` sin mensaje/PII y la clasificación de `Unavailable`, `DeadlineExceeded`, `Cancelled` y `Aborted` como errores transitorios sujetos al backoff existente. Los errores permanentes continúan suspendiendo la ronda de forma segura. `FirebasePlayerSessionDiagnosticTests`: **7/7 EditMode PASS**; Unity compiló scripts sin errores.
+
+Build job `build-a3a378a5c8`: **Succeeded, 318.86 s, 0 errores/6 advertencias**. Unity 6000.6.3f1, Development Android IL2CPP/ARM64, solo `Assets/Scenes/Main.unity`; paquete `com.haychoriypaty.game`, `0.2.81`/code`83`, min API26/target36. APK `Builds/Android/Archive/HayChoriYPaty-0.2.81-code83-firestore-error-handling-20261102.apk`, **411,943,539 bytes**, SHA-256 `7b2e945cd1570b27fd166fbcf89a4e3356072514d1be71b923b24abc3da23290`. **PASS:** ZIP, `zipalign -c -v 4`, APK Signature Scheme v2 (Android Debug; no Play Store release signing), `aapt` package/version/API, Development manifest, Analytics/Ad-ID opt-outs; IL2CPP metadata contiene `firestoreErrorCode`, `firestore-commit`, `PermissionDenied` y `Unavailable`. Instalada mediante `adb install -r` en Motorola Edge 60 Fusion (`ZY22MBNWRB`): **Success**; Package Manager confirmó `versionCode=83`/`versionName=0.2.81`, `lastUpdateTime=2026-11-02 12:36:51` y `firstInstallTime=2026-10-03 18:49:24` preservado. La SHA-256 del `base.apk` extraído del teléfono coincide exactamente con la del artefacto local. Actualización en sitio, sin limpiar datos. Prueba física 2026-11-02: la `UnityPlayerGameActivity` abrió y permaneció en primer plano sin crash, pero la captura 1220×2712 muestra CUENTA con “No pudimos sincronizar con seguridad. Tus datos locales están protegidos.” Logcat sanitizado: `stage=firestore-commit exceptionType=FirestoreException firestoreErrorCode=PermissionDenied`. Se tocó REINTENTAR una vez y el bloqueo siguió. La sesión de juego continúa inaccesible; no se cambió la cuenta ni se modificaron/desplegaron reglas Firebase. Evidencia: `/private/tmp/hcyp-device-smoke-final.png`. La APK conserva el bono Development temporal de +30 tickets, retirar antes de cualquier release.
+
+---
+
+# Entrega Android — 2026-11-02: recuperación visual ante rechazo de sync Huracán 0.2.81/code83
+
+APK Development IL2CPP/ARM64 generada desde el Editor activo Unity 6000.6.3f1 del checkout vigente, con escena única `Assets/Scenes/Main.unity`. Build job `build-eb9b0c8adb`: **Succeeded, 321.24 s, 0 errores / 5 advertencias**. Player Settings `0.2.81`/`83`, paquete `com.haychoriypaty.game`, min API26/target API36.
+
+Artefacto ignorado por Git: `Builds/Android/Archive/HayChoriYPaty-0.2.81-code83-huracan-sync-recovery-20261102.apk`, **411,944,851 bytes**, SHA-256 `b8aa85a5fcfd84c9c4e3c4bf04a5b499df0657518a677f41ef399de459a094dd`. **PASS:** ZIP íntegro, `zipalign -c 4`, APK Signature Scheme v2 (`apksigner verify` con OpenJDK de Unity), package/version/code/min API/target API/ABI `arm64-v8a`, manifest `debuggable=true` y Analytics/Ad-ID desactivados; metadata IL2CPP contiene `HandlePermanentSyncFailure` y `FormatFailureDiagnostic`. Firma Android Debug; no es release firmado para Play Store.
+
+Incluye el retorno al hub y apertura de CUENTA al fallar permanentemente la sincronización de Huracán; regresión PlayMode focalizada `PermanentFirebaseSyncFailureReturnsToHubAndOpensAccountPanel` **1/1 PASS** antes de la build. Esto evita la pantalla vacía, pero no confirma ni corrige la causa raíz del rechazo de Firebase. Al finalizar el build aún no estaba instalada; ver la instalación posterior. No hubo prueba Android de login/sync real. Se mantiene el bono temporal Development de +30 tickets, retirar antes de cualquier release. No hubo Git push.
+
+**Instalación — 2026-11-02:** `adb install -r` devolvió **Success** en Motorola Edge 60 Fusion (`ZY22MBNWRB`); Package Manager confirmó `com.haychoriypaty.game`, `versionCode=83`/`versionName=0.2.81`, `lastUpdateTime=2026-11-02 10:18:15` y conservó `firstInstallTime=2026-10-03 18:49:24`. Actualización en sitio, sin desinstalar ni limpiar datos. La app no se inició; login/sync Firebase y gameplay Android **NOT_RUN**.
+
+---
+
+# Entrega Android — 2026-11-01: diagnósticos Firebase 0.2.81/code83
+
+APK Android Development IL2CPP/ARM64 generada desde el Editor activo Unity 6000.6.3f1, checkout vigente y escena explícita `Assets/Scenes/Main.unity`. Build job `build-36183a850e`: **Succeeded, 499.87 s, 0 errores / 5 advertencias**. Player Settings: `0.2.81`/code`83`, paquete `com.haychoriypaty.game`, min API26/target API36.
+
+Artefacto ignorado por Git: `Builds/Android/Archive/HayChoriYPaty-0.2.81-code83-firebase-diagnostics-20261101.apk`, **411,944,550 bytes**, SHA-256 `62031842be80e03d7b6c9e5317a9a4223cd9f351b82ac6a533d06f698c476791`. **PASS:** ZIP íntegro, `zipalign -c 4`, firma APK Signature Scheme v2 (Android Debug), `aapt` package/version/code/min API/target API/ABI (`arm64-v8a`), manifest Development (`debuggable=true`) e IL2CPP metadata con `FormatFailureDiagnostic`, `firebaseErrorCode`, `firestore-read` y `firestore-commit`. El test EditMode de privacidad del diagnóstico pasó **1/1** antes de la build.
+
+Incluye el estado completo del checkout al momento de compilar, no únicamente la instrumentación Firebase. Esta APK expone etapa/tipo/código Firebase de los errores sin escribir mensajes, UID, correo, tokens ni progreso; **no demuestra que la causa raíz de login/sync esté corregida**, que sigue pendiente de reproducir y leer logcat con este build. Instalada como actualización en el Motorola Edge 60 Fusion (`ZY22MBNWRB`) con `adb install -r`: **Success**, `versionCode=83`/`versionName=0.2.81`, `lastUpdateTime=2026-11-01 23:55:26`; `firstInstallTime=2026-10-03 18:49:24` se conservó. No se desinstaló ni se borraron datos. La app no se inició; login/sync real y gameplay Android **NOT_RUN**. Conserva el bono temporal Development de +30 tickets; retirarlo antes de cualquier release. No hubo Git push.
+
+---
+
 # Entrega Android — 2026-11-01: Huracán Bonus Track 0.2.81/code83
 
 APK Android Development IL2CPP/ARM64, compilada desde el Editor Unity 6000.6.3f1 activo del checkout vigente, con la escena Assets/Scenes/Main.unity explícita. Build job build-e2f77bf4d8: Succeeded, 357.18 s, 0 errores / 5 advertencias. Player Settings: versionName 0.2.81, versionCode 83; paquete com.haychoriypaty.game, min API26/target API36.
@@ -5,6 +75,54 @@ APK Android Development IL2CPP/ARM64, compilada desde el Editor Unity 6000.6.3f1
 Artefacto ignorado por Git: Builds/Android/Archive/HayChoriYPaty-0.2.81-code83-huracan-20261101.apk, 411,941,423 bytes, SHA-256 f3b4b1d2b3f46834b9c6423beb6cbe978c63db4e843780ec5eeb06695128899b. PASS: ZIP íntegro, zipalign -c 4, APK Signature Scheme v2 (apksigner verify), aapt package/version/code/min API/target API, arm64-v8a libraries, manifest debuggable=true y metadata IL2CPP con StreetBonusTrackState, StreetBonusTrackProfile y HuracanBonusLevelId. El manifiesto desactiva Firebase Analytics y la colección Ad-ID, aunque quedan permisos AD-ID procedentes de dependencias. Firma Android Debug; no es release firmado para Play Store.
 
 No se instaló ni inició. Pruebas Unity de gameplay, Game View en dispositivo, Firebase real y simulaciones de balance NOT_RUN; los umbrales Bonus siguen provisionales. Esta build Development conserva el bono temporal QA de +30 tickets; retirarlo antes de cualquier release. APK no versionada; el commit contiene solo el alcance Huracán, no el artefacto.
+
+---
+
+# Instalación Android — 2026-11-01: Ferro veredita 0.2.81/code83
+
+Se instaló la APK recién generada mediante `adb install -r` en Motorola Edge 60 Fusion (`ZY22MBNWRB`), el 2026-11-01 a las 13:28 (-03); resultado **Success**. Package Manager confirma `com.haychoriypaty.game`, `versionCode=83`, min API26/target API36 y `lastUpdateTime=2026-11-01 13:28:29`; `firstInstallTime=2026-10-03 18:49:24` se conservó. Actualización en sitio: no se desinstaló, no se borraron datos y la app no se abrió. Esto reemplaza la APK previa de igual versionCode; gameplay/performance y revisión visual en teléfono **NOT_RUN**.
+
+---
+
+# Entrega Android — 2026-11-01: APK Development Ferro veredita 0.2.81/code83
+
+Generada desde el checkout activo con Unity 6000.6.3f1, Android Development IL2CPP/ARM64 y escena explícita `Assets/Scenes/Main.unity` (aunque `SampleScene` siga habilitada en Player Settings). Build job `build-92597ffcc8`: **Succeeded, 101.010826 s, 0 errores/6 advertencias**. Player Settings `0.2.81`/code`83`, paquete `com.haychoriypaty.game`, min API26/target API36.
+
+Artefacto `Builds/Android/Archive/HayChoriYPaty-0.2.81-code83-ferro-sidewalk-20261101.apk`, **396,691,742 bytes**, SHA-256 `eb44006cc155541d0a3fb1f995865692d4ceb97c1e62fff153168fdb5bd63358`. **PASS:** ZIP íntegro, `zipalign -c 4`, firma APK Signature Scheme v2 (`apksigner verify`), metadatos `aapt` para paquete/versión/código/min API/target API/`arm64-v8a`, flags de Analytics y Ad-ID desactivados, manifest `debuggable=true` y metadata IL2CPP con `FerroMuralSidewalkBounds`, `FerroMuralSidewalkMaxScreenPixels` y `FerroMuralSidewalkSource`. Android Debug firmado; no es firma de Play Store.
+
+Incluye el cambio local de veredita de Ferro. Al terminar el build aún no estaba instalada; la instalación posterior en el Motorola está documentada arriba. El juego no se abrió; Android gameplay/performance y visual de vereda en dispositivo **NOT_RUN**. El EditMode focalizado original quedó **BLOCKED** por transición de Play Mode; dos repeticiones posteriores con el Editor idle (filtro por nombre base y luego por nombre calificado) seleccionaron **0 tests**, así que no acreditan PASS (**NOT_RUN**). No se detuvo ni reinició Unity. Se conserva el bono Development temporal de +30 tickets, retirar antes de distribuir un release. No hubo Git push.
+
+---
+
+# Entrega Android — 2026-10-31: APK Development 0.2.81/code83
+
+Se generó desde el checkout activo con Unity 6000.6.3f1, Android IL2CPP/ARM64 y escena única `Assets/Scenes/Main.unity`. Build job `build-64f4c1ff3e`: **Succeeded, 342.412726 s, 0 errores/8 advertencias**. Player Settings `0.2.81`/code`83`, package `com.haychoriypaty.game`, min API26/target API36/ABI arm64-v8a.
+
+Artefacto `Builds/Android/Archive/HayChoriYPaty-0.2.81-code83-current-local-updates-20261031.apk`, **396,691,742 bytes**, SHA-256 `b1a57cf18a76c0e37511d48ac73b0e6d1371a704ffea962259d9a6f059ff0232`. Validaciones: ZIP íntegro, `zipalign -c 4`, `apksigner verify` (v2), `aapt` package/version/API/ABI y flags de Analytics/Ad-ID; IL2CPP metadata contiene `DrawHubLayeredEnvironment`. Android Debug firmado, no es firma Play Store.
+
+Incluye las modificaciones locales construidas en esta compilación, entre ellas refuerzo ambiental×3, capas ambientales, veredas Ferro/Los Redondos, corrección de espera de parrilleros, 380 s de Camioneros y apertura de Los Redondos alineada con Camioneros. Pruebas de workers: 5/5 EditMode + 1/1 PlayMode PASS; la captura de cocina es proyección aislada, no Game View completa. APK instalada con `adb install -r` en Motorola Edge 60 Fusion (`ZY22MBNWRB`) el 2026-10-31 a las 19:33 (-03); Package Manager confirma `versionCode=83`, `versionName=0.2.81`, y `firstInstallTime=2026-10-03 18:49:24` preservado. No se desinstaló, borraron datos ni inició el juego. Android gameplay/performance y visual de veredas en dispositivo **NOT_RUN**. El bono temporal Development +30 tickets permanece; retirar antes de distribuir un release. Git push no solicitado.
+
+---
+
+# Entrega Android — 2026-10-31: APK Development 0.2.81/code83
+
+Se generó desde el checkout activo con Unity 6000.6.3f1, Android IL2CPP/ARM64 y escena única `Assets/Scenes/Main.unity`. Build job `build-64f4c1ff3e`: **Succeeded, 342.412726 s, 0 errores/8 advertencias**. Player Settings `0.2.81`/code`83`, package `com.haychoriypaty.game`, min API26/target API36/ABI arm64-v8a.
+
+Artefacto `Builds/Android/Archive/HayChoriYPaty-0.2.81-code83-current-local-updates-20261031.apk`, **396,691,742 bytes**, SHA-256 `b1a57cf18a76c0e37511d48ac73b0e6d1371a704ffea962259d9a6f059ff0232`. Validaciones: ZIP íntegro, `zipalign -c 4`, `apksigner verify` (v2), `aapt` package/version/API/ABI y flags de Analytics/Ad-ID; IL2CPP metadata contiene `DrawHubLayeredEnvironment`. Android Debug firmado, no es firma Play Store.
+
+Incluye las modificaciones locales construidas en esta compilación, entre ellas refuerzo ambiental×3, capas ambientales, veredas Ferro/Los Redondos, corrección de espera de parrilleros, 380 s de Camioneros y apertura de Los Redondos alineada con Camioneros. Pruebas de workers: 5/5 EditMode + 1/1 PlayMode PASS; la captura de cocina es proyección aislada, no Game View completa. APK instalada con `adb install -r` en Motorola Edge 60 Fusion (`ZY22MBNWRB`) el 2026-10-31 a las 19:33 (-03); Package Manager confirma `versionCode=83`, `versionName=0.2.81`, y `firstInstallTime=2026-10-03 18:49:24` preservado. No se desinstaló, borraron datos ni inició el juego. Android gameplay/performance y visual de veredas en dispositivo **NOT_RUN**. El bono temporal Development +30 tickets permanece; retirar antes de distribuir un release. Git push no solicitado.
+
+---
+
+# Entrega Android — 2026-10-31: Independiente inicia con $20, 0.2.80/code82 instalado
+
+Se actualizó el APK Development IL2CPP/ARM64 desde Unity 6000.6.3f1, escena única `Assets/Scenes/Main.unity`, para incluir el saldo inicial de **$20** de Independiente (LevelIndex4). Build job `build-7ea0800315`: **Succeeded, 95.84 s, 0 errores/5 advertencias**; Player Settings se mantienen en `0.2.80`/code`82`, package `com.haychoriypaty.game`, min API26,target36,ARM64.
+
+APK `Builds/Android/Archive/HayChoriYPaty-0.2.80-code82-independiente-20-20261031.apk`, **837,495,495 bytes**, SHA-256 `79afc92b53963871d1dc90fb6c8e0518db980cf89fa4b81dd15cfabc48e5c5c7`. **PASS** `aapt` package/version/code, `zipalign -c -v 4`, and installation as an in-place update. Direct `apksigner verify` **NOT_RUN** because no Java runtime is available to the shell; Package Manager accepted the update from code81, confirming compatible signing identity.
+
+Installed with `adb install -r` on Motorola Edge 60 Fusion (`ZY22MBNWRB`) at **2026-10-31 01:22:56**. PackageManager confirms versionCode82/versionName0.2.80 and preserves `firstInstallTime=2026-10-03 18:49:24`; no uninstall/data clear. The app was **not launched**; Android gameplay smoke test **NOT_RUN**. This Development APK retains the temporary +30 ticket QA bonus; remove it before release distribution. Git was not requested.
+
+Focused Unity EditMode regression `AdjustedOpeningBalanceAppliesOnSelectionAdvanceStartAndRetry(4,20)` passed **1/1**. A broader seven-test selection included stale unrelated expectations (San Lorenzo duration/market stock and retry-fixture assumptions); these were not changed as part of this balance request.
 
 ---
 
@@ -891,3 +1009,5 @@ La fixture StreetArt terminó 213/230: todas las pruebas del nuevo HUD pasaron (
 # Entrega Android — animación de personajes del barrio, 0.2.77/code79 (2026-10-30)
 
 Unity 6000.6.3f1 BuildPipeline completó una APK Development, Main-only, IL2CPP/ARM64 desde el Editor activo en 425,9 s. Artefacto `Builds/Android/Archive/HayChoriYPaty-0.2.77-code79-hub-characters.apk`: 425.727.167 bytes, SHA-256 `70b1dcf743619122d579fab656ba957655eb0cc5cc1a179b424b3797ef6167b1`. Package `com.haychoriypaty.game`, versionName `0.2.77`, versionCode `79`, min API 26 / target API 36. ZIP íntegro, `zipalign -c -v 4` PASS, APK Signature Scheme v2 PASS; certificado Android Debug (no es release para Play Store). Manifiesto conserva desactivadas la colección de Firebase Analytics y la recolección de Analytics Ad-ID. No se instaló ni se hizo QA físico/performance. El APK se guarda fuera del control de versiones y no reemplaza entregas anteriores.
+
+# Entrega Android — 2026-10-31: APK Development 0.2.81/code83

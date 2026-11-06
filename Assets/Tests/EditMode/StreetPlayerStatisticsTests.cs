@@ -83,7 +83,27 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(7, LongArray(statistics, "deliveredByProduct").Length);
             Assert.AreEqual(10, LongArray(statistics, "consumedUnitsByIngredient").Length);
             Assert.AreEqual(5, LongArray(statistics, "paidHiresByRole").Length);
-            Assert.AreEqual(11, LongArray(statistics, "winsByLevel").Length);
+            Assert.AreEqual(13, LongArray(statistics, "winsByLevel").Length);
+        }
+
+        [Test]
+        public void ArgentinosMatchStatisticsUseTheirOwnStableIdSlot()
+        {
+            object statistics = NewStatistics();
+            object record = NewRecord();
+            WriteField(record, "id", "argentinos-record");
+            WriteField(record, "attemptId", "argentinos-attempt");
+            WriteField(record, "level", 12);
+            WriteField(record, "won", true);
+            WriteField(record, "elapsedSeconds", 315f);
+            WriteField(record, "salesByProduct", new long[7]);
+            WriteField(record, "stockConsumed", new long[10]);
+            WriteField(record, "stockRemaining", new long[10]);
+            WriteField(record, "hiresByRole", new long[5]);
+
+            Assert.IsTrue(Apply(statistics, record));
+            Assert.AreEqual(1L, LongArray(statistics, "winsByLevel")[12]);
+            Assert.AreEqual(0L, LongArray(statistics, "winsByLevel")[11], "ID12 must not merge into Huracán ID11.");
         }
 
         [Test]
@@ -304,7 +324,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(7L, LongArray(statistics, "deliveredByProduct")[0]);
             Assert.AreEqual(2L, LongArray(statistics, "deliveredByProduct")[1]);
             Assert.AreEqual(0L, LongArray(statistics, "deliveredByProduct")[2]);
-            Assert.AreEqual(11, LongArray(statistics, "winsByLevel").Length);
+            Assert.AreEqual(13, LongArray(statistics, "winsByLevel").Length);
             Assert.AreEqual(0L, LongArray(statistics, "winsByLevel")[0]);
         }
 

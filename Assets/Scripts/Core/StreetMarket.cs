@@ -42,8 +42,8 @@ namespace HayChoriYPaty
         public long nextAttemptId = 1, attemptId, settledAttemptId;
         public int attemptLevel = -1, initializedUnlockedLevel = -1;
         public int[] stockUnits = new int[10], attemptStock;
-        public long[] highestRecognizedSalesByLevel = new long[11];
-        public bool[] bonusPaidByLevel = new bool[11];
+        public long[] highestRecognizedSalesByLevel = new long[13];
+        public bool[] bonusPaidByLevel = new bool[13];
         public bool attemptActive, kitGranted, legacyTransitionRepairApplied, legacyZeroBalanceRecoveryApplied;
         public int victoryPayoutVersion; // Additive v4 compatibility: latest receipt reconciled once.
         public StreetMarketResult lastResult;
@@ -82,8 +82,8 @@ namespace HayChoriYPaty
         {
             Data = data ?? new StreetMarketData(); Balance = balance ?? new StreetBalance();
             Data.stockUnits = Normalize(Data.stockUnits, 10);
-            Data.highestRecognizedSalesByLevel = Normalize(Data.highestRecognizedSalesByLevel, 11);
-            Data.bonusPaidByLevel = Normalize(Data.bonusPaidByLevel, 11);
+            Data.highestRecognizedSalesByLevel = Normalize(Data.highestRecognizedSalesByLevel, 13);
+            Data.bonusPaidByLevel = Normalize(Data.bonusPaidByLevel, 13);
             Data.attemptStock = Data.attemptStock == null ? null : Normalize(Data.attemptStock, 10);
             Data.balanceCents = Math.Max(0L, Data.balanceCents);
             Data.cumulativePurchaseUnits = Math.Max(0L, Data.cumulativePurchaseUnits);
@@ -122,7 +122,9 @@ namespace HayChoriYPaty
         public int[] RequiredUnits(StreetSimulation sim)
         {
             int[] result = new int[10];
-            if (sim == null) return result;
+            // Camioneros' Tower Defense uses real kitchen units for its only two offerings
+            // (Chori and Coca), but neither has a Mercado ingredient debit/preflight gate.
+            if (sim == null || sim.LevelIndex == StreetSimulation.TowerDefenseCampaignLevelId) return result;
             for (int slot = 0; slot < sim.ProductCount; slot++)
             {
                 int product = sim.GetAvailableProduct(slot);
@@ -245,7 +247,11 @@ namespace HayChoriYPaty
                 unlockedLevel >= StreetSimulation.LevelNames.Length || nextLevelSimulation.LevelIndex != unlockedLevel ||
                 Data.attemptActive || BalanceCents != 0 || Data.cumulativePurchaseSpendCents != 0) return 0L;
 
-            int completedLevel = unlockedLevel - 1;
+            // Existing `unlockedLevel` values remain a stable-ID frontier, not a campaign position.
+            // Only the new detached terminal ID needs the inserted campaign-order predecessor.
+            int position = StreetSimulation.CampaignPositionOf(unlockedLevel);
+            int completedLevel = unlockedLevel == StreetSimulation.ArgentinosJuniorsLevelId
+                ? StreetSimulation.CampaignLevelAt(position - 1) : unlockedLevel - 1;
             if (completedLevel < 0 || completedLevel >= Data.highestRecognizedSalesByLevel.Length ||
                 !Data.bonusPaidByLevel[completedLevel]) return 0L;
 
@@ -295,8 +301,10 @@ namespace HayChoriYPaty
                 result.level < 0 || result.level >= Data.highestRecognizedSalesByLevel.Length ||
                 !Data.bonusPaidByLevel[result.level] || Data.highestRecognizedSalesByLevel[result.level] < result.halfSalesCents) return 0L;
 
-            int nextLevel = result.level + 1;
-            if (nextLevel >= StreetSimulation.LevelNames.Length) return 0L;
+            int nextLevel = StreetSimulation.NextCampaignLevelId(result.level);
+            if (nextLevel == StreetSimulation.HuracanBonusLevelId)
+                nextLevel = StreetSimulation.NextCampaignLevelId(StreetSimulation.HuracanBonusLevelId);
+            if (nextLevel < 0 || nextLevel >= StreetSimulation.LevelNames.Length) return 0L;
             long missingCost = MinimumPurchaseCostCents(new StreetSimulation(Balance, nextLevel, 5f));
             if (missingCost <= 0 || missingCost == long.MaxValue) return 0L;
 
@@ -317,7 +325,7 @@ namespace HayChoriYPaty
             StreetMarketResult result = Data.lastResult;
             if (result == null || !result.won) { Data.victoryPayoutVersion = 1; return 0L; }
             if (Data.attemptId <= 0 || Data.settledAttemptId != Data.attemptId ||
-                result.level != Data.attemptLevel || result.level < 0 || result.level >= 11 ||
+                result.level != Data.attemptLevel || result.level < 0 || result.level >= StreetSimulation.LevelNames.Length ||
                 result.grossSalesCents < 0 || result.leftoverCents < 0 || result.leftoverCents > long.MaxValue / 2 ||
                 result.halfSalesCents != result.grossSalesCents / 2 ||
                 result.recognizedSalesCents < 0 || result.recognizedSalesCents > result.halfSalesCents ||

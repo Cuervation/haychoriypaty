@@ -92,6 +92,23 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
+        public void FreeParrilleroDoesNotConsumePaidHireTierAcrossAllCampaignLevels()
+        {
+            int[] expectedBaseCosts = { 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 70 };
+            for (int level = 0; level < expectedBaseCosts.Length; level++)
+            {
+                object sim = Make(level, 100000);
+                Assert.Greater((int)Get(sim, "ParrilleroCount"), 0, "Level " + (level + 1) + " has a free Parrillero.");
+                Assert.AreEqual(expectedBaseCosts[level], Get(sim, "ParrilleroHireCost"),
+                    "The first paid Parrillero on level " + (level + 1) + " must use that level's base.");
+                Assert.IsTrue((bool)Call(sim, "CanHireRole", Role("Parrillero")));
+                Assert.IsTrue((bool)Call(sim, "TryHire", Role("Parrillero")));
+                Assert.AreEqual(CeilToFive(expectedBaseCosts[level] * 2.5d), Get(sim, "ParrilleroHireCost"),
+                    "Only the first paid hire advances the role-local curve on level " + (level + 1) + ".");
+            }
+        }
+
+        [Test]
         public void EveryRoleHasFifteenPaidHiresWithAnIndependentUnboundedProgression()
         {
             object sim = Make(4, 1000000);

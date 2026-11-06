@@ -9,23 +9,6 @@ namespace HayChoriYPaty
         private const int BonusCardFirstAction = 5000;
         private const int BonusAguanteAction = 5010;
         private const int BonusWorkerFirstAction = 5020;
-        private const int BonusReturnAction = 5030;
-        private const int BonusRetryAction = 5031;
-        private const int BonusNextAction = 5032;
-
-        private Rect BonusChoicePanelBounds(float height) => new Rect(14f, Mathf.Max(112f, height * .5f - 153f), W - 28f, 306f);
-        private Rect BonusCardBounds(int index, float height)
-        {
-            const float width = 156f, gap = 9f;
-            float left = (W - (3f * width + 2f * gap)) * .5f;
-            return new Rect(left + index * (width + gap), Mathf.Max(150f, height * .5f - 97f), width, 222f);
-        }
-        private Rect BonusWorkerChoiceBounds(int index, int count, float height)
-        {
-            float width = Mathf.Min(156f, (W - 44f - 12f * Mathf.Max(0, count - 1)) / Mathf.Max(1, count));
-            float gap = 12f, total = count * width + Mathf.Max(0, count - 1) * gap;
-            return new Rect((W - total) * .5f + index * (width + gap), height * .5f - 38f, width, 82f);
-        }
         private Rect BonusAguanteBounds => new Rect(W - 166f, 76f, 150f, 42f);
 
         private int HitBonusTrackAction(Vector2 point)
@@ -39,28 +22,26 @@ namespace HayChoriYPaty
                 {
                     if (state.EmergencyRoleSelectionPending)
                     {
-                        for (int i = 0; i < state.EmergencyRoles.Count; i++)
-                            if (BonusWorkerChoiceBounds(i, state.EmergencyRoles.Count, logicalCanvasHeight).Contains(new Vector2(point.x, y)))
+                        Rect[] choices = CurrentResponsiveFooter(game.Sim, logicalCanvasHeight).BonusChoiceBounds;
+                        for (int i = 0; i < state.EmergencyRoles.Count && i < choices.Length; i++)
+                            if (choices[i].Contains(new Vector2(point.x, y)))
                                 return BonusWorkerFirstAction + i;
                     }
                     else
                     {
-                        for (int i = 0; i < state.CurrentCards.Count; i++)
-                            if (BonusCardBounds(i, logicalCanvasHeight).Contains(new Vector2(point.x, y))) return BonusCardFirstAction + i;
+                        Rect[] buttons = CurrentResponsiveFooter(game.Sim, logicalCanvasHeight).BonusChoiceBounds;
+                        for (int i = 0; i < state.CurrentCards.Count && i < buttons.Length; i++)
+                            if (buttons[i].Contains(new Vector2(point.x, y))) return BonusCardFirstAction + i;
                     }
                 }
                 else if (state.AguanteReady && BonusAguanteBounds.Contains(new Vector2(point.x, y))) return BonusAguanteAction;
             }
             else if (game.Sim.Phase == RoundPhase.Won || game.Sim.Phase == RoundPhase.Lost)
             {
-                Rect panel = BonusResultPanelBounds(logicalCanvasHeight);
-                float bottom = panel.yMax - 76f;
-                bool next = game.CanAdvanceAfterResult;
-                Rect left = next ? new Rect(panel.x + 16f, bottom, 142f, 60f) : new Rect(panel.x + 52f, bottom, 174f, 60f);
-                Rect retry = next ? new Rect(panel.center.x - 71f, bottom, 142f, 60f) : new Rect(panel.xMax - 226f, bottom, 174f, 60f);
-                if (left.Contains(new Vector2(point.x, y))) return BonusReturnAction;
-                if (retry.Contains(new Vector2(point.x, y))) return BonusRetryAction;
-                if (next && new Rect(panel.xMax - 158f, bottom, 142f, 60f).Contains(new Vector2(point.x, y))) return BonusNextAction;
+                Vector2 resultPoint = new Vector2(point.x, y);
+                if (BonusResultLevelsBounds(logicalCanvasHeight).Contains(resultPoint)) return ResultLevelsAction;
+                if (game.CanAdvanceAfterResult && BonusResultNextBounds(logicalCanvasHeight).Contains(resultPoint))
+                    return VictoryExitAction;
             }
             return 0;
         }
@@ -85,13 +66,14 @@ namespace HayChoriYPaty
             FillRect(new Rect(bar.x, bar.y, bar.width * progress, bar.height), new Color(1f, .74f, .12f));
             DrawMarketBluePanel(new Rect(10f, 73f, 520f, 27f), new Color(.02f, .055f, .16f, .83f));
             string status = state.AguanteActive ? "¡AGUANTE! ACTIVO " + state.AguanteBoostRemaining.ToString("0.0") + " s"
+                : state.AguanteReady && state.SelectionPending ? "¡AGUANTE! LISTO · ELEGÍ UNA MEJORA"
                 : state.AguanteReady ? "¡AGUANTE! LISTO · TOCÁ PARA ACTIVAR"
                 : "¡AGUANTE! " + Mathf.RoundToInt(state.AguanteProgress * 10f) + "/10 ENTREGAS";
             if (state.GoldenDeliveriesRemaining > 0) status += "   ·   ENTREGA DORADA " + state.GoldenDeliveriesRemaining;
             if (state.GlobalBoostRemaining > 0f) status += "   ·   TODOS A FONDO " + state.GlobalBoostRemaining.ToString("0") + " s";
             MarketText(new Rect(17f, 74f, 375f, 25f), status, 13, Color.white, TextAnchor.MiddleLeft);
             if (state.AguanteReady && sim.Phase == RoundPhase.Playing)
-                DrawStandardButton(BonusAguanteBounds, BonusAguanteAction, "¡AGUANTE!", true);
+                DrawStandardButton(BonusAguanteBounds, BonusAguanteAction, "¡AGUANTE!", !state.SelectionPending);
             else if (state.AguanteActive)
                 DrawStandardButton(BonusAguanteBounds, BonusAguanteAction, "ACELERÓN " + state.AguanteBoostRemaining.ToString("0") + " s", false);
             int nextStar = state.Stars >= 3 ? -1 : state.Stars == 0 ? StreetBonusTrackState.BasicStarScore
@@ -113,7 +95,7 @@ namespace HayChoriYPaty
             }
             if (!state.SelectionPending && Time.unscaledTime < bonusIntroUntil)
                 DrawBonusTrackIntro(logicalCanvasHeight);
-            if (state.SelectionPending) DrawBonusChoiceOverlay(state);
+            if (state.SelectionPending) DrawBonusChoiceCards(state);
         }
 
         private void DrawBonusTrackIntro(float height)
@@ -127,53 +109,154 @@ namespace HayChoriYPaty
                 new Color(1f, 1f, 1f, alpha));
         }
 
-        private void DrawBonusChoiceOverlay(StreetBonusTrackState state)
+        private void DrawBonusChoiceCards(StreetBonusTrackState state)
         {
-            float height = logicalCanvasHeight;
-            FillRect(new Rect(0f, 0f, W, height), new Color(0f, .015f, .055f, .78f));
-            Rect panel = BonusChoicePanelBounds(height);
-            bool super = state.IsSuperBonusPending;
-            float pulse = .5f + .5f * Mathf.Sin(Time.unscaledTime * 9f);
-            DrawMarketBluePanel(panel, super ? new Color(.12f + .12f * pulse, .035f, .095f + .05f * pulse, .99f)
-                : new Color(.02f, .085f, .30f, .99f));
-            MarketText(new Rect(panel.x + 10f, panel.y + 10f, panel.width - 20f, 39f),
-                state.EmergencyRoleSelectionPending ? "ELEGÍ EL REFUERZO" : super ? "✦ ¡SUPER BONUS! ✦" : "¡ELEGÍ TU MEJORA!",
-                super ? 34 : 29, super ? new Color(1f, .58f + .36f * pulse, .14f) : new Color(1f, .83f, .22f));
-            if (state.EmergencyRoleSelectionPending)
+            float previousVerticalScale = layoutVerticalScale;
+            layoutVerticalScale = 1f;
+            try
             {
-                MarketText(new Rect(panel.x + 18f, panel.y + 55f, panel.width - 36f, 32f), "Elegí qué especialista se suma al equipo", 16, Color.white);
-                for (int i = 0; i < state.EmergencyRoles.Count; i++)
+                Rect[] choices = CurrentResponsiveFooter(game.Sim, logicalCanvasHeight).BonusChoiceBounds;
+                bool choosingRole = state.EmergencyRoleSelectionPending;
+                bool super = state.IsSuperBonusPending && !choosingRole;
+                int count = choosingRole ? state.EmergencyRoles.Count : state.CurrentCards.Count;
+                for (int i = 0; i < count && i < choices.Length; i++)
                 {
-                    StreetWorkerRole role = state.EmergencyRoles[i];
-                    Rect choice = BonusWorkerChoiceBounds(i, state.EmergencyRoles.Count, height);
-                    DrawStandardButton(choice, BonusWorkerFirstAction + i, StreetBonusTrackState.RoleTitle(role), true);
+                    Rect card = choices[i];
+                    float compact = Mathf.Clamp01(card.height / 120f);
+                    int action = choosingRole ? BonusWorkerFirstAction + i : BonusCardFirstAction + i;
+                    Rect face = new Rect(card.x + 2f * compact, card.y + 2f * compact,
+                        card.width - 4f * compact, card.height - 6f * compact);
+                    Color color = choosingRole ? new Color(.055f, .24f, .47f, .99f)
+                        : super ? new Color(.39f, .105f, .14f, .99f) : new Color(.055f, .24f, .47f, .99f);
+                    DrawMarketBluePanel(card, color);
+                    if (pressedAction == action) DrawMarketBluePanel(face, new Color(.16f, .52f, .78f, .72f));
+
+                    if (choosingRole)
+                    {
+                        StreetWorkerRole role = state.EmergencyRoles[i];
+                        DrawBonusRoleIcon(new Rect(card.center.x - 20f * compact, card.y + 5f * compact,
+                            40f * compact, 38f * compact), role);
+                        MarketText(new Rect(card.x + 6f * compact, card.y + 44f * compact,
+                                card.width - 12f * compact, 34f * compact),
+                            StreetBonusTrackState.RoleTitle(role), Mathf.Max(10, Mathf.RoundToInt(18f * compact)), Color.white);
+                        MarketText(new Rect(card.x + 6f * compact, card.y + 78f * compact,
+                                card.width - 12f * compact, 28f * compact),
+                            "TOCÁ PARA SUMAR", Mathf.Max(9, Mathf.RoundToInt(13f * compact)), new Color(.76f, .92f, 1f));
+                    }
+                    else
+                    {
+                        StreetBonusCard option = state.CurrentCards[i];
+                        float iconTop = card.y + (super ? 14f : 4f) * compact;
+                        float iconSize = (super ? 31f : 39f) * compact;
+                        if (super)
+                            MarketText(new Rect(card.x + 5f * compact, card.y + compact,
+                                    card.width - 10f * compact, 15f * compact),
+                                "✦ SUPER BONUS ✦", Mathf.Max(9, Mathf.RoundToInt(11f * compact)), new Color(1f, .82f, .25f));
+                        DrawBonusCardIcon(new Rect(card.center.x - iconSize * .5f, iconTop,
+                            iconSize, iconSize), option);
+                        float titleTop = card.y + (super ? 46f : 41f) * compact;
+                        MarketText(new Rect(card.x + 7f * compact, titleTop,
+                                card.width - 14f * compact, 30f * compact),
+                            WrapBonusChoiceText(StreetBonusTrackState.CardTitle(option), 13),
+                            Mathf.Max(10, Mathf.RoundToInt(16f * compact)), Color.white);
+                        float descriptionTop = card.y + (super ? 78f : 72f) * compact;
+                        MarketText(new Rect(card.x + 8f * compact, descriptionTop, card.width - 16f * compact,
+                            card.yMax - 6f * compact - descriptionTop),
+                            WrapBonusChoiceText(StreetBonusTrackState.CardDescription(option), 17),
+                            Mathf.Max(9, Mathf.RoundToInt(12f * compact)),
+                            new Color(.94f, .97f, 1f));
+                    }
+
+                    // The whole framed card is the action target; there is no secondary ELEGIR button.
+                    if (GUI.Button(LayoutRect(card), GUIContent.none, invisible) &&
+                        !SuppressLevelSelectorNativeTap && !SuppressMarketNativeTap)
+                        NativeAction(action);
                 }
-                MarketText(new Rect(panel.x + 18f, panel.yMax - 38f, panel.width - 36f, 26f), "El tiempo sigue pausado hasta que elijas", 14, new Color(.83f, .91f, 1f));
-                return;
+            }
+            finally { layoutVerticalScale = previousVerticalScale; }
+        }
+
+        private void DrawBonusCardIcon(Rect iconBounds, StreetBonusCard card)
+        {
+            Texture2D texture = null;
+            Rect source = Rect.zero;
+            if (card == StreetBonusCard.ParrillaAFondo || card == StreetBonusCard.OtroParrillero)
+            {
+                texture = parrilleroIcon;
+                if (texture != null) source = new Rect(0f, 0f, texture.width, texture.height);
+            }
+            else if (card == StreetBonusCard.CocaExpress || card == StreetBonusCard.OtroCocacolero)
+            {
+                int level = StreetSimulation.HuracanBonusLevelId;
+                texture = CocacoleroArtForLevel(level);
+                if (texture != null) source = CocacoleroPoseForLevel(level, 0);
+            }
+            else if (card == StreetBonusCard.MozoRelampago || card == StreetBonusCard.OtroMozo)
+            {
+                texture = mozoWorker;
+                if (texture != null) source = ParrilleroPoses[0];
+            }
+            else
+            {
+                texture = gameCoin;
+                if (texture != null) source = new Rect(0f, 0f, texture.width, texture.height);
             }
 
-            for (int i = 0; i < state.CurrentCards.Count; i++)
+            if (texture != null) Draw(iconBounds, texture, source, false, false);
+            else MarketText(iconBounds, "★", 32, new Color(1f, .86f, .34f));
+        }
+
+        private void DrawBonusRoleIcon(Rect iconBounds, StreetWorkerRole role)
+        {
+            int level = StreetSimulation.HuracanBonusLevelId;
+            Texture2D texture = role == StreetWorkerRole.Parrillero ? parrilleroIcon
+                : role == StreetWorkerRole.Mozo ? mozoWorker
+                : CocacoleroArtForLevel(level);
+            Rect source = Rect.zero;
+            if (texture != null)
+                source = role == StreetWorkerRole.Mozo ? ParrilleroPoses[0]
+                    : role == StreetWorkerRole.Cocacolero ? CocacoleroPoseForLevel(level, 0)
+                    : new Rect(0f, 0f, texture.width, texture.height);
+            if (texture != null) Draw(iconBounds, texture, source, false, false);
+            else MarketText(iconBounds, "★", 28, new Color(1f, .86f, .34f));
+        }
+
+        private static string WrapBonusChoiceText(string value, int maxCharacters)
+        {
+            if (string.IsNullOrEmpty(value) || maxCharacters < 1) return value ?? string.Empty;
+            string[] words = value.Split(new[] { ' ' }, System.StringSplitOptions.RemoveEmptyEntries);
+            var lines = new System.Collections.Generic.List<string>();
+            string line = string.Empty;
+            for (int i = 0; i < words.Length; i++)
             {
-                StreetBonusCard card = state.CurrentCards[i];
-                Rect bounds = BonusCardBounds(i, height);
-                Color color = super ? new Color(.42f, .14f, .15f, .98f) : new Color(.055f, .24f, .47f, .98f);
-                DrawMarketBluePanel(bounds, color);
-                string icon = card == StreetBonusCard.ParrillaAFondo || card == StreetBonusCard.OtroParrillero ? "🔥"
-                    : card == StreetBonusCard.CocaExpress || card == StreetBonusCard.OtroCocacolero ? "COCA"
-                    : card == StreetBonusCard.MozoRelampago || card == StreetBonusCard.OtroMozo ? "MOZO" : "★";
-                MarketText(new Rect(bounds.x + 8f, bounds.y + 10f, bounds.width - 16f, 38f), icon, 28, new Color(1f, .86f, .34f));
-                MarketText(new Rect(bounds.x + 8f, bounds.y + 55f, bounds.width - 16f, 52f), StreetBonusTrackState.CardTitle(card), 18, Color.white);
-                MarketText(new Rect(bounds.x + 11f, bounds.y + 109f, bounds.width - 22f, 62f), StreetBonusTrackState.CardDescription(card), 14, new Color(.88f, .94f, 1f));
-                DrawStandardButton(new Rect(bounds.x + 12f, bounds.yMax - 51f, bounds.width - 24f, 43f), BonusCardFirstAction + i, "ELEGIR", true);
+                string word = words[i];
+                if (line.Length > 0 && line.Length + 1 + word.Length > maxCharacters)
+                {
+                    lines.Add(line);
+                    line = word;
+                }
+                else line = line.Length == 0 ? word : line + " " + word;
             }
-            MarketText(new Rect(panel.x + 16f, panel.yMax - 33f, panel.width - 32f, 25f),
-                "Tiempo detenido · una sola elección · partida  " + state.ChoiceCount + "/5", 14, new Color(.84f, .92f, 1f));
+            if (line.Length > 0) lines.Add(line);
+            return string.Join("\n", lines.ToArray());
         }
 
         private Rect BonusResultPanelBounds(float height)
         {
             float panelHeight = Mathf.Min(590f, height - 100f);
             return new Rect(14f, (height - panelHeight) * .5f, W - 28f, panelHeight);
+        }
+
+        private Rect BonusResultLevelsBounds(float height)
+        {
+            Rect panel = BonusResultPanelBounds(height);
+            return new Rect(panel.x + 52f, panel.yMax - 76f, 174f, 60f);
+        }
+
+        private Rect BonusResultNextBounds(float height)
+        {
+            Rect panel = BonusResultPanelBounds(height);
+            return new Rect(panel.xMax - 226f, panel.yMax - 76f, 174f, 60f);
         }
 
         private void DrawBonusTrackResultPanel()
@@ -209,19 +292,10 @@ namespace HayChoriYPaty
             if (progress != null && progress.threeStarTicketAwarded && state.Stars == 3)
                 MarketText(new Rect(panel.x + 18f, panel.y + 333f, panel.width - 36f, 22f), "Bono de primera vez por 3 estrellas: cobrado", 12, new Color(.8f, .9f, 1f));
 
-            float bottom = panel.yMax - 76f;
             bool canAdvance = game.CanAdvanceAfterResult;
-            if (canAdvance)
-            {
-                DrawStandardButton(new Rect(panel.x + 16f, bottom, 142f, 60f), BonusReturnAction, "VOLVER");
-                DrawStandardButton(new Rect(panel.center.x - 71f, bottom, 142f, 60f), BonusRetryAction, "REINTENTAR");
-                DrawStandardButton(new Rect(panel.xMax - 158f, bottom, 142f, 60f), BonusNextAction, "SIGUIENTE");
-            }
-            else
-            {
-                DrawStandardButton(new Rect(panel.x + 52f, bottom, 174f, 60f), BonusReturnAction, "VOLVER");
-                DrawStandardButton(new Rect(panel.xMax - 226f, bottom, 174f, 60f), BonusRetryAction, "REINTENTAR");
-            }
+            DrawStandardButton(BonusResultLevelsBounds(logicalCanvasHeight), ResultLevelsAction, "NIVELES");
+            DrawStandardButton(BonusResultNextBounds(logicalCanvasHeight), VictoryExitAction,
+                canAdvance ? "SIGUIENTE PARTIDO" : "ÚLTIMO NIVEL", canAdvance);
         }
     }
 }

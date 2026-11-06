@@ -1038,13 +1038,21 @@ var sim = Make(level: 1); Start(sim); Set(sim, "Coins", 10000);
         }
 
         [Test]
-        public void TwentyOneCrowdUsesDistinctReusableSlots()
+        public void TwentyEightCrowdUsesFourRowsOfSevenDistinctSlots()
         {
             object balance = NewBalance(); object sim = Make(balance: balance);
-            for (int i = 0; i < 21; i++) Assert.IsTrue(Spawn(sim, 0, 999));
+            Assert.AreEqual(28, Get(balance, "maxCustomers"), "Default level balance must restore the fourth row.");
+            for (int i = 0; i < 28; i++) Assert.IsTrue(Spawn(sim, 0, 999), "Admission failed at queue slot " + i);
             Assert.IsFalse(Spawn(sim, 0, 1));
             IList customers = Customers(sim);
-            Assert.AreEqual(21, customers.Count);
+            Assert.AreEqual(28, customers.Count);
+            for (int i = 0; i < customers.Count; i++)
+            {
+                Assert.AreEqual(i, Get(customers[i], "Slot"), "Initial admission remains front-row-first and FIFO.");
+                Assert.AreEqual(new Vector2(58 + 70 * (i % 7), 324 - 56 * (i / 7)), Get(customers[i], "Target"),
+                    "Customer should be assigned to its matching queue column and row.");
+            }
+            Assert.AreEqual(156f, ((Vector2)Get(customers[21], "Target")).y, "The fourth row must be reachable and distinct.");
             for (int i = 0; i < customers.Count; i++)
                 for (int j = i + 1; j < customers.Count; j++)
                     Assert.AreNotEqual(Get(customers[i], "Target"), Get(customers[j], "Target"));
@@ -2040,7 +2048,7 @@ string[] names = (string[])simType.GetField("LevelNames", BindingFlags.Public | 
         private object FullSettledQueue(int coins = 0)
         {
             object sim = Make(); Start(sim); Set(sim, "Coins", coins);
-            for (int i = 0; i < 21; i++) Assert.IsTrue(Spawn(sim, 0, 4));
+            for (int i = 0; i < 28; i++) Assert.IsTrue(Spawn(sim, 0, 4));
             foreach (object c in Customers(sim)) { Set(c, "Position", Get(c, "Target")); State(c, "Waiting"); }
             return sim;
         }
@@ -2060,21 +2068,24 @@ string[] names = (string[])simType.GetField("LevelNames", BindingFlags.Public | 
         public void ServedFrontAdvancesExistingLaneAndAdmitsNewcomerOnlyAtTail()
         {
             object sim = FullSettledQueue(); IList queue = Customers(sim);
-            object front = queue[0], second = queue[7], third = queue[14];
+            object front = queue[0], second = queue[7], third = queue[14], fourth = queue[21];
             Vector2 secondFrom = (Vector2)Get(second, "Position"), thirdFrom = (Vector2)Get(third, "Position");
             int secondId = (int)Get(second, "Id"), thirdId = (int)Get(third, "Id");
+            int fourthId = (int)Get(fourth, "Id");
             Set(front, "Remaining", 0); State(front, "Receiving"); SetField(front, "ReceiveRemaining", 0f);
             HiddenCall(sim, "AdvanceCustomers", .01f);
             Assert.AreEqual("Leaving", Get(front, "State").ToString()); Assert.AreEqual(-1, Field(front, "Slot"));
             Assert.AreEqual(0, Field(second, "Slot")); Assert.AreEqual(7, Field(third, "Slot"));
+            Assert.AreEqual(14, Field(fourth, "Slot"));
             Assert.AreEqual("Advancing", Get(second, "State").ToString()); Assert.AreEqual("Advancing", Get(third, "State").ToString());
+            Assert.AreEqual("Advancing", Get(fourth, "State").ToString());
             Assert.AreEqual(secondFrom, Get(second, "Position")); Assert.AreEqual(thirdFrom, Get(third, "Position"));
             Assert.AreEqual(secondId, Get(second, "Id")); Assert.AreEqual(thirdId, Get(third, "Id"));
             Assert.AreEqual(4, Get(second, "Remaining")); Assert.AreEqual(4, Get(third, "Remaining"));
             Assert.IsFalse(Spawn(sim, 0, 1), "Leaver counts toward capacity until offscreen");
             HiddenCall(sim, "RemoveCustomer", front); Assert.IsTrue(Spawn(sim, 0, 1));
-            object newcomer = queue[queue.Count - 1]; Assert.AreEqual(14, Field(newcomer, "Slot"));
-            Assert.Greater((int)Get(newcomer, "Id"), thirdId);
+            object newcomer = queue[queue.Count - 1]; Assert.AreEqual(21, Field(newcomer, "Slot"));
+            Assert.Greater((int)Get(newcomer, "Id"), fourthId);
             HiddenCall(sim, "AdvanceCustomers", .05f);
             Assert.Greater(((Vector2)Get(second, "Position")).y, secondFrom.y);
             Assert.Less(((Vector2)Get(second, "Position")).y, ((Vector2)Get(second, "Target")).y);
@@ -2144,21 +2155,46 @@ string[] names = (string[])simType.GetField("LevelNames", BindingFlags.Public | 
         [Test]
         public void NewLevelsHaveStableNamesCatalogGoalsDurationAndDemand()
         {
-string[] expectedNames = { "Racing Club / Avellaneda", "San Lorenzo / Boedo", "River Plate / Núñez", "Boca Juniors / La Boca", "Sindicato de Camioneros / Plaza de Mayo", "Los Redondos / Tandil" };
-            int[] expectedGoals = { 850, 1020, 1050, 1150, 1300, 1450 };
-            float[] expectedDurations = { 260f, 300f, 340f, 340f, 360f, 315f };
-            float[] expectedDemand = { 1.65f, 1.815f, 1.9965f, 2.19615f, 2.415765f, 2.6573415f };
+            string[] expectedNames = { "Racing Club / Avellaneda", "San Lorenzo / Boedo", "River Plate / Núñez", "Boca Juniors / La Boca", "Sindicato de Camioneros / Plaza de Mayo", "Los Redondos / Tandil", "Argentinos Juniors / La Paternal" };
+            int[] expectedGoals = { 850, 1020, 1050, 1150, 1300, 1450, 1450 };
+            float[] expectedDurations = { 260f, 300f, 340f, 340f, 380f, 315f, 315f };
+            float[] expectedDemand = { 1.65f, 1.815f, 1.9965f, 2.19615f, 2.415765f, 2.6573415f, 2.6573415f };
+            int[] levelIds = { 5, 6, 7, 8, 9, 10, 12 };
             string[] names = (string[])simType.GetField("LevelNames", BindingFlags.Public | BindingFlags.Static).GetValue(null);
             object balance = NewBalance();
             float[] demand = (float[])balanceType.GetField("levelDemandMultipliers", Instance).GetValue(balance);
             for (int i = 0; i < expectedNames.Length; i++)
             {
-                int level = i + 5; object sim = Make(level: level, balance: balance);
+                int level = levelIds[i]; object sim = Make(level: level, balance: balance);
                 Assert.AreEqual(expectedNames[i], names[level]); Assert.AreEqual(expectedGoals[i], Get(sim, "Goal"));
                 Assert.AreEqual(expectedDurations[i], Get(sim, "TimeRemaining")); Assert.AreEqual(7, Get(sim, "ProductCount"));
                 CollectionAssert.AreEqual(new[] { 0, 1, 2, 3, 4, 6, 5 }, AvailableProducts(sim));
                 Assert.AreEqual(expectedDemand[i], demand[level], 0.00001f);
             }
+        }
+
+        [Test]
+        public void ArgentinosJuniorsMatchesLosRedondosGoalsMarketAndFreeStartingTeam()
+        {
+            object balance = NewBalance();
+            object losRedondos = Make(level: 10, balance: balance);
+            object argentinos = Make(level: 12, balance: balance);
+            Assert.AreEqual(Get(losRedondos, "Goal"), Get(argentinos, "Goal"));
+            Assert.AreEqual(Get(losRedondos, "TimeRemaining"), Get(argentinos, "TimeRemaining"));
+            Assert.AreEqual(315f, Get(argentinos, "TimeRemaining"));
+            Assert.AreEqual(7, Get(argentinos, "ProductCount"));
+            CollectionAssert.AreEqual(AvailableProducts(losRedondos), AvailableProducts(argentinos));
+            Assert.AreEqual(Get(losRedondos, "ParrilleroHireCost"), Get(argentinos, "ParrilleroHireCost"));
+            Assert.AreEqual(Get(losRedondos, "CocacoleroHireCost"), Get(argentinos, "CocacoleroHireCost"));
+            Assert.AreEqual(Get(losRedondos, "MozoHireCost"), Get(argentinos, "MozoHireCost"));
+            Start(losRedondos); Start(argentinos);
+            Assert.AreEqual(500, Get(argentinos, "Coins"));
+            Assert.AreEqual(Get(losRedondos, "ParrilleroCount"), Get(argentinos, "ParrilleroCount"));
+            Assert.AreEqual(Get(losRedondos, "CocacoleroCount"), Get(argentinos, "CocacoleroCount"));
+            Assert.AreEqual(Get(losRedondos, "MozoCount"), Get(argentinos, "MozoCount"));
+            Assert.AreEqual(1, Get(argentinos, "ParrilleroCount"));
+            Assert.AreEqual(1, Get(argentinos, "CocacoleroCount"));
+            Assert.AreEqual(1, Get(argentinos, "MozoCount"));
         }
 
         [Test]
@@ -2185,7 +2221,7 @@ StrategyRun run = SimulateStrategy(10, 1337, "D");
             Tune(balance, "levelProductIds", new[] { "0", "0,4", "0,1,4", "0,1,2,4,6", "0,1,2,3,4,6,5" });
             object sim = Make(level: level, balance: balance);
             Assert.AreEqual(goal, Get(sim, "Goal"));
-            Assert.AreEqual(level == 5 ? 260f : level == 6 ? 300f : (level == 7 || level == 8) ? 340f : level == 9 ? 360f : level == 10 ? 315f : 300f, Get(sim, "TimeRemaining"));
+            Assert.AreEqual(level == 5 ? 260f : level == 6 ? 300f : (level == 7 || level == 8) ? 340f : level == 9 ? 380f : level == 10 ? 315f : 300f, Get(sim, "TimeRemaining"));
             Assert.AreEqual(7, Get(sim, "ProductCount"));
             Start(sim); Assert.DoesNotThrow(() => Step(sim, 1f));
         }
@@ -2214,8 +2250,8 @@ object sim = Make(level: level);
                 new[] {210,145,80,75,175,75,90}, new[] {230,175,110,95,205,90,115},
                 new[] {250,180,110,95,210,90,115}, new[] {275,195,120,110,225,100,125},
                 new[] {310,220,135,125,255,110,145}, new[] {345,245,150,140,285,120,165} };
-            float[] durations = {120f,150f,180f,210f,240f,260f,300f,340f,340f,300f,315f};
-            int[] openingCoins = {0,10,0,0,0,250,250,800,800,500,500};
+            float[] durations = {120f,150f,180f,210f,240f,260f,300f,340f,340f,380f,315f};
+            int[] openingCoins = {0,10,0,0,20,250,250,800,800,500,500};
             for (int level = 0; level < 11; level++)
             {
                 object balance = NewBalance(); object sim = Make(level: level, balance: balance); int total = 0;
@@ -2282,7 +2318,7 @@ object sim = Make(level: level);
         }
 
         [Test]
-        public void CamionerosStartsWith360SecondsFreeCocacoleroAndMozo()
+        public void CamionerosStartsWith380SecondsFreeCocacoleroAndMozo()
         {
             object balance = NewBalance();
             object sim = Make(level: 8, balance: balance);
@@ -2290,7 +2326,7 @@ object sim = Make(level: level);
             Start(sim);
 
             Assert.AreEqual(500, Get(sim, "Coins"));
-            Assert.AreEqual(360f, Get(sim, "TimeRemaining"));
+            Assert.AreEqual(380f, Get(sim, "TimeRemaining"));
             Assert.AreEqual(1, Get(sim, "ParrilleroCount"));
             Assert.AreEqual(1, Get(sim, "CocacoleroCount"));
             Assert.AreEqual(0, Get(sim, "ParrilleroPremiumCount"));
@@ -2312,7 +2348,7 @@ object sim = Make(level: level);
             Assert.IsTrue((bool)Call(nextAttempt, "SelectLevel", 9));
             Start(nextAttempt);
             Assert.AreEqual(500, Get(nextAttempt, "Coins"));
-            Assert.AreEqual(360f, Get(nextAttempt, "TimeRemaining"));
+            Assert.AreEqual(380f, Get(nextAttempt, "TimeRemaining"));
             Assert.AreEqual(3, Get(nextAttempt, "StaffCount"), "A new Camioneros attempt restores only the three free starters.");
             Assert.AreEqual(1, Get(nextAttempt, "ParrilleroCount"));
             Assert.AreEqual(1, Get(nextAttempt, "CocacoleroCount"));
@@ -2383,14 +2419,16 @@ object sim = Make(level: level);
                     }
                 Assert.IsNotNull(game);
                 object balance = gameType.GetProperty("Balance", BindingFlags.Instance | BindingFlags.Public).GetValue(game, null);
+                Assert.AreEqual(28, balanceType.GetField("maxCustomers", Instance).GetValue(balance),
+                    "Serialized Main must not override the four-row default with the old 21-customer cap.");
                 int[][] expectedGoals = {
                     new[] {200,0,0,0,0,0,0}, new[] {200,0,0,0,200,0,0}, new[] {180,120,0,0,150,0,0},
                     new[] {185,125,60,0,155,0,75}, new[] {190,130,70,65,160,65,80},
                     new[] {210,145,80,75,175,75,90}, new[] {230,175,110,95,205,90,115},
                     new[] {250,180,110,95,210,90,115}, new[] {275,195,120,110,225,100,125},
                     new[] {310,220,135,125,255,110,145}, new[] {345,245,150,140,285,120,165} };
-                float[] expectedDurations = {120f,150f,180f,210f,240f,260f,300f,340f,340f,360f,315f};
-                int[] expectedOpeningCoins = {0,10,0,0,0,250,250,800,800,500,500};
+                float[] expectedDurations = {120f,150f,180f,210f,240f,260f,300f,340f,340f,380f,315f};
+                int[] expectedOpeningCoins = {0,10,0,0,20,250,250,800,800,500,500};
                 object sanLorenzo = null;
                 for (int level = 0; level < 11; level++)
                 {
@@ -2437,7 +2475,7 @@ object sim = Make(level: level);
             }
         }
 
-        [TestCase(9, 360f)]
+        [TestCase(9, 380f)]
         [TestCase(10, 315f)]
         public void MainSceneCamionerosAndRedondosStartWithMatchingCashAndWorkers(int level, float duration)
         {
@@ -2509,20 +2547,21 @@ object sim = Make(level: level);
             }
         }
 
-        [TestCase(1, 10)] [TestCase(8, 250)] [TestCase(9, 500)] [TestCase(10, 500)]
+        [TestCase(1, 10)] [TestCase(4, 20)] [TestCase(8, 250)] [TestCase(9, 500)] [TestCase(10, 500)]
         public void AdjustedOpeningBalanceAppliesOnSelectionAdvanceStartAndRetry(int level, int expectedCoins)
         {
-            object selected = Make();
+            object balance = NewBalance();
+            object selected = Make(balance: balance);
             Assert.IsTrue((bool)Call(selected, "SelectLevel", level));
             Assert.AreEqual(expectedCoins, Get(selected, "Coins"));
             Start(selected);
             Assert.AreEqual(expectedCoins, Get(selected, "Coins"));
             Assert.AreEqual(0, Get(selected, "CoinsEarned"), "Opening funds are not earned sales.");
-            Set(selected, "Coins", 0);
+            selected = Make(level: level, balance: balance);
             Start(selected);
-            Assert.AreEqual(expectedCoins, Get(selected, "Coins"), "A retry receives only its configured opening balance.");
+            Assert.AreEqual(expectedCoins, Get(selected, "Coins"), "A fresh retry receives only its configured opening balance.");
 
-            object advancing = Make(level: level - 1);
+            object advancing = Make(level: level - 1, balance: balance);
             Set(advancing, "Phase", Enum.Parse(Get(advancing, "Phase").GetType(), "Won"));
             Assert.IsTrue((bool)Call(advancing, "NextLevel"));
             Assert.AreEqual(level, Get(advancing, "LevelIndex"));

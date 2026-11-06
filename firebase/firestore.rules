@@ -108,7 +108,7 @@ service cloud.firestore {
         && matchId.matches('[a-f0-9]{32}') && d.attemptId == matchId
         && d.operationId is string && d.operationId.matches('[a-f0-9]{32}')
         && d.revision is int && d.revision > 0
-        && d.level is int && d.level >= 0 && d.level <= 11
+        && d.level is int && d.level >= 0 && d.level <= 12
         && d.grossSalesCents is int && d.grossSalesCents >= 0
         && d.rewardCents is int && d.rewardCents >= 0
         && d.committedAt == request.time

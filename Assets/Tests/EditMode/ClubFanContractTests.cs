@@ -17,7 +17,7 @@ namespace HayChoriYPaty.Tests
         public void EveryRegisteredLevelHasCompleteMatchedFrontWalkAndTwoRiotFrames()
         {
             string[] names = (string[])Runtime("StreetSimulation").GetField("LevelNames").GetValue(null);
-            int[] expected = { 9, 8, 9, 12, 12, 12, 12, 12, 12, 12, 12 };
+            int[] expected = { 9, 8, 9, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12 };
             Assert.AreEqual(expected.Length, names.Length, "New levels need an explicit expected wardrobe count and visual DoD review.");
             for (int level = 0; level < names.Length; level++)
             {
@@ -128,6 +128,8 @@ namespace HayChoriYPaty.Tests
         [TestCase("street-river-riot-fans-v2")]
         [TestCase("street-boca-riot-fans-v2")]
         [TestCase("street-losredondos-riot-fans-v1")]
+        [TestCase("street-argentinos-riot-fans-v1")]
+        [TestCase("street-argentinos-riot-fans-v2")]
         public void NewRiotAtlasKeepsEveryPoseInsideItsOwnCell(string name)
         {
             var t = new Texture2D(2, 2);

@@ -45,6 +45,7 @@ namespace HayChoriYPaty
         private readonly StreetKitchenBalance balance;
         private readonly IStreetKitchenStock ingredientStock;
         private readonly bool unlimitedSandwiches;
+        private readonly bool activeCookSelfDelivery;
         private readonly List<StreetFoodUnit> units = new List<StreetFoodUnit>();
         // Reused per-step order keeps legacy grill transfer rear/top-first without allocating.
         private readonly List<StreetFoodUnit> advanceOrder = new List<StreetFoodUnit>();
@@ -76,14 +77,20 @@ namespace HayChoriYPaty
             : this(balance, availableProducts, ingredientStock, activeCooks, false) { }
 
         public StreetKitchenProduction(StreetKitchenBalance balance, int[] availableProducts,
-            IStreetKitchenStock ingredientStock, bool activeCooks, bool unlimitedSandwiches)
+            IStreetKitchenStock ingredientStock, bool activeCooks, bool unlimitedSandwiches,
+            bool activeCookSelfDelivery)
         {
             this.balance = balance ?? new StreetKitchenBalance();
             this.ingredientStock = ingredientStock;
             this.unlimitedSandwiches = unlimitedSandwiches && !activeCooks;
+            this.activeCookSelfDelivery = activeCookSelfDelivery && activeCooks;
             ActiveCooks = activeCooks;
             Initialize(availableProducts ?? new int[0]);
         }
+
+        public StreetKitchenProduction(StreetKitchenBalance balance, int[] availableProducts,
+            IStreetKitchenStock ingredientStock, bool activeCooks, bool unlimitedSandwiches)
+            : this(balance, availableProducts, ingredientStock, activeCooks, unlimitedSandwiches, false) { }
 
         public bool HasSupply(int product)
         {
@@ -112,7 +119,8 @@ namespace HayChoriYPaty
 
         public StreetFoodUnit TryTake(int product, StreetWorkerRole role, int workerId)
         {
-            if (product < 0 || product >= 7 || workerId <= 0 || !StreetSpecialties.IsDeliveryResponsible(role, product, ActiveCooks)) return null;
+            if (product < 0 || product >= 7 || workerId <= 0 ||
+                !StreetSpecialties.IsDeliveryResponsible(role, product, ActiveCooks && !activeCookSelfDelivery)) return null;
 
             // Levels 1-5 display sandwiches as physical table stacks. Take the highest
             // occupied layer first, then move rear-to-front within that layer, so empty
@@ -126,7 +134,7 @@ namespace HayChoriYPaty
                 StreetFoodUnit unit = units[i];
                 if (unit.Product != product || unit.Location != StreetFoodLocation.Table || unit.State != StreetFoodState.Cooked ||
                     (unit.WorkerId != 0 && unit.WorkerId != workerId) ||
-                    (ActiveCooks && product < 4 && unit.WorkerId != workerId)) continue;
+                    (ActiveCooks && !activeCookSelfDelivery && product < 4 && unit.WorkerId != workerId)) continue;
 
                 if (selected == null || (legacyBaseSlotCount > 0 && LegacyTablePickupPrecedes(unit, selected, legacyBaseSlotCount)))
                     selected = unit;

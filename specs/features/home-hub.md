@@ -1,5 +1,19 @@
 # Feature: Portada y hub de día de partido
 
+## Señales táctiles animadas y sin destellos fijos — revisión vigente 2026-11-06
+
+- Sustituye los destellos pintados y los nueve glints superpuestos del delta 2026-11-02. Se limpian las estrellas decorativas alrededor de JUGAR, Mercado e Insignias y las cuñas de atención de Ranking en el mismo master 841×1870, conservando composición, personajes, textos y GUID. El original anterior se conserva solo como evidencia local; la identidad byte-a-byte con la referencia antigua es histórica, ya no requisito activo.
+- Los cuatro carteles reales pulsan suavemente a escala 1–1,08, ciclo 2,8 s y fases alternadas, usando tiempo no escalado. Al mantener el toque reducen la escala a 0,95 y navegan al soltar. No agregar botones, estrellas nuevas ni recortes de carteles de una versión vieja; se muestrean las regiones locales del propio master limpio. No hay texturas/materiales nuevos por frame.
+- La envolvente máxima visible define un área táctil estable: no cambia con la fase y cubre todo el pulso. Se conserva la proyección ScaleAndCrop, safe area, IDs de acciones y destinos/gate Firebase. No reactivar rigs ni capas históricas que tapen el fondo. Los efectos de hojas/humo/brasa siguen independientes; se retiran los brillos/sweeps antiguos sobre Ranking/Jugar para no competir con el pulso.
+| Criterio obligatorio | Estado | Evidencia directa |
+|---|---|---|
+| Quitar estrellas decorativas pintadas y overlay de glints sin rediseñar el hub | `PASS` | Master limpio 841×1870 con GUID preservado y capturas reales; las estrellas del trofeo/escudos son contenido del dibujo, no destellos decorativos |
+| Cuatro carteles pulsan y responden al presionar; funcionan con `Time.timeScale=0` | `PASS` | 4 casos parametrizados `EachActualSignPulsesAndPressesInsideAStableTouchEnvelope`; PlayMode `FourCleanSignsAnimatePausedAndTheirStableTargetsNavigateOnRelease` |
+| Hitboxes estables cubren la envolvente y navegan al soltar hacia los mismos destinos | `PASS` | PlayMode prueba down/up de acciones 200/201/202/203 en ambas resoluciones; Mercado conserva su overlay con `hubActive` de fondo |
+| Texto legible, sin bordes dobles/costuras evidentes, presentación full-bleed | `PASS` | Revisión visual independiente de fases A/B/presionado en Game View 540×1200 y 1080×1920 |
+
+Unity `6000.6.3f1`: **6 casos EditMode únicos aprobados** (los 4 parámetros se revalidaron tras reforzar el pulso a 1,08) y **1 PlayMode aprobado**. El primer intento PlayMode falló por una expectativa antigua de Mercado y el índice de restauración del tamaño temporal; se corrigió solo el fixture y el rerun final aprobó. `git diff --check` focalizado `PASS`. Pruebas con perfil efímero en memoria, sin PlayerPrefs/cloud, y restauración del tamaño Game View. Evidencia no versionada: `Logs/Acceptance/HubTouchAnimation20261106/` (`EditMode-results.xml`, `EditMode-final-results.xml`, `PlayMode-final-results.xml`, capturas fases A/B/presionado en ambas resoluciones). `hub-touch-animation-unity.gif` combina 24 frames auténticos de Unity muestreados en un ciclo de 2,8 s; no es una animación generada ni prueba de dispositivo. Los tests históricos de `StreetHubViewTests` con PlayerPrefs fueron actualizados pero no ejecutados; el fixture nuevo aislado cubre la interacción afectada. APK/dispositivo: **`NOT_RUN`** (no solicitados).
+
 ## Alcance vigente — 2026-10-27
 
 La presentación conserva la portada animada vigente (logo, tres frases y barra de progreso compacta de 118×6 unidades lógicas). Se muestra antes del hub, sin requerir que Firebase haya terminado el acceso. Al completar la duración mínima y la carga de recursos, avanza automáticamente a la pantalla principal. Ya no existe una portada Firebase independiente. Durante la carga inicial solo se muestra el arte de portada cuando ya está disponible; no se intercala la pantalla genérica azul «PREPARANDO EL BARRIO...».
@@ -99,9 +113,9 @@ Aceptación focalizada en el Editor Unity 6000.6.3f1 existente:
 - **PASS 2/2 EditMode**: multiplicador/densidad/alpha/intervalos y anclas en seis tamaños portrait, con los cuatro hotspots intactos.
 - **PASS 1/1 PlayMode**: tras una visita breve hay al menos ocho hojas y seis emisiones activas, reloj >15 s aun con `Time.timeScale = 0`, sin instanciar rigs de personajes; fixture restaura tiempo/guardado/tamaño de Game View.
 - **PASS visual acotado**: capturas full Game View **1080×1920** a 3 y 4 s revisadas; las hojas cambian de posición, el fondo conserva su composición y botones/textos siguen legibles. Evidencia: `Path.GetTempPath()/hcyp-street-hub-view-tests/hub-ambient-triple-{3s,4s}-playmode-1080x1920.png`.
-- **NOT_RUN**: nueva APK, instalación y rendimiento/visual Android físico. La APK ticket-corrected 0.2.79/code81 instalada antes de este cambio **no contiene este refuerzo ×3**. No hubo commit/push.
+- **Estado al cierre de esta entrega (2026-10-30):** en ese momento no había nueva APK ni prueba Android; la versión 0.2.79/code81 instalada no contenía ×3. La compilación posterior 0.2.81/code83 y su estado de instalación se documentan en la sección del refuerzo natural 2026-10-31.
 
-## Ambiente por capas separadas — pedido 2026-10-30 (en implementación)
+## Ambiente por capas separadas — pedido 2026-10-30 (aceptación previa; ver refuerzo 2026-10-31)
 
 Autorizadas seis familias nuevas: banderas del estadio, camisetas colgadas, bordes de toldos, sombras lentas de nubes sobre la calle, pájaros lejanos y variación cálida suave de luces del almacén. Los personajes/rigs siguen pausados. Conservar master original, cuatro hotspots, CUENTA/ajustes/audio y gameplay; las sustituciones visuales usan fondo limpiado más primer plano transparente en recursos separados, nunca mover un recorte opaco con el objeto original visible detrás. El refuerzo ambiental ×3 anterior se conserva.
 
@@ -123,6 +137,29 @@ Estado actual tras **nueva ronda explícita de corrección solicitada por el usu
 Evidencia real: `Logs/Acceptance/HubLayers-20261030/final/hub-layered-{master,phase-0,phase-2,phase-5}-playmode-1080x{1920,2400}.png`. La primera ronda anterior se detuvo correctamente tras dos ciclos FAIL; esta nueva autorización y evidencia reemplazan ese estado, no convierten los intentos anteriores en aprobados.
 
 APK/instalación/Git **NOT_RUN**; la APK instalada no incluye estas capas. Procedencia de arte: `docs/art/hub-environment-layers-20261030.md`. No confundir este pedido con las antiguas máscaras de personajes pausadas.
+
+## Refuerzo natural de las seis familias ambientales — 2026-10-31 (solicitado)
+
+Mantener intactos el master ilustrado, sus GUID y los clean plates/capas transparentes existentes; no animar personas, textos, hotspots ni gameplay. El nuevo detalle usa las mismas anclas físicas, tiempo no escalado y recursos reutilizados del hub.
+
+- Banderas y camiseta ondulan con amplitud mayor, frecuencias/fases distintas y segundo armónico suave.
+- Quince hojas reutilizables parten de cinco zonas (cielo, copas superiores izquierda/derecha y árboles inferiores de ambos lados), y cruzan hacia el paseo; el primer ciclo empieza ya en movimiento.
+- Nueve emisiones de humo usan tres siluetas orgánicas cacheadas, con alturas/anchos, curva, balanceo y destinos variados; seis brasas pulsan y dos chispas siguen sus propios intervalos.
+- Toldos usan capas con clean backing; el borde superior y laterales quedan anclados mientras el bajo oscila en segmentos cortos y sin estirar la textura.
+- Dos sombras blandas recorren áreas mayores de calle en diagonales lentas; las luces del almacén y su reflejo cálido tienen más extensión/brillo, acotados.
+- Cuatro aves tienen pool separado, intervalos de aparición, dirección, altura, arco, tamaño y aleteo variables.
+
+**Criterios de aceptación:** seis familias legibles y con fases distintas; toldos sin huecos/dobles bordes; árboles con hojas en movimiento fuera del cielo; master/UI/hotspots intactos; temporización/pools/recursos sin asignaciones por frame; Game View real en1080×1920 y1080×2400.
+
+**Estado de comprobación final:** **PASS Unity** en el proyecto correcto con Unity 6000.6.3f1. El bridge tardó en inicializarse después de abrir el Editor, pero se auto-conectó (log: `Server ready on http://127.0.0.1:8080`, `Session connected`); no fue necesaria una conexión manual. La compilación de scripts tardó 1,35 s, sin errores C#; Console solo registró la advertencia de deprecación del Editor Intel/macOS.
+
+- **EditMode:** **10/10 PASS**, job `35418785bfd14c2d91b6a5f5d50afffc`.
+- **PlayMode composición/capas:** **1/1 PASS**, `LayeredEnvironmentRendersCleanIndependentLayersAcrossPortraitViews`, job `ecbccf7f85514039879b1dbbbec9ccc6`.
+- **PlayMode animación ambiental:** **1/1 PASS**, `AmbientOverlaysRenderInTheFullHubGameView`, job `081630d8160644539be6acdb6b016d1d`; verificó capturas del Game View y actividad también con `Time.timeScale = 0`.
+- Capturas reales revisadas a **1080×1920** y **1080×2400**, fases0/2/5, además de Game View 1080×1920 a3s/4s y luego de15+s con tiempo de juego pausado. Directorio: `/var/folders/bf/q6_2cmvn6ls9pc5h5g7thj8r0000gn/T/hcyp-street-hub-view-tests/`; muestras 3s/4s: `hub-ambient-triple-3s-playmode-1080x1920.png` y `hub-ambient-triple-4s-playmode-1080x1920.png`.
+- La verificación cubre capas limpias, recursos reutilizados, hojas/humo/chispas/aves activas, rigs/personajes ausentes, reloj no escalado, liberación de recursos y conservación de hitboxes/composición. `git diff --check` PASS.
+
+APK Development IL2CPP/ARM64 **0.2.81/code83 generada e instalada** desde Main-only, con estos cambios. ZIP/zipalign/v2 signature/package/version/ABI verificados; SHA-256 `b1a57cf18a76c0e37511d48ac73b0e6d1371a704ffea962259d9a6f059ff0232`. Se instaló como actualización en el Motorola, sin iniciar el juego; rendimiento/visual Android y Git **NOT_RUN**. Las capturas y jobs anteriores a los cambios finales no se usan como evidencia de la ronda Unity final.
 
 ## Aceptación histórica del hub (0.2.64)
 
@@ -190,3 +227,33 @@ A pedido del usuario se pausan los reemplazos articulados y todos los movimiento
 - [x] El hub no instancia el renderer/rig de personajes y muestra el master estático.
 - [ ] PlayMode `NeighborhoodCharactersStayStillDuringAShortHubVisit`, con captura de Game View inicial y tras 6,5 s: **BLOCKED**; Unity MCP perdió la sesión al esperar `command_result` y `editor_state` volvió a informar `ping not answered`.
 - [ ] Nueva APK e instalación: **NOT_RUN**; requieren pedido explícito. La APK instalada no incorpora esta pausa de código fuente.
+
+## Restauración y animación de carteles Mercado/Insignias — 2026-11-02
+
+Se recuperan los píxeles de ambos carteles desde el master anterior (`7a7e8b0`) como recortes transparentes en `Assets/Art/Street/Resources/StreetHubSignage/`; el master actual y sus GUID no se reemplazan. `StreetView.HubSignage` los dibuja sobre el hub usando exactamente las áreas de acción ya existentes para Mercado e Insignias (acciones 201/202), sin cambiar hitboxes ni navegación. Solo las dos placas tienen un vaivén/balanceo discreto en desfase: ciclo de3,6s con reloj no escalado, desplazamiento máximo1,25×3,2 unidades lógicas, escala±0,8% y giro±0,55°. El resto de arte/personajes y acciones queda intacto.
+
+**Aceptación focalizada:** recursos importados y legibles; límites de dibujo coinciden con los hotspots; ambos carteles animan durante `Time.timeScale=0`; capturas full Game View antes/después muestran el resultado y no duplican las placas. EditMode `StreetHubSignageTests` y PlayMode `RestoredSignsAnimateInTheFullHubGameView` preparados, pero **BLOCKED / NOT_RUN**: Unity MCP no respondió (`ping not answered`; `instances=0`) después de tres solicitudes acotadas de refresh/compilación, incluidas dos esperas de60s. El proceso Unity conserva abierto el lock del proyecto (PID49011), así que no se abrió una segunda instancia ni se borró el lock. No hay captura de Game View ni resultado de compilación/pruebas para esta entrega. `git diff --check` focalizado sobre fuentes/contrato **PASS**; el chequeo global informa trailing whitespace preexistente en seis `.meta` de `Assets/Resources/ModularKitchen/Art/`, ajenos a este cambio y preservados. Revisión focalizada del diff **PASS**. APK e instalación **NOT_RUN** (no solicitadas).
+
+## Carteles fijos, banderín de Insignias y destellos — 2026-11-02
+
+Este delta reemplaza el vaivén/balanceo del intento anterior: **Mercado queda fijo** en la pared del almacén, arriba de su propio toldo; **Insignias** se coloca como banderín azul con respaldo de tela y dos ataduras visibles sobre la reja de venta. Las placas conservan los recortes originales recuperados en `StreetHubSignage/`; solo se compone el nuevo respaldo del banderín en runtime, no se sustituye el master ni se generan clavos. Las áreas de acción Mercado/Insignias se mueven junto a la señal visible; JUGAR permanece en la perspectiva original del mostrador. Dieciocho destellos pulsantes, animados con reloj no escalado, rodean JUGAR, Mercado e Insignias; los carteles no se desplazan ni rotan.
+
+- [x] Mercado estático encima de la marquesina; banderín Insignias con placa legible, tela y ataduras en la reja; sin duplicar las placas del master.
+- [x] Geometría de las acciones 201/202 coincide con sus nuevos bounds; las tres señales reciben múltiples destellos visibles.
+- [x] `StreetHubSignageTests`: **3/3 EditMode PASS**. Consola Unity sin errores nuevos; permanecen advertencias existentes de otras partes del proyecto.
+- [x] Captura **full Unity Game View/Play Mode real, 1080×1920**, revisada: `Logs/Acceptance/HubSignage-20261102/final-unity-gameview-1080x1920.png`. Esta evidencia no es una captura de dispositivo ni de APK.
+- [ ] Comprador junto a JUGAR: **pendiente**; sigue integrado en el master. Se preservó el arte original en vez de ocultarlo con un parche que alteraba el fondo.
+- [ ] PlayMode automatizado `RepositionedSignsStayPinnedAndSparkleInTheFullHubGameView`: **BLOCKED / NOT_RUN** en el último intento; el runner no comenzó las pruebas antes del timeout de inicialización. La captura manual sí corresponde a Play Mode real.
+- [ ] APK, instalación y teléfono: **NOT_RUN** (no solicitados).
+
+## Integración literal de la referencia completa — reemplazo visual 2026-11-02
+
+Este delta **supersede** las composiciones parciales de recortes, telas y placas descritas arriba. Se usa como fondo la imagen completa entregada por el usuario (841×1870), que ya integra JUGAR pegado en perspectiva al puesto y sin clavos, Mercado sobre el toldo, Insignias como bandera azul atada a la reja, los destellos pintados y los personajes sin el comprador frente al puesto. El PNG del recurso `street-hub-stadium-v1` coincide byte a byte con esa referencia; se conserva su GUID/importador. No se dibujan encima recortes/cutouts del master anterior: esa capa antigua tapaba la bandera y el cartel de Mercado. Los cuatro hotspots continúan invisibles y se remapean a los elementos visibles; los controles de ajustes/audio aprovechan sus iconos integrados. Nueve glints pequeños animan sobre destellos ya pintados sin mover los carteles ni sus hitboxes.
+
+- [x] El recurso del fondo es idéntico al archivo de referencia proporcionado y mantiene GUID `8a11c78f310d45a590d0761af9ed5631`.
+- [x] `DrawHubScreen` deja de componer `DrawHubLayeredEnvironment`, evitando volver a superponer camisetas, toldos, lonas y recortes anteriores sobre una ilustración completa.
+- [x] Los límites del hotspot quedan documentados por `StreetHubSignageTests`; las comprobaciones de geometría responsive para 320×568 y 360×640 habían pasado antes de este cambio de composición.
+- [x] Compilación aislada con Roslyn 8.0.318 del Editor Unity 6000.6.3f1 usando los `.rsp` vigentes: runtime, EditMode y PlayMode; sin errores (warnings existentes anotados en el log local).
+- [ ] EditMode `StreetHubSignageTests`: **NOT_RUN** en el reintento (0 tests iniciados; runner no inicializó en 120 s).
+- [ ] PlayMode `CompleteReferenceArtworkIsNotCoveredByLegacyLayerCutouts` y captura full Game View 1080×2400: **BLOCKED / NOT_RUN**; el runner no inició ningún test en 120 s y luego el WebSocket MCP Unity se cerró. La captura anterior es previa a quitar la capa y no sirve como evidencia de aceptación de este delta. No declarar aceptación visual hasta capturar y revisar el Game View nuevo.
+- [ ] Android/APK y dispositivo: **NOT_RUN** (no solicitados).

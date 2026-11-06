@@ -142,6 +142,14 @@ namespace HayChoriYPaty.Tests
                         "The entire queued cook must remain inside its own grill's horizontal span.");
                     Assert.LessOrEqual(waiting.x + 30f, grill.xMax + .01f,
                         "A waiting cook must not spill into the other specialty's grill.");
+                    if (product < 2 && queued == 2)
+                    {
+                        Rect table = (Rect)Call(layout, "BoundsForProduct", product);
+                        Assert.GreaterOrEqual(waiting.x - 30f, table.xMin - .01f,
+                            "Both waiting normal cooks must stay below their own table.");
+                        Assert.LessOrEqual(waiting.x + 30f, table.xMax + .01f,
+                            "The second waiting normal cook must not appear under the Premium table.");
+                    }
                     Rect otherGrill = (Rect)Call(layout, "GrillBoundsForProduct", product < 2 ? 2 : 0);
                     Assert.IsFalse(waiting.x >= otherGrill.xMin && waiting.x <= otherGrill.xMax,
                         "Normal and Premium waiting zones must never swap or mix.");

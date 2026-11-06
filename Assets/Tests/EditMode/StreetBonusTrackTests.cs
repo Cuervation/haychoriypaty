@@ -54,13 +54,15 @@ namespace HayChoriYPaty.Tests
         [Test]
         public void CampaignOrderInsertsHuracanWithoutShiftingStableLevelIds()
         {
-            CollectionAssert.AreEqual(new[] { 0, 1, 2, 3, 4, 11, 5, 6, 7, 8, 9, 10 },
+            CollectionAssert.AreEqual(new[] { 0, 1, 2, 3, 4, 11, 5, 6, 7, 8, 9, 10, 12 },
                 (int[])simType.GetField("CampaignOrder", BindingFlags.Public | BindingFlags.Static).GetValue(null));
+            Assert.AreEqual(13, ((string[])simType.GetField("LevelNames", BindingFlags.Public | BindingFlags.Static).GetValue(null)).Length);
             Assert.AreEqual(11, CallStatic(simType, "CampaignLevelAt", 5));
             Assert.AreEqual(5, CallStatic(simType, "NextCampaignLevelId", 11));
             Assert.AreEqual(11, CallStatic(simType, "NextCampaignLevelId", 4));
             Assert.AreEqual(10, CallStatic(simType, "NextCampaignLevelId", 9));
-            Assert.AreEqual(-1, CallStatic(simType, "NextCampaignLevelId", 10));
+            Assert.AreEqual(12, CallStatic(simType, "NextCampaignLevelId", 10));
+            Assert.AreEqual(-1, CallStatic(simType, "NextCampaignLevelId", 12));
         }
 
         [Test]
@@ -71,12 +73,57 @@ namespace HayChoriYPaty.Tests
             Put(legacy, "unlockedLevel", 7);
             object migrated = gameType.GetMethod("MigrateSaveData", AnyStatic).Invoke(null, new[] { legacy });
 
-            Assert.AreEqual(5, Read(migrated, "version"));
+            Assert.AreEqual(6, Read(migrated, "version"));
             Assert.AreEqual(7, Read(migrated, "unlockedLevel"));
             Assert.IsTrue((bool)Read(migrated, "legacyRacingUnlocked"));
             Assert.IsTrue((bool)Read(migrated, "huracanUnlocked"));
             Assert.IsFalse((bool)Read(migrated, "racingUnlockedByHuracan"));
             Assert.NotNull(Read(migrated, "bonusTrack"));
+        }
+
+        [Test]
+        public void LegacyV5UnlocksArgentinosOnlyWithAnActualLosRedondosWin()
+        {
+            object frontierOnly = Activator.CreateInstance(saveType);
+            Put(frontierOnly, "version", 5);
+            Put(frontierOnly, "unlockedLevel", 10);
+            object migratedFrontierOnly = gameType.GetMethod("MigrateSaveData", AnyStatic).Invoke(null, new[] { frontierOnly });
+            Assert.AreEqual(6, Read(migratedFrontierOnly, "version"));
+            Assert.IsFalse((bool)Read(migratedFrontierOnly, "argentinosUnlocked"),
+                "The legacy frontier means Los Redondos is available; it does not prove a win there.");
+            Assert.AreEqual(10, Read(migratedFrontierOnly, "unlockedLevel"));
+
+            object wonSave = Activator.CreateInstance(saveType);
+            Put(wonSave, "version", 5);
+            Put(wonSave, "unlockedLevel", 10);
+            object statistics = Activator.CreateInstance(Runtime("StreetPlayerStatistics"));
+            Put(statistics, "winsByLevel", new long[12]);
+            ((long[])Read(statistics, "winsByLevel"))[10] = 1;
+            Put(wonSave, "statistics", statistics);
+            object migratedWonSave = gameType.GetMethod("MigrateSaveData", AnyStatic).Invoke(null, new[] { wonSave });
+            Assert.IsTrue((bool)Read(migratedWonSave, "argentinosUnlocked"));
+            Assert.AreEqual(10, Read(migratedWonSave, "unlockedLevel"), "Legacy stable-ID frontier stays capped at Los Redondos.");
+        }
+
+        [Test]
+        public void ArgentinosUsesAnIndependentUnlockFlagAndIsTheCampaignTerminal()
+        {
+            object save = Activator.CreateInstance(saveType);
+            Put(save, "version", 6);
+            Put(save, "unlockedLevel", 10);
+            Put(save, "argentinosUnlocked", false);
+            object tickets = Activator.CreateInstance(ticketType);
+            Put(tickets, "migrationApplied", true);
+            Put(save, "tickets", tickets);
+            object game = CreateGame(JsonUtility.ToJson(save));
+
+            Assert.IsTrue((bool)Call(game, "IsLevelUnlocked", 10));
+            Assert.IsFalse((bool)Call(game, "IsLevelUnlocked", 12));
+            object liveSave = Read(game, "save");
+            Put(liveSave, "argentinosUnlocked", true);
+            Assert.IsTrue((bool)Call(game, "IsLevelUnlocked", 12));
+            Assert.AreEqual(10, Read(liveSave, "unlockedLevel"), "Unlocking ID12 must not move the legacy stable-ID frontier.");
+            Assert.AreEqual(-1, CallStatic(simType, "NextCampaignLevelId", 12));
         }
 
         [Test]
@@ -114,6 +161,122 @@ namespace HayChoriYPaty.Tests
             AdvanceTo(sim, 120f);
             Assert.AreEqual("Won", Read(sim, "Phase").ToString());
             Assert.AreEqual(120f, (float)Read(sim, "Elapsed"), .0001f);
+        }
+
+        [Test]
+        public void BonusChoiceCardsSitBelowHuracanCaptionAbovePennantsAndHitTheirWholeCard()
+        {
+            object sim = NewSim(11);
+            Assert.IsTrue((bool)Call(sim, "StartBonusRound", 4097));
+            AdvanceTo(sim, 20f);
+            Assert.IsTrue((bool)Read(Read(sim, "BonusTrack"), "SelectionPending"));
+
+            Type viewType = Runtime("StreetView");
+            MethodInfo build = viewType.GetMethod("BuildResponsiveFooterLayout", AnyStatic);
+            Assert.NotNull(build);
+            const float height = 1360f; // 610×1536 portrait viewport expressed in the 540-wide logical canvas.
+            float verticalScale = height / 960f;
+            object footer = build.Invoke(null, new object[] { sim, height, false, false });
+            Rect caption = (Rect)Read(footer, "LevelBadge");
+            Rect pennants = (Rect)Read(footer, "Pennants");
+            Rect[] buttons = (Rect[])Read(footer, "BonusChoiceBounds");
+            Assert.AreEqual(3, buttons.Length);
+            Assert.Greater(pennants.height, 1f, "Huracán keeps a visible banderín strip at the supplied tall portrait height.");
+
+            for (int i = 0; i < buttons.Length; i++)
+            {
+                Assert.Greater(buttons[i].yMin, caption.yMax * verticalScale,
+                    "Choice cards must be below the club/neighborhood caption.");
+                Assert.Less(buttons[i].yMax, pennants.yMin,
+                    "Choice cards must stay above the pennants.");
+                Assert.AreEqual(156f, buttons[i].width, .01f, "The whole upgrade card is tappable; there is no smaller ELEGIR button.");
+                Assert.AreEqual(120f, buttons[i].height, .01f);
+                float expectedCardCenter = (540f - (3f * 156f + 2f * 9f)) * .5f + i * 165f + 78f;
+                Assert.AreEqual(expectedCardCenter, buttons[i].center.x, .01f,
+                    "Each footer choice card stays in its matching column.");
+            }
+
+            GameObject viewHost = new GameObject("Huracán bonus choice pointer geometry test");
+            viewHost.SetActive(false);
+            hosts.Add(viewHost);
+            Component game = viewHost.AddComponent(gameType);
+            gameType.GetField("sim", PrivateInstance).SetValue(game, sim);
+            gameType.GetField("playerActive", PrivateInstance).SetValue(game, true);
+            Component view = viewHost.AddComponent(viewType);
+            viewType.GetField("game", PrivateInstance).SetValue(view, game);
+            viewType.GetField("logicalCanvasHeight", PrivateInstance).SetValue(view, height);
+            viewType.GetField("layoutVerticalScale", PrivateInstance).SetValue(view, verticalScale);
+            MethodInfo hitAction = viewType.GetMethod("HitAction", PrivateInstance);
+            stateType.GetField("aguanteReady", AnyInstance).SetValue(Read(sim, "BonusTrack"), true);
+            Vector2 aguantePointer = new Vector2(449f, 97f / verticalScale);
+            Assert.AreEqual(0, (int)hitAction.Invoke(view, new object[] { aguantePointer }),
+                "Aguante must not compete with the pending one-card choice.");
+            for (int i = 0; i < buttons.Length; i++)
+            {
+                Vector2[] samples = {
+                    buttons[i].center,
+                    new Vector2(buttons[i].xMin + 1f, buttons[i].yMin + 1f),
+                    new Vector2(buttons[i].xMax - 1f, buttons[i].yMax - 1f)
+                };
+                for (int sample = 0; sample < samples.Length; sample++)
+                {
+                    Vector2 pointer = new Vector2(samples[sample].x, samples[sample].y / verticalScale);
+                    Assert.AreEqual(5000 + i, (int)hitAction.Invoke(view, new object[] { pointer }),
+                        "The whole visible footer card must select that card, without a smaller secondary button.");
+                }
+            }
+        }
+
+        [Test]
+        public void EmergencyRoleChoicesAlsoUseDirectFooterCardsAndMatchingHitActions()
+        {
+            object sim = null;
+            int emergencyCardIndex = -1;
+            for (int seed = 1; seed <= 512 && emergencyCardIndex < 0; seed++)
+            {
+                object candidate = NewSim(11);
+                Assert.IsTrue((bool)Call(candidate, "StartBonusRound", seed));
+                AdvanceTo(candidate, 20f);
+                IList cards = (IList)Read(Read(candidate, "BonusTrack"), "CurrentCards");
+                for (int i = 0; i < cards.Count; i++)
+                    if (cards[i].ToString() == "RefuerzoDeEmergencia")
+                    {
+                        sim = candidate;
+                        emergencyCardIndex = i;
+                        break;
+                    }
+            }
+            Assert.NotNull(sim, "The deterministic offer search should find Refuerzo de Emergencia.");
+            Assert.IsTrue((bool)Call(sim, "ChooseBonusCard", emergencyCardIndex));
+            object state = Read(sim, "BonusTrack");
+            Assert.IsTrue((bool)Read(state, "EmergencyRoleSelectionPending"));
+
+            const float height = 1360f;
+            float verticalScale = height / 960f;
+            Type viewType = Runtime("StreetView");
+            object footer = viewType.GetMethod("BuildResponsiveFooterLayout", AnyStatic)
+                .Invoke(null, new object[] { sim, height, false, false });
+            Rect[] cardsBounds = (Rect[])Read(footer, "BonusChoiceBounds");
+            IList roles = (IList)Read(state, "EmergencyRoles");
+            Assert.AreEqual(roles.Count, cardsBounds.Length);
+
+            GameObject viewHost = new GameObject("Huracán inline emergency role pointer test");
+            viewHost.SetActive(false);
+            hosts.Add(viewHost);
+            Component game = viewHost.AddComponent(gameType);
+            gameType.GetField("sim", PrivateInstance).SetValue(game, sim);
+            gameType.GetField("playerActive", PrivateInstance).SetValue(game, true);
+            Component view = viewHost.AddComponent(viewType);
+            viewType.GetField("game", PrivateInstance).SetValue(view, game);
+            viewType.GetField("logicalCanvasHeight", PrivateInstance).SetValue(view, height);
+            viewType.GetField("layoutVerticalScale", PrivateInstance).SetValue(view, verticalScale);
+            MethodInfo hitAction = viewType.GetMethod("HitAction", PrivateInstance);
+            for (int i = 0; i < cardsBounds.Length; i++)
+            {
+                Vector2 pointer = new Vector2(cardsBounds[i].center.x, cardsBounds[i].center.y / verticalScale);
+                Assert.AreEqual(5020 + i, (int)hitAction.Invoke(view, new object[] { pointer }),
+                    "The role card itself selects the role in that column.");
+            }
         }
 
         [Test]
@@ -209,6 +372,45 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(4L, Read(game, "TicketBalance"), "Later three-star runs earn only the repeatable regular ticket.");
             Assert.AreEqual(1, Read(Read(game, "BonusTrackProgress"), "lastTickets"));
             Assert.IsNotEmpty(latestJson);
+        }
+
+        [Test]
+        public void BonusMatchAndStaleOutboxUseTheCommittedSnapshotInventory()
+        {
+            int[] stock = { 3, 0, 5, 7, 8, 9, 10, 11, 12, 13 };
+            object save = Activator.CreateInstance(saveType);
+            Put(save, "version", 5);
+            Put(save, "unlockedLevel", 4);
+            Put(save, "huracanUnlocked", true);
+            object tickets = Activator.CreateInstance(ticketType);
+            Put(tickets, "migrationApplied", true);
+            Put(save, "tickets", tickets);
+            object market = Activator.CreateInstance(Runtime("StreetMarketData"));
+            Put(market, "stockUnits", stock);
+            Put(market, "kitGranted", true);
+            Put(market, "initializedUnlockedLevel", 4);
+            Put(save, "market", market);
+
+            object game = CreateGame(JsonUtility.ToJson(save));
+            Assert.IsTrue((bool)Call(game, "SelectLevel", 11));
+            Assert.IsTrue((bool)Call(game, "TryStartRound"));
+            object match = gameType.GetMethod("BuildBonusMatchRecord", AnyInstance)
+                .Invoke(game, new[] { Read(Read(game, "Sim"), "BonusTrack") });
+
+            var expected = Array.ConvertAll(stock, value => (long)value);
+            CollectionAssert.AreEqual((ICollection)expected, (ICollection)Read(match, "stockRemaining"),
+                "Huracán does not consume Mercado stock; its match must retain the current inventory.");
+
+            object committedSnapshot = JsonUtility.FromJson(latestJson, saveType);
+            var queuedFields = new Dictionary<string, object> { { "stockRemaining", new long[10] } };
+            Type repositoryType = Type.GetType("HayChoriYPaty.Cloud.FirestorePlayerRepository, Assembly-CSharp", true);
+            MethodInfo bindInventory = repositoryType.GetMethod("BindMatchInventoryToSnapshot", AnyStatic);
+            Assert.NotNull(bindInventory);
+            bindInventory.Invoke(null, new[] { queuedFields, committedSnapshot });
+
+            var expectedFirestore = Array.ConvertAll(stock, value => (object)(long)value);
+            CollectionAssert.AreEqual(expectedFirestore, (ICollection)queuedFields["stockRemaining"],
+                "Retrying an older queued match must project stockRemaining from its immutable snapshot.");
         }
 
         private object CreateGame(string json)

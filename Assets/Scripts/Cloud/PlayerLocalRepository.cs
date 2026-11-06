@@ -51,7 +51,7 @@ namespace HayChoriYPaty.Cloud
         {
             if (string.IsNullOrWhiteSpace(json) || json.Length > 450000) throw new InvalidDataException("Invalid snapshot size");
             var save = JsonUtility.FromJson<StreetGame.SaveData>(json);
-            if (save == null || save.version < 1 || save.version > 5 || save.unlockedLevel < 0 || save.unlockedLevel > 10)
+            if (save == null || save.version < 1 || save.version > 6 || save.unlockedLevel < 0 || save.unlockedLevel > 10)
                 throw new InvalidDataException("Invalid snapshot version/progress");
             if (save.tickets != null && !save.tickets.IsValid()) throw new InvalidDataException("Invalid ticket ledger");
             if (save.market != null)

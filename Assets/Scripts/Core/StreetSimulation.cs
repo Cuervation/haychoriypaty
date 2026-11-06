@@ -35,7 +35,7 @@ namespace HayChoriYPaty
     [Serializable]
     public sealed class StreetBalance
     {
-        [Range(1, 21)] public int maxCustomers = 21;
+        [Range(1, 28)] public int maxCustomers = 28;
         public int randomSeed = 1337;
         [Range(.1f,4f)] public float priceSensitivity=2.5f;
         [HideInInspector, Tooltip("Legacy serialized limit retained for save/scene compatibility; worker hiring is unlimited when the role is enabled.")]
@@ -63,7 +63,7 @@ namespace HayChoriYPaty
         [Min(0.1f)] public float customerArrivalSeconds = 0.16f;
         [Min(0.1f)] public float workerSpeed = 300f;
         [Min(10f)] public float customerSpeed = 300f;
-        public float[] levelDemandMultipliers = { 1f, 1.1f, 1.2f, 1.35f, 1.5f, 1.65f, 1.815f, 1.9965f, 2.19615f, 2.415765f, 2.6573415f };
+        public float[] levelDemandMultipliers = { 1f, 1.1f, 1.2f, 1.35f, 1.5f, 1.65f, 1.815f, 1.9965f, 2.19615f, 2.415765f, 2.6573415f, 1.65f, 2.6573415f };
         [Min(0.01f)] public float pickupSeconds = 0.28f;
         [Min(0f)] public float minPrice = 0f;
         [Min(0f)] public float maxPrice = 60f;
@@ -73,12 +73,12 @@ namespace HayChoriYPaty
         [Min(1)] public int minOrderQuantity = 999;
         [Min(1)] public int maxOrderQuantity = 999;
         [Min(0f)] public float initialPrice = 5f;
-        public int[] levelProductCounts = { 1, 2, 3, 5, 7, 7, 7, 7, 7, 7, 7 };
+        public int[] levelProductCounts = { 1, 2, 3, 5, 7, 7, 7, 7, 7, 7, 7, 3, 7 };
         [Tooltip("Comma-separated stable product IDs, in each level's display/order priority.")]
-        public string[] levelProductIds = { "0", "0,4", "0,1,4", "0,1,2,4,6", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5" };
+        public string[] levelProductIds = { "0", "0,4", "0,1,4", "0,1,2,4,6", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,4", "0,1,2,3,4,6,5" };
         [HideInInspector, Tooltip("Legacy aggregate goals retained for serialized-scene compatibility; individual levelBalances are authoritative.")]
-        public int[] levelGoals = { 200, 200, 65, 85, 110, 121, 133, 146, 161, 177, 195 };
-        public float[] levelDurations = { 120f, 150f, 180f, 210f, 240f, 260f, 300f, 340f, 340f, 360f, 315f };
+        public int[] levelGoals = { 200, 200, 65, 85, 110, 121, 133, 146, 161, 177, 195, 0, 195 };
+        public float[] levelDurations = { 120f, 150f, 180f, 210f, 240f, 260f, 300f, 340f, 340f, 380f, 315f, StreetBonusTrackState.DurationSeconds, 315f };
         [Tooltip("Official per-level goals, role hire base costs, speed-cost multiplier, and opening attempt balance.")]
         public StreetLevelBalance[] levelBalances = CreateOfficialLevelBalances();
 
@@ -90,21 +90,22 @@ namespace HayChoriYPaty
                 new StreetLevelBalance(new[] {200,0,0,0,200,0,0}, new[] {20,20,0,0}, 1.5f, 10),
                 new StreetLevelBalance(new[] {180,120,0,0,150,0,0}, new[] {25,25,0,0}, 2.25f),
                 new StreetLevelBalance(new[] {185,125,60,0,155,0,75}, new[] {30,30,35,0}, 3.25f),
-                new StreetLevelBalance(new[] {190,130,70,65,160,65,80}, new[] {35,35,45,40}, 4.50f),
+                new StreetLevelBalance(new[] {190,130,70,65,160,65,80}, new[] {35,35,45,40}, 4.50f, 20),
                 new StreetLevelBalance(new[] {210,145,80,75,175,75,90}, new[] {40,40,50,200,50}, 6.00f, 250),
                 new StreetLevelBalance(new[] {230,175,110,95,205,90,115}, new[] {45,45,55,50,55}, 8.00f, 250),
                 new StreetLevelBalance(new[] {250,180,110,95,210,90,115}, new[] {50,50,65,55,60}, 10.50f, 800),
                 new StreetLevelBalance(new[] {275,195,120,110,225,100,125}, new[] {55,55,70,65,65}, 13.50f, 800),
                 new StreetLevelBalance(new[] {310,220,135,125,255,110,145}, new[] {60,60,80,70,70}, 17.00f, 500),
                 new StreetLevelBalance(new[] {345,245,150,140,285,120,165}, new[] {70,70,90,80,80}, 21.00f, 500),
-                new StreetLevelBalance(new[] {0,0,0,0,0,0,0}, new[] {0,0,0,0,0}, 1f)
+                new StreetLevelBalance(new[] {0,0,0,0,0,0,0}, new[] {0,0,0,0,0}, 1f),
+                new StreetLevelBalance(new[] {345,245,150,140,285,120,165}, new[] {70,70,90,80,80}, 21.00f, 500)
             };
         }
 
         public StreetLevelBalance GetLevelBalance(int levelIndex)
         {
             return levelBalances != null && levelIndex >= 0 && levelIndex < levelBalances.Length && levelBalances[levelIndex] != null
-                ? levelBalances[levelIndex] : CreateOfficialLevelBalances()[Mathf.Clamp(levelIndex, 0, 11)];
+                ? levelBalances[levelIndex] : CreateOfficialLevelBalances()[Mathf.Clamp(levelIndex, 0, 12)];
         }
 
         public int GetProductGoal(int levelIndex, int productId)
@@ -112,7 +113,7 @@ namespace HayChoriYPaty
             if (productId < 0 || productId >= 7) return 0;
             StreetLevelBalance row = GetLevelBalance(levelIndex);
             return row.goalsByProductId != null && productId < row.goalsByProductId.Length && row.goalsByProductId[productId] > 0
-                ? row.goalsByProductId[productId] : CreateOfficialLevelBalances()[Mathf.Clamp(levelIndex, 0, 11)].goalsByProductId[productId];
+                ? row.goalsByProductId[productId] : CreateOfficialLevelBalances()[Mathf.Clamp(levelIndex, 0, 12)].goalsByProductId[productId];
         }
 
         public int GetHireBaseCost(int levelIndex, StreetWorkerRole role)
@@ -123,7 +124,7 @@ namespace HayChoriYPaty
             StreetLevelBalance row = GetLevelBalance(levelIndex);
             return row.hireBaseCostsByRole != null && roleIndex >= 0 && roleIndex < row.hireBaseCostsByRole.Length
                 ? Mathf.Max(0, row.hireBaseCostsByRole[roleIndex])
-                : CreateOfficialLevelBalances()[Mathf.Clamp(levelIndex, 0, 10)].hireBaseCostsByRole[roleIndex];
+                : CreateOfficialLevelBalances()[Mathf.Clamp(levelIndex, 0, 12)].hireBaseCostsByRole[roleIndex];
         }
         public int GetStartingCoins(int levelIndex)
         {
@@ -299,29 +300,31 @@ namespace HayChoriYPaty
         public const float FrontQueueY = 324f, QueueRowSpacing = 56f;
         // Legacy public name retained for callers; all levels use the shared scene service line.
         public const float ChicagoCounterServiceY = StreetSceneLayout.WorkerServiceY;
-        private const int QueueColumns = 7, QueueSlots = 21;
+        private const int QueueColumns = 7, QueueRows = 4, QueueSlots = QueueColumns * QueueRows;
         public static readonly string[] ProductNames = { "Chori", "Paty", "Bondiola", "Vacío", "Coca 600 ml", "Fernet con Coca 1 L", "Cerveza en lata" };
         public const int HuracanBonusLevelId = 11;
-        public static readonly int[] CampaignOrder = { 0, 1, 2, 3, 4, HuracanBonusLevelId, 5, 6, 7, 8, 9, 10 };
-        public static readonly string[] LevelNames = { "Floresta / All Boys", "Nueva Chicago", "Liniers - Velez Sarsfield", "Ferro Carril Oeste", "Independiente de Avellaneda", "Racing Club / Avellaneda", "San Lorenzo / Boedo", "River Plate / Núñez", "Boca Juniors / La Boca", "Sindicato de Camioneros / Plaza de Mayo", "Los Redondos / Tandil", "Huracán / Parque Patricios" };
+        public const int ArgentinosJuniorsLevelId = 12;
+        public static readonly int[] CampaignOrder = { 0, 1, 2, 3, 4, HuracanBonusLevelId, 5, 6, 7, 8, 9, 10, ArgentinosJuniorsLevelId };
+        public static readonly string[] LevelNames = { "Floresta / All Boys", "Nueva Chicago", "Liniers - Velez Sarsfield", "Ferro Carril Oeste", "Independiente de Avellaneda", "Racing Club / Avellaneda", "San Lorenzo / Boedo", "River Plate / Núñez", "Boca Juniors / La Boca", "Sindicato de Camioneros / Plaza de Mayo", "Los Redondos / Tandil", "Huracán / Parque Patricios", "Argentinos Juniors / La Paternal" };
         // Player-facing captions consistently show the club/team first and its neighborhood second.
         // LevelNames remain stable theme keys consumed by ClubVisualTheme.
         public static readonly string[] LevelDisplayNames = {
             "All Boys / Floresta", "Nueva Chicago / Mataderos", "Vélez Sarsfield / Liniers",
             "Ferro / Caballito", "Independiente / Avellaneda", "Racing Club / Avellaneda",
             "San Lorenzo / Boedo", "River Plate / Núñez", "Boca Juniors / La Boca",
-            "Sindicato de Camioneros / Plaza de Mayo", "Los Redondos / Tandil", "Huracán / Parque Patricios"
+            "Sindicato de Camioneros / Plaza de Mayo", "Los Redondos / Tandil", "Huracán / Parque Patricios",
+            "Argentinos Juniors / La Paternal"
         };
-        private static readonly int[] DefaultProductCounts = { 1, 2, 3, 5, 7, 7, 7, 7, 7, 7, 7, 3 };
+        private static readonly int[] DefaultProductCounts = { 1, 2, 3, 5, 7, 7, 7, 7, 7, 7, 7, 3, 7 };
         private static readonly int[][] DefaultLevelProducts = {
             new[] { 0 }, new[] { 0, 4 }, new[] { 0, 1, 4 },
             new[] { 0, 1, 2, 4, 6 }, new[] { 0, 1, 2, 3, 4, 6, 5 },
             new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 },
-            new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 4 }
+            new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 4 }, new[] { 0, 1, 2, 3, 4, 6, 5 }
         };
-        private static readonly float[] DefaultDemandMultipliers = { 1f, 1.1f, 1.2f, 1.35f, 1.5f, 1.65f, 1.815f, 1.9965f, 2.19615f, 2.415765f, 2.6573415f, 1.65f };
+        private static readonly float[] DefaultDemandMultipliers = { 1f, 1.1f, 1.2f, 1.35f, 1.5f, 1.65f, 1.815f, 1.9965f, 2.19615f, 2.415765f, 2.6573415f, 1.65f, 2.6573415f };
         private static readonly int[] DefaultSpeedCosts = { 5, 10, 15, 20, 30, 45, 65, 90, 125 };
-        private static readonly float[] DefaultDurations = { 120f, 150f, 180f, 210f, 240f, 260f, 300f, 340f, 340f, 360f, 315f, StreetBonusTrackState.DurationSeconds };
+        private static readonly float[] DefaultDurations = { 120f, 150f, 180f, 210f, 240f, 260f, 300f, 340f, 340f, 380f, 315f, StreetBonusTrackState.DurationSeconds, 315f };
         private const int MaxHireCost = int.MaxValue - int.MaxValue % 5;
         private readonly StreetBalance balance;
         private readonly int[][] availableProductsByLevel;
@@ -390,11 +393,11 @@ namespace HayChoriYPaty
                 return true;
             }
         }
-        public int GetProductGoal(int productId) => !IsBonusTrack && IsProductAvailable(productId) ? balance.GetProductGoal(LevelIndex, productId) : 0;
+        public int GetProductGoal(int productId) => !IsBonusTrack && LevelIndex != TowerDefenseCampaignLevelId && IsProductAvailable(productId) ? balance.GetProductGoal(LevelIndex, productId) : 0;
         public int GetProductDelivered(int productId) => productId >= 0 && productId < deliveredByProduct.Length ? deliveredByProduct[productId] : 0;
         public int GetProductRemaining(int productId) => Mathf.Max(0, GetProductGoal(productId) - GetProductDelivered(productId));
         public bool IsProductGoalComplete(int productId) => GetProductGoal(productId) > 0 && GetProductRemaining(productId) == 0;
-        public float TimeRemaining { get { return Mathf.Max(0f, (IsBonusTrack ? StreetBonusTrackState.DurationSeconds : LevelValue(balance.levelDurations, LevelIndex, DefaultDurations)) - Elapsed); } }
+        public float TimeRemaining { get { if (LevelIndex == TowerDefenseCampaignLevelId) return 0f; return Mathf.Max(0f, (IsBonusTrack ? StreetBonusTrackState.DurationSeconds : LevelValue(balance.levelDurations, LevelIndex, DefaultDurations)) - Elapsed); } }
         public int StaffCount { get { return workers.Count; } }
         public StreetWorkerRole NextHireRole
         {
@@ -460,8 +463,8 @@ namespace HayChoriYPaty
             return HasRole(role) ? int.MaxValue : 0;
         }
         private int StartingParrilleroCount => LevelIndex == 6 || IsBonusTrack ? 2 : 1;
-        private int StartingCocacoleroCount => LevelIndex == 9 || LevelIndex == 10 || IsBonusTrack ? 1 : 0;
-        private bool StartsWithFreeMozo => LevelIndex == 5 || LevelIndex == 6 || LevelIndex == 8 || LevelIndex == 9 || LevelIndex == 10 || IsBonusTrack;
+        private int StartingCocacoleroCount => LevelIndex == 9 || LevelIndex == 10 || LevelIndex == ArgentinosJuniorsLevelId || IsBonusTrack ? 1 : 0;
+        private bool StartsWithFreeMozo => LevelIndex == 5 || LevelIndex == 6 || LevelIndex == 8 || LevelIndex == 9 || LevelIndex == 10 || LevelIndex == ArgentinosJuniorsLevelId || IsBonusTrack;
 
         public int HireCostForRole(StreetWorkerRole role)
         {
@@ -476,10 +479,10 @@ namespace HayChoriYPaty
             int roleWorkerCount, long ticketWorkers = 0)
         {
             if (sourceBalance == null || roleWorkerCount < 0) return 0;
-            long freeBaseline = role == StreetWorkerRole.Parrillero && (levelIndex == 6 || levelIndex == HuracanBonusLevelId) ? 2
-                : role == StreetWorkerRole.Cocacolero && (levelIndex == 9 || levelIndex == 10 || levelIndex == HuracanBonusLevelId) ? 1
+            long freeBaseline = role == StreetWorkerRole.Parrillero ? (levelIndex == 6 || levelIndex == HuracanBonusLevelId ? 2 : 1)
+                : role == StreetWorkerRole.Cocacolero && (levelIndex == 9 || levelIndex == 10 || levelIndex == ArgentinosJuniorsLevelId || levelIndex == HuracanBonusLevelId) ? 1
                 : role == StreetWorkerRole.ParrilleroPremium && levelIndex == 5 ? 1
-                : role == StreetWorkerRole.Mozo && (levelIndex == 5 || levelIndex == 6 || levelIndex == 8 || levelIndex == 9 || levelIndex == 10 || levelIndex == HuracanBonusLevelId) ? 1
+                : role == StreetWorkerRole.Mozo && (levelIndex == 5 || levelIndex == 6 || levelIndex == 8 || levelIndex == 9 || levelIndex == 10 || levelIndex == ArgentinosJuniorsLevelId || levelIndex == HuracanBonusLevelId) ? 1
                 : 0;
             long paidNumber = Math.Max(1L, (long)roleWorkerCount - freeBaseline - Math.Max(0L, ticketWorkers) + 1);
             return ComputeHireCost(sourceBalance.GetHireBaseCost(levelIndex, role), paidNumber);
@@ -571,10 +574,12 @@ namespace HayChoriYPaty
                 return Mathf.Clamp01((balance.maxPrice-total/ProductCount)/Mathf.Max(0.01f,balance.maxPrice-balance.minPrice));
             }
         }
-        public int ProductCount { get { return availableProductsByLevel[LevelIndex].Length; } }
+        public int ProductCount { get { return LevelIndex == TowerDefenseCampaignLevelId ? 2 : availableProductsByLevel[LevelIndex].Length; } }
 
         public int GetAvailableProduct(int slot)
         {
+            if (LevelIndex == TowerDefenseCampaignLevelId)
+                return slot == 0 ? 0 : slot == 1 ? 4 : -1;
             return slot >= 0 && slot < ProductCount ? availableProductsByLevel[LevelIndex][slot] : -1;
         }
 
@@ -588,7 +593,7 @@ namespace HayChoriYPaty
                 int[] parsed = ParseProductIds(value.levelProductIds != null && level < value.levelProductIds.Length
                     ? value.levelProductIds[level] : null);
                 if (parsed == null) parsed = (int[])DefaultLevelProducts[level].Clone();
-                result[level] = parsed;
+                result[level] = level == TowerDefenseCampaignLevelId ? new[] {0, 4} : parsed;
             }
             return result;
         }
@@ -679,6 +684,11 @@ namespace HayChoriYPaty
         internal bool BeginExternalCampaignRuntime()
         {
             if (LevelIndex != TowerDefenseCampaignLevelId || Phase != RoundPhase.Playing || externalCampaignRuntime) return false;
+            // StartRound's ordinary baseline is retained for every traditional level, but TD is
+            // an empty manual-placement mode, so remove only that baseline after the common attempt starts.
+            workers.Clear();
+            nextWorker = 1;
+            Array.Clear(ticketWorkersByRole, 0, ticketWorkersByRole.Length);
             externalCampaignRuntime = true;
             return true;
         }
@@ -701,7 +711,8 @@ namespace HayChoriYPaty
             }
             for (int role = 0; role < workerCounts.Length; role++) if (workerCounts[role] < 0) return false;
 
-            Elapsed = Mathf.Clamp(elapsedSeconds, 0f, LevelValue(balance.levelDurations, LevelIndex, DefaultDurations));
+            // Tower Defense is untimed; retain its complete run length for history/audit.
+            Elapsed = Mathf.Max(0f, elapsedSeconds);
             Coins = Mathf.Max(0, coins);
             CoinsEarned = Mathf.Max(0, coinsEarned);
             SpeedLevel = Mathf.Max(0, speedLevel);
@@ -865,7 +876,7 @@ namespace HayChoriYPaty
 
         public bool SpawnCustomerWithProducts(int[] products, int[] quantities)
         {
-            if (customers.Count >= Mathf.Clamp(balance.maxCustomers, 1, 21) || products == null || quantities == null ||
+            if (customers.Count >= Mathf.Clamp(balance.maxCustomers, 1, QueueSlots) || products == null || quantities == null ||
                 products.Length < 1 || products.Length > StreetCustomer.MaxOrderProducts || products.Length != quantities.Length) return false;
             int maxQuantity = LevelIndex <= 2 ? 4 : 999;
             int[] boundedQuantities = new int[quantities.Length];
@@ -986,7 +997,7 @@ namespace HayChoriYPaty
 
         private int DemandCapacity()
         {
-            int cap=Mathf.Clamp(balance.maxCustomers,1,21);
+            int cap=Mathf.Clamp(balance.maxCustomers,1,QueueSlots);
             return DemandFraction>=.8f?cap:Mathf.Clamp(Mathf.RoundToInt(Mathf.Lerp(1,cap,DemandFraction*DemandFraction)),1,cap);
         }
         private void SpawnQuotaBalancedOrder()

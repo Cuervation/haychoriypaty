@@ -204,6 +204,13 @@ namespace HayChoriYPaty.Tests
                     Assert.GreaterOrEqual(renderedX - 30f, grill.xMin - .01f);
                     Assert.LessOrEqual(renderedX + 30f, grill.xMax + .01f,
                         "Each waiting cook must render at its own grill, not its specialty table or the other grill.");
+                    if (product == 0)
+                    {
+                        Rect table = (Rect)Call(layout, "BoundsForProduct", product);
+                        Assert.GreaterOrEqual(renderedX - 30f, table.xMin - .01f);
+                        Assert.LessOrEqual(renderedX + 30f, table.xMax + .01f,
+                            "Both normal waiters must be under the normal table, not the Premium table.");
+                    }
                 }
                 yield return null;
                 yield return null;

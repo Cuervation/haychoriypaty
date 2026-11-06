@@ -50,6 +50,11 @@ namespace HayChoriYPaty.Tests
             object balance = Activator.CreateInstance(balanceType);
             return Activator.CreateInstance(productionType, new object[] { balance, products, null, true });
         }
+        private object MakeActive(int[] products, bool allowCookSelfDelivery)
+        {
+            object balance = Activator.CreateInstance(balanceType);
+            return Activator.CreateInstance(productionType, new object[] { balance, products, null, true, false, allowCookSelfDelivery });
+        }
         private static object Get(object value, string name) => value.GetType().GetProperty(name, PublicInstance).GetValue(value);
         private static object Call(object value, string name, params object[] args)
         {
@@ -216,6 +221,35 @@ namespace HayChoriYPaty.Tests
             Assert.IsTrue((bool)Call(kitchen, "Consume", id, 0, 7));
             Assert.IsNull(Call(kitchen, "Find", id));
             Assert.AreEqual(23, (int)Call(kitchen, "TableCount", 0));
+        }
+
+        [Test]
+        public void ActiveCookSelfDeliveryIsOptInAndDoesNotChangeDefaultMozoPolicy()
+        {
+            object defaultKitchen = MakeActive(new[] { 0 }, false);
+            object optInKitchen = MakeActive(new[] { 0 }, true);
+            object parrillero = EnumValue(roleType, "Parrillero");
+            object mozo = EnumValue(roleType, "Mozo");
+            int defaultUnit = DepositQuickSandwich(defaultKitchen, 501);
+            int optInUnit = DepositQuickSandwich(optInKitchen, 502);
+
+            Assert.IsNull(Call(defaultKitchen, "TryTake", 0, parrillero, 501), "Unchanged active-cook levels still require a Mozo for sandwich pickup.");
+            Assert.IsNotNull(Call(defaultKitchen, "ReserveTableUnit", 0, 503));
+            Assert.IsNotNull(Call(defaultKitchen, "TryTake", 0, mozo, 503));
+            Assert.IsNotNull(Call(optInKitchen, "TryTake", 0, parrillero, 502), "Tower Defense may opt Parrilleros into self-delivery while still taking a real unit.");
+            Assert.IsNotNull(Call(defaultKitchen, "Find", defaultUnit));
+            Assert.IsNotNull(Call(optInKitchen, "Find", optInUnit));
+        }
+
+        private static int DepositQuickSandwich(object kitchen, int workerId)
+        {
+            object reserved = Call(kitchen, "ReserveCook", 0, workerId);
+            Assert.IsNotNull(reserved);
+            int id = (int)Get(reserved, "Id");
+            Assert.IsTrue((bool)Call(kitchen, "AdvanceCook", id, workerId, 3f, 1f));
+            Assert.IsTrue((bool)Call(kitchen, "TakeCooked", id, workerId));
+            Assert.IsTrue((bool)Call(kitchen, "DepositCooked", id, workerId));
+            return id;
         }
 
         [Test]

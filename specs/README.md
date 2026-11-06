@@ -7,11 +7,12 @@
 | Estado confirmado, versión, pendientes y entorno | [current-state.md](current-state.md) |
 | Límite del producto y siete IDs | [product.md](product.md) |
 | Resumen del loop actual | [gameplay.md](gameplay.md) |
-| Catálogos, precios, metas/tiempos y contratación/velocidad | [street-automation.md](features/street-automation.md#current-per-product-level-balance--2026-10-24) (tablas vigentes; resto contiene evolución histórica) |
+| Balance operativo actual de niveles: catálogos, precios, metas/tiempos, caja y plantel | [BALANCE_ACTUAL_NIVELES.md](../docs/BALANCE_ACTUAL_NIVELES.md) (fuente consolidada) + [street-automation.md](features/street-automation.md) (contrato de mecánicas y economía; tablas fechadas antiguas son históricas) |
 | Cocineros activos 2 s / CookWorkRate, Mozo, seis cards y ampliación desde Racing | [active-cooks-mozos.md](features/active-cooks-mozos.md) (incluye restauración posterior del escenario) |
 | Cocina modular, stock físico, geometría y proyección | [modular-kitchen.md](features/modular-kitchen.md) (modo base niveles 1–5; Racing+ aplica el delta anterior) |
 | Mercado/Heladera persistentes y compras sin crédito | [market-fridge.md](features/market-fridge.md) |
 | Huracán / Parque Patricios Bonus Track (campaña, cartas y persistencia) | [huracan-bonus-track.md](features/huracan-bonus-track.md) |
+| Argentinos Juniors / La Paternal (último nivel de campaña, murales y progresión) | [argentinos-juniors.md](features/argentinos-juniors.md) |
 | Tower Defense — Camioneros / Plaza de Mayo (posición 11 de campaña, ID estable 9; aceptación pendiente) | [tower-defense.md](features/tower-defense.md) |
 | Firebase/Google obligatorio, perfiles UID, outbox y estado de integración | [firebase-player.md](features/firebase-player.md) (implementación local, aceptación real pendiente) |
 | Workers, gait y agarre físico | [worker-animation.md](features/worker-animation.md) |

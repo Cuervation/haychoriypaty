@@ -20,7 +20,7 @@ function commit(db,revision,id,options={}) {
   for(const key of options.omitState||[]) delete state[key];
   if(!options.skipState) batch.set(current(db),state);
   if(!options.skipReceipt) batch.set(doc(db,'players/alice/operations/'+id),{schemaVersion:1,uid:'alice',operationId:id,revision,previousRevision:revision-1,payloadHash:hash,matchId,createdAt:serverTimestamp(),...(options.receipt||{})});
-  if(matchId && !options.skipMatch) { const matchRef=doc(db,'players/alice/matches/'+matchId); const match={schemaVersion:1,uid:'alice',id:matchId,attemptId:matchId,operationId:id,revision,level:2,grossSalesCents:500,rewardCents:250,salesByProduct:Array(7).fill(0),hiresByRole:Array(5).fill(0),stockConsumed:Array(10).fill(0),stockRemaining:Array(10).fill(0),committedAt:serverTimestamp(),utc:'2026-10-16T00:00:00Z',club:'Test club',result:'won',won:true,abandoned:false,elapsedSeconds:50,hireSpendCents:0,speedSpendCents:0,initialCoinsCents:100,leftoverCents:0,halfSalesRewardCents:250,leftoverBonusCents:0,progressionBonusCents:0,customersAttended:0,customersLost:0,ordersCompleted:0,recordsReached:0,...(options.match||{})}; for(const key of options.omitMatch||[]) delete match[key]; batch.set(matchRef,match); }
+  if(matchId && !options.skipMatch) { const matchRef=doc(db,'players/alice/matches/'+matchId); const match={schemaVersion:1,uid:'alice',id:matchId,attemptId:matchId,operationId:id,revision,level:2,grossSalesCents:500,rewardCents:250,salesByProduct:Array(7).fill(0),hiresByRole:Array(5).fill(0),stockConsumed:Array(10).fill(0),stockRemaining:Array(10).fill(0),committedAt:serverTimestamp(),utc:'2026-10-16T00:00:00Z',club:'Test club',result:'won',won:true,abandoned:false,elapsedSeconds:50,hireSpendCents:0,speedSpendCents:0,initialCoinsCents:100,leftoverCents:0,halfSalesRewardCents:250,leftoverBonusCents:0,progressionBonusCents:0,customersAttended:0,customersLost:0,ordersCompleted:0,recordsReached:0,bonusScore:0,bonusStars:0,bonusDeliveries:0,bonusCompletedOrders:0,bonusTickets:0,bonusUpgrades:'',...(options.match||{})}; for(const key of options.omitMatch||[]) delete match[key]; batch.set(matchRef,match); }
   return batch.commit();
 }
 let passed=0; const names=new Set();
@@ -65,16 +65,25 @@ try {
       rewardCents:result==='abandoned'?0:250,halfSalesRewardCents:result==='abandoned'?0:250};
     await check('full DTO '+result+' atomic commit',()=>assertSucceeds(commit(alice,revision,unique(),{matchId:unique(),state:{stockUnits:inventory},match})));
   }
-  const deny=async(name,options)=>check(name,()=>assertFails(commit(alice,7,unique(),{matchId:unique(),state:{stockUnits:inventory},match:{stockRemaining:inventory},...options})));
+  await check('Huracan bonus DTO with level 11 atomic commit',()=>assertSucceeds(commit(alice,7,unique(),{matchId:unique(),state:{stockUnits:inventory},match:{
+    level:11,club:'Huracán / Parque Patricios',stockRemaining:inventory,bonusScore:6500,bonusStars:2,bonusDeliveries:64,
+    bonusCompletedOrders:14,bonusTickets:1,bonusUpgrades:'OTRO PARRILLERO | COCA EXPRESS'
+  }})));
+  await check('Argentinos Juniors DTO with level 12 atomic commit',()=>assertSucceeds(commit(alice,8,unique(),{matchId:unique(),state:{stockUnits:inventory},match:{
+    level:12,club:'Argentinos Juniors / La Paternal',stockRemaining:inventory
+  }})));
+  const deny=async(name,options)=>check(name,()=>assertFails(commit(alice,9,unique(),{matchId:unique(),state:{stockUnits:inventory},match:{stockRemaining:inventory},...options})));
   // Independent invalid field cases are evaluated from the same valid base revision.
   for(const [field,value] of Object.entries({schemaVersion:2,uid:'bob',id:'0'.repeat(32),attemptId:'0'.repeat(32),operationId:'bad',revision:1.5,
-    level:11,grossSalesCents:-1,rewardCents:-1,committedAt:new Date(0),utc:3,club:5,elapsedSeconds:-1,won:1,abandoned:1,
+    level:13,grossSalesCents:-1,rewardCents:-1,committedAt:new Date(0),utc:3,club:5,elapsedSeconds:-1,won:1,abandoned:1,
     result:'unknown',hireSpendCents:-1,speedSpendCents:-1,initialCoinsCents:-1,leftoverCents:-1,halfSalesRewardCents:-1,
-    leftoverBonusCents:-1,progressionBonusCents:-1,customersAttended:-1,customersLost:-1,ordersCompleted:-1,recordsReached:4})) {
+    leftoverBonusCents:-1,progressionBonusCents:-1,customersAttended:-1,customersLost:-1,ordersCompleted:-1,recordsReached:4,
+    bonusScore:-1,bonusStars:4,bonusDeliveries:-1,bonusCompletedOrders:-1,bonusTickets:3,bonusUpgrades:'x'.repeat(513)})) {
     await deny('match invalid '+field,{match:{stockRemaining:inventory,[field]:value}});
   }
   for(const field of ['grossSalesCents','rewardCents','hireSpendCents','speedSpendCents','initialCoinsCents','leftoverCents',
-    'halfSalesRewardCents','leftoverBonusCents','progressionBonusCents','customersAttended','customersLost','ordersCompleted','recordsReached'])
+    'halfSalesRewardCents','leftoverBonusCents','progressionBonusCents','customersAttended','customersLost','ordersCompleted','recordsReached',
+    'bonusScore','bonusStars','bonusDeliveries','bonusCompletedOrders','bonusTickets'])
     await deny('match noninteger '+field,{match:{stockRemaining:inventory,[field]:0.5}});
   await deny('match utc oversized',{match:{stockRemaining:inventory,utc:'x'.repeat(65)}});
   await deny('match club oversized',{match:{stockRemaining:inventory,club:'x'.repeat(129)}});
@@ -92,7 +101,8 @@ try {
   }
   for(const field of ['id','attemptId','uid','operationId','revision','schemaVersion','committedAt','utc','level','club','result','won','abandoned','elapsedSeconds',
     'salesByProduct','grossSalesCents','hireSpendCents','speedSpendCents','initialCoinsCents','leftoverCents','halfSalesRewardCents','leftoverBonusCents',
-    'progressionBonusCents','rewardCents','stockConsumed','stockRemaining','hiresByRole','customersAttended','customersLost','ordersCompleted','recordsReached'])
+    'progressionBonusCents','rewardCents','stockConsumed','stockRemaining','hiresByRole','customersAttended','customersLost','ordersCompleted','recordsReached',
+    'bonusScore','bonusStars','bonusDeliveries','bonusCompletedOrders','bonusTickets','bonusUpgrades'])
     await deny('match required '+field,{omitMatch:[field]});
   for(const [field,value] of Object.entries({schemaVersion:2,uid:'bob',revision:7.5,operationId:'bad',payloadHash:'bad',snapshot:'',
     unlockedLevel:11,balanceCents:0.5,stockUnits:[],updatedAt:new Date(0)}))
@@ -108,6 +118,6 @@ try {
   await check('match cannot be rewritten',()=>assertFails(setDoc(doc(alice,'players/alice/matches/'+'d'.repeat(32)),{grossSalesCents:1},{merge:true})));
   await check('receipt cannot be deleted',()=>assertFails(deleteDoc(doc(alice,'players/alice/operations/'+'c'.repeat(32)))));
   await check('current state cannot be deleted',()=>assertFails(deleteDoc(current(alice))));
-  assert.equal((await getDoc(current(alice))).data().revision,6,'all malformed atomic batches must leave state untouched');
+  assert.equal((await getDoc(current(alice))).data().revision,8,'all malformed atomic batches must leave state untouched');
   console.log(`RULES_RESULT ${passed}/${passed} passed — isolated emulator only, no production reads/writes.`);
 } finally {await env.cleanup();}

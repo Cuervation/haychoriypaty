@@ -538,7 +538,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HayChoriYPaty.StreetGame
   balance:
-    maxCustomers: 21
+    maxCustomers: 28
     randomSeed: 1337
     priceSensitivity: 2.5
     maxStaff: 5
@@ -572,6 +572,8 @@ MonoBehaviour:
     - 2.19615
     - 2.415765
     - 2.6573415
+    - 1.65
+    - 2.6573415
     pickupSeconds: 0.28
     minPrice: 0
     maxPrice: 60
@@ -596,7 +598,7 @@ MonoBehaviour:
     minOrderQuantity: 999
     maxOrderQuantity: 999
     initialPrice: 5
-    levelProductCounts: 0100000002000000030000000500000007000000070000000700000007000000070000000700000007000000i
+    levelProductCounts: 01000000020000000300000005000000070000000700000007000000070000000700000007000000070000000300000007000000i
     levelProductIds:
     - 0
     - 0,4
@@ -608,7 +610,10 @@ MonoBehaviour:
     - 0,1,2,3,4,6,5
     - 0,1,2,3,4,6,5
     - 0,1,2,3,4,6,5
-    levelGoals: c8000000c800000041000000550000006e000000790000008500000092000000a1000000b1000000c3000000i
+    - 0,1,2,3,4,6,5
+    - 0,1,4
+    - 0,1,2,3,4,6,5
+    levelGoals: c8000000c800000041000000550000006e000000790000008500000092000000a1000000b1000000c300000000000000c3000000i
     levelDurations:
     - 120
     - 150
@@ -619,7 +624,9 @@ MonoBehaviour:
     - 300
     - 340
     - 340
-    - 360
+    - 380
+    - 315
+    - 120
     - 315
     florestaFinishAtDeadline: 0
   selectedLevel: 0

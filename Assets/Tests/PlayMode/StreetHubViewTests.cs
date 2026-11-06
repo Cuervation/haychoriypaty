@@ -125,6 +125,34 @@ namespace HayChoriYPaty.Tests
                 "Startup should not draw the separate generic PREPARANDO EL BARRIO screen.");
         }
 
+        [UnityTest] public IEnumerator PermanentFirebaseSyncFailureReturnsToHubAndOpensAccountPanel()
+        {
+            float deadline = Time.realtimeSinceStartup + 20f;
+            while (!(bool)Field("viewResourcesReady") && Time.realtimeSinceStartup < deadline) yield return null;
+            Assert.IsTrue((bool)Field("viewResourcesReady"), "The account hub must be available before presenting a sync failure.");
+
+            Type sessionType = Type.GetType("HayChoriYPaty.Cloud.FirebasePlayerSession, Assembly-CSharp", true);
+            accountRoot = new GameObject("Temporary permanent sync failure test");
+            Component session = accountRoot.AddComponent(sessionType);
+            ((Behaviour)session).enabled = false;
+            sessionType.GetProperty("Instance").GetSetMethod(true).Invoke(null, new[] { session });
+            sessionType.GetField("game", P).SetValue(session, game);
+            PropertyInfo state = sessionType.GetProperty("State");
+            state.GetSetMethod(true).Invoke(session, new[] { Enum.Parse(state.PropertyType, "Ready") });
+            vt.GetField("introActive", P).SetValue(view, false);
+            vt.GetField("hubActive", P).SetValue(view, false);
+
+            MethodInfo failure = sessionType.GetMethod("HandlePermanentSyncFailure", P);
+            Assert.IsNotNull(failure);
+            failure.Invoke(session, null);
+
+            Assert.IsFalse((bool)gt.GetProperty("IsPlayerActive").GetValue(game), "Gameplay must remain blocked after a permanent sync failure.");
+            Assert.IsTrue((bool)sessionType.GetProperty("AccountMenuOpen").GetValue(session));
+            Assert.AreEqual("Error", sessionType.GetProperty("State").GetValue(session).ToString());
+            Assert.IsTrue((bool)vt.GetProperty("AccountMenuVisible").GetValue(view),
+                "The hub must be active so the protected-data error panel can render instead of leaving a blank game scene.");
+        }
+
         [UnityTest] public IEnumerator AmbientOverlaysRenderInTheFullHubGameView()
         {
             float deadline = Time.realtimeSinceStartup + 30f;
@@ -169,72 +197,66 @@ namespace HayChoriYPaty.Tests
             yield return Capture("hub-ambient-cycle-playmode-1080x1920");
         }
 
-        [UnityTest] public IEnumerator LayeredEnvironmentRendersCleanIndependentLayersAcrossPortraitViews()
+        [UnityTest] public IEnumerator SignsPulseInsideStableHotspotsInTheFullHubGameView()
         {
-            float deadline = Time.realtimeSinceStartup + 40f;
+            float deadline = Time.realtimeSinceStartup + 30f;
             while (!(bool)Field("viewResourcesReady") && Time.realtimeSinceStartup < deadline) yield return null;
-            Assert.IsTrue((bool)Field("viewResourcesReady"));
+            Assert.IsTrue((bool)Field("viewResourcesReady"), "The real hub artwork must be ready before visual acceptance.");
+
             vt.GetField("introActive", P).SetValue(view, false);
             vt.GetField("hubActive", P).SetValue(view, true);
             vt.GetField("settingsActive", P).SetValue(view, false);
             vt.GetField("marketActive", P).SetValue(view, false);
             vt.GetField("badgesActive", P).SetValue(view, false);
             vt.GetField("rankingActive", P).SetValue(view, false);
-            const BindingFlags all = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
-            MethodInfo bypass = vt.GetMethod("SetHubLayeredEnvironmentBypassedForTesting", all);
-            MethodInfo pose = vt.GetMethod("SetHubLayeredEnvironmentElapsedForTesting", all);
             Time.timeScale = 0f;
-            foreach (int height in new[] { 1920, 2400 })
+
+            yield return Capture("hub-signage-phase-a-playmode-1080x1920");
+            Assert.NotNull(Field("hubBackdrop"), "The reference artwork with the integrated signs must be drawn in the live hub.");
+            Assert.AreEqual(4, vt.GetProperty("HubSignageAnimationCount", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null));
+            MethodInfo bounds = vt.GetMethod("HubSignageArtworkSourceBounds", BindingFlags.Static | BindingFlags.NonPublic);
+            MethodInfo sparkleAlpha = vt.GetMethod("HubSignagePulseScale", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.IsNotNull(bounds); Assert.IsNotNull(sparkleAlpha);
+            Rect marketBoundsA = (Rect)bounds.Invoke(null, new object[] { 0 });
+            Rect badgesBoundsA = (Rect)bounds.Invoke(null, new object[] { 1 });
+            float sparkleA = (float)sparkleAlpha.Invoke(null, new object[] { 200, 0f, false });
+
+            yield return new WaitForSecondsRealtime(.9f);
+            yield return Capture("hub-signage-phase-b-playmode-1080x1920");
+            Assert.AreEqual(marketBoundsA, (Rect)bounds.Invoke(null, new object[] { 0 }),
+                "The Mercado sign stays fixed on the storefront wall while gameplay time is paused.");
+            Assert.AreEqual(badgesBoundsA, (Rect)bounds.Invoke(null, new object[] { 1 }),
+                "The Insignias flag remains tied to the fence rail.");
+            float sparkleB = (float)sparkleAlpha.Invoke(null, new object[] { 200, .7f, false });
+            Assert.Greater(Mathf.Abs(sparkleA - sparkleB), .01f,
+                "The actual sign scale pulses while its artwork anchor remains fixed.");
+            Assert.IsTrue((bool)Field("hubActive"), "The animation remains limited to the active hub.");
+        }
+
+        [UnityTest] public IEnumerator CompleteReferenceArtworkIsNotCoveredByLegacyLayerCutouts()
+        {
+            float deadline = Time.realtimeSinceStartup + 30f;
+            while (!(bool)Field("viewResourcesReady") && Time.realtimeSinceStartup < deadline) yield return null;
+            Assert.IsTrue((bool)Field("viewResourcesReady"), "The complete user reference must be ready before review.");
+            vt.GetField("introActive", P).SetValue(view, false);
+            vt.GetField("hubActive", P).SetValue(view, true);
+            vt.GetField("settingsActive", P).SetValue(view, false);
+            vt.GetField("marketActive", P).SetValue(view, false);
+            vt.GetField("badgesActive", P).SetValue(view, false);
+            vt.GetField("rankingActive", P).SetValue(view, false);
+            Time.timeScale = 0f;
+            yield return Capture("hub-reference-match-playmode-1080x1920");
+            Assert.NotNull(Field("hubBackdrop"), "The submitted full illustration is the hub background.");
+            Assert.IsNull(Field("hubLayeredEnvironmentRenderer"),
+                "Legacy cutouts must not cover the integrated Mercado sign or Insignias flag in the reference artwork.");
+            Assert.IsNull(vt.GetField("hubSignageSparkleTexture", P), "No sparkle overlay remains.");
+            Assert.IsNull(Field("hubCharacterScene"), "The reference already contains the neighborhood characters; do not overlay rigs.");
+            foreach (int action in new[] { 200, 201, 202, 203 })
             {
-#if UNITY_EDITOR
-                if (height != gameViewHeight)
-                {
-                    selectedSize.SetValue(gameWindow, previousSize);
-                    sizeGroup.GetType().GetMethod("RemoveCustomSize", all).Invoke(sizeGroup, new object[] { addedSize });
-                    gameViewWidth = 1080; gameViewHeight = height;
-                    SetPortraitView(false);
-                    yield return null; yield return null;
-                }
-#endif
-                bypass.Invoke(view, new object[] { true });
-                yield return Capture("hub-layered-master-playmode-1080x1920");
-                bypass.Invoke(view, new object[] { false });
-                pose.Invoke(view, new object[] { 0f });
-                yield return Capture("hub-layered-phase-0-playmode-1080x1920");
-                Assert.IsTrue((bool)vt.GetProperty("HubLayeredEnvironmentResourcesReadyForTesting", all).GetValue(view));
-                object overlay = Field("hubLayeredEnvironmentRenderer");
-                var patches = (Array)overlay.GetType().GetField("cleanPatches", P).GetValue(overlay);
-                Assert.AreEqual(8, patches.Length);
-                foreach (object patch in patches) Assert.IsNotNull(patch, "Every moving cloth has its own clean backing.");
-                pose.Invoke(view, new object[] { 2.3f });
-                yield return Capture("hub-layered-phase-2-playmode-1080x1920");
-                pose.Invoke(view, new object[] { 5.6f });
-                yield return Capture("hub-layered-phase-5-playmode-1080x1920");
-                Assert.IsNull(Field("hubCharacterScene"), "Environmental motion must leave character rigs paused.");
-                foreach (int action in new[] { 200, 201, 202, 203 })
-                {
-                    Rect bounds = (Rect)vt.GetMethod("HubArtworkActionBounds", P).Invoke(view, new object[] { action });
-                    Assert.AreEqual(action, vt.GetMethod("HitAction", P).Invoke(view, new object[] { bounds.center }));
-                }
+                Rect bounds = (Rect)vt.GetMethod("HubArtworkActionBounds", P).Invoke(view, new object[] { action });
+                Assert.AreEqual(action, vt.GetMethod("HitAction", P).Invoke(view, new object[] { bounds.center }),
+                    "Each visible sign remains clickable at its reference position: " + action);
             }
-            object activeOverlay = Field("hubLayeredEnvironmentRenderer");
-            FieldInfo clock = activeOverlay.GetType().GetField("elapsed", P);
-            float before = (float)clock.GetValue(activeOverlay);
-            yield return new WaitForSecondsRealtime(.3f);
-            Assert.Greater((float)clock.GetValue(activeOverlay), before, "The environmental clock is unscaled.");
-            Dispatch(203);
-            float hiddenAt = (float)clock.GetValue(activeOverlay);
-            yield return new WaitForSecondsRealtime(.3f);
-            Assert.AreEqual(hiddenAt, clock.GetValue(activeOverlay), "Clock must stop when another hub page is shown.");
-            var cleanPatches = (Array)activeOverlay.GetType().GetField("cleanPatches", P).GetValue(activeOverlay);
-            UnityEngine.Object firstPatch = (UnityEngine.Object)cleanPatches.GetValue(0);
-            UnityEngine.Object birdTexture = (UnityEngine.Object)activeOverlay.GetType().GetField("birdSilhouette", P).GetValue(activeOverlay);
-            Assert.IsNotNull(birdTexture, "Bird silhouettes must be cached, not recreated as strokes per frame.");
-            vt.GetMethod("ReleaseHubLayeredEnvironmentResources", all).Invoke(view, null);
-            yield return null; yield return null;
-            Assert.IsNull(Field("hubLayeredEnvironmentRenderer"));
-            Assert.IsTrue(firstPatch == null, "Generated backing textures must be destroyed when released.");
-            Assert.IsTrue(birdTexture == null, "The cached bird silhouette must also be destroyed when released.");
         }
 
         [UnityTest] public IEnumerator NeighborhoodCharactersStayStillDuringAShortHubVisit()

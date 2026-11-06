@@ -32,6 +32,34 @@ namespace HayChoriYPaty.Tests
             marketConfig.GetType().GetField("packPricesCents",Public).SetValue(marketConfig,new[]{999});
             Assert.AreEqual(1600,Call(Market(null,shortBalance),"PackPriceCents",8));
         }
+        [Test] public void MarketWatermarksKeepHuracanAndArgentinosInSeparateStableSlots()
+        {
+            object data = Activator.CreateInstance(dataType);
+            object market = Market(data);
+            long[] sales = (long[])dataType.GetField("highestRecognizedSalesByLevel").GetValue(Get(market, "Data"));
+            bool[] paid = (bool[])dataType.GetField("bonusPaidByLevel").GetValue(Get(market, "Data"));
+            Assert.AreEqual(13, sales.Length); Assert.AreEqual(13, paid.Length);
+            sales[11] = 1100; sales[12] = 1200; paid[11] = true;
+            object restored = Market(JsonUtility.FromJson(JsonUtility.ToJson(Get(market, "Data")), dataType));
+            sales = (long[])dataType.GetField("highestRecognizedSalesByLevel").GetValue(Get(restored, "Data"));
+            paid = (bool[])dataType.GetField("bonusPaidByLevel").GetValue(Get(restored, "Data"));
+            Assert.AreEqual(1100L, sales[11]); Assert.AreEqual(1200L, sales[12]);
+            Assert.IsTrue(paid[11]); Assert.IsFalse(paid[12]);
+        }
+        [Test] public void ArgentinosLegacyProgressionRepairUsesLosRedondosAsItsPredecessor()
+        {
+            object balance = Activator.CreateInstance(balanceType), data = Activator.CreateInstance(dataType);
+            long[] sales = (long[])dataType.GetField("highestRecognizedSalesByLevel").GetValue(data);
+            bool[] paid = (bool[])dataType.GetField("bonusPaidByLevel").GetValue(data);
+            sales[10] = long.MaxValue; paid[10] = true;
+            object market = Market(data, balance), argentinos = Sim(12);
+            long expected = (long)Call(market, "MinimumPurchaseCostCents", argentinos);
+
+            Assert.Greater(expected, 0L);
+            Assert.AreEqual(expected, Call(market, "ReconcileLegacyProgressionBalance", argentinos, 12));
+            Assert.AreEqual(expected, Get(market, "BalanceCents"));
+            Assert.IsTrue((bool)dataType.GetField("legacyTransitionRepairApplied").GetValue(Get(market, "Data")));
+        }
         [Test] public void RecipesUseActualCatalogGoalsAndBreadIsShared()
         {
             object market=Market(), sim=Sim(4); int[] req=(int[])Call(market,"RequiredUnits",sim);
@@ -45,6 +73,21 @@ namespace HayChoriYPaty.Tests
             Assert.IsFalse((bool)Call(market,"IsIngredientUnlocked",8,0));
             Assert.IsTrue((bool)Call(market,"IsIngredientUnlocked",8,4));
         }
+        [Test] public void DefenseStartsWithoutLegacyQuotaStockWhileTraditionalGateStaysIntact()
+        {
+            object data = Activator.CreateInstance(dataType), market = Market(data), defense = Sim(9);
+            CollectionAssert.AreEqual(new int[10], (int[])Call(market, "RequiredUnits", defense));
+            Assert.IsTrue((bool)Call(market, "HasRequiredStock", defense));
+            Assert.IsTrue((bool)Call(market, "BeginAttempt", defense));
+            Assert.AreEqual(0, Call(defense, "GetProductGoal", 0));
+            Assert.AreEqual(0, Call(defense, "GetProductGoal", 4));
+            Assert.AreEqual(0f, Get(defense, "TimeRemaining"));
+            object ordinaryMarket = Market(), ordinary = Sim(8);
+            Assert.IsFalse((bool)Call(ordinaryMarket, "HasRequiredStock", ordinary));
+            Assert.Greater((float)Get(ordinary, "TimeRemaining"), 0f);
+            Assert.Greater((int)Call(ordinary, "GetProductGoal", 0), 0);
+        }
+
         [Test] public void VelezDoesNotRequireSandwichIngredientsBeforeStarting()
         {
             object sim = Sim(2), data = Activator.CreateInstance(dataType), market = Market(data);
@@ -160,7 +203,9 @@ namespace HayChoriYPaty.Tests
             for(int level=0;level<11;level++)
             {
                 object sim=Sim(level); long cost=(long)Call(market,"MinimumPurchaseCostCents",sim);
-                Assert.Greater(cost,0L); Assert.Less(cost,long.MaxValue);
+                if (level == 9) Assert.AreEqual(0L, cost, "Defense has no legacy quota stock requirement.");
+                else Assert.Greater(cost,0L, "Traditional level " + level);
+                Assert.Less(cost,long.MaxValue);
             }
             object ready=Sim(); Call(market,"Initialize",0); Assert.IsTrue((bool)Call(market,"BeginAttempt",ready));
             Assert.IsFalse((bool)Call(market,"BeginAttempt",ready)); Call(market,"AbortAttempt");

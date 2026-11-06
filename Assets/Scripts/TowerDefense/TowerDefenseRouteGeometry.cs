@@ -8,9 +8,10 @@ namespace HayChoriYPaty
     /// Serializable dimensions for a horizontal, alternating serpentine route.
     /// SegmentLengths contains one straight length per row. The first row runs
     /// left-to-right; every following row reverses direction. Rows descend from
-    /// the highest Y lane to the lowest. Row spacing is
-    /// measured between centerlines, TurnRadius is the lateral bulge of each cubic
-    /// U-turn, and PlayableBounds is expressed in the same
+    /// the highest Y lane to the lowest. Row spacing is measured between
+    /// centerlines. The legacy TurnRadius field is retained for serialized-config
+    /// compatibility but ignored by the orthogonal route; TurnSegments controls
+    /// subdivisions of each straight vertical connector. PlayableBounds is expressed in the same
     /// Unity world-space units as the returned points.
     /// </summary>
     [Serializable]
@@ -19,9 +20,13 @@ namespace HayChoriYPaty
         [Min(3)] public int RowCount = 3;
         public float[] SegmentLengths = { 8f, 8f, 8f };
         [Min(0.01f)] public float CorridorWidth = 2f;
+        [Tooltip("Optional horizontal-run width; zero uses CorridorWidth.")]
+        [Min(0f)] public float HorizontalCorridorWidth;
         [Min(0.01f)] public float RowSpacing = 3f;
-        [Min(0.01f)] public float TurnRadius = 1.1f;
+        [Tooltip("Legacy serialized field; orthogonal straight connectors do not use a turn radius.")]
+        [Min(0f)] public float TurnRadius = 1.1f;
         public Rect PlayableBounds = new Rect(-10f, -10f, 20f, 20f);
+        [Tooltip("Number of samples along each straight vertical connector; retained to preserve route-row indexing.")]
         [Range(4, 128)] public int TurnSegments = 12;
     }
 
@@ -68,7 +73,7 @@ namespace HayChoriYPaty
     }
 
     /// <summary>
-    /// Builds a continuous horizontal serpentine with sampled cubic U-turns.
+    /// Builds a continuous orthogonal horizontal serpentine with straight vertical connectors.
     /// The route is translated as a whole to center its fence envelope in the
     /// playable rectangle; segment lengths are never scaled or silently shortened.
     /// </summary>
@@ -104,8 +109,6 @@ namespace HayChoriYPaty
             float firstY = config.PlayableBounds.center.y + (config.RowCount - 1) * config.RowSpacing * 0.5f;
             float currentX = 0f;
             float currentY = firstY;
-            float turnRadius = config.TurnRadius;
-
             centerline.Add(new Vector2(currentX, currentY));
             for (int row = 0; row < config.RowCount; row++)
             {
@@ -118,26 +121,22 @@ namespace HayChoriYPaty
 
                 float nextY = currentY - config.RowSpacing;
                 Vector2 start = new Vector2(currentX, currentY);
-                Vector2 control1 = new Vector2(currentX + direction * turnRadius, currentY);
-                Vector2 control2 = new Vector2(currentX + direction * turnRadius, nextY);
                 Vector2 end = new Vector2(currentX, nextY);
                 for (int sample = 1; sample <= config.TurnSegments; sample++)
                 {
                     float t = sample / (float)config.TurnSegments;
-                    float inverse = 1f - t;
-                    Vector2 point = inverse * inverse * inverse * start +
-                        3f * inverse * inverse * t * control1 +
-                        3f * inverse * t * t * control2 +
-                        t * t * t * end;
-                    centerline.Add(sample == config.TurnSegments ? end : point);
+                    // Keep each connector on one vertical line; samples exist only
+                    // for the existing route-row indexing contract.
+                    centerline.Add(sample == config.TurnSegments ? end : Vector2.Lerp(start, end, t));
                 }
 
                 currentY = nextY;
             }
 
             Vector2[] centerlinePoints = centerline.ToArray();
-            Vector2[] left = OffsetPolyline(centerlinePoints, config.CorridorWidth * 0.5f);
-            Vector2[] right = OffsetPolyline(centerlinePoints, -config.CorridorWidth * 0.5f);
+            float horizontalWidth = config.HorizontalCorridorWidth > 0f ? config.HorizontalCorridorWidth : config.CorridorWidth;
+            Vector2[] left = OffsetPolyline(centerlinePoints, config.CorridorWidth * 0.5f, horizontalWidth * 0.5f);
+            Vector2[] right = OffsetPolyline(centerlinePoints, -config.CorridorWidth * 0.5f, -horizontalWidth * 0.5f);
 
             // Center by translation only. This preserves every configured segment length.
             float minimumX = float.PositiveInfinity;
@@ -175,17 +174,15 @@ namespace HayChoriYPaty
             if (!IsFinite(config.CorridorWidth) || config.CorridorWidth <= 0f)
                 errors.Add("CorridorWidth must be a finite value greater than zero.");
 
+            if (!IsFinite(config.HorizontalCorridorWidth) || config.HorizontalCorridorWidth < 0f)
+                errors.Add("HorizontalCorridorWidth must be finite and nonnegative (zero uses CorridorWidth).");
+            if (config.HorizontalCorridorWidth > 0f && config.HorizontalCorridorWidth >= config.RowSpacing)
+                errors.Add("RowSpacing must be greater than HorizontalCorridorWidth.");
+
             if (!IsFinite(config.RowSpacing) || config.RowSpacing <= 0f)
                 errors.Add("RowSpacing must be a finite value greater than zero.");
             else if (IsFinite(config.CorridorWidth) && config.CorridorWidth > 0f && config.RowSpacing <= config.CorridorWidth)
                 errors.Add("RowSpacing must be greater than CorridorWidth so adjacent fence rails do not overlap at U-turns.");
-
-            if (!IsFinite(config.TurnRadius) || config.TurnRadius <= 0f)
-                errors.Add("TurnRadius must be a finite value greater than zero.");
-            else if (IsFinite(config.CorridorWidth) && config.CorridorWidth > 0f && config.TurnRadius <= config.CorridorWidth * 0.5f)
-                errors.Add("TurnRadius must exceed half the CorridorWidth to keep inner fence rails from folding across one another.");
-            else if (IsFinite(config.RowSpacing) && config.RowSpacing > 0f && config.TurnRadius > config.RowSpacing * 0.5f)
-                errors.Add("TurnRadius must not exceed half the RowSpacing.");
 
             if (config.SegmentLengths == null || config.SegmentLengths.Length != config.RowCount)
             {
@@ -211,35 +208,45 @@ namespace HayChoriYPaty
             return errors;
         }
 
-        private static Vector2[] OffsetPolyline(Vector2[] points, float distance)
+        private static Vector2[] OffsetPolyline(Vector2[] points, float verticalDistance, float horizontalDistance)
         {
             var result = new Vector2[points.Length];
             for (int i = 0; i < points.Length; i++)
-                result[i] = points[i] + OffsetAt(points, i, distance);
+            {
+                Vector2 incoming = i > 0 ? (points[i] - points[i - 1]).normalized : Vector2.zero;
+                Vector2 outgoing = i < points.Length - 1 ? (points[i + 1] - points[i]).normalized : Vector2.zero;
+                Vector2 a = OffsetNormal(incoming, verticalDistance, horizontalDistance);
+                Vector2 b = OffsetNormal(outgoing, verticalDistance, horizontalDistance);
+                if (i == 0) result[i] = points[i] + b;
+                else if (i == points.Length - 1) result[i] = points[i] + a;
+                else if (Mathf.Abs(incoming.x * outgoing.y - incoming.y * outgoing.x) < .001f)
+                    result[i] = points[i] + b;
+                else result[i] = points[i] + a + b;
+            }
+
+            // Centerline turn samples can lie above the offset corner when the
+            // corridor is wider than a single sample. Redistribute the samples
+            // between the actual corner intersections so rails never double back.
+            for (int start = 0; start < points.Length - 1;)
+            {
+                Vector2 delta = points[start + 1] - points[start];
+                if (Mathf.Abs(delta.x) > .0001f || Mathf.Abs(delta.y) < .0001f) { start++; continue; }
+                int end = start + 1;
+                while (end < points.Length - 1 &&
+                       Mathf.Abs(points[end + 1].x - points[end].x) < .0001f &&
+                       Mathf.Abs(points[end + 1].y - points[end].y) > .0001f) end++;
+                Vector2 first = result[start], last = result[end];
+                for (int i = start + 1; i < end; i++)
+                    result[i] = Vector2.Lerp(first, last, (i - start) / (float)(end - start));
+                start = end;
+            }
             return result;
         }
 
-        private static Vector2 OffsetAt(Vector2[] points, int index, float distance)
+        private static Vector2 OffsetNormal(Vector2 direction, float verticalDistance, float horizontalDistance)
         {
-            Vector2 incoming = index > 0 ? (points[index] - points[index - 1]).normalized : Vector2.zero;
-            Vector2 outgoing = index < points.Length - 1 ? (points[index + 1] - points[index]).normalized : Vector2.zero;
-            if (index == 0)
-                return Perpendicular(outgoing) * distance;
-            if (index == points.Length - 1)
-                return Perpendicular(incoming) * distance;
-
-            Vector2 incomingNormal = Perpendicular(incoming);
-            Vector2 outgoingNormal = Perpendicular(outgoing);
-            Vector2 miter = incomingNormal + outgoingNormal;
-            if (miter.sqrMagnitude < 0.000001f)
-                return outgoingNormal * distance;
-
-            miter.Normalize();
-            float projection = Vector2.Dot(miter, outgoingNormal);
-            if (projection <= 0.0001f)
-                return outgoingNormal * distance;
-
-            return miter * (distance / projection);
+            return Perpendicular(direction) * (Mathf.Abs(direction.x) > Mathf.Abs(direction.y)
+                ? horizontalDistance : verticalDistance);
         }
 
         private static Vector2 Perpendicular(Vector2 direction)

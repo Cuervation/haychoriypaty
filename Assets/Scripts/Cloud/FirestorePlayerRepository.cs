@@ -55,6 +55,7 @@ namespace HayChoriYPaty.Cloud
             if (operation.match != null)
             {
                 matchFields = Fields(operation.match);
+                BindMatchInventoryToSnapshot(matchFields, save);
                 matchFields["uid"] = uid; matchFields["operationId"] = operation.id;
                 matchFields["schemaVersion"] = 1L; matchFields["revision"] = operation.expectedRevision + 1;
                 matchFields["committedAt"] = FieldValue.ServerTimestamp;
@@ -102,6 +103,18 @@ namespace HayChoriYPaty.Cloud
         }
         private static List<object> Values(IEnumerable data)
         { var result = new List<object>(); foreach (var item in data) result.Add(Value(item)); return result; }
+
+        private static void BindMatchInventoryToSnapshot(Dictionary<string, object> matchFields, StreetGame.SaveData save)
+        {
+            if (matchFields == null || save == null || save.market == null ||
+                save.market.stockUnits == null || save.market.stockUnits.Length != 10)
+                throw new InvalidOperationException("Match inventory snapshot required");
+
+            // Rules atomically link a terminal match to the exact post-commit state. This also
+            // repairs older queued Bonus Track records whose stockRemaining defaulted to zero.
+            matchFields["stockRemaining"] = Values(save.market.stockUnits);
+        }
+
         private static object Value(object data)
         {
             if (data == null || data is string || data is bool || data is long || data is double) return data;

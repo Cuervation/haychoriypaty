@@ -12,10 +12,13 @@ namespace HayChoriYPaty
         public int Rows { get; private set; }
         public FanAtlasLayoutKind Kind { get; private set; }
         public bool ReverseVariantRows { get; private set; }
+        public bool ReversePairedPoseOrder { get; private set; }
 
-        public FanAtlasLayout(int columns, int rows, FanAtlasLayoutKind kind, bool reverseVariantRows = false)
+        public FanAtlasLayout(int columns, int rows, FanAtlasLayoutKind kind, bool reverseVariantRows = false,
+            bool reversePairedPoseOrder = false)
         {
             Columns = columns; Rows = rows; Kind = kind; ReverseVariantRows = reverseVariantRows;
+            ReversePairedPoseOrder = reversePairedPoseOrder;
         }
 
         public Rect SourceRect(int textureWidth, int textureHeight, int variant, int variantsPerRow, int pose = 0)
@@ -24,7 +27,12 @@ namespace HayChoriYPaty
             int row = variant / variantsPerRow;
             int column = variant % variantsPerRow;
             if (ReverseVariantRows) row = Rows - 1 - row;
-            if (Kind == FanAtlasLayoutKind.PairedColumns) column = column * 2 + (pose & 1);
+            if (Kind == FanAtlasLayoutKind.PairedColumns)
+            {
+                int pairedPose = pose & 1;
+                if (ReversePairedPoseOrder) pairedPose = 1 - pairedPose;
+                column = column * 2 + pairedPose;
+            }
             if (column >= Columns || row >= Rows) return Rect.zero;
             float cellWidth = textureWidth / (float)Columns, cellHeight = textureHeight / (float)Rows;
             return new Rect(column * cellWidth, textureHeight - (row + 1) * cellHeight, cellWidth, cellHeight);
@@ -159,7 +167,11 @@ namespace HayChoriYPaty
             new ClubVisualTheme("Los Redondos / Tandil", new Color32(24, 25, 30, 255), new Color32(180, 38, 48, 255), new Color32(220, 171, 58, 255),
                 muralResource: "street-background-losredondos-v1", muralSource: new Rect(0, .155f, 1, .242f), fans: Grid4("street-losredondos-fans-front-v1", "street-losredondos-fans-walk-v1", "street-losredondos-riot-fans-v1", 12).WithRiotPoseMetrics(RiotMetrics10())),
             new ClubVisualTheme("Huracán / Parque Patricios", new Color32(150, 16, 40, 255), new Color32(247, 243, 230, 255),
-                sceneryTint: new Color(1f, .97f, .95f), muralResource: "street-mural-huracan-master-v1", muralSource: new Rect(0, 0, 1, 1))
+                sceneryTint: new Color(1f, .97f, .95f), muralResource: "street-mural-huracan-master-v1", muralSource: new Rect(0, 0, 1, 1),
+                fans: HuracanFans()),
+            new ClubVisualTheme("Argentinos Juniors / La Paternal", new Color32(194, 28, 42, 255), new Color32(247, 244, 232, 255),
+                muralResource: "street-mural-argentinos-master-v1", muralSource: new Rect(0, 0, 1, 1),
+                fans: ArgentinosFans())
         };
 
         private static readonly ClubVisualTheme UnknownTheme =
@@ -283,6 +295,23 @@ namespace HayChoriYPaty
             new Vector2(1.3143f,0.0469f), new Vector2(1.3397f,0.0391f),
         };
         private static FanAtlasLayout Grid(int columns, int rows, bool reverse = false) => new FanAtlasLayout(columns, rows, FanAtlasLayoutKind.Grid, reverse);
+        private static ClubFanDefinition HuracanFans()
+        {
+            // The generated cheering/walking sheet places walk first and cheer second in each pair.
+            // Keep that art order explicit so runtime pose selection still draws the intended pose.
+            var paired = new FanAtlasLayout(6, 4, FanAtlasLayoutKind.PairedColumns, reversePairedPoseOrder: true);
+            var riot = new FanAtlasLayout(6, 4, FanAtlasLayoutKind.PairedColumns);
+            return new ClubFanDefinition("street-huracan-fans-paired-v1", "street-huracan-fans-paired-v1",
+                "street-huracan-riot-fans-v1", 12, 3, paired, paired, riot);
+        }
+        private static ClubFanDefinition ArgentinosFans()
+        {
+            // The generated sheet places walking at the left and cheering at the right of each pair.
+            var frontAndWalk = new FanAtlasLayout(6, 4, FanAtlasLayoutKind.PairedColumns, reversePairedPoseOrder: true);
+            var riot = new FanAtlasLayout(6, 4, FanAtlasLayoutKind.PairedColumns);
+            return new ClubFanDefinition("street-argentinos-fans-paired-v2", "street-argentinos-fans-paired-v2",
+                "street-argentinos-riot-fans-v2", 12, 3, frontAndWalk, frontAndWalk, riot);
+        }
         private static ClubFanDefinition Grid3(string front, string walk, string riot, int variants, int columns, int riotColumns, int riotRows) =>
             new ClubFanDefinition(front, walk, riot, variants, columns, Grid(columns, 3), Grid(columns, 3), new FanAtlasLayout(riotColumns, riotRows, FanAtlasLayoutKind.PairedColumns), 2, riotColumns == 4 ? 2 : 3);
         private static ClubFanDefinition Grid4(string front, string walk, string riot, int variants) =>
