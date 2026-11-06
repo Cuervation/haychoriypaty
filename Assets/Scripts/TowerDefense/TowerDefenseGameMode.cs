@@ -6,6 +6,20 @@ namespace HayChoriYPaty
 {
     public enum TowerDefenseRunPhase { Ready, Playing, Paused, Finished }
 
+    /// <summary>Receipt of one consumed unit, never a request to create inventory or revenue.</summary>
+    public readonly struct TowerDefenseDelivery
+    {
+        public readonly int UnitId, Product, WorkerId, FanId, Zone;
+        public readonly Vector2 Source, Target;
+        public readonly float Elapsed;
+        public TowerDefenseDelivery(int unitId, int product, int workerId, int fanId, int zone,
+            Vector2 source, Vector2 target, float elapsed)
+        {
+            UnitId = unitId; Product = product; WorkerId = workerId; FanId = fanId; Zone = zone;
+            Source = source; Target = target; Elapsed = elapsed;
+        }
+    }
+
     [Serializable]
     public sealed class TowerDefenseOrderLine
     {
@@ -85,6 +99,8 @@ namespace HayChoriYPaty
         public bool IsMoving { get; internal set; }
         public float AnimationTime { get; internal set; }
         public float TravelDistance { get; internal set; }
+        public float ServeAnimationSeconds { get; internal set; }
+        public Vector2 LastServiceTarget { get; internal set; }
 
         internal int TargetZone;
         internal Vector2[] TransferRoute;
@@ -113,6 +129,8 @@ namespace HayChoriYPaty
         public const int MaxWorkersPerRolePerZone = 3;
         public const float CampaignStepSliceSeconds = 0.05f;
         public const float FanDepartureDurationSeconds = 0.42f;
+        public const float DeliveryCueDurationSeconds = 0.30f;
+        public const float StationSpacingLogical = 140f;
         private static readonly int[] OrderProductIds = { 0, 4 };
         private const int MaximumSpeedLevel = 9;
         private static TowerDefenseGameMode activeInstance;
@@ -123,6 +141,7 @@ namespace HayChoriYPaty
         private readonly System.Random random;
         private readonly List<TowerDefenseFanState> fans = new List<TowerDefenseFanState>();
         private readonly List<TowerDefenseFanState> serviceOrder = new List<TowerDefenseFanState>();
+        private readonly HashSet<int> servicedWorkers = new HashSet<int>();
         private readonly List<TowerDefenseWorkerState> workers = new List<TowerDefenseWorkerState>();
         private readonly int[] deliveredByProduct = new int[7];
         private readonly int[] availableProducts;
@@ -183,9 +202,15 @@ namespace HayChoriYPaty
         public int EscapedFans { get; private set; }
         public int TotalDelivered { get; private set; }
         public float WorldUnitsPerLogicalPixel => worldUnitsPerLogicalPixel;
+        public event Action<TowerDefenseDelivery> DeliveryCompleted;
 
         /// <summary>Returns the configured, passable service point for one of the first level's work areas.</summary>
         public Vector2 WorkZone(int zone) => zone >= 0 && zone < serviceZones.Length ? serviceZones[zone] : Vector2.zero;
+
+        // Shared by station presentation and placed staff: each role serves its own
+        // product without leaving the same player-selected work area.
+        public Vector2 StationPosition(StreetWorkerRole role, int zone) => WorkZone(zone) +
+            Vector2.right * ((role == StreetWorkerRole.Parrillero ? -.5f : .5f) * StationSpacingLogical * worldUnitsPerLogicalPixel);
 
         public TowerDefenseGameMode(TowerDefenseLevelConfig levelConfig, StreetBalance campaignBalance,
             TowerDefenseRouteGeometryConfig runtimeRoute, float logicalPixelScale, Vector2 firstServiceZone, Vector2 secondServiceZone)
@@ -504,15 +529,20 @@ namespace HayChoriYPaty
             serviceOrder.Clear();
             serviceOrder.AddRange(fans);
             serviceOrder.Sort(CompareServicePriority);
-            for (int w = 0; w < workers.Count; w++)
+            servicedWorkers.Clear();
+            // Arbitrate shared ready stock by fan urgency BEFORE worker hire order.
+            // Otherwise an upper-area cook can consume the last unit for a rear fan
+            // while a lower-area cook eligible for the exit-near fan receives nothing.
+            for (int f = 0; f < serviceOrder.Count; f++)
             {
-                TowerDefenseWorkerState worker = workers[w];
-                if (worker.IsMoving) continue;
-                bool delivered = false;
-                for (int f = 0; f < serviceOrder.Count && !delivered; f++)
+                TowerDefenseFanState fan = serviceOrder[f];
+                if (fan.OrderComplete) continue;
+                for (int w = 0; w < workers.Count; w++)
                 {
-                    TowerDefenseFanState fan = serviceOrder[f];
-                    if (fan.OrderComplete || !IsAdjacentToArea(fan, worker.ServiceZone)) continue;
+                    if (fan.OrderComplete) break;
+                    TowerDefenseWorkerState worker = workers[w];
+                    if (worker.IsMoving || servicedWorkers.Contains(worker.Id) ||
+                        !IsAdjacentToArea(fan, worker.ServiceZone)) continue;
                     for (int line = 0; line < fan.Order.Count; line++)
                     {
                         TowerDefenseOrderLine order = (TowerDefenseOrderLine)fan.Order[line];
@@ -545,8 +575,13 @@ namespace HayChoriYPaty
                                 fan.IsDeparting = true;
                                 fan.DepartureProgress = 0f;
                             }
+                            worker.ServeAnimationSeconds = DeliveryCueDurationSeconds;
+                            worker.LastServiceTarget = fan.RouteFollower.Position;
+                            DeliveryCompleted?.Invoke(new TowerDefenseDelivery(unit.Id, order.Product, worker.Id, fan.Id,
+                                worker.ServiceZone, StationPosition(worker.Role, worker.ServiceZone),
+                                fan.RouteFollower.Position, elapsed));
                         }
-                        delivered = true; // One physical unit per worker per service pass.
+                        servicedWorkers.Add(worker.Id); // Still one physical unit per worker per pass.
                         break;
                     }
                 }
@@ -585,6 +620,7 @@ namespace HayChoriYPaty
             {
                 TowerDefenseWorkerState worker = workers[i];
                 worker.AnimationTime += deltaTime;
+                worker.ServeAnimationSeconds = Mathf.Max(0f, worker.ServeAnimationSeconds - deltaTime);
                 if (!worker.IsMoving) continue;
                 float movement = Mathf.Max(0f, sourceBalance.workerSpeed) * worldUnitsPerLogicalPixel * deltaTime;
                 while (movement > 0f && worker.TransferIndex < worker.TransferRoute.Length)
@@ -666,8 +702,8 @@ namespace HayChoriYPaty
 
         private Vector2 ZoneWorkerPosition(StreetWorkerRole role, int zone, int roleIndex)
         {
-            Vector2 basePoint = serviceZones[Mathf.Clamp(zone, 0, serviceZones.Length - 1)];
-            float lateral = ((roleIndex % 3) - 1) * worldUnitsPerLogicalPixel * 32f;
+            Vector2 basePoint = StationPosition(role, Mathf.Clamp(zone, 0, serviceZones.Length - 1));
+            float lateral = (roleIndex == 0 ? 0f : roleIndex == 1 ? -28f : 28f) * worldUnitsPerLogicalPixel;
             float depth = -((roleIndex / 3) * worldUnitsPerLogicalPixel * 22f);
             return basePoint + new Vector2(lateral, depth);
         }

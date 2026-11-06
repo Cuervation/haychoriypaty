@@ -1,5 +1,8 @@
 # Informe — corrección de inconsistencias de niveles
 
+> **HISTÓRICO — NO ES LA FUENTE VIGENTE.** Este corte es del 2026-11-03; sus descripciones/cifras de Camioneros y sus checks preceden a la revisión actual de Tower Defense y a Argentinos ID12. Conservar como evidencia del arreglo de esa fecha. Ver [balance maestro](../BALANCE_ACTUAL_NIVELES.md) y [contrato TD](../../specs/features/tower-defense.md).
+
+
 **Fecha:** 2026-11-03 · **Checkout activo:** `/Users/celestino/HayChoriYPaty` · **Sin commit/push.** Se preservó el trabajo local ajeno.
 
 > **Actualización posterior — 2026-11-03:** las frases más abajo que describen Tower Defense como modo separado corresponden al corte de esta corrección de balance y quedaron supersedidas por [la integración de Camioneros en la campaña](INTEGRACION_CAMIONEROS_TOWER_DEFENSE.md). Camioneros es ahora la posición visible 11 (ID 9) y su única modalidad jugable es TD; el recurso/configuración de ruta sigue separado, pero el intento usa progresión, Mercado, tickets, guardado y resultado de campaña. Este cambio no altera los valores de balance referidos en este informe.

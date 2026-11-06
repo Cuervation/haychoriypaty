@@ -1,6 +1,32 @@
 # Tower Defense — Camioneros / Plaza de Mayo
 
-**Estado:** integrado en el código fuente como la única modalidad jugable de Camioneros (posición visible 11, ID de campaña estable 9); aceptación end-to-end pendiente. Sigue en implementación y no se declara completo ni aceptado. El runtime de ruta/hinchas es específico de Tower Defense, pero inicio, economía de campaña, mercado, tickets, guardado, estadísticas, resultados y progresión pertenecen al mismo intento del nivel ID 9.
+**Estado:** integrada en fuente como única modalidad de Camioneros (posición visible 11, ID estable 9). La revisión actual de mesas/servicio está **implementada pero no completamente aceptada**: recursos, entrega A/B/C, cobros y feedback focalizados `PASS`; el intento de victoria en ola automática con movimiento normal sigue `FAIL` (35/36 unidades, 9/10 hinchas completos, uno escapó). No declarar aceptación completa ni victoria natural certificada. La evidencia anterior de dominio/Game View se conserva por revisión. Campaña humana completa, suite global, APK/dispositivo pendientes.
+
+## Mesas de choris y servicio visible — revisión solicitada 2026-11-06
+
+Esta solicitud sustituye toda mención anterior a parrilla visible o pares parrilla/barril en TD. En cada área compartida hay **mesa de choris preparados y barril de Coca lleno**, usando `Station_NormalTable`, `Station_CocaBarrel`, sandwiches/bebidas y proporciones del juego tradicional. No instanciar `Station_NormalGrill`, `street-parrilla-large`, humo, brasas ni cocción visible. Parrillero atiende junto a la mesa y Cocacolero junto al barril, permaneciendo dentro del área. Se permite conservar la preparación lógica interna sin representarla como cocción.
+
+El feedback de atención debe nacer únicamente de una entrega física válida: gesto del trabajador y producto existente hacia el hincha receptor. Ninguna animación crea stock, ventas ni cobros. Mantener prioridad al más cercano a salida sobre camino adyacente, precios, cupos, contratación por colocación, reglas de victoria/derrota y liquidación comunes.
+
+| Criterio obligatorio de esta revisión | Estado | Evidencia directa |
+|---|---|---|
+| Ambas áreas muestran mesa cargada de choris y barril Coca lleno; ninguna parrilla/cocción visible; muebles y proporciones originales | `PASS` | `AssertPreparedStations` en PlayMode: 2 mesas, 2 barriles, sprites originales, 12 choris/mesa, hielo y 6 Coca/barril; Game View completo 540×960 revisado independientemente |
+| Caso A: contratar/colocar P, preparar automáticamente y entregar solo Chori; no entregar Coca sin C | `PASS` | `CaseAPlacedParrilleroProducesAndServesChoriFromPreparedTable`: puntero real de UI, `Step`, unidad consumida, pedido/cobro/proyección y Coca pendiente; sin inyectar comida |
+| Caso B: contratar/colocar C, entregar solo Coca; no entregar Chori sin P | `PASS` | `CaseBPlacedCocacoleroServesOnlyCocaFromLoadedBarrel`: colocación inferior, entrega Coca +$5, Chori pendiente, sin nuevo cobro en pasadas posteriores |
+| Caso C: ambos roles en áreas elegidas; pedido mixto, cantidades/cobro/contadores/completion exactos, sin fantasmas ni producto equivocado | `PASS` | `CaseCMixedOrderUsesRealProductionCorrectRolesReceiptsAndCampaignProjection`: 2 Chori + 2 Coca, $20, cuatro unidades distintas consumidas, parcial conserva línea Chori, un cierre, retirada y proyección común |
+| Feedback ligado a unidad real y receptor correcto, retirado al terminar; trabajadores dentro de área | `PASS` | `HandoffCuesAnimatePauseAndRecycleWithoutCreatingSales`: producto se desplaza, gesto del worker, pausa congela, pool reutiliza, no cobro extra; frames reales por producto y tests de adyacencia |
+| Prioridad compartida hacia salida y reglas terminales de dominio/settlement | `PASS` | Repro `SharedReadyChoriGoesToMostAdvancedEligibleFanAcrossBothAreas` falló antes y pasó tras corregir el bucle; victoria finita y pérdida/settlement en dominio, pérdida sin trabajadores en ola natural |
+| Victoria de ola automática con movimiento normal y contrataciones solo por monedas | `FAIL` | `AutomaticMixedTenFanWaveCanWinWithCoinHiresAndNormalMovement`: 36 unidades solicitadas, 35 entregadas, 9 retirados y 1 escape en 15,85004 s, saldo $45. No equivale a demostrar imposibilidad con otras políticas/semillas, pero no certifica la victoria solicitada |
+
+**Implementación:** la mesa conserva las piezas `Tabletop`/`Trestle_Left`/`Trestle_Right` y proporciones de `StreetKitchenLayout`; los sprites de choris y Coca son los prefabs tradicionales. La exhibición preparada es presentación, no stock vendible adicional; la preparación lógica interna de Chori se conserva. Los trabajadores se alinean con su mesa/barril en el área elegida. `DeliveryCompleted` se emite después de `Kitchen.TryTake`/`Consume`, pedido, contador e ingreso, e identifica unidad/producto/trabajador/hincha. Solo ese recibo anima el producto existente y el gesto; no hay cocina/grill visible.
+
+**Corrección funcional:** el orden de contratación arbitraba incorrectamente el inventario compartido entre áreas: un P podía consumir la última porción para un hincha menos avanzado antes de que el P de la otra área atendiera al próximo a salida. Repro determinista rojo con una unidad y dos áreas; ahora se recorren primero hinchas por progreso y luego trabajadores elegibles adyacentes, manteniendo una unidad por trabajador/pasada, sin moverlos ni cambiar stock, producción, precios o velocidad.
+
+**Validación Unity 6000.6.3f1:** 36 casos EditMode únicos `PASS` (30 iniciales + 5 settlement + el nuevo repro; el rerun final de 23 dominio/settlement incluye casos ya contados). PlayMode: **9 casos únicos `PASS` y 1 `FAIL`**. Primer job 7/7; secuencia 1/1; job final de 8 afectados con 7 `Passed` y la victoria natural `Failed`; las dos pruebas iniciales de colocación sin cambio se reutilizan, no se suman reruns. Casos A/B/C fijan hinchas para aislar producción/entrega; el diagnóstico natural usa aparición y movimiento normales, compras UI por saldo e ingresos reales. La política inicial fija 1 P + 1 C por área falló; la corrección de política reinvirtió en P y quedó 35/36, y corregir la prioridad demostrada no resolvió ese resultado. Se agotó el bucle acotado sin modificar balance para forzar un pase. **Queda pendiente investigar/corregir la victoria natural; no hay aprobación integral.** La prueba añadida de victoria permanece fallida y no fue deshabilitada.
+
+Evidencia local ignorada: `Logs/Acceptance/TowerDefenseReadyStations20261106/`: jobs JSON iniciales/finales, `PlayMode-final-callback-results.json` exportado directamente de `ITestResultAdaptor`, capturas `case-a-*`, `case-b-*`, `case-c-*`, `automatic-wave-*`, y secuencias `handoff-{chori,coca}-frame-00..05.png`. GIFs `handoff-{chori,coca}-unity.gif` combinan seis Game Views auténticos por producto (muestras de 0,05 s, reproducción ralentizada a 0,14 s/frame); no son mockups. Main quedó restaurada limpia y fuera de PlayMode, perfil efímero/persistencia en memoria, sin saves reales ni cloud. Revisión independiente de recursos y servicio focalizado `PASS`; no aprobación completa mientras siga el `FAIL`. Suite global, otros tamaños, APK/dispositivo y Git: `NOT_RUN` (no solicitados).
+
+Las aprobaciones anteriores no validan esta nueva presentación.
 
 ## Reglas vigentes Defense — revisión 2026-11-06 (sustituye metas y duración tradicionales)
 
@@ -10,6 +36,7 @@
 - **Victoria:** los 10 aparecieron, los 10 completaron todo su pedido y terminaron de desaparecer; la escena vacía inicial o una pausa entre apariciones no gana. **Derrota inmediata:** cualquier hincha sin atender llega a la salida; no esperar a los demás ni agotar un reloj.
 - Mantener áreas compartidas, sombras tenues sin etiquetas/bordes, límite 3 de cada rol por área, inicio sin trabajadores ni canjes de tickets, y prioridad al solicitante más próximo a la salida **solo sobre camino adyacente**, sin salir de su área.
 - Mercado mantiene snapshot/intento/settlement común, pero el preflight ID 9 no exige las antiguas cuotas/recetas. La cocina TD actual para chori/Coca no consume ingredientes; no inventar un nuevo gate de stock. No cambiar catálogo, cuotas, temporizadores ni mercado de otros niveles.
+- No hay control de mejora de velocidad expuesto en la interfaz jugable de TD. El código conserva `SpeedUpgradeCost`/`TryUpgradeSpeed` y el puente de `StreetGame` para compatibilidad interna, que aún consultan el factor legacy ×17; no documentar esa API como una acción disponible al jugador ni agregarle una hitbox/botón.
 - Resultado explícito Defense se proyecta al intento común: victoria desbloquea el siguiente nivel y liquida una sola vez; salida de hincha registra derrota, no abandono. Salir manualmente de una partida todavía no terminal conserva el abandono común. Sin nuevo schema ni monedas/premios paralelos.
 
 ### Aceptación obligatoria de esta revisión
@@ -41,7 +68,7 @@
 
 Esta revisión sustituye las menciones históricas a plantel/tickets iniciales y contratación automática. Los checkpoints anteriores no describen esas reglas vigentes.
 
-- La partida TD de Camioneros empieza sin trabajadores, con sus dos pares parrilla/barril ya presentes. Ignora el plantel inicial/configurado para este runtime; no aplica ni consume reservas de trabajadores de tickets y no permite canjear/agregar trabajadores por tickets en ID 9. Los saldos y reservas para otros niveles se conservan; premios de tickets y reglas de otros niveles no cambian.
+- La partida TD de Camioneros empieza sin trabajadores, con sus dos pares mesa de choris/barril Coca ya presentes. Ignora el plantel inicial/configurado para este runtime; no aplica ni consume reservas de trabajadores de tickets y no permite canjear/agregar trabajadores por tickets en ID 9. Los saldos y reservas para otros niveles se conservan; premios de tickets y reglas de otros niveles no cambian.
 - Tocar Parrillero o Cocacolero selecciona y mantiene visualmente pulsada esa tarjeta, sin contratar ni gastar. Se sombrean ambas áreas de trabajo; al tocar una válida se contrata ese tipo en esa área, usando el precio oficial y guardado comunes, y se limpia la selección. La misma tarjeta cancela; la otra cambia el tipo. Sin botones adicionales.
 - Cada área admite hasta **3 Parrilleros y 3 Cocacoleros**, con cupos separados por tipo/área. Área inválida/llena, rol no admitido, pausa o saldo insuficiente no contratan ni gastan; un área llena se muestra no disponible. El trabajador permanece asignado al área elegida incluso después de reflow o demanda en otra área.
 - Parrillero entrega su producción de chori sin requerir un Mozo oculto; se mantiene la reserva/toma/consumo de unidades físicas. El permiso de autoentrega de cocina es exclusivo TD, sin cambiar la política Mozo de los demás niveles ni catálogo/metas/economía fuera de lo solicitado.
@@ -91,7 +118,10 @@ El intento conserva snapshot, recibo/settlement y guardado de `StreetMarket`, pe
 
 La configuración debe permitir cantidad y longitudes de tramos, ancho de corredor, separación/altura, límites del área jugable, entrada/salida, espacios de estación, prefabs/sprites de valla y puntos de servicio. Waypoints y alcances deben ser inspeccionables. Las configuraciones fuera de pantalla deben advertir/fallar validación: nunca encoger personajes o deformar arte automáticamente.
 
-## Criterios obligatorios de aceptación
+## Registro histórico de integración previo a la aceptación focalizada (2026-11-03)
+
+> **HISTÓRICO — SUPERSEDIDO PARA EL ESTADO ACTUAL.** La matriz y los `NOT_RUN` que siguen describen la integración inicial de campaña, antes de las pruebas y capturas del 2026-11-06 registradas en “Aceptación obligatoria de esta revisión”. Consérvese como evidencia de los bloqueos de aquella fecha; no volver a usarla como checklist vigente.
+
 
 Estados permitidos para evidencia: `PASS`, `FAIL`, `BLOCKED`, `NOT_RUN`, `NOT_APPLICABLE` (con motivo). La evidencia nueva de esta integración se distingue de los checkpoints standalone anteriores; una prueba/captura histórica no valida por sí sola el acceso desde el selector ni el settlement de campaña.
 
@@ -122,20 +152,23 @@ Estados permitidos para evidencia: `PASS`, `FAIL`, `BLOCKED`, `NOT_RUN`, `NOT_AP
 - `NOT_RUN` — Composición y hitboxes desde campaña a 1080×1920 y otra relación. MCP está conectado y existe una captura full Game View aislada a 540×960 de las vallas rectas (entrada de validación posterior), pero no reemplaza esas comprobaciones integradas.
 - `NOT_RUN` — Regresión holística en Unity: rutas 3/5/7, varios hinchas, producción/entrega y niveles tradicionales.
 
-## Configuración vigente y pendientes
+## Notas históricas de diseño y evolución (no fuente del estado vigente)
 
 - Camioneros de campaña es el ID estable `9`, posición visible 11; 10 hinchas en total, sin duración límite, con pedidos Chori/Coca; solo moneda inicial y precios provienen de `StreetBalance`. El identificador interno de recurso TD no reemplaza ni altera el ID de campaña.
 - La configuración inicial Tower Defense debe limitarse al recorrido de tres tramos, doble valla y dos zonas de la solicitud.
 - No añadir una persistencia paralela ni objetivos/recompensas nuevos. Defense usa sus condiciones explícitas de diez atendidos/primer escape y el settlement común; solo una salida manual no terminal se registra como abandono.
 - Las imágenes Image 1/Image 2 mencionadas en el texto pegado inicial no llegaron en aquella sesión; el 2026-11-04 se recibió una referencia de perspectiva y se aprobó su composición para Camioneros. El usuario autorizó usar el fondo panorámico existente de Plaza de Mayo, de modo que la ausencia de un mural de pared separado no bloquea el primer nivel. No sustituir por Ferro/All Boys.
 
-### Tarjetas grandes y estaciones iniciales (2026-11-05)
+### Tarjetas grandes y estaciones iniciales (2026-11-05; estaciones reemplazadas por revisión de mesas 2026-11-06)
 
 - Sustituye el tamaño 78×60 y los tres botones superiores de la revisión anterior: únicamente Parrillero y Cocacolero, a 234×120 lógicos, sin velocidad/pausa/volver en el footer ni zonas táctiles de esos tres botones. Las tarjetas reutilizan los helpers y sprites de campaña y caben bajo nombre/barrio con precio y contador legibles.
 - Ambas zonas de trabajo arrancan con un `Station_NormalGrill` que usa el sprite existente `street-parrilla-large` (parrilla llena de chorizos) y un `Station_CocaBarrel` existente. No se requieren contrataciones ni progreso para que aparezcan. La parrilla se presenta delante de los pies del trabajador, no debajo de él, sin mover sus rutas de servicio.
 - Los chorizos ilustrados son presentación ambiental, no unidades comprables/entregables ni stock adicional; no se cambia producción, inventario, catálogo, metas, dinero ni guardado.
 
-### Ajuste posterior aprobado por el usuario — 2026-11-05
+### Ajuste posterior de tamaño de tarjetas — 2026-11-05 (histórico, reemplazado por ampliación posterior)
+
+> Las medidas 78×60 y otros detalles de este checkpoint fueron una iteración intermedia; no reemplazan la presentación vigente descrita arriba.
+
 
 - La referencia visual aprobada define dos vallas laterales rectas y continuas en los giros, sin fragmentos que invadan el paso. Los puntos muestreados de cada riel se redistribuyen entre sus intersecciones para no retroceder; el sprite existente recorta en memoria solo márgenes laterales transparentes, sin modificar el asset ni su GUID. El recorrido central y el tamaño de los hinchas se conservan.
 - El **ancho de los tramos horizontales**, no el tamaño de hincha, se reduce un 20%: a 540×960, 76,8 unidades lógicas frente a 96 de los tramos verticales. En resoluciones cortas se aplica el mismo factor sobre el ancho adaptado. Las geometrías de rieles/colliders reflejan esos anchos.
@@ -154,7 +187,10 @@ Estados permitidos para evidencia: `PASS`, `FAIL`, `BLOCKED`, `NOT_RUN`, `NOT_AP
 
 - **2026-11-05 — paso de hinchas completamente libre:** mantener solo las dos vallas laterales que delimitan el S ortogonal; ningún panel puede cruzar el corredor ni ocupar parcialmente un carril. El test nuevo verifica que cada módulo recto quede contenido en una sola pierna de la polilínea de borde, incluidos conectores más cortos que el módulo de 60. La ruta y los colliders continuos permanecen iguales.
 
-## Validación
+## Evidencia histórica por iteración
+
+> Los registros fechados a continuación preservan resultados reales de sus respectivas versiones. La revisión actual y su aceptación están al principio del contrato; las capturas/tests anteriores no prueban criterios nuevos ni dispositivo.
+
 
 - **2026-11-05 — tarjetas grandes y dos zonas equipadas:** `PASS` 8/8 EditMode de `TowerDefenseScreenLayoutTests` (dos tarjetas 234×120, cero controles superiores, fuentes de estaciones y reserva responsive); `PASS` 1/1 PlayMode aislado (`TowerDefenseLargeHireStationsVisualProbe_20261105.ShowsOnlyLargeHireCardsAndLoadedStationsInBothZones`, job `25725d1082ff4b2887ed0898565a7d82`). El probe verifica las dos hitboxes de contratación, exactamente cuatro estaciones (parrilla llena + barril por zona) activas desde `Configure`, sprite original de parrilla y ancho 150 lógico. Captura full Game View 540×960 revisada: `/private/tmp/hcyp-td-large-hires-stations-20261105.png`. Se usaron nueve hinchas sintéticos sin perfil/Firebase ni guardado. El job previo `802c914256c54d0093e8cb1b1bd294ee` ejecutó cero tests antes de importar el probe y no cuenta como aprobado. No reemplaza una compra real de campaña ni validación de otros dispositivos.
 

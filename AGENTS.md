@@ -3,6 +3,7 @@
 ## Alcance y fuentes
 - Trabajar en el checkout Unity activo; confirmar raíz Git y `projectRoot` de MCP si difieren. El checkpoint y los límites pendientes están en [specs/current-state.md](specs/current-state.md).
 - [specs/README.md](specs/README.md) es el índice: leer solo el contrato de la tarea. `status.md` y `decisions.md` son historiales, no reglas completas vigentes. Ante contradicción, contrastar el contrato más reciente con código y valores serializados; informar lo irresoluble, no inventar gameplay ni adaptar código a reglas obsoletas.
+- El selector vigente tiene 13 posiciones (12 clubes y el bonus de Huracán); no confundir posición con ID estable. La tabla única de balance actual es [docs/BALANCE_ACTUAL_NIVELES.md](docs/BALANCE_ACTUAL_NIVELES.md); las excepciones de Camioneros TD y Huracán pertenecen a sus contratos específicos.
 - Hacer el cambio mínimo autorizado. No implementar pendientes ni ampliar alcance; preservar trabajo local ajeno. Cambiar comportamiento exige actualizar su contrato; un retoque cosmético sin impacto contractual no exige reescribir SDD.
 
 ## Trabajo proporcional

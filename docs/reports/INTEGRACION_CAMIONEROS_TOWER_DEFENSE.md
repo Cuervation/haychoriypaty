@@ -1,5 +1,8 @@
 # Informe — Camioneros Tower Defense integrado a la campaña
 
+> **HISTÓRICO — NO ES LA FUENTE VIGENTE.** Informe de integración del 2026-11-03, anterior a las reglas de pedidos/10 hinchas, colocación y aceptación Unity 2026-11-06. Su declaración de cuotas, roster y reloj aplica a ese checkpoint, no al runtime TD actual. Ver [contrato vigente](../../specs/features/tower-defense.md).
+
+
 **Fecha:** 2026-11-03 · **Checkout:** `/Users/celestino/HayChoriYPaty` · **Unity del proyecto:** `6000.6.3f1`. Se preservaron los demás cambios locales.
 
 ## Resultado de implementación

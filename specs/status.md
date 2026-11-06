@@ -1,3 +1,7 @@
+# Historial de cambios y validaciones (fechado)
+
+> **HISTÓRICO:** este archivo registra el estado en la fecha de cada entrada. Una entrada marcada PASS no valida el runtime actual ni reemplaza el contrato vigente. Consultar [current-state](current-state.md), [índice SDD](README.md) y la [tabla maestra](../docs/BALANCE_ACTUAL_NIVELES.md).
+
 ## 2026-11-06 — Camisetas de la hinchada de Huracán
 
 Se incorporaron seis camisetas Huracán basadas en las referencias del usuario, repetidas entre doce identidades en atlas de festejo/caminata y de derrota; solo cambia el arte del equipo ID11. `ClubVisualTheme` asigna los sprites dedicados, mantiene la escala/lógica existente y mapea el orden fuente caminar→festejar sin editar los PNG. `HuracanThemeUsesItsSixShirtWardrobeForCheeringWalkingAndDefeat` pasó **1/1 EditMode** en Unity 6000.6.3f1; ambos atlas se importaron/cargaron con transparencia y 6×4 celdas. No se capturó una ronda en Game View ni se generó/instaló APK. Ver [contrato Huracán](features/huracan-bonus-track.md).
@@ -60,7 +64,7 @@ APK Development Main-only IL2CPP/ARM64, Unity 6000.6.3f1, **0.2.82/code84**, bui
 
 ## 2026-11-02 — Diagnóstico y retry de errores Firestore
 
-El cliente ahora registra `FirestoreException.ErrorCode` sin texto sensible y clasifica `Unavailable`, `DeadlineExceeded`, `Cancelled` y `Aborted` como transitorios para el backoff existente; `PermissionDenied` continúa siendo permanente. `FirebasePlayerSessionDiagnosticTests` pasó **7/7 EditMode**. APK Development Android `0.2.81/code83` generada correctamente desde Main (318.86 s, 0 errores/6 advertencias), ZIP/alineación/firma v2/metadata verificados e instalada como actualización en el Motorola Edge 60 Fusion. Package Manager conserva `firstInstallTime=2026-10-03 18:49:24`; la SHA-256 del `base.apk` instalado coincide con el artefacto. No se limpiaron datos. Smoke test en Motorola: actividad Unity en foreground, sin crash, pero panel CUENTA bloquea gameplay; logcat sanitizado registró `firestore-commit / FirestoreException / PermissionDenied`, y un REINTENTAR no lo resolvió. Falta comparar reglas activas con el commit. No se tocaron reglas remotas. Detalles: [diagnóstico Firebase](features/firebase-player.md#diagnóstico-real-android--2026-11-02) y [entrega Android](features/android-prototype.md).
+El cliente ahora registra `FirestoreException.ErrorCode` sin texto sensible y clasifica `Unavailable`, `DeadlineExceeded`, `Cancelled` y `Aborted` como transitorios para el backoff existente; `PermissionDenied` continúa siendo permanente. `FirebasePlayerSessionDiagnosticTests` pasó **7/7 EditMode**. APK Development Android `0.2.81/code83` generada correctamente desde Main (318.86 s, 0 errores/6 advertencias), ZIP/alineación/firma v2/metadata verificados e instalada como actualización en el Motorola Edge 60 Fusion. Package Manager conserva `firstInstallTime=2026-10-03 18:49:24`; la SHA-256 del `base.apk` instalado coincide con el artefacto. No se limpiaron datos. Smoke test en Motorola: actividad Unity en foreground, sin crash, pero panel CUENTA bloquea gameplay; logcat sanitizado registró `firestore-commit / FirestoreException / PermissionDenied`, y un REINTENTAR no lo resolvió. Falta comparar reglas activas con el commit. No se tocaron reglas remotas. Detalles: [diagnóstico Firebase](features/firebase-player.md) y [entrega Android](features/android-prototype.md).
 
 ## 2026-11-01 — Huracán / Parque Patricios Bonus Track (integrado en fuente; pendiente de aceptación)
 
@@ -723,7 +727,7 @@ Implemented the per-ID quota/hire/speed table, individual victory predicate, quo
 
 Measured real-simulation outcomes (three seeds: 1337, 407, 2026, full route/production/order/purchase logic) with those adjustments: River 3/3, average win 285.0s; Boca 3/3, 292.0s; Camioneros 3/3, 252.4s; Los Redondos 3/3, 278.0s. At zero opening funds, L6 and L7 were 3/3 (251s / 260s averages); L8–L11 respectively were 2/3, 2/3, 0/3, 0/3. For L10, $100 opening funds yielded 2/3 and $150 3/3; for L11, $100 yielded 0/3, $150 2/3 and $200 3/3.
 
-Unity 6000.6.3f1 compiled the edited scripts; the console query returned 0 errors/warnings. The focused NUnit job started but Unity MCP Test Runner disconnected/timed out before publishing results; `TestResults.xml` remained stale, so no new NUnit pass is claimed. The all-strategy A–D regression and portrait Game View review remain pending due that editor/MCP outage. See [the authoritative balance table](features/street-automation.md#current-per-product-level-balance--2026-10-24).
+Unity 6000.6.3f1 compiled the edited scripts; the console query returned 0 errors/warnings. The focused NUnit job started but Unity MCP Test Runner disconnected/timed out before publishing results; `TestResults.xml` remained stale, so no new NUnit pass is claimed. The all-strategy A–D regression and portrait Game View review remain pending due that editor/MCP outage. See [the authoritative balance table](../docs/BALANCE_ACTUAL_NIVELES.md).
 
 ## Official product sale prices — 2026-10-08
 

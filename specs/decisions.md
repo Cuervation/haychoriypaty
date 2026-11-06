@@ -1,3 +1,7 @@
+# Historial de decisiones
+
+> **HISTÓRICO:** estas entradas conservan el contexto y la decisión en su fecha; no son una especificación acumulativa vigente. Para las reglas activas, prevalecen el código/configuración y el contrato indexado en [specs/README.md](README.md).
+
 ## 2026-10-29 — Adopt River's U opening setup for River and Boca
 
 At the user's request, set River and Boca to the River U experiment's start: $800 per attempt, one free normal Parrillero, no other free starters, ×1.00, and 340 seconds. Preserve their distinct quotas and all role/speed price curves. The isolated River U experiment produced 2/10 wins without a three-win streak; treat this as a provisional user-directed balance choice, not proven robust balance. LegacySpeed3ThenRoster_v1 remains an audit purchase policy, not shipped automation.

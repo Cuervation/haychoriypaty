@@ -21,6 +21,7 @@ namespace HayChoriYPaty.Tests
         object mode;
         bool failSaves, previousGate;
         int savedCalls;
+        readonly ArrayList receipts = new ArrayList();
         float previousTime;
         FieldInfo editorGate;
         UnityEditor.EditorWindow gameWindow;
@@ -28,7 +29,7 @@ namespace HayChoriYPaty.Tests
         object sizeGroup;
         int previousSize, addedSize = -1;
         public static string CaptureDirectory => Path.GetFullPath(Path.Combine(Application.dataPath,
-            "../Logs/Acceptance/TowerDefensePlacement/TenFans20261106"));
+            "../Logs/Acceptance/TowerDefenseReadyStations20261106"));
 
         static Type T(string n) => Type.GetType("HayChoriYPaty." + n + ", Assembly-CSharp", true);
         static object Get(object o, string n)
@@ -99,6 +100,12 @@ namespace HayChoriYPaty.Tests
             Time.timeScale = 0f;
             Assert.IsTrue((bool)Call(view, "StartTowerDefenseRun"), (string)Get(view, "towerDefenseError"));
             mode = Get(view, "towerDefenseMode");
+            receipts.Clear();
+            EventInfo deliveryEvent = mode.GetType().GetEvent("DeliveryCompleted");
+            Type receiptType = deliveryEvent.EventHandlerType.GetGenericArguments()[0];
+            Delegate handler = GetType().GetMethod("RecordReceipt", I).MakeGenericMethod(receiptType)
+                .CreateDelegate(deliveryEvent.EventHandlerType, this);
+            deliveryEvent.AddEventHandler(mode, handler);
             Assert.AreEqual(0, ((ICollection)Get(mode, "Workers")).Count);
             Assert.IsTrue((bool)Get(game, "IsPlayerActive"));
             yield return null; yield return null;
@@ -125,6 +132,264 @@ namespace HayChoriYPaty.Tests
             Directory.CreateDirectory(CaptureDirectory);
             File.WriteAllBytes(Path.Combine(CaptureDirectory, name + ".png"), image.EncodeToPNG());
             UnityEngine.Object.Destroy(image);
+        }
+
+        void RecordReceipt<TReceipt>(TReceipt receipt)
+        {
+            object item = receipt;
+            int id = (int)Get(item, "UnitId");
+            foreach (object prior in receipts) Assert.AreNotEqual(id, Get(prior, "UnitId"), "A physical unit cannot be delivered twice.");
+            Assert.IsNull(Call(Get(mode, "Kitchen"), "Find", id), "Receipt is emitted only after the unit is physically consumed.");
+            receipts.Add(item);
+        }
+
+        object HeldFan(int[] products, int[] quantities, float progress)
+        {
+            Assert.IsTrue((bool)Call(mode, "TrySpawnFan", products, quantities));
+            IList fans = (IList)Get(mode, "Fans");
+            object fan = fans[fans.Count - 1], follower = Get(fan, "RouteFollower");
+            Call(follower, "Advance", (float)Get(follower, "TotalDistance") * progress / (float)Get(follower, "Speed"));
+            // A held QA target isolates actual production/service; no product is injected.
+            follower.GetType().GetProperty("Speed", I).SetValue(follower, 0f);
+            return fan;
+        }
+
+        void AssertPreparedStations()
+        {
+            object presentation = Get(view, "towerDefensePresentation");
+            IList stations = (IList)Get(presentation, "stationObjects");
+            Assert.AreEqual(4, stations.Count);
+            int tables = 0, barrels = 0;
+            foreach (GameObject station in stations)
+            {
+                bool table = station.name.EndsWith("Station_NormalTable");
+                if (table) tables++; else { barrels++; Assert.IsTrue(station.name.EndsWith("Station_CocaBarrel")); }
+                int products = 0;
+                foreach (SpriteRenderer renderer in station.GetComponentsInChildren<SpriteRenderer>(true))
+                {
+                    Assert.IsNotNull(renderer.sprite);
+                    string sprite = renderer.sprite.name.ToLowerInvariant();
+                    Assert.IsFalse(sprite.Contains("grill") || sprite.Contains("parrilla") || sprite.Contains("smoke") || sprite.Contains("heat"));
+                    if (renderer.name.StartsWith(table ? "Prepared Chori display" : "Loaded Coca display"))
+                    {
+                        products++;
+                        string prefab = table ? "Sandwich_Chori" : "Drink_Coca";
+                        Assert.AreSame(Resources.Load<GameObject>("ModularKitchen/Prefabs/" + prefab).GetComponent<SpriteRenderer>().sprite, renderer.sprite);
+                    }
+                }
+                Assert.AreEqual(table ? 12 : 6, products, "Prepared products/loaded barrel are visible from frame zero.");
+                if (!table) Assert.IsNotNull(station.transform.Find("Ice"));
+            }
+            Assert.AreEqual(2, tables); Assert.AreEqual(2, barrels);
+        }
+
+        IEnumerator RealSingleRoleService(int card, int product, int zone, string name)
+        {
+            AssertPreparedStations();
+            object wanted = HeldFan(new[] {product}, new[] {1}, zone == 0 ? .12f : .85f);
+            object other = HeldFan(new[] {product == 0 ? 4 : 0}, new[] {1}, zone == 0 ? .23f : .92f);
+            Set(mode, "stopSpawning", true);
+            int initial = Coins, cost = (int)Call(mode, "HireCost", Role(card == 0 ? "Parrillero" : "Cocacolero"));
+            yield return Capture(name + "-before-hire");
+            for (int n = 0; n < 5; n++) Call(mode, "Step", .05f);
+            Assert.AreEqual(0, Get(mode, "TotalDelivered")); Assert.AreEqual(0, receipts.Count);
+            yield return Tap(Cards()[card].center); yield return Tap(Areas()[zone].center);
+            Assert.AreEqual(initial - cost, Coins);
+            Assert.AreEqual(1, Count(card == 0 ? "Parrillero" : "Cocacolero", zone));
+            object worker = ((IList)Get(mode, "Workers"))[0];
+            Vector2 start = (Vector2)Get(worker, "Position");
+            for (int n = 0; n < 120 && (int)Get(mode, "TotalDelivered") == 0; n++)
+            {
+                Call(mode, "Step", .05f); yield return null;
+            }
+            Assert.AreEqual(1, Get(mode, "TotalDelivered"));
+            Assert.AreEqual(1, receipts.Count); Assert.AreEqual(product, Get(receipts[0], "Product"));
+            Assert.AreEqual(Get(wanted, "Id"), Get(receipts[0], "FanId"));
+            Assert.AreEqual(zone, Get(receipts[0], "Zone"));
+            Assert.AreEqual(0, Get(wanted, "PendingUnits")); Assert.IsTrue((bool)Get(wanted, "IsDeparting"));
+            Assert.AreEqual(1, Get(other, "PendingUnits"), "A worker cannot serve the other role's product.");
+            Assert.AreEqual(5, Get(mode, "CoinsEarned")); Assert.AreEqual(initial - cost + 5, Coins);
+            Assert.AreEqual(1, Get(mode, "OrdersCompleted")); Assert.AreEqual(start, Get(worker, "Position"));
+            Call(mode, "Step", .12f);
+            object presentation = Get(view, "towerDefensePresentation"); Call(presentation, "Sync", mode);
+            IList cues = (IList)Get(presentation, "deliveryCues");
+            Assert.AreEqual(1, cues.Count); Assert.IsNotNull(((SpriteRenderer)Get(cues[0], "Renderer")).sprite);
+            yield return Capture(name + "-physical-delivery");
+            for (int n = 0; n < 20; n++) Call(mode, "Step", .05f);
+            Call(presentation, "Sync", mode);
+            Assert.AreEqual(0, ((IList)Get(presentation, "deliveryCues")).Count);
+            Assert.AreEqual(1, Get(mode, "TotalDelivered")); Assert.AreEqual(1, receipts.Count);
+            Assert.AreEqual(1, Get(mode, "ServedFans")); Assert.IsFalse((bool)Get(mode, "HasWon"));
+            Assert.IsTrue((bool)Call(game, "PersistTowerDefenseProgress", mode));
+            object sim = Get(game, "Sim");
+            Assert.AreEqual(1, Get(sim, "Delivered")); Assert.AreEqual(5, Get(sim, "CoinsEarned"));
+            yield return Capture(name + "-completed-no-phantom-sales");
+        }
+
+        [UnityTest]
+        public IEnumerator CaseAPlacedParrilleroProducesAndServesChoriFromPreparedTable()
+        {
+            yield return RealSingleRoleService(0, 0, 0, "case-a-chori");
+        }
+
+        [UnityTest]
+        public IEnumerator CaseBPlacedCocacoleroServesOnlyCocaFromLoadedBarrel()
+        {
+            yield return RealSingleRoleService(1, 4, 1, "case-b-coca");
+        }
+
+        [UnityTest]
+        public IEnumerator CaseCMixedOrderUsesRealProductionCorrectRolesReceiptsAndCampaignProjection()
+        {
+            AssertPreparedStations();
+            object fan = HeldFan(new[] {0, 4}, new[] {2, 2}, .48f);
+            Set(mode, "stopSpawning", true);
+            yield return Tap(Cards()[0].center); yield return Tap(Areas()[0].center);
+            yield return Tap(Cards()[1].center); yield return Tap(Areas()[1].center);
+            int hiredCoins = Coins;
+            var positions = new ArrayList();
+            foreach (object worker in (IList)Get(mode, "Workers")) positions.Add(Get(worker, "Position"));
+            for (int n = 0; n < 20 && ((int[])Get(mode, "DeliveredByProduct"))[4] < 2; n++)
+            { Call(mode, "Step", .05f); yield return null; }
+            Assert.AreEqual(2, ((int[])Get(mode, "DeliveredByProduct"))[4]);
+            Assert.AreEqual(0, ((int[])Get(mode, "DeliveredByProduct"))[0]);
+            Assert.AreEqual(2, Get(fan, "PendingUnits")); Assert.IsFalse((bool)Get(fan, "IsDeparting"));
+            yield return Capture("case-c-partial-coca-keeps-chori-order");
+            for (int n = 0; n < 240 && (int)Get(mode, "TotalDelivered") < 4; n++)
+            { Call(mode, "Step", .05f); yield return null; }
+            Assert.AreEqual(4, receipts.Count); Assert.AreEqual(4, Get(mode, "TotalDelivered"));
+            CollectionAssert.AreEqual(new[] {2, 0, 0, 0, 2, 0, 0}, (int[])Get(mode, "DeliveredByProduct"));
+            Assert.AreEqual(20, Get(mode, "CoinsEarned")); Assert.AreEqual(hiredCoins + 20, Coins);
+            Assert.AreEqual(1, Get(mode, "CustomersAttended")); Assert.AreEqual(1, Get(mode, "OrdersCompleted"));
+            Assert.AreEqual(0, Get(fan, "PendingUnits")); Assert.IsTrue((bool)Get(fan, "IsDeparting"));
+            foreach (object receipt in receipts)
+            {
+                int product = (int)Get(receipt, "Product"), id = (int)Get(receipt, "WorkerId");
+                object worker = ((IList)Get(mode, "Workers"))[id - 1];
+                Assert.AreEqual(product == 0 ? "Parrillero" : "Cocacolero", Get(worker, "Role").ToString());
+                Assert.AreEqual(product == 0 ? 0 : 1, Get(receipt, "Zone"));
+                Assert.AreEqual(Get(fan, "Id"), Get(receipt, "FanId"));
+            }
+            Call(mode, "Step", .12f);
+            yield return Capture("case-c-mixed-completion-visible-chori-handoff");
+            Call(mode, "Step", .5f);
+            Assert.AreEqual(1, Get(mode, "ServedFans")); Assert.AreEqual(0, ((IList)Get(mode, "Fans")).Count);
+            Assert.AreEqual(4, receipts.Count);
+            for (int i = 0; i < positions.Count; i++) Assert.AreEqual(positions[i], Get(((IList)Get(mode, "Workers"))[i], "Position"));
+            Assert.IsTrue((bool)Call(game, "PersistTowerDefenseProgress", mode));
+            object sim = Get(game, "Sim");
+            Assert.AreEqual(4, Get(sim, "Delivered")); Assert.AreEqual(20, Get(sim, "CoinsEarned"));
+            Assert.AreEqual(1, Get(sim, "OrdersCompleted"));
+            yield return Capture("case-c-completed-stations-and-staff");
+        }
+
+        [UnityTest]
+        public IEnumerator HandoffCuesAnimatePauseAndRecycleWithoutCreatingSales()
+        {
+            AssertPreparedStations();
+            HeldFan(new[] {0, 4}, new[] {1, 1}, .48f);
+            Set(mode, "stopSpawning", true);
+            yield return Tap(Cards()[0].center); yield return Tap(Areas()[0].center);
+            yield return Tap(Cards()[1].center); yield return Tap(Areas()[1].center);
+            object presentation = Get(view, "towerDefensePresentation");
+            GameObject firstCue = null;
+            foreach (int product in new[] {4, 0})
+            {
+                int expected = product == 4 ? 1 : 2;
+                for (int n = 0; n < 160 && receipts.Count < expected; n++)
+                { Call(mode, "Step", .05f); yield return null; }
+                Assert.AreEqual(expected, receipts.Count);
+                Call(presentation, "Sync", mode);
+                IList cues = (IList)Get(presentation, "deliveryCues"); Assert.AreEqual(1, cues.Count);
+                GameObject cue = (GameObject)Get(cues[0], "GameObject");
+                if (firstCue == null) firstCue = cue; else Assert.AreSame(firstCue, cue, "Reuse the expired visual, never a new inventory item.");
+                Vector3 start = cue.transform.position;
+                for (int frame = 0; frame < 6; frame++)
+                {
+                    if (frame > 0) Call(mode, "Step", .05f);
+                    Call(presentation, "Sync", mode);
+                    if (frame == 2)
+                    {
+                        Assert.AreNotEqual(start, cue.transform.position, "Actual product cue must move toward its recipient.");
+                        object worker = ((IList)Get(mode, "Workers"))[product == 0 ? 0 : 1];
+                        IDictionary staff = (IDictionary)Get(presentation, "workerViews");
+                        GameObject workerObject = (GameObject)Get(staff[(int)Get(worker, "Id")], "GameObject");
+                        Assert.Greater(Quaternion.Angle(Quaternion.identity, workerObject.transform.localRotation), 1f, "A real handoff has a service gesture.");
+                        Vector3 held = cue.transform.position; float elapsed = (float)Get(mode, "Elapsed");
+                        Call(mode, "Pause"); Call(mode, "Step", 1f); Call(presentation, "Sync", mode);
+                        Assert.AreEqual(elapsed, Get(mode, "Elapsed")); Assert.AreEqual(held, cue.transform.position);
+                        Call(mode, "Resume");
+                    }
+                    Assert.AreEqual(expected, receipts.Count);
+                    yield return Capture("handoff-" + (product == 0 ? "chori" : "coca") + "-frame-" + frame.ToString("00"));
+                }
+                Call(mode, "Step", .1f); Call(presentation, "Sync", mode);
+                Assert.AreEqual(0, ((IList)Get(presentation, "deliveryCues")).Count);
+            }
+            Call(mode, "Step", .5f); Call(presentation, "Sync", mode);
+            Assert.AreEqual(1, Get(mode, "ServedFans")); Assert.AreEqual(2, Get(mode, "TotalDelivered"));
+            Assert.AreEqual(10, Get(mode, "CoinsEarned")); Assert.AreEqual(2, receipts.Count);
+            Assert.AreEqual(1, ((ICollection)Get(presentation, "pooledDeliveryCues")).Count);
+        }
+
+        [UnityTest]
+        public IEnumerator AutomaticMixedTenFanWaveCanWinWithCoinHiresAndNormalMovement()
+        {
+            AssertPreparedStations();
+            // Legal player strategy: one Coca covers the upper/shared path; prioritize
+            // Chori throughput and reinvest actual receipts, never inject money/stock.
+            foreach (int[] placement in new[] {new[] {0, 0}, new[] {1, 0}, new[] {0, 1}, new[] {0, 1}})
+            { yield return Tap(Cards()[placement[0]].center); yield return Tap(Areas()[placement[1]].center); }
+            Assert.AreEqual(4, ((IList)Get(mode, "Workers")).Count);
+            int afterHires = Coins, additionalSpend = 0, requested = 0;
+            var seen = new System.Collections.Generic.HashSet<int>();
+            bool captured = false;
+            for (int n = 0; n < 3600 && Get(mode, "Phase").ToString() == "Playing"; n++)
+            {
+                int cooks = Count("Parrillero", 0) + Count("Parrillero", 1);
+                int cost = (int)Call(mode, "HireCost", Role("Parrillero"));
+                if (cooks < 6 && Coins >= cost)
+                {
+                    int before = Coins, zone = Count("Parrillero", 1) < 3 ? 1 : 0;
+                    yield return Tap(Cards()[0].center); yield return Tap(Areas()[zone].center);
+                    Assert.AreEqual(cooks + 1, Count("Parrillero", 0) + Count("Parrillero", 1));
+                    additionalSpend += before - Coins;
+                }
+                Call(mode, "Step", .05f);
+                foreach (object fan in (IList)Get(mode, "Fans"))
+                    if (seen.Add((int)Get(fan, "Id"))) requested += (int)Get(fan, "PendingUnits");
+                if (!captured && (float)Get(mode, "Elapsed") >= 10f)
+                { captured = true; yield return Capture("automatic-wave-ten-seconds-natural-route"); }
+                if (n % 100 == 0) yield return null;
+            }
+            string outcome = "elapsed=" + Get(mode, "Elapsed") + ", requested=" + requested + ", delivered=" + Get(mode, "TotalDelivered") +
+                ", served=" + Get(mode, "ServedFans") + ", escaped=" + Get(mode, "EscapedFans") + ", coins=" + Coins;
+            TestContext.WriteLine(outcome);
+            if (!(bool)Get(mode, "HasWon")) yield return Capture("automatic-wave-strategy-failure");
+            Assert.IsTrue((bool)Get(mode, "HasWon"), "Natural finite wave with legal adaptive coin hires: " + outcome);
+            Assert.IsFalse((bool)Get(mode, "HasLost")); Assert.AreEqual(10, seen.Count);
+            Assert.AreEqual(10, Get(mode, "SpawnedFans")); Assert.AreEqual(10, Get(mode, "ServedFans"));
+            Assert.AreEqual(10, Get(mode, "OrdersCompleted")); Assert.AreEqual(0, Get(mode, "EscapedFans"));
+            Assert.AreEqual(requested, Get(mode, "TotalDelivered")); Assert.AreEqual(requested, receipts.Count);
+            Assert.AreEqual(requested * 5, Get(mode, "CoinsEarned")); Assert.AreEqual(afterHires - additionalSpend + requested * 5, Coins);
+            Call(view, "UpdateTowerDefenseFrame");
+            Assert.AreEqual("Won", Get(Get(game, "Sim"), "Phase").ToString());
+            TestContext.WriteLine("Natural wave: requested/delivered=" + requested + ", earned=" + requested * 5 + ", final coins=" + Coins);
+            yield return Capture("automatic-wave-won-common-campaign-result");
+        }
+
+        [UnityTest]
+        public IEnumerator AutomaticWaveWithoutWorkersLosesWithNoGhostDeliveries()
+        {
+            AssertPreparedStations();
+            for (int n = 0; n < 3600 && Get(mode, "Phase").ToString() == "Playing"; n++)
+            { Call(mode, "Step", .05f); if (n % 100 == 0) yield return null; }
+            Assert.IsTrue((bool)Get(mode, "HasLost")); Assert.IsFalse((bool)Get(mode, "HasWon"));
+            Assert.AreEqual(1, Get(mode, "EscapedFans")); Assert.AreEqual(0, Get(mode, "TotalDelivered"));
+            Assert.AreEqual(0, receipts.Count); Assert.AreEqual(500, Coins); Assert.AreEqual(0, Get(mode, "CoinsEarned"));
+            Call(view, "UpdateTowerDefenseFrame");
+            Assert.AreEqual("Lost", Get(Get(game, "Sim"), "Phase").ToString());
+            yield return Capture("automatic-wave-first-escape-no-workers-no-ghost-sales");
         }
 
         [UnityTest]

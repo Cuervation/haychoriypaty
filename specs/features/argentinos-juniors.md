@@ -8,12 +8,12 @@ Agregar Argentinos Juniors como último nivel normal de campaña, con las fotos 
 
 - ID estable nuevo: **12**. Se agrega al final después de Los Redondos (ID10); ninguna posición/ID existente se renumera. Huracán (ID11) conserva su bonus entre Independiente y Racing. Orden visible: `0,1,2,3,4,11,5,6,7,8,9,10,12`.
 - El selector existente lo lista como **Argentinos Juniors / La Paternal**, última tarjeta y inicialmente bloqueada.
-- Su balance tradicional copia exactamente el nivel regular más reciente, Los Redondos (ID10): 315 s; catálogo `[0,1,2,3,4,6,5]`; metas `[345,245,150,140,285,120,165]`; $500; un Parrillero, un Cocacolero y un Mozo gratis; costos base `[70,70,90,80,80]`; factor de velocidad ×21,00. No copiar la modalidad Tower Defense de Camioneros ni el modo Bonus Track de Huracán.
+- Su balance tradicional copia exactamente Los Redondos (ID10), el nivel regular anterior. Las dos filas vigentes están en [la tabla maestra](../../docs/BALANCE_ACTUAL_NIVELES.md); no duplicar aquí cifras de metas/caja/tiers. No copiar la modalidad Tower Defense de Camioneros ni el Bonus Track de Huracán.
 - Ganar ID10 habilita ID12. El frontier histórico `unlockedLevel` sigue acotado a 0–10; ID12 usa su propio flag persistido. Ganar ID12 no crea un ID nuevo.
 - Migración SaveData v5→v6 solo concede el flag si hay evidencia de una victoria ID10 en estadísticas o un match terminal pendiente; `unlockedLevel == 10` por sí solo solo acredita acceso a Los Redondos. Preservar prefijos existentes de estadísticas y watermarks de Mercado.
 - Partidos/estadísticas de ID12 se guardan en su slot independiente. Firestore local permite resultado `level == 12` y rechaza `level > 12`; `unlockedLevel` remoto sigue limitado a10.
 - Mural y hinchas tienen recursos dedicados; las camisetas de Huracán/Camioneros/otros clubes no deben reutilizarse como sprites de Argentinos. Los sprites de hinchas integran los cinco patrones de camiseta aportados, sin sponsors ni letras agregadas. No crear un escudo independiente.
-- El escudo oficial de Argentinos Juniors aportado por el usuario se muestra en la última tarjeta del selector y en las superficies comunes que consumen el manifiesto de escudos; el índice 11 de Huracán conserva su espacio sin escudo.
+- El escudo oficial aportado por el usuario se asigna a Argentinos ID12. Huracán ID11 también tiene su propio escudo oficial aportado por el usuario; cada recurso se enruta por ID y no se intercambian.
 
 ## Aceptación
 

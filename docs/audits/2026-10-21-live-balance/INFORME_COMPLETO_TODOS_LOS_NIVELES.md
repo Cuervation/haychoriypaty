@@ -1,6 +1,8 @@
 # Informe completo — viabilidad y balance de los 11 niveles
 **21 de octubre de 2026 · partidas reales en Unity, ×1 · sin cambios de código ni balance.**
 
+> **Corte histórico, no balance vigente:** este informe conserva la configuración y las 155 partidas del 2026-10-21. Valores posteriores difieren (por ejemplo, River/Boca $800 y Camioneros 380 s) y Huracán se insertó después en el orden de campaña. Consultar [`docs/BALANCE_ACTUAL_NIVELES.md`](../../BALANCE_ACTUAL_NIVELES.md) para la configuración actual y el [informe de corrección 2026-11-03](../../reports/INFORME_CORRECCION_NIVELES.md) para las validaciones recientes. No interpretar la muestra histórica como prueba de ganabilidad/imposibilidad actual.
+
 ## 1. Conclusión ejecutiva
 Se completaron **155 partidas: 5 victorias y 150 derrotas**. Hay además **una partida histórica interrumpida**, excluida de esos resultados y del límite de25. Los niveles ganados se detuvieron en su primera victoria; no se hicieron25 partidas innecesarias allí.
 

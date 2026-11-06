@@ -96,14 +96,16 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void BothWorkZonesUseGrillAndCocaStationResourcesFromTheStart()
+        public void BothWorkZonesUsePreparedChoriTableAndCocaBarrelFromTheStart()
         {
             Type presentation = RuntimeType("TowerDefenseWorldPresentation");
             MethodInfo resources = presentation.GetMethod("StartingStationResources", BindingFlags.NonPublic | BindingFlags.Static);
             Assert.IsNotNull(resources);
             string[] names = (string[])resources.Invoke(null, new object[] {new[] {0, 1, 2, 3, 4, 5, 6}});
-            CollectionAssert.AreEqual(new[] {"Station_NormalGrill", "Station_CocaBarrel"}, names);
-            Assert.IsNotNull(Resources.Load<Sprite>("street-parrilla-large"), "Reuse the existing fully loaded chorizo grill art.");
+            CollectionAssert.AreEqual(new[] {"Station_NormalTable", "Station_CocaBarrel"}, names);
+            Assert.IsNotNull(Resources.Load<GameObject>("ModularKitchen/Prefabs/Station_NormalTable"));
+            Assert.IsNotNull(Resources.Load<GameObject>("ModularKitchen/Prefabs/Sandwich_Chori"));
+            Assert.IsNotNull(Resources.Load<GameObject>("ModularKitchen/Prefabs/Drink_Coca"));
             Assert.IsNotNull(Resources.Load<GameObject>("ModularKitchen/Prefabs/Station_CocaBarrel"));
         }
 

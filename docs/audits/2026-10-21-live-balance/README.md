@@ -1,5 +1,7 @@
 # Auditoría real de balance — 21/10/2026
 
+> **Documento histórico:** los resultados y valores aquí conservan el corte de balance auditado el 2026-10-21; no describen la configuración vigente del checkout ni prueban ganabilidad actual. Usar [`docs/BALANCE_ACTUAL_NIVELES.md`](../../BALANCE_ACTUAL_NIVELES.md) para metas, caja, tiempos y planteles actuales, y el [informe de corrección 2026-11-03](../../reports/INFORME_CORRECCION_NIVELES.md) para cambios/estado de validación. No se reescriben ni descartan los datos de las partidas históricas.
+
 - [Informe completo y propuestas por nivel](INFORME_COMPLETO_TODOS_LOS_NIVELES.md)
 - [155 partidas completas, CSV](TODAS_LAS_PARTIDAS_COMPLETAS.csv)
 - [Validación independiente](VALIDACION_FINAL.md)

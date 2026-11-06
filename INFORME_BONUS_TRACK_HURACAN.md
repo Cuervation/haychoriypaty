@@ -1,5 +1,8 @@
 # Informe — Bonus Track Huracán / Parque Patricios
 
+> **HISTÓRICO — NO ES LA FUENTE VIGENTE.** Informe de implementación del 2026-11-01; conserva el esquema SaveData v5 y el estado de pruebas de aquella fecha. El código actual usa SaveData v6 y el contrato vigente actualiza el orden/slots. Ver [contrato Huracán](specs/features/huracan-bonus-track.md).
+
+
 **Fecha:** 2026-11-01
 **Checkout:** `/Users/celestino/HayChoriYPaty`
 **Estado honesto:** funcionalidad integrada en fuente y compilada estáticamente; **no aceptada como terminada**. Faltan ejecución de tests, balance por simulación y revisión/capturas reales de Unity Game View.

@@ -2,7 +2,7 @@
 
 ## Authority and scope
 
-> Current reading: [Balance actual de niveles](../../docs/BALANCE_ACTUAL_NIVELES.md) is the complete current source-derived table for all 12 campaign positions and the separate Tower Defense configuration. The dated balance table below is historical. [Active cooks/Mozos](active-cooks-mozos.md) supersedes sandwich delivery/layout from Racing only; [modular kitchen](modular-kitchen.md) supersedes pre-modular fixed furniture geometry; [Mercado](market-fridge.md) owns persistent cash/ingredients and cash-only purchases. Dated sections below retain history: old caps, editable/uniform prices and prior validation are not current rules. Do not read the whole log for a local change.
+> Current reading: [Balance actual de niveles](../../docs/BALANCE_ACTUAL_NIVELES.md) is the sole current source-derived table for all 13 visible positions (12 clubs plus Huracán bonus), including effective Tower Defense rules. Stable IDs are `0,1,2,3,4,11,5,6,7,8,9,10,12`; 11 traditional club positions use quota/deadline rules, Huracán is a scoring Bonus Track and Camioneros is Tower Defense. The dated tables below are historical. [Active cooks/Mozos](active-cooks-mozos.md) defines the standard traditional active-cook sandwich loop from Racing; Huracán also uses the active-cook simulation but its roster/modifiers are defined in its own contract. [Modular kitchen](modular-kitchen.md) supersedes pre-modular fixed furniture geometry; [Mercado](market-fridge.md) owns persistent cash/ingredients and cash-only purchases. Dated sections below retain history: old caps, editable/uniform prices and prior validation are not current rules. Do not read the whole log for a local change.
 
 This newly requested milestone supersedes the delivery boundary of the [historical Floresta prototype](floresta-prototype.md), not its validation record. [Product](../product.md) retains the exact seven-product catalog and outdoor standing-only setting. [Visual reference](../visual-reference.md) distinguishes observed video evidence from prompt requirements. No copied Food Fever assets, new services/packages, manual movement or complex cooking controls.
 
@@ -158,9 +158,9 @@ For Racing (level 6), the first Fernetero hire costs **$200**; later hires conti
 
 **2026-10-29 Boca free-Mozo adjustment — user requested:** LevelIndex8 now starts each fresh attempt with **one free normal Parrillero + one free Mozo**, $800 and ×1.00 speed, retaining its 340-second deadline and all existing quotas/economy. The first paid Mozo remains $65; the free starter does not advance the role-local hire tier. Retries restore exactly this pair. River and all remaining levels are unchanged.
 
-**2026-10-31 Camioneros duration-only adjustment — user requested:** LevelIndex9 lasts **380 seconds (6:20)**, replacing the 360-second duration below. Source defaults, fallback and Main scene agree; all other level settings and free workers remain unchanged. Static comparison against HEAD confirms only index9 changed in all three duration arrays. Focused Unity regression `CamionerosStartsWith380SecondsFreeCocacoleroAndMozo` **PASS** as part of the 5/5 EditMode suite on 2026-10-31. The 0.2.81/code83 Development APK includes the 380-second deadline; phone installation/gameplay test remain NOT_RUN.
+**Historical 2026-10-31 Camioneros duration-only adjustment — user requested:** the legacy LevelIndex9 balance row was changed to **380 seconds (6:20)** and a focused Unity regression passed 5/5 at that date. This value remains serialized for compatibility, but the Tower Defense runtime now has **no level deadline** and ignores that duration for victory/defeat. The 0.2.81/code83 evidence applies only to that dated traditional-balance snapshot, not current Defense.
 
-**Historical 2026-10-30 Camioneros setting — superseded 2026-10-31:** LevelIndex9 briefly lasted **360 seconds (6:00)** with one free normal Parrillero + one free Mozo + one free Cocacolero. The current duration is **380 seconds**, as recorded in the later adjustment above and the [current balance table](../../docs/BALANCE_ACTUAL_NIVELES.md). Historical 4/4 test evidence remains valid only for the earlier 360-second configuration.
+**Historical 2026-10-30 Camioneros setting — superseded 2026-10-31:** the legacy row briefly held **360 seconds (6:00)** with one free normal Parrillero + one free Mozo + one free Cocacolero. Both that staff and the later 380-second deadline are superseded by current Tower Defense rules; see [the balance table](../../docs/BALANCE_ACTUAL_NIVELES.md) and [TD contract](tower-defense.md). The historical 4/4 test is valid only for its old configuration.
 
 - [x] Focused Unity 6000.6.3f1 EditMode checks passed: the Camioneros startup/hire-tier regression, its serialized Main-scene startup regression, all-level names/catalog/goals/durations, and the all-level active-cook/starter roster gate (4/4 PASS).
 
@@ -218,7 +218,11 @@ The `ELEGÍ TU CANCHA` screen contains only the campaign cards and `VOLVER`: do 
 
 ## Rules and state contract
 
-### Mandatory club trifulca / level Definition of Done — 2026-10-07
+Current mode-specific terminal rules and exact values are centralized rather than repeated below: traditional quota/deadline and shared economy in [the balance table](../../docs/BALANCE_ACTUAL_NIVELES.md); finite-fan win/escape-loss in [Tower Defense](tower-defense.md); timed score, cards, Aguante and ticket rewards in [Huracán](huracan-bonus-track.md). Campaign progression/Market behavior is specified in [market-fridge](market-fridge.md). The dated acceptance/design records that follow preserve historical milestones; do not treat their older global rules or checkboxes as current-runtime acceptance.
+
+### Historical club trifulca / level Definition of Done — 2026-10-07
+
+This dated asset requirement applies to the eleven traditional club themes, not as a universal terminal rule for Huracán or Tower Defense. Its unchecked visual checklist below is historical evidence of the state recorded in 2026-10-07, not the current acceptance matrix.
 
 Every registered/future level is incomplete without its own scenery and one complete fan definition containing Front, Walking and Riot resources, variant count and explicit atlas/frame layouts. Normal, walking, raised-stick and down-swing frames must depict the same character/outfit selected deterministically by customerId. Each variant requires two distinct angry wooden-stick poses, not cheering/fists substituted for a missing frame. Ferro artwork is explicitly shared with Camioneros as requested; no official level may depend on the generic riot fallback.
 
@@ -226,9 +230,9 @@ Use ClubVisualTheme's fan definition for regular crowd, anger crossfade and riot
 
 Preserve the real queued customers/positions/IDs, gradual anger, unscaled pose alternation, destruction/impact/debris/shake and GAME OVER/VOLVER. No economy, difficulty, products, workers, time or progression changes.
 
-- [ ] All11levels have complete non-generic two-pose riot definitions and identity-consistent assets.
+- [ ] All 11 traditional club themes have complete non-generic two-pose riot definitions and identity-consistent assets.
 - [ ] Structural tests enforce this Definition of Done for existing and future entries.
-- [ ] All11loss sequences visually reviewed; both poses, real queue, unscaled animation and VOLVER validated.
+- [ ] All 11 traditional-club loss sequences visually reviewed; both poses, real queue, unscaled animation and VOLVER validated.
 
 ### River visual identity — initial art checkpoint, level8 / index7 (2026-10-07)
 

@@ -365,6 +365,32 @@ namespace HayChoriYPaty.Tests
             Assert.AreSame(behind, ((System.Collections.IList)Get<object>(mode, "Fans"))[0], "Target sorting must not reorder live fans.");
         }
 
+        [Test]
+        public void SharedReadyChoriGoesToMostAdvancedEligibleFanAcrossBothAreas()
+        {
+            mode = CreateMode(.02f); Invoke(mode, "Begin");
+            Hire("Parrillero", 0); Hire("Parrillero", 1);
+            var workers = (System.Collections.IList)Get<object>(mode, "Workers");
+            object behind = SpawnAt(0, RowLength(0) * .5f);
+            object ahead = SpawnAt(0, RouteDistanceTo(2 * RowStride) + RowLength(2) * .75f);
+            Assert.AreEqual(false, CallPrivate("IsAdjacentToArea", ahead, 0));
+            Assert.AreEqual(true, CallPrivate("IsAdjacentToArea", ahead, 1));
+            Assert.AreEqual(false, CallPrivate("IsAdjacentToArea", behind, 1));
+            ReadyServing(0, Get<int>(workers[0], "Id"));
+            object kitchen = Get<object>(mode, "Kitchen");
+            Assert.AreEqual(1, Invoke(kitchen, "TableCount", new object[] {0}));
+            int coins = Get<int>(mode, "Coins");
+            CallPrivate("DeliverWithinServiceRanges");
+            Assert.AreEqual(0, Get<int>(ahead, "PendingUnits"), "Shared physical stock must not be stolen by a less-urgent area just because its cook was hired first.");
+            Assert.AreEqual(1, Get<int>(behind, "PendingUnits"));
+            Assert.AreEqual(coins + 5, Get<int>(mode, "Coins"));
+            Assert.AreEqual(1, Get<int>(mode, "TotalDelivered"));
+            Assert.Greater(Get<float>(workers[1], "ServeAnimationSeconds"), 0f);
+            Assert.AreEqual(0f, Get<float>(workers[0], "ServeAnimationSeconds"));
+            CallPrivate("DeliverWithinServiceRanges");
+            Assert.AreEqual(1, Get<int>(mode, "TotalDelivered"), "No second serving exists; a second pass cannot fabricate one.");
+        }
+
         [TestCase(0)]
         [TestCase(1)]
         public void SharedAreaIncludesBothBoundingRowsAndOwnTurnButNotOtherTurnOrThirdRow(int zone)

@@ -25,6 +25,15 @@ namespace HayChoriYPaty
             public Sprite[] Frames;
         }
 
+        private sealed class DeliveryCue
+        {
+            public GameObject GameObject;
+            public SpriteRenderer Renderer;
+            public TowerDefenseDelivery Receipt;
+        }
+
+        private readonly List<DeliveryCue> deliveryCues = new List<DeliveryCue>();
+        private readonly Stack<DeliveryCue> pooledDeliveryCues = new Stack<DeliveryCue>();
         private readonly Dictionary<int, FanView> activeFans = new Dictionary<int, FanView>();
         private readonly Stack<FanView> pooledFans = new Stack<FanView>();
         private readonly Dictionary<int, WorkerView> workerViews = new Dictionary<int, WorkerView>();
@@ -79,6 +88,7 @@ namespace HayChoriYPaty
             CreateStations(runtimeConfig);
             CreateOverlayCamera(screenSize);
             configured = true;
+            mode.DeliveryCompleted += OnDeliveryCompleted;
             Sync(gameMode);
             return true;
         }
@@ -95,6 +105,7 @@ namespace HayChoriYPaty
             }
             for (int i = stationObjects.Count - 1; i >= 0; i--) DestroyPresentationObject(stationObjects[i]);
             stationObjects.Clear();
+            ClearDeliveryCues();
             CreateStations(runtimeConfig);
             ResizeTarget(screenSize);
             Sync(mode);
@@ -130,6 +141,7 @@ namespace HayChoriYPaty
             mode = gameMode;
             SyncFans(gameMode);
             SyncWorkers(gameMode);
+            SyncDeliveryCues(gameMode.Elapsed);
         }
 
         public void ResizeTarget(Vector2 screenSize)
@@ -159,6 +171,9 @@ namespace HayChoriYPaty
         public void DisposePresentation()
         {
             configured = false;
+            if (mode != null) mode.DeliveryCompleted -= OnDeliveryCompleted;
+            ClearDeliveryCues();
+            while (pooledDeliveryCues.Count > 0) DestroyPresentationObject(pooledDeliveryCues.Pop().GameObject);
             if (sourceCamera != null) sourceCamera.cullingMask = originalSourceCameraMask;
             if (overlayCamera != null)
             {
@@ -220,49 +235,170 @@ namespace HayChoriYPaty
         private static string[] StartingStationResources(int[] products)
         {
             var resources = new List<string>(2);
-            if (Contains(products, 0) || Contains(products, 1)) resources.Add("Station_NormalGrill");
+            if (Contains(products, 0)) resources.Add("Station_NormalTable");
             if (Contains(products, 4)) resources.Add("Station_CocaBarrel");
             return resources.ToArray();
         }
 
         private void CreateStationRow(string[] resourceNames, Vector2 center, int zone)
         {
-            if (resourceNames == null || resourceNames.Length == 0) return;
-            float worldPerPixel = mode.WorldUnitsPerLogicalPixel;
-            float spacing = worldPerPixel * 140f;
-            float start = -(resourceNames.Length - 1) * spacing * 0.5f;
+            if (resourceNames == null) return;
+            float pixel = mode.WorldUnitsPerLogicalPixel;
             for (int i = 0; i < resourceNames.Length; i++)
             {
-                GameObject prefab = Resources.Load<GameObject>("ModularKitchen/Prefabs/" + resourceNames[i]);
+                string resource = resourceNames[i];
+                GameObject prefab = Resources.Load<GameObject>("ModularKitchen/Prefabs/" + resource);
                 if (prefab == null)
                 {
-                    Debug.LogWarning("Tower Defense station prefab is missing: ModularKitchen/Prefabs/" + resourceNames[i]);
+                    Debug.LogWarning("Tower Defense station prefab is missing: " + resource);
                     continue;
                 }
+                bool table = resource == "Station_NormalTable";
+                StreetWorkerRole role = table ? StreetWorkerRole.Parrillero : StreetWorkerRole.Cocacolero;
                 GameObject station = Instantiate(prefab, presentationRoot.transform, false);
-                station.name = "TD zone " + zone + " " + resourceNames[i];
-                station.transform.position = new Vector3(center.x + start + i * spacing, center.y, 0f);
-                float scale = worldPerPixel * 5.2f;
-                if (resourceNames[i] == "Station_NormalGrill")
+                station.name = "TD zone " + zone + " " + resource;
+                Vector2 anchor = mode.StationPosition(role, zone);
+                station.transform.position = new Vector3(anchor.x, anchor.y - 18f * pixel, 0f);
+                int depth = 32 + Mathf.RoundToInt(-(anchor.y - 54f * pixel) * 12f);
+                if (table)
                 {
-                    // Reuse the campaign's chorizo-loaded grill artwork from frame
-                    // zero. Its illustrated chorizos are display-only, never stock.
-                    Sprite loadedGrill = Resources.Load<Sprite>("street-parrilla-large");
-                    SpriteRenderer renderer = station.GetComponentInChildren<SpriteRenderer>(true);
-                    if (loadedGrill != null && renderer != null)
-                    {
-                        renderer.sprite = loadedGrill;
-                        scale = worldPerPixel * 150f / Mathf.Max(.001f, loadedGrill.bounds.size.x);
-                        // Put the loaded grate in front of the worker's feet rather
-                        // than beneath them, without changing any service route.
-                        station.transform.position += Vector3.down * (worldPerPixel * 18f);
-                    }
+                    // Same three original parts, fit and proportions as StreetKitchenRenderer.
+                    Rect bounds = new Rect(-StreetKitchenLayout.TableWidth * .5f, -40f,
+                        StreetKitchenLayout.TableWidth, StreetKitchenLayout.SandwichTableHeight);
+                    Rect visual = StreetKitchenLayout.FoodTableVisualBounds(bounds);
+                    float topDepth = visual.height * StreetKitchenLayout.SandwichTableTopDepthRatio;
+                    float supportHeight = visual.height - topDepth + StreetKitchenLayout.SandwichTableSupportOverlap;
+                    FitTablePart(station, "Tabletop", visual.center.x, visual.yMin + topDepth * .5f,
+                        bounds.width, topDepth, pixel, depth + 2);
+                    float supportX = bounds.width * (.5f - StreetKitchenLayout.SandwichTableSupportCenterFraction);
+                    float supportWidth = bounds.width * StreetKitchenLayout.SandwichTableSupportWidthFraction;
+                    FitTablePart(station, "Trestle_Left", -supportX, visual.yMax - supportHeight * .5f,
+                        supportWidth, supportHeight, pixel, depth);
+                    FitTablePart(station, "Trestle_Right", supportX, visual.yMax - supportHeight * .5f,
+                        supportWidth, supportHeight, pixel, depth);
+                    // Prepared-product display, not additional physical stock. Only Kitchen
+                    // consumption can issue a delivery receipt, change an order or pay coins.
+                    Vector2 footprint = StreetKitchenLayout.TableServingFootprint(0);
+                    for (int row = 0; row < 3; row++)
+                        for (int col = 0; col < 4; col++)
+                        {
+                            Vector2 point = new Vector2((col - 1.5f) * (footprint.x + StreetKitchenLayout.CompactSandwichGap),
+                                visual.yMin + topDepth * (.18f + row * .28f));
+                            CreateProductDisplay(station.transform, "Sandwich_Chori", "Prepared Chori display",
+                                (Vector2)station.transform.position + new Vector2(point.x, -point.y) * pixel,
+                                footprint, depth + 3 + row);
+                        }
                 }
-                station.transform.localScale = Vector3.one * scale;
+                else
+                {
+                    SpriteRenderer barrel = station.GetComponent<SpriteRenderer>();
+                    if (barrel != null && barrel.sprite != null)
+                    {
+                        float fit = Mathf.Min(StreetKitchenLayout.BarrelWidth / barrel.sprite.bounds.size.x,
+                            StreetKitchenLayout.BarrelHeight / barrel.sprite.bounds.size.y) * pixel;
+                        station.transform.localScale = Vector3.one * fit;
+                    }
+                    SetSortingRecursively(station, depth);
+                    Transform ice = station.transform.Find("Ice");
+                    if (ice != null) ice.GetComponent<SpriteRenderer>().sortingOrder = depth + 1;
+                    for (int row = 0; row < 2; row++)
+                        for (int col = 0; col < 3; col++)
+                            CreateProductDisplay(station.transform, "Drink_Coca", "Loaded Coca display",
+                                (Vector2)station.transform.position + new Vector2((col - 1) * 13f, 27f - row * 7f) * pixel,
+                                StreetKitchenLayout.TableServingSize(4), depth + 2 + row);
+                }
                 SetLayerRecursively(station, presentationLayer);
-                SetSortingRecursively(station, 12 + i);
                 stationObjects.Add(station);
             }
+        }
+
+        private static void FitTablePart(GameObject station, string name, float x, float y,
+            float width, float height, float pixel, int depth)
+        {
+            Transform part = station.transform.Find(name);
+            if (part == null) return;
+            SpriteRenderer renderer = part.GetComponent<SpriteRenderer>();
+            if (renderer == null || renderer.sprite == null) return;
+            Vector2 size = renderer.sprite.bounds.size;
+            part.localPosition = new Vector3(x * pixel, -y * pixel, 0f);
+            part.localScale = new Vector3(width * pixel / size.x, height * pixel / size.y, 1f);
+            renderer.sortingOrder = depth;
+        }
+
+        private GameObject CreateProductDisplay(Transform parent, string prefabName, string name,
+            Vector2 position, Vector2 logicalSize, int depth)
+        {
+            GameObject prefab = Resources.Load<GameObject>("ModularKitchen/Prefabs/" + prefabName);
+            if (prefab == null) return null;
+            GameObject item = Instantiate(prefab, parent, false);
+            item.name = name;
+            item.transform.position = new Vector3(position.x, position.y, 0f);
+            SpriteRenderer renderer = item.GetComponent<SpriteRenderer>();
+            if (renderer != null && renderer.sprite != null)
+            {
+                Vector2 size = renderer.sprite.bounds.size;
+                float fit = Mathf.Min(logicalSize.x / size.x, logicalSize.y / size.y) * mode.WorldUnitsPerLogicalPixel;
+                item.transform.localScale = Vector3.one * (fit / Mathf.Max(.0001f, parent.lossyScale.x));
+                renderer.sortingOrder = depth;
+            }
+            SetLayerRecursively(item, presentationLayer);
+            return item;
+        }
+
+        private void OnDeliveryCompleted(TowerDefenseDelivery receipt)
+        {
+            if (!configured || (receipt.Product != 0 && receipt.Product != 4)) return;
+            DeliveryCue cue = pooledDeliveryCues.Count > 0 ? pooledDeliveryCues.Pop() : new DeliveryCue();
+            if (cue.GameObject == null)
+            {
+                cue.GameObject = new GameObject("TD physical handoff cue");
+                cue.GameObject.transform.SetParent(presentationRoot.transform, false);
+                cue.GameObject.layer = presentationLayer;
+                cue.Renderer = cue.GameObject.AddComponent<SpriteRenderer>();
+                cue.Renderer.sortingOrder = 1000;
+            }
+            GameObject prefab = Resources.Load<GameObject>("ModularKitchen/Prefabs/" +
+                (receipt.Product == 0 ? "Sandwich_Chori" : "Drink_Coca"));
+            cue.Renderer.sprite = prefab != null ? prefab.GetComponent<SpriteRenderer>().sprite : null;
+            cue.Receipt = receipt;
+            cue.GameObject.name = "TD delivered product " + receipt.Product + " unit " + receipt.UnitId + " to fan " + receipt.FanId;
+            cue.GameObject.SetActive(true);
+            deliveryCues.Add(cue);
+        }
+
+        private void SyncDeliveryCues(float elapsed)
+        {
+            for (int i = deliveryCues.Count - 1; i >= 0; i--)
+            {
+                DeliveryCue cue = deliveryCues[i];
+                float t = Mathf.Clamp01((elapsed - cue.Receipt.Elapsed) / TowerDefenseGameMode.DeliveryCueDurationSeconds);
+                if (t >= 1f)
+                {
+                    cue.GameObject.SetActive(false);
+                    deliveryCues.RemoveAt(i); pooledDeliveryCues.Push(cue);
+                    continue;
+                }
+                float pixel = mode.WorldUnitsPerLogicalPixel;
+                Vector2 from = cue.Receipt.Source + Vector2.up * 14f * pixel;
+                Vector2 to = cue.Receipt.Target + Vector2.up * 28f * pixel;
+                Vector2 point = Vector2.Lerp(from, to, Mathf.SmoothStep(0f, 1f, t)) + Vector2.up * (Mathf.Sin(t * Mathf.PI) * 12f * pixel);
+                cue.GameObject.transform.position = new Vector3(point.x, point.y, 0f);
+                if (cue.Renderer.sprite == null) continue;
+                Vector2 size = StreetKitchenLayout.TableServingSize(cue.Receipt.Product) * 1.3f;
+                float fit = Mathf.Min(size.x / cue.Renderer.sprite.bounds.size.x, size.y / cue.Renderer.sprite.bounds.size.y) * pixel;
+                cue.GameObject.transform.localScale = Vector3.one * fit;
+                cue.Renderer.color = new Color(1f, 1f, 1f, 1f - Mathf.Clamp01((t - .8f) * 5f));
+            }
+        }
+
+        private void ClearDeliveryCues()
+        {
+            for (int i = 0; i < deliveryCues.Count; i++)
+            {
+                deliveryCues[i].GameObject.SetActive(false);
+                pooledDeliveryCues.Push(deliveryCues[i]);
+            }
+            deliveryCues.Clear();
         }
 
         private void SyncFans(TowerDefenseGameMode gameMode)
@@ -340,10 +476,16 @@ namespace HayChoriYPaty
                 staleIds.Remove(worker.Id);
                 int frame = worker.IsMoving ? Mathf.FloorToInt(worker.TravelDistance / Mathf.Max(.01f, gameMode.WorldUnitsPerLogicalPixel * 16f)) % workerView.Frames.Length
                     : Mathf.FloorToInt(worker.AnimationTime * 2f) % workerView.Frames.Length;
+                // Station staff breathe/serve, never cycle cooking poses at an invisible grill.
+                if (!worker.IsMoving) frame = 0;
                 workerView.Renderer.sprite = workerView.Frames[frame];
+                float serve = Mathf.Sin(Mathf.Clamp01(worker.ServeAnimationSeconds /
+                    TowerDefenseGameMode.DeliveryCueDurationSeconds) * Mathf.PI);
+                float facing = worker.LastServiceTarget.x < worker.Position.x ? -1f : 1f;
+                workerView.GameObject.transform.localRotation = Quaternion.Euler(0f, 0f, -facing * serve * 5f);
                 float bob = worker.IsMoving ? Mathf.Sin(worker.AnimationTime * 12f) * gameMode.WorldUnitsPerLogicalPixel * 1.3f
                     : Mathf.Sin(worker.AnimationTime * 2.2f + worker.Id) * gameMode.WorldUnitsPerLogicalPixel * 1.1f;
-                workerView.GameObject.transform.position = new Vector3(worker.Position.x, worker.Position.y + bob, 0f);
+                workerView.GameObject.transform.position = new Vector3(worker.Position.x, worker.Position.y + bob + serve * gameMode.WorldUnitsPerLogicalPixel * 2f, 0f);
                 workerView.Renderer.flipX = worker.IsMoving && worker.TargetZone < worker.ServiceZone;
                 workerView.Renderer.sortingOrder = 28 + Mathf.RoundToInt(-worker.Position.y * 12f);
             }

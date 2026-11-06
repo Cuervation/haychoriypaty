@@ -1,5 +1,8 @@
 # Validación independiente — continuación Camioneros / Los Redondos
 
+> **HISTÓRICO — NO ES LA FUENTE VIGENTE.** Resultados fechados 2026-10-21; no describen la campaña ni el balance vigentes. Consultar [balance actual](../../BALANCE_ACTUAL_NIVELES.md).
+
+
 Revisión read-only de la evidencia terminada. No controlé Unity, no inicié ni simulé rondas y no edité el checkout.
 
 ## Resultado comprobado
