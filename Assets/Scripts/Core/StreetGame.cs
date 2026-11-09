@@ -55,10 +55,17 @@ namespace HayChoriYPaty
         [System.Serializable]
         public sealed class SaveData
         {
-            public int version = 6;
+            public int version = 7;
             public int unlockedLevel;
             // `unlockedLevel` remains the original stable-ID frontier; campaign order is separate.
             public bool huracanUnlocked, legacyRacingUnlocked, racingUnlockedByHuracan, argentinosUnlocked;
+            // Explicit, stable-ID unlock state for the reorganized campaign. Never infer this set from a max ID.
+            public bool[] unlockedLevelIds = new bool[13];
+            // One-time repair for pre-v7 market snapshots, expressed in the old stable-ID frontier.
+            public int legacyProgressionRepairLevel = -1;
+            // Legacy ID10 wins/records are historical traditional Los Redondos, before ID10 became Tower Defense.
+            public bool hasLegacyTraditionalLosRedondosResult;
+            public string legacyTraditionalLosRedondosPendingAttemptId;
             public float price = 5f;
             public float[] prices;
             public int coins;
@@ -99,6 +106,8 @@ namespace HayChoriYPaty
         public bool IsLevelUnlocked(int levelId)
         {
             if (save == null || levelId < 0 || levelId >= StreetSimulation.LevelNames.Length) return false;
+            if (save.version >= 7 && save.unlockedLevelIds != null && save.unlockedLevelIds.Length == StreetSimulation.LevelNames.Length)
+                return save.unlockedLevelIds[levelId];
             if (levelId == StreetSimulation.HuracanBonusLevelId)
                 return save.huracanUnlocked || save.legacyRacingUnlocked;
             if (levelId == StreetSimulation.ArgentinosJuniorsLevelId)
@@ -107,6 +116,17 @@ namespace HayChoriYPaty
                 return save.legacyRacingUnlocked || save.racingUnlockedByHuracan || save.unlockedLevel >= 6;
             return levelId <= save.unlockedLevel;
         }
+        private int FirstUnlockedCampaignLevel()
+        {
+            for (int position = 0; position < StreetSimulation.CampaignOrder.Length; position++)
+            {
+                int id = StreetSimulation.CampaignLevelAt(position);
+                if (IsLevelUnlocked(id)) return id;
+            }
+            return 0;
+        }
+        public bool IsIngredientUnlocked(int ingredientId) => playerActive && market != null && save != null &&
+            market.IsIngredientUnlocked(ingredientId, save.unlockedLevelIds, save.unlockedLevel);
         public bool HasWonLevel(int levelIndex)
         {
             if (save == null || save.statistics == null || levelIndex < 0 || levelIndex >= StreetSimulation.LevelNames.Length ||
@@ -232,8 +252,12 @@ namespace HayChoriYPaty
             market.RecoverLegacyZeroPayoutTransition();
             resumedChulengoResult = save.pendingVictoryMatch != null;
             if (resumedChulengoResult && market.LastResult != null) selectedLevel = market.LastResult.level;
+            else if (!market.Data.attemptActive && market.HasPreparationPermitPurchases &&
+                market.Data.preparationLevelId >= 0 && market.Data.preparationLevelId < StreetSimulation.LevelNames.Length &&
+                IsLevelUnlocked(market.Data.preparationLevelId))
+                selectedLevel = market.Data.preparationLevelId;
             selectedLevel = Mathf.Clamp(selectedLevel, 0, StreetSimulation.LevelNames.Length - 1);
-            if (!IsLevelUnlocked(selectedLevel)) selectedLevel = Mathf.Clamp(save.unlockedLevel, 0, 10);
+            if (!IsLevelUnlocked(selectedLevel)) selectedLevel = FirstUnlockedCampaignLevel();
             // A Bonus Track interrupted by app closure has no resumable simulation; discard only
             // its volatile attempt token. It never consumed stock or issued a ticket.
             if (!market.Data.attemptActive && selectedLevel == StreetSimulation.HuracanBonusLevelId &&
@@ -243,13 +267,16 @@ namespace HayChoriYPaty
             }
             sim = new StreetSimulation(balance, selectedLevel, save.price);
             if(save.prices!=null && save.prices.Length==7)for(int i=0;i<7;i++)sim.SetProductPrice(i,save.prices[i]);
-            if (save.unlockedLevel > 0)
+            if (save.legacyProgressionRepairLevel > 0 && save.legacyProgressionRepairLevel < StreetSimulation.LevelNames.Length &&
+                !market.Data.attemptActive)
             {
-                // Some older saves entered Mercado with completed-level rewards already watermarked,
-                // but no Mercado cash existed to pay them. Reconcile only the next unlocked level once.
-                var nextUnlockedSimulation = new StreetSimulation(balance, save.unlockedLevel, save.price);
-                market.ReconcileLegacyProgressionBalance(nextUnlockedSimulation, save.unlockedLevel);
+                // Preserve the bounded pre-v7 recovery once, using its old stable-ID frontier semantics.
+                int legacyNextLevel = save.legacyProgressionRepairLevel;
+                var nextUnlockedSimulation = new StreetSimulation(balance, legacyNextLevel, save.price);
+                market.ReconcileLegacyProgressionBalance(nextUnlockedSimulation, legacyNextLevel);
+                save.legacyProgressionRepairLevel = -1;
             }
+            if (!market.Data.attemptActive && !resumedChulengoResult) market.SelectPreparationLevel(selectedLevel);
             InitializeDeliverySound();
             bool startupTicketGrantApplied = ShouldGrantTemporaryStartupTickets() &&
                 TryApplyTemporaryStartupTicketGrant(save.tickets);
@@ -356,41 +383,54 @@ namespace HayChoriYPaty
             if (market != null && market.Data.attemptActive) return false; // Refuse progression if settlement was rejected.
             if (receipt == null) return false;
             int previousUnlocked = save.unlockedLevel;
+            bool[] previousCampaignUnlocks = (bool[])save.unlockedLevelIds.Clone();
+            bool previousHuracanUnlocked = save.huracanUnlocked;
             bool previousArgentinosUnlocked = save.argentinosUnlocked;
+            bool previousLegacyRacingUnlocked = save.legacyRacingUnlocked;
             if (sim.Phase == RoundPhase.Won)
             {
                 int nextLevel = StreetSimulation.NextCampaignLevelId(sim.LevelIndex);
-                if (sim.LevelIndex == 4) save.huracanUnlocked = true;
-                else if (sim.LevelIndex == 10) save.argentinosUnlocked = true;
-                else save.unlockedLevel = Mathf.Max(save.unlockedLevel, Mathf.Min(10, sim.LevelIndex + 1));
+                bool firstTimeUnlock = nextLevel >= 0 && !IsLevelUnlocked(nextLevel);
+                if (nextLevel >= 0) SetCampaignLevelUnlocked(nextLevel);
+                save.unlockedLevel = Mathf.Max(save.unlockedLevel, Mathf.Min(10, sim.LevelIndex + 1));
                 if (market != null && nextLevel >= 0 && nextLevel != StreetSimulation.HuracanBonusLevelId)
                 {
-                    // Keep bounded legacy recovery for older receipts; current victories pay in full.
-                    // The normal first-unlock grant covers only the remaining next-stock deficit.
                     var nextLevelSimulation = new StreetSimulation(balance, nextLevel, sim.Price);
-                    market.ReconcileLegacyProgressionBalance(nextLevelSimulation, nextLevel);
-                    bool firstTimeUnlock = nextLevel == StreetSimulation.ArgentinosJuniorsLevelId
-                        ? !previousArgentinosUnlocked : nextLevel > previousUnlocked;
                     market.GrantFirstUnlockStockBonus(nextLevelSimulation, firstTimeUnlock);
                 }
             }
             if (receipt.won && !receipt.chulengoManaged)
             {
                 StreetMatchRecord victoryMatch = BuildMatchRecord(receipt);
-                if (!market.PrepareChulengo()) return false;
+                if (!market.PrepareChulengo())
+                {
+                    RestoreCampaignProgress(previousUnlocked, previousCampaignUnlocks, previousHuracanUnlocked,
+                        previousArgentinosUnlocked, previousLegacyRacingUnlocked);
+                    return false;
+                }
                 save.pendingVictoryMatch = victoryMatch;
                 save.activeAttemptSummary = null;
                 resultSaved = Save(); // No final match/history/statistics before the player chooses.
+                if (!resultSaved)
+                {
+                    RestoreCampaignProgress(previousUnlocked, previousCampaignUnlocks, previousHuracanUnlocked,
+                        previousArgentinosUnlocked, previousLegacyRacingUnlocked);
+                }
                 return resultSaved;
             }
             if (save.pendingMatch == null) save.pendingMatch = BuildMatchRecord(receipt);
-            if (save.pendingMatch.won && !EnsureVictoryTicketAwarded(save.pendingMatch)) return false;
-            save.statistics.ApplyMatch(save.pendingMatch);
+            if (save.pendingMatch.won && !EnsureVictoryTicketAwarded(save.pendingMatch))
+            {
+                RestoreCampaignProgress(previousUnlocked, previousCampaignUnlocks, previousHuracanUnlocked,
+                    previousArgentinosUnlocked, previousLegacyRacingUnlocked);
+                return false;
+            }
+            ApplyCampaignMatchStatistics(save.pendingMatch);
             resultSaved = SaveWithMatch(save.pendingMatch);
             if (!resultSaved)
             {
-                save.unlockedLevel = previousUnlocked;
-                save.argentinosUnlocked = previousArgentinosUnlocked;
+                RestoreCampaignProgress(previousUnlocked, previousCampaignUnlocks, previousHuracanUnlocked,
+                    previousArgentinosUnlocked, previousLegacyRacingUnlocked);
             }
             else { ResetAttemptMetrics(); activeAttemptId = null; save.activeAttemptId = null; }
             return resultSaved;
@@ -410,6 +450,10 @@ namespace HayChoriYPaty
             }
 
             StreetBonusTrackProfile progress = save.bonusTrack;
+            int previousUnlocked = save.unlockedLevel;
+            bool[] previousCampaignUnlocks = (bool[])save.unlockedLevelIds.Clone();
+            bool previousHuracanUnlocked = save.huracanUnlocked;
+            bool previousLegacyRacingUnlocked = save.legacyRacingUnlocked;
             if (progress.lastAttemptId != record.attemptId)
             {
                 progress.previousBestScore = progress.bestScore;
@@ -427,9 +471,16 @@ namespace HayChoriYPaty
 
             if (record.bonusStars > 0)
             {
-                save.racingUnlockedByHuracan = true;
-                save.unlockedLevel = Mathf.Max(save.unlockedLevel, 5);
-                if (!EnsureVictoryTicketAwarded(record)) return false;
+                int nextLevel = StreetSimulation.NextCampaignLevelId(StreetSimulation.HuracanBonusLevelId);
+                if (nextLevel >= 0) SetCampaignLevelUnlocked(nextLevel);
+                if (!EnsureVictoryTicketAwarded(record))
+                {
+                    save.unlockedLevel = previousUnlocked;
+                    save.unlockedLevelIds = previousCampaignUnlocks;
+                    save.huracanUnlocked = previousHuracanUnlocked;
+                    save.legacyRacingUnlocked = previousLegacyRacingUnlocked;
+                    return false;
+                }
                 if (record.bonusTickets <= 0) record.bonusTickets = 1;
                 if (record.bonusStars == 3 && !progress.threeStarTicketAwarded &&
                     save.tickets.balance < long.MaxValue && save.tickets.totalEarned < long.MaxValue)
@@ -443,13 +494,52 @@ namespace HayChoriYPaty
             else record.bonusTickets = 0;
             progress.lastTickets = record.bonusTickets;
 
-            if (!save.statistics.HasApplied(record.attemptId)) save.statistics.ApplyMatch(record);
+            if (!save.statistics.HasApplied(record.attemptId)) ApplyCampaignMatchStatistics(record);
             resultSaved = SaveWithMatch(record);
-            if (!resultSaved) return false;
+            if (!resultSaved)
+            {
+                save.unlockedLevel = previousUnlocked;
+                save.unlockedLevelIds = previousCampaignUnlocks;
+                save.huracanUnlocked = previousHuracanUnlocked;
+                save.legacyRacingUnlocked = previousLegacyRacingUnlocked;
+                return false;
+            }
             ResetAttemptMetrics();
             activeAttemptId = null;
             save.activeAttemptId = null;
             return true;
+        }
+
+        private void SetCampaignLevelUnlocked(int levelId)
+        {
+            if (save?.unlockedLevelIds == null || levelId < 0 || levelId >= save.unlockedLevelIds.Length) return;
+            save.unlockedLevelIds[levelId] = true;
+            if (levelId == StreetSimulation.HuracanBonusLevelId) save.huracanUnlocked = true;
+            else if (levelId == StreetSimulation.ArgentinosJuniorsLevelId) save.argentinosUnlocked = true;
+            else if (levelId == 5) save.legacyRacingUnlocked = true;
+        }
+
+        private void RestoreCampaignProgress(int legacyFrontier, bool[] unlocks, bool huracan, bool argentinos, bool racing)
+        {
+            save.unlockedLevel = legacyFrontier;
+            save.unlockedLevelIds = unlocks;
+            save.huracanUnlocked = huracan;
+            save.argentinosUnlocked = argentinos;
+            save.legacyRacingUnlocked = racing;
+        }
+
+        private void ApplyCampaignMatchStatistics(StreetMatchRecord record)
+        {
+            if (IsLegacyTraditionalLosRedondosPending(record)) save.statistics.ApplyLegacyTraditionalLosRedondosMatch(record);
+            else save.statistics.ApplyMatch(record);
+        }
+
+        private bool IsLegacyTraditionalLosRedondosPending(StreetMatchRecord match)
+        {
+            return save != null && save.hasLegacyTraditionalLosRedondosResult && match != null && match.level ==
+                StreetSimulation.LosRedondosTowerDefenseCampaignLevelId &&
+                !string.IsNullOrEmpty(save.legacyTraditionalLosRedondosPendingAttemptId) &&
+                match.attemptId == save.legacyTraditionalLosRedondosPendingAttemptId;
         }
 
         public bool TryCollectVictoryReward() => playerActive && ResolveVictoryChoice(-1);
@@ -489,7 +579,7 @@ namespace HayChoriYPaty
             record.rewardCents = receipt.earnedCents;
             save.pendingMatch = record;
             if (!EnsureVictoryTicketAwarded(record)) return false;
-            save.statistics.ApplyMatch(record);
+            ApplyCampaignMatchStatistics(record);
             save.pendingVictoryMatch = null;
             resultSaved = SaveWithMatch(record);
             if (!resultSaved) { save.pendingVictoryMatch = record; return false; }
@@ -505,11 +595,32 @@ namespace HayChoriYPaty
             if (!playerActive || sim == null || sim.Phase == RoundPhase.Playing || level < 0 ||
                 level >= StreetSimulation.LevelNames.Length || !IsLevelUnlocked(level)) return false;
             if (!EnsureResultSaved()) return false;
+            string previousSave = JsonUtility.ToJson(save);
+            StreetSimulation previousSimulation = sim;
+            bool previousHadMarketResult = market.Data.lastResult != null;
+            int previousSelectedLevel = selectedLevel;
+            bool previousResultSaved = resultSaved, previousResumedChulengoResult = resumedChulengoResult;
             resumedChulengoResult = false;
             selectedLevel = level;
+            if (!market.Data.attemptActive) market.SelectPreparationLevel(level);
             ResetAttemptMetrics();
             sim = NewReadySimulation(level); resultSaved = false;
-            InitializeDeliverySound(); Save(); return true;
+            InitializeDeliverySound();
+            if (Save()) return true;
+
+            // A preparation change clears its old permits only when the new selection is durable.
+            save = JsonUtility.FromJson<SaveData>(previousSave);
+            if (StreetMatchRecord.IsAbsent(save.pendingMatch)) save.pendingMatch = null;
+            if (StreetMatchRecord.IsAbsent(save.pendingVictoryMatch)) save.pendingVictoryMatch = null;
+            if (StreetMatchRecord.IsAbsent(save.activeAttemptSummary)) save.activeAttemptSummary = null;
+            if (!previousHadMarketResult && save.market != null) save.market.lastResult = null;
+            market = new StreetMarket(save.market, balance);
+            sim = previousSimulation;
+            selectedLevel = previousSelectedLevel;
+            resultSaved = previousResultSaved;
+            resumedChulengoResult = previousResumedChulengoResult;
+            InitializeDeliverySound();
+            return false;
         }
         public void SetPrice(float value)
         {
@@ -520,15 +631,15 @@ namespace HayChoriYPaty
         public void StartRound() { TryStartRound(); }
         public bool TryStartRound()
         {
-            // Stable Camioneros ID 9 is never a traditional market simulation.
-            if (sim == null || sim.LevelIndex == StreetSimulation.TowerDefenseCampaignLevelId) return false;
+            // Both stable TD IDs are owned by the external mode, never the traditional simulation.
+            if (sim == null || StreetSimulation.IsTowerDefenseLevel(sim.LevelIndex)) return false;
             return TryStartRoundCore(false);
         }
 
         public bool TryStartTowerDefenseRound()
         {
-            return sim != null && sim.LevelIndex == StreetSimulation.TowerDefenseCampaignLevelId &&
-                IsLevelUnlocked(StreetSimulation.TowerDefenseCampaignLevelId) && TryStartRoundCore(true);
+            return sim != null && StreetSimulation.IsTowerDefenseLevel(sim.LevelIndex) &&
+                IsLevelUnlocked(sim.LevelIndex) && TryStartRoundCore(true);
         }
 
         private bool TryStartRoundCore(bool externalTowerDefense)
@@ -548,6 +659,7 @@ namespace HayChoriYPaty
                 RestoreMarketAfterFailedStart(previousMarket);
                 return false;
             }
+            market.ConsumePreparationPermits(sim.LevelIndex);
             if (eligibleLevel)
                 for (int role = 0; role < ticketGrants.Length; role++)
                     save.tickets.pendingWorkersByRole[role] -= ticketGrants[role];
@@ -680,6 +792,8 @@ namespace HayChoriYPaty
         private bool TryStartBonusRound()
         {
             if (!playerActive || sim == null || !sim.IsBonusTrack || !CanStartRound || save.bonusTrack == null) return false;
+            string previousMarket = JsonUtility.ToJson(market.Data);
+            market.ConsumePreparationPermits(sim.LevelIndex);
             string previousAttempt = save.activeAttemptId;
             long previousStarted = save.statistics.attemptsStarted;
             long previousBonusStarted = save.bonusTrack.attemptsStarted;
@@ -693,6 +807,7 @@ namespace HayChoriYPaty
                 save.statistics.attemptsStarted = previousStarted;
                 save.bonusTrack.attemptsStarted = previousBonusStarted;
                 save.activeAttemptId = activeAttemptId = previousAttempt;
+                RestoreMarketAfterFailedStart(previousMarket);
                 return false;
             }
             resultSaved = false;
@@ -701,6 +816,7 @@ namespace HayChoriYPaty
                 save.statistics.attemptsStarted = previousStarted;
                 save.bonusTrack.attemptsStarted = previousBonusStarted;
                 save.activeAttemptId = activeAttemptId = previousAttempt;
+                RestoreMarketAfterFailedStart(previousMarket);
                 if (!Save()) FreezeAfterUnpersistedMutation();
                 return false;
             }
@@ -716,9 +832,9 @@ namespace HayChoriYPaty
         {
             int index = (int)role;
             return playerActive && save?.tickets != null && market != null && sim != null &&
-                save.unlockedLevel >= 5 && sim.LevelIndex >= 5 && !sim.IsBonusTrack && sim.Phase == RoundPhase.Ready &&
+                IsLevelUnlocked(sim.LevelIndex) && sim.LevelIndex >= 5 && !sim.IsBonusTrack && sim.Phase == RoundPhase.Ready &&
                 !HasPendingChulengo && !resumedChulengoResult && !market.Data.attemptActive &&
-                sim.LevelIndex != StreetSimulation.TowerDefenseCampaignLevelId &&
+                !StreetSimulation.IsTowerDefenseLevel(sim.LevelIndex) &&
                 index >= 0 && index < 5 && sim.HasRole(role) && save.tickets.balance >= 3 &&
                 save.tickets.totalSpent <= long.MaxValue - 3 && save.tickets.pendingWorkersByRole[index] < long.MaxValue;
         }
@@ -780,6 +896,21 @@ namespace HayChoriYPaty
             save.market = market.Data;
             return false;
         }
+        public bool IsPreparationPermitPurchased(int itemId) => playerActive && market != null && sim != null &&
+            market.IsPreparationPermitPurchased(itemId, sim.LevelIndex);
+
+        public bool TryBuyPreparationPermit(int itemId)
+        {
+            if (!playerActive || HasPendingChulengo || resumedChulengoResult || market == null || sim == null ||
+                sim.Phase != RoundPhase.Ready || market.Data.attemptActive ||
+                market.Data.preparationLevelId != sim.LevelIndex) return false;
+            string before = JsonUtility.ToJson(market.Data);
+            if (!market.TryBuyPreparationPermit(itemId, sim.LevelIndex)) return false;
+            save.market = market.Data;
+            if (Save()) return true;
+            RestoreMarketAfterFailedStart(before);
+            return false;
+        }
         public bool BuyMissingIngredient(int ingredient) => market != null &&
             TryBuyIngredient(ingredient, market.MissingPacks(sim, ingredient));
         public bool TryHire() { return TryHireParrillero(); }
@@ -830,6 +961,7 @@ namespace HayChoriYPaty
             if (next < 0 || !IsLevelUnlocked(next)) return false;
             resumedChulengoResult = false;
             selectedLevel = next;
+            if (!market.Data.attemptActive) market.SelectPreparationLevel(next);
             ResetAttemptMetrics();
             sim = NewReadySimulation(selectedLevel); InitializeDeliverySound(); Save(); return true;
         }
@@ -920,13 +1052,16 @@ namespace HayChoriYPaty
             try
             {
                 // JsonUtility fills omitted fields with defaults; require a real legacy version marker.
-                if (!System.Text.RegularExpressions.Regex.IsMatch(json, "^\\s*\\{\\s*\\\"version\\\"\\s*:\\s*[1-6](?:\\s*[,}])")) return false;
+                if (!System.Text.RegularExpressions.Regex.IsMatch(json, "^\\s*\\{\\s*\\\"version\\\"\\s*:\\s*[1-7](?:\\s*[,}])")) return false;
                 data = MigrateSaveData(JsonUtility.FromJson<SaveData>(json));
                 // Unity serializes inline null DTOs as empty objects; never interpret them as results.
                 if (data != null && StreetMatchRecord.IsAbsent(data.pendingMatch)) data.pendingMatch = null;
                 if (data != null && StreetMatchRecord.IsAbsent(data.pendingVictoryMatch)) data.pendingVictoryMatch = null;
                 if (data != null && StreetMatchRecord.IsAbsent(data.activeAttemptSummary)) data.activeAttemptSummary = null;
-                if (data == null || data.version != 6 || (data.tickets != null && !data.tickets.IsValid())) { data = null; return false; }
+                if (data == null || data.version != 7 || data.unlockedLevelIds == null ||
+                    data.unlockedLevelIds.Length != StreetSimulation.LevelNames.Length ||
+                    !data.unlockedLevelIds[0] ||
+                    (data.tickets != null && !data.tickets.IsValid())) { data = null; return false; }
                 data.unlockedLevel = Mathf.Clamp(data.unlockedLevel, 0, 10);
                 data.price = Mathf.Clamp(data.price, balance.minPrice, balance.maxPrice);
                 data.staff = Mathf.Max(1, data.staff);
@@ -974,6 +1109,31 @@ namespace HayChoriYPaty
                 wonArgentinosPredecessor |= data.pendingVictoryMatch != null && data.pendingVictoryMatch.level == 10 && data.pendingVictoryMatch.won;
                 data.argentinosUnlocked = wonArgentinosPredecessor;
                 data.version = 6;
+            }
+            if (data.version == 6)
+            {
+                // Freeze the exact legacy stable-ID access set; do not fill a prefix of the new visual order.
+                var legacyAccess = new bool[StreetSimulation.LevelNames.Length];
+                legacyAccess[0] = true;
+                for (int id = 1; id <= 10; id++) legacyAccess[id] = id <= Mathf.Clamp(data.unlockedLevel, 0, 10);
+                legacyAccess[5] |= data.legacyRacingUnlocked || data.racingUnlockedByHuracan || data.unlockedLevel >= 6;
+                legacyAccess[StreetSimulation.HuracanBonusLevelId] = data.huracanUnlocked || data.legacyRacingUnlocked;
+                legacyAccess[StreetSimulation.ArgentinosJuniorsLevelId] = data.argentinosUnlocked;
+                data.unlockedLevelIds = legacyAccess;
+                data.legacyProgressionRepairLevel = data.unlockedLevel;
+                if (data.statistics != null) data.statistics.ArchiveLegacyTraditionalLosRedondosRecords();
+
+                // The old terminal Redondos record remains historical. Keep a pending token so v7
+                // result persistence cannot apply the new campaign successor to that legacy win.
+                if ((data.pendingMatch != null && data.pendingMatch.level == StreetSimulation.LosRedondosTowerDefenseCampaignLevelId) ||
+                    (data.pendingVictoryMatch != null && data.pendingVictoryMatch.level == StreetSimulation.LosRedondosTowerDefenseCampaignLevelId))
+                {
+                    data.hasLegacyTraditionalLosRedondosResult = true;
+                    var legacyRecord = data.pendingVictoryMatch != null ? data.pendingVictoryMatch : data.pendingMatch;
+                    data.legacyTraditionalLosRedondosPendingAttemptId = legacyRecord == null || string.IsNullOrEmpty(legacyRecord.attemptId)
+                        ? null : legacyRecord.attemptId;
+                }
+                data.version = 7;
             }
             return data;
         }
@@ -1031,7 +1191,12 @@ namespace HayChoriYPaty
             return true;
         }
 
-        private SaveData DefaultSave() { return new SaveData { price = balance.initialPrice }; }
+        private SaveData DefaultSave()
+        {
+            var data = new SaveData { price = balance.initialPrice };
+            data.unlockedLevelIds[0] = true;
+            return data;
+        }
 
         private StreetMatchRecord BuildMatchRecord(StreetMarketResult receipt)
         {
@@ -1047,7 +1212,7 @@ namespace HayChoriYPaty
                 utc = DateTime.UtcNow.ToString("o"), level = level, club = StreetSimulation.LevelDisplayNames[level],
                 won = receipt.won, result = receipt.won ? "won" : "lost", elapsedSeconds = sim.Elapsed, grossSalesCents = receipt.grossSalesCents,
                 hireSpendCents = attemptHireSpendCents, speedSpendCents = attemptSpeedSpendCents,
-                initialCoinsCents = (long)balance.GetStartingCoins(level) * 100L,
+                initialCoinsCents = (long)StreetSimulation.GetStartingCoinsForLevel(balance, level) * 100L,
                 leftoverCents = receipt.leftoverCents, halfSalesRewardCents = receipt.recognizedSalesCents,
                 leftoverBonusCents = receipt.bonusCents, progressionBonusCents = receipt.progressionBonusCents,
                 rewardCents = receipt.earnedCents,
@@ -1089,7 +1254,7 @@ namespace HayChoriYPaty
                 level = level, club = StreetSimulation.LevelDisplayNames[level], result = "abandoned", abandoned = true,
                 elapsedSeconds = sim.Elapsed, grossSalesCents = (long)Math.Max(0, sim.CoinsEarned) * 100L,
                 hireSpendCents = attemptHireSpendCents, speedSpendCents = attemptSpeedSpendCents,
-                initialCoinsCents = (long)balance.GetStartingCoins(level) * 100L,
+                initialCoinsCents = (long)StreetSimulation.GetStartingCoinsForLevel(balance, level) * 100L,
                 leftoverCents = (long)Math.Max(0, sim.Coins) * 100L,
                 customersAttended = sim.CustomersAttended, customersLost = sim.CustomersLost, ordersCompleted = sim.OrdersCompleted,
                 salesByProduct = new long[7], stockConsumed = new long[10], stockRemaining = new long[10], hiresByRole = (long[])attemptHiresByRole.Clone()
@@ -1140,17 +1305,16 @@ namespace HayChoriYPaty
             save.market = market?.Data ?? save.market;
             if (save.pendingMatch != null && save.pendingMatch.won)
             {
-                if (save.pendingMatch.level == 4) save.huracanUnlocked = true;
-                else if (save.pendingMatch.level == 10) save.argentinosUnlocked = true;
-                else if (save.pendingMatch.level == StreetSimulation.HuracanBonusLevelId)
+                StreetMatchRecord pending = save.pendingMatch;
+                if (!IsLegacyTraditionalLosRedondosPending(pending))
                 {
-                    if (save.pendingMatch.bonusStars > 0)
+                    if (pending.level != StreetSimulation.HuracanBonusLevelId || pending.bonusStars > 0)
                     {
-                        save.racingUnlockedByHuracan = true;
-                        save.unlockedLevel = Mathf.Max(save.unlockedLevel, 5);
+                        int next = StreetSimulation.NextCampaignLevelId(pending.level);
+                        if (next >= 0) SetCampaignLevelUnlocked(next);
                     }
+                    save.unlockedLevel = Mathf.Max(save.unlockedLevel, Mathf.Min(10, pending.level + 1));
                 }
-                else save.unlockedLevel = Mathf.Max(save.unlockedLevel, Mathf.Min(10, save.pendingMatch.level + 1));
             }
             StreetMatchRecord pendingToRestore = null;
             StreetMatchRecord summaryToRestore = null;

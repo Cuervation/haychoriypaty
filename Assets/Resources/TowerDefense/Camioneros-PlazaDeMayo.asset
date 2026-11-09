@@ -38,7 +38,8 @@ MonoBehaviour:
   directionSignPrefab: {fileID: 1359721814499061152, guid: 9cf7a7df68e2841c88fe696034ad64a0, type: 3}
   directionArrowSprite: {fileID: 21300000, guid: ef3873967f16248bd8b9a67207f11688, type: 3}
   availableProducts: 0000000004000000
-  fanSpeed: 0.45
+  fanSpeed: 0.1575
+  minimumEntrySpacingLogical: 96
   serviceRange: 0.8
   firstWorkZoneOffset: {x: 0, y: 0}
   secondWorkZoneOffset: {x: 0, y: 0}

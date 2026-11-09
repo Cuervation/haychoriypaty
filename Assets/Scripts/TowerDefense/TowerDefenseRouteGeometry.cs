@@ -28,6 +28,7 @@ namespace HayChoriYPaty
         public Rect PlayableBounds = new Rect(-10f, -10f, 20f, 20f);
         [Tooltip("Number of samples along each straight vertical connector; retained to preserve route-row indexing.")]
         [Range(4, 128)] public int TurnSegments = 12;
+        [NonSerialized] public float FanEntryExtensionWorldUnits;
     }
 
     /// <summary>A public, inspectable report of route configuration/layout errors.</summary>

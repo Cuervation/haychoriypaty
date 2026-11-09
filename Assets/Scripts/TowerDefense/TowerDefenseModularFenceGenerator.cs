@@ -9,7 +9,7 @@ namespace HayChoriYPaty
     /// <summary>
     /// Constructs two independent rows of small SpriteRenderer pieces and continuous
     /// EdgeCollider2D route rails from the route's offset polylines. Optional visual
-    /// tails bring the entry/exit panels to the camera edges without moving the route.
+    /// endpoint fitting snaps entry/exit panels to camera edges without moving the route.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class TowerDefenseModularFenceGenerator : MonoBehaviour
@@ -130,34 +130,34 @@ namespace HayChoriYPaty
             }
             SetLayerRecursively(generatedRoot.gameObject, presentationLayer);
             ClearGeneratedChildren();
-            BuildRail(ExtendVisualRailToHorizontalBounds(latestGeometry.LeftBoundary), 0);
-            BuildRail(ExtendVisualRailToHorizontalBounds(latestGeometry.RightBoundary), 1);
-            // Simulation/collision keep using the unextended route; only fence art reaches
-            // the screen edges, so screen framing cannot change follower waypoints.
+            BuildRail(FitVisualRailToHorizontalBounds(latestGeometry.LeftBoundary), 0);
+            BuildRail(FitVisualRailToHorizontalBounds(latestGeometry.RightBoundary), 1);
+            // Simulation/collision keep using the original route; only fence art snaps
+            // to the screen edges, so screen framing cannot change follower waypoints.
             BuildEdge("Fence rail 0 collider", latestGeometry.LeftBoundary);
             BuildEdge("Fence rail 1 collider", latestGeometry.RightBoundary);
             BuildDirectionSigns(latestGeometry);
             return GeneratedPieceCount > 0;
         }
 
-        private Vector2[] ExtendVisualRailToHorizontalBounds(Vector2[] source)
+        private Vector2[] FitVisualRailToHorizontalBounds(Vector2[] source)
         {
             if (!hasVisualHorizontalBounds || source == null || source.Length < 2) return source;
             Vector2[] extended = (Vector2[])source.Clone();
             Vector2 firstTangent = FirstTangent(source);
             Vector2 lastTangent = LastTangent(source);
 
-            // Odd-row Tower Defense paths enter from the left and leave on the right.
-            // The directional branches also keep the helper valid for a reversed path.
-            if (firstTangent.x > 0.5f && extended[0].x > visualLeftEdge)
+            // Pin visible endpoints exactly to camera bounds even when the authored
+            // route already extends beyond them. Also supports a reversed route.
+            if (firstTangent.x > 0.5f)
                 extended[0].x = visualLeftEdge;
-            else if (firstTangent.x < -0.5f && extended[0].x < visualRightEdge)
+            else if (firstTangent.x < -0.5f)
                 extended[0].x = visualRightEdge;
 
             int last = extended.Length - 1;
-            if (lastTangent.x > 0.5f && extended[last].x < visualRightEdge)
+            if (lastTangent.x > 0.5f)
                 extended[last].x = visualRightEdge;
-            else if (lastTangent.x < -0.5f && extended[last].x > visualLeftEdge)
+            else if (lastTangent.x < -0.5f)
                 extended[last].x = visualLeftEdge;
 
             return extended;
@@ -270,8 +270,7 @@ namespace HayChoriYPaty
             SetLayerRecursively(pieceObject, presentationLayer);
             pieceObject.transform.position = new Vector3(position.x, position.y, 0f);
             pieceObject.transform.localScale = new Vector3(uniformScale, uniformScale, 1f);
-            if (tangent.sqrMagnitude > 0.000001f)
-                pieceObject.transform.rotation = Quaternion.AngleAxis(Mathf.Atan2(tangent.y, tangent.x) * Mathf.Rad2Deg, Vector3.forward);
+            pieceObject.transform.rotation = GetFencePanelRotation(tangent);
 
             var renderer = pieceObject.GetComponent<SpriteRenderer>();
             if (renderer == null) renderer = pieceObject.AddComponent<SpriteRenderer>();
@@ -288,6 +287,19 @@ namespace HayChoriYPaty
             if (metadata == null) metadata = pieceObject.AddComponent<TowerDefenseFencePiece>();
             metadata.Initialize(kind, railIndex, pieceIndex);
             GeneratedPieceCount++;
+        }
+
+        /// <summary>
+        /// Keep the asymmetric fence artwork upright in screen space instead of
+        /// rotating it with the direction of travel. Leftward horizontal runs
+        /// otherwise flip the support feet above the rail, while alternating
+        /// vertical runs swap them between sides.
+        /// </summary>
+        private static Quaternion GetFencePanelRotation(Vector2 tangent)
+        {
+            if (tangent.sqrMagnitude <= 0.000001f) return Quaternion.identity;
+            float angle = Mathf.Abs(tangent.x) >= Mathf.Abs(tangent.y) ? 0f : 90f;
+            return Quaternion.AngleAxis(angle, Vector3.forward);
         }
 
         private void BuildDirectionSigns(TowerDefenseRouteGeometryResult geometry)

@@ -1,0 +1,46 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 74e28fc3c853e44a9bdf80b9b1fa1841, type: 3}
+  m_Name: LosRedondos-Tandil
+  m_EditorClassIdentifier: Assembly-CSharp::HayChoriYPaty.TowerDefenseLevelConfig
+  modeId: tower-defense
+  levelId: tower-defense.los-redondos.tandil.level-1
+  displayName: Los Redondos / Tandil
+  sourceCampaignLevelId: 10
+  backgroundResource: street-background-losredondos-v1
+  route:
+    RowCount: 3
+    SegmentLengths:
+    - 3.8
+    - 3.8
+    - 3.8
+    CorridorWidth: 0.9
+    RowSpacing: 1.8
+    PlayableBounds:
+      serializedVersion: 2
+      x: -3.3
+      y: -4.7
+      width: 6.6
+      height: 9.4
+    TurnSegments: 16
+  straightFencePrefab: {fileID: 2371312016393039640, guid: 26ca722ab4b564168b77a248a37ddd55, type: 3}
+  turnFencePrefab: {fileID: 5325544064044861468, guid: 68a6d7eb36cdf4e8aa4b233a89f11119, type: 3}
+  terminalFencePrefab: {fileID: 3412343263549730106, guid: fdf92aa37b642494095a6916e80a192f, type: 3}
+  directionSignPrefab: {fileID: 1359721814499061152, guid: 9cf7a7df68e2841c88fe696034ad64a0, type: 3}
+  directionArrowSprite: {fileID: 21300000, guid: ef3873967f16248bd8b9a67207f11688, type: 3}
+  availableProducts: 0000000004000000
+  fanSpeed: 0.1575
+  minimumEntrySpacingLogical: 58
+  serviceRange: 0.8
+  firstWorkZoneOffset: {x: 0, y: 0}
+  secondWorkZoneOffset: {x: 0, y: 0}
+  startingWorkersByRole: 0000000000000000000000000000000000000000

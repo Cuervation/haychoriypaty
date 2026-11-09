@@ -17,6 +17,7 @@ namespace HayChoriYPaty.Tests
         private Type gameType, saveType, marketDataType, ticketDataType, matchType, roleType;
         private bool oldEditorInitialization, oldTemporaryStartupTicketGrantApplied, persistSucceeds = true;
         private string persistedJson;
+        private object persistedMatch;
         private readonly List<GameObject> hosts = new List<GameObject>();
 
         [SetUp]
@@ -35,6 +36,7 @@ namespace HayChoriYPaty.Tests
             startupGrant.SetValue(null, false);
             persistSucceeds = true;
             persistedJson = null;
+            persistedMatch = null;
         }
 
         [TearDown]
@@ -68,6 +70,7 @@ namespace HayChoriYPaty.Tests
         {
             if (!persistSucceeds) return false;
             persistedJson = json;
+            persistedMatch = match;
             return true;
         }
 
@@ -208,21 +211,69 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void WinningLosRedondosUnlocksArgentinosWithoutMovingLegacyFrontier()
+        public void LegacyLosRedondosAccessNowSelectsTowerDefenseInsteadOfTraditionalMode()
         {
             object game = NewGame(Json(NewLegacySave(10, null, Tickets(0))));
             Assert.IsFalse((bool)Invoke(game, "IsLevelUnlocked", 12), "Access to Los Redondos alone does not unlock Argentinos.");
             SelectLevel(game, 10);
-            Assert.IsTrue((bool)Invoke(game, "TryStartRound"));
-            ForgeTerminalResult(game, "Won");
+            Type simulationType = Runtime("StreetSimulation");
+            Assert.IsTrue((bool)simulationType.GetMethod("IsTowerDefenseLevel", PublicStatic).Invoke(null, new object[] { 10 }));
+            Assert.IsFalse((bool)Invoke(game, "TryStartRound"), "Legacy ID10 must not be reinterpreted as a traditional round.");
+            Assert.IsTrue((bool)Invoke(game, "TryStartTowerDefenseRound"));
+            object sim = Read(game, "Sim");
+            Assert.AreEqual(500, Read(sim, "Coins"), "Both defense campaign identities use the isolated common opening grant.");
+            Assert.AreEqual(2, Read(sim, "ProductCount"));
+        }
 
-            Assert.IsTrue((bool)Invoke(game, "IsLevelUnlocked", 12));
-            Assert.AreEqual(10, Read(game, "UnlockedLevel"), "The persisted frontier remains capped at the final legacy stable ID.");
-            object persisted = JsonUtility.FromJson(persistedJson, saveType);
-            Assert.IsTrue((bool)Field(persisted, "argentinosUnlocked"));
-            Assert.AreEqual(6, Field(persisted, "version"));
-            object reloaded = NewGame(persistedJson);
-            Assert.IsTrue((bool)Invoke(reloaded, "IsLevelUnlocked", 12), "The separate unlock flag survives reload.");
+        [Test]
+        public void LegacyPendingTraditionalLosRedondosWinDoesNotUnlockItsNewCampaignSuccessor()
+        {
+            object pending = Activator.CreateInstance(matchType);
+            Put(pending, "id", "legacy-redondos-result"); Put(pending, "attemptId", "legacy-redondos-attempt");
+            Put(pending, "level", 10); Put(pending, "won", true);
+            object legacy = NewLegacySave(2, null, Tickets(0), null, pending);
+            object game = NewGame(Json(legacy));
+
+            Assert.IsTrue((bool)Invoke(game, "IsLevelUnlocked", 12), "The historical win keeps its old Argentinos unlock meaning.");
+            Assert.IsFalse((bool)Invoke(game, "IsLevelUnlocked", 4));
+            Assert.IsTrue((bool)Invoke(game, "Save"));
+            Assert.IsFalse((bool)Invoke(game, "IsLevelUnlocked", 4), "Persisting a legacy ID10 win must not reinterpret it as a TD ID10 campaign transition.");
+        }
+
+        [Test]
+        public void ResolvingMigratedLegacyLosRedondosVictoryPreservesHistoryBucketAndOutboxIdentity()
+        {
+            object pendingVictory = Activator.CreateInstance(matchType);
+            Put(pendingVictory, "id", "legacy-redondos-pending"); Put(pendingVictory, "attemptId", "legacy-redondos-attempt");
+            Put(pendingVictory, "level", 10); Put(pendingVictory, "won", true); Put(pendingVictory, "elapsedSeconds", 77f);
+            Put(pendingVictory, "salesByProduct", new long[7]); Put(pendingVictory, "stockConsumed", new long[10]);
+            Put(pendingVictory, "stockRemaining", new long[10]); Put(pendingVictory, "hiresByRole", new long[5]);
+            object legacy = NewLegacySave(2, null, Tickets(0), pendingVictory);
+            Put(legacy, "version", 6);
+            object oldStats = Field(legacy, "statistics");
+            long[] wins = new long[13]; wins[10] = 2; Put(oldStats, "winsByLevel", wins);
+            float[] times = new float[13]; times[10] = 90f; Put(oldStats, "bestWinTimeByLevel", times);
+            object ticketLedger = Field(legacy, "tickets"); Put(ticketLedger, "migrationApplied", true);
+            object oldMarket = Field(legacy, "market");
+            object result = Activator.CreateInstance(Runtime("StreetMarketResult"));
+            Put(result, "won", true); Put(result, "level", 10); Put(result, "chulengoManaged", true);
+            Put(result, "chulengoPending", true); Put(result, "chulengoBaseRewardCents", 10000L);
+            Put(result, "recognizedSalesCents", 5000L); Put(result, "bonusCents", 5000L); Put(result, "earnedCents", 10000L);
+            Put(oldMarket, "lastResult", result);
+
+            object game = NewGame(Json(legacy));
+            object migratedStats = Field(Field(game, "save"), "statistics");
+            Assert.AreEqual(2L, Field(migratedStats, "legacyTraditionalLosRedondosWins"));
+            Assert.AreEqual(0L, ((long[])Field(migratedStats, "winsByLevel"))[10]);
+            Assert.IsFalse((bool)Invoke(game, "IsLevelUnlocked", 4));
+
+            Assert.IsTrue((bool)Invoke(game, "TryCollectVictoryReward"));
+            Assert.AreEqual(3L, Field(migratedStats, "legacyTraditionalLosRedondosWins"));
+            Assert.AreEqual(0L, ((long[])Field(migratedStats, "winsByLevel"))[10], "The old traditional result must not be counted in the new TD slot.");
+            Assert.IsFalse((bool)Invoke(game, "IsLevelUnlocked", 4), "The old pending victory must not unlock the new ID10 successor.");
+            Assert.IsNotNull(persistedMatch, "The existing result is committed rather than dropped from the outbox.");
+            Assert.AreEqual("legacy-redondos-attempt", Field(persistedMatch, "attemptId"));
+            Assert.AreEqual(10, Field(persistedMatch, "level"));
         }
 
         [Test]
@@ -262,14 +313,31 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void CamionerosTowerDefenseUsesCampaignId9SettlementAndUnlocksLosRedondosExactlyOnce()
+        public void TicketEligibilityUsesExplicitUnlocksAndStableLevelIdentityAfterReordering()
+        {
+            object save = NewLegacySave(3, null, Tickets(9));
+            Put(save, "version", 7);
+            bool[] unlocked = new bool[13]; unlocked[0] = true; unlocked[2] = true;
+            unlocked[5] = true; unlocked[12] = true;
+            Put(save, "unlockedLevelIds", unlocked);
+            object game = NewGame(Json(save));
+            object parrillero = Role(roleType, "Parrillero");
+
+            SelectLevel(game, 12);
+            Assert.IsTrue((bool)Invoke(game, "CanRedeemTicketWorker", parrillero), "Explicitly unlocked Argentinos keeps its legacy ID>=5 ticket eligibility.");
+            SelectLevel(game, 5);
+            Assert.IsTrue((bool)Invoke(game, "CanRedeemTicketWorker", parrillero), "Racing remains eligible after the campaign reorder.");
+            SelectLevel(game, 2);
+            Assert.IsFalse((bool)Invoke(game, "CanRedeemTicketWorker", parrillero), "A newly earlier stable ID below 5 does not gain ticket eligibility from its visual position.");
+        }
+
+        [Test]
+        public void CamionerosTowerDefenseUsesCampaignId9SettlementAndAdvancesByCampaignOrderExactlyOnce()
         {
             Type simulationType = Runtime("StreetSimulation");
             int[] order = (int[])simulationType.GetField("CampaignOrder", PublicStatic).GetValue(null);
             Assert.AreEqual(13, order.Length);
-            Assert.AreEqual(9, order[10], "Camioneros remains visible slot 11 with its stable ID 9.");
-            Assert.AreEqual(10, order[11], "Los Redondos remains after Camioneros with stable ID 10.");
-            Assert.AreEqual(12, order[12], "Argentinos Juniors is appended without shifting established IDs.");
+            CollectionAssert.AreEqual(new[] { 0, 1, 9, 2, 12, 3, 11, 10, 4, 5, 6, 7, 8 }, order);
 
             long[] reservedForOtherLevels = { 1, 1, 0, 0, 0 };
             object game = NewGame(Json(NewLegacySave(9, null, Tickets(4, 0, reservedForOtherLevels))));
@@ -312,7 +380,7 @@ namespace HayChoriYPaty.Tests
             Assert.IsFalse((bool)Invoke(game, "ProcessRoundResult"), "Retrying the terminal result cannot create a second match or ticket.");
             Assert.AreEqual(ticketsBeforeChoice + 1, (long)Read(game, "TicketBalance"));
             Assert.IsTrue((bool)Invoke(game, "NextLevel"));
-            Assert.AreEqual(10, Read(Read(game, "Sim"), "LevelIndex"));
+            Assert.AreEqual(2, Read(Read(game, "Sim"), "LevelIndex"), "The successor follows the reordered campaign rather than numeric stable-ID order.");
         }
 
         [Test]
@@ -493,7 +561,8 @@ namespace HayChoriYPaty.Tests
         {
             for (int level = 5; level <= 10; level++)
             {
-                if (level == 9) continue; // Camioneros uses the separate Tower Defense entry point and starts without ticket workers.
+                if ((bool)Runtime("StreetSimulation").GetMethod("IsTowerDefenseLevel", PublicStatic).Invoke(null, new object[] { level }))
+                    continue; // Both TD identities use the separate entry point and start without ticket workers.
                 long[] pending = new long[5]; pending[0] = 1;
                 object game = NewGame(Json(NewLegacySave(10, null, Tickets(0, 3, pending))));
                 SelectLevel(game, level);

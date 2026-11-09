@@ -56,7 +56,7 @@ namespace HayChoriYPaty
         private bool matched;
         // Tight full-body frame bounds in the source PNG. Each cooking pose keeps the shoulders,
         // arms, hands, tongs, torso and feet together in one anchored cutout.
-        private static readonly Rect[] CookingPoseBounds = {
+        internal static readonly Rect[] CookingPoseBounds = {
             new Rect(112,29,454,632), new Rect(587,29,518,633),
             new Rect(73,669,493,662), new Rect(587,669,518,662)
         };

@@ -2,6 +2,64 @@
 
 > **HISTÓRICO:** este archivo registra el estado en la fecha de cada entrada. Una entrada marcada PASS no valida el runtime actual ni reemplaza el contrato vigente. Consultar [current-state](current-state.md), [índice SDD](README.md) y la [tabla maestra](../docs/BALANCE_ACTUAL_NIVELES.md).
 
+## 2026-11-09 — Torre Defense: envelope completo de los 6 trabajadores
+
+La ubicación de Parrilleros/Cocacoleros en portrait alto trataba `worker.Position` como centro del sprite aunque la vista usa pivot Y `0.02` (casi a los pies); la fila superior podía cruzar el riel horizontal. Ahora el cálculo centra los envelopes de dos filas de 94 px con 8 px de margen al claro de vallas, conserva 110 px entre anclas y comprueba el tamaño real de las cuatro poses regulares de cada oficio. La prueba EditMode existente se amplió: contrata 3+3 en cada una de las dos áreas, comprueba las seis cajas completas contra límites de vallas reales, separación entre trabajadores y espacio libre de mesa/barril. Mesa/barril y centros de estación no se movieron.
+
+**Validación:** `PASS` revisión estática y cálculo geométrico focalizado para ruta portrait 540 lógica (clearance horizontal 9,6 px, cajas 3+3 disjuntas y clearance de conector vertical 18,74 px). `PASS` `git diff --check` focalizado. Unity MCP identifica el proyecto `/Users/celestino/HayChoriYPaty`, pero el EditMode job `4e4ab7bbb5624393adb30073c34c8486` no inició pruebas antes del timeout (`completed=0`): `BLOCKED`. `editor/state` agotó 2 s y `read_console` indicó ping sin respuesta; Game View `BLOCKED`, sin captura. No se generó APK.
+
+## 2026-11-09 — APK Development del working tree actual
+
+Unity 6000.6.3f1 BuildPipeline vía Unity MCP, Android Development IL2CPP/ARM64, con `Assets/Scenes/Main.unity` explícita: **Succeeded en 293,00 s, 0 errores / 5 advertencias** (job `build-f39f21e5a0`). APK local ignorada por Git: `Builds/Android/Archive/HayChoriYPaty-0.2.83-code85-current-tree-20261109.apk`, **422.576.550 bytes**, SHA-256 `666563490c97797795e10383d9b70748c27da2b12cd64f06f70731dba588a0e1`. ZIP, `zipalign -c -v 4`, firma v2 y metadata **PASS**; package `com.haychoriypaty.game`, versionName `0.2.83`/versionCode `85`, min API26/target36, ABI `arm64-v8a`, Development/debuggable, Analytics/Ad-ID desactivados. Firma Android Debug (no Play Store). Esta operación no ejecutó pruebas ni lanzó la app; smoke físico **NOT_RUN**. La instalación posterior del mismo día se registra a continuación. Ver [Android delivery](features/android-prototype.md).
+
+## 2026-11-09 — Instalación de APK actual en Motorola Edge 60 Fusion
+
+Por pedido del usuario, `adb install -r` devolvió **Success** en `ZY22MBNWRB`. Package Manager verifica `com.haychoriypaty.game`, `versionName=0.2.83`/`versionCode=85`, `lastUpdateTime=2026-11-09 14:17:01` y `firstInstallTime=2026-10-03 18:49:24` conservado. Fue una actualización in-place: no se desinstaló ni se borraron datos/progreso. La aplicación no se lanzó; smoke de gameplay **NOT_RUN**. Ver [Android delivery](features/android-prototype.md).
+
+## 2026-11-09 — Validación Unity de la caminata de Camioneros
+
+Se abrió Unity 6000.6.3f1 en `/Users/celestino/HayChoriYPaty`, con `Assets/Scenes/Main.unity` activa al inicio. La regresión EditMode de las tres poses pasó 1/1 (`7c05a421226341d881183d9fe53f67e`). La oleada integrada PlayMode de 60 hinchas pasó 1/1 (`1915d3a675cb43cb9defe010ca2a3622`): 60 atendidos, 0 escapes y victoria; se obtuvieron Game Views reales 540×960, 720×1280 y 1080×1920. Después del primer timeout/desconexión de MCP, se cerró de forma normal únicamente el Editor bloqueado, se reabrió el mismo checkout y se ejecutó el PlayMode focalizado `CamionerosAdvancingFanCyclesThroughTheThreeLoadedWalkingSprites`, 1/1 **PASS** (`b93a8604850248a180e94c9a0047d10c`, duración 4,04 s). La prueba confirmó que el hincha real cambia la textura renderizada 0→1→2→0 al avanzar 18 px lógicos por fase, respetando el desfase inicial por ID, y dejó cuatro capturas Game View (`camioneros-walking-pose-0.png` a `-3.png`) en `Logs/Acceptance/TowerDefenseReadyStations20261106/`. Al finalizar se verificó `Main.unity` activa, Editor fuera de PlayMode, sin compilación en curso; la única advertencia observada fue que el fixture de test no tiene Audio Listener. La validación de gait queda **PASS**; no se generó APK.
+
+## 2026-11-09 — Caminata frontal en tramos descendentes de Camioneros
+
+Se agregaron tres atlas frontales descendentes (base, zancada contraria y fase de paso) para que la perspectiva cambie con el vector del recorrido, en vez de mostrar hinchas caminando de costado al bajar verticalmente. Los tramos horizontales conservan la familia lateral; la cadencia de 18 px, el desfase por hincha, la escala, el gameplay y Los Redondos no cambian. Los seis atlas usan las mismas 12 identidades y formato 1086×1448/3×4. Revisión de código/recursos y `git diff --check` de archivos editados **PASS**. Se solicitaron las pruebas EditMode, pero Unity MCP perdió la sesión mientras esperaba el resultado: **BLOCKED**, sin XML. La regresión PlayMode nueva y una captura Game View quedaron **NOT_RUN** al no recuperarse la conexión. No se reinició Unity ni se generó APK.
+
+## 2026-11-07 — Tower Defense: vallado termina al ras del borde derecho
+
+Se quitó el inset de 4 px lógicos para que el arte del vallado termine exactamente en ambos bordes proyectados de cámara. Ahora los extremos visuales se fijan a los límites del viewport aunque la geometría serializada ya los sobrepase; el recorrido simulado y sus colliders no cambian. El EditMode de extremos se ajustó para forzar límites dentro de la ruta y detectar que ningún terminal quede desplazado. Revisión estática y `git diff --check` focalizado **PASS**; EditMode/Game View **NOT_RUN** porque Unity MCP reporta `instance_count=0`. No se generó APK.
+
+## 2026-11-07 — Tower Defense: orientación consistente de vallas
+
+Los paneles de valla ya no siguen el sentido del tramo al rotarse: se fijan a 0° en horizontal y 90° en vertical para que los apoyos no queden cabeza abajo en las pasadas hacia la izquierda ni alternen de lado en conectores verticales. Ruta, dimensiones y colliders permanecen iguales. Se reforzó `TowerDefenseModularFenceGeneratorTests` para rechazar el eje invertido. Revisión estática y `git diff --check` focalizado **PASS**. EditMode y Game View **NOT_RUN** porque `mcpforunity://instances` reportó cero instancias; no se abrió ni reinició Unity. No se generó APK.
+
+## 2026-11-07 — Zancada visible para hinchas de Camioneros TD
+
+El renderer de Camioneros ID9 ahora alterna la pose base y un atlas de paso contrario, escogiendo fase por progreso de ruta cada 18 px lógicos y desfasando por ID. Se conservan los doce diseños verdes/blancos; la vista frontal de atención/salida y Los Redondos ID10 no cambian. Se añadió una regresión EditMode para cadencia, desfase, aislamiento por nivel y dimensiones iguales de ambos atlas.
+
+**Validación:** revisión estática del renderer y el atlas **PASS**; `git diff --check` focalizado **PASS**. Una compilación Roslyn del runtime no termina por `CS0173` ajeno a esta tarea en `StreetView.BonusTrack.cs:279` (condicional de `int` frente a `string`); no hubo diagnóstico en el archivo editado. El Test Runner y la captura de Game View están **NOT_RUN/BLOCKED**: Unity MCP informa `instance_count=0`, y la ejecución batch anterior falló al inicializar Licensing (`attempt to write a readonly database`) antes de abrir el proyecto, sin XML. La APK instalada `0.2.83/code85` es anterior a este cambio; no se solicitó generar ni instalar otra.
+
+## 2026-11-07 — Hinchas Tower Defense entran desde el borde izquierdo
+
+A pedido del usuario, cada nuevo hincha aparece al ras del borde izquierdo del viewport jugable, con su frame completo de 78 px lógicos visible; luego recorre una extensión horizontal hasta incorporarse al primer waypoint de la ruta S. La extensión solo existe en el follower: no altera vallas, geometría de ruta, colliders, giros, salida ni áreas de trabajo. La longitud inicial se descuenta del progreso al probar adyacencia del hincha a un área de entrega.
+
+**Validación:** `git diff --check` y revisión estática focalizada **PASS**. Se añadió una regresión EditMode que verifica centro de aparición, unión al S existente y frontera de área. Unity MCP no tiene Editor conectado (`instance_count=0`); el Test Runner en copia aislada **BLOCKED** antes de iniciar casos por `attempt to write a readonly database` y fallo de Licensing a los 74,86 s (sin XML). Captura full Game View **BLOCKED**; no se afirma validación visual. APK instalada `0.2.83/code85` predates este cambio; no se pidió generar ni instalar otra.
+
+## 2026-11-07 — Instalación en Motorola de APK Tower Defense 0.2.83/code85
+
+Por pedido del usuario, se instaló `Builds/Android/Archive/HayChoriYPaty-0.2.83-code85-td-worker-delivery-fixes-20261107.apk` con `adb install -r`: **Success** en Motorola Edge 60 Fusion (`ZY22MBNWRB`). Package Manager confirma `com.haychoriypaty.game`, `versionName=0.2.83`/`versionCode=85`, `lastUpdateTime=2026-11-07 19:59:37` y `firstInstallTime=2026-10-03 18:49:24` preservado. Actualización in-place, sin desinstalar ni borrar datos/progreso. La aplicación no se lanzó; smoke de gameplay en el dispositivo **NOT_RUN**. Ver [Android delivery](features/android-prototype.md).
+
+## 2026-11-07 — Tower Defense: entregas individuales de Coca y Parrilleros simultáneos
+
+Se corrigió la entrega repetida del mismo Cocacolero: el runtime disparaba otra entrega cada slice de 0,05 s mientras la botella anterior seguía en handoff. Cada trabajador ahora tiene un cooldown funcional individual de 0,62 s ligado a una entrega física confirmada. Esto evita cues repetidos por un solo Cocacolero y no bloquea workers distintos. Se conserva el espaciado de 84 px lógicos entre Parrilleros de un área para que sus poses simultáneas no se cubran; ninguno camina fuera del área elegida.
+
+**Validación Unity 6000.6.3f1:** el repro EditMode primero falló antes del arreglo como esperado (dos entregas en lugar de una), y pasó después 1/1, job `90dc9afdad274200b28c757622282657`. PlayMode pasó 1/1 para Cocacolero secuencial (`3015aa13fa5343c1b455bbf1704e08ef`), Parrilleros simultáneos y separados (`e057850b5a7f4a65b00130e657115fd6`), y orden mixto sin regresión (`3a506fa689ae4ac6a74601600ab45c1c`). Se inspeccionó la captura Game View `Logs/Acceptance/TowerDefenseReadyStations20261106/single-cocacolero-serial-handoff.png`; Main quedó fuera de Play Mode. APK Android Development IL2CPP/ARM64/Main-only generada con BuildPipeline en 280.93 s, 0 errores/6 advertencias. Artefacto `Builds/Android/Archive/HayChoriYPaty-0.2.83-code85-td-worker-delivery-fixes-20261107.apk`, 422,576,268 bytes, SHA-256 `947ab246d00fc5cb26ba28f7bbcbd908d987f011e036823c130977dc699b70c3`; ZIP/zipalign/firma v2/package/version/API/ABI revisados. No instalada ni lanzada; el teléfono conserva la APK anterior. Ver [Android](features/android-prototype.md) y [Tower Defense](features/tower-defense.md).
+
+## 2026-11-07 — Tower Defense: 60 hinchas por partida y mitad de velocidad
+
+Camioneros (ID9) y Los Redondos (ID10) ahora comparten una ola total de 60 hinchas cada uno y multiplicador `0.1575`, exactamente la mitad del valor anterior `0.315`. Solo cambian estas configuraciones exclusivas de Defense; niveles tradicionales y reglas/economía compartida permanecen intactos.
+
+**Validación:** revisión estática de código/configuración y `git diff --check` `PASS`. La ejecución focalizada no arrancó: Unity MCP sin instancia y batchmode falló en inicialización de Licensing antes de cargar el proyecto (`attempt to write a readonly database`, timeout 74.83 s), por lo que EditMode/PlayMode quedan `NOT_RUN`. La APK instalada en Motorola sigue en la configuración anterior; no se pidió compilar ni instalar una nueva.
+
 ## 2026-11-06 — Camisetas de la hinchada de Huracán
 
 Se incorporaron seis camisetas Huracán basadas en las referencias del usuario, repetidas entre doce identidades en atlas de festejo/caminata y de derrota; solo cambia el arte del equipo ID11. `ClubVisualTheme` asigna los sprites dedicados, mantiene la escala/lógica existente y mapea el orden fuente caminar→festejar sin editar los PNG. `HuracanThemeUsesItsSixShirtWardrobeForCheeringWalkingAndDefeat` pasó **1/1 EditMode** en Unity 6000.6.3f1; ambos atlas se importaron/cargaron con transparencia y 6×4 celdas. No se capturó una ronda en Game View ni se generó/instaló APK. Ver [contrato Huracán](features/huracan-bonus-track.md).

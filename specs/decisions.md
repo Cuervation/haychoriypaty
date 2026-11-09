@@ -347,3 +347,6 @@ Aclaración posterior del usuario: mantener exactamente la misma ilustración a 
 
 ## 2026-11-05 — No invadir el pasillo del Tower Defense con módulos de valla
 Conservar el corredor de hinchas completamente libre entre sus dos límites ortogonales: ningún panel puede prolongarse desde un tramo a la pierna contigua ni bloquear solo parte del paso. Usar 120/60 unidades lógicas como tamaños preferidos; si una conexión recta mide menos de 60, reducir uniformemente esa pieza para que quepa en su propio tramo. Tradeoff: algunos módulos de giro pueden quedar menores que el módulo corto estándar; se prioriza el paso libre y la geometría recta sobre una valla sobredimensionada.
+
+## 2026-11-06 — Permisos del Mercado pertenecen a una sola preparación
+Guardar habilitación municipal y contribución policial como dos compras separadas de 50.000 centavos, ligadas al ID estable de la preparación, sin usar IDs/contadores de ingredientes. La salida y reentrada al Mercado conserva las compras; cambiar de nivel las limpia sin reembolso; solo el inicio durable consume los flags. Un rechazo o fallo de guardado/inicio los restaura. Por ahora no producen efectos jugables, ajustes de balance ni métricas de mercadería.

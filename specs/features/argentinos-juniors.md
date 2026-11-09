@@ -2,14 +2,14 @@
 
 ## Objetivo
 
-Agregar Argentinos Juniors como último nivel normal de campaña, con las fotos aportadas por el usuario como referencia para el mural y el vestuario de hinchas, conservando la presentación, el loop y los sprites 2D del juego. Las camisetas deben representar los cinco estilos enviados: roja con dos líneas blancas paralelas, roja jaspeada, blanca con línea roja, roja con banda diagonal blanca y marfil con hombros/mangas rojos. Cada hincha conserva el mismo uniforme en sus poses normales y de trifulca; no añadir sponsors ni letras. El escudo del club se usa solo desde la imagen oficial aportada por el usuario, sin crear una versión independiente.
+Agregar Argentinos Juniors como nivel normal de campaña, con las fotos aportadas por el usuario como referencia para el mural y el vestuario de hinchas, conservando la presentación, el loop y los sprites 2D del juego. Las camisetas deben representar los cinco estilos enviados: roja con dos líneas blancas paralelas, roja jaspeada, blanca con línea roja, roja con banda diagonal blanca y marfil con hombros/mangas rojos. Cada hincha conserva el mismo uniforme en sus poses normales y de trifulca; no añadir sponsors ni letras. El escudo del club se usa solo desde la imagen oficial aportada por el usuario, sin crear una versión independiente.
 
 ## Contrato de campaña y balance
 
-- ID estable nuevo: **12**. Se agrega al final después de Los Redondos (ID10); ninguna posición/ID existente se renumera. Huracán (ID11) conserva su bonus entre Independiente y Racing. Orden visible: `0,1,2,3,4,11,5,6,7,8,9,10,12`.
-- El selector existente lo lista como **Argentinos Juniors / La Paternal**, última tarjeta y inicialmente bloqueada.
-- Su balance tradicional copia exactamente Los Redondos (ID10), el nivel regular anterior. Las dos filas vigentes están en [la tabla maestra](../../docs/BALANCE_ACTUAL_NIVELES.md); no duplicar aquí cifras de metas/caja/tiers. No copiar la modalidad Tower Defense de Camioneros ni el Bonus Track de Huracán.
-- Ganar ID10 habilita ID12. El frontier histórico `unlockedLevel` sigue acotado a 0–10; ID12 usa su propio flag persistido. Ganar ID12 no crea un ID nuevo.
+- ID estable **12**, posición visible **5**, entre Vélez y Ferro. Orden visible: `0,1,9,2,12,3,11,10,4,5,6,7,8`. No se renumera ningún ID.
+- El selector existente lo lista como **Argentinos Juniors / La Paternal**, quinta tarjeta y inicialmente bloqueada.
+- Su balance tradicional conserva los valores históricos de Los Redondos antes de su conversión a Tower Defense. Los valores vigentes están en [la tabla maestra](../../docs/BALANCE_ACTUAL_NIVELES.md); no duplicar aquí cifras de metas/caja/tiers. No copiar la modalidad Tower Defense de Camioneros ni el Bonus Track de Huracán.
+- Ganar Vélez ID2 habilita ID12; ganar ID12 habilita Ferro ID3. SaveData v7 conserva desbloqueos por ID y migra los flags antiguos sin otorgar accesos nuevos por posición.
 - Migración SaveData v5→v6 solo concede el flag si hay evidencia de una victoria ID10 en estadísticas o un match terminal pendiente; `unlockedLevel == 10` por sí solo solo acredita acceso a Los Redondos. Preservar prefijos existentes de estadísticas y watermarks de Mercado.
 - Partidos/estadísticas de ID12 se guardan en su slot independiente. Firestore local permite resultado `level == 12` y rechaza `level > 12`; `unlockedLevel` remoto sigue limitado a10.
 - Mural y hinchas tienen recursos dedicados; las camisetas de Huracán/Camioneros/otros clubes no deben reutilizarse como sprites de Argentinos. Los sprites de hinchas integran los cinco patrones de camiseta aportados, sin sponsors ni letras agregadas. No crear un escudo independiente.

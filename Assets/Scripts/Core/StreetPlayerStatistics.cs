@@ -26,6 +26,11 @@ namespace HayChoriYPaty
         public long[] winsByLevel = new long[13], lossesByLevel = new long[13];
         public float[] bestWinTimeByLevel = new float[13];
         public long[] bestGrossCentsByLevel = new long[13], bestUnitsSoldByLevel = new long[13];
+        // Stable ID10 used to be traditional Los Redondos. Keep its historic level-specific records
+        // separate now that the same campaign ID is a Tower Defense mode.
+        public long legacyTraditionalLosRedondosWins, legacyTraditionalLosRedondosLosses;
+        public float legacyTraditionalLosRedondosBestWinTime;
+        public long legacyTraditionalLosRedondosBestGrossCents, legacyTraditionalLosRedondosBestUnitsSold;
         // Current result retry token; the cloud outbox owns the durable history of acknowledgements.
         public string lastAppliedAttemptId;
         // Recovery token for a live-attempt checkpoint; this never represents a finished result.
@@ -44,6 +49,11 @@ namespace HayChoriYPaty
             bestWinTimeByLevel = Normalize(bestWinTimeByLevel, 13);
             bestGrossCentsByLevel = Normalize(bestGrossCentsByLevel, 13);
             bestUnitsSoldByLevel = Normalize(bestUnitsSoldByLevel, 13);
+            legacyTraditionalLosRedondosWins = Math.Max(0, legacyTraditionalLosRedondosWins);
+            legacyTraditionalLosRedondosLosses = Math.Max(0, legacyTraditionalLosRedondosLosses);
+            legacyTraditionalLosRedondosBestWinTime = Math.Max(0, legacyTraditionalLosRedondosBestWinTime);
+            legacyTraditionalLosRedondosBestGrossCents = Math.Max(0, legacyTraditionalLosRedondosBestGrossCents);
+            legacyTraditionalLosRedondosBestUnitsSold = Math.Max(0, legacyTraditionalLosRedondosBestUnitsSold);
             speedUpgrades = Math.Max(0, speedUpgrades); speedSpendCents = Math.Max(0, speedSpendCents);
             grossSalesCents = Math.Max(0, grossSalesCents); totalMarketRewardsCents = Math.Max(0, totalMarketRewardsCents);
             ingredientSpendTotalCents = Math.Max(0, ingredientSpendTotalCents);
@@ -55,6 +65,23 @@ namespace HayChoriYPaty
             ordersCompleted = Math.Max(0, ordersCompleted); completedProducts = Math.Max(0, completedProducts);
         }
 
+        /// <summary>Idempotently separates old traditional ID10 records from the new TD level-10 bucket.</summary>
+        public void ArchiveLegacyTraditionalLosRedondosRecords()
+        {
+            Normalize();
+            const int legacyId = 10;
+            legacyTraditionalLosRedondosWins = Math.Max(legacyTraditionalLosRedondosWins, winsByLevel[legacyId]);
+            legacyTraditionalLosRedondosLosses = Math.Max(legacyTraditionalLosRedondosLosses, lossesByLevel[legacyId]);
+            float archivedBest = bestWinTimeByLevel[legacyId];
+            if (archivedBest > 0f && (legacyTraditionalLosRedondosBestWinTime <= 0f || archivedBest < legacyTraditionalLosRedondosBestWinTime))
+                legacyTraditionalLosRedondosBestWinTime = archivedBest;
+            legacyTraditionalLosRedondosBestGrossCents = Math.Max(legacyTraditionalLosRedondosBestGrossCents, bestGrossCentsByLevel[legacyId]);
+            legacyTraditionalLosRedondosBestUnitsSold = Math.Max(legacyTraditionalLosRedondosBestUnitsSold, bestUnitsSoldByLevel[legacyId]);
+            winsByLevel[legacyId] = lossesByLevel[legacyId] = 0;
+            bestWinTimeByLevel[legacyId] = 0;
+            bestGrossCentsByLevel[legacyId] = bestUnitsSoldByLevel[legacyId] = 0;
+        }
+
         public bool HasApplied(string attemptId)
         {
             return !string.IsNullOrEmpty(attemptId) && lastAppliedAttemptId == attemptId;
@@ -62,6 +89,16 @@ namespace HayChoriYPaty
 
         /// <summary>Applies one settled result exactly once. The record and aggregates are serialized together.</summary>
         public bool ApplyMatch(StreetMatchRecord record)
+        {
+            return ApplyMatchInternal(record, false);
+        }
+
+        public bool ApplyLegacyTraditionalLosRedondosMatch(StreetMatchRecord record)
+        {
+            return record != null && record.level == 10 && ApplyMatchInternal(record, true);
+        }
+
+        private bool ApplyMatchInternal(StreetMatchRecord record, bool legacyTraditionalLosRedondos)
         {
             if (record == null || string.IsNullOrEmpty(record.attemptId) || HasApplied(record.attemptId)) return false;
             Normalize();
@@ -79,16 +116,39 @@ namespace HayChoriYPaty
             if (record.abandoned) abandons = Add(abandons, 1);
             else attemptsFinished = Add(attemptsFinished, 1);
             int newRecords = 0;
-            if (!record.abandoned && record.grossSalesCents > bestGrossCentsByLevel[level]) newRecords++;
-            if (!record.abandoned && units > bestUnitsSoldByLevel[level]) newRecords++;
-            if (!record.abandoned && record.grossSalesCents > bestGrossCentsByLevel[level]) bestGrossCentsByLevel[level] = record.grossSalesCents;
-            if (!record.abandoned && units > bestUnitsSoldByLevel[level]) bestUnitsSoldByLevel[level] = units;
+            long priorGross = legacyTraditionalLosRedondos ? legacyTraditionalLosRedondosBestGrossCents : bestGrossCentsByLevel[level];
+            long priorUnits = legacyTraditionalLosRedondos ? legacyTraditionalLosRedondosBestUnitsSold : bestUnitsSoldByLevel[level];
+            if (!record.abandoned && record.grossSalesCents > priorGross) newRecords++;
+            if (!record.abandoned && units > priorUnits) newRecords++;
+            if (!record.abandoned && record.grossSalesCents > priorGross)
+            {
+                if (legacyTraditionalLosRedondos) legacyTraditionalLosRedondosBestGrossCents = record.grossSalesCents;
+                else bestGrossCentsByLevel[level] = record.grossSalesCents;
+            }
+            if (!record.abandoned && units > priorUnits)
+            {
+                if (legacyTraditionalLosRedondos) legacyTraditionalLosRedondosBestUnitsSold = units;
+                else bestUnitsSoldByLevel[level] = units;
+            }
             if (!record.abandoned && record.won)
             {
-                wins = Add(wins, 1); winsByLevel[level] = Add(winsByLevel[level], 1);
-                if (bestWinTimeByLevel[level] <= 0 || record.elapsedSeconds < bestWinTimeByLevel[level]) { bestWinTimeByLevel[level] = record.elapsedSeconds; newRecords++; }
+                wins = Add(wins, 1);
+                if (legacyTraditionalLosRedondos) legacyTraditionalLosRedondosWins = Add(legacyTraditionalLosRedondosWins, 1);
+                else winsByLevel[level] = Add(winsByLevel[level], 1);
+                float priorBest = legacyTraditionalLosRedondos ? legacyTraditionalLosRedondosBestWinTime : bestWinTimeByLevel[level];
+                if (priorBest <= 0 || record.elapsedSeconds < priorBest)
+                {
+                    if (legacyTraditionalLosRedondos) legacyTraditionalLosRedondosBestWinTime = record.elapsedSeconds;
+                    else bestWinTimeByLevel[level] = record.elapsedSeconds;
+                    newRecords++;
+                }
             }
-            else if (!record.abandoned) { losses = Add(losses, 1); lossesByLevel[level] = Add(lossesByLevel[level], 1); }
+            else if (!record.abandoned)
+            {
+                losses = Add(losses, 1);
+                if (legacyTraditionalLosRedondos) legacyTraditionalLosRedondosLosses = Add(legacyTraditionalLosRedondosLosses, 1);
+                else lossesByLevel[level] = Add(lossesByLevel[level], 1);
+            }
             record.recordsReached = newRecords;
             AwardProductSalesBadges();
             lastAppliedAttemptId = record.attemptId;

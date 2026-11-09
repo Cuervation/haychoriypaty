@@ -8,7 +8,25 @@ namespace HayChoriYPaty
     public sealed class TowerDefenseLevelConfig : ScriptableObject
     {
         public const string CamionerosLevelId = "tower-defense.camioneros.plaza-de-mayo.level-1";
-        public const int CamionerosFansToServe = 10;
+        public const string LosRedondosLevelId = "tower-defense.los-redondos.tandil.level-1";
+        public const int CamionerosCampaignLevelId = 9;
+        public const int LosRedondosCampaignLevelId = 10;
+        public const int CommonEconomicBalanceLevelId = 9;
+        public const int FansToServe = 60;
+        public const float DefaultMinimumEntrySpacingLogical = 58f;
+        public const float CamionerosMinimumEntrySpacingLogical = 96f;
+        // Kept as a source-compatible alias for older UI/tests; both defenses share the wave size.
+        public const int CamionerosFansToServe = FansToServe;
+
+        public static string ResourcesPathForCampaignLevel(int campaignLevelId)
+        {
+            switch (campaignLevelId)
+            {
+                case CamionerosCampaignLevelId: return "TowerDefense/Camioneros-PlazaDeMayo";
+                case LosRedondosCampaignLevelId: return "TowerDefense/LosRedondos-Tandil";
+                default: return null;
+            }
+        }
 
         [SerializeField] private string modeId = "tower-defense";
         [SerializeField] private string levelId = CamionerosLevelId;
@@ -32,7 +50,9 @@ namespace HayChoriYPaty
         [SerializeField] private Sprite directionArrowSprite;
         [SerializeField] private int[] availableProducts = { 0, 4 };
         [Tooltip("Multiplier applied to Tower Defense fan movement; other campaign levels are unaffected.")]
-        [SerializeField, Min(0.05f)] private float fanSpeed = 0.45f;
+        [SerializeField, Min(0.05f)] private float fanSpeed = 0.1575f;
+        [Tooltip("Minimum route progress, in logical pixels, before another fan may enter. This keeps arrivals visibly staggered.")]
+        [SerializeField, Min(1f)] private float minimumEntrySpacingLogical = DefaultMinimumEntrySpacingLogical;
         [SerializeField, Min(0.01f)] private float serviceRange = 0.8f;
         [SerializeField] private Vector2 firstWorkZoneOffset;
         [SerializeField] private Vector2 secondWorkZoneOffset;
@@ -42,7 +62,7 @@ namespace HayChoriYPaty
         public string ModeId => string.IsNullOrWhiteSpace(modeId) ? "tower-defense" : modeId;
         public string LevelId => string.IsNullOrWhiteSpace(levelId) ? CamionerosLevelId : levelId;
         public string DisplayName => string.IsNullOrWhiteSpace(displayName) ? "Camioneros / Plaza de Mayo" : displayName;
-        /// <summary>Campaign level whose current balance drives this runtime and whose stable ID owns progression.</summary>
+        /// <summary>Visual/campaign identity whose stable ID owns progression and persistence.</summary>
         public int SourceCampaignLevelId => sourceCampaignLevelId;
         public string BackgroundResource => backgroundResource;
         public TowerDefenseRouteGeometryConfig Route => route;
@@ -53,7 +73,10 @@ namespace HayChoriYPaty
         public Sprite DirectionArrowSprite => directionArrowSprite;
         public int[] AvailableProducts => availableProducts == null ? Array.Empty<int>() : (int[])availableProducts.Clone();
         public float FanSpeed => Mathf.Max(0f, fanSpeed);
-        public int TotalFanCount => CamionerosFansToServe;
+        public float MinimumEntrySpacingLogical => Mathf.Max(1f, minimumEntrySpacingLogical);
+        public int TotalFanCount => FansToServe;
+        /// <summary>Legacy source-row compatibility metadata; runtime TD costs use the frozen profile.</summary>
+        public int EconomicBalanceCampaignLevelId => CommonEconomicBalanceLevelId;
         public float ServiceRange => Mathf.Max(0.01f, serviceRange);
         public Vector2 FirstWorkZoneOffset => firstWorkZoneOffset;
         public Vector2 SecondWorkZoneOffset => secondWorkZoneOffset;
@@ -73,7 +96,8 @@ namespace HayChoriYPaty
                 RowSpacing = runtimeRoute.RowSpacing,
                 TurnRadius = runtimeRoute.TurnRadius,
                 PlayableBounds = runtimeRoute.PlayableBounds,
-                TurnSegments = runtimeRoute.TurnSegments
+                TurnSegments = runtimeRoute.TurnSegments,
+                FanEntryExtensionWorldUnits = runtimeRoute.FanEntryExtensionWorldUnits
             };
         }
 

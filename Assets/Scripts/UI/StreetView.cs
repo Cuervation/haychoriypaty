@@ -460,11 +460,13 @@ namespace HayChoriYPaty
         private int levelSelectIgnoreNativeTapUntilFrame = -1;
         private const int ReadyLevelSelectorAction = 19;
         private const int MarketBackAction = 70, MarketOtherAction = 190;
-        private const int MarketIngredientsTabAction = 191, MarketExtrasTabAction = 192, MarketTicketRedeemAction = 220;
+        private const int MarketIngredientsTabAction = 191, MarketExtrasTabAction = 192, MarketPermitsTabAction = 193, MarketTicketRedeemAction = 220;
         private const float MarketTicketCardHeight = 108f, MarketTicketCardGap = 8f, MarketExtrasNoticeHeight = 38f;
         private const int MarketMinusAction = 80, MarketPlusAction = 100, MarketPlusTenAction = 120;
         private const int MarketBuyAction = 140, MarketMissingAction = 150, MarketPlayAction = 160;
         private const int MarketRowMissingAction = 170, MarketExpandAction = 180;
+        private const int MarketMunicipalPermitAction = 230, MarketPoliceContributionAction = 231;
+        private const float MarketPermitCardHeight = 112f, MarketPermitCardGap = 8f;
         private const int ResultLevelsAction = 163;
         private const int ChulengoMultiplyAction = 164, ChulengoCollectAction = 165;
         private static readonly Rect ReadyLevelSelector = new Rect(161, 905, 218, 44);
@@ -476,8 +478,9 @@ namespace HayChoriYPaty
         private readonly Sprite[] marketIngredientSprites = new Sprite[10];
         private readonly Texture2D[] marketFreshMeatTextures = new Texture2D[10];
         private Texture2D marketFernetBottle, marketCocaLarge, marketBreadCommon, marketBreadBurger;
+        private Texture2D municipalPermitIcon, policeContributionIcon;
         private readonly int[] marketPendingPacks = new int[10];
-        private float marketScroll, marketPointerDownY, marketPointerDownScroll, marketLastPurchaseTime = -10f;
+        private float marketScroll, marketPointerDownY, marketPointerDownScroll, marketLastPurchaseTime = -10f, marketLastPermitPurchaseTime = -10f;
         private bool marketDragging, marketPointerHeld;
         private float marketTouchDownY, marketTouchDownScroll;
         private bool marketTouchHeld, marketTouchDragging;
@@ -957,6 +960,8 @@ namespace HayChoriYPaty
             yield return LoadStartupResourceAsync<Texture2D>("ModularKitchen/Art/coca-2500ml-display-v1", loaded => marketCocaLarge = loaded);
             yield return LoadStartupResourceAsync<Texture2D>("ModularKitchen/Art/market-bread-common-v1", loaded => marketBreadCommon = loaded);
             yield return LoadStartupResourceAsync<Texture2D>("ModularKitchen/Art/market-bread-burger-v1", loaded => marketBreadBurger = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>("ModularKitchen/Art/market-municipal-permit-v1", loaded => municipalPermitIcon = loaded);
+            yield return LoadStartupResourceAsync<Texture2D>("ModularKitchen/Art/market-police-contribution-v1", loaded => policeContributionIcon = loaded);
             foreach (int id in new[] { 4, 5 })
             {
                 int ingredientId = id;
@@ -1772,7 +1777,7 @@ namespace HayChoriYPaty
                     if (selectionSucceeded)
                     {
                         levelSelectActive = false;
-                        if (level == StreetSimulation.TowerDefenseCampaignLevelId)
+                        if (StreetSimulation.IsTowerDefenseLevel(level))
                         {
                             marketFromSelector = true;
                             if (game.CanStartRound)
@@ -1787,7 +1792,7 @@ namespace HayChoriYPaty
                             }
                             else
                             {
-                                marketActive = true; marketTab = 0; marketMessage = "Prepará Mercado para iniciar Camioneros Tower Defense.";
+                                marketActive = true; marketTab = 0; marketMessage = "Prepará Mercado para iniciar Tower Defense.";
                                 marketScroll = 0; marketOtherExpanded = false; marketExpandedIngredient = -1;
                             }
                         }
@@ -1820,10 +1825,22 @@ namespace HayChoriYPaty
             if (marketActive)
             {
                 if (a == MarketBackAction) { marketActive=false; marketMessage=game.CanStartRound?"Stock suficiente para jugar.":"Falta stock para iniciar. Revisá Mercado."; if(marketFromSelector)levelSelectActive=true; return; }
-                if (a == MarketIngredientsTabAction || a == MarketExtrasTabAction)
+                if (a == MarketIngredientsTabAction || a == MarketExtrasTabAction || a == MarketPermitsTabAction)
                 {
-                    int nextTab = a == MarketIngredientsTabAction ? 0 : 1;
+                    int nextTab = a == MarketIngredientsTabAction ? 0 : a == MarketExtrasTabAction ? 1 : 2;
                     if (marketTab != nextTab) { marketTab = nextTab; marketScroll = 0f; marketMessage = ""; }
+                    return;
+                }
+                if (a == MarketMunicipalPermitAction || a == MarketPoliceContributionAction)
+                {
+                    if (Time.unscaledTime - marketLastPermitPurchaseTime < .25f) return;
+                    marketLastPermitPurchaseTime = Time.unscaledTime;
+                    int item = a == MarketMunicipalPermitAction ? (int)StreetMarketPermitItem.MunicipalLicense : (int)StreetMarketPermitItem.PoliceContribution;
+                    bool success = game.TryBuyPreparationPermit(item);
+                    marketMessage = success ? StreetMarketPreparationCatalog.Name(item) + " adquirida para esta preparación."
+                        : game.IsPreparationPermitPurchased(item) ? "Este permiso ya está comprado."
+                        : game.Market.BalanceCents < StreetMarketPreparationCatalog.ItemPriceCents ? MarketInsufficientFundsMessage(StreetMarketPreparationCatalog.ItemPriceCents)
+                        : "No se pudo guardar la compra; el saldo no cambió.";
                     return;
                 }
                 if (a >= MarketTicketRedeemAction && a < MarketTicketRedeemAction + 5)
@@ -1878,7 +1895,7 @@ namespace HayChoriYPaty
                 }
                 if (a == MarketPlayAction)
                 {
-                    if (game.Sim.LevelIndex == StreetSimulation.TowerDefenseCampaignLevelId)
+                    if (StreetSimulation.IsTowerDefenseLevel(game.Sim.LevelIndex))
                     {
                         if (StartTowerDefenseRun())
                         {
@@ -2511,7 +2528,7 @@ namespace HayChoriYPaty
 
         private void DrawRiotWaitMessage(Rect bounds)
         {
-            string message = game != null && game.Sim != null && game.Sim.LevelIndex == 9
+            string message = game != null && game.Sim != null && StreetSimulation.IsTowerDefenseLevel(game.Sim.LevelIndex)
                 ? "Un hincha llegó a la salida sin su pedido." : "Los hinchas se cansaron de esperar......";
             int fontSize = FitStandardButtonFontSize(menuTitle, message, bounds);
             GUIStyle caption = CreateStandardButtonLabelStyle(menuTitle, fontSize, Color.white);
@@ -3004,7 +3021,7 @@ namespace HayChoriYPaty
                 layoutVerticalScale = 1f;
                 Vector2 screenSize = new Vector2(Screen.width, Screen.height);
                 Rect cutoutGap = TopHudCutoutBounds(screenSize, Screen.cutouts);
-                if (sim.LevelIndex == 9)
+                if (StreetSimulation.IsTowerDefenseLevel(sim.LevelIndex))
                 {
                     GUI.matrix = Matrix4x4.Scale(new Vector3(Screen.width / W, Screen.width / W, 1f));
                     GUI.color = Color.white;
@@ -4158,8 +4175,9 @@ namespace HayChoriYPaty
         private static Rect MarketTabBounds(int tab, int productCount)
         {
             Rect strip = MarketTabsBounds(productCount);
-            float gap = 8f, width = (strip.width - gap) * .5f;
-            return new Rect(strip.x + Mathf.Clamp(tab, 0, 1) * (width + gap), strip.y, width, strip.height);
+            const int tabCount = 3;
+            float gap = 6f, width = (strip.width - gap * (tabCount - 1)) / tabCount;
+            return new Rect(strip.x + Mathf.Clamp(tab, 0, tabCount - 1) * (width + gap), strip.y, width, strip.height);
         }
         private Rect MarketTabsBounds() => MarketTabsBounds(game.Sim.ProductCount);
         private Rect MarketTabBounds(int tab) => MarketTabBounds(tab, game.Sim.ProductCount);
@@ -4171,7 +4189,7 @@ namespace HayChoriYPaty
             int[] need = game.Market.RequiredUnits(game.Sim);
             var ids = new System.Collections.Generic.List<int>();
             for (int i = 0; i < need.Length; i++)
-                if (required ? need[i] > 0 : need[i] == 0 && game.Market.IsIngredientUnlocked(i, game.UnlockedLevel)) ids.Add(i);
+                if (required ? need[i] > 0 : need[i] == 0 && game.IsIngredientUnlocked(i)) ids.Add(i);
             return ids.ToArray();
         }
         private int[] MarketVisibleIngredients()
@@ -4183,7 +4201,7 @@ namespace HayChoriYPaty
         private int MarketExpandedId()
         {
             if (marketExpandedIngredient == -2) return -1;
-            foreach (int id in MarketVisibleIngredients()) if (id == marketExpandedIngredient && game.Market.IsIngredientUnlocked(id, game.UnlockedLevel)) return id;
+            foreach (int id in MarketVisibleIngredients()) if (id == marketExpandedIngredient && game.IsIngredientUnlocked(id)) return id;
             foreach (int id in MarketIngredientIds(true)) if (game.Market.MissingUnits(game.Sim, id) > 0) return id;
             return -1;
         }
@@ -4197,6 +4215,7 @@ namespace HayChoriYPaty
         }
         private float MarketContentHeight()
         {
+            if (marketTab == 2) return 40f + 2f * MarketPermitCardHeight + MarketPermitCardGap;
             if (marketTab == 1)
                 return game.TicketExtrasUnlocked ? MarketExtrasNoticeHeight + 8f +
                     5f * MarketTicketCardHeight + 4f * MarketTicketCardGap : MarketBodyBounds().height;
@@ -4217,6 +4236,15 @@ namespace HayChoriYPaty
         private static Rect MarketTicketRedeemButtonBounds(Rect card) =>
             new Rect(card.xMax - 151f, card.y + 25f, 140f, 58f);
         private Rect MarketTicketRedeemButtonBounds(int slot) => MarketTicketRedeemButtonBounds(MarketTicketCardBounds(slot));
+        private Rect MarketPermitCardBounds(int slot)
+        {
+            Rect body = MarketBodyBounds();
+            if (slot < 0 || slot >= StreetMarketPreparationCatalog.ItemCount) return Rect.zero;
+            return new Rect(body.x, body.y + 40f + slot * (MarketPermitCardHeight + MarketPermitCardGap) - marketScroll,
+                body.width, MarketPermitCardHeight);
+        }
+        private static Rect MarketPermitBuyButtonBounds(Rect card) =>
+            new Rect(card.xMax - 154f, card.y + 34f, 142f, 48f);
         private float MarketMaxScroll() => Mathf.Max(0, MarketContentHeight() - MarketBodyBounds().height);
         private Rect MarketRowBounds(int slot)
         {
@@ -4249,10 +4277,22 @@ namespace HayChoriYPaty
             if (MarketBackBounds().Contains(p)) return MarketBackAction;
             if (MarketTabBounds(0).Contains(p)) return MarketIngredientsTabAction;
             if (MarketTabBounds(1).Contains(p)) return MarketExtrasTabAction;
+            if (MarketTabBounds(2).Contains(p)) return MarketPermitsTabAction;
             if (MarketPlayBounds().Contains(p)) return MarketPlayAction;
             if (marketTab == 0 && MarketBuyMissingBounds(logicalCanvasHeight).Contains(p)) return MarketCanBuyMissing() ? MarketMissingAction : 0;
             Rect body = MarketBodyBounds();
             if (!body.Contains(p)) return 0;
+            if (marketTab == 2)
+            {
+                for (int item = 0; item < StreetMarketPreparationCatalog.ItemCount; item++)
+                {
+                    Rect card = MarketPermitCardBounds(item);
+                    if (MarketFullyVisibleInViewport(card, body) && MarketPermitBuyButtonBounds(card).Contains(p) &&
+                        !game.IsPreparationPermitPurchased(item) && game.Market.BalanceCents >= StreetMarketPreparationCatalog.ItemPriceCents)
+                        return item == (int)StreetMarketPermitItem.MunicipalLicense ? MarketMunicipalPermitAction : MarketPoliceContributionAction;
+                }
+                return 0;
+            }
             if (marketTab == 1)
             {
                 if (!game.TicketExtrasUnlocked) return 0;
@@ -4270,7 +4310,7 @@ namespace HayChoriYPaty
             for (int slot = 0; slot < visible.Length; slot++)
             {
                 int id = visible[slot]; Rect row = MarketRowBounds(slot);
-                if (!MarketFullyVisibleInViewport(row, body) || !row.Contains(p) || !game.Market.IsIngredientUnlocked(id, game.UnlockedLevel)) continue;
+                if (!MarketFullyVisibleInViewport(row, body) || !row.Contains(p) || !game.IsIngredientUnlocked(id)) continue;
                 if (id == MarketExpandedId() && MarketPurchaseControlsVisible(row, body))
                     foreach (int action in new[] { MarketMinusAction, MarketPlusAction, MarketPlusTenAction, MarketBuyAction, MarketRowMissingAction })
                         if (MarketPurchaseControlBounds(row, action).Contains(p)) return action + id;
@@ -4300,11 +4340,11 @@ namespace HayChoriYPaty
             DrawMarketBluePanel(new Rect(150, 8, 240, 56), MarketRoyalBlue);
             MarketText(new Rect(164, 10, 212, 50), "MERCADO", 34, Color.white);
             DrawMarketClubHeader();
-            MarketText(new Rect(26, 176, 488, 22), game.Sim.LevelIndex == 9 ? "MODO DEFENSE" : "OBJETIVOS DEL PARTIDO", 18, new Color(.84f, .96f, 1f));
+            MarketText(new Rect(26, 176, 488, 22), StreetSimulation.IsTowerDefenseLevel(game.Sim.LevelIndex) ? "MODO DEFENSE" : "OBJETIVOS DEL PARTIDO", 18, new Color(.84f, .96f, 1f));
             DrawMarketObjectiveCards(game.Sim);
             Rect economy = MarketEconomyBounds(game.Sim.ProductCount);
             DrawMarketBluePanel(economy, new Color(.012f, .075f, .25f, .98f));
-            if (marketTab == 0)
+            if (marketTab != 1)
             {
                 if (gameCoin != null) GUI.DrawTexture(new Rect(economy.x + 12, economy.y + 11, 36, 36), gameCoin, ScaleMode.ScaleToFit, true);
                 MarketText(new Rect(economy.x + 54, economy.y + 12, 210, 32), "SALDO DISPONIBLE", 18, Color.white, TextAnchor.MiddleLeft);
@@ -4350,7 +4390,8 @@ namespace HayChoriYPaty
                         }
                     }
                 }
-                else DrawMarketExtrasBody(body);
+                else if (marketTab == 1) DrawMarketExtrasBody(body);
+                else DrawMarketPermitsBody(body);
             }
             finally { GUI.EndGroup(); }
             DrawMarketScrollBar(body);
@@ -4360,16 +4401,48 @@ namespace HayChoriYPaty
                 DrawMarketBluePanel(messageBounds, new Color(.015f, .12f, .38f, .96f));
                 MarketText(new Rect(messageBounds.x + 6, messageBounds.y, messageBounds.width - 12, messageBounds.height), marketMessage, 14, Color.white);
             }
-            if (marketTab == 0) DrawMarketEconomyFooter(); else DrawMarketExtrasFooter();
+            if (marketTab == 0) DrawMarketEconomyFooter();
+            else if (marketTab == 1) DrawMarketExtrasFooter();
+            else DrawMarketPermitsFooter();
             DrawMarketPlayButton(MarketPlayBounds(), "JUGAR PARTIDO", game.CanStartRound);
         }
         private void DrawMarketTabs()
         {
-            for (int tab = 0; tab < 2; tab++)
-                DrawStandardButton(MarketTabBounds(tab), tab == 0 ? MarketIngredientsTabAction : MarketExtrasTabAction,
-                    tab == 0 ? "INGREDIENTES" : "EXTRAS");
+            for (int tab = 0; tab < 3; tab++)
+                DrawStandardButton(MarketTabBounds(tab), tab == 0 ? MarketIngredientsTabAction : tab == 1 ? MarketExtrasTabAction : MarketPermitsTabAction,
+                    tab == 0 ? "INGREDIENTES" : tab == 1 ? "EXTRAS" : "PERMISOS");
             Rect selected = MarketTabBounds(marketTab);
             FillRect(new Rect(selected.x + 10f, selected.yMax - 4f, selected.width - 20f, 4f), MarketGold);
+        }
+        private void DrawMarketPermitsBody(Rect body)
+        {
+            MarketText(new Rect(8f, 2f, body.width - 16f, 34f), "PERMISOS Y CONTRIBUCIONES", 20, MarketGold, TextAnchor.MiddleLeft);
+            for (int item = 0; item < StreetMarketPreparationCatalog.ItemCount; item++)
+            {
+                Rect absolute = MarketPermitCardBounds(item);
+                if (!MarketFullyVisibleInViewport(absolute, body)) continue;
+                Rect card = new Rect(absolute.x - body.x, absolute.y - body.y, absolute.width, absolute.height);
+                DrawMarketBluePanel(card, MarketIce);
+                Texture2D icon = item == (int)StreetMarketPermitItem.MunicipalLicense ? municipalPermitIcon : policeContributionIcon;
+                if (icon != null) GUI.DrawTexture(new Rect(card.x + 10f, card.y + 19f, 72f, 72f), icon, ScaleMode.ScaleToFit, true);
+                MarketText(new Rect(card.x + 88f, card.y + 24f, card.width - 260f, 30f),
+                    StreetMarketPreparationCatalog.Name(item).ToUpperInvariant(), 19, MarketBlueInk, TextAnchor.MiddleLeft);
+                MarketText(new Rect(card.x + 88f, card.y + 57f, card.width - 260f, 28f),
+                    "$" + (StreetMarketPreparationCatalog.ItemPriceCents / 100L).ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    23, MarketRoyalBlue, TextAnchor.MiddleLeft);
+                bool purchased = game.IsPreparationPermitPurchased(item);
+                bool enough = game.Market.BalanceCents >= StreetMarketPreparationCatalog.ItemPriceCents;
+                string caption = purchased ? "COMPRADO" : enough ? "COMPRAR" : "SALDO INSUFICIENTE";
+                int action = item == (int)StreetMarketPermitItem.MunicipalLicense ? MarketMunicipalPermitAction : MarketPoliceContributionAction;
+                DrawStandardButton(MarketPermitBuyButtonBounds(card), action, caption, !purchased && enough);
+            }
+        }
+        private void DrawMarketPermitsFooter()
+        {
+            Rect footer = MarketEconomyFooterBounds(logicalCanvasHeight);
+            DrawMarketBluePanel(footer, new Color(.012f, .075f, .25f));
+            MarketText(new Rect(footer.x + 12f, footer.y + 7f, footer.width - 24f, 23f), "HABILITACIONES DE PREPARACIÓN", 14, Color.white);
+            MarketText(new Rect(footer.x + 12f, footer.y + 31f, footer.width - 24f, 24f), "No modifican la jugabilidad por ahora.", 17, MarketGold);
         }
         private void DrawMarketExtrasBody(Rect body)
         {
@@ -4378,7 +4451,7 @@ namespace HayChoriYPaty
                 Rect panel = new Rect(14f, body.y + Mathf.Max(12f, (body.height - 116f) * .5f), W - 28f, 116f);
                 DrawMarketBluePanel(panel, new Color(.012f, .075f, .25f, .98f));
                 MarketText(new Rect(panel.x + 10f, panel.y + 12f, panel.width - 20f, 38f), "EXTRAS SE DESBLOQUEA EN RACING", 21, MarketGold);
-                MarketText(new Rect(panel.x + 16f, panel.y + 54f, panel.width - 32f, 46f), "Juntá tickets con cada victoria.\nCanjeá desde Racing (nivel 7).", 17, Color.white);
+                MarketText(new Rect(panel.x + 16f, panel.y + 54f, panel.width - 32f, 46f), "Juntá tickets con cada victoria.\nCanjeá desde Racing (nivel 10).", 17, Color.white);
                 return;
             }
             Rect notice = MarketExtrasNoticeBounds();
@@ -4386,8 +4459,8 @@ namespace HayChoriYPaty
             {
                 Rect localNotice = new Rect(notice.x - body.x, notice.y - body.y, notice.width, notice.height);
                 DrawMarketBluePanel(localNotice, new Color(.012f, .075f, .25f, .96f));
-                string message = game.Sim.LevelIndex == StreetSimulation.TowerDefenseCampaignLevelId ? "CAMIONEROS SE JUEGA SIN TRABAJADORES DE TICKETS"
-                    : game.Sim.LevelIndex >= 5 ? "CADA TRABAJADOR CUESTA 3 TICKETS" : "SE CANJEA AL PREPARAR RACING (NIVEL 7)";
+                string message = StreetSimulation.IsTowerDefenseLevel(game.Sim.LevelIndex) ? "TOWER DEFENSE SE JUEGA SIN TRABAJADORES DE TICKETS"
+                    : game.Sim.LevelIndex >= 5 ? "CADA TRABAJADOR CUESTA 3 TICKETS" : "SE CANJEA AL PREPARAR RACING";
                 MarketText(new Rect(localNotice.x + 8f, localNotice.y + 2f, localNotice.width - 16f, localNotice.height - 4f), message, 17, Color.white);
             }
             for (int index = 0; index < 5; index++)
@@ -4403,8 +4476,8 @@ namespace HayChoriYPaty
                 MarketText(new Rect(textX, local.y + 38f, 232f, 20f), "COSTO: 3 TICKETS", 15, MarketRoyalBlue, TextAnchor.MiddleLeft);
                 MarketText(new Rect(textX, local.y + 65f, 232f, 24f), "RESERVADOS: " + game.PendingTicketWorkers(role), 15, MarketBlueInk, TextAnchor.MiddleLeft);
                 bool canRedeem = game.CanRedeemTicketWorker(role);
-                string caption = game.Sim.LevelIndex == StreetSimulation.TowerDefenseCampaignLevelId ? "NO DISPONIBLE"
-                    : game.Sim.LevelIndex < 5 ? "NIVEL 7+" : game.TicketBalance < 3
+                string caption = StreetSimulation.IsTowerDefenseLevel(game.Sim.LevelIndex) ? "NO DISPONIBLE"
+                    : game.Sim.LevelIndex < 5 ? "DISPONIBLE EN RACING" : game.TicketBalance < 3
                     ? "FALTAN " + System.Math.Max(0L, 3L - game.TicketBalance) + " TICKETS" : "CANJEAR";
                 DrawStandardButton(MarketTicketRedeemButtonBounds(local), MarketTicketRedeemAction + index, caption, canRedeem);
             }
@@ -4491,15 +4564,15 @@ namespace HayChoriYPaty
             int product = sim.GetAvailableProduct(slot);
             string name = StreetSimulation.ProductNames[product]; int separator = name.IndexOf(' ');
             return (separator > 0 ? name.Substring(0, separator) : name) +
-                (sim.LevelIndex == 9 ? string.Empty : " ×" + sim.GetProductGoal(product));
+                (StreetSimulation.IsTowerDefenseLevel(sim.LevelIndex) ? string.Empty : " ×" + sim.GetProductGoal(product));
         }
         private void DrawMarketObjectiveCards(StreetSimulation sim)
         {
-            if (sim.LevelIndex == 9)
+            if (StreetSimulation.IsTowerDefenseLevel(sim.LevelIndex))
             {
                 Rect card = new Rect(26f, 207f, 488f, 76f);
                 DrawMarketBluePanel(card, MarketIce);
-                MarketText(new Rect(36f, 211f, 468f, 30f), "ATENDÉ A LOS 10 HINCHAS", 24, MarketBlueInk);
+                MarketText(new Rect(36f, 211f, 468f, 30f), "ATENDÉ A LOS " + TowerDefenseLevelConfig.FansToServe + " HINCHAS", 24, MarketBlueInk);
                 MarketText(new Rect(36f, 244f, 468f, 32f), "Chori y Coca · Que ninguno llegue a la salida", 16, MarketBlueInk);
                 return;
             }
@@ -4540,7 +4613,7 @@ namespace HayChoriYPaty
             }
             Rect track = new Rect(statsX, row.y + 66, statsWidth - 84, 16);
             FillRect(track, MarketNavy);
-            bool unlocked = game.Market.IsIngredientUnlocked(id, game.UnlockedLevel);
+            bool unlocked = game.IsIngredientUnlocked(id);
             float coverage = needed > 0 ? Mathf.Clamp01((float)stock / needed) : 0f;
             FillRect(new Rect(track.x + 2, track.y + 2, (track.width - 4) * coverage, track.height - 4), missing > 0 ? MarketCyan : new Color(.20f, .78f, .32f));
             MarketText(new Rect(track.xMax + 4, row.y + 62, 80, 24), !unlocked ? "BLOQUEADO" : needed == 0 ? "RESERVA" : missing == 0 ? "COMPLETO" : "FALTANTE", 12,
@@ -7237,8 +7310,8 @@ namespace HayChoriYPaty
 
         private static string FormatQuotaSummary(StreetSimulation sim, bool pendingOnly)
         {
-            if (sim.LevelIndex == 9)
-                return pendingOnly ? "UN HINCHA LLEGÓ A LA SALIDA" : "10 HINCHAS ATENDIDOS";
+            if (StreetSimulation.IsTowerDefenseLevel(sim.LevelIndex))
+                return pendingOnly ? "UN HINCHA LLEGÓ A LA SALIDA" : TowerDefenseLevelConfig.FansToServe + " HINCHAS ATENDIDOS";
             var entries = new System.Collections.Generic.List<string>(sim.ProductCount);
             for (int slot = 0; slot < sim.ProductCount; slot++)
             {
@@ -7318,9 +7391,9 @@ namespace HayChoriYPaty
                     return;
                 }
                 VictoryText(VictorySlot(frame, new Rect(.095f, .149f, .81f, .189f)),
-                    game.Sim.LevelIndex == 9 ? "¡DEFENSA\nCOMPLETADA!" : "¡TURNO\nCOMPLETADO!", Mathf.RoundToInt(50f * fontScale), gold, TextAnchor.MiddleCenter);
+                    StreetSimulation.IsTowerDefenseLevel(game.Sim.LevelIndex) ? "¡DEFENSA\nCOMPLETADA!" : "¡TURNO\nCOMPLETADO!", Mathf.RoundToInt(50f * fontScale), gold, TextAnchor.MiddleCenter);
                 VictoryText(VictorySlot(frame, new Rect(.10f, .345f, .80f, .055f)),
-                    game.Sim.LevelIndex == 9 ? "PEDIDOS COMPLETOS" : victory ? "VENTAS COMPLETADAS" : "FALTAN", Mathf.RoundToInt(23f * fontScale), brown, TextAnchor.MiddleCenter);
+                    StreetSimulation.IsTowerDefenseLevel(game.Sim.LevelIndex) ? "PEDIDOS COMPLETOS" : victory ? "VENTAS COMPLETADAS" : "FALTAN", Mathf.RoundToInt(23f * fontScale), brown, TextAnchor.MiddleCenter);
                 string sales = FormatQuotaSummary(game.Sim, !victory);
                 VictoryText(VictorySlot(frame, new Rect(.09f, .398f, .82f, .15f)), sales,
                     Mathf.RoundToInt(17f * fontScale), gold, TextAnchor.MiddleCenter);

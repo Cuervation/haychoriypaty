@@ -7,7 +7,9 @@ namespace HayChoriYPaty
     {
         public const float RouteTopReserve = 240f;
         public const float FooterReserve = 240f;
-        // The 96px corridor leaves a visible margin around the 78px fan frame.
+        // Shared visual frame width used to anchor follower entry to the viewport edge.
+        public const float FanFrameWidthLogical = 78f;
+        // The 96px corridor leaves a visible margin around the fan frame.
         public const float CorridorWidthLogical = 96f;
         // Display-only clearance for the full-height fence artwork above the footer.
         public const float VisualStageLift = 24f;
@@ -93,7 +95,6 @@ namespace HayChoriYPaty
 
             runtimeConfig = Object.Instantiate(source);
             runtimeConfig.name = source.name + " (runtime viewport)";
-            runtimeConfig.ConfigureRoute(route);
             TowerDefenseRouteGeometryResult geometry = TowerDefenseRouteGeometry.Generate(route);
             if (geometry == null || !geometry.IsValid)
             {
@@ -102,6 +103,14 @@ namespace HayChoriYPaty
                 runtimeConfig = null;
                 return false;
             }
+
+            float entryCenterOffsetLogical = source.SourceCampaignLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId
+                ? -FanFrameWidthLogical * .5f
+                : FanFrameWidthLogical * .5f;
+            Vector2 screenEntry = LogicalToWorld(camera, viewport, logicalWidth, canvasScale,
+                new Vector2(entryCenterOffsetLogical, logicalHeight * .5f));
+            route.FanEntryExtensionWorldUnits = Mathf.Max(0f, geometry.Centerline[0].x - screenEntry.x);
+            runtimeConfig.ConfigureRoute(route);
 
             firstServiceZone = runtimeConfig.WorkZonePosition(geometry, 0);
             secondServiceZone = runtimeConfig.WorkZonePosition(geometry, Mathf.Min(1, route.RowCount - 2));

@@ -88,7 +88,7 @@ namespace HayChoriYPaty
                     marketActive = false; marketFromSelector = false; hubActive = false;
                     levelSelectActive = true; levelSelectScroll = 0f;
                 }
-                else towerDefenseError = "No se pudo guardar la salida de Camioneros.";
+                else towerDefenseError = "No se pudo guardar la salida de Tower Defense.";
             }
             else if (action == TowerDefenseSpeedAction)
             {
@@ -158,11 +158,12 @@ namespace HayChoriYPaty
         private bool StartTowerDefenseRun()
         {
             towerDefenseError = null;
-            if (game == null || game.Sim == null || game.SelectedLevel != StreetSimulation.TowerDefenseCampaignLevelId ||
-                game.Sim.LevelIndex != StreetSimulation.TowerDefenseCampaignLevelId ||
-                !game.IsLevelUnlocked(StreetSimulation.TowerDefenseCampaignLevelId))
+            int campaignLevelId = game != null && game.Sim != null ? game.Sim.LevelIndex : -1;
+            string configResource = TowerDefenseLevelConfig.ResourcesPathForCampaignLevel(campaignLevelId);
+            if (game == null || game.Sim == null || string.IsNullOrEmpty(configResource) ||
+                game.SelectedLevel != campaignLevelId || !game.IsLevelUnlocked(campaignLevelId))
             {
-                towerDefenseError = "Camioneros Tower Defense requiere seleccionar el nivel 11 desbloqueado.";
+                towerDefenseError = "Tower Defense requiere seleccionar un nivel Defense desbloqueado.";
                 return false;
             }
             if (!game.CanStartRound)
@@ -176,18 +177,18 @@ namespace HayChoriYPaty
                 towerDefenseError = "No hay una cámara activa para proyectar el recorrido.";
                 return false;
             }
-            towerDefenseSourceConfig = Resources.Load<TowerDefenseLevelConfig>("TowerDefense/Camioneros-PlazaDeMayo");
+            towerDefenseSourceConfig = Resources.Load<TowerDefenseLevelConfig>(configResource);
             if (towerDefenseSourceConfig == null)
             {
-                towerDefenseError = "Falta la configuración TowerDefense/Camioneros-PlazaDeMayo.";
+                towerDefenseError = "Falta la configuración " + configResource + ".";
                 return false;
             }
             towerDefenseBackdrop = Resources.Load<Texture2D>(towerDefenseSourceConfig.BackgroundResource);
-            if (towerDefenseBackdrop == null) towerDefenseBackdrop = camionerosBackground;
-            towerDefenseCrest = Resources.Load<Texture2D>("street-camioneros-crest-v1");
+            if (towerDefenseBackdrop == null) towerDefenseBackdrop = campaignLevelId == 9 ? camionerosBackground : losRedondosBackground;
+            towerDefenseCrest = LevelCrestForLevel(campaignLevelId);
             if (towerDefenseBackdrop == null)
             {
-                towerDefenseError = "No se pudo cargar el fondo existente de Camioneros / Plaza de Mayo.";
+                towerDefenseError = "No se pudo cargar el fondo de " + towerDefenseSourceConfig.DisplayName + ".";
                 return false;
             }
 
@@ -297,7 +298,7 @@ namespace HayChoriYPaty
                     EndTowerDefenseRun();
                     hubActive = false; marketActive = false; marketFromSelector = false; levelSelectActive = false;
                 }
-                else towerDefenseError = "No se pudo guardar el resultado de Camioneros.";
+                else towerDefenseError = "No se pudo guardar el resultado de Tower Defense.";
             }
         }
 
@@ -391,8 +392,11 @@ namespace HayChoriYPaty
             DrawFooterBluePanel(LayoutRect(new Rect(0f, footerTop, W, height - footerTop)), layoutVerticalScale);
             if (towerDefenseCrest != null)
                 DrawLevelCrest(LayoutRect(new Rect(18f, footerTop + 9f, 34f, 42f)), towerDefenseCrest);
-            DrawTowerDefenseLabel(new Rect(58f, footerTop + 2f, W - 76f, 29f), "CAMIONEROS", towerDefenseTitle);
-            DrawTowerDefenseLabel(new Rect(58f, footerTop + 29f, W - 76f, 22f), "PLAZA DE MAYO", towerDefenseSmallLabel);
+            string[] identity = (towerDefenseSourceConfig != null ? towerDefenseSourceConfig.DisplayName : "Tower Defense").Split('/');
+            string title = identity.Length > 0 ? identity[0].Trim().ToUpperInvariant() : "TOWER DEFENSE";
+            string location = identity.Length > 1 ? identity[1].Trim().ToUpperInvariant() : string.Empty;
+            DrawTowerDefenseLabel(new Rect(58f, footerTop + 2f, W - 76f, 29f), title, towerDefenseTitle);
+            DrawTowerDefenseLabel(new Rect(58f, footerTop + 29f, W - 76f, 22f), location, towerDefenseSmallLabel);
 
             bool active = towerDefenseMode.Phase == TowerDefenseRunPhase.Playing;
             Rect[] hireBounds = TowerDefenseHireBounds(height);
@@ -601,9 +605,10 @@ namespace HayChoriYPaty
         {
             if (backdrop == null || towerDefenseBackdrop == null || canvasHeight <= 0f) return;
             // Draw within the active safe-area logical canvas, like the route and footer.
-            // Use existing Camioneros mural art all the way to the route so no unrelated
-            // campaign mural can show through behind the HUD.
-            Rect themeSource = ClubVisualTheme.ForLevel(StreetSimulation.TowerDefenseCampaignLevelId).MuralSource;
+            // Use the selected club's existing mural art all the way to the route so no
+            // unrelated campaign mural can show through behind the HUD.
+            int visualLevelId = towerDefenseSourceConfig != null ? towerDefenseSourceConfig.SourceCampaignLevelId : 9;
+            Rect themeSource = ClubVisualTheme.ForLevel(visualLevelId).MuralSource;
             Rect muralSource = new Rect(themeSource.x * towerDefenseBackdrop.width,
                 themeSource.y * towerDefenseBackdrop.height, themeSource.width * towerDefenseBackdrop.width,
                 themeSource.height * towerDefenseBackdrop.height);
@@ -704,8 +709,8 @@ namespace HayChoriYPaty
                 upgradePercent.fontSize = statusSize;
                 if (role == StreetWorkerRole.Parrillero && parrilleroIcon != null)
                     DrawUpgradeOvalContent(card, parrilleroIcon, new Rect(22, 6, 1269, 1188));
-                else if (role == StreetWorkerRole.Cocacolero && CocacoleroArtForLevel(9) != null)
-                    DrawUpgradeOvalContent(card, CocacoleroArtForLevel(9), CocacoleroPoseForLevel(9, 0));
+                else if (role == StreetWorkerRole.Cocacolero && CocacoleroArtForLevel(TowerDefenseLevelConfig.CommonEconomicBalanceLevelId) != null)
+                    DrawUpgradeOvalContent(card, CocacoleroArtForLevel(TowerDefenseLevelConfig.CommonEconomicBalanceLevelId), CocacoleroPoseForLevel(TowerDefenseLevelConfig.CommonEconomicBalanceLevelId, 0));
                 string price = cost > 0 ? cost.ToString() : "MAX";
                 if (cost > 0) Item(UpgradeCoinBounds(card), 10);
                 int priceSize = upgradePrice.fontSize;
@@ -751,7 +756,7 @@ namespace HayChoriYPaty
             }
             else if (role == StreetWorkerRole.Cocacolero)
             {
-                texture = CocacoleroArtForLevel(9);
+                texture = CocacoleroArtForLevel(TowerDefenseLevelConfig.CommonEconomicBalanceLevelId);
                 poses = null;
             }
             else
@@ -766,12 +771,48 @@ namespace HayChoriYPaty
             for (int frame = 0; frame < frameCount; frame++)
             {
                 Rect topOrigin;
-                if (role == StreetWorkerRole.Cocacolero) topOrigin = CocacoleroPoseForLevel(9, frame);
+                if (role == StreetWorkerRole.Cocacolero) topOrigin = CocacoleroPoseForLevel(TowerDefenseLevelConfig.CommonEconomicBalanceLevelId, frame);
                 else if (role == StreetWorkerRole.Fernetero) topOrigin = MatchedCocacoleroPose(frame, new Vector2(texture.width, texture.height));
                 else topOrigin = poses[frame];
                 Rect spriteRect = new Rect(topOrigin.x, texture.height - topOrigin.yMax, topOrigin.width, topOrigin.height);
-                frames[frame] = Sprite.Create(texture, spriteRect, new Vector2(.5f, .02f), 100f, 0, SpriteMeshType.Tight);
+                frames[frame] = Sprite.Create(texture, spriteRect, new Vector2(.5f, TowerDefenseGameMode.WorkerVisualPivotY), 100f, 0, SpriteMeshType.Tight);
                 frames[frame].name = "TD " + role + " campaign pose " + frame;
+                frames[frame].hideFlags = HideFlags.DontSave;
+            }
+            return frames;
+        }
+
+        /// <summary>
+        /// Creates short delivery gestures from already-authored campaign poses. Coca's reach
+        /// pose contains a bottle, so the delivery cue must stay hidden until the release.
+        /// </summary>
+        internal Sprite[] CreateTowerDefenseHandoffFrames(StreetWorkerRole role)
+        {
+            Texture2D texture;
+            Rect[] poses;
+            if (role == StreetWorkerRole.Parrillero)
+            {
+                texture = Resources.Load<Texture2D>("street-parrillero-cooking-arms-v1");
+                poses = StreetWorkerProjection.CookingPoseBounds;
+            }
+            else if (role == StreetWorkerRole.Cocacolero)
+            {
+                texture = Resources.Load<Texture2D>("street-cocacolero-barrel-reach-v1");
+                poses = texture != null ? new[] { new Rect(0f, 0f, texture.width, texture.height) } : Array.Empty<Rect>();
+            }
+            else
+            {
+                return Array.Empty<Sprite>();
+            }
+
+            if (texture == null || poses == null || poses.Length == 0) return Array.Empty<Sprite>();
+            var frames = new Sprite[poses.Length];
+            for (int frame = 0; frame < poses.Length; frame++)
+            {
+                Rect pose = poses[frame];
+                Rect spriteRect = new Rect(pose.x, texture.height - pose.yMax, pose.width, pose.height);
+                frames[frame] = Sprite.Create(texture, spriteRect, new Vector2(.5f, TowerDefenseGameMode.WorkerVisualPivotY), 100f, 0, SpriteMeshType.Tight);
+                frames[frame].name = "TD " + role + " handoff pose " + frame;
                 frames[frame].hideFlags = HideFlags.DontSave;
             }
             return frames;

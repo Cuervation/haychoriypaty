@@ -1,3 +1,83 @@
+# Android — 2026-11-09: entrada progresiva de hinchas de Camioneros, APK 0.2.83/code85
+
+Unity 6000.6.3f1 BuildPipeline en una copia aislada del working tree capturado desde `HEAD 64d638c`; Android Development IL2CPP/ARM64 y solo `Assets/Scenes/Main.unity`: **Succeeded en 528.27 s, 0 errores / 5 advertencias**. Se incluyeron las fuentes y sprites de producto del working tree, pero no builds, escenas temporales, capturas ni archivos de auditoría. `ProjectSettings.asset` y `GvhProjectSettings.xml` se restauraron desde HEAD en la copia para excluir preferencias locales (`runInBackground` y cookie/opt-in local de Firebase Analytics); el checkout activo y Unity interactivo no se modificaron durante el build.
+
+La primera compilación aislada encontró `CS0103` en `TowerDefenseScreenLayoutTests.cs`: la prueba refería directamente una constante del runtime desde un asmdef sin referencia a `Assembly-CSharp`. Se corrigió esa referencia en la prueba mediante reflexión, acorde al patrón de ese asmdef, y se repitió la compilación. La compilación incluye el assembly de pruebas, pero **no ejecuta casos**: EditMode/PlayMode y captura Game View de la entrada progresiva continúan `BLOCKED`/`NOT_RUN` por la sesión Unity MCP no disponible. El build no valida visualmente el comportamiento.
+
+APK local ignorada por Git: `Builds/Android/Archive/HayChoriYPaty-0.2.83-code85-camioneros-progressive-entry-20261109.apk`, **407,587,676 bytes**, SHA-256 `662794a27635ff94a425ddbf6dbb07c2a8070256243b8869f3b75ff829264f77`. **PASS:** ZIP íntegro, `zipalign -c -v 4`, firma APK v2 y `aapt` metadata: `com.haychoriypaty.game`, `0.2.83`/code`85`, min API26/target API36, ABI `arm64-v8a`; Android Debug signer, no es release Play Store.
+
+**No instalada ni lanzada.** El teléfono conserva la instalación previa; no se hizo smoke físico. El build es una APK de desarrollo y no equivale a aceptación de gameplay.
+
+# Android — 2026-11-09: APK del working tree actual, 0.2.83/code85
+
+Unity 6000.6.3f1 BuildPipeline mediante Unity MCP, Android Development IL2CPP/ARM64, con `Assets/Scenes/Main.unity` explícita (Build Settings también tenía SampleScene habilitada): **Succeeded en 293.00 s, 0 errores / 5 advertencias**. Job `build-f39f21e5a0`.
+
+APK local ignorada por Git: `Builds/Android/Archive/HayChoriYPaty-0.2.83-code85-current-tree-20261109.apk`, **422,576,550 bytes**, SHA-256 `666563490c97797795e10383d9b70748c27da2b12cd64f06f70731dba588a0e1`. **PASS:** ZIP íntegro, `zipalign -c -v 4`, firma APK Scheme v2 y metadata con `aapt`: paquete `com.haychoriypaty.game`, `0.2.83`/code`85`, min API26/target API36, ABI `arm64-v8a`; `android:debuggable=true`, Analytics y Ad-ID desactivados. Firmada Android Debug; no es release Play Store.
+
+**Instalación física:** `adb install -r` devolvió **Success** en Motorola Edge 60 Fusion (`ZY22MBNWRB`). Package Manager confirma `com.haychoriypaty.game`, `0.2.83`/`85`, `lastUpdateTime=2026-11-09 14:17:01` y `firstInstallTime=2026-10-03 18:49:24` preservado. Actualización in-place: no se desinstaló ni borró datos. La app no se lanzó; smoke de gameplay en teléfono **NOT_RUN**. La instalación no agrega pruebas de gameplay a la compilación.
+
+---
+
+# Android — 2026-11-07: vallado Tower Defense al ras de ambos bordes, APK 0.2.83/code85
+
+Unity 6000.6.3f1 compiló una copia aislada de **HEAD `64d638c` + el working tree existente** (solo `Assets/Scenes/Main.unity`; Development IL2CPP/ARM64): **Succeeded en 562.17 s, 0 errores / 5 advertencias**. Tras el cierre autorizado del Editor que mantenía el lock, Unity MCP no tenía una sesión disponible; la copia excluyó cachés, logs, builds y escenas temporales de tests. Se restauraron `ProjectSettings.asset` y `GvhProjectSettings.xml` desde HEAD para excluir preferencias locales (`runInBackground` y opt-in de Firebase Analytics), sin alterar el checkout. La primera compilación limpia encontró `CS0103` en un test de layout: el asmdef no referencia `Assembly-CSharp`; se corrigió el test para obtener `FanFrameWidthLogical` mediante el `layoutType` reflejado ya existente y se repitió el build exitosamente.
+
+APK ignorada por Git: `Builds/Android/Archive/HayChoriYPaty-0.2.83-code85-current-tree-fence-right-edge-20261107.apk`, **405,358,446 bytes**, SHA-256 `7092675d60f449b30c672028d091d7ec96e8d16af0918f9a8a3da50ac2546965`. **PASS:** ZIP íntegro, `zipalign -c 4`, APK Signature Scheme v2, `aapt` package/version/API/ABI. `com.haychoriypaty.game`, `0.2.83`/code`85`, min API26/target API36, `arm64-v8a`; manifiesto Development/debuggable, Analytics y Ad-ID desactivados; metadata IL2CPP incluye `FitVisualRailToHorizontalBounds`. Firma Android Debug, no Play Store.
+
+**EditMode/PlayMode tests, instalación y smoke de gameplay NOT_RUN.** La compilación verifica que los assemblies compilan y que BuildPipeline pasó, pero no equivale a ejecutar las pruebas ni validar gameplay en teléfono. La APK Development aplica el grant temporal QA de `+30` tickets; retirar antes de una distribución release. No se instaló ni se subió a Git.
+
+---
+
+# Android — 2026-11-07: cooldown de trabajadores Tower Defense, APK 0.2.83/code85
+
+Unity 6000.6.3f1 compiló el checkout activo mediante el Editor, Android Development IL2CPP/ARM64, con solo `Assets/Scenes/Main.unity`: **Succeeded en 280.93 s, 0 errores/6 advertencias**. Build job `build-6e94ed7aa5`. La compilación contiene el cooldown funcional individual de 0,62 s por entrega y el espaciado de Parrilleros del mismo área.
+
+APK ignorada por Git: `Builds/Android/Archive/HayChoriYPaty-0.2.83-code85-td-worker-delivery-fixes-20261107.apk`, **422,576,268 bytes**, SHA-256 `947ab246d00fc5cb26ba28f7bbcbd908d987f011e036823c130977dc699b70c3`. **PASS:** ZIP válido, `zipalign -c 4`, firma APK Scheme v2, manifiesto y `aapt` paquete/versión/API/ABI. `com.haychoriypaty.game`, `0.2.83`/code`85`, min API26/target API36, `arm64-v8a`; manifest Development/debuggable, Firebase Analytics y Ad-ID desactivados. Los metadatos IL2CPP contienen `DeliveryCooldownSeconds`, `DeliveryIntervalSeconds` y `ZoneWorkerPosition`. Firma Android Debug, no Play Store.
+
+**Instalación física:** `adb install -r` devolvió **Success** en Motorola Edge 60 Fusion (`ZY22MBNWRB`). Package Manager confirma `com.haychoriypaty.game`, `versionName=0.2.83`/`versionCode=85`, `lastUpdateTime=2026-11-07 19:59:37` y conserva `firstInstallTime=2026-10-03 18:49:24`. Actualización in-place; no se desinstaló ni se borraron datos/caché/progreso. Esta APK precede al ajuste de entrada de hinchas del contrato Tower Defense. La app no se lanzó; gameplay smoke en dispositivo **NOT_RUN**. Es una APK Development con el grant temporal QA de `+30` tickets; retirar antes de cualquier distribución release.
+
+---
+
+## Android — 2026-11-07: APK generada e instalada antes del arreglo de workers, 0.2.83/code85
+
+Unity 6000.6.3f1 compiló el checkout activo mediante el Editor Unity, Android Development IL2CPP/ARM64, con `Assets/Scenes/Main.unity` especificada explícitamente: **Succeeded en 367.65 s, 0 errores / 5 advertencias**. Build job `build-05a1f4ea18`. La compilación incluye el estado vigente de Tower Defense (60 hinchas, `fanSpeed=0.1575` en Camioneros/Los Redondos). Build Settings también tenía `SampleScene.unity` habilitada, por eso no se incluyó en esta APK.
+
+APK ignorada por Git: `Builds/Android/Archive/HayChoriYPaty-0.2.83-code85-latest-20261107.apk`, **422,576,268 bytes**, SHA-256 `a616852324dd76cb3f53aca02ac72ac4e09858b457795a46e55821f37728394b`. **PASS:** ZIP íntegro, `zipalign -c 4`, APK Signature Scheme v2, `aapt` package/version/API/ABI. Paquete `com.haychoriypaty.game`, `0.2.83`/code`85`, min API26/target API36, ABI `arm64-v8a`. Manifest Development/debuggable; Firebase Analytics y colección Ad-ID desactivados. Firma Android Debug; no es una release firmada para Play Store. Se instaló con `adb install -r`: **Success** en Motorola Edge 60 Fusion (`ZY22MBNWRB`). Package Manager confirma `lastUpdateTime=2026-11-07 16:51:42` y conserva `firstInstallTime=2026-10-03 18:49:24`; actualización in-place sin desinstalar ni borrar datos/caché. El SHA-256 del `base.apk` extraído del teléfono coincide byte a byte con el artefacto local. La app no se lanzó; gameplay smoke y EditMode/PlayMode **NOT_RUN**. Esta build Development conserva el grant temporal QA de `+30` tickets; retirar antes de cualquier distribución release.
+
+---
+
+# Android — 2026-11-07: instalación de APK previa (30 hinchas) en Motorola
+
+Se instaló `Builds/Android/Archive/HayChoriYPaty-0.2.83-code85-current-tree-retry-20261106-224909.apk` con `adb install -r`: **Success** en Motorola Edge 60 Fusion (`ZY22MBNWRB`). Package Manager confirma `com.haychoriypaty.game`, `versionName=0.2.83`/`versionCode=85`, `lastUpdateTime=2026-11-07 11:13:34`; se conserva `firstInstallTime=2026-10-03 18:49:24`. Actualización in-place, sin desinstalar ni borrar datos/caché. La app quedó cerrada/no lanzada; smoke de gameplay **NOT_RUN**. APK Development firmada Android Debug, no Play Store.
+
+---
+
+# Android — 2026-11-06: APK del working tree actual, 0.2.83/code85 (reintento)
+
+Unity 6000.6.3f1 compiló una copia aislada de **HEAD `64d638c` + el working tree capturado el 2026-11-06**, Android Development, IL2CPP/ARM64, solo `Assets/Scenes/Main.unity`: **Succeeded en 426.26 s, 0 errores / 5 advertencias**. La primera ejecución sandboxed no pudo escribir la base SQLite del Licensing Client; la compilación pasó con acceso al servicio de licencia ya instalado. No se editó manualmente configuración/licencia global. La copia excluyó `Assets/InitTestScene*.unity`, restauró `ProjectSettings.asset` y `GvhProjectSettings.xml` desde HEAD para excluir preferencias locales (incluida la activación local de Analytics) y conservó los inputs Firebase. Unity no escribió en el checkout principal durante el build.
+
+Paquete `com.haychoriypaty.game`, versionName `0.2.83`, versionCode `85`, min API26/target API36, ABI `arm64-v8a`. APK ignorada por Git: `Builds/Android/Archive/HayChoriYPaty-0.2.83-code85-current-tree-retry-20261106-224909.apk`, **404,854,928 bytes**, SHA-256 `3797793cbe7b0f01abce65212a0b316b0403e3dd76b137c327ef29fbf5cc6c93`. **PASS:** ZIP íntegro, `zipalign -c -v 4`, APK Signature Scheme v2 y `aapt` package/version/API/ABI. Manifest Development/debuggable; Firebase Analytics desactivado y recolección de Ad-ID deshabilitada. Firma Android Debug; no es una release firmada para Play Store. Pruebas EditMode/PlayMode, smoke de gameplay y **instalación en dispositivo NOT_RUN**.
+
+---
+
+# Android — 2026-11-06: hinchas de Tower Defense −30%, 0.2.83/code85
+
+Se redujo solo `TowerDefenseLevelConfig.FanSpeed` del nivel Camioneros de `0.45` a `0.315`. Unity 6000.6.3f1 compiló una copia aislada del working tree (Android Development, IL2CPP/ARM64, solo `Assets/Scenes/Main.unity`): **Succeeded en 553.99 s, 0 errores / 5 advertencias**. La copia evitó el Unity Editor cerrado/locked checkout; excluyó `Library`, `Builds`, `Logs`, preferencias y artefactos temporales; `ProjectSettings.asset` y `GvhProjectSettings.xml` se restauraron desde HEAD para no incluir preferencias locales ajenas. Inputs Firebase del proyecto se conservaron. El checkout principal no se abrió ni recibió escrituras desde Unity durante la compilación.
+
+Paquete `com.haychoriypaty.game`, versionName `0.2.83`, versionCode `85`, min API26/target API36, ABI `arm64-v8a`. APK ignorada por Git: `Builds/Android/Archive/HayChoriYPaty-0.2.83-code85-camioneros-fan-speed-20261106.apk`, **404,171,102 bytes**, SHA-256 `f1e635dc9f9c2de064b441b0864d9d85b6e019dd46a226cbb701fb3f146a326f`. **PASS:** ZIP íntegro, `zipalign -c -v 4`, APK Signature Scheme v2, `aapt` package/version/API/ABI, manifest Development/debuggable, Analytics desactivado (`firebase_analytics_collection_deactivated=true`) y colección Ad-ID deshabilitada. Firma Android Debug; no es release firmada para Play Store. **Instalada** el 2026-11-06 con `adb install -r` (Success) en Motorola Edge 60 Fusion (`ZY22MBNWRB`). Package Manager confirma `0.2.83/code85`, `lastUpdateTime=2026-11-06 16:46:45` y conserva `firstInstallTime=2026-10-03 18:49:24`. Actualización in-place: no se desinstaló ni borró datos/caché. App no lanzada; smoke físico/gameplay **NOT_RUN**. Esta compilación previa conserva el presupuesto de 10 hinchas y no incluye el cambio a 30.
+
+Validación de cambio: EditMode `CamionerosFansMoveAtSeventyPercentOfTheirPreviousConfiguredSpeed` 1/1 PASS y PlayMode `AutomaticMixedTenFanWaveCanWinWithCoinHiresAndNormalMovement` 1/1 PASS (36/36 unidades, 10/10 hinchas, cero fugas). Detalle contractual en [Tower Defense](tower-defense.md). La PlayMode se ejecutó en una copia aislada con renderizado habilitado; el primer intento `-nographics` se cerró antes de completar por fallo nativo de URP/RenderTexture.
+
+---
+
+# Android — 2026-11-06: APK generada desde HEAD `64d638c`, 0.2.83/code85
+
+APK Development IL2CPP/ARM64, escena única `Assets/Scenes/Main.unity`, Unity 6000.6.3f1, generada en copia aislada de HEAD `64d638cc2910a1fd445a1e02843ef54aae988db7`. BuildPipeline **Succeeded en 59.10 s, 0 errores / 1 advertencia** (Diagnostics Data recomienda habilitar Debug Symbols). Se excluyeron preferencias/configuración local ajena; se conservaron los inputs Android de Firebase necesarios para compilar. Paquete `com.haychoriypaty.game`, versionName `0.2.83`, versionCode `85`, min API26/target API36, ABI `arm64-v8a`.
+
+Artefacto ignorado por Git: `Builds/Android/Archive/HayChoriYPaty-0.2.83-code85-64d638c-20261106.apk`, **404,165,610 bytes**, SHA-256 `d24fd3d5fc6cfa94ca36be44d96a398a60fe09e558f3c3076d069cd7169160b0`. **PASS:** ZIP íntegro, `zipalign -c -v 4`, firma APK v2, package/version/API/ABI; manifest Development/debuggable, Analytics desactivado y recolección de Ad-ID deshabilitada. Firma Android Debug; no es release firmada para Play Store. **Instalada** con `adb install -r` (Success) en Motorola Edge 60 Fusion (`ZY22MBNWRB`); Package Manager confirma `0.2.83/code85`, `lastUpdateTime=2026-11-06 13:28:03` y `firstInstallTime=2026-10-03 18:49:24` conservado. Actualización in-place: no se desinstaló ni se borraron datos/caché. **No lanzada**; EditMode/PlayMode y gameplay smoke **NOT_RUN**.
+
+---
+
 # Android — 2026-11-06: APK del working tree actual, 0.2.83/code85
 
 APK Development IL2CPP/ARM64, escena única `Assets/Scenes/Main.unity`, Unity 6000.6.3f1. BuildPipeline en copia aislada del checkout vigente (**HEAD `5b178de` + working tree capturado el 2026-11-06**) terminó **Succeeded en 7:52.38, 0 errores / 5 advertencias**. Se excluyeron las escenas temporales sin seguimiento `Assets/InitTestScene*.unity`; en esa copia se restauraron `runInBackground` y `GvhProjectSettings.xml` desde HEAD para no incluir preferencias locales ajenas (incluida la activación local de Analytics). No se alteró el checkout para compilar. Paquete `com.haychoriypaty.game`, versionName `0.2.83`, versionCode `85`, min API26/target API36, ABI `arm64-v8a`.

@@ -28,6 +28,18 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(Save(), repo.State.snapshot);
             Assert.IsNull(repo.State.pending[0].match, "Restart must not create a phantom match from Unity inline serialization.");
         }
+        [Test] public void VersionSevenRequiresTheExplicitStableIdUnlockSet()
+        {
+            const string valid = "{\"version\":7,\"unlockedLevel\":2,\"unlockedLevelIds\":[true,false,false,false,false,false,false,false,false,false,false,false,false],\"market\":{\"balanceCents\":250,\"stockUnits\":[0,0,0,0,0,0,0,0,0,0]}}";
+            Assert.IsTrue(Repo("v7").Commit(valid, null));
+            MethodInfo validate = Repository.GetMethod("ValidateSnapshot", BindingFlags.Public | BindingFlags.Static);
+            string invalid = "{\"version\":7,\"unlockedLevel\":2,\"unlockedLevelIds\":[true,false],\"market\":{\"balanceCents\":250,\"stockUnits\":[0,0,0,0,0,0,0,0,0,0]}}";
+            Assert.Throws<InvalidDataException>(() =>
+            {
+                try { validate.Invoke(null, new object[] { invalid }); }
+                catch (TargetInvocationException error) { throw error.InnerException; }
+            });
+        }
         [Test] public void CopyAndAckNeverTurnNoMatchOperationsIntoEmptyMatches()
         {
             var repo = Repo("uid"); Assert.IsTrue(repo.Commit(Save(), null)); Assert.IsTrue(repo.Commit(Save(300), null));

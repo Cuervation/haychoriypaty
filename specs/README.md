@@ -8,13 +8,13 @@
 | Límite del producto y siete IDs | [product.md](product.md) |
 | Resumen del loop actual | [gameplay.md](gameplay.md) |
 | Campaña actual: 13 posiciones visibles, 12 clubes + Huracán bonus; no confundir posición e ID | [current-state.md](current-state.md) y [street-automation.md](features/street-automation.md) |
-| Única tabla vigente de balance: 11 modos tradicionales y excepciones especiales | [BALANCE_ACTUAL_NIVELES.md](../docs/BALANCE_ACTUAL_NIVELES.md); mecánicas y economía compartida en [street-automation.md](features/street-automation.md) |
+| Única tabla vigente de balance: 10 modos tradicionales y excepciones especiales | [BALANCE_ACTUAL_NIVELES.md](../docs/BALANCE_ACTUAL_NIVELES.md); mecánicas y economía compartida en [street-automation.md](features/street-automation.md) |
 | Cocineros activos 2 s / CookWorkRate, Mozo, seis cards y ampliación desde Racing | [active-cooks-mozos.md](features/active-cooks-mozos.md) (incluye restauración posterior del escenario) |
 | Cocina modular, stock físico, geometría y proyección | [modular-kitchen.md](features/modular-kitchen.md) (modo base niveles 1–5; Racing+ aplica el delta anterior) |
 | Mercado/Heladera, settlement de tickets y gates de stock por modo | [market-fridge.md](features/market-fridge.md) |
-| Huracán ID11 / Parque Patricios (posición visible 6; Bonus Track de puntuación) | [huracan-bonus-track.md](features/huracan-bonus-track.md) |
-| Argentinos Juniors ID12 / La Paternal (posición visible 13; último club) | [argentinos-juniors.md](features/argentinos-juniors.md) |
-| Tower Defense — Camioneros ID9 (posición visible 11; sin cuotas ni deadline) | [tower-defense.md](features/tower-defense.md) |
+| Huracán ID11 / Parque Patricios (posición visible 7; Bonus Track de puntuación) | [huracan-bonus-track.md](features/huracan-bonus-track.md) |
+| Argentinos Juniors ID12 / La Paternal (posición visible 5) | [argentinos-juniors.md](features/argentinos-juniors.md) |
+| Tower Defense — Camioneros ID9 (posición 3) y Los Redondos ID10 (posición 8; sin cuotas ni deadline) | [tower-defense.md](features/tower-defense.md) |
 | Firebase/Google obligatorio, perfiles UID, outbox y estado de integración | [firebase-player.md](features/firebase-player.md) (implementación local, aceptación real pendiente) |
 | Workers, gait y agarre físico | [worker-animation.md](features/worker-animation.md) |
 | Arte/UI y composición | [visual-reference.md](visual-reference.md) (solo si se modifica presentación) |

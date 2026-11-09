@@ -502,7 +502,7 @@ namespace HayChoriYPaty.Tests
                 string written = null;
                 Assert.IsTrue(Activate(game, null, (json, match) => { written = json; return true; }));
                 Assert.IsTrue((bool)ReadProperty(game, "IsPlayerActive"));
-                StringAssert.Contains("\"version\":4", written);
+                StringAssert.Contains("\"version\":7", written);
                 Assert.IsTrue((bool)Invoke(game, "SuspendPlayer"));
                 Assert.IsFalse((bool)ReadProperty(game, "IsPlayerActive"));
                 Assert.IsNull(ReadProperty(game, "Sim"));
@@ -513,6 +513,27 @@ namespace HayChoriYPaty.Tests
                 UnityEngine.Object.DestroyImmediate(go);
                 SetEditorTestInitialization(gameType, prior);
             }
+        }
+
+        [Test]
+        public void LegacyLosRedondosBestTimeArchiveKeepsTheFasterHistoricalRecordAndIsIdempotent()
+        {
+            object statistics = NewStatistics();
+            float[] bestTimes = new float[13]; bestTimes[10] = 72f;
+            WriteField(statistics, "bestWinTimeByLevel", bestTimes);
+            WriteField(statistics, "legacyTraditionalLosRedondosBestWinTime", 51f);
+            Invoke(statistics, "ArchiveLegacyTraditionalLosRedondosRecords");
+            Assert.AreEqual(51f, ReadField(statistics, "legacyTraditionalLosRedondosBestWinTime"),
+                "A smaller positive time is a better best-win record.");
+            Invoke(statistics, "ArchiveLegacyTraditionalLosRedondosRecords");
+            Assert.AreEqual(51f, ReadField(statistics, "legacyTraditionalLosRedondosBestWinTime"),
+                "Repeated migration must not change the archived result.");
+
+            bestTimes = new float[13]; bestTimes[10] = 38f;
+            WriteField(statistics, "bestWinTimeByLevel", bestTimes);
+            Invoke(statistics, "ArchiveLegacyTraditionalLosRedondosRecords");
+            Assert.AreEqual(38f, ReadField(statistics, "legacyTraditionalLosRedondosBestWinTime"),
+                "The archived historical record reconciles to the faster of both valid times.");
         }
 
         [Test]

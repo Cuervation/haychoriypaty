@@ -13,6 +13,7 @@ namespace HayChoriYPaty.Editor
         private const string ArrowPath = "Assets/Art/TowerDefense/Resources/fence-direction-arrow-v1.png";
         private const string ResourcesFolder = "Assets/Resources/TowerDefense";
         private const string ConfigPath = ResourcesFolder + "/Camioneros-PlazaDeMayo.asset";
+        private const string LosRedondosConfigPath = ResourcesFolder + "/LosRedondos-Tandil.asset";
 
         [MenuItem("Hay Chori y Paty/Tower Defense/Build modular fence assets")]
         public static void Build()
@@ -50,12 +51,54 @@ namespace HayChoriYPaty.Editor
                 serialized.FindProperty("terminalFencePrefab").objectReferenceValue = terminal;
                 serialized.FindProperty("directionSignPrefab").objectReferenceValue = direction;
                 serialized.FindProperty("directionArrowSprite").objectReferenceValue = arrow;
+                serialized.FindProperty("minimumEntrySpacingLogical").floatValue =
+                    TowerDefenseLevelConfig.CamionerosMinimumEntrySpacingLogical;
                 serialized.ApplyModifiedPropertiesWithoutUndo();
                 EditorUtility.SetDirty(config);
             }
 
+            TowerDefenseLevelConfig redondos = EnsureLosRedondosConfig(config);
+            if (redondos != null)
+            {
+                SerializedObject serialized = new SerializedObject(redondos);
+                serialized.FindProperty("straightFencePrefab").objectReferenceValue = straight;
+                serialized.FindProperty("turnFencePrefab").objectReferenceValue = turn;
+                serialized.FindProperty("terminalFencePrefab").objectReferenceValue = terminal;
+                serialized.FindProperty("directionSignPrefab").objectReferenceValue = direction;
+                serialized.FindProperty("directionArrowSprite").objectReferenceValue = arrow;
+                serialized.FindProperty("minimumEntrySpacingLogical").floatValue =
+                    TowerDefenseLevelConfig.DefaultMinimumEntrySpacingLogical;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+                EditorUtility.SetDirty(redondos);
+            }
+
             AssetDatabase.SaveAssets();
-            Debug.Log("Tower Defense modular assets ready: 3 fence piece prefabs, direction sign, and Camioneros / Plaza de Mayo config.");
+            Debug.Log("Tower Defense modular assets ready: shared fence pieces and Camioneros / Plaza de Mayo + Los Redondos / Tandil configs.");
+        }
+
+        private static TowerDefenseLevelConfig EnsureLosRedondosConfig(TowerDefenseLevelConfig source)
+        {
+            if (source == null) return null;
+            TowerDefenseLevelConfig config = AssetDatabase.LoadAssetAtPath<TowerDefenseLevelConfig>(LosRedondosConfigPath);
+            if (config == null)
+            {
+                config = ScriptableObject.CreateInstance<TowerDefenseLevelConfig>();
+                AssetDatabase.CreateAsset(config, LosRedondosConfigPath);
+            }
+
+            // Los Redondos inherits all shared gameplay and route fields from the canonical
+            // defense config on every rebuild; only its campaign identity/background differ.
+            EditorUtility.CopySerialized(source, config);
+            config.name = "LosRedondos-Tandil";
+
+            SerializedObject serialized = new SerializedObject(config);
+            serialized.FindProperty("modeId").stringValue = "tower-defense";
+            serialized.FindProperty("levelId").stringValue = TowerDefenseLevelConfig.LosRedondosLevelId;
+            serialized.FindProperty("displayName").stringValue = "Los Redondos / Tandil";
+            serialized.FindProperty("sourceCampaignLevelId").intValue = TowerDefenseLevelConfig.LosRedondosCampaignLevelId;
+            serialized.FindProperty("backgroundResource").stringValue = "street-background-losredondos-v1";
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            return config;
         }
 
         private static TowerDefenseLevelConfig EnsureConfigAsset()

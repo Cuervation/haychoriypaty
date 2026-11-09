@@ -18,7 +18,21 @@ namespace HayChoriYPaty.Tests
         }
         object Sim(int level=0) => Activator.CreateInstance(simType,new object[]{Activator.CreateInstance(balanceType),level,5f,0,1,0});
         object Market(object data=null,object balance=null) => Activator.CreateInstance(marketType,new[]{data??Activator.CreateInstance(dataType),balance??Activator.CreateInstance(balanceType)});
-        static object Call(object target,string name,params object[] args) => target.GetType().GetMethod(name,Public).Invoke(target,args);
+        static object Call(object target,string name,params object[] args)
+        {
+            var methods = target.GetType().GetMethods(Public);
+            for (int i = 0; i < methods.Length; i++)
+            {
+                var parameters = methods[i].GetParameters();
+                if (methods[i].Name != name || parameters.Length != args.Length) continue;
+                bool compatible = true;
+                for (int p = 0; p < parameters.Length; p++)
+                    if (args[p] != null && !parameters[p].ParameterType.IsInstanceOfType(args[p])) { compatible = false; break; }
+                if (compatible) return methods[i].Invoke(target, args);
+            }
+            throw new MissingMethodException(target.GetType().FullName, name);
+        }
+        static object CallStatic(Type target,string name,params object[] args) => target.GetMethod(name,BindingFlags.Public|BindingFlags.Static).Invoke(null,args);
         static object Get(object target,string name) => target.GetType().GetProperty(name,Public).GetValue(target,null);
         [Test] public void JsonKeepsCentsAndNormalizesExistingStock()
         {
@@ -31,6 +45,89 @@ namespace HayChoriYPaty.Tests
             object marketConfig=balanceType.GetField("market",Public).GetValue(shortBalance);
             marketConfig.GetType().GetField("packPricesCents",Public).SetValue(marketConfig,new[]{999});
             Assert.AreEqual(1600,Call(Market(null,shortBalance),"PackPriceCents",8));
+        }
+        [Test] public void MunicipalPermitPurchaseChargesExactlyOnceAndIsNotAnIngredient()
+        {
+            object data=Activator.CreateInstance(dataType);
+            dataType.GetField("balanceCents").SetValue(data,100000L);
+            dataType.GetField("preparationLevelId").SetValue(data,0);
+            object market=Market(data);
+
+            Assert.IsTrue((bool)Call(market,"TryBuyPreparationPermit",0,0));
+            Assert.IsFalse((bool)Call(market,"TryBuyPreparationPermit",0,0),"A repeated tap must not charge twice.");
+            Assert.AreEqual(50000L,Get(market,"BalanceCents"));
+            object saved=Get(market,"Data");
+            Assert.IsTrue((bool)dataType.GetField("municipalPermitPurchased").GetValue(saved));
+            Assert.IsFalse((bool)dataType.GetField("policeContributionPurchased").GetValue(saved));
+            Assert.AreEqual(0L,(long)dataType.GetField("cumulativePurchaseSpendCents").GetValue(saved));
+        }
+        [Test] public void PolicePermitAndBothPurchasesUseCentralPrice()
+        {
+            object data=Activator.CreateInstance(dataType);
+            dataType.GetField("balanceCents").SetValue(data,100000L);
+            dataType.GetField("preparationLevelId").SetValue(data,0);
+            object market=Market(data);
+
+            Assert.IsTrue((bool)Call(market,"TryBuyPreparationPermit",1,0));
+            Assert.IsTrue((bool)Call(market,"TryBuyPreparationPermit",0,0));
+            Assert.IsFalse((bool)Call(market,"TryBuyPreparationPermit",1,0));
+            Assert.AreEqual(0L,Get(market,"BalanceCents"));
+            object saved=Get(market,"Data");
+            Assert.IsTrue((bool)dataType.GetField("municipalPermitPurchased").GetValue(saved));
+            Assert.IsTrue((bool)dataType.GetField("policeContributionPurchased").GetValue(saved));
+            Type catalog=Type.GetType("HayChoriYPaty.StreetMarketPreparationCatalog, Assembly-CSharp",true);
+            Assert.AreEqual(50000L,(long)catalog.GetField("ItemPriceCents",BindingFlags.Public|BindingFlags.Static).GetRawConstantValue());
+        }
+        [Test] public void InsufficientBalanceRejectsPermitWithoutMutation()
+        {
+            object data=Activator.CreateInstance(dataType);
+            dataType.GetField("balanceCents").SetValue(data,49999L);
+            dataType.GetField("preparationLevelId").SetValue(data,0);
+            object market=Market(data);
+
+            Assert.IsFalse((bool)Call(market,"TryBuyPreparationPermit",0,0));
+            Assert.AreEqual(49999L,Get(market,"BalanceCents"));
+            Assert.IsFalse((bool)dataType.GetField("municipalPermitPurchased").GetValue(Get(market,"Data")));
+        }
+        [Test] public void PermitPurchasesSurviveSerializationAndClearOnlyForANewPreparation()
+        {
+            object data=Activator.CreateInstance(dataType);
+            dataType.GetField("balanceCents").SetValue(data,100000L);
+            dataType.GetField("preparationLevelId").SetValue(data,0);
+            object market=Market(data);
+            Assert.IsTrue((bool)Call(market,"TryBuyPreparationPermit",0,0));
+            object loadedData=JsonUtility.FromJson(JsonUtility.ToJson(Get(market,"Data")),dataType);
+            object restored=Market(loadedData);
+            Assert.IsTrue((bool)Call(restored,"IsPreparationPermitPurchased",0,0));
+            Assert.IsFalse((bool)Call(restored,"SelectPreparationLevel",0));
+            Assert.IsTrue((bool)Call(restored,"IsPreparationPermitPurchased",0,0));
+            Assert.IsTrue((bool)Call(restored,"SelectPreparationLevel",1));
+            Assert.IsFalse((bool)Call(restored,"IsPreparationPermitPurchased",0,1));
+            Assert.AreEqual(50000L,Get(restored,"BalanceCents"),"Changing the preparation clears flags without refunding the purchase.");
+        }
+        [Test] public void ConsumingSuccessfulPreparationClearsFlagsWithoutChangingEconomy()
+        {
+            object data=Activator.CreateInstance(dataType);
+            dataType.GetField("balanceCents").SetValue(data,100000L);
+            dataType.GetField("preparationLevelId").SetValue(data,0);
+            object market=Market(data);
+            Assert.IsTrue((bool)Call(market,"TryBuyPreparationPermit",0,0));
+            Assert.IsTrue((bool)Call(market,"TryBuyPreparationPermit",1,0));
+            Call(market,"ConsumePreparationPermits",0);
+            Assert.IsFalse((bool)Call(market,"IsPreparationPermitPurchased",0,0));
+            Assert.IsFalse((bool)Call(market,"IsPreparationPermitPurchased",1,0));
+            Assert.AreEqual(0L,Get(market,"BalanceCents"));
+        }
+        [Test] public void LegacyMarketSaveWithoutPreparationFieldsLoadsWithoutPermits()
+        {
+            object legacy=JsonUtility.FromJson("{\"balanceCents\":12345}",dataType);
+            object market=Market(legacy);
+            object restored=Get(market,"Data");
+
+            Assert.AreEqual(12345L,Get(market,"BalanceCents"));
+            Assert.IsFalse((bool)dataType.GetField("municipalPermitPurchased").GetValue(restored));
+            Assert.IsFalse((bool)dataType.GetField("policeContributionPurchased").GetValue(restored));
+            Assert.AreEqual(0,Call(market,"Units",0));
         }
         [Test] public void MarketWatermarksKeepHuracanAndArgentinosInSeparateStableSlots()
         {
@@ -73,15 +170,32 @@ namespace HayChoriYPaty.Tests
             Assert.IsFalse((bool)Call(market,"IsIngredientUnlocked",8,0));
             Assert.IsTrue((bool)Call(market,"IsIngredientUnlocked",8,4));
         }
-        [Test] public void DefenseStartsWithoutLegacyQuotaStockWhileTraditionalGateStaysIntact()
+        [Test] public void CampaignMarketGateUsesExplicitStableIdUnlocksInsteadOfLegacyFrontier()
         {
-            object data = Activator.CreateInstance(dataType), market = Market(data), defense = Sim(9);
-            CollectionAssert.AreEqual(new int[10], (int[])Call(market, "RequiredUnits", defense));
-            Assert.IsTrue((bool)Call(market, "HasRequiredStock", defense));
-            Assert.IsTrue((bool)Call(market, "BeginAttempt", defense));
-            Assert.AreEqual(0, Call(defense, "GetProductGoal", 0));
-            Assert.AreEqual(0, Call(defense, "GetProductGoal", 4));
-            Assert.AreEqual(0f, Get(defense, "TimeRemaining"));
+            object market = Market();
+            bool[] unlocked = new bool[13]; unlocked[0] = true; unlocked[1] = true;
+            Assert.IsTrue((bool)Call(market, "IsIngredientUnlocked", 0, unlocked, 10));
+            Assert.IsFalse((bool)Call(market, "IsIngredientUnlocked", 8, unlocked, 10),
+                "A high legacy frontier must not unlock Fernet ingredients after campaign reorder.");
+            Assert.IsFalse((bool)Call(market, "IsIngredientUnlocked", 2, unlocked, 10));
+            unlocked[12] = true;
+            Assert.IsTrue((bool)Call(market, "IsIngredientUnlocked", 8, unlocked, 0),
+                "An explicitly unlocked Argentinos ID exposes only its configured catalog.");
+        }
+        [Test] public void BothDefenseLevelsStartWithoutLegacyQuotaStockWhileTraditionalGateStaysIntact()
+        {
+            for (int level = 9; level <= 10; level++)
+            {
+                object data = Activator.CreateInstance(dataType), market = Market(data), defense = Sim(level);
+                CollectionAssert.AreEqual(new int[10], (int[])Call(market, "RequiredUnits", defense));
+                Assert.IsTrue((bool)Call(market, "HasRequiredStock", defense));
+                Assert.IsTrue((bool)Call(market, "BeginAttempt", defense));
+                Assert.AreEqual(0, Call(defense, "GetProductGoal", 0));
+                Assert.AreEqual(0, Call(defense, "GetProductGoal", 4));
+                Assert.AreEqual(0f, Get(defense, "TimeRemaining"));
+                Assert.AreEqual(2, Get(defense, "ProductCount"));
+                Assert.AreEqual(500, CallStatic(simType, "GetStartingCoinsForLevel", Activator.CreateInstance(balanceType), level));
+            }
             object ordinaryMarket = Market(), ordinary = Sim(8);
             Assert.IsFalse((bool)Call(ordinaryMarket, "HasRequiredStock", ordinary));
             Assert.Greater((float)Get(ordinary, "TimeRemaining"), 0f);

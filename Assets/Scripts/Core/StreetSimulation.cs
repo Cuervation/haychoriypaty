@@ -292,6 +292,7 @@ namespace HayChoriYPaty
     public sealed class StreetSimulation
     {
         public const int TowerDefenseCampaignLevelId = 9;
+        public const int LosRedondosTowerDefenseCampaignLevelId = 10;
         public const float FixedProductPrice = 5f; // Legacy common/chori price retained for compatibility.
         public const float FlorestaChoriPrice = FixedProductPrice; // Legacy name retained for compatibility.
         private static readonly float[] OfficialProductPrices = { FixedProductPrice, FixedProductPrice, 10f, 12f, FixedProductPrice, 12f, 7f };
@@ -304,7 +305,7 @@ namespace HayChoriYPaty
         public static readonly string[] ProductNames = { "Chori", "Paty", "Bondiola", "Vacío", "Coca 600 ml", "Fernet con Coca 1 L", "Cerveza en lata" };
         public const int HuracanBonusLevelId = 11;
         public const int ArgentinosJuniorsLevelId = 12;
-        public static readonly int[] CampaignOrder = { 0, 1, 2, 3, 4, HuracanBonusLevelId, 5, 6, 7, 8, 9, 10, ArgentinosJuniorsLevelId };
+        public static readonly int[] CampaignOrder = { 0, 1, TowerDefenseCampaignLevelId, 2, ArgentinosJuniorsLevelId, 3, HuracanBonusLevelId, LosRedondosTowerDefenseCampaignLevelId, 4, 5, 6, 7, 8 };
         public static readonly string[] LevelNames = { "Floresta / All Boys", "Nueva Chicago", "Liniers - Velez Sarsfield", "Ferro Carril Oeste", "Independiente de Avellaneda", "Racing Club / Avellaneda", "San Lorenzo / Boedo", "River Plate / Núñez", "Boca Juniors / La Boca", "Sindicato de Camioneros / Plaza de Mayo", "Los Redondos / Tandil", "Huracán / Parque Patricios", "Argentinos Juniors / La Paternal" };
         // Player-facing captions consistently show the club/team first and its neighborhood second.
         // LevelNames remain stable theme keys consumed by ClubVisualTheme.
@@ -343,6 +344,10 @@ namespace HayChoriYPaty
         private bool externalCampaignRuntime;
 
         public static int CampaignLevelAt(int position) => position >= 0 && position < CampaignOrder.Length ? CampaignOrder[position] : -1;
+        public static bool IsTowerDefenseLevel(int levelId) =>
+            levelId == TowerDefenseCampaignLevelId || levelId == LosRedondosTowerDefenseCampaignLevelId;
+        public static int GetStartingCoinsForLevel(StreetBalance sourceBalance, int levelId) =>
+            IsTowerDefenseLevel(levelId) ? TowerDefenseEconomyProfile.StartingCoins : sourceBalance == null ? 0 : sourceBalance.GetStartingCoins(levelId);
         public static int CampaignPositionOf(int levelId)
         {
             for (int i = 0; i < CampaignOrder.Length; i++) if (CampaignOrder[i] == levelId) return i;
@@ -393,11 +398,11 @@ namespace HayChoriYPaty
                 return true;
             }
         }
-        public int GetProductGoal(int productId) => !IsBonusTrack && LevelIndex != TowerDefenseCampaignLevelId && IsProductAvailable(productId) ? balance.GetProductGoal(LevelIndex, productId) : 0;
+        public int GetProductGoal(int productId) => !IsBonusTrack && !IsTowerDefenseLevel(LevelIndex) && IsProductAvailable(productId) ? balance.GetProductGoal(LevelIndex, productId) : 0;
         public int GetProductDelivered(int productId) => productId >= 0 && productId < deliveredByProduct.Length ? deliveredByProduct[productId] : 0;
         public int GetProductRemaining(int productId) => Mathf.Max(0, GetProductGoal(productId) - GetProductDelivered(productId));
         public bool IsProductGoalComplete(int productId) => GetProductGoal(productId) > 0 && GetProductRemaining(productId) == 0;
-        public float TimeRemaining { get { if (LevelIndex == TowerDefenseCampaignLevelId) return 0f; return Mathf.Max(0f, (IsBonusTrack ? StreetBonusTrackState.DurationSeconds : LevelValue(balance.levelDurations, LevelIndex, DefaultDurations)) - Elapsed); } }
+        public float TimeRemaining { get { if (IsTowerDefenseLevel(LevelIndex)) return 0f; return Mathf.Max(0f, (IsBonusTrack ? StreetBonusTrackState.DurationSeconds : LevelValue(balance.levelDurations, LevelIndex, DefaultDurations)) - Elapsed); } }
         public int StaffCount { get { return workers.Count; } }
         public StreetWorkerRole NextHireRole
         {
@@ -574,11 +579,11 @@ namespace HayChoriYPaty
                 return Mathf.Clamp01((balance.maxPrice-total/ProductCount)/Mathf.Max(0.01f,balance.maxPrice-balance.minPrice));
             }
         }
-        public int ProductCount { get { return LevelIndex == TowerDefenseCampaignLevelId ? 2 : availableProductsByLevel[LevelIndex].Length; } }
+        public int ProductCount { get { return IsTowerDefenseLevel(LevelIndex) ? 2 : availableProductsByLevel[LevelIndex].Length; } }
 
         public int GetAvailableProduct(int slot)
         {
-            if (LevelIndex == TowerDefenseCampaignLevelId)
+            if (IsTowerDefenseLevel(LevelIndex))
                 return slot == 0 ? 0 : slot == 1 ? 4 : -1;
             return slot >= 0 && slot < ProductCount ? availableProductsByLevel[LevelIndex][slot] : -1;
         }
@@ -593,7 +598,7 @@ namespace HayChoriYPaty
                 int[] parsed = ParseProductIds(value.levelProductIds != null && level < value.levelProductIds.Length
                     ? value.levelProductIds[level] : null);
                 if (parsed == null) parsed = (int[])DefaultLevelProducts[level].Clone();
-                result[level] = level == TowerDefenseCampaignLevelId ? new[] {0, 4} : parsed;
+                result[level] = IsTowerDefenseLevel(level) ? new[] {0, 4} : parsed;
             }
             return result;
         }
@@ -664,7 +669,7 @@ namespace HayChoriYPaty
         {
             if (!CanStartRoundWithTicketWorkers(ticketRoleCounts)) return false;
             customers.Clear(); sales.Clear();
-            Coins = balance.GetStartingCoins(LevelIndex); CoinsEarned = 0; // Opening balance is a configured attempt grant, not earned revenue.
+            Coins = GetStartingCoinsForLevel(balance, LevelIndex); CoinsEarned = 0; // Opening balance is a configured attempt grant, not earned revenue.
             Elapsed = 0f; Delivered = 0; customersAttended = ordersCompleted = 0;
             Array.Clear(deliveredByProduct, 0, deliveredByProduct.Length);
             // Every round entry is a fresh attempt; ticket workers augment, never replace, its baseline.
@@ -683,7 +688,7 @@ namespace HayChoriYPaty
         /// <summary>Marks the already-started stable Camioneros campaign attempt as TD-owned.</summary>
         internal bool BeginExternalCampaignRuntime()
         {
-            if (LevelIndex != TowerDefenseCampaignLevelId || Phase != RoundPhase.Playing || externalCampaignRuntime) return false;
+            if (!IsTowerDefenseLevel(LevelIndex) || Phase != RoundPhase.Playing || externalCampaignRuntime) return false;
             // StartRound's ordinary baseline is retained for every traditional level, but TD is
             // an empty manual-placement mode, so remove only that baseline after the common attempt starts.
             workers.Clear();
@@ -698,7 +703,7 @@ namespace HayChoriYPaty
             int[] workerCounts, int[] deliveredByProduct, int attendedCustomers, int completedOrders,
             bool terminal, bool won)
         {
-            if (!externalCampaignRuntime || LevelIndex != TowerDefenseCampaignLevelId || Phase != RoundPhase.Playing ||
+            if (!externalCampaignRuntime || !IsTowerDefenseLevel(LevelIndex) || Phase != RoundPhase.Playing ||
                 float.IsNaN(elapsedSeconds) || float.IsInfinity(elapsedSeconds) || workerCounts == null || workerCounts.Length != 5 ||
                 deliveredByProduct == null || deliveredByProduct.Length != 7 || attendedCustomers < 0 || completedOrders < 0) return false;
 
@@ -808,7 +813,7 @@ namespace HayChoriYPaty
             bonusTrack = IsBonusTrack ? new StreetBonusTrackState(balance.randomSeed + LevelIndex * 97) : null;
             RefreshKitchenLayout();
             ResetTeamAndSpeed();
-            Coins = balance.GetStartingCoins(LevelIndex); CoinsEarned = 0;
+            Coins = GetStartingCoinsForLevel(balance, LevelIndex); CoinsEarned = 0;
             customersAttended = ordersCompleted = 0;
             Array.Clear(deliveredByProduct, 0, deliveredByProduct.Length); Delivered = 0;
             return true;
@@ -823,7 +828,7 @@ namespace HayChoriYPaty
             bonusTrack = IsBonusTrack ? new StreetBonusTrackState(balance.randomSeed + LevelIndex * 97) : null;
             RefreshKitchenLayout();
             ResetTeamAndSpeed();
-            Coins = balance.GetStartingCoins(LevelIndex); CoinsEarned = 0;
+            Coins = GetStartingCoinsForLevel(balance, LevelIndex); CoinsEarned = 0;
             customersAttended = ordersCompleted = 0;
             Array.Clear(deliveredByProduct, 0, deliveredByProduct.Length); Delivered = 0;
             Phase = RoundPhase.Ready; return true;

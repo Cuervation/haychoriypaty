@@ -100,6 +100,7 @@ namespace HayChoriYPaty
         public float AnimationTime { get; internal set; }
         public float TravelDistance { get; internal set; }
         public float ServeAnimationSeconds { get; internal set; }
+        public float DeliveryCooldownSeconds { get; internal set; }
         public Vector2 LastServiceTarget { get; internal set; }
 
         internal int TargetZone;
@@ -129,8 +130,15 @@ namespace HayChoriYPaty
         public const int MaxWorkersPerRolePerZone = 3;
         public const float CampaignStepSliceSeconds = 0.05f;
         public const float FanDepartureDurationSeconds = 0.42f;
-        public const float DeliveryCueDurationSeconds = 0.30f;
-        public const float StationSpacingLogical = 140f;
+        public const float DeliveryIntervalSeconds = 0.62f;
+        public const float DeliveryCueDurationSeconds = DeliveryIntervalSeconds;
+        public const float WorkerVisualHeightLogical = 94f;
+        public const float WorkerVisualPivotY = 0.02f;
+        public const float WorkerFenceClearanceLogical = 8f;
+        public const float StationSpacingLogical = 340f;
+        private const float ParallelWorkerSpacingLogical = 84f;
+        private const float WorkerRoleRowSeparationLogical = 110f;
+        private const float CompactStationSpacingLogical = 140f;
         private static readonly int[] OrderProductIds = { 0, 4 };
         private const int MaximumSpeedLevel = 9;
         private static TowerDefenseGameMode activeInstance;
@@ -161,6 +169,7 @@ namespace HayChoriYPaty
         private float serviceRange;
         private TowerDefenseRouteGeometryResult routeGeometry;
         private TowerDefenseRouteGeometryConfig route;
+        private Vector2[] fanRouteWaypoints;
 
         public static bool OwnsRuntime => activeInstance != null;
         public static bool CampaignStepSuspended => campaignStepSuspended;
@@ -207,10 +216,25 @@ namespace HayChoriYPaty
         /// <summary>Returns the configured, passable service point for one of the first level's work areas.</summary>
         public Vector2 WorkZone(int zone) => zone >= 0 && zone < serviceZones.Length ? serviceZones[zone] : Vector2.zero;
 
+        private bool UsesSplitWorkerRows
+        {
+            get
+            {
+                float corridor = route.HorizontalCorridorWidth > 0f ? route.HorizontalCorridorWidth : route.CorridorWidth;
+                float clearHeightLogical = Mathf.Max(0f, route.RowSpacing - corridor) /
+                    Mathf.Max(0.0001f, worldUnitsPerLogicalPixel);
+                return clearHeightLogical >= WorkerVisualHeightLogical + WorkerRoleRowSeparationLogical +
+                    WorkerFenceClearanceLogical * 2f;
+            }
+        }
+
+        public float CurrentStationSpacingLogical => UsesSplitWorkerRows
+            ? StationSpacingLogical : CompactStationSpacingLogical;
+
         // Shared by station presentation and placed staff: each role serves its own
         // product without leaving the same player-selected work area.
         public Vector2 StationPosition(StreetWorkerRole role, int zone) => WorkZone(zone) +
-            Vector2.right * ((role == StreetWorkerRole.Parrillero ? -.5f : .5f) * StationSpacingLogical * worldUnitsPerLogicalPixel);
+            Vector2.right * ((role == StreetWorkerRole.Parrillero ? -.5f : .5f) * CurrentStationSpacingLogical * worldUnitsPerLogicalPixel);
 
         public TowerDefenseGameMode(TowerDefenseLevelConfig levelConfig, StreetBalance campaignBalance,
             TowerDefenseRouteGeometryConfig runtimeRoute, float logicalPixelScale, Vector2 firstServiceZone, Vector2 secondServiceZone)
@@ -230,6 +254,7 @@ namespace HayChoriYPaty
             routeGeometry = TowerDefenseRouteGeometry.Generate(route);
             if (routeGeometry == null || !routeGeometry.IsValid)
                 throw new ArgumentException(routeGeometry == null ? "Tower Defense route generation returned no geometry." : string.Join("; ", routeGeometry.Validation.Errors), nameof(runtimeRoute));
+            fanRouteWaypoints = BuildFanRouteWaypoints(routeGeometry, route.FanEntryExtensionWorldUnits);
 
             serviceZones[0] = firstServiceZone;
             serviceZones[1] = secondServiceZone;
@@ -244,7 +269,7 @@ namespace HayChoriYPaty
                 workerCounts[role] = 0;
                 ticketWorkersByRole[role] = 0L;
             }
-            coins = startingCoins >= 0 ? startingCoins : sourceBalance.GetStartingCoins(sourceLevel);
+            coins = startingCoins >= 0 ? startingCoins : TowerDefenseEconomyProfile.StartingCoins;
             Kitchen = new StreetKitchenProduction(sourceBalance.kitchen, availableProducts, null, true, false, true);
             random = new System.Random(sourceBalance.randomSeed + sourceLevel * 97 + config.LevelId.GetHashCode());
             BuildWorkers();
@@ -290,7 +315,7 @@ namespace HayChoriYPaty
         public int HireCost(StreetWorkerRole role)
         {
             if (!IsPlaceableRole(role) || !IsRoleAvailable(role)) return 0;
-            return StreetSimulation.CalculateHireCost(sourceBalance, config.SourceCampaignLevelId, role,
+            return TowerDefenseEconomyProfile.CalculateHireCost(role,
                 workerCounts[(int)role], ticketWorkersByRole[(int)role]);
         }
 
@@ -327,7 +352,7 @@ namespace HayChoriYPaty
         }
 
         public int SpeedUpgradeCost => speedLevel >= MaximumSpeedLevel ? 0
-            : StreetSimulation.CalculateSpeedCost(sourceBalance, config.SourceCampaignLevelId, speedLevel);
+            : TowerDefenseEconomyProfile.CalculateSpeedCost(speedLevel);
 
         public bool TryUpgradeSpeed()
         {
@@ -381,6 +406,7 @@ namespace HayChoriYPaty
                 fans[i].RouteFollower.Progress / fans[i].RouteFollower.TotalDistance;
             route = CloneRoute(runtimeRoute);
             routeGeometry = nextGeometry;
+            fanRouteWaypoints = BuildFanRouteWaypoints(routeGeometry, route.FanEntryExtensionWorldUnits);
             serviceZones[0] = firstServiceZone;
             serviceZones[1] = secondServiceZone;
             // Followers and worker offsets below must be rebuilt using the new viewport scale.
@@ -389,7 +415,7 @@ namespace HayChoriYPaty
             for (int i = 0; i < fans.Count; i++)
             {
                 TowerDefenseFanState fan = fans[i];
-                var follower = new TowerDefenseFanRouteFollower(fan.Id, routeGeometry.Centerline,
+                var follower = new TowerDefenseFanRouteFollower(fan.Id, fanRouteWaypoints,
                     sourceBalance.customerSpeed * config.FanSpeed * logicalPixelScale);
                 if (follower.Speed > 0f && normalized[i] > 0f)
                     follower.Advance(normalized[i] * follower.TotalDistance / follower.Speed);
@@ -443,7 +469,7 @@ namespace HayChoriYPaty
 
         private bool HasEntrySpacing()
         {
-            float minimumSpacing = 58f * worldUnitsPerLogicalPixel;
+            float minimumSpacing = config.MinimumEntrySpacingLogical * worldUnitsPerLogicalPixel;
             for (int i = 0; i < fans.Count; i++)
                 if (fans[i].RouteFollower.Progress < minimumSpacing) return false;
             return true;
@@ -463,7 +489,7 @@ namespace HayChoriYPaty
             if (stopSpawning || spawnedFans >= TotalFanCount || fans.Count >= TotalFanCount ||
                 routeGeometry == null || routeGeometry.Centerline.Length < 2) return false;
             int id = nextFanId++;
-            var follower = new TowerDefenseFanRouteFollower(id, routeGeometry.Centerline,
+            var follower = new TowerDefenseFanRouteFollower(id, fanRouteWaypoints,
                 sourceBalance.customerSpeed * config.FanSpeed * worldUnitsPerLogicalPixel);
             fans.Add(new TowerDefenseFanState(id, follower, products, quantities));
             spawnedFans++;
@@ -541,7 +567,7 @@ namespace HayChoriYPaty
                 {
                     if (fan.OrderComplete) break;
                     TowerDefenseWorkerState worker = workers[w];
-                    if (worker.IsMoving || servicedWorkers.Contains(worker.Id) ||
+                    if (worker.IsMoving || worker.DeliveryCooldownSeconds > 0f || servicedWorkers.Contains(worker.Id) ||
                         !IsAdjacentToArea(fan, worker.ServiceZone)) continue;
                     for (int line = 0; line < fan.Order.Count; line++)
                     {
@@ -575,6 +601,7 @@ namespace HayChoriYPaty
                                 fan.IsDeparting = true;
                                 fan.DepartureProgress = 0f;
                             }
+                            worker.DeliveryCooldownSeconds = DeliveryIntervalSeconds;
                             worker.ServeAnimationSeconds = DeliveryCueDurationSeconds;
                             worker.LastServiceTarget = fan.RouteFollower.Position;
                             DeliveryCompleted?.Invoke(new TowerDefenseDelivery(unit.Id, order.Product, worker.Id, fan.Id,
@@ -610,8 +637,20 @@ namespace HayChoriYPaty
                 to += length;
                 if (i <= start) from += length;
             }
-            float progress = fan.RouteFollower.Progress;
+            float progress = Mathf.Max(0f, fan.RouteFollower.Progress - route.FanEntryExtensionWorldUnits);
             return progress >= from && progress <= to;
+        }
+
+        private static Vector2[] BuildFanRouteWaypoints(TowerDefenseRouteGeometryResult geometry, float entryExtension)
+        {
+            Vector2[] centerline = geometry == null ? null : geometry.Centerline;
+            if (centerline == null || centerline.Length < 2) return Array.Empty<Vector2>();
+            if (!IsFinite(entryExtension) || entryExtension <= 0f) return centerline;
+
+            var expanded = new Vector2[centerline.Length + 1];
+            expanded[0] = centerline[0] - Vector2.right * entryExtension;
+            Array.Copy(centerline, 0, expanded, 1, centerline.Length);
+            return expanded;
         }
 
         private void AdvanceWorkers(float deltaTime)
@@ -621,6 +660,7 @@ namespace HayChoriYPaty
                 TowerDefenseWorkerState worker = workers[i];
                 worker.AnimationTime += deltaTime;
                 worker.ServeAnimationSeconds = Mathf.Max(0f, worker.ServeAnimationSeconds - deltaTime);
+                worker.DeliveryCooldownSeconds = Mathf.Max(0f, worker.DeliveryCooldownSeconds - deltaTime);
                 if (!worker.IsMoving) continue;
                 float movement = Mathf.Max(0f, sourceBalance.workerSpeed) * worldUnitsPerLogicalPixel * deltaTime;
                 while (movement > 0f && worker.TransferIndex < worker.TransferRoute.Length)
@@ -702,8 +742,37 @@ namespace HayChoriYPaty
 
         private Vector2 ZoneWorkerPosition(StreetWorkerRole role, int zone, int roleIndex)
         {
+            if (UsesSplitWorkerRows)
+            {
+                // Worker sprites are anchored near their feet (pivot y=.02), not at
+                // their visual center. Center the complete two-row sprite envelope
+                // inside the clear space between the horizontal fence rails.
+                float lateralLogical = roleIndex == 0
+                    ? (role == StreetWorkerRole.Parrillero ? -76f : 76f)
+                    : roleIndex == 1
+                        ? (role == StreetWorkerRole.Parrillero ? 8f : -8f)
+                        : (role == StreetWorkerRole.Parrillero ? 92f : -92f);
+                float horizontalCorridor = route.HorizontalCorridorWidth > 0f ? route.HorizontalCorridorWidth : route.CorridorWidth;
+                float clearHalfHeightLogical = Mathf.Max(0f, route.RowSpacing - horizontalCorridor) /
+                    (2f * Mathf.Max(0.0001f, worldUnitsPerLogicalPixel));
+                float visualMinYLogical = -WorkerVisualHeightLogical * WorkerVisualPivotY;
+                float visualMaxYLogical = WorkerVisualHeightLogical * (1f - WorkerVisualPivotY);
+                float lowerRowMinimum = -clearHalfHeightLogical + WorkerFenceClearanceLogical - visualMinYLogical;
+                float lowerRowMaximum = clearHalfHeightLogical - WorkerFenceClearanceLogical -
+                    WorkerRoleRowSeparationLogical - visualMaxYLogical;
+                float lowerRowAnchor = (lowerRowMinimum + lowerRowMaximum) * 0.5f;
+                // Parrilleros use the upper row, Cocacoleros the lower one; row
+                // separation plus each sprite's real pivot keeps their silhouettes apart.
+                float rowAnchor = role == StreetWorkerRole.Parrillero
+                    ? lowerRowAnchor + WorkerRoleRowSeparationLogical : lowerRowAnchor;
+                return WorkZone(zone) + new Vector2(lateralLogical, rowAnchor) * worldUnitsPerLogicalPixel;
+            }
+
             Vector2 basePoint = StationPosition(role, Mathf.Clamp(zone, 0, serviceZones.Length - 1));
-            float lateral = (roleIndex == 0 ? 0f : roleIndex == 1 ? -28f : 28f) * worldUnitsPerLogicalPixel;
+            // Full-size handoff poses are up to 77 logical pixels wide; keep same-role
+            // workers at least 84 pixels apart so simultaneous servings remain visible.
+            float lateral = (roleIndex == 0 ? 0f : roleIndex == 1 ? -ParallelWorkerSpacingLogical : ParallelWorkerSpacingLogical)
+                * worldUnitsPerLogicalPixel;
             float depth = -((roleIndex / 3) * worldUnitsPerLogicalPixel * 22f);
             return basePoint + new Vector2(lateral, depth);
         }
@@ -728,7 +797,8 @@ namespace HayChoriYPaty
                 RowSpacing = source.RowSpacing,
                 TurnRadius = source.TurnRadius,
                 PlayableBounds = source.PlayableBounds,
-                TurnSegments = source.TurnSegments
+                TurnSegments = source.TurnSegments,
+                FanEntryExtensionWorldUnits = source.FanEntryExtensionWorldUnits
             };
         }
 

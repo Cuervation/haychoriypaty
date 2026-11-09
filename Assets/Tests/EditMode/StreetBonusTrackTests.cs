@@ -52,17 +52,22 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void CampaignOrderInsertsHuracanWithoutShiftingStableLevelIds()
+        public void ReorganizedCampaignOrderKeepsAllStableIdsAndBothDefenseModes()
         {
-            CollectionAssert.AreEqual(new[] { 0, 1, 2, 3, 4, 11, 5, 6, 7, 8, 9, 10, 12 },
+            CollectionAssert.AreEqual(new[] { 0, 1, 9, 2, 12, 3, 11, 10, 4, 5, 6, 7, 8 },
                 (int[])simType.GetField("CampaignOrder", BindingFlags.Public | BindingFlags.Static).GetValue(null));
             Assert.AreEqual(13, ((string[])simType.GetField("LevelNames", BindingFlags.Public | BindingFlags.Static).GetValue(null)).Length);
-            Assert.AreEqual(11, CallStatic(simType, "CampaignLevelAt", 5));
-            Assert.AreEqual(5, CallStatic(simType, "NextCampaignLevelId", 11));
-            Assert.AreEqual(11, CallStatic(simType, "NextCampaignLevelId", 4));
-            Assert.AreEqual(10, CallStatic(simType, "NextCampaignLevelId", 9));
-            Assert.AreEqual(12, CallStatic(simType, "NextCampaignLevelId", 10));
-            Assert.AreEqual(-1, CallStatic(simType, "NextCampaignLevelId", 12));
+            Assert.AreEqual(9, CallStatic(simType, "CampaignLevelAt", 2));
+            Assert.AreEqual(12, CallStatic(simType, "NextCampaignLevelId", 2));
+            Assert.AreEqual(11, CallStatic(simType, "NextCampaignLevelId", 3));
+            Assert.AreEqual(10, CallStatic(simType, "NextCampaignLevelId", 11));
+            Assert.AreEqual(4, CallStatic(simType, "NextCampaignLevelId", 10));
+            Assert.AreEqual(6, CallStatic(simType, "NextCampaignLevelId", 5));
+            Assert.AreEqual(3, CallStatic(simType, "NextCampaignLevelId", 12));
+            Assert.AreEqual(-1, CallStatic(simType, "NextCampaignLevelId", 8));
+            Assert.IsTrue((bool)CallStatic(simType, "IsTowerDefenseLevel", 9));
+            Assert.IsTrue((bool)CallStatic(simType, "IsTowerDefenseLevel", 10));
+            Assert.IsFalse((bool)CallStatic(simType, "IsTowerDefenseLevel", 11));
         }
 
         [Test]
@@ -73,7 +78,7 @@ namespace HayChoriYPaty.Tests
             Put(legacy, "unlockedLevel", 7);
             object migrated = gameType.GetMethod("MigrateSaveData", AnyStatic).Invoke(null, new[] { legacy });
 
-            Assert.AreEqual(6, Read(migrated, "version"));
+            Assert.AreEqual(7, Read(migrated, "version"));
             Assert.AreEqual(7, Read(migrated, "unlockedLevel"));
             Assert.IsTrue((bool)Read(migrated, "legacyRacingUnlocked"));
             Assert.IsTrue((bool)Read(migrated, "huracanUnlocked"));
@@ -88,7 +93,7 @@ namespace HayChoriYPaty.Tests
             Put(frontierOnly, "version", 5);
             Put(frontierOnly, "unlockedLevel", 10);
             object migratedFrontierOnly = gameType.GetMethod("MigrateSaveData", AnyStatic).Invoke(null, new[] { frontierOnly });
-            Assert.AreEqual(6, Read(migratedFrontierOnly, "version"));
+            Assert.AreEqual(7, Read(migratedFrontierOnly, "version"));
             Assert.IsFalse((bool)Read(migratedFrontierOnly, "argentinosUnlocked"),
                 "The legacy frontier means Los Redondos is available; it does not prove a win there.");
             Assert.AreEqual(10, Read(migratedFrontierOnly, "unlockedLevel"));
@@ -106,7 +111,35 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void ArgentinosUsesAnIndependentUnlockFlagAndIsTheCampaignTerminal()
+        public void SaveV6MigrationPreservesExactLegacyIdUnlocksAndSeparatesTraditionalLosRedondosRecords()
+        {
+            object legacy = Activator.CreateInstance(saveType);
+            Put(legacy, "version", 6);
+            Put(legacy, "unlockedLevel", 2);
+            object statistics = Activator.CreateInstance(Runtime("StreetPlayerStatistics"));
+            long[] wins = new long[13]; wins[10] = 3;
+            Put(statistics, "winsByLevel", wins);
+            Put(statistics, "lossesByLevel", new long[13]);
+            Put(statistics, "bestGrossCentsByLevel", new long[13]);
+            Put(statistics, "bestUnitsSoldByLevel", new long[13]);
+            Put(statistics, "bestWinTimeByLevel", new float[13]);
+            Put(legacy, "statistics", statistics);
+
+            object migrated = gameType.GetMethod("MigrateSaveData", AnyStatic).Invoke(null, new[] { legacy });
+            bool[] unlocked = (bool[])Read(migrated, "unlockedLevelIds");
+            Assert.AreEqual(7, Read(migrated, "version"));
+            CollectionAssert.AreEqual(new[] { true, true, true, false, false, false, false, false, false, false, false, false, false }, unlocked);
+            object migratedStats = Read(migrated, "statistics");
+            Assert.AreEqual(3L, Read(migratedStats, "legacyTraditionalLosRedondosWins"));
+            Assert.AreEqual(0L, ((long[])Read(migratedStats, "winsByLevel"))[10]);
+
+            object migratedAgain = gameType.GetMethod("MigrateSaveData", AnyStatic).Invoke(null, new[] { migrated });
+            CollectionAssert.AreEqual(unlocked, (bool[])Read(migratedAgain, "unlockedLevelIds"));
+            Assert.AreEqual(3L, Read(Read(migratedAgain, "statistics"), "legacyTraditionalLosRedondosWins"));
+        }
+
+        [Test]
+        public void ArgentinosUsesAnIndependentUnlockBitAndBocaIsTheCampaignTerminal()
         {
             object save = Activator.CreateInstance(saveType);
             Put(save, "version", 6);
@@ -120,10 +153,11 @@ namespace HayChoriYPaty.Tests
             Assert.IsTrue((bool)Call(game, "IsLevelUnlocked", 10));
             Assert.IsFalse((bool)Call(game, "IsLevelUnlocked", 12));
             object liveSave = Read(game, "save");
-            Put(liveSave, "argentinosUnlocked", true);
+            ((bool[])Read(liveSave, "unlockedLevelIds"))[12] = true;
             Assert.IsTrue((bool)Call(game, "IsLevelUnlocked", 12));
             Assert.AreEqual(10, Read(liveSave, "unlockedLevel"), "Unlocking ID12 must not move the legacy stable-ID frontier.");
-            Assert.AreEqual(-1, CallStatic(simType, "NextCampaignLevelId", 12));
+            Assert.AreEqual(3, CallStatic(simType, "NextCampaignLevelId", 12));
+            Assert.AreEqual(-1, CallStatic(simType, "NextCampaignLevelId", 8));
         }
 
         [Test]

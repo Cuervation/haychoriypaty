@@ -42,7 +42,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual("tower-defense", Get<string>(mode, "ModeId"));
             Assert.AreEqual("tower-defense.camioneros.plaza-de-mayo.level-1", Get<string>(mode, "LevelId"));
             Assert.AreEqual(500, Get<int>(mode, "Coins"));
-            Assert.AreEqual(10, Get<int>(mode, "TotalFanCount"));
+            Assert.AreEqual(60, Get<int>(mode, "TotalFanCount"));
             Assert.AreEqual(0, Get<int>(mode, "SpawnedFans"));
             Assert.AreEqual(0, Get<int>(mode, "ServedFans"));
             Assert.IsFalse(Get<bool>(mode, "HasWon"));
@@ -53,16 +53,164 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
+        public void LosRedondosIdentityUsesCamionerosEconomyWithoutReadingTraditionalIdTenBalance()
+        {
+            mode = CreateMode(.02f);
+            int camionerosHire = (int)Invoke(mode, "HireCost", new[] { Enum.Parse(RuntimeType("StreetWorkerRole"), "Parrillero") });
+            int camionerosSpeed = Get<int>(mode, "SpeedUpgradeCost");
+            Assert.AreEqual(9, Get<int>(config, "EconomicBalanceCampaignLevelId"));
+
+            Invoke(mode, "Stop");
+            configType.GetField("sourceCampaignLevelId", PrivateInstance).SetValue(config, 10);
+            configType.GetField("levelId", PrivateInstance).SetValue(config, "tower-defense.los-redondos.tandil.level-1");
+            configType.GetField("displayName", PrivateInstance).SetValue(config, "Los Redondos / Tandil");
+            configType.GetField("backgroundResource", PrivateInstance).SetValue(config, "street-background-losredondos-v1");
+            mode = CreateMode(.02f);
+
+            Assert.AreEqual(10, Get<int>(config, "SourceCampaignLevelId"));
+            Assert.AreEqual(9, Get<int>(config, "EconomicBalanceCampaignLevelId"));
+            Assert.AreEqual("tower-defense.los-redondos.tandil.level-1", Get<string>(mode, "LevelId"));
+            Assert.AreEqual(camionerosHire,
+                (int)Invoke(mode, "HireCost", new[] { Enum.Parse(RuntimeType("StreetWorkerRole"), "Parrillero") }));
+            Assert.AreEqual(camionerosSpeed, Get<int>(mode, "SpeedUpgradeCost"));
+            Assert.AreEqual(60, Get<int>(mode, "TotalFanCount"));
+        }
+
+        [Test]
+        public void SharedEconomyProfilePreservesCurrentIdNineCurvesAndIgnoresLegacyRowsNineAndTen()
+        {
+            Type profile = RuntimeType("TowerDefenseEconomyProfile");
+            Type simulation = RuntimeType("StreetSimulation");
+            Type roleType = RuntimeType("StreetWorkerRole");
+            MethodInfo profileHire = profile.GetMethod("CalculateHireCost", PublicStatic);
+            MethodInfo profileSpeed = profile.GetMethod("CalculateSpeedCost", PublicStatic);
+            MethodInfo legacyHire = simulation.GetMethod("CalculateHireCost", PublicStatic);
+            MethodInfo legacySpeed = simulation.GetMethod("CalculateSpeedCost", PublicStatic);
+            Assert.AreEqual(500, profile.GetField("StartingCoins", PublicStatic).GetRawConstantValue());
+
+            foreach (string roleName in new[] { "Parrillero", "Cocacolero" })
+            {
+                object role = Enum.Parse(roleType, roleName);
+                for (int workers = 0; workers <= 8; workers++)
+                {
+                    int formerLevelNineCost = (int)legacyHire.Invoke(null, new[] { balance, (object)9, role, (object)workers, (object)0L });
+                    int frozenCost = (int)profileHire.Invoke(null, new[] { role, (object)workers, (object)0L });
+                    Assert.AreEqual(formerLevelNineCost, frozenCost, roleName + " curve at worker count " + workers);
+                }
+            }
+            for (int speed = 0; speed < 9; speed++)
+                Assert.AreEqual((int)legacySpeed.Invoke(null, new object[] { balance, 9, speed }),
+                    (int)profileSpeed.Invoke(null, new object[] { speed }), "Speed tier " + speed);
+
+            object exposedSnapshot = profile.GetMethod("CreateBalanceSnapshot", PublicStatic).Invoke(null, null);
+            int frozenHireAtFour = (int)profileHire.Invoke(null, new[] { Enum.Parse(roleType, "Parrillero"), (object)4, (object)0L });
+            int frozenSpeedAtFour = (int)profileSpeed.Invoke(null, new object[] { 4 });
+            Array snapshotRows = (Array)balanceType.GetField("levelBalances", PublicInstance).GetValue(exposedSnapshot);
+            object snapshotRow = snapshotRows.GetValue(9);
+            int[] snapshotBases = (int[])snapshotRow.GetType().GetField("hireBaseCostsByRole", PublicInstance).GetValue(snapshotRow);
+            snapshotBases[0] = 99999;
+            snapshotRow.GetType().GetField("speedCostMultiplier", PublicInstance).SetValue(snapshotRow, 999f);
+            Assert.AreEqual(frozenHireAtFour,
+                (int)profileHire.Invoke(null, new[] { Enum.Parse(roleType, "Parrillero"), (object)4, (object)0L }),
+                "Mutating the public snapshot must not mutate the hot-path cached profile.");
+            Assert.AreEqual(frozenSpeedAtFour, (int)profileSpeed.Invoke(null, new object[] { 4 }));
+
+            mode = CreateMode(.02f);
+            Invoke(mode, "Begin");
+            object baselineHire = Invoke(mode, "HireCost", new[] { Enum.Parse(roleType, "Parrillero") });
+            int baselineSpeed = Get<int>(mode, "SpeedUpgradeCost");
+            Assert.AreEqual(500, Get<int>(mode, "Coins"));
+
+            Array rows = (Array)balanceType.GetField("levelBalances", PublicInstance).GetValue(balance);
+            foreach (int levelId in new[] { 9, 10 })
+            {
+                object row = rows.GetValue(levelId);
+                int[] bases = (int[])row.GetType().GetField("hireBaseCostsByRole", PublicInstance).GetValue(row);
+                for (int i = 0; i < bases.Length; i++) bases[i] = 999;
+                row.GetType().GetField("speedCostMultiplier", PublicInstance).SetValue(row, 99f);
+                row.GetType().GetField("startingCoins", PublicInstance).SetValue(row, 99999);
+            }
+
+            Assert.AreEqual(baselineHire, Invoke(mode, "HireCost", new[] { Enum.Parse(roleType, "Parrillero") }));
+            Assert.AreEqual(baselineSpeed, Get<int>(mode, "SpeedUpgradeCost"));
+            Assert.AreEqual(500, profile.GetField("StartingCoins", PublicStatic).GetRawConstantValue());
+        }
+
+        [Test]
         public void FanWaveIsFiniteAndAcceptsOnlyChoriAndCocaOrders()
         {
             mode = CreateMode(.02f);
             Invoke(mode, "Begin");
             Assert.IsFalse((bool)Invoke(mode, "TrySpawnFan", new[] { new[] { 1 }, new[] { 1 } }), "Paty is not an order in this mode.");
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 60; i++)
                 Assert.IsTrue((bool)Invoke(mode, "TrySpawnFan", new[] { new[] { i % 2 == 0 ? 0 : 4 }, new[] { 1 } }));
-            Assert.AreEqual(10, Get<int>(mode, "SpawnedFans"));
-            Assert.AreEqual(10, ((System.Collections.IList)Get<object>(mode, "Fans")).Count);
-            Assert.IsFalse((bool)Invoke(mode, "TrySpawnFan", new[] { new[] { 0 }, new[] { 1 } }), "No eleventh customer may spawn.");
+            Assert.AreEqual(60, Get<int>(mode, "SpawnedFans"));
+            Assert.AreEqual(60, ((System.Collections.IList)Get<object>(mode, "Fans")).Count);
+            Assert.IsFalse((bool)Invoke(mode, "TrySpawnFan", new[] { new[] { 0 }, new[] { 1 } }), "No sixty-first customer may spawn.");
+        }
+
+        [Test]
+        public void SerializedDefenseLevelsKeepTheirConfiguredFanEntrySpacing()
+        {
+            MethodInfo load = null;
+            foreach (MethodInfo candidate in typeof(Resources).GetMethods(PublicStatic))
+            {
+                ParameterInfo[] parameters = candidate.GetParameters();
+                if (candidate.Name == "Load" && candidate.IsGenericMethodDefinition && parameters.Length == 1 &&
+                    parameters[0].ParameterType == typeof(string))
+                {
+                    load = candidate.MakeGenericMethod(configType);
+                    break;
+                }
+            }
+            Assert.IsNotNull(load, "Unity generic Resources.Load<T>(string) must be available.");
+
+            object camioneros = load.Invoke(null, new object[] { "TowerDefense/Camioneros-PlazaDeMayo" });
+            object losRedondos = load.Invoke(null, new object[] { "TowerDefense/LosRedondos-Tandil" });
+            Assert.IsNotNull(camioneros);
+            Assert.IsNotNull(losRedondos);
+            Assert.AreEqual(96f, Get<float>(camioneros, "MinimumEntrySpacingLogical"),
+                "Camioneros needs a visible gap larger than the 78 px fan frame.");
+            Assert.AreEqual(58f, Get<float>(losRedondos, "MinimumEntrySpacingLogical"),
+                "This request changes only campaign position 3; Los Redondos keeps its existing cadence.");
+        }
+
+        [Test]
+        public void CamionerosFansEnterGraduallyInsteadOfAppearingAsABatch()
+        {
+            Set(config, "minimumEntrySpacingLogical", 96f);
+            mode = CreateMode(.02f);
+            Invoke(mode, "Begin");
+
+            Invoke(mode, "Step", new object[] { 2f });
+            Assert.AreEqual(1, Get<int>(mode, "SpawnedFans"),
+                "At 2 seconds the first fan has not yet opened the 96 px entry gap for another fan.");
+
+            Invoke(mode, "Step", new object[] { .1f });
+            Assert.AreEqual(2, Get<int>(mode, "SpawnedFans"), "A second fan enters only after the first clears the minimum gap.");
+
+            Invoke(mode, "Step", new object[] { 1f });
+            Assert.AreEqual(2, Get<int>(mode, "SpawnedFans"),
+                "The next fan must also clear the entrance; one open interval cannot release a batch.");
+        }
+
+        [Test]
+        public void CamionerosFansMoveAtHalfOfTheirPreviousConfiguredSpeed()
+        {
+            const float previousMultiplier = 0.315f;
+            const float slowdown = 0.50f;
+            const float logicalPixelScale = 0.02f;
+            Assert.That(Get<float>(config, "FanSpeed"), Is.EqualTo(previousMultiplier * slowdown).Within(0.0001f));
+
+            mode = CreateMode(logicalPixelScale);
+            Invoke(mode, "Begin");
+            Assert.IsTrue((bool)Invoke(mode, "TrySpawnFan", new[] { new[] { 0 }, new[] { 1 } }));
+
+            object follower = Get<object>(((System.Collections.IList)Get<object>(mode, "Fans"))[0], "RouteFollower");
+            float campaignSpeed = (float)balanceType.GetField("customerSpeed", PublicInstance).GetValue(balance);
+            float expectedSpeed = campaignSpeed * previousMultiplier * slowdown * logicalPixelScale;
+            Assert.That(Get<float>(follower, "Speed"), Is.EqualTo(expectedSpeed).Within(0.0001f),
+                "Only the Tower Defense multiplier should scale the campaign customer speed.");
         }
 
         [Test]
@@ -76,7 +224,7 @@ namespace HayChoriYPaty.Tests
 
             Assert.IsTrue((bool)Invoke(mode, "TrySpawnFan", new[] { new[] { 0 }, new[] { 1 } }));
             // Fill the finite budget with requests that this cook cannot service.
-            for (int i = 0; i < 9; i++)
+            for (int i = 0; i < 29; i++)
                 Assert.IsTrue((bool)Invoke(mode, "TrySpawnFan", new[] {new[] {4}, new[] {1}}));
             Invoke(mode, "Step", new[] {(object).6f});
 
@@ -87,6 +235,41 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(1, Get<int>(mode, "CustomersAttended"));
             Assert.AreEqual(1, Get<int>(mode, "OrdersCompleted"));
             Assert.AreEqual(5, Get<int>(mode, "CoinsEarned"));
+        }
+
+        [Test]
+        public void OneCocacoleroWaitsForPreviousHandoffBeforeDeliveringToNextFan()
+        {
+            mode = CreateMode(.02f);
+            Invoke(mode, "Begin");
+            float waitingRow = RouteDistanceTo(0) + RowLength(0) * .5f;
+            object firstFan = SpawnAt(4, waitingRow);
+            object secondFan = SpawnAt(4, waitingRow);
+            foreach (object fan in new[] {firstFan, secondFan})
+            {
+                object follower = Get<object>(fan, "RouteFollower");
+                follower.GetType().GetProperty("Speed", PublicInstance).SetValue(follower, 0f, null);
+            }
+            Set(mode, "stopSpawning", true);
+            Hire("Cocacolero", 0);
+
+            Invoke(mode, "Step", new object[] {.05f});
+            Assert.AreEqual(1, Get<int>(mode, "TotalDelivered"));
+            float firstDeliveryAt = Get<float>(mode, "Elapsed");
+
+            for (int i = 0; i < 10; i++) Invoke(mode, "Step", new object[] {.05f});
+            Assert.AreEqual(1, Get<int>(mode, "TotalDelivered"),
+                "The same Cocacolero cannot begin another Coca handoff while the first cue is still active.");
+            Assert.AreEqual(0, Get<int>(firstFan, "PendingUnits"));
+            Assert.AreEqual(1, Get<int>(secondFan, "PendingUnits"));
+
+            for (int i = 0; i < 5 && Get<int>(mode, "TotalDelivered") < 2; i++)
+                Invoke(mode, "Step", new object[] {.05f});
+            Assert.AreEqual(2, Get<int>(mode, "TotalDelivered"), "The next fan must still receive Coca after the worker becomes available.");
+            Assert.AreEqual(0, Get<int>(firstFan, "PendingUnits"));
+            Assert.AreEqual(0, Get<int>(secondFan, "PendingUnits"));
+            Assert.That(Get<float>(mode, "Elapsed") - firstDeliveryAt,
+                Is.GreaterThanOrEqualTo((float)modeType.GetField("DeliveryCueDurationSeconds", PublicStatic).GetRawConstantValue()));
         }
 
         [Test]
@@ -261,31 +444,31 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void TenActualCompleteOrdersFadeOutThenWinWithoutQuotaOrReplacementFan()
+        public void SixtyActualCompleteOrdersFadeOutThenWinWithoutQuotaOrReplacementFan()
         {
             mode = CreateMode(.02f); Invoke(mode, "Begin");
             Assert.IsFalse(Get<bool>(mode, "HasWon"));
             CallPrivate("UpdateCompletionState");
             Assert.IsFalse(Get<bool>(mode, "HasWon"), "An initially empty scene is not a victory.");
             Hire("Cocacolero", 0);
-            for (int n = 0; n < 10; n++)
+            for (int n = 0; n < 60; n++)
                 Assert.IsTrue((bool)Invoke(mode, "TrySpawnFan", new[] {new[] {4}, new[] {2}}));
             var fans = (System.Collections.IList)Get<object>(mode, "Fans");
             object first = fans[0];
             CallPrivate("DeliverWithinServiceRanges");
             Assert.AreEqual(1, Get<int>(first, "PendingUnits"));
             Assert.IsFalse(Get<bool>(first, "IsDeparting"));
-            for (int n = 0; n < 19; n++) CallPrivate("DeliverWithinServiceRanges");
+            for (int n = 0; n < 119; n++) CallPrivate("DeliverWithinServiceRanges");
             foreach (object fan in fans)
             {
                 Assert.IsTrue(Get<bool>(fan, "IsDeparting"));
                 Assert.AreEqual(0, Get<int>(fan, "PendingUnits"));
             }
             Assert.IsFalse(Get<bool>(mode, "HasWon"), "Wait for visible departure, not just logical completion.");
-            Assert.AreEqual(20, Get<int>(mode, "TotalDelivered"));
+            Assert.AreEqual(120, Get<int>(mode, "TotalDelivered"));
             Invoke(mode, "Step", new object[] {.5f});
-            Assert.AreEqual(10, Get<int>(mode, "ServedFans"));
-            Assert.AreEqual(10, Get<int>(mode, "SpawnedFans"));
+            Assert.AreEqual(60, Get<int>(mode, "ServedFans"));
+            Assert.AreEqual(60, Get<int>(mode, "SpawnedFans"));
             Assert.AreEqual(0, fans.Count);
             Assert.IsTrue(Get<bool>(mode, "HasWon")); Assert.IsFalse(Get<bool>(mode, "HasLost"));
             Assert.AreEqual("Finished", Get<object>(mode, "Phase").ToString());
@@ -293,11 +476,11 @@ namespace HayChoriYPaty.Tests
             int coins = Get<int>(mode, "Coins");
             Invoke(mode, "Step", new object[] {1f});
             Assert.AreEqual(coins, Get<int>(mode, "Coins"));
-            Assert.AreEqual(20, Get<int>(mode, "TotalDelivered"));
+            Assert.AreEqual(120, Get<int>(mode, "TotalDelivered"));
         }
 
         [Test]
-        public void NoDeadlineCanEndDefenseAndAutomaticWaveNeverExceedsTen()
+        public void NoDeadlineCanEndDefenseAndAutomaticWaveNeverExceedsSixty()
         {
             mode = CreateMode(.02f); Invoke(mode, "Begin");
             Assert.IsTrue((bool)Invoke(mode, "TrySpawnFan", new[] {new[] {4}, new[] {1}}));
@@ -308,7 +491,7 @@ namespace HayChoriYPaty.Tests
             Assert.Greater(Get<float>(mode, "Elapsed"), 380f);
             Assert.AreEqual("Playing", Get<object>(mode, "Phase").ToString());
             Assert.IsFalse(Get<bool>(mode, "HasWon")); Assert.IsFalse(Get<bool>(mode, "HasLost"));
-            for (int n = 1; n < 10; n++)
+            for (int n = 1; n < 60; n++)
             {
                 foreach (object fan in fans)
                 {
@@ -319,7 +502,7 @@ namespace HayChoriYPaty.Tests
                 }
                 Invoke(mode, "Step", new object[] {.05f});
             }
-            Assert.AreEqual(10, Get<int>(mode, "SpawnedFans"));
+            Assert.AreEqual(60, Get<int>(mode, "SpawnedFans"));
             foreach (object fan in fans)
                 foreach (object line in (System.Collections.IEnumerable)Get<object>(fan, "Order"))
                 {
@@ -327,7 +510,7 @@ namespace HayChoriYPaty.Tests
                     Assert.That(Get<int>(line, "Remaining"), Is.InRange(1, 4));
                 }
             Invoke(mode, "Step", new object[] {1f});
-            Assert.AreEqual(10, Get<int>(mode, "SpawnedFans"));
+            Assert.AreEqual(60, Get<int>(mode, "SpawnedFans"));
         }
 
         [TestCase(0, 0)]
@@ -363,6 +546,179 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(zone, Get<int>(worker, "ServiceZone"));
             Assert.IsFalse(Get<bool>(worker, "IsMoving"));
             Assert.AreSame(behind, ((System.Collections.IList)Get<object>(mode, "Fans"))[0], "Target sorting must not reorder live fans.");
+        }
+
+        [Test]
+        public void ThreeParrillerosInOneAreaKeepDistinctHandoffSpaceAndServeInParallel()
+        {
+            mode = CreateMode(.02f); Invoke(mode, "Begin");
+            Hire("Parrillero", 0); Hire("Parrillero", 0); Hire("Parrillero", 0);
+            var workers = (System.Collections.IList)Get<object>(mode, "Workers");
+            Assert.AreEqual(3, workers.Count);
+            for (int i = 0; i < workers.Count; i++)
+                for (int j = i + 1; j < workers.Count; j++)
+                {
+                    Vector2 a = Get<Vector2>(workers[i], "Position"), b = Get<Vector2>(workers[j], "Position");
+                    Assert.That(Mathf.Abs(a.x - b.x) / .02f, Is.GreaterThanOrEqualTo(84f),
+                        "Same-area full-size handoff poses need an 84 logical-pixel minimum gap.");
+                }
+
+            float adjacentRowMidpoint = RouteDistanceTo(0) + RowLength(0) * .5f;
+            object[] fans = new object[3];
+            for (int i = 0; i < fans.Length; i++) fans[i] = SpawnAt(0, adjacentRowMidpoint);
+            for (int i = 0; i < workers.Count; i++) ReadyServing(0, Get<int>(workers[i], "Id"));
+
+            CallPrivate("DeliverWithinServiceRanges");
+
+            Assert.AreEqual(3, Get<int>(mode, "TotalDelivered"), "Each ready Parrillero may complete one handoff in the same pass.");
+            for (int i = 0; i < fans.Length; i++) Assert.AreEqual(0, Get<int>(fans[i], "PendingUnits"));
+            for (int i = 0; i < workers.Count; i++)
+            {
+                Assert.Greater(Get<float>(workers[i], "ServeAnimationSeconds"), 0f,
+                    "Every worker that delivered must enter its own visible handoff animation.");
+                Assert.AreEqual(0, Get<int>(workers[i], "ServiceZone"));
+                Assert.IsFalse(Get<bool>(workers[i], "IsMoving"), "Workers stay in their selected area; the handoff pose, not route-walking, is animated.");
+            }
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        public void TallPortraitCentersBothWorkerRowsInsideTheAreaAndSeparatesStations(int zone)
+        {
+            object route = Get<object>(config, "Route");
+            routeType.GetField("SegmentLengths", PublicInstance).SetValue(route, new[] {8f, 8f, 8f});
+            routeType.GetField("RowSpacing", PublicInstance).SetValue(route, 6f);
+            routeType.GetField("CorridorWidth", PublicInstance).SetValue(route, 1.92f);
+            routeType.GetField("HorizontalCorridorWidth", PublicInstance).SetValue(route, 1.536f);
+            routeType.GetField("PlayableBounds", PublicInstance).SetValue(route, new Rect(-6f, -8f, 12f, 16f));
+
+            mode = CreateMode(.02f);
+            object geometry = geometryType.GetMethod("Generate", PublicStatic).Invoke(null, new[] {route});
+            Assert.IsTrue(Get<bool>(geometry, "IsValid"));
+            Assert.AreEqual(340f, Get<float>(mode, "CurrentStationSpacingLogical"), .001f,
+                "Tall mobile layout separates the standard table and barrel beyond the worker display width.");
+            Invoke(mode, "Begin");
+            Set(mode, "coins", 10000);
+            for (int i = 0; i < 3; i++) Hire("Parrillero", zone);
+            for (int i = 0; i < 3; i++) Hire("Cocacolero", zone);
+            var hiredWorkers = (System.Collections.IList)Get<object>(mode, "Workers");
+            Assert.AreEqual(6, hiredWorkers.Count, "The target-area roster must permit the full 3+3 staff cap.");
+            Vector2 workCenter = (Vector2)Invoke(mode, "WorkZone", new object[] {zone});
+            object parrillero = Enum.Parse(RuntimeType("StreetWorkerRole"), "Parrillero");
+            object cocacolero = Enum.Parse(RuntimeType("StreetWorkerRole"), "Cocacolero");
+            float[] parrilleroX = {-76f, 8f, 92f};
+            float[] cocacoleroX = {76f, -8f, -92f};
+            float workerHeight = (float)modeType.GetField("WorkerVisualHeightLogical", PublicStatic).GetRawConstantValue();
+            float pivotY = (float)modeType.GetField("WorkerVisualPivotY", PublicStatic).GetRawConstantValue();
+            float fenceClearance = (float)modeType.GetField("WorkerFenceClearanceLogical", PublicStatic).GetRawConstantValue();
+            const float pixelScale = .02f;
+            const float rowSeparation = 110f;
+            float rowSpacing = (float)routeType.GetField("RowSpacing", PublicInstance).GetValue(route);
+            float horizontalCorridor = (float)routeType.GetField("HorizontalCorridorWidth", PublicInstance).GetValue(route);
+            float halfClearHeight = (rowSpacing - horizontalCorridor) / (2f * pixelScale);
+            float visualMinY = -workerHeight * pivotY;
+            float visualMaxY = workerHeight * (1f - pivotY);
+            float lowerRowBase = ((-halfClearHeight + fenceClearance - visualMinY) +
+                (halfClearHeight - fenceClearance - rowSeparation - visualMaxY)) * .5f;
+            Type streetViewType = RuntimeType("StreetView");
+            Rect[] parrilleroPoses = (Rect[])streetViewType.GetProperty("WorkerFoodPoseBounds",
+                BindingFlags.NonPublic | BindingFlags.Static).GetValue(null, null);
+            Rect[] cocacoleroPoses = (Rect[])streetViewType.GetMethod("WorkerDrinkPoseBounds",
+                BindingFlags.NonPublic | BindingFlags.Static).Invoke(null, new object[] {true});
+            float parrilleroWidth = MaxPoseWidthLogical(parrilleroPoses, workerHeight);
+            float cocacoleroWidth = MaxPoseWidthLogical(cocacoleroPoses, workerHeight);
+            var workerEnvelopes = new System.Collections.Generic.List<Rect>(6);
+            for (int i = 0; i < 3; i++)
+            {
+                object parrilleroState = hiredWorkers[i];
+                object cocacoleroState = hiredWorkers[i + 3];
+                Assert.AreEqual("Parrillero", Get<object>(parrilleroState, "Role").ToString());
+                Assert.AreEqual("Cocacolero", Get<object>(cocacoleroState, "Role").ToString());
+                Assert.AreEqual(zone, Get<int>(parrilleroState, "ServiceZone"));
+                Assert.AreEqual(zone, Get<int>(cocacoleroState, "ServiceZone"));
+                Vector2 parrilleroPosition = Get<Vector2>(parrilleroState, "Position");
+                Vector2 cocacoleroPosition = Get<Vector2>(cocacoleroState, "Position");
+                Assert.AreEqual(workCenter.x + parrilleroX[i] * .02f, parrilleroPosition.x, .0001f);
+                Assert.AreEqual(workCenter.x + cocacoleroX[i] * .02f, cocacoleroPosition.x, .0001f);
+                Assert.AreEqual(workCenter.y + (lowerRowBase + rowSeparation) * pixelScale,
+                    parrilleroPosition.y, .0001f, "Parrillero row must account for its foot-level Sprite pivot.");
+                Assert.AreEqual(workCenter.y + lowerRowBase * pixelScale,
+                    cocacoleroPosition.y, .0001f, "Cocacolero row must account for its foot-level Sprite pivot.");
+                workerEnvelopes.Add(WorkerVisualEnvelope(parrilleroPosition, parrilleroWidth, workerHeight, pivotY, pixelScale));
+                workerEnvelopes.Add(WorkerVisualEnvelope(cocacoleroPosition, cocacoleroWidth, workerHeight, pivotY, pixelScale));
+            }
+
+            float innerTurnFenceX = FindInnerTurnFenceX(geometry, zone, workCenter.y);
+            for (int i = 0; i < workerEnvelopes.Count; i++)
+            {
+                Rect worker = workerEnvelopes[i];
+                Assert.GreaterOrEqual(worker.yMin, workCenter.y - halfClearHeight * pixelScale + fenceClearance * pixelScale - .0001f,
+                    "The complete worker sprite must clear the lower horizontal fence.");
+                Assert.LessOrEqual(worker.yMax, workCenter.y + halfClearHeight * pixelScale - fenceClearance * pixelScale + .0001f,
+                    "The complete worker sprite must clear the upper horizontal fence.");
+                if (zone == 0)
+                    Assert.LessOrEqual(worker.xMax, innerTurnFenceX - fenceClearance * pixelScale + .0001f,
+                        "The complete worker sprite must stay inside the right U-turn fence.");
+                else
+                    Assert.GreaterOrEqual(worker.xMin, innerTurnFenceX + fenceClearance * pixelScale - .0001f,
+                        "The complete worker sprite must stay inside the left U-turn fence.");
+                for (int j = 0; j < i; j++)
+                    Assert.IsFalse(worker.Overlaps(workerEnvelopes[j]),
+                        "Three workers of each role must fit without any full-sprite overlap.");
+            }
+
+            Vector2 table = (Vector2)Invoke(mode, "StationPosition", new[] {parrillero, (object)zone});
+            Vector2 barrel = (Vector2)Invoke(mode, "StationPosition", new[] {cocacolero, (object)zone});
+            Type kitchenLayout = RuntimeType("StreetKitchenLayout");
+            float tableWidth = (float)kitchenLayout.GetField("TableWidth", PublicStatic).GetRawConstantValue();
+            float barrelWidth = (float)kitchenLayout.GetField("BarrelWidth", PublicStatic).GetRawConstantValue();
+            float furnitureGap = Vector2.Distance(table, barrel) / .02f - (tableWidth + barrelWidth) * .5f;
+            Assert.GreaterOrEqual(furnitureGap, 235f,
+                "The Coca barrel remains separate from the full-size chori table, leaving clear staff space.");
+
+        }
+
+        private static float MaxPoseWidthLogical(Rect[] poses, float targetHeight)
+        {
+            Assert.IsNotNull(poses);
+            Assert.GreaterOrEqual(poses.Length, 4);
+            float width = 0f;
+            for (int i = 0; i < 4; i++)
+                width = Mathf.Max(width, targetHeight * poses[i].width / Mathf.Max(.001f, poses[i].height));
+            return width;
+        }
+
+        private static Rect WorkerVisualEnvelope(Vector2 position, float widthLogical, float heightLogical,
+            float pivotY, float pixelScale)
+        {
+            float width = widthLogical * pixelScale;
+            float height = heightLogical * pixelScale;
+            return Rect.MinMaxRect(position.x - width * .5f,
+                position.y - height * pivotY,
+                position.x + width * .5f,
+                position.y + height * (1f - pivotY));
+        }
+
+        private static float FindInnerTurnFenceX(object geometry, int zone, float worldY)
+        {
+            Vector2[][] boundaries = {
+                Get<Vector2[]>(geometry, "LeftBoundary"),
+                Get<Vector2[]>(geometry, "RightBoundary")
+            };
+            float innerX = zone == 0 ? float.PositiveInfinity : float.NegativeInfinity;
+            for (int boundary = 0; boundary < boundaries.Length; boundary++)
+            {
+                Vector2[] points = boundaries[boundary];
+                for (int i = 1; i < points.Length; i++)
+                {
+                    Vector2 a = points[i - 1], b = points[i];
+                    if (Mathf.Abs(a.x - b.x) > .0001f || worldY < Mathf.Min(a.y, b.y) - .0001f ||
+                        worldY > Mathf.Max(a.y, b.y) + .0001f) continue;
+                    innerX = zone == 0 ? Mathf.Min(innerX, a.x) : Mathf.Max(innerX, a.x);
+                }
+            }
+            Assert.IsFalse(float.IsInfinity(innerX), "The target service area must intersect its actual vertical fence rails.");
+            return innerX;
         }
 
         [Test]

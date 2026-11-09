@@ -28,6 +28,8 @@ namespace HayChoriYPaty.Tests
         PropertyInfo selectedSize;
         object sizeGroup;
         int previousSize, addedSize = -1;
+        readonly ArrayList temporarySizes = new ArrayList();
+        int requestedLevelId = 9;
         public static string CaptureDirectory => Path.GetFullPath(Path.Combine(Application.dataPath,
             "../Logs/Acceptance/TowerDefenseReadyStations20261106"));
 
@@ -37,10 +39,20 @@ namespace HayChoriYPaty.Tests
             PropertyInfo p = o.GetType().GetProperty(n, I);
             return p != null ? p.GetValue(o) : o.GetType().GetField(n, I).GetValue(o);
         }
+        static object StaticValue(Type type, string n)
+        {
+            PropertyInfo p = type.GetProperty(n, S);
+            return p != null ? p.GetValue(null) : type.GetField(n, S).GetValue(null);
+        }
         static void Set(object o, string n, object v) => o.GetType().GetField(n, I).SetValue(o, v);
         static object Call(object o, string n, params object[] args)
         {
             try { return o.GetType().GetMethod(n, I).Invoke(o, args); }
+            catch (TargetInvocationException ex) { throw ex.InnerException; }
+        }
+        static object CallStatic(Type type, string n, params object[] args)
+        {
+            try { return type.GetMethod(n, S).Invoke(null, args); }
             catch (TargetInvocationException ex) { throw ex.InnerException; }
         }
         bool Persist<TMatch>(string json, TMatch match)
@@ -69,6 +81,7 @@ namespace HayChoriYPaty.Tests
         [UnitySetUp]
         public IEnumerator SetUp()
         {
+            requestedLevelId = TestContext.CurrentContext.Test.Name.IndexOf("LosRedondos", StringComparison.OrdinalIgnoreCase) >= 0 ? 10 : 9;
             previousTime = Time.timeScale;
             gt = T("StreetGame"); vt = T("StreetView");
             editorGate = gt.GetField("AllowEditorTestInitialization", S);
@@ -83,12 +96,12 @@ namespace HayChoriYPaty.Tests
             root = new GameObject("TD placement memory-only campaign"); root.SetActive(false);
             game = root.AddComponent(gt); root.SetActive(true);
             object seed = Activator.CreateInstance(gt.GetNestedType("SaveData", BindingFlags.Public));
-            Set(seed, "version", 5); Set(seed, "unlockedLevel", 10);
+            Set(seed, "version", 5); Set(seed, "unlockedLevel", 12);
             Type match = T("StreetMatchRecord");
             Type callback = typeof(Func<,,>).MakeGenericType(typeof(string), match, typeof(bool));
             Delegate persist = GetType().GetMethod("Persist", I).MakeGenericMethod(match).CreateDelegate(callback, this);
             Assert.IsTrue((bool)Call(game, "ActivatePlayer", JsonUtility.ToJson(seed), persist));
-            Assert.IsTrue((bool)Call(game, "SelectLevel", 9));
+            Assert.IsTrue((bool)Call(game, "SelectLevel", requestedLevelId));
             // No legacy quota stock is injected: this finite Defense run must start on its own rules.
             view = root.AddComponent(vt);
             Set(view, "introActive", false); Set(view, "hubActive", false);
@@ -134,6 +147,50 @@ namespace HayChoriYPaty.Tests
             UnityEngine.Object.Destroy(image);
         }
 
+        IEnumerator CaptureAtResolution(string name, int width, int height)
+        {
+            Assembly editor = typeof(UnityEditor.EditorWindow).Assembly;
+            gameWindow = UnityEditor.EditorWindow.GetWindow(editor.GetType("UnityEditor.GameView"));
+            Type registryType = editor.GetType("UnityEditor.GameViewSizes");
+            object registry = registryType.GetProperty("instance", S).GetValue(null);
+            object groupKind = registryType.GetProperty("currentGroupType", I).GetValue(registry);
+            sizeGroup = registryType.GetMethod("GetGroup", I).Invoke(registry, new[] {groupKind});
+            object size = Activator.CreateInstance(editor.GetType("UnityEditor.GameViewSize"),
+                new object[] {Enum.Parse(editor.GetType("UnityEditor.GameViewSizeType"), "FixedResolution"),
+                    width, height, "TD responsive capture " + requestedLevelId + " " + width + "x" + height});
+            sizeGroup.GetType().GetMethod("AddCustomSize", I).Invoke(sizeGroup, new[] {size});
+            int temporarySize = (int)sizeGroup.GetType().GetMethod("GetTotalCount", I).Invoke(sizeGroup, null) - 1;
+            temporarySizes.Add(temporarySize);
+            selectedSize.SetValue(gameWindow, temporarySize);
+            gameWindow.Repaint();
+            try
+            {
+                yield return null; yield return null; yield return new WaitForEndOfFrame();
+                Call(view, "UpdateTowerDefenseFrame");
+                yield return null; yield return new WaitForEndOfFrame();
+                Texture2D image = ScreenCapture.CaptureScreenshotAsTexture();
+                try
+                {
+                    Assert.AreEqual(width, image.width, "Actual Game View capture width for " + name);
+                    Assert.AreEqual(height, image.height, "Actual Game View capture height for " + name);
+                    string directory = Path.Combine(CaptureDirectory, "Level" + requestedLevelId.ToString("00"));
+                    Directory.CreateDirectory(directory);
+                    File.WriteAllBytes(Path.Combine(directory, name + ".png"), image.EncodeToPNG());
+                }
+                finally { UnityEngine.Object.Destroy(image); }
+            }
+            finally
+            {
+                sizeGroup.GetType().GetMethod("RemoveCustomSize", I).Invoke(sizeGroup, new object[] {temporarySize});
+                temporarySizes.Remove(temporarySize);
+                selectedSize.SetValue(gameWindow, addedSize);
+                gameWindow.Repaint();
+            }
+            yield return null;
+            Call(view, "UpdateTowerDefenseFrame");
+            yield return null;
+        }
+
         void RecordReceipt<TReceipt>(TReceipt receipt)
         {
             object item = receipt;
@@ -159,6 +216,13 @@ namespace HayChoriYPaty.Tests
             object presentation = Get(view, "towerDefensePresentation");
             IList stations = (IList)Get(presentation, "stationObjects");
             Assert.AreEqual(4, stations.Count);
+            Type simulationType = T("StreetSimulation");
+            object normalLevel = Activator.CreateInstance(simulationType, new[] { Get(game, "Balance"), (object)0, 5f, 0, 1, 0 });
+            int fullyLoadedLevelOneTable = (int)Call(Get(normalLevel, "Kitchen"), "TableCount", 0);
+            Type layoutType = T("StreetKitchenLayout");
+            object normalLayout = Activator.CreateInstance(layoutType, new object[] { new[] { 0 }, false });
+            Rect normalTableBounds = (Rect)Get(normalLayout, "NormalTableBounds");
+            float pixel = (float)Get(mode, "WorldUnitsPerLogicalPixel");
             int tables = 0, barrels = 0;
             foreach (GameObject station in stations)
             {
@@ -177,10 +241,102 @@ namespace HayChoriYPaty.Tests
                         Assert.AreSame(Resources.Load<GameObject>("ModularKitchen/Prefabs/" + prefab).GetComponent<SpriteRenderer>().sprite, renderer.sprite);
                     }
                 }
-                Assert.AreEqual(table ? 12 : 6, products, "Prepared products/loaded barrel are visible from frame zero.");
-                if (!table) Assert.IsNotNull(station.transform.Find("Ice"));
+                Assert.AreEqual(table ? fullyLoadedLevelOneTable : 6, products,
+                    "Prepared products/loaded barrel are visible from frame zero; the Chori display matches the complete Level 1 table.");
+                if (table)
+                {
+                    Assert.AreEqual(48, fullyLoadedLevelOneTable, "The reference is the actual Level 1 opening table, not a guessed display count.");
+                    Assert.AreEqual(fullyLoadedLevelOneTable, Call(Get(mode, "Kitchen"), "TableCapacity", 0));
+                    for (int slot = 0; slot < fullyLoadedLevelOneTable; slot++)
+                    {
+                        Transform display = station.transform.Find("Prepared Chori display " + slot.ToString("00"));
+                        Assert.IsNotNull(display, "Every Level 1 table slot is rendered exactly once.");
+                        Vector2 point = (Vector2)layoutType.GetMethod("TableSlotPosition", I, null,
+                            new[] { typeof(int), typeof(int), typeof(bool), typeof(int) }, null)
+                            .Invoke(normalLayout, new object[] { 0, slot, false, fullyLoadedLevelOneTable });
+                        Vector2 expectedOffset = new Vector2(point.x - normalTableBounds.center.x,
+                            -(point.y - normalTableBounds.center.y)) * pixel;
+                        Vector2 actualOffset = (Vector2)display.position - (Vector2)station.transform.position;
+                        Assert.Less(Vector2.Distance(expectedOffset, actualOffset), .0001f,
+                            "TD preserves the regular Level 1 table's exact slot placement.");
+                        Assert.Less(Mathf.Abs(Mathf.DeltaAngle(display.localEulerAngles.z,
+                            (float)CallStatic(layoutType, "TableSlotRotation", 0, slot, false))), .001f,
+                            "TD uses the same stable scatter/rotation as the regular table.");
+                    }
+                }
+                if (!table)
+                {
+                    Assert.IsNotNull(station.transform.Find("Ice"));
+                    SpriteRenderer barrel = station.GetComponent<SpriteRenderer>();
+                    Assert.IsNotNull(barrel);
+                    Assert.IsNotNull(barrel.sprite);
+                    Assert.AreEqual((float)StaticValue(layoutType, "BarrelWidth"),
+                        barrel.sprite.bounds.size.x * station.transform.lossyScale.x / pixel, .001f,
+                        "TD Coca barrel must render at the regular level's exact logical width.");
+                    Assert.AreEqual((float)StaticValue(layoutType, "BarrelHeight"),
+                        barrel.sprite.bounds.size.y * station.transform.lossyScale.y / pixel, .001f,
+                        "TD Coca barrel must render at the regular level's exact logical height.");
+                }
             }
             Assert.AreEqual(2, tables); Assert.AreEqual(2, barrels);
+        }
+
+        GameObject Station(int zone, string prefab)
+        {
+            IList stations = (IList)Get(Get(view, "towerDefensePresentation"), "stationObjects");
+            string expected = "TD zone " + zone + " " + prefab;
+            foreach (GameObject station in stations)
+                if (station != null && station.name == expected) return station;
+            Assert.Fail("Missing Tower Defense station " + expected);
+            return null;
+        }
+
+        int ActiveLoadedCocaDisplays(int zone)
+        {
+            Transform barrel = Station(zone, "Station_CocaBarrel").transform;
+            int active = 0;
+            for (int i = 0; i < barrel.childCount; i++)
+            {
+                Transform child = barrel.GetChild(i);
+                if (child.name.StartsWith("Loaded Coca display") && child.gameObject.activeSelf) active++;
+            }
+            return active;
+        }
+
+        int ActivePreparedChoriDisplays(int zone)
+        {
+            Transform table = Station(zone, "Station_NormalTable").transform;
+            int active = 0;
+            for (int i = 0; i < table.childCount; i++)
+            {
+                Transform child = table.GetChild(i);
+                if (child.name.StartsWith("Prepared Chori display") && child.gameObject.activeSelf) active++;
+            }
+            return active;
+        }
+
+        Transform FirstActiveLoadedCocaDisplay(int zone)
+        {
+            Transform barrel = Station(zone, "Station_CocaBarrel").transform;
+            for (int i = 0; i < barrel.childCount; i++)
+            {
+                Transform child = barrel.GetChild(i);
+                if (child.name.StartsWith("Loaded Coca display") && child.gameObject.activeSelf) return child;
+            }
+            Assert.Fail("No visible Coca bottle is available in zone " + zone);
+            return null;
+        }
+
+        Transform FirstActivePreparedChoriDisplay(int zone)
+        {
+            Transform table = Station(zone, "Station_NormalTable").transform;
+            for (int i = 0; i < table.childCount; i++)
+            {
+                Transform child = table.GetChild(i);
+                if (child.name.StartsWith("Prepared Chori display") && child.gameObject.activeSelf) return child;
+            }
+            Assert.Fail("No visible Chori serving is available in zone " + zone);
+            return null;
         }
 
         IEnumerator RealSingleRoleService(int card, int product, int zone, string name)
@@ -284,47 +440,195 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
+        public IEnumerator OneCocacoleroSerializesCocaHandoffsToOneFanAtATime()
+        {
+            AssertPreparedStations();
+            object firstFan = HeldFan(new[] {4}, new[] {1}, .12f);
+            object secondFan = HeldFan(new[] {4}, new[] {1}, .12f);
+            Set(mode, "stopSpawning", true);
+            yield return Tap(Cards()[1].center); yield return Tap(Areas()[0].center);
+
+            object presentation = Get(view, "towerDefensePresentation");
+            for (int n = 0; n < 40 && receipts.Count < 1; n++)
+            {
+                Call(mode, "Step", .05f);
+                Call(presentation, "Sync", mode);
+                yield return null;
+            }
+            Assert.AreEqual(1, receipts.Count);
+            Assert.AreEqual(1, Get(mode, "TotalDelivered"));
+            Assert.AreEqual(0, Get(firstFan, "PendingUnits"));
+            Assert.AreEqual(1, Get(secondFan, "PendingUnits"));
+            float firstDeliveryAt = (float)Get(receipts[0], "Elapsed");
+            IList cues = (IList)Get(presentation, "deliveryCues");
+            Assert.AreEqual(1, cues.Count, "One real Coca unit starts one visible handoff cue.");
+            yield return Capture("single-cocacolero-serial-handoff");
+
+            for (int n = 0; n < 10; n++)
+            {
+                Call(mode, "Step", .05f);
+                Call(presentation, "Sync", mode);
+                yield return null;
+                Assert.AreEqual(1, receipts.Count,
+                    "A single worker must not start another handoff during the 0.62-second service animation.");
+                Assert.LessOrEqual(((IList)Get(presentation, "deliveryCues")).Count, 1,
+                    "The same Cocacolero must never stack Coca flight cues.");
+            }
+
+            for (int n = 0; n < 6 && receipts.Count < 2; n++)
+            {
+                Call(mode, "Step", .05f);
+                Call(presentation, "Sync", mode);
+                yield return null;
+            }
+            Assert.AreEqual(2, receipts.Count, "After the cooldown, the same worker should continue serving the next waiting fan.");
+            Assert.AreNotEqual(Get(receipts[0], "FanId"), Get(receipts[1], "FanId"));
+            float gap = (float)Get(receipts[1], "Elapsed") - firstDeliveryAt;
+            Assert.That(gap, Is.GreaterThanOrEqualTo((float)StaticValue(T("TowerDefenseGameMode"), "DeliveryCueDurationSeconds")));
+            Assert.LessOrEqual(((IList)Get(presentation, "deliveryCues")).Count, 1);
+        }
+
+        [UnityTest]
+        public IEnumerator MultipleParrillerosInOneAreaShowDistinctParallelHandoffs()
+        {
+            AssertPreparedStations();
+            HeldFan(new[] {0}, new[] {1}, .12f);
+            HeldFan(new[] {0}, new[] {1}, .12f);
+            Set(mode, "stopSpawning", true);
+            yield return Tap(Cards()[0].center); yield return Tap(Areas()[0].center);
+            yield return Tap(Cards()[0].center); yield return Tap(Areas()[0].center);
+
+            IList workers = (IList)Get(mode, "Workers");
+            Assert.AreEqual(2, workers.Count);
+            Assert.AreEqual("Parrillero", Get(workers[0], "Role").ToString());
+            Assert.AreEqual("Parrillero", Get(workers[1], "Role").ToString());
+            Assert.AreEqual(0, Get(workers[0], "ServiceZone"));
+            Assert.AreEqual(0, Get(workers[1], "ServiceZone"));
+
+            object presentation = Get(view, "towerDefensePresentation");
+            for (int n = 0; n < 120 && receipts.Count < 2; n++)
+            {
+                Call(mode, "Step", .05f);
+                Call(presentation, "Sync", mode);
+                yield return null;
+            }
+            Assert.AreEqual(2, receipts.Count, "Both physical Chori units should be delivered by the two ready Parrilleros.");
+            Assert.AreNotEqual(Get(receipts[0], "WorkerId"), Get(receipts[1], "WorkerId"),
+                "The two distinct workers, not one worker twice, must perform the handoffs.");
+
+            float pixel = (float)Get(mode, "WorldUnitsPerLogicalPixel");
+            Vector2 firstPosition = (Vector2)Get(workers[0], "Position"), secondPosition = (Vector2)Get(workers[1], "Position");
+            Assert.That(Mathf.Abs(firstPosition.x - secondPosition.x) / pixel, Is.GreaterThanOrEqualTo(84f));
+            IDictionary staff = (IDictionary)Get(presentation, "workerViews");
+            SpriteRenderer[] renderers = new SpriteRenderer[2];
+            for (int i = 0; i < workers.Count; i++)
+            {
+                object worker = workers[i];
+                Assert.Greater((float)Get(worker, "ServeAnimationSeconds"), 0f,
+                    "Both workers must show the handoff animation in the same frame.");
+                Assert.IsFalse((bool)Get(worker, "IsMoving"), "The contract keeps each Parrillero inside the selected work area.");
+                object workerView = staff[(int)Get(worker, "Id")];
+                renderers[i] = (SpriteRenderer)Get(workerView, "Renderer");
+                Sprite[] handoffFrames = (Sprite[])Get(workerView, "HandoffFrames");
+                CollectionAssert.Contains(handoffFrames, renderers[i].sprite,
+                    "Each visible worker must use its approved Parrillero handoff sprite.");
+            }
+            Assert.IsFalse(renderers[0].bounds.Intersects(renderers[1].bounds),
+                "Same-area Parrillero handoff sprites must not cover one another.");
+            yield return Capture("two-parrilleros-area-0-parallel-handoff");
+        }
+
+        [UnityTest]
         public IEnumerator HandoffCuesAnimatePauseAndRecycleWithoutCreatingSales()
         {
             AssertPreparedStations();
             HeldFan(new[] {0, 4}, new[] {1, 1}, .48f);
             Set(mode, "stopSpawning", true);
-            yield return Tap(Cards()[0].center); yield return Tap(Areas()[0].center);
-            yield return Tap(Cards()[1].center); yield return Tap(Areas()[1].center);
             object presentation = Get(view, "towerDefensePresentation");
             GameObject firstCue = null;
             foreach (int product in new[] {4, 0})
             {
+                int zone = product == 4 ? 1 : 0;
+                int roleCard = product == 4 ? 1 : 0;
+                yield return Tap(Cards()[roleCard].center); yield return Tap(Areas()[zone].center);
                 int expected = product == 4 ? 1 : 2;
+                Transform sourceDisplay = product == 4 ? FirstActiveLoadedCocaDisplay(zone) : FirstActivePreparedChoriDisplay(zone);
+                Vector3 sourcePosition = sourceDisplay.position;
+                int initialSourceCount = product == 4 ? ActiveLoadedCocaDisplays(zone) : ActivePreparedChoriDisplays(zone);
                 for (int n = 0; n < 160 && receipts.Count < expected; n++)
                 { Call(mode, "Step", .05f); yield return null; }
                 Assert.AreEqual(expected, receipts.Count);
                 Call(presentation, "Sync", mode);
                 IList cues = (IList)Get(presentation, "deliveryCues"); Assert.AreEqual(1, cues.Count);
                 GameObject cue = (GameObject)Get(cues[0], "GameObject");
+                int remainingSourceCount = product == 4 ? ActiveLoadedCocaDisplays(zone) : ActivePreparedChoriDisplays(zone);
+                Assert.AreEqual(initialSourceCount - 1, remainingSourceCount,
+                    "Exactly the serving being handed off disappears from its cosmetic station display.");
+                Assert.IsFalse(sourceDisplay.gameObject.activeSelf);
+                Assert.AreEqual(product, Get(Get(cues[0], "Receipt"), "Product"));
+                Assert.Less(Vector3.Distance(sourcePosition, cue.transform.position), .0001f,
+                    "The one visible delivery cue starts at the source serving, not at an invented duplicate.");
+                if (product == 4)
+                {
+                    Assert.AreEqual(6, ActiveLoadedCocaDisplays(0), "A delivery in one area must not hide the other area's display.");
+                    Assert.IsFalse(((SpriteRenderer)Get(cues[0], "Renderer")).enabled,
+                        "Cocacolero's existing bottle-in-hand pose represents the pickup; the separate Coca cue appears at release.");
+                }
                 if (firstCue == null) firstCue = cue; else Assert.AreSame(firstCue, cue, "Reuse the expired visual, never a new inventory item.");
                 Vector3 start = cue.transform.position;
+                IList workers = (IList)Get(mode, "Workers");
+                object deliveryWorker = workers[product == 4 ? 0 : 1];
+                IDictionary staff = (IDictionary)Get(presentation, "workerViews");
+                object workerView = staff[(int)Get(deliveryWorker, "Id")];
+                SpriteRenderer workerRenderer = (SpriteRenderer)Get(workerView, "Renderer");
+                Sprite[] baseFrames = (Sprite[])Get(workerView, "Frames");
+                Sprite[] handoffFrames = (Sprite[])Get(workerView, "HandoffFrames");
+                Assert.IsNotNull(handoffFrames); Assert.Greater(handoffFrames.Length, 0);
+                Texture2D expectedHandoffArt = Resources.Load<Texture2D>(product == 4
+                    ? "street-cocacolero-barrel-reach-v1" : "street-parrillero-cooking-arms-v1");
+                Assert.IsNotNull(expectedHandoffArt);
+                Assert.AreSame(expectedHandoffArt, handoffFrames[0].texture,
+                    "The throw uses the already-approved role artwork, not a mismatched replacement sprite.");
+                Assert.AreNotSame(baseFrames[0], workerRenderer.sprite,
+                    "The serving worker switches to an existing authored reach/hand-off sprite.");
+                GameObject workerObject = (GameObject)Get(workerView, "GameObject");
+                float maxGestureAngle = 0f;
                 for (int frame = 0; frame < 6; frame++)
                 {
                     if (frame > 0) Call(mode, "Step", .05f);
                     Call(presentation, "Sync", mode);
+                    maxGestureAngle = Mathf.Max(maxGestureAngle,
+                        Quaternion.Angle(Quaternion.identity, workerObject.transform.localRotation));
                     if (frame == 2)
                     {
                         Assert.AreNotEqual(start, cue.transform.position, "Actual product cue must move toward its recipient.");
-                        object worker = ((IList)Get(mode, "Workers"))[product == 0 ? 0 : 1];
-                        IDictionary staff = (IDictionary)Get(presentation, "workerViews");
-                        GameObject workerObject = (GameObject)Get(staff[(int)Get(worker, "Id")], "GameObject");
-                        Assert.Greater(Quaternion.Angle(Quaternion.identity, workerObject.transform.localRotation), 1f, "A real handoff has a service gesture.");
+                        Sprite heldSprite = workerRenderer.sprite;
                         Vector3 held = cue.transform.position; float elapsed = (float)Get(mode, "Elapsed");
                         Call(mode, "Pause"); Call(mode, "Step", 1f); Call(presentation, "Sync", mode);
                         Assert.AreEqual(elapsed, Get(mode, "Elapsed")); Assert.AreEqual(held, cue.transform.position);
+                        Assert.AreSame(heldSprite, workerRenderer.sprite, "Pause freezes the worker pose as well as the product.");
                         Call(mode, "Resume");
                     }
                     Assert.AreEqual(expected, receipts.Count);
                     yield return Capture("handoff-" + (product == 0 ? "chori" : "coca") + "-frame-" + frame.ToString("00"));
                 }
-                Call(mode, "Step", .1f); Call(presentation, "Sync", mode);
+                Assert.Greater(maxGestureAngle, 1f, "A real handoff has a service gesture during its animation.");
+                Call(mode, "Step", .21f); Call(presentation, "Sync", mode);
+                Assert.IsTrue(((SpriteRenderer)Get(cues[0], "Renderer")).enabled,
+                    "The physical product appears at the worker's hand when the throw begins.");
+                Assert.Greater(Mathf.Abs(cue.transform.localEulerAngles.z), 1f,
+                    "The released product spins through a visible throwing arc.");
+                Assert.AreNotEqual(start, cue.transform.position);
+                Vector2 target = (Vector2)Get(Get(cues[0], "Receipt"), "Target") + Vector2.up * 28f *
+                    (float)Get(mode, "WorldUnitsPerLogicalPixel");
+                Assert.Less(Vector2.Distance((Vector2)cue.transform.position, target),
+                    Vector2.Distance((Vector2)start, target), "The launched unit travels toward the exact receipt recipient.");
+                yield return Capture("handoff-" + (product == 0 ? "chori" : "coca") + "-release-throw");
+                Call(mode, "Step", .25f); Call(presentation, "Sync", mode);
                 Assert.AreEqual(0, ((IList)Get(presentation, "deliveryCues")).Count);
+                Assert.AreEqual(initialSourceCount, product == 4 ? ActiveLoadedCocaDisplays(zone) : ActivePreparedChoriDisplays(zone),
+                    "The cosmetic product display returns after the real unit's visual handoff ends.");
+                Assert.IsTrue(sourceDisplay.gameObject.activeSelf);
             }
             Call(mode, "Step", .5f); Call(presentation, "Sync", mode);
             Assert.AreEqual(1, Get(mode, "ServedFans")); Assert.AreEqual(2, Get(mode, "TotalDelivered"));
@@ -333,8 +637,109 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
-        public IEnumerator AutomaticMixedTenFanWaveCanWinWithCoinHiresAndNormalMovement()
+        public IEnumerator CamionerosAdvancingFanCyclesThroughTheThreeLoadedWalkingSprites()
         {
+            Assert.AreEqual(9, requestedLevelId);
+            Assert.IsTrue((bool)Call(mode, "TrySpawnFan", new[] {4}, new[] {1}));
+            object fan = ((IList)Get(mode, "Fans"))[0];
+            object follower = Get(fan, "RouteFollower");
+            object presentation = Get(view, "towerDefensePresentation");
+            int fanId = (int)Get(fan, "Id");
+            Call(presentation, "Sync", mode);
+            IDictionary fanViews = (IDictionary)Get(presentation, "activeFans");
+            SpriteRenderer renderer = (SpriteRenderer)Get(fanViews[fanId], "Renderer");
+            string[] frameTextures =
+            {
+                "street-ferro-fans-walk-v2",
+                "street-ferro-fans-walk-reverse-v1",
+                "street-ferro-fans-walk-passing-v1"
+            };
+            int initialPose = fanId % frameTextures.Length;
+            Assert.AreEqual(frameTextures[initialPose], renderer.sprite.texture.name,
+                "The initial rendered atlas must honor the fan-ID phase offset.");
+            yield return Capture("camioneros-walking-pose-0");
+
+            float speed = (float)Get(follower, "Speed");
+            float distance = 18f * (float)Get(mode, "WorldUnitsPerLogicalPixel");
+            Assert.Greater(speed, 0f);
+            for (int stride = 1; stride <= frameTextures.Length; stride++)
+            {
+                Call(follower, "Advance", (distance + .0001f) / speed);
+                Call(presentation, "Sync", mode);
+                string expected = frameTextures[(initialPose + stride) % frameTextures.Length];
+                Assert.AreEqual(expected, renderer.sprite.texture.name,
+                    "The rendered supporter must cycle through all authored atlases as route progress advances.");
+                yield return Capture("camioneros-walking-pose-" + stride);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator CamionerosFanUsesFrontFacingThreePoseGaitOnDownwardRouteSegments()
+        {
+            Assert.AreEqual(9, requestedLevelId);
+            Assert.IsTrue((bool)Call(mode, "TrySpawnFan", new[] {4}, new[] {1}));
+            object fan = ((IList)Get(mode, "Fans"))[0];
+            object follower = Get(fan, "RouteFollower");
+            object presentation = Get(view, "towerDefensePresentation");
+            int fanId = (int)Get(fan, "Id");
+            float speed = (float)Get(follower, "Speed");
+            float pixel = (float)Get(mode, "WorldUnitsPerLogicalPixel");
+            Type presentationType = T("TowerDefenseWorldPresentation");
+            Assert.Greater(speed, 0f);
+            Assert.Greater(pixel, 0f);
+
+            // Advance along the configured real route until the first downward leg.
+            int steps = 0;
+            while (!(bool)CallStatic(presentationType, "IsWalkingDownwards", (Vector2)Get(follower, "Facing")) && steps < 10000)
+            {
+                Call(follower, "Advance", pixel / speed);
+                steps++;
+            }
+            Assert.IsTrue((bool)CallStatic(presentationType, "IsWalkingDownwards", (Vector2)Get(follower, "Facing")),
+                "The configured Camioneros path must contain a downward connector.");
+
+            string[] downTextures =
+            {
+                "street-ferro-fans-walk-down-v1",
+                "street-ferro-fans-walk-down-reverse-v1",
+                "street-ferro-fans-walk-down-passing-v1"
+            };
+            IDictionary fanViews = (IDictionary)Get(presentation, "activeFans");
+            SpriteRenderer renderer = (SpriteRenderer)Get(fanViews[fanId], "Renderer");
+            Call(presentation, "Sync", mode);
+            int pose = (int)CallStatic(presentationType, "FanWalkingFrameIndex", 9, fanId,
+                (float)Get(follower, "Progress"), pixel);
+            Assert.AreEqual(downTextures[pose], renderer.sprite.texture.name,
+                "A descending route segment must render the front-facing atlas, not the side-facing one.");
+            for (int phase = 0; phase < downTextures.Length; phase++)
+            {
+                Sprite selected = (Sprite)Call(presentation, "FanSpriteForFacing", fanId, false, phase, true);
+                Assert.AreEqual(downTextures[phase], selected.texture.name,
+                    "Each gait phase must resolve to its matching front-facing downward atlas.");
+            }
+            yield return Capture("camioneros-walking-down-pose-0");
+        }
+
+        [UnityTest]
+        public IEnumerator AutomaticMixedSixtyFanWaveCanWinWithCoinHiresAndNormalMovementForCamioneros()
+        {
+            yield return RunAutomaticMixedSixtyFanWave(9);
+        }
+
+        [UnityTest]
+        public IEnumerator AutomaticMixedSixtyFanWaveCanWinWithCoinHiresAndNormalMovementForLosRedondos()
+        {
+            yield return RunAutomaticMixedSixtyFanWave(10);
+        }
+
+        private IEnumerator RunAutomaticMixedSixtyFanWave(int campaignLevelId)
+        {
+            Assert.AreEqual(campaignLevelId, requestedLevelId);
+            object config = Get(view, "towerDefenseSourceConfig");
+            Assert.AreEqual(campaignLevelId, Get(config, "SourceCampaignLevelId"));
+            Assert.AreEqual(9, Get(config, "EconomicBalanceCampaignLevelId"));
+            string expectedWalkArt = campaignLevelId == 10 ? "street-losredondos-fans-walk-v1" : "street-ferro-fans-walk-v2";
+            Assert.AreEqual(expectedWalkArt, ((Sprite)Call(Get(view, "towerDefensePresentation"), "FanSprite", 1, false, 0)).texture.name);
             AssertPreparedStations();
             // Legal player strategy: one Coca covers the upper/shared path; prioritize
             // Chori throughput and reinvest actual receipts, never inject money/stock.
@@ -344,7 +749,7 @@ namespace HayChoriYPaty.Tests
             int afterHires = Coins, additionalSpend = 0, requested = 0;
             var seen = new System.Collections.Generic.HashSet<int>();
             bool captured = false;
-            for (int n = 0; n < 3600 && Get(mode, "Phase").ToString() == "Playing"; n++)
+            for (int n = 0; n < 7200 && Get(mode, "Phase").ToString() == "Playing"; n++)
             {
                 int cooks = Count("Parrillero", 0) + Count("Parrillero", 1);
                 int cost = (int)Call(mode, "HireCost", Role("Parrillero"));
@@ -359,7 +764,12 @@ namespace HayChoriYPaty.Tests
                 foreach (object fan in (IList)Get(mode, "Fans"))
                     if (seen.Add((int)Get(fan, "Id"))) requested += (int)Get(fan, "PendingUnits");
                 if (!captured && (float)Get(mode, "Elapsed") >= 10f)
-                { captured = true; yield return Capture("automatic-wave-ten-seconds-natural-route"); }
+                {
+                    captured = true;
+                    yield return CaptureAtResolution("tower-defense-540x960", 540, 960);
+                    yield return CaptureAtResolution("tower-defense-1080x1920", 1080, 1920);
+                    yield return CaptureAtResolution("tower-defense-720x1280", 720, 1280);
+                }
                 if (n % 100 == 0) yield return null;
             }
             string outcome = "elapsed=" + Get(mode, "Elapsed") + ", requested=" + requested + ", delivered=" + Get(mode, "TotalDelivered") +
@@ -367,9 +777,9 @@ namespace HayChoriYPaty.Tests
             TestContext.WriteLine(outcome);
             if (!(bool)Get(mode, "HasWon")) yield return Capture("automatic-wave-strategy-failure");
             Assert.IsTrue((bool)Get(mode, "HasWon"), "Natural finite wave with legal adaptive coin hires: " + outcome);
-            Assert.IsFalse((bool)Get(mode, "HasLost")); Assert.AreEqual(10, seen.Count);
-            Assert.AreEqual(10, Get(mode, "SpawnedFans")); Assert.AreEqual(10, Get(mode, "ServedFans"));
-            Assert.AreEqual(10, Get(mode, "OrdersCompleted")); Assert.AreEqual(0, Get(mode, "EscapedFans"));
+            Assert.IsFalse((bool)Get(mode, "HasLost")); Assert.AreEqual(60, seen.Count);
+            Assert.AreEqual(60, Get(mode, "SpawnedFans")); Assert.AreEqual(60, Get(mode, "ServedFans"));
+            Assert.AreEqual(60, Get(mode, "OrdersCompleted")); Assert.AreEqual(0, Get(mode, "EscapedFans"));
             Assert.AreEqual(requested, Get(mode, "TotalDelivered")); Assert.AreEqual(requested, receipts.Count);
             Assert.AreEqual(requested * 5, Get(mode, "CoinsEarned")); Assert.AreEqual(afterHires - additionalSpend + requested * 5, Coins);
             Call(view, "UpdateTowerDefenseFrame");
@@ -530,6 +940,12 @@ namespace HayChoriYPaty.Tests
             if (cameraRoot != null) UnityEngine.Object.Destroy(cameraRoot);
             Time.timeScale = previousTime;
             yield return null;
+            if (sizeGroup != null)
+            {
+                for (int i = temporarySizes.Count - 1; i >= 0; i--)
+                    sizeGroup.GetType().GetMethod("RemoveCustomSize", I).Invoke(sizeGroup, new[] {temporarySizes[i]});
+                temporarySizes.Clear();
+            }
             if (gameWindow != null && selectedSize != null) { selectedSize.SetValue(gameWindow, previousSize); gameWindow.Repaint(); }
             if (sizeGroup != null && addedSize >= 0) sizeGroup.GetType().GetMethod("RemoveCustomSize", I).Invoke(sizeGroup, new object[] {addedSize});
             if (editorGate != null) editorGate.SetValue(null, previousGate);

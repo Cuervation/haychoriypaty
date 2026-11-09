@@ -74,6 +74,11 @@ namespace HayChoriYPaty.Tests
                         Assert.IsTrue(Mathf.Abs(Mathf.Abs(axis.x) - 1f) < .001f ||
                             Mathf.Abs(Mathf.Abs(axis.y) - 1f) < .001f,
                             "Fence panels may align only to horizontal or vertical straight runs.");
+                        Vector3 expectedAxis = Mathf.Abs(axis.x) >= Mathf.Abs(axis.y)
+                            ? Vector3.right
+                            : Vector3.up;
+                        Assert.That(Vector3.Dot(axis.normalized, expectedAxis), Is.GreaterThan(.999f),
+                            "Fence art must keep one screen-facing orientation; reversing the route must not turn panels upside down or swap their supports.");
                         if (label == "ShortStraight")
                         {
                             if (shortFencePanelScale < 0f) shortFencePanelScale = piece.transform.localScale.x;
@@ -217,9 +222,11 @@ namespace HayChoriYPaty.Tests
                 object geometry = generatorType.GetProperty("LatestGeometry", PublicInstance).GetValue(generator, null);
                 Vector2[] originalLeft = (Vector2[])geometry.GetType().GetProperty("LeftBoundary").GetValue(geometry, null);
                 Vector2[] originalRight = (Vector2[])geometry.GetType().GetProperty("RightBoundary").GetValue(geometry, null);
-                float screenLeft = Mathf.Min(originalLeft[0].x, originalRight[0].x) - .25f;
+                // Deliberately put viewport edges inside the authored route bounds:
+                // visible art must snap to them, not merely extend from inside.
+                float screenLeft = Mathf.Min(originalLeft[0].x, originalRight[0].x) + .25f;
                 float screenRight = Mathf.Max(originalLeft[originalLeft.Length - 1].x,
-                    originalRight[originalRight.Length - 1].x) + .25f;
+                    originalRight[originalRight.Length - 1].x) - .25f;
                 Assert.IsTrue((bool)generatorType.GetMethod("SetVisualHorizontalBounds", PublicInstance)
                     .Invoke(generator, new object[] { screenLeft, screenRight }));
                 Assert.IsTrue((bool)generatorType.GetMethod("Generate", PublicInstance).Invoke(generator, null),

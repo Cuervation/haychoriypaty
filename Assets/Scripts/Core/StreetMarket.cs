@@ -4,6 +4,20 @@ using UnityEngine;
 
 namespace HayChoriYPaty
 {
+    public enum StreetMarketPermitItem
+    {
+        MunicipalLicense = 0,
+        PoliceContribution = 1
+    }
+
+    public static class StreetMarketPreparationCatalog
+    {
+        public const long ItemPriceCents = 50000L;
+        public static int ItemCount => 2;
+        public static string Name(int id) => id == (int)StreetMarketPermitItem.MunicipalLicense ? "Habilitación Municipal"
+            : id == (int)StreetMarketPermitItem.PoliceContribution ? "Contribución Policial" : string.Empty;
+    }
+
     [Serializable]
     public sealed class StreetMarketBalance
     {
@@ -45,6 +59,9 @@ namespace HayChoriYPaty
         public long[] highestRecognizedSalesByLevel = new long[13];
         public bool[] bonusPaidByLevel = new bool[13];
         public bool attemptActive, kitGranted, legacyTransitionRepairApplied, legacyZeroBalanceRecoveryApplied;
+        // Preparation-only permissions are isolated from merchandise, product stock and player statistics.
+        public int preparationLevelId = -1;
+        public bool municipalPermitPurchased, policeContributionPurchased;
         public int victoryPayoutVersion; // Additive v4 compatibility: latest receipt reconciled once.
         public StreetMarketResult lastResult;
     }
@@ -119,12 +136,72 @@ namespace HayChoriYPaty
             return unlockedIngredients[id];
         }
 
+        /// <summary>Uses the explicit stable-ID unlock set for the current campaign schema.</summary>
+        public bool IsIngredientUnlocked(int id, bool[] unlockedLevelIds, int legacyUnlockedLevel)
+        {
+            if (id < 0 || id >= 10) return false;
+            if (unlockedLevelIds == null || unlockedLevelIds.Length != StreetSimulation.LevelNames.Length)
+                return IsIngredientUnlocked(id, legacyUnlockedLevel);
+
+            for (int level = 0; level < unlockedLevelIds.Length; level++)
+            {
+                if (!unlockedLevelIds[level]) continue;
+                StreetSimulation simulation = new StreetSimulation(Balance, level, 5f);
+                for (int slot = 0; slot < simulation.ProductCount; slot++)
+                    foreach (int ingredient in StreetIngredientCatalog.Recipe(simulation.GetAvailableProduct(slot)))
+                        if (ingredient == id) return true;
+            }
+            return false;
+        }
+
+        public bool HasPreparationPermitPurchases => Data.municipalPermitPurchased || Data.policeContributionPurchased;
+
+        /// <summary>Bind preparation-only purchases to the explicitly selected stable level ID.</summary>
+        public bool SelectPreparationLevel(int levelId)
+        {
+            if (levelId < 0 || levelId >= StreetSimulation.LevelNames.Length || Data.attemptActive) return false;
+            if (Data.preparationLevelId == levelId) return false;
+            Data.preparationLevelId = levelId;
+            Data.municipalPermitPurchased = false;
+            Data.policeContributionPurchased = false;
+            return true;
+        }
+
+        public bool IsPreparationPermitPurchased(int itemId, int levelId)
+        {
+            if (Data.preparationLevelId != levelId) return false;
+            return itemId == (int)StreetMarketPermitItem.MunicipalLicense ? Data.municipalPermitPurchased
+                : itemId == (int)StreetMarketPermitItem.PoliceContribution && Data.policeContributionPurchased;
+        }
+
+        public bool TryBuyPreparationPermit(int itemId, int levelId)
+        {
+            if (itemId < 0 || itemId >= StreetMarketPreparationCatalog.ItemCount ||
+                levelId < 0 || levelId >= StreetSimulation.LevelNames.Length || Data.preparationLevelId != levelId ||
+                Data.attemptActive || (LastResult != null && LastResult.chulengoPending) ||
+                IsPreparationPermitPurchased(itemId, levelId) || Data.balanceCents < StreetMarketPreparationCatalog.ItemPriceCents)
+                return false;
+
+            Data.balanceCents -= StreetMarketPreparationCatalog.ItemPriceCents;
+            if (itemId == (int)StreetMarketPermitItem.MunicipalLicense) Data.municipalPermitPurchased = true;
+            else Data.policeContributionPurchased = true;
+            return true;
+        }
+
+        /// <summary>Consume only the current preparation's purchases; callers persist/rollback this with attempt start.</summary>
+        public void ConsumePreparationPermits(int levelId)
+        {
+            if (Data.preparationLevelId != levelId) return;
+            Data.municipalPermitPurchased = false;
+            Data.policeContributionPurchased = false;
+        }
+
         public int[] RequiredUnits(StreetSimulation sim)
         {
             int[] result = new int[10];
             // Camioneros' Tower Defense uses real kitchen units for its only two offerings
             // (Chori and Coca), but neither has a Mercado ingredient debit/preflight gate.
-            if (sim == null || sim.LevelIndex == StreetSimulation.TowerDefenseCampaignLevelId) return result;
+            if (sim == null || StreetSimulation.IsTowerDefenseLevel(sim.LevelIndex)) return result;
             for (int slot = 0; slot < sim.ProductCount; slot++)
             {
                 int product = sim.GetAvailableProduct(slot);
