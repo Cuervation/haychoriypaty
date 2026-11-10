@@ -1,3 +1,11 @@
+# Android — 2026-11-10: tutorial de Camioneros Tower Defense, APK 0.2.83/code85
+
+Unity 6000.6.3f1 BuildPipeline mediante el Editor MCP del checkout activo: Android Development, IL2CPP/ARM64, solo `Assets/Scenes/Main.unity`: **Succeeded** (job `build-8c1333e2d3`, 341.88 s, 0 errores / 7 advertencias). El tutorial de Camioneros ya había pasado sus dos pruebas PlayMode focalizadas en Unity (job `d0d3fe53eec84a80af806f5dd0177601`); el build no reemplaza pruebas de gameplay.
+
+APK local ignorada por Git: `Builds/Android/Archive/HayChoriYPaty-0.2.83-code85-camioneros-tutorial-20261110.apk`, **422,576,832 bytes**, SHA-256 `d6829dbb9452ffb0e3241a1303fe20799ba0cda70336ec03bb77a57ff674e2ee`. **PASS:** ZIP íntegro, `zipalign -c -v 4`, firma APK Scheme v2 y metadata `aapt`: `com.haychoriypaty.game`, `0.2.83`/code`85`, min API26/target API36, ABI `arm64-v8a`. Manifiesto Development/debuggable; Analytics y Ad-ID explícitamente desactivados por el build guard. Firma Android Debug, no es release Play Store.
+
+**No instalada ni lanzada.** No se pidió instalación, no se borraron datos ni se hizo smoke en teléfono. El build usó la configuración de desarrollo existente; build exitoso y tests focalizados no certifican el modo Tower Defense completo.
+
 # Android — 2026-11-09: entrada progresiva de hinchas de Camioneros, APK 0.2.83/code85
 
 Unity 6000.6.3f1 BuildPipeline en una copia aislada del working tree capturado desde `HEAD 64d638c`; Android Development IL2CPP/ARM64 y solo `Assets/Scenes/Main.unity`: **Succeeded en 528.27 s, 0 errores / 5 advertencias**. Se incluyeron las fuentes y sprites de producto del working tree, pero no builds, escenas temporales, capturas ni archivos de auditoría. `ProjectSettings.asset` y `GvhProjectSettings.xml` se restauraron desde HEAD en la copia para excluir preferencias locales (`runInBackground` y cookie/opt-in local de Firebase Analytics); el checkout activo y Unity interactivo no se modificaron durante el build.

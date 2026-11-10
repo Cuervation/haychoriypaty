@@ -1,11 +1,11 @@
 # Current state — Hay Chori y Paty
 
-**Corte:** 2026-11-09. Resumen vigente compacto; las reglas operativas están en los contratos y la tabla maestra. [Índice SDD](README.md). Se archivó el snapshot extenso anterior en [history/current-state-snapshot-through-20261106.md](history/current-state-snapshot-through-20261106.md).
+**Corte:** 2026-11-10. Resumen vigente compacto; las reglas operativas están en los contratos y la tabla maestra. [Índice SDD](README.md). Se archivó el snapshot extenso anterior en [history/current-state-snapshot-through-20261106.md](history/current-state-snapshot-through-20261106.md).
 
 ## Checkout y evidencia de entrega
 
 - Checkout activo `/Users/celestino/HayChoriYPaty`, rama `codex/street-automation`; preservar cambios locales preexistentes. Unity `6000.6.3f1`; Player Settings `0.2.83/code85`.
-- APK local más reciente (2026-11-09): `Builds/Android/Archive/HayChoriYPaty-0.2.83-code85-camioneros-progressive-entry-20261109.apk`, Development IL2CPP/ARM64, solo `Main.unity`, 407,587,676 bytes, SHA-256 `662794a27635ff94a425ddbf6dbb07c2a8070256243b8869f3b75ff829264f77`. Unity 6000.6.3f1 BuildPipeline en copia aislada succeeded (528.27 s, 0 errores/5 advertencias); ZIP, `zipalign`, firma v2 y metadata paquete/versión/API/ABI **PASS**. No instalada ni lanzada; el teléfono conserva la APK anterior y no se hizo smoke físico. La compilación de assemblies no equivale a ejecutar EditMode/PlayMode ni a validar Game View; la nueva entrada progresiva sigue `BLOCKED`/`NOT_RUN` en Unity. Detalle en [Android delivery](features/android-prototype.md).
+- APK local más reciente (2026-11-10): `Builds/Android/Archive/HayChoriYPaty-0.2.83-code85-camioneros-tutorial-20261110.apk`, Development IL2CPP/ARM64, solo `Main.unity`, 422,576,832 bytes, SHA-256 `d6829dbb9452ffb0e3241a1303fe20799ba0cda70336ec03bb77a57ff674e2ee`. Unity 6000.6.3f1 BuildPipeline mediante MCP succeeded en 341.88 s (0 errores/7 advertencias); ZIP, `zipalign`, firma v2 y metadata paquete/versión/API/ABI **PASS**. Contiene el tutorial Camioneros; sus dos pruebas PlayMode pasaron 2/2 y se revisaron capturas reales de ambos pasos. No instalada ni lanzada; no se hizo smoke físico. El build/tutoría focalizada no implican aceptación completa de Tower Defense. Detalle en [Android delivery](features/android-prototype.md).
 - Desarrollo conserva un grant de QA de `+30` tickets por inicio de proceso fuera del Editor; retirar antes de cualquier distribución release. No se limpiaron datos/saves para esta auditoría.
 
 ## Campaña efectiva
