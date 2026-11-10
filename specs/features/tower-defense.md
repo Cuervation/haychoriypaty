@@ -1,5 +1,17 @@
 # Tower Defense — Camioneros y Los Redondos
 
+## Tutorial de la tercera cancha — Camioneros / Plaza de Mayo (posición 3, ID 9) — 2026-11-09
+
+La primera apertura de Camioneros muestra una guía de dos pasos antes de que avance la partida. Reutiliza el globo crema continuo, el oscurecido de pantalla al 50%, `SIGUIENTE` y `SALTAR` del tutorial existente; cada paso apunta a una tarjeta de contratación que ya forma parte del footer. El paso de Parrillero indica `Tocá Parrillero y elegí cualquiera de las dos áreas`; el de Coca indica `Tocá Cocacolero y elegí cualquiera de las dos áreas`. No se agregan botones, áreas, costos ni reglas. `SIGUIENTE` avanza entre tarjetas y el último paso o `SALTAR` reanuda la misma partida; el tutorial se recuerda con una clave local solo tras persistir correctamente la reanudación. Los Redondos ID 10 y los tutoriales tradicionales no cambian.
+
+| Criterio | Estado | Evidencia |
+|---|---|---|
+| La tercera posición de campaña resuelve Camioneros ID 9 y no confunde el tutorial Paty de Vélez ID 2 | `PASS` estático | `StreetSimulation.CampaignOrder` y `TowerDefenseLevelConfig.CamionerosCampaignLevelId`; tutorial agregado exclusivamente en `StartTowerDefenseRun` para ID 9. |
+| El tutorial apunta a las tarjetas existentes y dice explícitamente que ambos trabajadores se eligen para cualquiera de las dos áreas | `PASS` estático | `CamionerosTutorialExplanations` nombra Parrillero/Cocacolero y `cualquiera de las dos áreas`; `CamionerosTutorialTargetBounds` y los IDs compartidos `LevelOneTutorialPrimaryAction`/`SkipAction` mantienen las tarjetas y controles existentes. |
+| No avanza ningún hincha hasta completar o saltar; completar reanuda la misma partida y registra la marca solo tras guardar | `PASS` estático | `StartTowerDefenseRun` pausa `TowerDefenseGameMode`; `HandleTowerDefenseAction` bloquea acciones de juego durante la guía; `CompleteCamionerosTutorial` reanuda, persiste y recién entonces guarda PlayerPrefs. |
+| PlayMode comprueba los dos objetivos, el bloqueo del avance, SIGUIENTE y SALTAR restaurando la marca previa | `PASS` | Unity 6000.6.3f1, PlayMode, job `d0d3fe53eec84a80af806f5dd0177601`: 2/2 (`CamionerosTutorialExplainsExistingHireCardsAndKeepsDefensePausedUntilContinue`, `CamionerosTutorialCanBeSkippedIntoTheSameDefenseRun`). |
+| Captura Game View real de ambos pasos a 540×960 | `PASS` | Capturas PlayMode revisadas: `/private/tmp/hcyp-camioneros-tutorial-parrillero.png` y `/private/tmp/hcyp-camioneros-tutorial-cocacolero.png`, ambas 540×960. La escena volvió a `Assets/Scenes/Main.unity` y PlayMode quedó detenido. |
+
 ## Entrada gradual con separación visible — ajuste solicitado 2026-11-09
 
 En Camioneros ID9, los hinchas se incorporan de uno en uno: el siguiente no puede entrar hasta que todos los activos hayan avanzado **96 px lógicos** desde la entrada. Ese intervalo supera el ancho de 78 px del frame y evita que los sprites se monten o parezcan aparecer juntos. Se conserva el presupuesto de 60 y la velocidad `0.1575`; no se añade límite de tiempo. Los Redondos ID10 mantiene su separación previa de 58 px. El valor pertenece a cada `TowerDefenseLevelConfig` serializado.

@@ -9,7 +9,7 @@ using UnityEngine.TestTools;
 
 namespace HayChoriYPaty.Tests
 {
-    /// <summary>Real TD UI with a disposable in-memory campaign profile, never PlayerPrefs/cloud.</summary>
+    /// <summary>Real TD UI with an in-memory campaign profile, restored tutorial preference, and no cloud.</summary>
     public sealed class TowerDefensePlacementViewTests
     {
         const BindingFlags I = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
@@ -21,6 +21,9 @@ namespace HayChoriYPaty.Tests
         object mode;
         bool failSaves, previousGate;
         int savedCalls;
+        bool hadCamionerosTutorialCompletion;
+        int previousCamionerosTutorialCompletion;
+        string camionerosTutorialCompletedKey;
         readonly ArrayList receipts = new ArrayList();
         float previousTime;
         FieldInfo editorGate;
@@ -84,6 +87,13 @@ namespace HayChoriYPaty.Tests
             requestedLevelId = TestContext.CurrentContext.Test.Name.IndexOf("LosRedondos", StringComparison.OrdinalIgnoreCase) >= 0 ? 10 : 9;
             previousTime = Time.timeScale;
             gt = T("StreetGame"); vt = T("StreetView");
+            camionerosTutorialCompletedKey = (string)vt.GetField("CamionerosTutorialCompletedKey", S).GetRawConstantValue();
+            hadCamionerosTutorialCompletion = PlayerPrefs.HasKey(camionerosTutorialCompletedKey);
+            previousCamionerosTutorialCompletion = hadCamionerosTutorialCompletion
+                ? PlayerPrefs.GetInt(camionerosTutorialCompletedKey) : 0;
+            bool isTutorialCase = TestContext.CurrentContext.Test.Name.IndexOf("CamionerosTutorial", StringComparison.OrdinalIgnoreCase) >= 0;
+            if (isTutorialCase) PlayerPrefs.DeleteKey(camionerosTutorialCompletedKey);
+            else PlayerPrefs.SetInt(camionerosTutorialCompletedKey, 1);
             editorGate = gt.GetField("AllowEditorTestInitialization", S);
             previousGate = (bool)editorGate.GetValue(null); editorGate.SetValue(null, false);
             Type firebase = Type.GetType("HayChoriYPaty.Cloud.FirebasePlayerSession, Assembly-CSharp", true);
@@ -145,6 +155,68 @@ namespace HayChoriYPaty.Tests
             Directory.CreateDirectory(CaptureDirectory);
             File.WriteAllBytes(Path.Combine(CaptureDirectory, name + ".png"), image.EncodeToPNG());
             UnityEngine.Object.Destroy(image);
+        }
+
+        IEnumerator CaptureCamionerosTutorialStep(string step)
+        {
+            yield return null; yield return new WaitForEndOfFrame();
+            Texture2D image = ScreenCapture.CaptureScreenshotAsTexture();
+            try
+            {
+                Assert.AreEqual(540, image.width); Assert.AreEqual(960, image.height);
+                File.WriteAllBytes("/private/tmp/hcyp-camioneros-tutorial-" + step + ".png", image.EncodeToPNG());
+            }
+            finally { UnityEngine.Object.Destroy(image); }
+        }
+
+        [UnityTest]
+        public IEnumerator CamionerosTutorialExplainsExistingHireCardsAndKeepsDefensePausedUntilContinue()
+        {
+            Assert.IsTrue((bool)Get(view, "towerDefenseTutorialActive"));
+            Assert.AreEqual("Paused", Get(mode, "Phase").ToString(),
+                "The Defense route must not advance while the first-time tutorial is open.");
+            Assert.AreEqual(0, ((ICollection)Get(mode, "Fans")).Count,
+                "No fan can enter before the tutorial is continued.");
+
+            Rect[] cards = Cards();
+            string[] headlines = (string[])vt.GetField("CamionerosTutorialHeadlines", S).GetValue(null);
+            string[] explanations = (string[])vt.GetField("CamionerosTutorialExplanations", S).GetValue(null);
+            CollectionAssert.AreEqual(new[] {"Para el chori,\ncontratá al Parrillero.", "Para la Coca,\ncontratá al Cocacolero."}, headlines);
+            CollectionAssert.AreEqual(new[]
+            {
+                "Tocá Parrillero y elegí\ncualquiera de las dos áreas.",
+                "Tocá Cocacolero y elegí\ncualquiera de las dos áreas."
+            }, explanations);
+            Rect firstTarget = (Rect)Call(view, "CamionerosTutorialTargetBounds");
+            Assert.AreEqual(cards[0], firstTarget, "The first callout targets the existing Parrillero card.");
+            Assert.AreEqual(300, (int)Call(view, "HitTowerDefenseAction",
+                ((Rect)Call(view, "CamionerosTutorialPrimaryBounds")).center));
+            yield return CaptureCamionerosTutorialStep("parrillero");
+
+            Call(view, "HandleTowerDefenseAction", 300);
+            Assert.AreEqual(1, Get(view, "towerDefenseTutorialStep"));
+            Assert.AreEqual("Paused", Get(mode, "Phase").ToString());
+            Rect secondTarget = (Rect)Call(view, "CamionerosTutorialTargetBounds");
+            Assert.AreEqual(cards[1], secondTarget, "The second callout targets the existing Cocacolero card.");
+            yield return CaptureCamionerosTutorialStep("cocacolero");
+
+            Call(view, "HandleTowerDefenseAction", 300);
+            Assert.IsFalse((bool)Get(view, "towerDefenseTutorialActive"));
+            Assert.AreEqual("Playing", Get(mode, "Phase").ToString());
+            Assert.AreEqual(1, PlayerPrefs.GetInt(camionerosTutorialCompletedKey, 0),
+                "Completion is saved only after the actual run resumes successfully.");
+        }
+
+        [UnityTest]
+        public IEnumerator CamionerosTutorialCanBeSkippedIntoTheSameDefenseRun()
+        {
+            Assert.IsTrue((bool)Get(view, "towerDefenseTutorialActive"));
+            Assert.AreEqual("Paused", Get(mode, "Phase").ToString());
+            Call(view, "HandleTowerDefenseAction", 301);
+            Assert.IsFalse((bool)Get(view, "towerDefenseTutorialActive"));
+            Assert.AreEqual("Playing", Get(mode, "Phase").ToString());
+            Assert.AreEqual(1, PlayerPrefs.GetInt(camionerosTutorialCompletedKey, 0));
+            yield return null;
         }
 
         IEnumerator CaptureAtResolution(string name, int width, int height)
@@ -948,6 +1020,9 @@ namespace HayChoriYPaty.Tests
             }
             if (gameWindow != null && selectedSize != null) { selectedSize.SetValue(gameWindow, previousSize); gameWindow.Repaint(); }
             if (sizeGroup != null && addedSize >= 0) sizeGroup.GetType().GetMethod("RemoveCustomSize", I).Invoke(sizeGroup, new object[] {addedSize});
+            if (hadCamionerosTutorialCompletion) PlayerPrefs.SetInt(camionerosTutorialCompletedKey, previousCamionerosTutorialCompletion);
+            else PlayerPrefs.DeleteKey(camionerosTutorialCompletedKey);
+            PlayerPrefs.Save();
             if (editorGate != null) editorGate.SetValue(null, previousGate);
         }
     }

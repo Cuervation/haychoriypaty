@@ -15,12 +15,25 @@ namespace HayChoriYPaty
         private const int TowerDefenseHireFirstAction = 7820;
         private const int TowerDefenseHireLastAction = TowerDefenseHireFirstAction + 1;
         private const int TowerDefensePlaceFirstAction = 7830;
+        private const string CamionerosTutorialCompletedKey = "HayChoriYPaty.TowerDefense.Camioneros.Tutorial.Completed.v1";
+        private static readonly string[] CamionerosTutorialHeadlines =
+        {
+            "Para el chori,\ncontratá al Parrillero.",
+            "Para la Coca,\ncontratá al Cocacolero."
+        };
+        private static readonly string[] CamionerosTutorialExplanations =
+        {
+            "Tocá Parrillero y elegí\ncualquiera de las dos áreas.",
+            "Tocá Cocacolero y elegí\ncualquiera de las dos áreas."
+        };
         private static readonly StreetWorkerRole[] TowerDefenseHireRoles =
         {
             StreetWorkerRole.Parrillero, StreetWorkerRole.Cocacolero
         };
 
         private bool towerDefenseActive;
+        private bool towerDefenseTutorialActive;
+        private int towerDefenseTutorialStep;
         private int towerDefenseSelectedRole = -1;
         private string towerDefenseError;
         private TowerDefenseLevelConfig towerDefenseSourceConfig;
@@ -49,6 +62,8 @@ namespace HayChoriYPaty
             if (towerDefenseCoinHud != null) Destroy(towerDefenseCoinHud);
             towerDefenseCoinHud = null;
             towerDefenseActive = false;
+            towerDefenseTutorialActive = false;
+            towerDefenseTutorialStep = 0;
             towerDefenseSelectedRole = -1;
             towerDefenseError = null;
             towerDefenseBackdrop = null;
@@ -73,6 +88,15 @@ namespace HayChoriYPaty
 
             if (towerDefenseMode == null) return true;
             if (game != null && game.Sim != null && game.Sim.IsExternalCampaignRuntime && !game.IsPlayerActive) return true;
+            if (towerDefenseTutorialActive)
+            {
+                if (action == LevelOneTutorialSkipAction ||
+                    (action == LevelOneTutorialPrimaryAction && towerDefenseTutorialStep == CamionerosTutorialHeadlines.Length - 1))
+                    CompleteCamionerosTutorial();
+                else if (action == LevelOneTutorialPrimaryAction && towerDefenseTutorialStep < CamionerosTutorialHeadlines.Length - 1)
+                    towerDefenseTutorialStep++;
+                return true;
+            }
             if (action == TowerDefensePauseAction)
             {
                 if (towerDefenseMode.Phase == TowerDefenseRunPhase.Paused) towerDefenseMode.Resume();
@@ -127,6 +151,25 @@ namespace HayChoriYPaty
             return true;
         }
 
+        private void CompleteCamionerosTutorial()
+        {
+            if (!towerDefenseTutorialActive || towerDefenseMode == null) return;
+
+            towerDefenseMode.Resume();
+            if (game == null || !game.PersistTowerDefenseProgress(towerDefenseMode))
+            {
+                towerDefenseMode.Pause();
+                towerDefenseError = "No se pudo guardar el comienzo de la partida.";
+                return;
+            }
+
+            towerDefenseTutorialActive = false;
+            towerDefenseTutorialStep = 0;
+            towerDefenseError = null;
+            PlayerPrefs.SetInt(CamionerosTutorialCompletedKey, 1);
+            PlayerPrefs.Save();
+        }
+
         private bool TowerDefensePlacementInputAllowed => towerDefenseMode != null &&
             towerDefenseMode.Phase == TowerDefenseRunPhase.Playing &&
             (game == null || game.Sim == null || !game.Sim.IsExternalCampaignRuntime || game.IsPlayerActive);
@@ -139,6 +182,11 @@ namespace HayChoriYPaty
         private int HitTowerDefenseAction(Vector2 point)
         {
             point.y *= layoutVerticalScale;
+            if (towerDefenseTutorialActive)
+            {
+                if (CamionerosTutorialSkipBounds().Contains(point)) return LevelOneTutorialSkipAction;
+                return CamionerosTutorialPrimaryBounds().Contains(point) ? LevelOneTutorialPrimaryAction : 0;
+            }
             if (!TowerDefensePlacementInputAllowed) return 0;
             Rect[] roleBounds = TowerDefenseHireBounds(logicalCanvasHeight);
             for (int i = 0; i < roleBounds.Length; i++)
@@ -236,6 +284,13 @@ namespace HayChoriYPaty
                 logicalCanvasHeight = logicalHeight;
                 layoutVerticalScale = logicalHeight / H;
                 TowerDefenseGameMode.SetCampaignStepSuspended(true);
+                if (campaignLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId &&
+                    PlayerPrefs.GetInt(CamionerosTutorialCompletedKey, 0) == 0)
+                {
+                    towerDefenseTutorialActive = true;
+                    towerDefenseTutorialStep = 0;
+                    towerDefenseMode.Pause();
+                }
                 return true;
             }
             catch (Exception exception)
@@ -253,6 +308,8 @@ namespace HayChoriYPaty
         {
             if (towerDefenseCoinHud != null) Destroy(towerDefenseCoinHud);
             towerDefenseCoinHud = null;
+            towerDefenseTutorialActive = false;
+            towerDefenseTutorialStep = 0;
             towerDefenseSelectedRole = -1;
             if (towerDefensePresentation != null) towerDefensePresentation.DisposePresentation();
             if (towerDefenseMode != null)
@@ -374,6 +431,7 @@ namespace HayChoriYPaty
                 if (towerDefenseActive && towerDefenseMode != null)
                     DrawTowerDefenseOrderBubbles(viewport);
                 DrawTowerDefenseHud(logicalHeight);
+                if (towerDefenseTutorialActive) DrawCamionerosTutorial();
             }
             finally
             {
@@ -677,6 +735,71 @@ namespace HayChoriYPaty
             float left = (W - (width * 2f + gap)) * .5f;
             return new[] { new Rect(left, height - 170f, width, cardHeight),
                 new Rect(left + width + gap, height - 170f, width, cardHeight) };
+        }
+
+        private Rect CamionerosTutorialTargetBounds()
+        {
+            Rect[] cards = TowerDefenseHireBounds(logicalCanvasHeight);
+            return cards.Length > towerDefenseTutorialStep
+                ? cards[towerDefenseTutorialStep]
+                : Rect.zero;
+        }
+
+        private Rect CamionerosTutorialPanelBounds()
+        {
+            Rect target = CamionerosTutorialTargetBounds();
+            float width = Mathf.Min(LevelOneTutorialBubbleWidth, W - 28f);
+            float x = Mathf.Clamp(target.center.x - width * .5f, 14f, W - width - 14f);
+            return new Rect(x, target.yMin - 260f, width, LevelOneTutorialBubbleHeight);
+        }
+
+        private Rect CamionerosTutorialPrimaryBounds() =>
+            LevelOneTutorialPrimaryBounds(CamionerosTutorialPanelBounds(), 1f);
+
+        private Rect CamionerosTutorialSkipBounds() =>
+            LevelOneTutorialSkipBounds(CamionerosTutorialPanelBounds(), 1f);
+
+        private void DrawCamionerosTutorial()
+        {
+            if (towerDefenseMode == null || towerDefenseTutorialStep < 0 ||
+                towerDefenseTutorialStep >= CamionerosTutorialHeadlines.Length) return;
+
+            DrawIntroScreen(Texture2D.whiteTexture, LevelOneTutorialBackdropDimColor(), ScaleMode.StretchToFill);
+            Rect panel = CamionerosTutorialPanelBounds();
+            Rect target = CamionerosTutorialTargetBounds();
+            const bool targetAbove = false;
+            const float tailWidth = 42f;
+            float baseX = Mathf.Clamp(target.center.x, panel.x + tailWidth * .5f, panel.xMax - tailWidth * .5f);
+            Vector2 tip = new Vector2(target.center.x, target.yMin);
+            Rect bubbleBounds = LevelOneTutorialBubbleDrawBounds(panel, tip, baseX, tailWidth, targetAbove);
+            if (levelOneTutorialBubbleTexture == null || levelOneTutorialBubbleTextureStep != towerDefenseTutorialStep ||
+                !levelOneTutorialBubbleTexturePanel.Equals(panel) || !levelOneTutorialBubbleTextureTip.Equals(tip) ||
+                !Mathf.Approximately(levelOneTutorialBubbleTextureTailWidth, tailWidth) ||
+                levelOneTutorialBubbleTextureTailAbove != targetAbove)
+            {
+                if (levelOneTutorialBubbleTexture != null) Destroy(levelOneTutorialBubbleTexture);
+                levelOneTutorialBubbleTexture = CreateLevelOneTutorialBubbleTexture(panel, tip, baseX, tailWidth, targetAbove);
+                levelOneTutorialBubbleTextureStep = towerDefenseTutorialStep;
+                levelOneTutorialBubbleTexturePanel = panel;
+                levelOneTutorialBubbleTextureTip = tip;
+                levelOneTutorialBubbleTextureTailWidth = tailWidth;
+                levelOneTutorialBubbleTextureTailAbove = targetAbove;
+            }
+
+            GUI.DrawTexture(bubbleBounds, levelOneTutorialBubbleTexture, ScaleMode.StretchToFill, true);
+            Rect headline = new Rect(panel.x + 18f, panel.y + 12f, panel.width - 36f, 58f);
+            DrawTutorialText(headline, CamionerosTutorialHeadlines[towerDefenseTutorialStep],
+                levelOneTutorialTitleStyle, 25, 20);
+            Rect explanation = new Rect(panel.x + 18f, panel.y + 72f, panel.width - 36f, 40f);
+            DrawTutorialText(explanation, CamionerosTutorialExplanations[towerDefenseTutorialStep],
+                levelOneTutorialBodyStyle, 19, 16);
+            DrawStandardButton(CamionerosTutorialPrimaryBounds(), LevelOneTutorialPrimaryAction, "SIGUIENTE");
+            Rect skipBounds = CamionerosTutorialSkipBounds();
+            FillRect(skipBounds, new Color(1f, .98f, .94f, .94f));
+            GUI.Label(skipBounds, "SALTAR", levelOneTutorialSkipStyle);
+#if !(ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER)
+            if (GUI.Button(skipBounds, "", invisible)) NativeAction(LevelOneTutorialSkipAction);
+#endif
         }
 
         private void DrawTowerDefenseHireCard(Rect bounds, int action, StreetWorkerRole role,
