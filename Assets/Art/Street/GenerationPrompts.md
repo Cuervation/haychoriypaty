@@ -401,3 +401,24 @@ Built-in ImageGen created two original transparent 1536×1024 atlases from the u
 
 SHA-256: paired `659e6c7b02dde392be0a6ae91504d5eb9341762933ceba420e871f70f5ed6251`; defeat `a06a522e5a4e8bc9f78cb329eb3ebad4672b3f049fa278015b2369d16f84f3a0`.
 Generated originals remain under `/Users/celestino/.codex/generated_images/01a1a299-d7fa-7d01-86cc-573fcb9938a5/` as `exec-3c5de039-aebe-4e39-806c-0616e4c33e7e.png` and `exec-6869c31c-c59a-4515-bd5a-643f83911c8b.png`.
+
+
+## Peregrinación Luján — ambientación de Moreno — 2026-11-11
+
+Built-in image_gen; Image 1 was the user's pilgrimage photo as composition/content guidance, Image 2 the previous game art as style guidance only. `Resources/street-background-peregrinacion-moreno-v2.png`, 2172×724 (3:1), is a continuous roadside environment—not a mural, frame, or poster. Superseded after the user clarified that the background must contain no people; the file is preserved. The Basilica badge, title/UI, layout, and gameplay remain unchanged.
+
+Prompt summary: full-bleed 3:1 illustrated Moreno pilgrimage environment, elevated road receding toward the distance, railway and green verge on the left, trees/poles, small roadside support tents and vans on the right, many backpacked pilgrims seen from behind walking toward Luján. User photo guided content/composition; existing game art guided style. No mural, frame, poster, title/logo, Basilica, UI, lettering, or watermark.
+
+
+## Peregrinación Luján — ambiente vacío para peregrinos en runtime — 2026-11-11
+
+Built-in image_gen edit from v2, preserving the environment composition/style while removing every person. `Resources/street-background-peregrinacion-moreno-v3.png`, 2172×724 (3:1), showed the empty road toward the horizon, railway/green verge, trees, poles, unattended support tents and vehicles. Superseded after the user clarified that the game background needs a strict side-on view. v1–v3 are preserved.
+
+Prompt summary: retain the panoramic Moreno setting and game art style but remove all people, crowds, silhouettes, staff/customers, statues/mannequins, including inside vehicles/tents. Keep the road clear for live pilgrim sprites; preserve railway on left, tree line/poles and unattended support tents/vehicles on right. No mural, frame, text, logo, UI, or watermark.
+
+
+## Peregrinación Luján — fondo lateral para Unity — 2026-11-11
+
+Built-in image_gen edit from v3. Final `Resources/street-background-peregrinacion-moreno-v4.png`, 2172×724 (3:1), is a strict perpendicular roadside/side-elevation view: road crosses the frame horizontally, with parallel railway/green verge, tree line, poles, unattended support tents and vehicles behind it. No people. This is the current ID14 resource; animated pilgrims remain runtime sprites.
+
+Prompt summary: recompose the empty Moreno scenery to a strict side-on/orthographic view from the sidewalk, with the empty road running left-to-right, parallel tracks/curb/tree line/poles, and roadside assistance tents and parked vehicles. No vanishing point, no road receding into the distance, no diagonal route, and no people/silhouettes/staff/customers. Keep the playfield road legible for lateral-moving characters; no text or UI.

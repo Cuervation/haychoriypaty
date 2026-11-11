@@ -97,20 +97,29 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void CamionerosOrderBubbleStaysAnchoredToTheEnteringFanInsteadOfSnappingOnscreen()
+        public void CamionerosAndPeregrinacionOrderBubblesStayAnchoredToEnteringFans()
         {
             Type streetView = RuntimeType("StreetView");
             MethodInfo boundsMethod = streetView.GetMethod("TowerDefenseOrderBubbleBounds", BindingFlags.NonPublic | BindingFlags.Static);
             MethodInfo visibilityMethod = streetView.GetMethod("ShouldDrawTowerDefenseBubbleForFanEntry", BindingFlags.NonPublic | BindingFlags.Static);
+            MethodInfo progressiveEntryMethod = streetView.GetMethod("UsesProgressiveTowerDefenseFanEntry", BindingFlags.NonPublic | BindingFlags.Static);
             Assert.IsNotNull(boundsMethod, "Tower Defense keeps the bubble anchored to the fan's screen position.");
-            Assert.IsNotNull(visibilityMethod, "Camioneros waits for the supporter to become visible before showing the bubble.");
+            Assert.IsNotNull(visibilityMethod, "Progressive-entry levels wait for the supporter to become visible before showing the bubble.");
+            Assert.IsNotNull(progressiveEntryMethod, "Only levels with progressive fan entry keep their bubbles unclamped to the viewport.");
 
             Assert.IsFalse((bool)visibilityMethod.Invoke(null, new object[] {9, 18f}),
                 "The order balloon must not lead the first partial foot/body reveal.");
             Assert.IsTrue((bool)visibilityMethod.Invoke(null, new object[] {9, 39f}),
                 "Once half the supporter frame has entered, its clipped balloon appears above it.");
+            Assert.IsFalse((bool)visibilityMethod.Invoke(null, new object[] {14, 0f}),
+                "Peregrinación must not show the balloon before its off-screen fan starts entering.");
+            Assert.IsTrue((bool)visibilityMethod.Invoke(null, new object[] {14, 39f}),
+                "Peregrinación reveals its balloon with the same half-frame threshold as Camioneros.");
             Assert.IsTrue((bool)visibilityMethod.Invoke(null, new object[] {10, 0f}),
                 "Los Redondos keeps its existing full-frame entrance and order bubble behavior.");
+            Assert.IsTrue((bool)progressiveEntryMethod.Invoke(null, new object[] {9}));
+            Assert.IsTrue((bool)progressiveEntryMethod.Invoke(null, new object[] {14}));
+            Assert.IsFalse((bool)progressiveEntryMethod.Invoke(null, new object[] {10}));
 
             Rect beforeViewport = (Rect)boundsMethod.Invoke(null, new object[] {new Vector2(-39f, 480f), 1, 9});
             Assert.LessOrEqual(beforeViewport.xMax, 0f,
@@ -130,6 +139,10 @@ namespace HayChoriYPaty.Tests
             Rect redondosBubble = (Rect)boundsMethod.Invoke(null, new object[] {new Vector2(-21f, 480f), 1, 10});
             Assert.That(redondosBubble.yMax, Is.EqualTo(480f - 68f).Within(.01f),
                 "Los Redondos keeps its existing vertical bubble anchor.");
+
+            Rect peregrinacionBubble = (Rect)boundsMethod.Invoke(null, new object[] {new Vector2(-21f, 480f), 1, 14});
+            Assert.That(peregrinacionBubble.center.x, Is.EqualTo(-21f).Within(.01f),
+                "Peregrinación's bubble must share the fan's off-screen viewport clipping instead of snapping to the margin.");
         }
 
         [TestCase(100f, 100f, 76f)]

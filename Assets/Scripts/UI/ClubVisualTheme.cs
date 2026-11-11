@@ -189,7 +189,7 @@ namespace HayChoriYPaty
                 new Color32(238, 173, 44, 255), muralResource: "street-background-larenga-autodromo-v1",
                 muralSource: new Rect(0, 0, 1, 1), fans: LaRengaFans()),
             new ClubVisualTheme("Peregrinación a Luján — Moreno", new Color32(82, 171, 222, 255), new Color32(248, 244, 225, 255),
-                new Color32(216, 174, 72, 255), muralResource: "street-background-peregrinacion-moreno-v1",
+                new Color32(216, 174, 72, 255), muralResource: "street-background-peregrinacion-moreno-v4",
                 muralSource: new Rect(0, 0, 1, 1), fans: PeregrinacionFans())
         };
 

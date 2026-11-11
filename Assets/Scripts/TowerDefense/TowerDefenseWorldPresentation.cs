@@ -52,6 +52,7 @@ namespace HayChoriYPaty
         private readonly Dictionary<string, Sprite> fanSpriteCache = new Dictionary<string, Sprite>();
         private readonly List<Sprite> generatedWorkerSprites = new List<Sprite>();
         private readonly List<GameObject> stationObjects = new List<GameObject>();
+        private readonly Dictionary<int, int> stationMinimumSortingOrderByRoleAndZone = new Dictionary<int, int>();
         private readonly Dictionary<int, List<GameObject>> choriDisplaysByZone = new Dictionary<int, List<GameObject>>();
         private readonly Dictionary<int, List<GameObject>> cocaDisplaysByZone = new Dictionary<int, List<GameObject>>();
         private readonly List<int> staleIds = new List<int>();
@@ -71,6 +72,8 @@ namespace HayChoriYPaty
         private int originalSourceCameraMask;
         private int presentationLayer = 5;
         private bool configured;
+
+        private static int StationSortKey(StreetWorkerRole role, int zone) => zone * 16 + (int)role;
 
         public RenderTexture OverlayTexture => overlayTexture;
         public int GeneratedFencePieceCount => fenceGenerator != null ? fenceGenerator.GeneratedPieceCount : 0;
@@ -214,6 +217,7 @@ namespace HayChoriYPaty
             }
             for (int i = 0; i < stationObjects.Count; i++) DestroyPresentationObject(stationObjects[i]);
             stationObjects.Clear();
+            stationMinimumSortingOrderByRoleAndZone.Clear();
             foreach (var pair in activeFans) DestroyPresentationObject(pair.Value.GameObject);
             activeFans.Clear();
             while (pooledFans.Count > 0) DestroyPresentationObject(pooledFans.Pop().GameObject);
@@ -259,6 +263,7 @@ namespace HayChoriYPaty
 
         private void CreateStations(TowerDefenseLevelConfig runtimeConfig)
         {
+            stationMinimumSortingOrderByRoleAndZone.Clear();
             if (runtimeConfig.FreeConstruction) { ClearPilgrimStations(); SyncPilgrimStations(); return; }
             choriDisplaysByZone.Clear();
             cocaDisplaysByZone.Clear();
@@ -292,7 +297,7 @@ namespace HayChoriYPaty
                 StreetWorkerRole role = table ? StreetWorkerRole.Parrillero : StreetWorkerRole.Cocacolero;
                 GameObject station = Instantiate(prefab, presentationRoot.transform, false);
                 station.name = "TD zone " + zone + " " + resource;
-                Vector2 anchor = mode.StationPosition(role, zone);
+                Vector2 anchor = mode.StationVisualPosition(role, zone);
                 station.transform.position = new Vector3(anchor.x,
                     anchor.y - TowerDefenseGameMode.StationRenderYOffsetLogical * pixel, 0f);
                 int depth = 32 + Mathf.RoundToInt(-(anchor.y - 54f * pixel) * 12f);
@@ -381,6 +386,15 @@ namespace HayChoriYPaty
                 }
                 SetLayerRecursively(station, presentationLayer);
                 stationObjects.Add(station);
+                if (visualLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId)
+                {
+                    SpriteRenderer[] parts = station.GetComponentsInChildren<SpriteRenderer>(true);
+                    int minimumOrder = int.MaxValue;
+                    for (int partIndex = 0; partIndex < parts.Length; partIndex++)
+                        if (parts[partIndex] != null) minimumOrder = Mathf.Min(minimumOrder, parts[partIndex].sortingOrder);
+                    if (minimumOrder != int.MaxValue)
+                        stationMinimumSortingOrderByRoleAndZone[StationSortKey(role, zone)] = minimumOrder;
+                }
             }
         }
 
@@ -684,6 +698,10 @@ namespace HayChoriYPaty
                 if (gameMode.FreeConstruction && worker.IsMoving && worker.TransferRoute != null && worker.TransferIndex < worker.TransferRoute.Length)
                     workerView.Renderer.flipX = worker.TransferRoute[worker.TransferIndex].x < worker.Position.x;
                 workerView.Renderer.sortingOrder = 28 + Mathf.RoundToInt(-worker.Position.y * 12f);
+                int stationMinimumOrder;
+                if (visualLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId &&
+                    stationMinimumSortingOrderByRoleAndZone.TryGetValue(StationSortKey(worker.Role, worker.ServiceZone), out stationMinimumOrder))
+                    workerView.Renderer.sortingOrder = Mathf.Min(workerView.Renderer.sortingOrder, stationMinimumOrder - 1);
             }
             for (int i = 0; i < staleIds.Count; i++)
             {

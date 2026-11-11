@@ -1,4 +1,5 @@
 using System;
+using System.Linq.Expressions;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
@@ -13,6 +14,7 @@ namespace HayChoriYPaty.Tests
         private Type configType, routeType, geometryType, modeType, balanceType;
         private ScriptableObject config;
         private object balance, mode;
+        private object capturedDelivery;
 
         [SetUp]
         public void SetUp()
@@ -56,6 +58,54 @@ namespace HayChoriYPaty.Tests
             Assert.IsTrue(Get<bool>(RuntimeType("TowerDefenseGameMode"), "OwnsRuntime", null));
             Assert.IsTrue(Get<bool>(RuntimeType("TowerDefenseGameMode"), "CampaignStepSuspended", null));
             CollectionAssert.AreEqual(new[] { 0, 4 }, (int[])Get<object>(mode, "AvailableProducts"));
+        }
+
+        [Test]
+        public void CamionerosStationPresentationOffsetsMatchEachWorkAreaWithoutChangingServiceAnchors()
+        {
+            object route = Get<object>(config, "Route");
+            routeType.GetField("SegmentLengths", PublicInstance).SetValue(route, new[] { 6f, 6f, 6f });
+            routeType.GetField("PlayableBounds", PublicInstance).SetValue(route, new Rect(-6f, -4.7f, 12f, 9.4f));
+            mode = CreateMode(.02f);
+
+            object parrillero = Enum.Parse(RuntimeType("StreetWorkerRole"), "Parrillero");
+            object cocacolero = Enum.Parse(RuntimeType("StreetWorkerRole"), "Cocacolero");
+            Vector2 areaOneTable = (Vector2)Invoke(mode, "StationPosition", new[] { parrillero, (object)0 });
+            Vector2 areaOneTableVisual = (Vector2)Invoke(mode, "StationVisualPosition", new[] { parrillero, (object)0 });
+            Vector2 areaOneBarrel = (Vector2)Invoke(mode, "StationPosition", new[] { cocacolero, (object)0 });
+            Vector2 areaOneBarrelVisual = (Vector2)Invoke(mode, "StationVisualPosition", new[] { cocacolero, (object)0 });
+            Assert.Less(areaOneTableVisual.x, areaOneTable.x, "Area 1's chori table moves left.");
+            Assert.AreEqual(areaOneBarrel, areaOneBarrelVisual, "Area 1's Coca barrel is not part of this adjustment.");
+
+            Vector2 areaTwoTable = (Vector2)Invoke(mode, "StationPosition", new[] { parrillero, (object)1 });
+            Vector2 areaTwoBarrel = (Vector2)Invoke(mode, "StationPosition", new[] { cocacolero, (object)1 });
+            Vector2 areaTwoTableVisual = (Vector2)Invoke(mode, "StationVisualPosition", new[] { parrillero, (object)1 });
+            Vector2 areaTwoBarrelVisual = (Vector2)Invoke(mode, "StationVisualPosition", new[] { cocacolero, (object)1 });
+            Assert.Greater(areaTwoTableVisual.x, areaTwoTable.x, "Area 2's chori table moves right.");
+            Assert.Greater(areaTwoBarrelVisual.x, areaTwoBarrel.x, "Area 2's Coca barrel moves right.");
+            float scale = Get<float>(mode, "WorldUnitsPerLogicalPixel");
+            float renderOffset = (float)modeType.GetField("StationRenderYOffsetLogical", PublicStatic).GetRawConstantValue();
+            float raise = 18f;
+            Vector2 areaTwoCenter = (Vector2)Invoke(mode, "WorkZone", new object[] { 1 });
+            float expectedRenderedY = areaTwoCenter.y + raise * scale;
+            Assert.AreEqual(expectedRenderedY, areaTwoTableVisual.y - renderOffset * scale, .0001f,
+                "Area 2's table is raised slightly above the work area's vertical midpoint.");
+            Assert.AreEqual(expectedRenderedY, areaTwoBarrelVisual.y - renderOffset * scale, .0001f,
+                "Area 2's barrel is aligned with the raised table.");
+            float tableWidth = (float)RuntimeType("StreetKitchenLayout").GetField("TableWidth", PublicStatic).GetRawConstantValue();
+            float barrelWidth = (float)RuntimeType("StreetKitchenLayout").GetField("BarrelWidth", PublicStatic).GetRawConstantValue();
+            float clearGap = areaTwoBarrelVisual.x - areaTwoTableVisual.x - (tableWidth + barrelWidth) * scale * .5f;
+            Assert.GreaterOrEqual(clearGap, 32f * scale - .0001f, "The area 2 table and barrel keep at least 32 logical pixels of clear space between footprints.");
+            AssertStationVisualInsideArea(0, areaOneTableVisual, tableWidth, scale);
+            AssertStationVisualInsideArea(0, areaOneBarrelVisual, barrelWidth, scale);
+            AssertStationVisualInsideArea(1, areaTwoTableVisual, tableWidth, scale);
+            AssertStationVisualInsideArea(1, areaTwoBarrelVisual, barrelWidth, scale);
+
+            int losRedondosCampaignLevelId = (int)RuntimeType("TowerDefenseLevelConfig")
+                .GetField("LosRedondosCampaignLevelId", PublicStatic).GetRawConstantValue();
+            Set(config, "sourceCampaignLevelId", losRedondosCampaignLevelId);
+            Assert.AreEqual(areaTwoTable, Invoke(mode, "StationVisualPosition", new[] { parrillero, (object)1 }),
+                "This visual adjustment is limited to Camioneros.");
         }
 
         [Test]
@@ -270,6 +320,16 @@ namespace HayChoriYPaty.Tests
             mode = CreateMode(0.02f);
             Invoke(mode, "Begin");
             Hire("Parrillero", 0);
+            capturedDelivery = null;
+            EventInfo deliveryEvent = modeType.GetEvent("DeliveryCompleted", PublicInstance);
+            Type deliveryType = deliveryEvent.EventHandlerType.GetGenericArguments()[0];
+            ParameterExpression deliveryParameter = Expression.Parameter(deliveryType, "delivery");
+            MethodInfo captureMethod = typeof(TowerDefenseGameModeTests)
+                .GetMethod(nameof(CaptureDelivery), PrivateInstance);
+            Delegate deliveryHandler = Expression.Lambda(deliveryEvent.EventHandlerType,
+                Expression.Call(Expression.Constant(this), captureMethod,
+                    Expression.Convert(deliveryParameter, typeof(object))), deliveryParameter).Compile();
+            deliveryEvent.AddEventHandler(mode, deliveryHandler);
 
             Assert.IsTrue((bool)Invoke(mode, "TrySpawnFan", new[] { new[] { 0 }, new[] { 1 } }));
             // Fill the finite budget with requests that this cook cannot service.
@@ -284,6 +344,14 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(1, Get<int>(mode, "CustomersAttended"));
             Assert.AreEqual(1, Get<int>(mode, "OrdersCompleted"));
             Assert.AreEqual(5, Get<int>(mode, "CoinsEarned"));
+            Vector2 expectedVisualSource = (Vector2)Invoke(mode, "StationVisualPosition", new object[]
+                { Enum.Parse(RuntimeType("StreetWorkerRole"), "Parrillero"), 0 }) -
+                Vector2.up * (float)modeType.GetField("StationRenderYOffsetLogical", PublicStatic).GetRawConstantValue() *
+                Get<float>(mode, "WorldUnitsPerLogicalPixel");
+            Assert.IsNotNull(capturedDelivery, "The physical delivery event should expose its presentation source.");
+            Vector2 receivedSource = (Vector2)deliveryType.GetField("Source", PublicInstance).GetValue(capturedDelivery);
+            Assert.AreEqual(expectedVisualSource, receivedSource,
+                "The physical handoff cue fallback originates at the moved visual table, not its unchanged base anchor.");
         }
 
         [Test]
@@ -632,7 +700,7 @@ namespace HayChoriYPaty.Tests
 
         [TestCase(0)]
         [TestCase(1)]
-        public void TallPortraitCentersBothWorkerRowsInsideTheAreaAndSeparatesStations(int zone)
+        public void TallPortraitStagesBothWorkerRowsBehindTheirStationsWithinTheArea(int zone)
         {
             object route = Get<object>(config, "Route");
             routeType.GetField("SegmentLengths", PublicInstance).SetValue(route, new[] {8f, 8f, 8f});
@@ -681,36 +749,48 @@ namespace HayChoriYPaty.Tests
             Assert.LessOrEqual(cocacoleroWidth, cocacoleroVisualWidth,
                 "The position envelope must include all four visible Cocacolero poses.");
             var workerEnvelopes = new System.Collections.Generic.List<Rect>(6);
-            Vector2 table = (Vector2)Invoke(mode, "StationPosition", new[] {parrillero, (object)zone});
-            Vector2 barrel = (Vector2)Invoke(mode, "StationPosition", new[] {cocacolero, (object)zone});
+            Vector2 tableAnchor = (Vector2)Invoke(mode, "StationVisualPosition", new[] {parrillero, (object)zone});
+            Vector2 barrelAnchor = (Vector2)Invoke(mode, "StationVisualPosition", new[] {cocacolero, (object)zone});
             Type kitchenLayout = RuntimeType("StreetKitchenLayout");
             float tableWidth = (float)kitchenLayout.GetField("TableWidth", PublicStatic).GetRawConstantValue();
             float tableHeight = (float)kitchenLayout.GetField("SandwichTableHeight", PublicStatic).GetRawConstantValue();
             float barrelWidth = (float)kitchenLayout.GetField("BarrelWidth", PublicStatic).GetRawConstantValue();
             float barrelHeight = (float)kitchenLayout.GetField("BarrelHeight", PublicStatic).GetRawConstantValue();
             float stationRenderOffset = (float)modeType.GetField("StationRenderYOffsetLogical", PublicStatic).GetRawConstantValue();
-            float workerStationClearance = (float)modeType.GetField("WorkerStationClearanceLogical", PublicStatic).GetRawConstantValue();
-            float tableHalfGroup = parrilleroSpacing + parrilleroVisualWidth * .5f;
-            float expectedParrilleroCenterX = table.x +
-                (tableWidth * .5f + workerStationClearance + tableHalfGroup) * pixelScale;
-            float barrelHalfGroup = cocacoleroSpacing + cocacoleroVisualWidth * .5f;
-            float expectedCocacoleroCenterX = barrel.x -
-                (barrelWidth * .5f + workerStationClearance + barrelHalfGroup) * pixelScale;
             Vector2 horizontalBounds = (Vector2)modeType.GetMethod("WorkAreaHorizontalBounds", PrivateInstance)
                 .Invoke(mode, new object[] {zone});
+            float tableHalfGroup = parrilleroSpacing + parrilleroVisualWidth * .5f;
+            float barrelHalfGroup = cocacoleroSpacing + cocacoleroVisualWidth * .5f;
+            float workerStationClearance = (float)modeType.GetField("WorkerStationClearanceLogical", PublicStatic).GetRawConstantValue();
+            Vector2 tableServiceAnchor = (Vector2)Invoke(mode, "StationPosition", new[] {parrillero, (object)zone});
+            Vector2 barrelServiceAnchor = (Vector2)Invoke(mode, "StationPosition", new[] {cocacolero, (object)zone});
+            float fallbackParrilleroCenterX = tableServiceAnchor.x +
+                (tableWidth * .5f + workerStationClearance + tableHalfGroup) * pixelScale;
+            float fallbackCocacoleroCenterX = barrelServiceAnchor.x -
+                (barrelWidth * .5f + workerStationClearance + barrelHalfGroup) * pixelScale;
+            float parrilleroMin = horizontalBounds.x + (fenceClearance + tableHalfGroup) * pixelScale;
+            float parrilleroMax = horizontalBounds.y - (fenceClearance + tableHalfGroup) * pixelScale;
+            float cocacoleroMin = horizontalBounds.x + (fenceClearance + barrelHalfGroup) * pixelScale;
+            float cocacoleroMax = horizontalBounds.y - (fenceClearance + barrelHalfGroup) * pixelScale;
+            float expectedParrilleroCenterX = parrilleroMax < parrilleroMin ? fallbackParrilleroCenterX
+                : Mathf.Clamp(tableAnchor.x, parrilleroMin, parrilleroMax);
+            float expectedCocacoleroCenterX = cocacoleroMax < cocacoleroMin ? fallbackCocacoleroCenterX
+                : Mathf.Clamp(barrelAnchor.x, cocacoleroMin, cocacoleroMax);
             float expectedStationSpacing = (horizontalBounds.y - horizontalBounds.x) / pixelScale -
                 2f * (float)modeType.GetField("StationOuterClearanceLogical", PublicStatic).GetRawConstantValue() -
                 (tableWidth + barrelWidth) * .5f;
             Assert.AreEqual(expectedStationSpacing, Get<float>(mode, "CurrentStationSpacingLogical"), .001f,
                 "The table and barrel spread to the edges of the chosen area without crossing its fences.");
+            Vector2 table = tableAnchor - Vector2.up * stationRenderOffset * pixelScale;
+            Vector2 barrel = barrelAnchor - Vector2.up * stationRenderOffset * pixelScale;
             Rect tableEnvelope = Rect.MinMaxRect(table.x - tableWidth * pixelScale * .5f,
-                table.y - stationRenderOffset * pixelScale - tableHeight * pixelScale * .5f,
+                table.y - tableHeight * pixelScale * .5f,
                 table.x + tableWidth * pixelScale * .5f,
-                table.y - stationRenderOffset * pixelScale + tableHeight * pixelScale * .5f);
+                table.y + tableHeight * pixelScale * .5f);
             Rect barrelEnvelope = Rect.MinMaxRect(barrel.x - barrelWidth * pixelScale * .5f,
-                barrel.y - stationRenderOffset * pixelScale - barrelHeight * pixelScale * .5f,
+                barrel.y - barrelHeight * pixelScale * .5f,
                 barrel.x + barrelWidth * pixelScale * .5f,
-                barrel.y - stationRenderOffset * pixelScale + barrelHeight * pixelScale * .5f);
+                barrel.y + barrelHeight * pixelScale * .5f);
             Assert.GreaterOrEqual(tableEnvelope.xMin, horizontalBounds.x - .0001f,
                 "The complete table footprint stays inside the selected fenced area.");
             Assert.LessOrEqual(tableEnvelope.xMax, horizontalBounds.y + .0001f,
@@ -737,9 +817,11 @@ namespace HayChoriYPaty.Tests
                 Assert.AreEqual(zone, Get<int>(cocacoleroState, "ServiceZone"));
                 Vector2 parrilleroPosition = Get<Vector2>(parrilleroState, "Position");
                 Vector2 cocacoleroPosition = Get<Vector2>(cocacoleroState, "Position");
-                Assert.AreEqual(expectedParrilleroCenterX + (i - 1) * parrilleroSpacing * pixelScale,
+                float parrilleroSide = i == 0 ? 0f : i == 1 ? -parrilleroSpacing : parrilleroSpacing;
+                float cocacoleroSide = i == 0 ? 0f : i == 1 ? -cocacoleroSpacing : cocacoleroSpacing;
+                Assert.AreEqual(expectedParrilleroCenterX + parrilleroSide * pixelScale,
                     parrilleroPosition.x, .0001f);
-                Assert.AreEqual(expectedCocacoleroCenterX + (i - 1) * cocacoleroSpacing * pixelScale,
+                Assert.AreEqual(expectedCocacoleroCenterX + cocacoleroSide * pixelScale,
                     cocacoleroPosition.x, .0001f);
                 Assert.AreEqual(workCenter.y + (lowerRowBase + rowSeparation) * pixelScale,
                     parrilleroPosition.y, .0001f, "Parrillero row must account for its foot-level Sprite pivot.");
@@ -749,14 +831,6 @@ namespace HayChoriYPaty.Tests
                     workerHeight, pivotY, pixelScale);
                 Rect cocacoleroEnvelope = WorkerVisualEnvelope(cocacoleroPosition, cocacoleroVisualWidth,
                     workerHeight, pivotY, pixelScale);
-                Assert.IsFalse(parrilleroEnvelope.Overlaps(tableEnvelope),
-                    "Parrilleros stand beside, not on top of, the fully stocked table.");
-                Assert.IsFalse(parrilleroEnvelope.Overlaps(barrelEnvelope),
-                    "Parrilleros stay clear of the full-size barrel, including its product display.");
-                Assert.IsFalse(cocacoleroEnvelope.Overlaps(tableEnvelope),
-                    "Cocacoleros stay clear of the fully stocked table.");
-                Assert.IsFalse(cocacoleroEnvelope.Overlaps(barrelEnvelope),
-                    "Cocacoleros stand beside, not on top of, the full-size barrel.");
                 workerEnvelopes.Add(parrilleroEnvelope);
                 workerEnvelopes.Add(cocacoleroEnvelope);
             }
@@ -785,8 +859,8 @@ namespace HayChoriYPaty.Tests
             }
 
             float furnitureGap = Mathf.Abs(table.x - barrel.x) / pixelScale - (tableWidth + barrelWidth) * .5f;
-            Assert.GreaterOrEqual(furnitureGap, 190f,
-                "The full-size table and barrel remain separated while workers use the clear space beside them.");
+            Assert.GreaterOrEqual(furnitureGap, 32f,
+                "The full-size table and barrel stay horizontally separated as the crews are staged behind them.");
 
         }
 
@@ -914,6 +988,16 @@ namespace HayChoriYPaty.Tests
         private object CallPrivate(string method, params object[] args) =>
             modeType.GetMethod(method, PrivateInstance).Invoke(mode, args);
 
+        private void AssertStationVisualInsideArea(int zone, Vector2 position, float width, float scale)
+        {
+            Vector2 bounds = (Vector2)CallPrivate("WorkAreaHorizontalBounds", zone);
+            float clearance = (float)modeType.GetField("StationOuterClearanceLogical", PublicStatic).GetRawConstantValue() * scale;
+            Assert.GreaterOrEqual(position.x - width * scale * .5f, bounds.x + clearance - .0001f,
+                "The visual station stays inside its fenced area's left edge.");
+            Assert.LessOrEqual(position.x + width * scale * .5f, bounds.y - clearance + .0001f,
+                "The visual station stays inside its fenced area's right edge.");
+        }
+
         private object CreateMode(float pixelScale) => CreateMode(config, pixelScale);
 
         private object CreateMode(object levelConfig, float pixelScale)
@@ -949,6 +1033,8 @@ namespace HayChoriYPaty.Tests
         }
 
         private static Type RuntimeType(string shortName) => Type.GetType("HayChoriYPaty." + shortName + ", Assembly-CSharp", true);
+
+        private void CaptureDelivery(object delivery) => capturedDelivery = delivery;
 
         private void Hire(string roleName, int zone)
         {

@@ -15,7 +15,7 @@ namespace HayChoriYPaty
         private const int TowerDefenseHireFirstAction = 7820;
         private const int TowerDefenseHireLastAction = TowerDefenseHireFirstAction + 1;
         private const int TowerDefensePlaceFirstAction = 7830;
-        private const float CamionerosMinimumFanRevealBeforeOrderBubbleLogical =
+        private const float TowerDefenseMinimumFanRevealBeforeOrderBubbleLogical =
             TowerDefenseResponsiveLayout.FanFrameWidthLogical * .5f;
         private const float TowerDefenseOrderBubbleHeadClearanceLogical = 6f;
         private const string CamionerosTutorialCompletedKey = "HayChoriYPaty.TowerDefense.Camioneros.Tutorial.Completed.v1";
@@ -627,9 +627,9 @@ namespace HayChoriYPaty
             float canvasScale = viewport.width / W;
             float feetOffset = towerDefenseMode.WorldUnitsPerLogicalPixel * 38f;
             IReadOnlyList<TowerDefenseFanState> fans = towerDefenseMode.Fans;
-            // Camioneros bubbles share the viewport edge with the world-space fan during
-            // its progressive entry. Clamping that level's bubble into view makes it pop
-            // at the margin before the supporter has walked onto the screen.
+            // Camioneros and Peregrinación bubbles share the viewport edge with the
+            // world-space fan during progressive entry. Clamping either bubble into view
+            // makes it pop at the margin before the supporter has walked onto the screen.
             GUI.BeginGroup(new Rect(0f, 0f, W, logicalCanvasHeight));
             try
             {
@@ -668,7 +668,7 @@ namespace HayChoriYPaty
                             - TowerDefenseResponsiveLayout.VisualStageLift;
                         bubble.y += headY - TowerDefenseOrderBubbleHeadClearanceLogical - bubble.yMax;
                     }
-                    if (levelId != TowerDefenseLevelConfig.CamionerosCampaignLevelId)
+                    if (!UsesProgressiveTowerDefenseFanEntry(levelId))
                         bubble.x = Mathf.Clamp(bubble.x, 6f, W - bubble.width - 6f);
                     if (bubble.yMax <= 0f || bubble.yMin >= logicalCanvasHeight) continue;
 
@@ -706,8 +706,12 @@ namespace HayChoriYPaty
         }
 
         private static bool ShouldDrawTowerDefenseBubbleForFanEntry(int campaignLevelId, float visibleFrameWidthLogical) =>
-            campaignLevelId != TowerDefenseLevelConfig.CamionerosCampaignLevelId ||
-            visibleFrameWidthLogical >= CamionerosMinimumFanRevealBeforeOrderBubbleLogical;
+            !UsesProgressiveTowerDefenseFanEntry(campaignLevelId) ||
+            visibleFrameWidthLogical >= TowerDefenseMinimumFanRevealBeforeOrderBubbleLogical;
+
+        private static bool UsesProgressiveTowerDefenseFanEntry(int campaignLevelId) =>
+            campaignLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId ||
+            campaignLevelId == TowerDefenseLevelConfig.PeregrinacionLujanCampaignLevelId;
 
         private static int TowerDefenseVisiblePendingLineCount(TowerDefenseFanState fan)
         {
