@@ -8,7 +8,7 @@ namespace HayChoriYPaty
     /// Pooled SpriteRenderer presentation for the TD route, fences, supporters, stations and staff.
     /// A transparent camera target is composited by the existing IMGUI view so the campaign renderer stays untouched.
     /// </summary>
-    public sealed class TowerDefenseWorldPresentation : MonoBehaviour
+    public sealed partial class TowerDefenseWorldPresentation : MonoBehaviour
     {
         private const float HandoffPickupEnd = .28f;
         private const float HandoffThrowStart = .44f;
@@ -169,6 +169,7 @@ namespace HayChoriYPaty
         {
             if (!configured || gameMode == null) return;
             mode = gameMode;
+            if (gameMode.FreeConstruction) SyncPilgrimStations();
             SyncFans(gameMode);
             SyncWorkers(gameMode);
             SyncDeliveryCues(gameMode.Elapsed);
@@ -200,6 +201,7 @@ namespace HayChoriYPaty
 
         public void DisposePresentation()
         {
+            ClearPilgrimStations();
             configured = false;
             if (mode != null) mode.DeliveryCompleted -= OnDeliveryCompleted;
             ClearDeliveryCues();
@@ -257,6 +259,7 @@ namespace HayChoriYPaty
 
         private void CreateStations(TowerDefenseLevelConfig runtimeConfig)
         {
+            if (runtimeConfig.FreeConstruction) { ClearPilgrimStations(); SyncPilgrimStations(); return; }
             choriDisplaysByZone.Clear();
             cocaDisplaysByZone.Clear();
             string[] resources = StartingStationResources(runtimeConfig.AvailableProducts);
@@ -290,7 +293,8 @@ namespace HayChoriYPaty
                 GameObject station = Instantiate(prefab, presentationRoot.transform, false);
                 station.name = "TD zone " + zone + " " + resource;
                 Vector2 anchor = mode.StationPosition(role, zone);
-                station.transform.position = new Vector3(anchor.x, anchor.y - 18f * pixel, 0f);
+                station.transform.position = new Vector3(anchor.x,
+                    anchor.y - TowerDefenseGameMode.StationRenderYOffsetLogical * pixel, 0f);
                 int depth = 32 + Mathf.RoundToInt(-(anchor.y - 54f * pixel) * 12f);
                 if (table)
                 {
@@ -415,7 +419,7 @@ namespace HayChoriYPaty
 
         private void OnDeliveryCompleted(TowerDefenseDelivery receipt)
         {
-            if (!configured || (receipt.Product != 0 && receipt.Product != 4)) return;
+            if (!configured || receipt.Product < 0 || receipt.Product > 6 || (!mode.FreeConstruction && receipt.Product != 0 && receipt.Product != 4)) return;
             DeliveryCue cue = pooledDeliveryCues.Count > 0 ? pooledDeliveryCues.Pop() : new DeliveryCue();
             if (cue.GameObject == null)
             {
@@ -426,7 +430,7 @@ namespace HayChoriYPaty
                 cue.Renderer.sortingOrder = 1000;
             }
             GameObject prefab = Resources.Load<GameObject>("ModularKitchen/Prefabs/" +
-                (receipt.Product == 0 ? "Sandwich_Chori" : "Drink_Coca"));
+                ProductPrefabs[receipt.Product]);
             cue.Renderer.sprite = prefab != null ? prefab.GetComponent<SpriteRenderer>().sprite : null;
             cue.Receipt = receipt;
             RestoreSourceDisplay(cue);
@@ -635,6 +639,12 @@ namespace HayChoriYPaty
                 float actionProgress = Mathf.Clamp01(1f - worker.ServeAnimationSeconds /
                     TowerDefenseGameMode.DeliveryCueDurationSeconds);
                 workerView.Renderer.sprite = workerView.Frames[frame];
+                if (gameMode.FreeConstruction && worker.IsCooking)
+                {
+                    Sprite[] cooking = workerView.HandoffFrames != null && workerView.HandoffFrames.Length > 0
+                        ? workerView.HandoffFrames : workerView.Frames;
+                    workerView.Renderer.sprite = cooking[Mathf.FloorToInt(worker.AnimationTime * 4f) % cooking.Length];
+                }
                 if (worker.ServeAnimationSeconds > 0f && workerView.HandoffFrames != null && workerView.HandoffFrames.Length > 0)
                 {
                     if (worker.Role == StreetWorkerRole.Cocacolero)
@@ -671,6 +681,8 @@ namespace HayChoriYPaty
                 workerView.GameObject.transform.position = new Vector3(worker.Position.x, worker.Position.y + bob + serve * gameMode.WorldUnitsPerLogicalPixel * 2f, 0f);
                 workerView.Renderer.flipX = worker.IsMoving ? worker.TargetZone < worker.ServiceZone
                     : worker.ServeAnimationSeconds > 0f && worker.LastServiceTarget.x < worker.Position.x;
+                if (gameMode.FreeConstruction && worker.IsMoving && worker.TransferRoute != null && worker.TransferIndex < worker.TransferRoute.Length)
+                    workerView.Renderer.flipX = worker.TransferRoute[worker.TransferIndex].x < worker.Position.x;
                 workerView.Renderer.sortingOrder = 28 + Mathf.RoundToInt(-worker.Position.y * 12f);
             }
             for (int i = 0; i < staleIds.Count; i++)
@@ -742,6 +754,9 @@ namespace HayChoriYPaty
             ClubFanDefinition fans = ClubVisualTheme.ForLevel(visualLevelId).Fans;
             if (fans == null) return null;
             Texture2D texture = receiving ? fans.LoadFrontFans() : fans.LoadWalkingFans();
+            bool directionalPairedWalk = !receiving && fans.WalkingPoseCount > 1 &&
+                !string.IsNullOrEmpty(fans.DownwardWalkingFans);
+            if (directionalPairedWalk && walkingDownwards) texture = fans.LoadDownwardWalkingFans();
             if (!receiving && visualLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId)
             {
                 int pose = walkingPose % CamionerosWalkingPoseCount;
@@ -776,13 +791,15 @@ namespace HayChoriYPaty
             if (texture == null) texture = fans.LoadFrontFans();
             if (texture == null) return null;
             Rect source = receiving ? fans.FrontSourceRect(texture.width, texture.height, customerId)
+                : directionalPairedWalk ? fans.WalkingAnimationSourceRect(texture.width, texture.height, customerId,
+                    walkingPose % fans.WalkingPoseCount)
                 : fans.WalkingSourceRect(texture.width, texture.height, customerId);
             string key = texture.name + ":" + source.x + ":" + source.y + ":" + source.width + ":" + source.height;
             Sprite sprite;
             if (fanSpriteCache.TryGetValue(key, out sprite)) return sprite;
             Rect bottomRect = new Rect(source.x, texture.height - source.yMax, source.width, source.height);
             sprite = Sprite.Create(texture, bottomRect, new Vector2(.5f, .02f), 100f, 0, SpriteMeshType.Tight);
-            sprite.name = "TD Ferro-configured supporter " + fans.GetVariant(customerId) +
+            sprite.name = "TD supporter " + visualLevelId + ":" + fans.GetVariant(customerId) +
                 (receiving ? " front" : " walk " + (walkingDownwards ? "down " : string.Empty) + (walkingPose % CamionerosWalkingPoseCount));
             sprite.hideFlags = HideFlags.DontSave;
             fanSpriteCache[key] = sprite;
@@ -796,7 +813,9 @@ namespace HayChoriYPaty
 
         private static int FanWalkingFrameIndex(int levelId, int fanId, float routeProgress, float worldUnitsPerLogicalPixel)
         {
-            if (levelId != TowerDefenseLevelConfig.CamionerosCampaignLevelId ||
+            int poseCount = levelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId
+                ? CamionerosWalkingPoseCount : ClubVisualTheme.ForLevel(levelId).Fans?.WalkingPoseCount ?? 1;
+            if (poseCount <= 1 ||
                 float.IsNaN(routeProgress) || float.IsInfinity(routeProgress) || routeProgress < 0f ||
                 float.IsNaN(worldUnitsPerLogicalPixel) || float.IsInfinity(worldUnitsPerLogicalPixel) ||
                 worldUnitsPerLogicalPixel <= 0f)
@@ -804,7 +823,16 @@ namespace HayChoriYPaty
 
             float halfStride = FanWalkHalfStrideLogicalPixels * worldUnitsPerLogicalPixel;
             int stridePhase = Mathf.FloorToInt(routeProgress / halfStride);
-            return (stridePhase + (fanId % CamionerosWalkingPoseCount)) % CamionerosWalkingPoseCount;
+            return (stridePhase + (fanId % poseCount)) % poseCount;
+        }
+
+        public bool TryGetFanVisualBounds(int fanId, out Bounds bounds)
+        {
+            FanView view;
+            if (activeFans.TryGetValue(fanId, out view) && view.Renderer != null && view.GameObject.activeSelf)
+            { bounds = view.Renderer.bounds; return true; }
+            bounds = default(Bounds);
+            return false;
         }
 
         private Sprite CreatePlaceholderSprite()

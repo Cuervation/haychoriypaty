@@ -27,7 +27,8 @@ namespace HayChoriYPaty.Tests
             Type type = config.GetType();
             CollectionAssert.AreEqual(new[] {0, 4}, (int[])type.GetProperty("AvailableProducts").GetValue(config));
             CollectionAssert.AreEqual(new int[5], (int[])type.GetProperty("StartingWorkersByRole").GetValue(config));
-            Assert.AreEqual(60, type.GetProperty("TotalFanCount").GetValue(config));
+            Assert.AreEqual(120, type.GetProperty("TotalFanCount").GetValue(config));
+            Assert.That((float)type.GetProperty("FanSpeed").GetValue(config), Is.EqualTo(.20475f).Within(.00001f));
         }
 
         [Test]
@@ -47,10 +48,10 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual("street-background-losredondos-v1", Read(redondos, "BackgroundResource"));
             Assert.AreEqual(9, Read(redondos, "EconomicBalanceCampaignLevelId"));
 
-            Assert.AreEqual(Read(camioneros, "TotalFanCount"), Read(redondos, "TotalFanCount"));
+            Assert.AreEqual(120, Read(camioneros, "TotalFanCount"));
             Assert.AreEqual(60, Read(redondos, "TotalFanCount"));
-            Assert.AreEqual(Read(camioneros, "FanSpeed"), Read(redondos, "FanSpeed"));
-            Assert.That((float)Read(camioneros, "FanSpeed"), Is.EqualTo(0.1575f).Within(0.0001f));
+            Assert.That((float)Read(camioneros, "FanSpeed"), Is.EqualTo(.20475f).Within(0.00001f));
+            Assert.That((float)Read(redondos, "FanSpeed"), Is.EqualTo(.1575f).Within(0.00001f));
             CollectionAssert.AreEqual((int[])Read(camioneros, "AvailableProducts"), (int[])Read(redondos, "AvailableProducts"));
             CollectionAssert.AreEqual((int[])Read(camioneros, "StartingWorkersByRole"), (int[])Read(redondos, "StartingWorkersByRole"));
             object camionerosRoute = Read(camioneros, "Route");
@@ -90,9 +91,45 @@ namespace HayChoriYPaty.Tests
             MethodInfo caption = RuntimeType("StreetView").GetMethod("MarketObjectiveCaption", BindingFlags.NonPublic | BindingFlags.Static);
             StringAssert.DoesNotContain("×", (string)caption.Invoke(null, new[] {defense, (object)0, (object)false}));
             StringAssert.Contains("×", (string)caption.Invoke(null, new[] {traditional, (object)0, (object)false}));
-            Assert.AreEqual("60 HINCHAS ATENDIDOS", summary.Invoke(null, new[] {defense, (object)false}));
+            Assert.AreEqual("120 HINCHAS ATENDIDOS", summary.Invoke(null, new[] {defense, (object)false}));
             Assert.AreEqual("UN HINCHA LLEGÓ A LA SALIDA", summary.Invoke(null, new[] {defense, (object)true}));
             StringAssert.Contains("/", (string)summary.Invoke(null, new[] {traditional, (object)false}));
+        }
+
+        [Test]
+        public void CamionerosOrderBubbleStaysAnchoredToTheEnteringFanInsteadOfSnappingOnscreen()
+        {
+            Type streetView = RuntimeType("StreetView");
+            MethodInfo boundsMethod = streetView.GetMethod("TowerDefenseOrderBubbleBounds", BindingFlags.NonPublic | BindingFlags.Static);
+            MethodInfo visibilityMethod = streetView.GetMethod("ShouldDrawTowerDefenseBubbleForFanEntry", BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.IsNotNull(boundsMethod, "Tower Defense keeps the bubble anchored to the fan's screen position.");
+            Assert.IsNotNull(visibilityMethod, "Camioneros waits for the supporter to become visible before showing the bubble.");
+
+            Assert.IsFalse((bool)visibilityMethod.Invoke(null, new object[] {9, 18f}),
+                "The order balloon must not lead the first partial foot/body reveal.");
+            Assert.IsTrue((bool)visibilityMethod.Invoke(null, new object[] {9, 39f}),
+                "Once half the supporter frame has entered, its clipped balloon appears above it.");
+            Assert.IsTrue((bool)visibilityMethod.Invoke(null, new object[] {10, 0f}),
+                "Los Redondos keeps its existing full-frame entrance and order bubble behavior.");
+
+            Rect beforeViewport = (Rect)boundsMethod.Invoke(null, new object[] {new Vector2(-39f, 480f), 1, 9});
+            Assert.LessOrEqual(beforeViewport.xMax, 0f,
+                "At the start the speech bubble remains outside along with its fully hidden fan.");
+
+            Rect partlyEntering = (Rect)boundsMethod.Invoke(null, new object[] {new Vector2(-21f, 480f), 1, 9});
+            Assert.Less(partlyEntering.xMin, 0f);
+            Assert.Greater(partlyEntering.xMax, 0f,
+                "The same viewport edge progressively reveals the bubble above the partially entering fan.");
+            Assert.That(partlyEntering.center.x, Is.EqualTo(-21f).Within(.01f),
+                "The bubble center follows the fan; it must not be clamped to the screen margin.");
+            float fanHeight = (float)RuntimeType("StreetSceneLayout").GetField("CustomerHeight").GetRawConstantValue();
+            float fanHeadTop = 480f - fanHeight;
+            Assert.That(fanHeadTop - partlyEntering.yMax, Is.EqualTo(6f).Within(.01f),
+                "The full speech bubble, including its tail, must sit a few logical pixels above the fan's head.");
+
+            Rect redondosBubble = (Rect)boundsMethod.Invoke(null, new object[] {new Vector2(-21f, 480f), 1, 10});
+            Assert.That(redondosBubble.yMax, Is.EqualTo(480f - 68f).Within(.01f),
+                "Los Redondos keeps its existing vertical bubble anchor.");
         }
 
         [TestCase(100f, 100f, 76f)]

@@ -27,7 +27,7 @@ namespace HayChoriYPaty
         private static StreetBalance BuildBalanceSnapshot()
         {
             var balance = new StreetBalance();
-            var balances = balance.levelBalances == null ? new StreetLevelBalance[13] : (StreetLevelBalance[])balance.levelBalances.Clone();
+            var balances = balance.levelBalances == null ? new StreetLevelBalance[15] : (StreetLevelBalance[])balance.levelBalances.Clone();
             if (balances.Length <= BalanceLevelId)
             {
                 var expanded = new StreetLevelBalance[BalanceLevelId + 1];

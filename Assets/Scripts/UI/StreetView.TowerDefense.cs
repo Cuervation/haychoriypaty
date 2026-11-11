@@ -15,6 +15,9 @@ namespace HayChoriYPaty
         private const int TowerDefenseHireFirstAction = 7820;
         private const int TowerDefenseHireLastAction = TowerDefenseHireFirstAction + 1;
         private const int TowerDefensePlaceFirstAction = 7830;
+        private const float CamionerosMinimumFanRevealBeforeOrderBubbleLogical =
+            TowerDefenseResponsiveLayout.FanFrameWidthLogical * .5f;
+        private const float TowerDefenseOrderBubbleHeadClearanceLogical = 6f;
         private const string CamionerosTutorialCompletedKey = "HayChoriYPaty.TowerDefense.Camioneros.Tutorial.Completed.v1";
         private static readonly string[] CamionerosTutorialHeadlines =
         {
@@ -65,6 +68,7 @@ namespace HayChoriYPaty
             towerDefenseTutorialActive = false;
             towerDefenseTutorialStep = 0;
             towerDefenseSelectedRole = -1;
+            ResetPilgrimPlacement();
             towerDefenseError = null;
             towerDefenseBackdrop = null;
             towerDefenseCrest = null;
@@ -87,6 +91,7 @@ namespace HayChoriYPaty
             if (!towerDefenseActive) return false;
 
             if (towerDefenseMode == null) return true;
+            if (IsPilgrimConstruction && HandlePilgrimAction(action)) return true;
             if (game != null && game.Sim != null && game.Sim.IsExternalCampaignRuntime && !game.IsPlayerActive) return true;
             if (towerDefenseTutorialActive)
             {
@@ -182,6 +187,7 @@ namespace HayChoriYPaty
         private int HitTowerDefenseAction(Vector2 point)
         {
             point.y *= layoutVerticalScale;
+            if (IsPilgrimConstruction) return HitPilgrimAction(point);
             if (towerDefenseTutorialActive)
             {
                 if (CamionerosTutorialSkipBounds().Contains(point)) return LevelOneTutorialSkipAction;
@@ -276,6 +282,7 @@ namespace HayChoriYPaty
                 if (!game.AttachTowerDefenseRuntime(towerDefenseMode))
                     throw new InvalidOperationException("No se pudo guardar el comienzo de la partida de campaña.");
                 towerDefenseSelectedRole = -1;
+                ResetPilgrimPlacement();
                 towerDefenseActive = true;
                 hubActive = false;
                 levelSelectActive = false;
@@ -377,9 +384,15 @@ namespace HayChoriYPaty
                 return;
             }
 
+            towerDefenseMode.Reflow(route, worldPerLogicalPixel, firstZone, secondZone);
+            if (!towerDefenseMode.LastReflowSucceeded)
+            {
+                Destroy(nextConfig);
+                towerDefenseError = "El área quedó demasiado pequeña para esta distribución. Restaurá el formato anterior.";
+                return;
+            }
             TowerDefenseLevelConfig previous = towerDefenseRuntimeConfig;
             towerDefenseRuntimeConfig = nextConfig;
-            towerDefenseMode.Reflow(route, worldPerLogicalPixel, firstZone, secondZone);
             if (towerDefensePresentation != null)
             {
                 towerDefensePresentation.ResizeTarget(screenSize);
@@ -444,13 +457,15 @@ namespace HayChoriYPaty
         private void DrawTowerDefenseHud(float height)
         {
             if (towerDefenseMode == null) return;
+            if (IsPilgrimConstruction) { DrawPilgrimHud(height); return; }
             DrawTowerDefenseCampaignHud();
 
             float footerTop = height - TowerDefenseResponsiveLayout.FooterReserve;
             DrawFooterBluePanel(LayoutRect(new Rect(0f, footerTop, W, height - footerTop)), layoutVerticalScale);
             if (towerDefenseCrest != null)
                 DrawLevelCrest(LayoutRect(new Rect(18f, footerTop + 9f, 34f, 42f)), towerDefenseCrest);
-            string[] identity = (towerDefenseSourceConfig != null ? towerDefenseSourceConfig.DisplayName : "Tower Defense").Split('/');
+            string[] identity = (towerDefenseSourceConfig != null ? towerDefenseSourceConfig.DisplayName : "Tower Defense")
+                .Split(new[] {'/', '–', '—'});
             string title = identity.Length > 0 ? identity[0].Trim().ToUpperInvariant() : "TOWER DEFENSE";
             string location = identity.Length > 1 ? identity[1].Trim().ToUpperInvariant() : string.Empty;
             DrawTowerDefenseLabel(new Rect(58f, footerTop + 2f, W - 76f, 29f), title, towerDefenseTitle);
@@ -526,6 +541,7 @@ namespace HayChoriYPaty
 
         private void DrawTowerDefensePlacementOverlay(Rect viewport)
         {
+            if (IsPilgrimConstruction) { DrawPilgrimPlacementOverlay(); return; }
             if (towerDefenseSelectedRole < 0 || !TowerDefensePlacementInputAllowed) return;
             StreetWorkerRole role = TowerDefenseHireRoles[towerDefenseSelectedRole];
             Rect[] areas = TowerDefensePlacementAreaBounds(viewport);
@@ -611,44 +627,87 @@ namespace HayChoriYPaty
             float canvasScale = viewport.width / W;
             float feetOffset = towerDefenseMode.WorldUnitsPerLogicalPixel * 38f;
             IReadOnlyList<TowerDefenseFanState> fans = towerDefenseMode.Fans;
-            for (int fanIndex = 0; fanIndex < fans.Count; fanIndex++)
+            // Camioneros bubbles share the viewport edge with the world-space fan during
+            // its progressive entry. Clamping that level's bubble into view makes it pop
+            // at the margin before the supporter has walked onto the screen.
+            GUI.BeginGroup(new Rect(0f, 0f, W, logicalCanvasHeight));
+            try
             {
-                TowerDefenseFanState fan = fans[fanIndex];
-                int visibleLines = TowerDefenseVisiblePendingLineCount(fan);
-                if (visibleLines <= 0) continue;
-
-                Vector2 routePosition = fan.RouteFollower.Position;
-                Vector3 projectedFeet = camera.WorldToScreenPoint(new Vector3(
-                    routePosition.x, routePosition.y - feetOffset, 0f));
-                if (projectedFeet.z <= 0f) continue;
-                Vector2 fanFeet = new Vector2(
-                    (projectedFeet.x - viewport.x) / canvasScale,
-                    (Screen.height - projectedFeet.y - viewport.y) / canvasScale
-                        - TowerDefenseResponsiveLayout.VisualStageLift);
-                // TD lanes have far more vertical separation than the campaign queue;
-                // keep the existing full-size product icons instead of shrinking each
-                // two-item order bubble to fit a regular queue row.
-                Rect bubble = OrderBubbleBounds(fanFeet, visibleLines, 20f);
-                bubble.x = Mathf.Clamp(bubble.x, 6f, W - bubble.width - 6f);
-                if (bubble.yMax <= 0f || bubble.yMin >= logicalCanvasHeight) continue;
-
-                DrawOrderBubble(bubble, 1f);
-                int shown = 0;
-                for (int lineIndex = 0; lineIndex < fan.Order.Count; lineIndex++)
+                for (int fanIndex = 0; fanIndex < fans.Count; fanIndex++)
                 {
-                    TowerDefenseOrderLine line = (TowerDefenseOrderLine)fan.Order[lineIndex];
-                    if (line.Remaining <= 0) continue;
-                    Rect row = OrderLineBounds(bubble, shown, visibleLines, 1f);
-                    DrawProductIcon(OrderIconBounds(row, 1f), line.Product, false);
-                    int originalFontSize = text.fontSize;
-                    Rect quantity = OrderQuantityBounds(row, 1f);
-                    text.fontSize = FitOrderQuantityFontSize(text, line.Remaining.ToString(), quantity.width);
-                    GUI.Label(quantity, line.Remaining.ToString(), text);
-                    text.fontSize = originalFontSize;
-                    shown++;
+                    TowerDefenseFanState fan = fans[fanIndex];
+                    int visibleLines = TowerDefenseVisiblePendingLineCount(fan);
+                    if (visibleLines <= 0) continue;
+
+                    Vector2 routePosition = fan.RouteFollower.Position;
+                    Vector3 projectedFeet = camera.WorldToScreenPoint(new Vector3(
+                        routePosition.x, routePosition.y - feetOffset, 0f));
+                    if (projectedFeet.z <= 0f) continue;
+                    Vector2 fanFeet = new Vector2(
+                        (projectedFeet.x - viewport.x) / canvasScale,
+                        (Screen.height - projectedFeet.y - viewport.y) / canvasScale
+                            - TowerDefenseResponsiveLayout.VisualStageLift);
+                    float visibleFanFrameLogical = Mathf.Clamp(fanFeet.x +
+                        TowerDefenseResponsiveLayout.FanFrameWidthLogical * .5f, 0f,
+                        TowerDefenseResponsiveLayout.FanFrameWidthLogical);
+                    int levelId = towerDefenseSourceConfig != null
+                        ? towerDefenseSourceConfig.SourceCampaignLevelId : -1;
+                    if (!ShouldDrawTowerDefenseBubbleForFanEntry(levelId, visibleFanFrameLogical)) continue;
+                    // TD lanes have far more vertical separation than the campaign queue;
+                    // keep the existing full-size product icons instead of shrinking each
+                    // two-item order bubble to fit a regular queue row.
+                    Rect bubble = TowerDefenseOrderBubbleBounds(fanFeet, visibleLines, levelId);
+                    // The new directional atlas uses a foot pivot, not a centered frame.
+                    // Anchor ID13 to the actual rendered head, including its gait bob.
+                    Bounds visualBounds;
+                    if ((levelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId || IsPilgrimConstruction) && towerDefensePresentation != null &&
+                        towerDefensePresentation.TryGetFanVisualBounds(fan.Id, out visualBounds))
+                    {
+                        Vector3 head = camera.WorldToScreenPoint(new Vector3(visualBounds.center.x, visualBounds.max.y, 0f));
+                        float headY = (Screen.height - head.y - viewport.y) / canvasScale
+                            - TowerDefenseResponsiveLayout.VisualStageLift;
+                        bubble.y += headY - TowerDefenseOrderBubbleHeadClearanceLogical - bubble.yMax;
+                    }
+                    if (levelId != TowerDefenseLevelConfig.CamionerosCampaignLevelId)
+                        bubble.x = Mathf.Clamp(bubble.x, 6f, W - bubble.width - 6f);
+                    if (bubble.yMax <= 0f || bubble.yMin >= logicalCanvasHeight) continue;
+
+                    DrawOrderBubble(bubble, 1f);
+                    int shown = 0;
+                    for (int lineIndex = 0; lineIndex < fan.Order.Count; lineIndex++)
+                    {
+                        TowerDefenseOrderLine line = (TowerDefenseOrderLine)fan.Order[lineIndex];
+                        if (line.Remaining <= 0) continue;
+                        Rect row = OrderLineBounds(bubble, shown, visibleLines, 1f);
+                        DrawProductIcon(OrderIconBounds(row, 1f), line.Product, false);
+                        int originalFontSize = text.fontSize;
+                        Rect quantity = OrderQuantityBounds(row, 1f);
+                        text.fontSize = FitOrderQuantityFontSize(text, line.Remaining.ToString(), quantity.width);
+                        GUI.Label(quantity, line.Remaining.ToString(), text);
+                        text.fontSize = originalFontSize;
+                        shown++;
+                    }
                 }
             }
+            finally { GUI.EndGroup(); }
         }
+
+        private static Rect TowerDefenseOrderBubbleBounds(Vector2 fanFeet, int visibleLines, int campaignLevelId)
+        {
+            Rect bubble = OrderBubbleBounds(fanFeet, visibleLines, 20f);
+            if (campaignLevelId != TowerDefenseLevelConfig.CamionerosCampaignLevelId) return bubble;
+
+            // The shared campaign anchor lets the speech tail overlap the top of the
+            // 76px fan frame. Keep the full TD bubble, including its tail, clear of the head.
+            float desiredBottom = fanFeet.y - StreetSceneLayout.CustomerHeight
+                - TowerDefenseOrderBubbleHeadClearanceLogical;
+            bubble.y += desiredBottom - bubble.yMax;
+            return bubble;
+        }
+
+        private static bool ShouldDrawTowerDefenseBubbleForFanEntry(int campaignLevelId, float visibleFrameWidthLogical) =>
+            campaignLevelId != TowerDefenseLevelConfig.CamionerosCampaignLevelId ||
+            visibleFrameWidthLogical >= CamionerosMinimumFanRevealBeforeOrderBubbleLogical;
 
         private static int TowerDefenseVisiblePendingLineCount(TowerDefenseFanState fan)
         {
@@ -826,7 +885,7 @@ namespace HayChoriYPaty
                 UpgradeOutline(UpgradeTitleBounds(card), RoleCaption(role), upgradeTitle, new Color(.98f, .99f, 1f));
                 upgradeTitle.fontSize = titleSize;
                 int statusSize = upgradePercent.fontSize;
-                string status = selected ? "ELEGÍ ÁREA" : "EQUIPO " + count;
+                string status = selected ? (IsPilgrimConstruction ? "COLOCAR" : "ELEGÍ ÁREA") : "EQUIPO " + count;
                 upgradePercent.fontSize = FitUpgradeStatusFontSize(upgradePercent, status, UpgradeStatusBounds(card).width);
                 UpgradeOutline(UpgradeStatusBounds(card), status, upgradePercent, new Color(.55f, .90f, 1f));
                 upgradePercent.fontSize = statusSize;
@@ -834,6 +893,12 @@ namespace HayChoriYPaty
                     DrawUpgradeOvalContent(card, parrilleroIcon, new Rect(22, 6, 1269, 1188));
                 else if (role == StreetWorkerRole.Cocacolero && CocacoleroArtForLevel(TowerDefenseLevelConfig.CommonEconomicBalanceLevelId) != null)
                     DrawUpgradeOvalContent(card, CocacoleroArtForLevel(TowerDefenseLevelConfig.CommonEconomicBalanceLevelId), CocacoleroPoseForLevel(TowerDefenseLevelConfig.CommonEconomicBalanceLevelId, 0));
+                if (role == StreetWorkerRole.ParrilleroPremium && premiumWorker != null)
+                    DrawUpgradeOvalContent(card, premiumWorker, ParrilleroPoses[0]);
+                else if (role == StreetWorkerRole.Mozo && mozoWorker != null)
+                    DrawUpgradeOvalContent(card, mozoWorker, ParrilleroPoses[0]);
+                else if (role == StreetWorkerRole.Fernetero && fernetWorker != null)
+                    DrawUpgradeOvalContent(card, fernetWorker, MatchedCocacoleroPose(0, new Vector2(fernetWorker.width, fernetWorker.height)));
                 string price = cost > 0 ? cost.ToString() : "MAX";
                 if (cost > 0) Item(UpgradeCoinBounds(card), 10);
                 int priceSize = upgradePrice.fontSize;

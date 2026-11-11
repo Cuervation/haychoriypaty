@@ -45,7 +45,7 @@ service cloud.firestore {
     function matchShape(d) {
       return d.keys().hasOnly(['id','attemptId','uid','operationId','revision','schemaVersion','committedAt',
         'utc','level','club','result','won','abandoned','elapsedSeconds','salesByProduct',
-        'grossSalesCents','hireSpendCents','speedSpendCents','initialCoinsCents','leftoverCents',
+        'grossSalesCents','hireSpendCents','speedSpendCents','equipmentSpendCents','initialCoinsCents','leftoverCents',
         'halfSalesRewardCents','leftoverBonusCents','progressionBonusCents','rewardCents',
         'stockConsumed','stockRemaining','hiresByRole','customersAttended','customersLost','ordersCompleted','recordsReached',
         'bonusScore','bonusStars','bonusDeliveries','bonusCompletedOrders','bonusTickets','bonusUpgrades'])
@@ -56,6 +56,7 @@ service cloud.firestore {
           || (d.result == 'lost' && !d.won && !d.abandoned)
           || (d.result == 'abandoned' && d.abandoned && !d.won && d.rewardCents == 0))
         && d.hireSpendCents is int && d.hireSpendCents >= 0 && d.speedSpendCents is int && d.speedSpendCents >= 0
+        && (!('equipmentSpendCents' in d) || (d.equipmentSpendCents is int && d.equipmentSpendCents >= 0))
         && d.initialCoinsCents is int && d.initialCoinsCents >= 0 && d.leftoverCents is int && d.leftoverCents >= 0
         && d.halfSalesRewardCents is int && d.halfSalesRewardCents >= 0
         && d.leftoverBonusCents is int && d.leftoverBonusCents >= 0
@@ -108,7 +109,7 @@ service cloud.firestore {
         && matchId.matches('[a-f0-9]{32}') && d.attemptId == matchId
         && d.operationId is string && d.operationId.matches('[a-f0-9]{32}')
         && d.revision is int && d.revision > 0
-        && d.level is int && d.level >= 0 && d.level <= 12
+        && d.level is int && d.level >= 0 && d.level <= 14
         && d.grossSalesCents is int && d.grossSalesCents >= 0
         && d.rewardCents is int && d.rewardCents >= 0
         && d.committedAt == request.time

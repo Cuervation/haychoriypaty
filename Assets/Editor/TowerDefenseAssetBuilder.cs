@@ -14,6 +14,7 @@ namespace HayChoriYPaty.Editor
         private const string ResourcesFolder = "Assets/Resources/TowerDefense";
         private const string ConfigPath = ResourcesFolder + "/Camioneros-PlazaDeMayo.asset";
         private const string LosRedondosConfigPath = ResourcesFolder + "/LosRedondos-Tandil.asset";
+        private const string LaRengaConfigPath = ResourcesFolder + "/LaRenga-AutodromoBuenosAires.asset";
 
         [MenuItem("Hay Chori y Paty/Tower Defense/Build modular fence assets")]
         public static void Build()
@@ -72,8 +73,48 @@ namespace HayChoriYPaty.Editor
                 EditorUtility.SetDirty(redondos);
             }
 
+            TowerDefenseLevelConfig laRenga = EnsureLaRengaConfig(redondos);
+            if (laRenga != null)
+            {
+                SerializedObject serialized = new SerializedObject(laRenga);
+                serialized.FindProperty("straightFencePrefab").objectReferenceValue = straight;
+                serialized.FindProperty("turnFencePrefab").objectReferenceValue = turn;
+                serialized.FindProperty("terminalFencePrefab").objectReferenceValue = terminal;
+                serialized.FindProperty("directionSignPrefab").objectReferenceValue = direction;
+                serialized.FindProperty("directionArrowSprite").objectReferenceValue = arrow;
+                serialized.FindProperty("totalFanCount").intValue = TowerDefenseLevelConfig.FansToServe;
+                serialized.FindProperty("fanSpeed").floatValue = TowerDefenseLevelConfig.DefaultFanSpeed;
+                serialized.FindProperty("minimumEntrySpacingLogical").floatValue = TowerDefenseLevelConfig.CamionerosMinimumEntrySpacingLogical;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+                EditorUtility.SetDirty(laRenga);
+            }
+
             AssetDatabase.SaveAssets();
-            Debug.Log("Tower Defense modular assets ready: shared fence pieces and Camioneros / Plaza de Mayo + Los Redondos / Tandil configs.");
+            Debug.Log("Tower Defense modular assets ready: shared fence pieces and Camioneros, Los Redondos, and La Renga configs.");
+        }
+
+        private static TowerDefenseLevelConfig EnsureLaRengaConfig(TowerDefenseLevelConfig source)
+        {
+            if (source == null) return null;
+            TowerDefenseLevelConfig config = AssetDatabase.LoadAssetAtPath<TowerDefenseLevelConfig>(LaRengaConfigPath);
+            if (config == null)
+            {
+                config = ScriptableObject.CreateInstance<TowerDefenseLevelConfig>();
+                AssetDatabase.CreateAsset(config, LaRengaConfigPath);
+            }
+            EditorUtility.CopySerialized(source, config);
+            config.name = "LaRenga-AutodromoBuenosAires";
+            SerializedObject serialized = new SerializedObject(config);
+            serialized.FindProperty("modeId").stringValue = "tower-defense";
+            serialized.FindProperty("levelId").stringValue = TowerDefenseLevelConfig.LaRengaLevelId;
+            serialized.FindProperty("displayName").stringValue = "La Renga – Autódromo Bs. As.";
+            serialized.FindProperty("sourceCampaignLevelId").intValue = TowerDefenseLevelConfig.LaRengaCampaignLevelId;
+            serialized.FindProperty("backgroundResource").stringValue = "street-background-larenga-autodromo-v1";
+            serialized.FindProperty("totalFanCount").intValue = TowerDefenseLevelConfig.FansToServe;
+            serialized.FindProperty("fanSpeed").floatValue = TowerDefenseLevelConfig.DefaultFanSpeed;
+            serialized.FindProperty("minimumEntrySpacingLogical").floatValue = TowerDefenseLevelConfig.CamionerosMinimumEntrySpacingLogical;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            return config;
         }
 
         private static TowerDefenseLevelConfig EnsureLosRedondosConfig(TowerDefenseLevelConfig source)
@@ -97,6 +138,8 @@ namespace HayChoriYPaty.Editor
             serialized.FindProperty("displayName").stringValue = "Los Redondos / Tandil";
             serialized.FindProperty("sourceCampaignLevelId").intValue = TowerDefenseLevelConfig.LosRedondosCampaignLevelId;
             serialized.FindProperty("backgroundResource").stringValue = "street-background-losredondos-v1";
+            serialized.FindProperty("totalFanCount").intValue = TowerDefenseLevelConfig.FansToServe;
+            serialized.FindProperty("fanSpeed").floatValue = TowerDefenseLevelConfig.DefaultFanSpeed;
             serialized.ApplyModifiedPropertiesWithoutUndo();
             return config;
         }

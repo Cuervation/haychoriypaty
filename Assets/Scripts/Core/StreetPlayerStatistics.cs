@@ -20,12 +20,13 @@ namespace HayChoriYPaty
         public long[] paidHiresByRole = new long[5];
         public long[] hireSpendCentsByRole = new long[5];
         public long grossSalesCents, totalMarketRewardsCents, ingredientSpendTotalCents;
+        public long equipmentSpendTotalCents;
         public long hireSpendTotalCents, speedSpendTotalCents, initialFreeCoinsCents, initialFreeMarketBalanceCents;
         public long speedUpgrades, speedSpendCents, attemptsStarted, attemptsFinished, wins, losses, abandons;
         public long customersAttended, customersLost, ordersCompleted, completedProducts;
-        public long[] winsByLevel = new long[13], lossesByLevel = new long[13];
-        public float[] bestWinTimeByLevel = new float[13];
-        public long[] bestGrossCentsByLevel = new long[13], bestUnitsSoldByLevel = new long[13];
+        public long[] winsByLevel = new long[15], lossesByLevel = new long[15];
+        public float[] bestWinTimeByLevel = new float[15];
+        public long[] bestGrossCentsByLevel = new long[15], bestUnitsSoldByLevel = new long[15];
         // Stable ID10 used to be traditional Los Redondos. Keep its historic level-specific records
         // separate now that the same campaign ID is a Tower Defense mode.
         public long legacyTraditionalLosRedondosWins, legacyTraditionalLosRedondosLosses;
@@ -45,10 +46,10 @@ namespace HayChoriYPaty
             AwardProductSalesBadges();
             paidHiresByRole = Normalize(paidHiresByRole, 5);
             hireSpendCentsByRole = Normalize(hireSpendCentsByRole, 5);
-            winsByLevel = Normalize(winsByLevel, 13); lossesByLevel = Normalize(lossesByLevel, 13);
-            bestWinTimeByLevel = Normalize(bestWinTimeByLevel, 13);
-            bestGrossCentsByLevel = Normalize(bestGrossCentsByLevel, 13);
-            bestUnitsSoldByLevel = Normalize(bestUnitsSoldByLevel, 13);
+            winsByLevel = Normalize(winsByLevel, 15); lossesByLevel = Normalize(lossesByLevel, 15);
+            bestWinTimeByLevel = Normalize(bestWinTimeByLevel, 15);
+            bestGrossCentsByLevel = Normalize(bestGrossCentsByLevel, 15);
+            bestUnitsSoldByLevel = Normalize(bestUnitsSoldByLevel, 15);
             legacyTraditionalLosRedondosWins = Math.Max(0, legacyTraditionalLosRedondosWins);
             legacyTraditionalLosRedondosLosses = Math.Max(0, legacyTraditionalLosRedondosLosses);
             legacyTraditionalLosRedondosBestWinTime = Math.Max(0, legacyTraditionalLosRedondosBestWinTime);
@@ -57,6 +58,7 @@ namespace HayChoriYPaty
             speedUpgrades = Math.Max(0, speedUpgrades); speedSpendCents = Math.Max(0, speedSpendCents);
             grossSalesCents = Math.Max(0, grossSalesCents); totalMarketRewardsCents = Math.Max(0, totalMarketRewardsCents);
             ingredientSpendTotalCents = Math.Max(0, ingredientSpendTotalCents);
+            equipmentSpendTotalCents = Math.Max(0, equipmentSpendTotalCents);
             hireSpendTotalCents = Math.Max(0, hireSpendTotalCents); speedSpendTotalCents = Math.Max(0, speedSpendTotalCents);
             initialFreeCoinsCents = Math.Max(0, initialFreeCoinsCents); initialFreeMarketBalanceCents = Math.Max(0, initialFreeMarketBalanceCents);
             attemptsStarted = Math.Max(0, attemptsStarted); attemptsFinished = Math.Max(0, attemptsFinished);
@@ -102,7 +104,7 @@ namespace HayChoriYPaty
         {
             if (record == null || string.IsNullOrEmpty(record.attemptId) || HasApplied(record.attemptId)) return false;
             Normalize();
-            int level = Clamp(record.level, 0, 12);
+            int level = Clamp(record.level, 0, 14);
             long units = 0;
             for (int i = 0; i < 7; i++) { long n = At(record.salesByProduct, i); deliveredByProduct[i] = Add(deliveredByProduct[i], n); units = Add(units, n); }
             for (int i = 0; i < 10; i++) consumedUnitsByIngredient[i] = Add(consumedUnitsByIngredient[i], At(record.stockConsumed, i));
@@ -220,7 +222,7 @@ namespace HayChoriYPaty
         public bool won, abandoned;
         public float elapsedSeconds;
         public long[] salesByProduct = new long[7];
-        public long grossSalesCents, hireSpendCents, speedSpendCents, initialCoinsCents, leftoverCents;
+        public long grossSalesCents, hireSpendCents, speedSpendCents, equipmentSpendCents, initialCoinsCents, leftoverCents;
         public long halfSalesRewardCents, leftoverBonusCents, progressionBonusCents, rewardCents;
         public long[] stockConsumed = new long[10], stockRemaining = new long[10];
         public long[] hiresByRole = new long[5];

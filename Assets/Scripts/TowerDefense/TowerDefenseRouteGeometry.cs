@@ -17,6 +17,7 @@ namespace HayChoriYPaty
     [Serializable]
     public sealed class TowerDefenseRouteGeometryConfig
     {
+        public TowerDefenseRouteKind RouteKind = TowerDefenseRouteKind.Serpentine;
         [Min(3)] public int RowCount = 3;
         public float[] SegmentLengths = { 8f, 8f, 8f };
         [Min(0.01f)] public float CorridorWidth = 2f;
@@ -26,6 +27,8 @@ namespace HayChoriYPaty
         [Tooltip("Legacy serialized field; orthogonal straight connectors do not use a turn radius.")]
         [Min(0f)] public float TurnRadius = 1.1f;
         public Rect PlayableBounds = new Rect(-10f, -10f, 20f, 20f);
+        [Tooltip("Optional player work area below a horizontal single-fence route; world-space bounds.")]
+        public Rect WorkBounds;
         [Tooltip("Number of samples along each straight vertical connector; retained to preserve route-row indexing.")]
         [Range(4, 128)] public int TurnSegments = 12;
         [NonSerialized] public float FanEntryExtensionWorldUnits;
@@ -74,7 +77,7 @@ namespace HayChoriYPaty
     }
 
     /// <summary>
-    /// Builds a continuous orthogonal horizontal serpentine with straight vertical connectors.
+    /// Builds a continuous orthogonal serpentine or the opt-in horizontal single-fence route.
     /// The route is translated as a whole to center its fence envelope in the
     /// playable rectangle; segment lengths are never scaled or silently shortened.
     /// </summary>
@@ -105,6 +108,9 @@ namespace HayChoriYPaty
             List<string> errors = ValidateConfiguration(config);
             if (errors.Count > 0)
                 return EmptyResult(errors);
+
+            if (config.RouteKind == TowerDefenseRouteKind.HorizontalSingleFence)
+                return GenerateHorizontalSingleFence(config);
 
             var centerline = new List<Vector2>();
             float firstY = config.PlayableBounds.center.y + (config.RowCount - 1) * config.RowSpacing * 0.5f;
@@ -154,6 +160,36 @@ namespace HayChoriYPaty
                 new TowerDefenseRouteValidationResult(errors), centerlinePoints, left, right);
         }
 
+        private static TowerDefenseRouteGeometryResult GenerateHorizontalSingleFence(TowerDefenseRouteGeometryConfig config)
+        {
+            var errors = new List<string>();
+            if (config.SegmentLengths == null || config.SegmentLengths.Length != 1 ||
+                !IsFinite(config.SegmentLengths[0]) || config.SegmentLengths[0] <= 0f)
+                errors.Add("HorizontalSingleFence requires exactly one finite positive segment length.");
+            if (!IsFinite(config.CorridorWidth) || config.CorridorWidth <= 0f)
+                errors.Add("HorizontalSingleFence corridor width must be finite and positive.");
+            if (!IsFinite(config.HorizontalCorridorWidth) || config.HorizontalCorridorWidth < 0f)
+                errors.Add("HorizontalSingleFence horizontal corridor width must be finite and nonnegative.");
+            if (errors.Count > 0) return EmptyResult(errors);
+
+            float corridorWidth = config.HorizontalCorridorWidth > 0f ? config.HorizontalCorridorWidth : config.CorridorWidth;
+            float halfLength = config.SegmentLengths[0] * .5f;
+            float halfCorridor = corridorWidth * .5f;
+            Vector2[] centerline =
+            {
+                new Vector2(config.PlayableBounds.center.x - halfLength, config.PlayableBounds.center.y),
+                new Vector2(config.PlayableBounds.center.x + halfLength, config.PlayableBounds.center.y)
+            };
+            Vector2[] left = { centerline[0] + Vector2.up * halfCorridor, centerline[1] + Vector2.up * halfCorridor };
+            Vector2[] right = { centerline[0] - Vector2.up * halfCorridor, centerline[1] - Vector2.up * halfCorridor };
+            AddBoundsErrorIfNeeded(config.PlayableBounds, centerline, left, right, errors);
+            if (config.WorkBounds.width <= 0f || config.WorkBounds.height <= 0f)
+                errors.Add("HorizontalSingleFence requires positive WorkBounds below the route.");
+            else if (config.WorkBounds.yMax > right[0].y + BoundsTolerance)
+                errors.Add("HorizontalSingleFence WorkBounds must remain below the single fence rail.");
+            return new TowerDefenseRouteGeometryResult(new TowerDefenseRouteValidationResult(errors), centerline, left, right);
+        }
+
         private static TowerDefenseRouteGeometryResult EmptyResult(List<string> errors)
         {
             return new TowerDefenseRouteGeometryResult(
@@ -169,8 +205,12 @@ namespace HayChoriYPaty
                 return errors;
             }
 
-            if (config.RowCount < 3 || config.RowCount > 9 || config.RowCount % 2 == 0)
-                errors.Add("RowCount must be an odd number from 3 through 9.");
+            if (config.RouteKind == TowerDefenseRouteKind.HorizontalSingleFence)
+            {
+                if (config.RowCount != 1) errors.Add("HorizontalSingleFence must contain exactly one route row.");
+            }
+            else if (config.RowCount < 3 || config.RowCount > 9 || config.RowCount % 2 == 0)
+                errors.Add("Serpentine RowCount must be an odd number from 3 through 9.");
 
             if (!IsFinite(config.CorridorWidth) || config.CorridorWidth <= 0f)
                 errors.Add("CorridorWidth must be a finite value greater than zero.");
@@ -182,7 +222,7 @@ namespace HayChoriYPaty
 
             if (!IsFinite(config.RowSpacing) || config.RowSpacing <= 0f)
                 errors.Add("RowSpacing must be a finite value greater than zero.");
-            else if (IsFinite(config.CorridorWidth) && config.CorridorWidth > 0f && config.RowSpacing <= config.CorridorWidth)
+            else if (config.RouteKind != TowerDefenseRouteKind.HorizontalSingleFence && IsFinite(config.CorridorWidth) && config.CorridorWidth > 0f && config.RowSpacing <= config.CorridorWidth)
                 errors.Add("RowSpacing must be greater than CorridorWidth so adjacent fence rails do not overlap at U-turns.");
 
             if (config.SegmentLengths == null || config.SegmentLengths.Length != config.RowCount)

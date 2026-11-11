@@ -1,0 +1,4 @@
+bebd5efe8063db062c1036dd3b45390e0d26e3b635173cbbe3e2b61a4d44e57c  Assets/Art/Street/Resources/street-background-peregrinacion-moreno-v1.png
+8c4aa0acdbad07724edf1978983eefa06140c983c37c17420a348bf94bd6a7a1  Assets/Art/Street/Resources/street-peregrinacion-crest-v1.png
+e195f911c1b8c1a1cce44434bcefc876a9e202b5398a9a36160efec35a109257  Assets/Art/Street/Resources/street-peregrinacion-fans-front-v1.png
+96cfa1d99d99ec9e29e836a0a6d02852e80cb49c436194f459a575268726f9a3  Assets/Art/Street/Resources/street-peregrinacion-fans-walk-v1.png

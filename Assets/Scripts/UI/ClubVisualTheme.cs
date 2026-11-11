@@ -55,6 +55,15 @@ namespace HayChoriYPaty
         public FanAtlasLayout FrontLayout { get; private set; }
         public FanAtlasLayout WalkingLayout { get; private set; }
         public FanAtlasLayout RiotLayout { get; private set; }
+        // Optional paired directional walk atlas. Existing clubs keep their original layouts.
+        public string DownwardWalkingFans { get; private set; }
+        public int WalkingPoseCount { get; private set; } = 1;
+        public ClubFanDefinition WithDirectionalWalking(string downward, int poses)
+        {
+            DownwardWalkingFans = downward;
+            WalkingPoseCount = Mathf.Clamp(poses, 1, 2);
+            return this;
+        }
         // Authored body-scale / transparent-foot-padding metrics, indexed by variant and pose.
         // Existing atlases retain their original drawing bounds when no metrics are configured.
         public Vector2[] RiotPoseMetrics { get; private set; }
@@ -93,6 +102,9 @@ namespace HayChoriYPaty
 
         public Texture2D LoadFrontFans() => Load(FrontFans);
         public Texture2D LoadWalkingFans() => Load(WalkingFans);
+        public Texture2D LoadDownwardWalkingFans() => Load(DownwardWalkingFans);
+        public Rect WalkingAnimationSourceRect(int width, int height, int customerId, int pose) =>
+            WalkingLayout.SourceRect(width, height, GetVariant(customerId), VariantsPerRow, pose);
         public Texture2D LoadRiotFans() => Load(RiotFans);
 
         public bool IsComplete(bool checkResources = true)
@@ -108,7 +120,8 @@ namespace HayChoriYPaty
             if (string.IsNullOrEmpty(FrontFans) || string.IsNullOrEmpty(WalkingFans) || string.IsNullOrEmpty(RiotFans) || RiotFans == GenericRiotFallback) return false;
             if (!Capacity(FrontLayout) || !Capacity(WalkingLayout) || !Capacity(RiotLayout)) return false;
             if (!checkResources) return true;
-            return ValidTexture(FrontFans, FrontLayout) && ValidTexture(WalkingFans, WalkingLayout) && ValidTexture(RiotFans, RiotLayout);
+            return ValidTexture(FrontFans, FrontLayout) && ValidTexture(WalkingFans, WalkingLayout) && ValidTexture(RiotFans, RiotLayout)
+                && (string.IsNullOrEmpty(DownwardWalkingFans) || ValidTexture(DownwardWalkingFans, WalkingLayout));
         }
 
         private bool Capacity(FanAtlasLayout layout)
@@ -171,7 +184,13 @@ namespace HayChoriYPaty
                 fans: HuracanFans()),
             new ClubVisualTheme("Argentinos Juniors / La Paternal", new Color32(194, 28, 42, 255), new Color32(247, 244, 232, 255),
                 muralResource: "street-mural-argentinos-master-v1", muralSource: new Rect(0, 0, 1, 1),
-                fans: ArgentinosFans())
+                fans: ArgentinosFans()),
+            new ClubVisualTheme("La Renga – Autódromo Bs. As.", new Color32(22, 28, 40, 255), new Color32(211, 43, 44, 255),
+                new Color32(238, 173, 44, 255), muralResource: "street-background-larenga-autodromo-v1",
+                muralSource: new Rect(0, 0, 1, 1), fans: LaRengaFans()),
+            new ClubVisualTheme("Peregrinación a Luján — Moreno", new Color32(82, 171, 222, 255), new Color32(248, 244, 225, 255),
+                new Color32(216, 174, 72, 255), muralResource: "street-background-peregrinacion-moreno-v1",
+                muralSource: new Rect(0, 0, 1, 1), fans: PeregrinacionFans())
         };
 
         private static readonly ClubVisualTheme UnknownTheme =
@@ -304,6 +323,23 @@ namespace HayChoriYPaty
             return new ClubFanDefinition("street-huracan-fans-paired-v1", "street-huracan-fans-paired-v1",
                 "street-huracan-riot-fans-v1", 12, 3, paired, paired, riot);
         }
+        private static ClubFanDefinition PeregrinacionFans()
+        {
+            var paired = new FanAtlasLayout(6, 4, FanAtlasLayoutKind.PairedColumns);
+            return new ClubFanDefinition("street-peregrinacion-fans-front-v1", "street-peregrinacion-fans-walk-v1",
+                "street-peregrinacion-fans-front-v1", 12, 3, paired, paired, paired)
+                .WithDirectionalWalking(null, 2);
+        }
+
+        private static ClubFanDefinition LaRengaFans()
+        {
+            var paired = new FanAtlasLayout(6, 4, FanAtlasLayoutKind.PairedColumns);
+            // TD departs using the receiving sprite plus its existing fade/lift; no riot is played.
+            return new ClubFanDefinition("street-larenga-fans-front-v1", "street-larenga-fans-walk-v1",
+                "street-larenga-fans-front-v1", 12, 3, paired, paired, paired)
+                .WithDirectionalWalking("street-larenga-fans-walk-down-v1", 2);
+        }
+
         private static ClubFanDefinition ArgentinosFans()
         {
             // The generated sheet places walking at the left and cheering at the right of each pair.

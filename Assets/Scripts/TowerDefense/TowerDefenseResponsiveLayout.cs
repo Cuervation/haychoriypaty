@@ -31,9 +31,10 @@ namespace HayChoriYPaty
             }
 
             TowerDefenseRouteGeometryConfig authored = source.Route;
-            if (authored == null || authored.RowCount < 3 || authored.RowCount > 9 || authored.RowCount % 2 == 0)
+            if (authored == null || (authored.RouteKind == TowerDefenseRouteKind.HorizontalSingleFence
+                ? authored.RowCount != 1 : authored.RowCount < 3 || authored.RowCount > 9 || authored.RowCount % 2 == 0))
             {
-                error = "The editable route must have an odd number of rows from 3 through 9.";
+                error = "The editable route has an invalid row count for its route kind.";
                 return false;
             }
 
@@ -46,6 +47,10 @@ namespace HayChoriYPaty
                 error = "The active camera does not produce a finite screen-to-world scale.";
                 return false;
             }
+
+            if (authored.RouteKind == TowerDefenseRouteKind.HorizontalSingleFence)
+                return TryCreateHorizontal(source, camera, viewport, logicalWidth, logicalHeight, canvasScale,
+                    worldUnitsPerLogicalPixel, out runtimeConfig, out route, out firstServiceZone, out secondServiceZone, out error);
 
             const float horizontalMargin = 16f;
             // The campaign's three runs sit below the mural and above its full footer.
@@ -114,6 +119,73 @@ namespace HayChoriYPaty
 
             firstServiceZone = runtimeConfig.WorkZonePosition(geometry, 0);
             secondServiceZone = runtimeConfig.WorkZonePosition(geometry, Mathf.Min(1, route.RowCount - 2));
+            return true;
+        }
+
+        private static bool TryCreateHorizontal(TowerDefenseLevelConfig source, Camera camera, Rect viewport,
+            float logicalWidth, float logicalHeight, float canvasScale, float pixel,
+            out TowerDefenseLevelConfig runtimeConfig, out TowerDefenseRouteGeometryConfig route,
+            out Vector2 firstServiceZone, out Vector2 secondServiceZone, out string error)
+        {
+            runtimeConfig = null;
+            route = null;
+            firstServiceZone = secondServiceZone = Vector2.zero;
+            error = null;
+            const float margin = 16f;
+            const float corridorLogical = 88f;
+            const float fenceClearanceLogical = 8f;
+            float footer = FooterReserve;
+            float routeY = RouteTopReserve + corridorLogical * .5f;
+            float workTop = routeY + corridorLogical * .5f + fenceClearanceLogical;
+            float workBottom = logicalHeight - footer - margin;
+            if (logicalWidth <= margin * 2f + corridorLogical || workBottom - workTop < 160f)
+            {
+                error = "Horizontal single-fence layout needs a usable lower work area above the footer.";
+                return false;
+            }
+
+            float entryX = -FanFrameWidthLogical * .5f;
+            float exitX = logicalWidth + FanFrameWidthLogical * .5f;
+            Vector2 routeTopLeft = LogicalToWorld(camera, viewport, logicalWidth, canvasScale,
+                new Vector2(entryX - corridorLogical * .5f, routeY - corridorLogical * .5f));
+            Vector2 routeBottomRight = LogicalToWorld(camera, viewport, logicalWidth, canvasScale,
+                new Vector2(exitX + corridorLogical * .5f, routeY + corridorLogical * .5f));
+            Rect worldRouteBounds = Rect.MinMaxRect(Mathf.Min(routeTopLeft.x, routeBottomRight.x), Mathf.Min(routeTopLeft.y, routeBottomRight.y),
+                Mathf.Max(routeTopLeft.x, routeBottomRight.x), Mathf.Max(routeTopLeft.y, routeBottomRight.y));
+            Vector2 workTopLeft = LogicalToWorld(camera, viewport, logicalWidth, canvasScale, new Vector2(margin, workTop));
+            Vector2 workBottomRight = LogicalToWorld(camera, viewport, logicalWidth, canvasScale,
+                new Vector2(logicalWidth - margin, workBottom));
+            Rect workBounds = Rect.MinMaxRect(Mathf.Min(workTopLeft.x, workBottomRight.x), Mathf.Min(workTopLeft.y, workBottomRight.y),
+                Mathf.Max(workTopLeft.x, workBottomRight.x), Mathf.Max(workTopLeft.y, workBottomRight.y));
+
+            float runLogical = exitX - entryX;
+            route = new TowerDefenseRouteGeometryConfig
+            {
+                RouteKind = TowerDefenseRouteKind.HorizontalSingleFence,
+                RowCount = 1,
+                SegmentLengths = new[] { runLogical * pixel },
+                CorridorWidth = corridorLogical * pixel,
+                HorizontalCorridorWidth = corridorLogical * pixel,
+                RowSpacing = corridorLogical * 2f * pixel,
+                TurnRadius = source.Route.TurnRadius,
+                PlayableBounds = worldRouteBounds,
+                WorkBounds = workBounds,
+                TurnSegments = Mathf.Clamp(source.Route.TurnSegments, 4, 128)
+            };
+            runtimeConfig = UnityEngine.Object.Instantiate(source);
+            runtimeConfig.name = source.name + " (runtime horizontal viewport)";
+            TowerDefenseRouteGeometryResult geometry = TowerDefenseRouteGeometry.Generate(route);
+            if (geometry == null || !geometry.IsValid)
+            {
+                error = geometry == null ? "Route generator returned no layout." : string.Join("; ", geometry.Validation.Errors);
+                UnityEngine.Object.Destroy(runtimeConfig);
+                runtimeConfig = null;
+                return false;
+            }
+            Vector2 entry = LogicalToWorld(camera, viewport, logicalWidth, canvasScale, new Vector2(entryX, routeY));
+            route.FanEntryExtensionWorldUnits = Mathf.Max(0f, geometry.Centerline[0].x - entry.x);
+            runtimeConfig.ConfigureRoute(route);
+            firstServiceZone = secondServiceZone = workBounds.center;
             return true;
         }
 

@@ -31,7 +31,7 @@ namespace HayChoriYPaty
         public const string ProgressKey = "HayChoriYPaty.StreetGame.v1";
         private const string SaveKey = ProgressKey;
         [SerializeField] private StreetBalance balance = new StreetBalance();
-        [SerializeField, Range(0, 12)] private int selectedLevel;
+        [SerializeField, Range(0, 14)] private int selectedLevel;
         private StreetSimulation sim;
         private OrderDeliverySound deliverySound;
         private SaveData save;
@@ -43,7 +43,7 @@ namespace HayChoriYPaty
         private bool suspensionRequested;
         private Func<string, StreetMatchRecord, bool> persist;
         private string activeAttemptId;
-        private long attemptHireSpendCents, attemptSpeedSpendCents;
+        private long attemptHireSpendCents, attemptSpeedSpendCents, attemptEquipmentSpendCents;
         private readonly long[] attemptHiresByRole = new long[5];
         private const long TemporaryStartupTicketGrant = 30L;
         private static bool temporaryStartupTicketGrantAppliedThisProcess;
@@ -55,12 +55,12 @@ namespace HayChoriYPaty
         [System.Serializable]
         public sealed class SaveData
         {
-            public int version = 7;
+            public int version = 9;
             public int unlockedLevel;
             // `unlockedLevel` remains the original stable-ID frontier; campaign order is separate.
             public bool huracanUnlocked, legacyRacingUnlocked, racingUnlockedByHuracan, argentinosUnlocked;
             // Explicit, stable-ID unlock state for the reorganized campaign. Never infer this set from a max ID.
-            public bool[] unlockedLevelIds = new bool[13];
+            public bool[] unlockedLevelIds = new bool[15];
             // One-time repair for pre-v7 market snapshots, expressed in the old stable-ID frontier.
             public int legacyProgressionRepairLevel = -1;
             // Legacy ID10 wins/records are historical traditional Los Redondos, before ID10 became Tower Defense.
@@ -754,6 +754,7 @@ namespace HayChoriYPaty
             if (!sim.ImportTowerDefenseState(mode.Elapsed, mode.Coins, mode.CoinsEarned, mode.SpeedLevel,
                     mode.WorkerCountsByRole, delivered, mode.CustomersAttended, mode.OrdersCompleted, terminal, won)) return false;
             attemptHireSpendCents = mode.HireSpendCents;
+            attemptEquipmentSpendCents = mode.EquipmentSpendCents;
             attemptSpeedSpendCents = mode.SpeedSpendCents;
             Array.Clear(attemptHiresByRole, 0, attemptHiresByRole.Length);
             for (int role = 0; role < Math.Min(hires.Length, attemptHiresByRole.Length); role++)
@@ -774,6 +775,30 @@ namespace HayChoriYPaty
             save.statistics.hireSpendTotalCents += costCents;
             if (!PersistTowerDefenseProgress(mode)) return false;
             return true;
+        }
+
+        public bool TryHireTowerDefenseAt(TowerDefenseGameMode mode, StreetWorkerRole role, Vector2 position)
+        {
+            int index = (int)role;
+            if (!playerActive || sim == null || mode == null || !sim.IsExternalCampaignRuntime ||
+                mode != towerDefenseMode || index < 0 || index >= 5 || !mode.CanHireAt(role, position)) return false;
+            int cost = mode.HireCost(role);
+            if (cost <= 0 || !mode.TryHireAt(role, position)) return false;
+            long cents = (long)cost * 100L;
+            save.statistics.paidHiresByRole[index]++;
+            save.statistics.hireSpendCentsByRole[index] += cents;
+            save.statistics.hireSpendTotalCents += cents;
+            return PersistTowerDefenseProgress(mode);
+        }
+
+        public bool TryPlaceTowerDefenseStation(TowerDefenseGameMode mode, TowerDefenseStationKind kind, Vector2 position)
+        {
+            if (!playerActive || sim == null || mode == null || mode != towerDefenseMode || !sim.IsExternalCampaignRuntime) return false;
+            TowerDefensePlacedStation placed;
+            int cost = mode.StationCost(kind);
+            if (!mode.TryPlaceStation(kind, position, out placed)) return false;
+            save.statistics.equipmentSpendTotalCents += (long)cost * 100L;
+            return PersistTowerDefenseProgress(mode);
         }
 
         public bool TryUpgradeTowerDefenseSpeed(TowerDefenseGameMode mode)
@@ -1041,7 +1066,7 @@ namespace HayChoriYPaty
 
         private void ResetAttemptMetrics()
         {
-            attemptHireSpendCents = attemptSpeedSpendCents = 0;
+            attemptHireSpendCents = attemptSpeedSpendCents = attemptEquipmentSpendCents = 0;
             Array.Clear(attemptHiresByRole, 0, attemptHiresByRole.Length);
         }
 
@@ -1052,13 +1077,13 @@ namespace HayChoriYPaty
             try
             {
                 // JsonUtility fills omitted fields with defaults; require a real legacy version marker.
-                if (!System.Text.RegularExpressions.Regex.IsMatch(json, "^\\s*\\{\\s*\\\"version\\\"\\s*:\\s*[1-7](?:\\s*[,}])")) return false;
+                if (!System.Text.RegularExpressions.Regex.IsMatch(json, "^\\s*\\{\\s*\\\"version\\\"\\s*:\\s*[1-9](?:\\s*[,}])")) return false;
                 data = MigrateSaveData(JsonUtility.FromJson<SaveData>(json));
                 // Unity serializes inline null DTOs as empty objects; never interpret them as results.
                 if (data != null && StreetMatchRecord.IsAbsent(data.pendingMatch)) data.pendingMatch = null;
                 if (data != null && StreetMatchRecord.IsAbsent(data.pendingVictoryMatch)) data.pendingVictoryMatch = null;
                 if (data != null && StreetMatchRecord.IsAbsent(data.activeAttemptSummary)) data.activeAttemptSummary = null;
-                if (data == null || data.version != 7 || data.unlockedLevelIds == null ||
+                if (data == null || data.version != 9 || data.unlockedLevelIds == null ||
                     data.unlockedLevelIds.Length != StreetSimulation.LevelNames.Length ||
                     !data.unlockedLevelIds[0] ||
                     (data.tickets != null && !data.tickets.IsValid())) { data = null; return false; }
@@ -1113,7 +1138,8 @@ namespace HayChoriYPaty
             if (data.version == 6)
             {
                 // Freeze the exact legacy stable-ID access set; do not fill a prefix of the new visual order.
-                var legacyAccess = new bool[StreetSimulation.LevelNames.Length];
+                // Materialize the established v7 campaign shape first; v7→v8 appends ID13 below.
+                var legacyAccess = new bool[13];
                 legacyAccess[0] = true;
                 for (int id = 1; id <= 10; id++) legacyAccess[id] = id <= Mathf.Clamp(data.unlockedLevel, 0, 10);
                 legacyAccess[5] |= data.legacyRacingUnlocked || data.racingUnlockedByHuracan || data.unlockedLevel >= 6;
@@ -1134,6 +1160,45 @@ namespace HayChoriYPaty
                         ? null : legacyRecord.attemptId;
                 }
                 data.version = 7;
+            }
+            if (data.version == 7)
+            {
+                var prior = data.unlockedLevelIds;
+                if (prior == null || prior.Length != 13) return null;
+                var expanded = new bool[14];
+                Array.Copy(prior, expanded, 13);
+                bool laterCampaignAccess = false;
+                for (int id = 4; id <= 8 && id < expanded.Length; id++) laterCampaignAccess |= expanded[id];
+                bool nonLegacyRedondosWin = data.statistics != null && data.statistics.winsByLevel != null && data.statistics.winsByLevel.Length > 10 &&
+                    data.statistics.winsByLevel[10] > 0;
+                if (!nonLegacyRedondosWin)
+                {
+                    bool legacyAttempt = data.hasLegacyTraditionalLosRedondosResult &&
+                        !string.IsNullOrEmpty(data.legacyTraditionalLosRedondosPendingAttemptId);
+                    nonLegacyRedondosWin = (data.pendingMatch != null && data.pendingMatch.level == 10 && data.pendingMatch.won &&
+                        (!legacyAttempt || data.pendingMatch.attemptId != data.legacyTraditionalLosRedondosPendingAttemptId)) ||
+                        (data.pendingVictoryMatch != null && data.pendingVictoryMatch.level == 10 && data.pendingVictoryMatch.won &&
+                        (!legacyAttempt || data.pendingVictoryMatch.attemptId != data.legacyTraditionalLosRedondosPendingAttemptId));
+                }
+                expanded[StreetSimulation.LaRengaTowerDefenseCampaignLevelId] = laterCampaignAccess || nonLegacyRedondosWin;
+                data.unlockedLevelIds = expanded;
+                data.version = 8;
+            }
+            if (data.version == 8)
+            {
+                bool[] prior = data.unlockedLevelIds;
+                if (prior == null || prior.Length != 14) return null;
+                var expanded = new bool[15];
+                Array.Copy(prior, expanded, 14);
+                bool laterAccess = false;
+                for (int id = 4; id <= 8; id++) laterAccess |= prior[id];
+                bool rengaWon = data.statistics != null && data.statistics.winsByLevel != null &&
+                    data.statistics.winsByLevel.Length > 13 && data.statistics.winsByLevel[13] > 0;
+                rengaWon |= data.pendingMatch != null && data.pendingMatch.level == 13 && data.pendingMatch.won;
+                rengaWon |= data.pendingVictoryMatch != null && data.pendingVictoryMatch.level == 13 && data.pendingVictoryMatch.won;
+                expanded[StreetSimulation.PeregrinacionTowerDefenseCampaignLevelId] = laterAccess || rengaWon;
+                data.unlockedLevelIds = expanded;
+                data.version = 9;
             }
             return data;
         }
@@ -1211,7 +1276,7 @@ namespace HayChoriYPaty
                 id = attemptId, attemptId = attemptId,
                 utc = DateTime.UtcNow.ToString("o"), level = level, club = StreetSimulation.LevelDisplayNames[level],
                 won = receipt.won, result = receipt.won ? "won" : "lost", elapsedSeconds = sim.Elapsed, grossSalesCents = receipt.grossSalesCents,
-                hireSpendCents = attemptHireSpendCents, speedSpendCents = attemptSpeedSpendCents,
+                hireSpendCents = attemptHireSpendCents, speedSpendCents = attemptSpeedSpendCents, equipmentSpendCents = attemptEquipmentSpendCents,
                 initialCoinsCents = (long)StreetSimulation.GetStartingCoinsForLevel(balance, level) * 100L,
                 leftoverCents = receipt.leftoverCents, halfSalesRewardCents = receipt.recognizedSalesCents,
                 leftoverBonusCents = receipt.bonusCents, progressionBonusCents = receipt.progressionBonusCents,
@@ -1253,7 +1318,7 @@ namespace HayChoriYPaty
                 id = attemptId, attemptId = attemptId, utc = DateTime.UtcNow.ToString("o"),
                 level = level, club = StreetSimulation.LevelDisplayNames[level], result = "abandoned", abandoned = true,
                 elapsedSeconds = sim.Elapsed, grossSalesCents = (long)Math.Max(0, sim.CoinsEarned) * 100L,
-                hireSpendCents = attemptHireSpendCents, speedSpendCents = attemptSpeedSpendCents,
+                hireSpendCents = attemptHireSpendCents, speedSpendCents = attemptSpeedSpendCents, equipmentSpendCents = attemptEquipmentSpendCents,
                 initialCoinsCents = (long)StreetSimulation.GetStartingCoinsForLevel(balance, level) * 100L,
                 leftoverCents = (long)Math.Max(0, sim.Coins) * 100L,
                 customersAttended = sim.CustomersAttended, customersLost = sim.CustomersLost, ordersCompleted = sim.OrdersCompleted,

@@ -1,10 +1,18 @@
+# Android — 2026-11-10: shutter de premio y árbol de campaña, 0.2.83/code85
+
+Unity 6000.6.3f1 BuildPipeline por MCP; Android no-Development, IL2CPP/ARM64, escenas `Assets/Scenes/Main.unity` y `Assets/Scenes/SampleScene.unity`: **Succeeded** en 555.0365 s, 0 errores / 5 advertencias (job `build-ecdcbe4e1a`). El build compiló el árbol Unity completo presente en ese momento. No se ejecutaron en esta pasada las suites específicas completas de Tower Defense, La Renga o Peregrinación.
+
+APK local ignorada por Git: `Builds/Android/Archive/HayChoriYPaty-0.2.83-code85-reward-shutter-20261110.apk`, **510,462,569 bytes**, SHA-256 `cb19c1e418d1652ae8522b89a71b211e1f5a1580bbc06c0765db39fed98f832b`. **PASS:** ZIP íntegro, `zipalign -c -v 4`, APK Signature Scheme v2 (`apksigner verify` con el OpenJDK incluido en Unity) y metadata `aapt`: `com.haychoriypaty.game`, `0.2.83`/code`85`, min API26/target API36. Firma Android Debug; no es release firmada para Play Store.
+
+En Unity, `StreetRewardShutterTests` pasó **9/9 EditMode** y `StreetSceneBuildGuardTests` **3/3 EditMode**; la compilación/postbuild no mostró errores. No se instaló ni lanzó esta APK. La validación focalizada no certifica la campaña completa ni reemplaza las pruebas pendientes de cada nivel. Se compiló desde el working tree de ese momento; algunas preferencias locales del Editor quedaron fuera de Git, por lo que la configuración exacta de ese APK no se reconstruye desde el commit únicamente.
+
 # Android — 2026-11-10: tutorial de Camioneros Tower Defense, APK 0.2.83/code85
 
 Unity 6000.6.3f1 BuildPipeline mediante el Editor MCP del checkout activo: Android Development, IL2CPP/ARM64, solo `Assets/Scenes/Main.unity`: **Succeeded** (job `build-8c1333e2d3`, 341.88 s, 0 errores / 7 advertencias). El tutorial de Camioneros ya había pasado sus dos pruebas PlayMode focalizadas en Unity (job `d0d3fe53eec84a80af806f5dd0177601`); el build no reemplaza pruebas de gameplay.
 
 APK local ignorada por Git: `Builds/Android/Archive/HayChoriYPaty-0.2.83-code85-camioneros-tutorial-20261110.apk`, **422,576,832 bytes**, SHA-256 `d6829dbb9452ffb0e3241a1303fe20799ba0cda70336ec03bb77a57ff674e2ee`. **PASS:** ZIP íntegro, `zipalign -c -v 4`, firma APK Scheme v2 y metadata `aapt`: `com.haychoriypaty.game`, `0.2.83`/code`85`, min API26/target API36, ABI `arm64-v8a`. Manifiesto Development/debuggable; Analytics y Ad-ID explícitamente desactivados por el build guard. Firma Android Debug, no es release Play Store.
 
-**No instalada ni lanzada.** No se pidió instalación, no se borraron datos ni se hizo smoke en teléfono. El build usó la configuración de desarrollo existente; build exitoso y tests focalizados no certifican el modo Tower Defense completo.
+**Instalación física PASS** el 2026-11-10: `adb install -r` devolvió `Success` en Motorola Edge 60 Fusion (`ZY22MBNWRB`). Package Manager confirma `com.haychoriypaty.game`, `versionName=0.2.83`/`versionCode=85`, `lastUpdateTime=2026-11-10 11:09:19` y `firstInstallTime=2026-10-03 18:49:24` preservado. Actualización in-place; no se desinstaló ni borraron datos. La app no se lanzó; smoke de gameplay en teléfono **NOT_RUN**. El build usó la configuración de desarrollo existente; build exitoso y tests focalizados no certifican el modo Tower Defense completo.
 
 # Android — 2026-11-09: entrada progresiva de hinchas de Camioneros, APK 0.2.83/code85
 

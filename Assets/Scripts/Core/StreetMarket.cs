@@ -56,8 +56,8 @@ namespace HayChoriYPaty
         public long nextAttemptId = 1, attemptId, settledAttemptId;
         public int attemptLevel = -1, initializedUnlockedLevel = -1;
         public int[] stockUnits = new int[10], attemptStock;
-        public long[] highestRecognizedSalesByLevel = new long[13];
-        public bool[] bonusPaidByLevel = new bool[13];
+        public long[] highestRecognizedSalesByLevel = new long[15];
+        public bool[] bonusPaidByLevel = new bool[15];
         public bool attemptActive, kitGranted, legacyTransitionRepairApplied, legacyZeroBalanceRecoveryApplied;
         // Preparation-only permissions are isolated from merchandise, product stock and player statistics.
         public int preparationLevelId = -1;
@@ -99,8 +99,8 @@ namespace HayChoriYPaty
         {
             Data = data ?? new StreetMarketData(); Balance = balance ?? new StreetBalance();
             Data.stockUnits = Normalize(Data.stockUnits, 10);
-            Data.highestRecognizedSalesByLevel = Normalize(Data.highestRecognizedSalesByLevel, 13);
-            Data.bonusPaidByLevel = Normalize(Data.bonusPaidByLevel, 13);
+            Data.highestRecognizedSalesByLevel = Normalize(Data.highestRecognizedSalesByLevel, 15);
+            Data.bonusPaidByLevel = Normalize(Data.bonusPaidByLevel, 15);
             Data.attemptStock = Data.attemptStock == null ? null : Normalize(Data.attemptStock, 10);
             Data.balanceCents = Math.Max(0L, Data.balanceCents);
             Data.cumulativePurchaseUnits = Math.Max(0L, Data.cumulativePurchaseUnits);

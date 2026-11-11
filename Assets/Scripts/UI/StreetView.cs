@@ -27,12 +27,13 @@ namespace HayChoriYPaty
         private const string LosRedondosCrestResource = "street-los-redondos-crest-v1";
         private const string HuracanCrestResource = "street-huracan-crest-v1";
         private const string ArgentinosCrestResource = "street-argentinos-crest-v1";
+        private const string LaRengaCrestResource = "street-larenga-crest-v1";
         // Ordered by StreetSimulation.LevelDisplayNames; user-supplied crests are scoped to their levels.
         private static readonly string[] LevelCrestResourceNames = {
             AllBoysCrestResource, ChicagoCrestResource, VelezCrestResource,
             FerroCrestResource, IndependienteCrestResource, RacingCrestResource,
             SanLorenzoCrestResource, RiverCrestResource, BocaCrestResource,
-            CamionerosCrestResource, LosRedondosCrestResource, HuracanCrestResource, ArgentinosCrestResource
+            CamionerosCrestResource, LosRedondosCrestResource, HuracanCrestResource, ArgentinosCrestResource, LaRengaCrestResource, "street-peregrinacion-crest-v1"
         };
         private const string VelezFrontFansResource = "street-velez-fans-front-v1";
         private const string VelezWalkingFansResource = "street-velez-fans-walk-v1";
@@ -4562,7 +4563,8 @@ namespace HayChoriYPaty
                 DrawMarketBluePanel(badge, ClubVisualTheme.ForLevel(level).PrimaryColor);
                 MarketText(new Rect(badge.x + 6, badge.y + 20, badge.width - 12, 36), MarketClubInitials(level), 22, Color.white);
             }
-            string[] club = StreetSimulation.LevelDisplayNames[level].Split('/');
+            string[] club = StreetSimulation.LevelDisplayNames[level].Split(new[] {'/', '–', '—'});
+            if (level == StreetSimulation.PeregrinacionTowerDefenseCampaignLevelId) club = new[] {"Peregrinación", "a Luján · Moreno"};
             float captionX = Mathf.Max(120f, badge.xMax + 16f);
             float captionWidth = 506f - captionX;
             MarketText(new Rect(captionX, 77, captionWidth, 24), "NIVEL " + (StreetSimulation.CampaignPositionOf(level) + 1), 19, MarketCyan, TextAnchor.MiddleLeft);
@@ -4591,8 +4593,8 @@ namespace HayChoriYPaty
             {
                 Rect card = new Rect(26f, 207f, 488f, 76f);
                 DrawMarketBluePanel(card, MarketIce);
-                MarketText(new Rect(36f, 211f, 468f, 30f), "ATENDÉ A LOS " + TowerDefenseLevelConfig.FansToServe + " HINCHAS", 24, MarketBlueInk);
-                MarketText(new Rect(36f, 244f, 468f, 32f), "Chori y Coca · Que ninguno llegue a la salida", 16, MarketBlueInk);
+                MarketText(new Rect(36f, 211f, 468f, 30f), "ATENDÉ A LOS " + TowerDefenseLevelConfig.TotalFanCountForCampaignLevel(sim.LevelIndex) + (sim.LevelIndex == StreetSimulation.PeregrinacionTowerDefenseCampaignLevelId ? " PEREGRINOS" : " HINCHAS"), 24, MarketBlueInk);
+                MarketText(new Rect(36f, 244f, 468f, 32f), sim.LevelIndex == StreetSimulation.PeregrinacionTowerDefenseCampaignLevelId ? "7 productos · Construí y atendé antes de la salida" : "Chori y Coca · Que ninguno llegue a la salida", 16, MarketBlueInk);
                 return;
             }
             for (int slot = 0; slot < sim.ProductCount; slot++)
@@ -7330,7 +7332,8 @@ namespace HayChoriYPaty
         private static string FormatQuotaSummary(StreetSimulation sim, bool pendingOnly)
         {
             if (StreetSimulation.IsTowerDefenseLevel(sim.LevelIndex))
-                return pendingOnly ? "UN HINCHA LLEGÓ A LA SALIDA" : TowerDefenseLevelConfig.FansToServe + " HINCHAS ATENDIDOS";
+                return pendingOnly ? "UN HINCHA LLEGÓ A LA SALIDA"
+                    : TowerDefenseLevelConfig.TotalFanCountForCampaignLevel(sim.LevelIndex) + " HINCHAS ATENDIDOS";
             var entries = new System.Collections.Generic.List<string>(sim.ProductCount);
             for (int slot = 0; slot < sim.ProductCount; slot++)
             {

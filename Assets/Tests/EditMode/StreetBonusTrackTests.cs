@@ -54,19 +54,21 @@ namespace HayChoriYPaty.Tests
         [Test]
         public void ReorganizedCampaignOrderKeepsAllStableIdsAndBothDefenseModes()
         {
-            CollectionAssert.AreEqual(new[] { 0, 1, 9, 2, 12, 3, 11, 10, 4, 5, 6, 7, 8 },
+            CollectionAssert.AreEqual(new[] { 0, 1, 9, 2, 12, 3, 11, 10, 13, 14, 4, 5, 6, 7, 8 },
                 (int[])simType.GetField("CampaignOrder", BindingFlags.Public | BindingFlags.Static).GetValue(null));
-            Assert.AreEqual(13, ((string[])simType.GetField("LevelNames", BindingFlags.Public | BindingFlags.Static).GetValue(null)).Length);
+            Assert.AreEqual(15, ((string[])simType.GetField("LevelNames", BindingFlags.Public | BindingFlags.Static).GetValue(null)).Length);
             Assert.AreEqual(9, CallStatic(simType, "CampaignLevelAt", 2));
             Assert.AreEqual(12, CallStatic(simType, "NextCampaignLevelId", 2));
             Assert.AreEqual(11, CallStatic(simType, "NextCampaignLevelId", 3));
             Assert.AreEqual(10, CallStatic(simType, "NextCampaignLevelId", 11));
-            Assert.AreEqual(4, CallStatic(simType, "NextCampaignLevelId", 10));
+            Assert.AreEqual(13, CallStatic(simType, "NextCampaignLevelId", 10));
+            Assert.AreEqual(4, CallStatic(simType, "NextCampaignLevelId", 13));
             Assert.AreEqual(6, CallStatic(simType, "NextCampaignLevelId", 5));
             Assert.AreEqual(3, CallStatic(simType, "NextCampaignLevelId", 12));
             Assert.AreEqual(-1, CallStatic(simType, "NextCampaignLevelId", 8));
             Assert.IsTrue((bool)CallStatic(simType, "IsTowerDefenseLevel", 9));
             Assert.IsTrue((bool)CallStatic(simType, "IsTowerDefenseLevel", 10));
+            Assert.IsTrue((bool)CallStatic(simType, "IsTowerDefenseLevel", 13));
             Assert.IsFalse((bool)CallStatic(simType, "IsTowerDefenseLevel", 11));
         }
 

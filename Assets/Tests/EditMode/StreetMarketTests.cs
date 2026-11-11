@@ -135,7 +135,7 @@ namespace HayChoriYPaty.Tests
             object market = Market(data);
             long[] sales = (long[])dataType.GetField("highestRecognizedSalesByLevel").GetValue(Get(market, "Data"));
             bool[] paid = (bool[])dataType.GetField("bonusPaidByLevel").GetValue(Get(market, "Data"));
-            Assert.AreEqual(13, sales.Length); Assert.AreEqual(13, paid.Length);
+            Assert.AreEqual(15, sales.Length); Assert.AreEqual(15, paid.Length);
             sales[11] = 1100; sales[12] = 1200; paid[11] = true;
             object restored = Market(JsonUtility.FromJson(JsonUtility.ToJson(Get(market, "Data")), dataType));
             sales = (long[])dataType.GetField("highestRecognizedSalesByLevel").GetValue(Get(restored, "Data"));

@@ -24,7 +24,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(2172, header.width); Assert.AreEqual(274, header.height);
             string[] names = (string[])Type.GetType("HayChoriYPaty.StreetSimulation, Assembly-CSharp", true)
                 .GetField("LevelNames").GetValue(null);
-            Assert.AreEqual(13, names.Length);
+            Assert.AreEqual(15, names.Length);
             Assert.AreEqual("River Plate / Núñez", names[7]);
             Assert.AreEqual("Boca Juniors / La Boca", themes.GetProperty("ClubName").GetValue(
                 themes.GetMethod("ForLevel").Invoke(null, new object[] { 8 })));
@@ -93,7 +93,7 @@ namespace HayChoriYPaty.Tests
             Type simulation = Type.GetType("HayChoriYPaty.StreetSimulation, Assembly-CSharp", true);
             Type themes = Type.GetType("HayChoriYPaty.ClubVisualTheme, Assembly-CSharp", true);
             string[] names = (string[])simulation.GetField("LevelNames").GetValue(null);
-            Assert.AreEqual(13, names.Length);
+            Assert.AreEqual(15, names.Length);
             Assert.AreEqual("Argentinos Juniors / La Paternal", names[12]);
             object theme = themes.GetMethod("ForLevel").Invoke(null, new object[] { 12 });
             Assert.AreEqual("Argentinos Juniors / La Paternal", themes.GetProperty("ClubName").GetValue(theme));

@@ -2,6 +2,24 @@
 
 > **HISTÓRICO:** este archivo registra el estado en la fecha de cada entrada. Una entrada marcada PASS no valida el runtime actual ni reemplaza el contrato vigente. Consultar [current-state](current-state.md), [índice SDD](README.md) y la [tabla maestra](../docs/BALANCE_ACTUAL_NIVELES.md).
 
+## 2026-11-10 — Peregrinación a Luján ID14: implementación parcial, no aceptada
+
+Campaña15, orden13→14→4, SaveData9 compatible con v8/v7/outbox anterior. Ruta de una sola fila/riel inferior con área construible, equipamiento libre y cinco roles/siete productos; arte propio Moreno + insignia Basílica. Balance provisional (60fans lentos/caja1200) sin evidencia de ganabilidad. Mural corregido a PEREGRINACIÓN LUJÁN y fuga/caminantes hacia derecha. Asignación multiestación aún prioriza la primera y congestión requiere resolver/validar. Cuatro assemblies Roslyn PASS estático; ninguna ejecución Unity confirmada. Consulta inicial nueva a Unity reportó session disconnected y estado sin ping; no se reinició ni cerró el Editor. Pruebas Unity y tres Game Views pendientes. Sin commit/push/APK/deploy. [Contrato](features/peregrinacion-lujan.md), [informe](../docs/reports/PEREGRINACION_IMPLEMENTACION_2026-11-10.md).
+
+## 2026-11-10 — La Renga ID13: implementación; aceptación Unity pendiente
+
+Campaña ampliada aditivamente a 14 posiciones (10→13→4), SaveData v8, compatibilidad local/outbox v7 y estadísticas de 14 IDs. Tercer TD con 60/.1575/96, mismo motor, economía y servicio físico; mural/insignia y 12 identidades direccionales propios. Cuatro assemblies compilan con Roslyn instalado **PASS**; esto no demuestra importación ni tests Unity. MCP agotó tres reconexiones acotadas y run_tests EditMode terminó en timeout sin job: tests **NOT_RUN**, Game Views 540×960/1080×1920/720×1280 **BLOCKED**. Sin reiniciar Editor, commit/push, APK ni publicación Firebase. [Informe](../docs/reports/LA_RENGA_IMPLEMENTACION_2026-11-10.md), [revisión independiente](../docs/reports/LA_RENGA_REVISION_INDEPENDIENTE_2026-11-10.md), [contrato](features/la-renga.md).
+
+## 2026-11-10 — Tower Defense: 120 hinchas Camioneros y globo sincronizado
+
+Camioneros ID9 queda configurado para 120 hinchas a `fanSpeed=0.20475` (30% más que `0.1575`); Los Redondos ID10 permanece en 60 y `0.1575`. El objetivo de Mercado y el resumen de fin usan el presupuesto del nivel. Durante la entrada progresiva de Camioneros, el globo permanece oculto hasta que entra al menos media anchura del hincha (39/78 px lógicos) y luego aparece arriba, unido a su posición y recortado al mismo viewport: ya no salta al borde ni se adelanta al hincha.
+
+**Validación Unity:** EditMode focalizado **PASS 6/6**, job `75795ad3c301471fb089b3533f2f7c2a`; PlayMode Game View `CamionerosOrderBubbleEntersWithTheFanInsteadOfAppearingAtTheEdge` **PASS 1/1**, job `9fd87185721e49c291a4f6bc6e83cdb7`. Capturas reales 540×960 a 18/39/60 px en `Logs/Acceptance/TowerDefenseReadyStations20261106/`. Tras las pruebas se verificó `Assets/Scenes/Main.unity` activa y sin cambios pendientes. `git diff --check` focalizado **PASS**. El chequeo global encuentra trailing whitespace en `.meta` de ModularKitchen modificados fuera de este cambio (preservados). APK y push **NOT_RUN**; la instalada precede a estos cambios. Detalles y alcance criterio por criterio en [contrato Tower Defense](features/tower-defense.md).
+
+### Corrección posterior del globo — 2026-11-10
+
+La punta del globo TD quedaba a la altura del inicio de la cabeza y podía tocar el sprite. Se desplazó solo el globo de Tower Defense para dejar 6 px lógicos libres sobre la cabeza, sin mover el ancla horizontal ni modificar globos de niveles tradicionales. Se agregó una aserción EditMode de esa distancia. **Validación de esta corrección: BLOCKED**; job `efa381798f934dc3b753d768a1d67add` agotó el timeout MCP de 120 s con `completed=0`, y `editor/state` reportó ping sin respuesta. El validador estático del test EditMode devolvió cero diagnósticos; el de runtime no pudo procesar el archivo parcial con punto en su nombre. Game View actualizado **NOT_RUN**; las capturas anteriores no validan la holgura nueva. No se generó APK ni se reinició Unity.
+
 ## 2026-11-09 — Torre Defense: envelope completo de los 6 trabajadores
 
 La ubicación de Parrilleros/Cocacoleros en portrait alto trataba `worker.Position` como centro del sprite aunque la vista usa pivot Y `0.02` (casi a los pies); la fila superior podía cruzar el riel horizontal. Ahora el cálculo centra los envelopes de dos filas de 94 px con 8 px de margen al claro de vallas, conserva 110 px entre anclas y comprueba el tamaño real de las cuatro poses regulares de cada oficio. La prueba EditMode existente se amplió: contrata 3+3 en cada una de las dos áreas, comprueba las seis cajas completas contra límites de vallas reales, separación entre trabajadores y espacio libre de mesa/barril. Mesa/barril y centros de estación no se movieron.

@@ -130,11 +130,12 @@ namespace HayChoriYPaty
             }
             SetLayerRecursively(generatedRoot.gameObject, presentationLayer);
             ClearGeneratedChildren();
-            BuildRail(FitVisualRailToHorizontalBounds(latestGeometry.LeftBoundary), 0);
+            bool singleFence = levelConfig.RouteKind == TowerDefenseRouteKind.HorizontalSingleFence;
+            if (!singleFence) BuildRail(FitVisualRailToHorizontalBounds(latestGeometry.LeftBoundary), 0);
             BuildRail(FitVisualRailToHorizontalBounds(latestGeometry.RightBoundary), 1);
             // Simulation/collision keep using the original route; only fence art snaps
             // to the screen edges, so screen framing cannot change follower waypoints.
-            BuildEdge("Fence rail 0 collider", latestGeometry.LeftBoundary);
+            if (!singleFence) BuildEdge("Fence rail 0 collider", latestGeometry.LeftBoundary);
             BuildEdge("Fence rail 1 collider", latestGeometry.RightBoundary);
             BuildDirectionSigns(latestGeometry);
             return GeneratedPieceCount > 0;

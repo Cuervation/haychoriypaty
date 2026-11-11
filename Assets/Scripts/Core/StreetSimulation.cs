@@ -63,7 +63,7 @@ namespace HayChoriYPaty
         [Min(0.1f)] public float customerArrivalSeconds = 0.16f;
         [Min(0.1f)] public float workerSpeed = 300f;
         [Min(10f)] public float customerSpeed = 300f;
-        public float[] levelDemandMultipliers = { 1f, 1.1f, 1.2f, 1.35f, 1.5f, 1.65f, 1.815f, 1.9965f, 2.19615f, 2.415765f, 2.6573415f, 1.65f, 2.6573415f };
+        public float[] levelDemandMultipliers = { 1f, 1.1f, 1.2f, 1.35f, 1.5f, 1.65f, 1.815f, 1.9965f, 2.19615f, 2.415765f, 2.6573415f, 1.65f, 2.6573415f, 2.6573415f, 1f };
         [Min(0.01f)] public float pickupSeconds = 0.28f;
         [Min(0f)] public float minPrice = 0f;
         [Min(0f)] public float maxPrice = 60f;
@@ -73,12 +73,12 @@ namespace HayChoriYPaty
         [Min(1)] public int minOrderQuantity = 999;
         [Min(1)] public int maxOrderQuantity = 999;
         [Min(0f)] public float initialPrice = 5f;
-        public int[] levelProductCounts = { 1, 2, 3, 5, 7, 7, 7, 7, 7, 7, 7, 3, 7 };
+        public int[] levelProductCounts = { 1, 2, 3, 5, 7, 7, 7, 7, 7, 7, 7, 3, 7, 2, 7 };
         [Tooltip("Comma-separated stable product IDs, in each level's display/order priority.")]
-        public string[] levelProductIds = { "0", "0,4", "0,1,4", "0,1,2,4,6", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,4", "0,1,2,3,4,6,5" };
+        public string[] levelProductIds = { "0", "0,4", "0,1,4", "0,1,2,4,6", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,4", "0,1,2,3,4,6,5", "0,4", "0,1,2,3,4,6,5" };
         [HideInInspector, Tooltip("Legacy aggregate goals retained for serialized-scene compatibility; individual levelBalances are authoritative.")]
-        public int[] levelGoals = { 200, 200, 65, 85, 110, 121, 133, 146, 161, 177, 195, 0, 195 };
-        public float[] levelDurations = { 120f, 150f, 180f, 210f, 240f, 260f, 300f, 340f, 340f, 380f, 315f, StreetBonusTrackState.DurationSeconds, 315f };
+        public int[] levelGoals = { 200, 200, 65, 85, 110, 121, 133, 146, 161, 177, 195, 0, 195, 0, 0 };
+        public float[] levelDurations = { 120f, 150f, 180f, 210f, 240f, 260f, 300f, 340f, 340f, 380f, 315f, StreetBonusTrackState.DurationSeconds, 315f, 0f, 0f };
         [Tooltip("Official per-level goals, role hire base costs, speed-cost multiplier, and opening attempt balance.")]
         public StreetLevelBalance[] levelBalances = CreateOfficialLevelBalances();
 
@@ -98,14 +98,16 @@ namespace HayChoriYPaty
                 new StreetLevelBalance(new[] {310,220,135,125,255,110,145}, new[] {60,60,80,70,70}, 17.00f, 500),
                 new StreetLevelBalance(new[] {345,245,150,140,285,120,165}, new[] {70,70,90,80,80}, 21.00f, 500),
                 new StreetLevelBalance(new[] {0,0,0,0,0,0,0}, new[] {0,0,0,0,0}, 1f),
-                new StreetLevelBalance(new[] {345,245,150,140,285,120,165}, new[] {70,70,90,80,80}, 21.00f, 500)
+                new StreetLevelBalance(new[] {345,245,150,140,285,120,165}, new[] {70,70,90,80,80}, 21.00f, 500),
+                new StreetLevelBalance(new[] {0,0,0,0,0,0,0}, new[] {0,0,0,0,0}, 1f),
+                new StreetLevelBalance(new[] {0,0,0,0,0,0,0}, new[] {60,60,60,60,60}, 1f, 1200)
             };
         }
 
         public StreetLevelBalance GetLevelBalance(int levelIndex)
         {
             return levelBalances != null && levelIndex >= 0 && levelIndex < levelBalances.Length && levelBalances[levelIndex] != null
-                ? levelBalances[levelIndex] : CreateOfficialLevelBalances()[Mathf.Clamp(levelIndex, 0, 12)];
+                ? levelBalances[levelIndex] : CreateOfficialLevelBalances()[Mathf.Clamp(levelIndex, 0, 14)];
         }
 
         public int GetProductGoal(int levelIndex, int productId)
@@ -113,7 +115,7 @@ namespace HayChoriYPaty
             if (productId < 0 || productId >= 7) return 0;
             StreetLevelBalance row = GetLevelBalance(levelIndex);
             return row.goalsByProductId != null && productId < row.goalsByProductId.Length && row.goalsByProductId[productId] > 0
-                ? row.goalsByProductId[productId] : CreateOfficialLevelBalances()[Mathf.Clamp(levelIndex, 0, 12)].goalsByProductId[productId];
+                ? row.goalsByProductId[productId] : CreateOfficialLevelBalances()[Mathf.Clamp(levelIndex, 0, 14)].goalsByProductId[productId];
         }
 
         public int GetHireBaseCost(int levelIndex, StreetWorkerRole role)
@@ -124,7 +126,7 @@ namespace HayChoriYPaty
             StreetLevelBalance row = GetLevelBalance(levelIndex);
             return row.hireBaseCostsByRole != null && roleIndex >= 0 && roleIndex < row.hireBaseCostsByRole.Length
                 ? Mathf.Max(0, row.hireBaseCostsByRole[roleIndex])
-                : CreateOfficialLevelBalances()[Mathf.Clamp(levelIndex, 0, 12)].hireBaseCostsByRole[roleIndex];
+                : CreateOfficialLevelBalances()[Mathf.Clamp(levelIndex, 0, 14)].hireBaseCostsByRole[roleIndex];
         }
         public int GetStartingCoins(int levelIndex)
         {
@@ -293,6 +295,8 @@ namespace HayChoriYPaty
     {
         public const int TowerDefenseCampaignLevelId = 9;
         public const int LosRedondosTowerDefenseCampaignLevelId = 10;
+        public const int LaRengaTowerDefenseCampaignLevelId = 13;
+        public const int PeregrinacionTowerDefenseCampaignLevelId = 14;
         public const float FixedProductPrice = 5f; // Legacy common/chori price retained for compatibility.
         public const float FlorestaChoriPrice = FixedProductPrice; // Legacy name retained for compatibility.
         private static readonly float[] OfficialProductPrices = { FixedProductPrice, FixedProductPrice, 10f, 12f, FixedProductPrice, 12f, 7f };
@@ -305,8 +309,8 @@ namespace HayChoriYPaty
         public static readonly string[] ProductNames = { "Chori", "Paty", "Bondiola", "Vacío", "Coca 600 ml", "Fernet con Coca 1 L", "Cerveza en lata" };
         public const int HuracanBonusLevelId = 11;
         public const int ArgentinosJuniorsLevelId = 12;
-        public static readonly int[] CampaignOrder = { 0, 1, TowerDefenseCampaignLevelId, 2, ArgentinosJuniorsLevelId, 3, HuracanBonusLevelId, LosRedondosTowerDefenseCampaignLevelId, 4, 5, 6, 7, 8 };
-        public static readonly string[] LevelNames = { "Floresta / All Boys", "Nueva Chicago", "Liniers - Velez Sarsfield", "Ferro Carril Oeste", "Independiente de Avellaneda", "Racing Club / Avellaneda", "San Lorenzo / Boedo", "River Plate / Núñez", "Boca Juniors / La Boca", "Sindicato de Camioneros / Plaza de Mayo", "Los Redondos / Tandil", "Huracán / Parque Patricios", "Argentinos Juniors / La Paternal" };
+        public static readonly int[] CampaignOrder = { 0, 1, TowerDefenseCampaignLevelId, 2, ArgentinosJuniorsLevelId, 3, HuracanBonusLevelId, LosRedondosTowerDefenseCampaignLevelId, LaRengaTowerDefenseCampaignLevelId, PeregrinacionTowerDefenseCampaignLevelId, 4, 5, 6, 7, 8 };
+        public static readonly string[] LevelNames = { "Floresta / All Boys", "Nueva Chicago", "Liniers - Velez Sarsfield", "Ferro Carril Oeste", "Independiente de Avellaneda", "Racing Club / Avellaneda", "San Lorenzo / Boedo", "River Plate / Núñez", "Boca Juniors / La Boca", "Sindicato de Camioneros / Plaza de Mayo", "Los Redondos / Tandil", "Huracán / Parque Patricios", "Argentinos Juniors / La Paternal", "La Renga – Autódromo Bs. As.", "Peregrinación a Luján — Moreno" };
         // Player-facing captions consistently show the club/team first and its neighborhood second.
         // LevelNames remain stable theme keys consumed by ClubVisualTheme.
         public static readonly string[] LevelDisplayNames = {
@@ -314,18 +318,18 @@ namespace HayChoriYPaty
             "Ferro / Caballito", "Independiente / Avellaneda", "Racing Club / Avellaneda",
             "San Lorenzo / Boedo", "River Plate / Núñez", "Boca Juniors / La Boca",
             "Sindicato de Camioneros / Plaza de Mayo", "Los Redondos / Tandil", "Huracán / Parque Patricios",
-            "Argentinos Juniors / La Paternal"
+            "Argentinos Juniors / La Paternal", "La Renga – Autódromo Bs. As.", "Peregrinación a Luján — Moreno"
         };
-        private static readonly int[] DefaultProductCounts = { 1, 2, 3, 5, 7, 7, 7, 7, 7, 7, 7, 3, 7 };
+        private static readonly int[] DefaultProductCounts = { 1, 2, 3, 5, 7, 7, 7, 7, 7, 7, 7, 3, 7, 2, 7 };
         private static readonly int[][] DefaultLevelProducts = {
             new[] { 0 }, new[] { 0, 4 }, new[] { 0, 1, 4 },
             new[] { 0, 1, 2, 4, 6 }, new[] { 0, 1, 2, 3, 4, 6, 5 },
             new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 },
-            new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 4 }, new[] { 0, 1, 2, 3, 4, 6, 5 }
+            new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 4 }, new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 4 }, new[] {0,1,2,3,4,6,5}
         };
-        private static readonly float[] DefaultDemandMultipliers = { 1f, 1.1f, 1.2f, 1.35f, 1.5f, 1.65f, 1.815f, 1.9965f, 2.19615f, 2.415765f, 2.6573415f, 1.65f, 2.6573415f };
+        private static readonly float[] DefaultDemandMultipliers = { 1f, 1.1f, 1.2f, 1.35f, 1.5f, 1.65f, 1.815f, 1.9965f, 2.19615f, 2.415765f, 2.6573415f, 1.65f, 2.6573415f, 2.6573415f, 1f };
         private static readonly int[] DefaultSpeedCosts = { 5, 10, 15, 20, 30, 45, 65, 90, 125 };
-        private static readonly float[] DefaultDurations = { 120f, 150f, 180f, 210f, 240f, 260f, 300f, 340f, 340f, 380f, 315f, StreetBonusTrackState.DurationSeconds, 315f };
+        private static readonly float[] DefaultDurations = { 120f, 150f, 180f, 210f, 240f, 260f, 300f, 340f, 340f, 380f, 315f, StreetBonusTrackState.DurationSeconds, 315f, 0f, 0f };
         private const int MaxHireCost = int.MaxValue - int.MaxValue % 5;
         private readonly StreetBalance balance;
         private readonly int[][] availableProductsByLevel;
@@ -345,9 +349,15 @@ namespace HayChoriYPaty
 
         public static int CampaignLevelAt(int position) => position >= 0 && position < CampaignOrder.Length ? CampaignOrder[position] : -1;
         public static bool IsTowerDefenseLevel(int levelId) =>
-            levelId == TowerDefenseCampaignLevelId || levelId == LosRedondosTowerDefenseCampaignLevelId;
+            !string.IsNullOrEmpty(TowerDefenseLevelConfig.ResourcesPathForCampaignLevel(levelId));
         public static int GetStartingCoinsForLevel(StreetBalance sourceBalance, int levelId) =>
-            IsTowerDefenseLevel(levelId) ? TowerDefenseEconomyProfile.StartingCoins : sourceBalance == null ? 0 : sourceBalance.GetStartingCoins(levelId);
+            IsTowerDefenseLevel(levelId) ? TowerDefenseStartingCoins(levelId) : sourceBalance == null ? 0 : sourceBalance.GetStartingCoins(levelId);
+
+        private static int TowerDefenseStartingCoins(int levelId)
+        {
+            var config = Resources.Load<TowerDefenseLevelConfig>(TowerDefenseLevelConfig.ResourcesPathForCampaignLevel(levelId));
+            return config != null ? config.StartingCoins : TowerDefenseEconomyProfile.StartingCoins;
+        }
         public static int CampaignPositionOf(int levelId)
         {
             for (int i = 0; i < CampaignOrder.Length; i++) if (CampaignOrder[i] == levelId) return i;
@@ -579,12 +589,10 @@ namespace HayChoriYPaty
                 return Mathf.Clamp01((balance.maxPrice-total/ProductCount)/Mathf.Max(0.01f,balance.maxPrice-balance.minPrice));
             }
         }
-        public int ProductCount { get { return IsTowerDefenseLevel(LevelIndex) ? 2 : availableProductsByLevel[LevelIndex].Length; } }
+        public int ProductCount { get { return availableProductsByLevel[LevelIndex].Length; } }
 
         public int GetAvailableProduct(int slot)
         {
-            if (IsTowerDefenseLevel(LevelIndex))
-                return slot == 0 ? 0 : slot == 1 ? 4 : -1;
             return slot >= 0 && slot < ProductCount ? availableProductsByLevel[LevelIndex][slot] : -1;
         }
 
@@ -598,7 +606,7 @@ namespace HayChoriYPaty
                 int[] parsed = ParseProductIds(value.levelProductIds != null && level < value.levelProductIds.Length
                     ? value.levelProductIds[level] : null);
                 if (parsed == null) parsed = (int[])DefaultLevelProducts[level].Clone();
-                result[level] = IsTowerDefenseLevel(level) ? new[] {0, 4} : parsed;
+                result[level] = IsTowerDefenseLevel(level) && level != PeregrinacionTowerDefenseCampaignLevelId ? new[] {0, 4} : parsed;
             }
             return result;
         }

@@ -83,7 +83,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(7, LongArray(statistics, "deliveredByProduct").Length);
             Assert.AreEqual(10, LongArray(statistics, "consumedUnitsByIngredient").Length);
             Assert.AreEqual(5, LongArray(statistics, "paidHiresByRole").Length);
-            Assert.AreEqual(13, LongArray(statistics, "winsByLevel").Length);
+            Assert.AreEqual(15, LongArray(statistics, "winsByLevel").Length);
         }
 
         [Test]
@@ -324,7 +324,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(7L, LongArray(statistics, "deliveredByProduct")[0]);
             Assert.AreEqual(2L, LongArray(statistics, "deliveredByProduct")[1]);
             Assert.AreEqual(0L, LongArray(statistics, "deliveredByProduct")[2]);
-            Assert.AreEqual(13, LongArray(statistics, "winsByLevel").Length);
+            Assert.AreEqual(15, LongArray(statistics, "winsByLevel").Length);
             Assert.AreEqual(0L, LongArray(statistics, "winsByLevel")[0]);
         }
 

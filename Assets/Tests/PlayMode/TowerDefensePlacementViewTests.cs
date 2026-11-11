@@ -84,7 +84,9 @@ namespace HayChoriYPaty.Tests
         [UnitySetUp]
         public IEnumerator SetUp()
         {
-            requestedLevelId = TestContext.CurrentContext.Test.Name.IndexOf("LosRedondos", StringComparison.OrdinalIgnoreCase) >= 0 ? 10 : 9;
+            requestedLevelId = TestContext.CurrentContext.Test.Name.IndexOf("Peregrinacion", StringComparison.OrdinalIgnoreCase) >= 0 ? 14
+                : TestContext.CurrentContext.Test.Name.IndexOf("LaRenga", StringComparison.OrdinalIgnoreCase) >= 0 ? 13
+                : TestContext.CurrentContext.Test.Name.IndexOf("LosRedondos", StringComparison.OrdinalIgnoreCase) >= 0 ? 10 : 9;
             previousTime = Time.timeScale;
             gt = T("StreetGame"); vt = T("StreetView");
             camionerosTutorialCompletedKey = (string)vt.GetField("CamionerosTutorialCompletedKey", S).GetRawConstantValue();
@@ -153,7 +155,9 @@ namespace HayChoriYPaty.Tests
             Texture2D image = ScreenCapture.CaptureScreenshotAsTexture();
             Assert.AreEqual(540, image.width); Assert.AreEqual(960, image.height);
             Directory.CreateDirectory(CaptureDirectory);
-            File.WriteAllBytes(Path.Combine(CaptureDirectory, name + ".png"), image.EncodeToPNG());
+            string directory = requestedLevelId >= 13 ? Path.Combine(CaptureDirectory, "Level"+requestedLevelId) : CaptureDirectory;
+            Directory.CreateDirectory(directory);
+            File.WriteAllBytes(Path.Combine(directory, name + ".png"), image.EncodeToPNG());
             UnityEngine.Object.Destroy(image);
         }
 
@@ -219,7 +223,7 @@ namespace HayChoriYPaty.Tests
             yield return null;
         }
 
-        IEnumerator CaptureAtResolution(string name, int width, int height)
+        IEnumerator CaptureAtResolution(string name, int width, int height, bool restoreResolution = true)
         {
             Assembly editor = typeof(UnityEditor.EditorWindow).Assembly;
             gameWindow = UnityEditor.EditorWindow.GetWindow(editor.GetType("UnityEditor.GameView"));
@@ -253,14 +257,20 @@ namespace HayChoriYPaty.Tests
             }
             finally
             {
-                sizeGroup.GetType().GetMethod("RemoveCustomSize", I).Invoke(sizeGroup, new object[] {temporarySize});
-                temporarySizes.Remove(temporarySize);
-                selectedSize.SetValue(gameWindow, addedSize);
-                gameWindow.Repaint();
+                if (restoreResolution)
+                {
+                    sizeGroup.GetType().GetMethod("RemoveCustomSize", I).Invoke(sizeGroup, new object[] {temporarySize});
+                    temporarySizes.Remove(temporarySize);
+                    selectedSize.SetValue(gameWindow, addedSize);
+                    gameWindow.Repaint();
+                }
             }
-            yield return null;
-            Call(view, "UpdateTowerDefenseFrame");
-            yield return null;
+            if (restoreResolution)
+            {
+                yield return null;
+                Call(view, "UpdateTowerDefenseFrame");
+                yield return null;
+            }
         }
 
         void RecordReceipt<TReceipt>(TReceipt receipt)
@@ -793,24 +803,206 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
-        public IEnumerator AutomaticMixedSixtyFanWaveCanWinWithCoinHiresAndNormalMovementForCamioneros()
+        public IEnumerator CamionerosOrderBubbleEntersWithTheFanInsteadOfAppearingAtTheEdge()
         {
-            yield return RunAutomaticMixedSixtyFanWave(9);
+            Assert.AreEqual(9, requestedLevelId);
+            Call(mode, "Step", .05f);
+            IList fans = (IList)Get(mode, "Fans");
+            Assert.AreEqual(1, fans.Count, "The first supporter appears gradually from the left entrance.");
+            Set(mode, "stopSpawning", true);
+            object fan = fans[0];
+            object follower = Get(fan, "RouteFollower");
+            object presentation = Get(view, "towerDefensePresentation");
+            float pixel = (float)Get(mode, "WorldUnitsPerLogicalPixel");
+            float speed = (float)Get(follower, "Speed");
+            Assert.Greater(pixel, 0f);
+            Assert.Greater(speed, 0f);
+
+            // Capture two points in the 78px entrance reveal. The bubble is rendered
+            // through the same viewport clip as its world-space fan, above its head.
+            Call(follower, "Advance", 18f * pixel / speed);
+            Call(presentation, "Sync", mode);
+            yield return Capture("camioneros-entry-reveal-18px-fan-and-order-bubble");
+
+            Call(follower, "Advance", 21f * pixel / speed);
+            Call(presentation, "Sync", mode);
+            yield return Capture("camioneros-entry-reveal-39px-fan-and-order-bubble");
+
+            Call(follower, "Advance", 21f * pixel / speed);
+            Call(presentation, "Sync", mode);
+            yield return Capture("camioneros-entry-reveal-60px-fan-and-order-bubble");
+        }
+
+        [UnityTest]
+        public IEnumerator AutomaticMixedOneHundredTwentyFanWaveCanWinWithCoinHiresAndNormalMovementForCamioneros()
+        {
+            yield return RunAutomaticMixedFanWave(9, 120);
         }
 
         [UnityTest]
         public IEnumerator AutomaticMixedSixtyFanWaveCanWinWithCoinHiresAndNormalMovementForLosRedondos()
         {
-            yield return RunAutomaticMixedSixtyFanWave(10);
+            yield return RunAutomaticMixedFanWave(10, 60);
         }
 
-        private IEnumerator RunAutomaticMixedSixtyFanWave(int campaignLevelId)
+        [UnityTest]
+        public IEnumerator LaRengaAutomaticSixtyFansCanWinWithNormalMovementAndCoinHires()
+        {
+            Assert.IsFalse((bool)Get(view, "towerDefenseTutorialActive"));
+            yield return RunAutomaticMixedFanWave(13, 60);
+        }
+
+        [UnityTest]
+        public IEnumerator LaRengaMixedOrderUsesPhysicalProductsAndCommonCampaignProjection()
+        {
+            yield return CaseCMixedOrderUsesRealProductionCorrectRolesReceiptsAndCampaignProjection();
+        }
+
+        [UnityTest]
+        public IEnumerator LaRengaWithoutWorkersLosesAtTheFirstPendingEscape()
+        {
+            yield return AutomaticWaveWithoutWorkersLosesWithNoGhostDeliveries();
+        }
+
+        [UnityTest]
+        public IEnumerator LaRengaGameViewShowsBothStaffedAreasFansAndPhysicalThrowsAtThreeResolutions()
+        {
+            Assert.AreEqual(13, requestedLevelId); AssertPreparedStations();
+            Set(mode, "stopSpawning", true);
+            for (int n = 0; n < 9; n++) HeldFan(new[] {0, 4}, new[] {4, 4}, .05f + n * .105f);
+            foreach (int zone in new[] {0, 1})
+                foreach (int role in new[] {0, 1})
+                { yield return Tap(Cards()[role].center); yield return Tap(Areas()[zone].center); }
+            Assert.AreEqual(4, ((IList)Get(mode, "Workers")).Count);
+            bool chori = false, coca = false;
+            for (int n = 0; n < 400 && !chori; n++)
+            {
+                Call(mode, "Step", .05f);
+                foreach (object receipt in receipts)
+                { chori |= (int)Get(receipt, "Product") == 0; coca |= (int)Get(receipt, "Product") == 4; }
+                if (n % 10 == 0) yield return null;
+            }
+            Assert.IsTrue(chori); Assert.IsTrue(coca);
+            Call(mode, "Step", .36f); // Advance a real receipt into its airborne throw phase.
+            yield return null;
+            // Held QA targets isolate visual production/handoffs; the separate sixty-fan
+            // natural-wave test proves route movement and the finite win condition.
+            yield return CaptureAtResolution("la-renga-service-540x960", 540, 960);
+            yield return CaptureAtResolution("la-renga-service-1080x1920", 1080, 1920);
+            yield return CaptureAtResolution("la-renga-service-720x1280", 720, 1280);
+        }
+
+        private void BuildPilgrimEquipmentAndInitialCrew()
+        {
+            Assert.AreEqual(14, requestedLevelId);
+            Rect bounds = (Rect)Get(mode, "WorkBounds");
+            float pixel = (float)Get(mode, "WorldUnitsPerLogicalPixel");
+            Type stationKind = T("TowerDefenseStationKind"), roleKind = T("StreetWorkerRole");
+            // Legal purchases only; no cash injection, follower-speed change or held QA targets.
+            Vector2[] locations = {new Vector2(128,64),new Vector2(384,64),new Vector2(256,320),
+                new Vector2(64,320),new Vector2(448,320),new Vector2(128,160),new Vector2(384,160)};
+            // Place all seven separate fixtures. A blocked access is a real test failure, not waived.
+            for (int i=0;i<7;i++)
+            {
+                Vector2 point=bounds.min+locations[i]*pixel;
+                Assert.IsTrue((bool)Call(game,"TryPlaceTowerDefenseStation",mode,Enum.ToObject(stationKind,i),point),"Equipment "+i);
+            }
+            var hired=new bool[5]; int count=0;
+            for(int tick=0;tick<600 && count<5;tick++)
+            {
+                if(tick%20==0)
+                foreach(int role in new[]{0,4,1,2,3})
+                {
+                    if(hired[role])continue;
+                    foreach(int y in new[]{192,224,160,256,128,96,64})
+                    {
+                        for(int x=64;x<bounds.width/pixel-40;x+=32)
+                        {
+                            Vector2 point=bounds.min+new Vector2(x,y)*pixel;
+                            if(!(bool)Call(game,"TryHireTowerDefenseAt",mode,Enum.ToObject(roleKind,role),point))continue;
+                            hired[role]=true;count++;break;
+                        }
+                        if(hired[role])break;
+                    }
+                }
+                if(count<5)Call(mode,"Step",.05f);
+            }
+            Assert.AreEqual(5,((IList)Get(mode,"Workers")).Count,"A legal progressive strategy must afford and reach all five roles.");
+            Assert.AreEqual(7,((IList)Get(mode,"PlacedStations")).Count);
+        }
+
+        [UnityTest]
+        public IEnumerator PeregrinacionNaturalSixtyWithSevenProductsUsesLegalConstructionAndCanWin()
+        {
+            BuildPilgrimEquipmentAndInitialCrew();
+            int[] delivered;
+            for (int tick=0;tick<24000 && Get(mode,"Phase").ToString()=="Playing";tick++)
+            {
+                Call(mode,"Step",.05f);
+                if (tick % 120 == 0) yield return null;
+            }
+            Assert.IsTrue((bool)Get(mode,"HasWon"),"Natural full wave must win without teleport, cash or speed changes.");
+            Assert.AreEqual(60,Get(mode,"SpawnedFans")); Assert.AreEqual(60,Get(mode,"ServedFans"));
+            delivered=(int[])Get(mode,"DeliveredByProduct");
+            for (int product=0;product<7;product++) Assert.Greater(delivered[product],0,"Real deliveries product " + product);
+            long spend=(long)Get(mode,"HireSpendCents")+(long)Get(mode,"EquipmentSpendCents");
+            Assert.AreEqual(1200L+(int)Get(mode,"CoinsEarned")-spend/100,(long)(int)Get(mode,"Coins"));
+            Call(view,"UpdateTowerDefenseFrame");
+            Assert.AreEqual("Won",Get(Get(game,"Sim"),"Phase").ToString());
+            Assert.IsTrue((bool)Call(game,"IsLevelUnlocked",4));
+        }
+
+        [UnityTest]
+        public IEnumerator PeregrinacionGameViewSingleFenceFreeConstructionAtThreeResolutions()
+        {
+            BuildPilgrimEquipmentAndInitialCrew();
+            for (int tick=0;tick<1600 && receipts.Count==0;tick++)
+            { Call(mode,"Step",.05f); if (tick%50==0) yield return null; }
+            Assert.Greater(receipts.Count,0,"Capture needs real production and delivery.");
+            Call(mode,"Step",.36f);
+            object presentation=Get(view,"towerDefensePresentation");Call(presentation,"Sync",mode);
+            var component=(Component)presentation;
+            Assert.AreEqual(1,component.GetComponentsInChildren<EdgeCollider2D>().Length,"Exactly one physical rail collider.");
+            yield return CaptureAtResolution("peregrinacion-horizontal-540x960",540,960);
+            yield return CaptureAtResolution("peregrinacion-horizontal-1080x1920",1080,1920);
+            yield return CaptureAtResolution("peregrinacion-horizontal-720x1280",720,1280);
+        }
+
+        [UnityTest]
+        public IEnumerator PeregrinacionPointerPreviewPlacesFurnitureAndRejectsOverlapWithoutCharge()
+        {
+            yield return Tap(((Rect)Call(view,"PilgrimTabBounds",1)).center);
+            yield return Tap(((Rect)Call(view,"PilgrimCardBounds",0)).center);
+            Assert.AreEqual(0,Get(view,"pilgrimSelection"));
+            Rect work=(Rect)Get(mode,"WorkBounds");float pixel=(float)Get(mode,"WorldUnitsPerLogicalPixel");
+            Vector2 world=work.min+new Vector2(128,64)*pixel;
+            Vector2 logical=((Rect)Call(view,"PilgrimWorldToLogical",new Rect(world,Vector2.zero))).position;
+            yield return Tap(logical);
+            Assert.AreEqual(1,((IList)Get(mode,"PlacedStations")).Count);Assert.AreEqual(-1,Get(view,"pilgrimSelection"));
+            int coins=(int)Get(mode,"Coins");
+            yield return Tap(((Rect)Call(view,"PilgrimCardBounds",0)).center);yield return Tap(logical);
+            Assert.AreEqual(1,((IList)Get(mode,"PlacedStations")).Count);Assert.AreEqual(coins,Get(mode,"Coins"));
+            Assert.IsNotEmpty((string)Get(view,"towerDefenseError"));
+        }
+
+        [UnityTest]
+        public IEnumerator PeregrinacionWithoutWorkersLosesAndPauseStopsSimulation()
+        {
+            Call(mode,"Pause");float elapsed=(float)Get(mode,"Elapsed");Call(mode,"Step",20f);
+            Assert.AreEqual(elapsed,Get(mode,"Elapsed"));Call(mode,"Resume");
+            for (int tick=0;tick<1800 && !(bool)Get(mode,"HasLost");tick++)
+            { Call(mode,"Step",.05f);if(tick%100==0)yield return null; }
+            Assert.IsTrue((bool)Get(mode,"HasLost"));Assert.AreEqual(0,Get(mode,"TotalDelivered"));
+        }
+
+        private IEnumerator RunAutomaticMixedFanWave(int campaignLevelId, int expectedFanCount)
         {
             Assert.AreEqual(campaignLevelId, requestedLevelId);
             object config = Get(view, "towerDefenseSourceConfig");
             Assert.AreEqual(campaignLevelId, Get(config, "SourceCampaignLevelId"));
             Assert.AreEqual(9, Get(config, "EconomicBalanceCampaignLevelId"));
-            string expectedWalkArt = campaignLevelId == 10 ? "street-losredondos-fans-walk-v1" : "street-ferro-fans-walk-v2";
+            string expectedWalkArt = campaignLevelId == 13 ? "street-larenga-fans-walk-v1"
+                : campaignLevelId == 10 ? "street-losredondos-fans-walk-v1" : "street-ferro-fans-walk-v2";
             Assert.AreEqual(expectedWalkArt, ((Sprite)Call(Get(view, "towerDefensePresentation"), "FanSprite", 1, false, 0)).texture.name);
             AssertPreparedStations();
             // Legal player strategy: one Coca covers the upper/shared path; prioritize
@@ -849,9 +1041,9 @@ namespace HayChoriYPaty.Tests
             TestContext.WriteLine(outcome);
             if (!(bool)Get(mode, "HasWon")) yield return Capture("automatic-wave-strategy-failure");
             Assert.IsTrue((bool)Get(mode, "HasWon"), "Natural finite wave with legal adaptive coin hires: " + outcome);
-            Assert.IsFalse((bool)Get(mode, "HasLost")); Assert.AreEqual(60, seen.Count);
-            Assert.AreEqual(60, Get(mode, "SpawnedFans")); Assert.AreEqual(60, Get(mode, "ServedFans"));
-            Assert.AreEqual(60, Get(mode, "OrdersCompleted")); Assert.AreEqual(0, Get(mode, "EscapedFans"));
+            Assert.IsFalse((bool)Get(mode, "HasLost")); Assert.AreEqual(expectedFanCount, seen.Count);
+            Assert.AreEqual(expectedFanCount, Get(mode, "SpawnedFans")); Assert.AreEqual(expectedFanCount, Get(mode, "ServedFans"));
+            Assert.AreEqual(expectedFanCount, Get(mode, "OrdersCompleted")); Assert.AreEqual(0, Get(mode, "EscapedFans"));
             Assert.AreEqual(requested, Get(mode, "TotalDelivered")); Assert.AreEqual(requested, receipts.Count);
             Assert.AreEqual(requested * 5, Get(mode, "CoinsEarned")); Assert.AreEqual(afterHires - additionalSpend + requested * 5, Coins);
             Call(view, "UpdateTowerDefenseFrame");
@@ -935,6 +1127,95 @@ namespace HayChoriYPaty.Tests
             yield return Tap(cards[1].center); yield return Tap(areas[1].center);
             Assert.AreEqual(coins, Coins); Assert.AreEqual(saves, savedCalls);
             Assert.AreEqual(1, Count("Cocacolero", 1));
+        }
+
+        [UnityTest]
+        public IEnumerator ThreeParrillerosAndThreeCocacolerosFitInsideTheFirstAreaInTallPortrait()
+        {
+            yield return PlaceAndCaptureThreePlusThreeWorkers(0);
+        }
+
+        [UnityTest]
+        public IEnumerator ThreeParrillerosAndThreeCocacolerosFitInsideTheSecondAreaInTallPortrait()
+        {
+            yield return PlaceAndCaptureThreePlusThreeWorkers(1);
+        }
+
+        IEnumerator PlaceAndCaptureThreePlusThreeWorkers(int zone)
+        {
+            Set(mode, "coins", 10000);
+            Rect[] cards = Cards(), areas = Areas();
+            for (int role = 0; role < 2; role++)
+                for (int i = 0; i < 3; i++)
+                {
+                    yield return Tap(cards[role].center);
+                    yield return Tap(areas[zone].center);
+                }
+
+            Assert.AreEqual(3, Count("Parrillero", zone));
+            Assert.AreEqual(3, Count("Cocacolero", zone));
+            yield return CaptureAtResolution("workers-3-plus-3-area-" + zone + "-576x1280", 576, 1280, false);
+            AssertTallPortraitWorkersAndStationsStayInsideArea(zone);
+        }
+
+        void AssertTallPortraitWorkersAndStationsStayInsideArea(int zone)
+        {
+            float pixel = (float)Get(mode, "WorldUnitsPerLogicalPixel");
+            Vector2 horizontal = (Vector2)Call(mode, "WorkAreaHorizontalBounds", new object[] {zone});
+            Vector2 center = (Vector2)Call(mode, "WorkZone", zone);
+            object route = Get(mode, "RouteConfig");
+            float rowSpacing = (float)route.GetType().GetField("RowSpacing", I).GetValue(route);
+            float horizontalCorridor = (float)route.GetType().GetField("HorizontalCorridorWidth", I).GetValue(route);
+            float halfClearHeight = (rowSpacing - horizontalCorridor) * .5f;
+            float fenceClearance = (float)T("TowerDefenseGameMode").GetField("WorkerFenceClearanceLogical", S).GetRawConstantValue() * pixel;
+            IDictionary workerViews = (IDictionary)Get(Get(view, "towerDefensePresentation"), "workerViews");
+            IList workers = (IList)Get(mode, "Workers");
+            IList stations = (IList)Get(Get(view, "towerDefensePresentation"), "stationObjects");
+            var zoneStations = new System.Collections.Generic.List<Rect>();
+            for (int i = 0; i < stations.Count; i++)
+            {
+                GameObject station = (GameObject)stations[i];
+                if (!station.name.Contains("zone " + zone + " ")) continue;
+                foreach (SpriteRenderer renderer in station.GetComponentsInChildren<SpriteRenderer>(true))
+                {
+                    if (renderer == null || !renderer.enabled || renderer.sprite == null) continue;
+                    Bounds bounds = renderer.bounds;
+                    zoneStations.Add(Rect.MinMaxRect(bounds.min.x, bounds.min.y, bounds.max.x, bounds.max.y));
+                }
+            }
+            Assert.Greater(zoneStations.Count, 0, "Both original-size station sprites and their stock displays are present.");
+
+            for (int i = 0; i < workers.Count; i++)
+            {
+                object worker = workers[i];
+                if ((int)Get(worker, "ServiceZone") != zone) continue;
+                int id = (int)Get(worker, "Id");
+                object workerView = workerViews[id];
+                SpriteRenderer renderer = (SpriteRenderer)Get(workerView, "Renderer");
+                Bounds bounds = renderer.bounds;
+                Rect envelope = Rect.MinMaxRect(bounds.min.x, bounds.min.y, bounds.max.x, bounds.max.y);
+                Assert.GreaterOrEqual(envelope.xMin, horizontal.x - .0001f,
+                    "The rendered sprite stays within the outer fence edge.");
+                Assert.LessOrEqual(envelope.xMax, horizontal.y + .0001f,
+                    "The rendered sprite stays within the inner U-turn edge.");
+                Assert.GreaterOrEqual(envelope.yMin, center.y - halfClearHeight + fenceClearance - .0001f,
+                    "The full rendered sprite clears the lower rail.");
+                Assert.LessOrEqual(envelope.yMax, center.y + halfClearHeight - fenceClearance + .0001f,
+                    "The full rendered sprite clears the upper rail.");
+                for (int s = 0; s < zoneStations.Count; s++)
+                    Assert.IsFalse(envelope.Overlaps(zoneStations[s]),
+                        "No Parrillero or Cocacolero sprite may cover the table, barrel, or stocked product displays.");
+                for (int j = 0; j < i; j++)
+                {
+                    object prior = workers[j];
+                    if ((int)Get(prior, "ServiceZone") != zone) continue;
+                    SpriteRenderer priorRenderer = (SpriteRenderer)Get(workerViews[(int)Get(prior, "Id")], "Renderer");
+                    Bounds priorBounds = priorRenderer.bounds;
+                    Rect priorEnvelope = Rect.MinMaxRect(priorBounds.min.x, priorBounds.min.y, priorBounds.max.x, priorBounds.max.y);
+                    Assert.IsFalse(envelope.Overlaps(priorEnvelope),
+                        "All six rendered sprites must have clear space between each other.");
+                }
+            }
         }
 
         [UnityTest]
