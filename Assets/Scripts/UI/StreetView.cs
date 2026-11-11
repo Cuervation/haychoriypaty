@@ -1049,6 +1049,7 @@ namespace HayChoriYPaty
         }
         private void OnDisable()
         {
+            rewardShutterStarted = -1f; // Uncommitted choices remain pending in the existing save.
             DisposeTowerDefenseUi();
             if (hubMusicAudioSource != null) hubMusicAudioSource.Stop();
             ReleaseHubSignageResources();
@@ -1190,6 +1191,7 @@ namespace HayChoriYPaty
 
         private void Update()
         {
+            UpdateRewardShutter();
             UpdateHubMusic();
             // The branded presentation belongs to startup, not to the authenticated game session.
             // Let it complete while Firebase resolves; game actions remain gated separately.
@@ -1386,6 +1388,7 @@ namespace HayChoriYPaty
         }
         private void HandlePointer(Vector2 pixel, bool down, bool up)
         {
+            if (RewardShutterActive) return;
             if (game == null || (!IsTowerDefenseNavigationActive && (!game.IsPlayerActive || game.Sim == null)) ||
                 (Cloud.FirebasePlayerSession.Instance != null && Cloud.FirebasePlayerSession.Instance.BlocksGameInput)) return;
             if (ConsumeVictoryTransitionPointer(down, up)) return;
@@ -1544,7 +1547,7 @@ namespace HayChoriYPaty
         }
         private void DispatchAction(int a)
         {
-            if (VictoryTransitionActive || victorySkipHeld || game == null) return;
+            if (RewardShutterActive || VictoryTransitionActive || victorySkipHeld || game == null) return;
             var firebaseSession = Cloud.FirebasePlayerSession.Instance;
             bool isHubSettingsAction = hubActive &&
                 (a == HubSettingsAction || a == HubSettingsMusicAction || a == HubSettingsBackAction || a == HubTopMusicAction);
@@ -1587,6 +1590,13 @@ namespace HayChoriYPaty
             if (game.ShowChulengoResult)
             {
                 bool lockedRetry = game.HasPendingChulengo && game.ChulengoChoiceLocked;
+                if (game.HasPendingChulengo &&
+                    (a == ChulengoCollectAction && (!lockedRetry || game.ChulengoSelectedSector < 0) ||
+                     a == ChulengoMultiplyAction && lockedRetry && game.ChulengoSelectedSector < 0))
+                {
+                    StartRewardShutter();
+                    return;
+                }
                 bool chulengoOk = a == ChulengoMultiplyAction ? (lockedRetry
                         ? game.ChulengoSelectedSector < 0 ? game.TryCollectVictoryReward()
                             : game.TryMultiplyVictoryReward(game.ChulengoSelectedSector)
@@ -2066,6 +2076,15 @@ namespace HayChoriYPaty
         public bool HubAccountActionRendered => false;
 
         private void OnGUI()
+        {
+            bool enabled = GUI.enabled;
+            if (RewardShutterActive) GUI.enabled = false;
+            DrawGameGui();
+            GUI.enabled = enabled;
+            DrawRewardShutter();
+        }
+
+        private void DrawGameGui()
         {
             if (game == null) return;
             if (!startupArtReady)

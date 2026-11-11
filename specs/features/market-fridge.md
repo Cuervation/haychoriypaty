@@ -6,6 +6,12 @@
 
 Keep inventory persistent in StreetGame, but present stock and purchasing through one Mercado IMGUI screen; there is no separate Heladera/Stock view or tab. Reuse StreetView's existing style and controls. There are 13 campaign slots: 10 traditional quota modes, Tower Defense IDs 9 and 10 and Bonus Track ID11; current catalogs/targets are centralized in [the balance table](../../docs/BALANCE_ACTUAL_NIVELES.md). The regular level-0 opening is direct; traditional levels with required ingredients use Mercado first. Huracán bypasses stock preflight; Tower Defense retains attempt snapshot/settlement but does not gate on legacy quotas or ingredients. Mercado access from the selector must not itself start a match. Purchasing unlocks after winning All Boys. Loss returns to levels; Boca ID8 is the terminal club and has no next campaign level.
 
+## Transición de cobro — 2026-11-10
+
+Al elegir **COBRAR** en Chulengo (incluido el reintento de un cobro congelado), mostrar la persiana azul de la vista previa aprobada: dos mitades cierran verticalmente durante 0,54 s, logo original centrado durante la espera de 0,60 s y apertura durante 0,54 s. Bloquear interacciones durante la animación. Ejecutar una sola vez el cobro durable existente al quedar cubierta la pantalla; revelar el resultado real o el estado de reintento si falla. Si la vista se desactiva antes de cerrar, conservar el cobro pendiente; no redirigir automáticamente ni alterar economía, MULTIPLICAR o navegación posterior. El hub del GIF era una pantalla ilustrativa, no un cambio de flujo.
+
+**Estado:** fuente y compilación Roslyn focalizada disponibles; importación, ejecución, controles y aspecto en Game View Unity pendientes por conexión MCP inaccesible. No se declara aceptación visual ni funcional completa.
+
 ## Domain and persistence
 
 ### Manual surplus purchases — 2026-10-26
