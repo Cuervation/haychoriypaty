@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
@@ -68,6 +69,16 @@ namespace HayChoriYPaty.Tests
             Assert.NotNull(config);
             Func<string,object> property=n=>config.GetType().GetProperty(n,I).GetValue(config);
             Assert.AreEqual(14,property("SourceCampaignLevelId")); Assert.AreEqual(true,property("FreeConstruction"));
+            Assert.AreEqual(8,property("EconomicBalanceCampaignLevelId")); Assert.AreEqual(true,property("UseCampaignEconomyPricing"));
+            Assert.AreEqual(1200,property("StartingCoins"),"The level keeps its own opening cash.");
+            Assert.AreEqual(false,property("EquipmentPlacementAllowed"),"Every Luján station is preinstalled and equipment cannot be placed or purchased.");
+            CollectionAssert.AreEqual(new[]{1,0,0,0,1},(int[])property("StartingWorkersByRole"));
+            Array startingStations=(Array)property("StartingStations");
+            Assert.AreEqual(7,startingStations.Length,"Luján starts with one real instance of every station type.");
+            CollectionAssert.AreEqual(new[]{0,1,2,3,4,5,6},startingStations.Cast<object>()
+                .Select(station=>Convert.ToInt32(station.GetType().GetField("Kind").GetValue(station))).ToArray());
+            MethodInfo hireCost=config.GetType().GetMethod("HireCostForRole",I);
+            CollectionAssert.AreEqual(new[]{55,55,70,65,65},new[]{0,1,2,3,4}.Select(i=>(int)hireCost.Invoke(config,new[]{Enum.ToObject(T("StreetWorkerRole"),i)})).ToArray());
             CollectionAssert.AreEquivalent(new[]{0,1,2,3,4,5,6},(IEnumerable)property("AvailableProducts"));
             Assert.AreEqual("street-background-peregrinacion-moreno-v4",property("BackgroundResource"));
             Assert.NotNull(Resources.Load<Texture2D>((string)property("BackgroundResource")));

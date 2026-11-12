@@ -1,4 +1,16 @@
-# Android — 2026-11-12: build posterior al commit 8720fbc (**NO ENTREGABLE**)
+# Android — 2026-11-12: build limpio del commit 1137205 (**BUILD E INSTALACIÓN PASS; SMOKE LIMITADO**)
+
+Unity 6000.6.3f1, BuildPipeline `build-3f21874818`, opción `clean_build`; Android no-Development, IL2CPP/ARM64, escenas `Assets/Scenes/Main.unity` y `Assets/Scenes/SampleScene.unity`: **Succeeded**, 568,34 s, **0 errores / 7 advertencias**. El log de esta build no contiene `You are building a player, but you have uncompiled code changes`; el BuildPipeline recompiló los objetos nativos Android desde cero. Entre las advertencias están cuatro usos existentes/deprecados de `DEVELOPMENT_BUILD` en `Assets/Scripts/UI/StreetView.cs`, advertencias de clang y el diagnóstico opcional que requiere Debug Symbols para simbolizar crash reports. No bloquearon el build.
+
+APK local ignorada por Git: `Builds/Android/Archive/HayChoriYPaty-0.2.83-code85-1137205-clean-validated-20261112.apk`, **389.191.968 bytes**, SHA-256 `c6e5a27f0a4d24dff22850628764779cd8ba9cff0f6385ac9c1b685b2f3f443e`. **PASS:** ZIP íntegro, `zipalign -c -v 4`, firma Android Debug verificada por `apksigner` (v2), metadata `aapt`: `com.haychoriypaty.game`, `0.2.83`/code`85`, min API26/target API36, ABI `arm64-v8a`. No es firma de distribución.
+
+**Instalación física: `PASS`** — tras la reconexión confirmada por el usuario, `adb install -r` terminó `Success` en Motorola Edge 60 Fusion (`ZY22MBNWRB`). Package Manager informa `0.2.83`/code`85`, `lastUpdateTime=2026-11-12 12:01:56` y el mismo `firstInstallTime=2026-10-03 18:49:24`; la actualización en sitio conservó la instalación existente.
+
+**Smoke físico de arranque: `PASS` acotado** — se abrió `UnityPlayerGameActivity` sin tocar controles ni iniciar una partida; 12 s después el proceso seguía activo, estaba en foreground y no apareció `FATAL EXCEPTION`, señal fatal ni excepción Unity en las últimas 3.000 líneas de logcat. Captura física 1220×2712: `/private/tmp/hcyp-post-install-smoke-20261112.png`, pantalla principal visible. Firebase inicializó; no se probaron autenticación, Firestore, reintento de sync, gameplay ni niveles TD en el teléfono. No se limpió ni borró ningún dato. La prueba no equivale a aceptación integral.
+
+**Regresiones Unity relacionadas:** EditMode job `4310f5246a184c9db5ec29e500e0b3e9` **5/5 PASS** (identidad/configuración de Peregrinación y formación/orden de contratación Camioneros); PlayMode job `902fc502557740cda748d7868b94c102` **2/2 PASS** (fondo Moreno en Unity Game View y trabajadores alineados en las dos áreas Camioneros). Capturas y limitaciones quedan en los contratos Tower Defense y Peregrinación. Esto no valida campaña completa ni servicios Firebase en teléfono.
+
+# Android — 2026-11-12: build inicial posterior al commit 8720fbc (**HISTÓRICO; NO ENTREGABLE**)
 
 El commit `8720fbc` ya está en `origin/codex/street-automation`. Unity 6000.6.3f1 BuildPipeline job `build-ddc1844182` reportó **Succeeded**, Android no-Development, escenas `Main.unity` + `SampleScene.unity`, 712,15 s, 0 errores / 9 advertencias. Sin embargo, Console incluyó `You are building a player, but you have uncompiled code changes`; por eso el APK `Builds/Android/Archive/HayChoriYPaty-0.2.83-code85-commit-pending-20261112.apk` (389.191.896 bytes, SHA-256 `e9ad5d1f02be28603e44b391cc49058dea5e384b51fb96c6ddf7345734356ccd`) **no se considera una entrega válida del commit ni se recomienda usarla para probar estos cambios**.
 

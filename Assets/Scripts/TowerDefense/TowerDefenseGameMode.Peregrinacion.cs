@@ -32,17 +32,22 @@ namespace HayChoriYPaty
         public const float ConstructionFurnitureClearanceLogical = 12f;
         public const float ConstructionWorkerWidthLogical = ParrilleroVisualWidthLogical;
         public const float ConstructionWorkerHeightLogical = WorkerVisualHeightLogical;
+        private const float BocaKitchenWorkerLaneLogical = WorkerVisualHeightLogical + 6f;
+        private static readonly StreetKitchenLayout BocaKitchenLayout =
+            new StreetKitchenLayout(new[] { 0, 1, 2, 3, 4, 5, 6 }, true);
         private readonly List<TowerDefensePlacedStation> placedStations = new List<TowerDefensePlacedStation>();
         private long equipmentSpendCents;
         private int nextStationId = 1;
 
         public Rect WorkBounds => config.FreeConstruction ? route.WorkBounds : Rect.zero;
+        public bool EquipmentPlacementAllowed => config.EquipmentPlacementAllowed;
         public IReadOnlyList<TowerDefensePlacedStation> PlacedStations => placedStations;
         public long EquipmentSpendCents => equipmentSpendCents;
 
         public int StationCost(TowerDefenseStationKind kind)
         {
             if (!config.FreeConstruction || !Enum.IsDefined(typeof(TowerDefenseStationKind), kind)) return 0;
+            if (!config.EquipmentPlacementAllowed) return -1;
             int alreadyPlaced = 0;
             for (int i = 0; i < placedStations.Count; i++) if (placedStations[i].Kind == kind) alreadyPlaced++;
             return alreadyPlaced < config.FreeStationCount(kind) ? 0 : config.StationCost;
@@ -54,10 +59,174 @@ namespace HayChoriYPaty
             return false;
         }
 
+        private void InitializeStartingStations()
+        {
+            if (!config.FreeConstruction) return;
+            TowerDefenseStartingStation[] starting = config.StartingStations;
+            for (int i = 0; i < starting.Length; i++)
+            {
+                Vector2 position = WorkBounds.min + starting[i].PositionFromWorkBoundsMin * worldUnitsPerLogicalPixel;
+                if (!Enum.IsDefined(typeof(TowerDefenseStationKind), starting[i].Kind) ||
+                    !IsFinite(position.x) || !IsFinite(position.y))
+                    throw new ArgumentException("Invalid starting station entry for " + config.LevelId + ".", nameof(config));
+
+                Rect bounds = StationFootprint(starting[i].Kind, position, false);
+                if (!Contains(WorkBounds, bounds))
+                    throw new ArgumentException("Starting station is outside the work area for " + config.LevelId + " (" +
+                        starting[i].Kind + ").", nameof(config));
+                for (int existing = 0; existing < placedStations.Count; existing++)
+                {
+                    // The pre-installed Boca kitchen uses a tightly packed countertop row.
+                    // Keep real footprints disjoint, but don't apply the extra build clearance
+                    // intended for player-placed furniture in other construction levels.
+                    Rect occupied = IsBocaKitchenLevel ? bounds
+                        : Expand(bounds, ConstructionFurnitureClearanceLogical * worldUnitsPerLogicalPixel);
+                    if (Overlaps(occupied, placedStations[existing].Bounds))
+                        throw new ArgumentException("Starting stations overlap for " + config.LevelId + " (" +
+                            starting[i].Kind + ").", nameof(config));
+                }
+
+                // Authored opening stations are installed, not bought. Resolve access only after the
+                // complete furniture layout exists so an early entry cannot block a later station.
+                placedStations.Add(new TowerDefensePlacedStation(nextStationId++, starting[i].Kind, bounds,
+                    new Vector2(float.NaN, float.NaN), StationPickupPosition(starting[i].Kind, bounds)));
+            }
+
+            // Resolve opening access points after all furniture bounds exist. A role may share
+            // an access point across its paired stations (Coca/beer, normal/premium tables),
+            // so one worker does not need an impossible seventh idle slot in the narrow work area.
+            for (int i = 0; i < placedStations.Count; i++)
+            {
+                TowerDefensePlacedStation current = placedStations[i];
+                Vector2 access = new Vector2(float.NaN, float.NaN);
+                StreetWorkerRole accessRole = StationWorkerRole(current.Kind);
+                TowerDefenseStartingStation authored = starting[i];
+                Vector2 authoredAccess = authored.HasAccessPosition
+                    ? WorkBounds.min + authored.AccessPositionFromWorkBoundsMin * worldUnitsPerLogicalPixel
+                    : new Vector2(float.NaN, float.NaN);
+                if (authored.HasAccessPosition && IsBocaKitchenLevel)
+                    authoredAccess = KeepBocaWorkerLaneClear(authoredAccess);
+                for (int prior = 0; prior < i; prior++)
+                {
+                    TowerDefensePlacedStation existing = placedStations[prior];
+                    if (StationWorkerRole(existing.Kind) != accessRole) continue;
+                    access = existing.WorkPosition;
+                    if (authored.HasAccessPosition)
+                    {
+                        if (Vector2.Distance(authoredAccess, access) > worldUnitsPerLogicalPixel * .1f)
+                            throw new ArgumentException("Stations operated by the same role must share one authored access point for " +
+                                current.Kind + ".", nameof(config));
+                    }
+                    break;
+                }
+                if (!IsFinite(access.x) || !IsFinite(access.y))
+                {
+                    if (authored.HasAccessPosition)
+                    {
+                        access = authoredAccess;
+                        if (!IsStationAccessClear(current.Kind, access, current.Bounds, Rect.zero))
+                            throw new ArgumentException("Authored starting-station access is blocked for " + current.Kind + ".", nameof(config));
+                    }
+                    else
+                    {
+                        access = FindStationAccessAnchor(current.Kind, current.Bounds);
+                    }
+                }
+                if (!IsFinite(access.x) || !IsFinite(access.y))
+                    throw new ArgumentException("Starting station has no reachable worker access for " + current.Kind + ".", nameof(config));
+                placedStations[i] = new TowerDefensePlacedStation(current.Id, current.Kind, current.Bounds,
+                    access, current.PickupPosition);
+            }
+
+            // Check the real production handoffs with the worker envelopes that use them. Not
+            // every role needs a separate idle point at every station: the cook hands food to a
+            // table access point that the Mozo also uses, and drink stations share one Cocacolero.
+            TowerDefensePlacedStation normalGrill = FindPlacedStation(TowerDefenseStationKind.NormalGrill);
+            TowerDefensePlacedStation normalTable = FindPlacedStation(TowerDefenseStationKind.NormalTable);
+            TowerDefensePlacedStation premiumGrill = FindPlacedStation(TowerDefenseStationKind.PremiumGrill);
+            TowerDefensePlacedStation premiumTable = FindPlacedStation(TowerDefenseStationKind.PremiumTable);
+            TowerDefensePlacedStation cocaBarrel = FindPlacedStation(TowerDefenseStationKind.CocaBarrel);
+            TowerDefensePlacedStation beerBarrel = FindPlacedStation(TowerDefenseStationKind.BeerBarrel);
+            // Free-construction configs may deliberately start without a complete kitchen.
+            // Validate a production handoff only when both ends of that route are authored.
+            if (normalGrill != null && normalTable != null &&
+                    !TryBuildWorkerPath(null, normalGrill.WorkPosition, normalTable.WorkPosition, Rect.zero, out _, StreetWorkerRole.Parrillero) ||
+                premiumGrill != null && premiumTable != null &&
+                    !TryBuildWorkerPath(null, premiumGrill.WorkPosition, premiumTable.WorkPosition, Rect.zero, out _, StreetWorkerRole.ParrilleroPremium) ||
+                cocaBarrel != null && beerBarrel != null &&
+                    !TryBuildWorkerPath(null, cocaBarrel.WorkPosition, beerBarrel.WorkPosition, Rect.zero, out _, StreetWorkerRole.Cocacolero))
+                throw new ArgumentException("Starting stations are not connected by their role's worker path for " + config.LevelId + ".", nameof(config));
+        }
+
+        private bool IsBocaKitchenLevel => config.SourceCampaignLevelId == TowerDefenseLevelConfig.PeregrinacionLujanCampaignLevelId;
+
+        private Vector2 KeepBocaWorkerLaneClear(Vector2 position)
+        {
+            float furnitureTop = WorkBounds.yMin;
+            for (int i = 0; i < placedStations.Count; i++)
+                furnitureTop = Mathf.Max(furnitureTop, placedStations[i].Bounds.yMax);
+
+            float pixel = worldUnitsPerLogicalPixel;
+            float minimum = furnitureTop + (WorkerVisualHeightLogical * WorkerVisualPivotY + 2f) * pixel;
+            float maximum = WorkBounds.yMax - WorkerVisualHeightLogical * (1f - WorkerVisualPivotY) * pixel;
+            if (maximum < minimum) return new Vector2(float.NaN, float.NaN);
+            position.y = Mathf.Clamp(Mathf.Max(position.y, minimum), minimum, maximum);
+            return position;
+        }
+
+        private static Rect BocaKitchenSourceBounds()
+        {
+            Rect[] stations =
+            {
+                BocaKitchenLayout.NormalGrillBounds, BocaKitchenLayout.PremiumGrillBounds,
+                BocaKitchenLayout.NormalTableBounds, BocaKitchenLayout.PremiumTableBounds,
+                BocaKitchenLayout.FernetTableBounds, BocaKitchenLayout.CocaBarrelBounds,
+                BocaKitchenLayout.BeerBarrelBounds
+            };
+            float xMin = float.PositiveInfinity, yMin = float.PositiveInfinity;
+            float xMax = float.NegativeInfinity, yMax = float.NegativeInfinity;
+            for (int i = 0; i < stations.Length; i++)
+            {
+                xMin = Mathf.Min(xMin, stations[i].xMin);
+                yMin = Mathf.Min(yMin, stations[i].yMin);
+                xMax = Mathf.Max(xMax, stations[i].xMax);
+                yMax = Mathf.Max(yMax, stations[i].yMax);
+            }
+            return Rect.MinMaxRect(xMin, yMin, xMax, yMax);
+        }
+
+        private Rect BocaKitchenSourceBounds(TowerDefenseStationKind kind)
+        {
+            switch (kind)
+            {
+                case TowerDefenseStationKind.NormalGrill: return BocaKitchenLayout.NormalGrillBounds;
+                case TowerDefenseStationKind.PremiumGrill: return BocaKitchenLayout.PremiumGrillBounds;
+                case TowerDefenseStationKind.NormalTable: return BocaKitchenLayout.NormalTableBounds;
+                case TowerDefenseStationKind.PremiumTable: return BocaKitchenLayout.PremiumTableBounds;
+                case TowerDefenseStationKind.FernetTable: return BocaKitchenLayout.FernetTableBounds;
+                case TowerDefenseStationKind.CocaBarrel: return BocaKitchenLayout.CocaBarrelBounds;
+                case TowerDefenseStationKind.BeerBarrel: return BocaKitchenLayout.BeerBarrelBounds;
+                default: return Rect.zero;
+            }
+        }
+
+        private float BocaKitchenFitScale()
+        {
+            Rect source = BocaKitchenSourceBounds();
+            float pixel = Mathf.Max(.0001f, worldUnitsPerLogicalPixel);
+            float availableWidth = WorkBounds.width / pixel;
+            // Preserve one worker-height service lane behind the furniture before fitting
+            // the same Boca station proportions into the smaller TD workfield.
+            float availableHeight = WorkBounds.height / pixel - BocaKitchenWorkerLaneLogical;
+            return Mathf.Min(availableWidth / source.width, availableHeight / source.height);
+        }
+
         public TowerDefensePlacementResult PreviewStationPlacement(TowerDefenseStationKind kind, Vector2 position)
         {
             Rect bounds = StationFootprint(kind, position);
             if (!config.FreeConstruction) return InvalidPlacement("Este nivel no habilita construcción libre.", bounds);
+            if (!config.EquipmentPlacementAllowed)
+                return InvalidPlacement("El equipamiento de este nivel ya está instalado y no se puede comprar ni colocar.", bounds);
             if (!Enum.IsDefined(typeof(TowerDefenseStationKind), kind)) return InvalidPlacement("Estación desconocida.", bounds);
             if (!IsFinite(position.x) || !IsFinite(position.y)) return InvalidPlacement("La posición no es válida.", bounds);
             if (!Contains(WorkBounds, bounds)) return InvalidPlacement("La estación debe quedar dentro del área libre, bajo la valla y fuera del HUD.", bounds);
@@ -73,7 +242,7 @@ namespace HayChoriYPaty
         public bool TryPlaceStation(TowerDefenseStationKind kind, Vector2 position, out TowerDefensePlacedStation placed)
         {
             placed = null;
-            if (Phase != TowerDefenseRunPhase.Playing) return false;
+            if (Phase != TowerDefenseRunPhase.Playing || !config.EquipmentPlacementAllowed) return false;
             TowerDefensePlacementResult preview = PreviewStationPlacement(kind, position);
             if (!preview.IsValid) return false;
             int cost = StationCost(kind);
@@ -82,11 +251,7 @@ namespace HayChoriYPaty
             if (cost > 0)
                 equipmentSpendCents = AddCents(equipmentSpendCents, (long)cost * 100L);
             Rect bounds = preview.Bounds;
-            Vector2 work = FindStationAccessAnchor(kind, bounds);
-            Vector2 pickup = kind == TowerDefenseStationKind.CocaBarrel || kind == TowerDefenseStationKind.BeerBarrel
-                ? new Vector2(bounds.center.x, bounds.yMin)
-                : new Vector2(bounds.center.x, bounds.yMin - 18f * worldUnitsPerLogicalPixel);
-            placed = new TowerDefensePlacedStation(nextStationId++, kind, bounds, work, pickup);
+            placed = CreatePlacedStation(kind, bounds);
             placedStations.Add(placed);
             // A new obstacle can change a previous station's accessible side.
             for (int i=0;i<placedStations.Count;i++)
@@ -96,6 +261,32 @@ namespace HayChoriYPaty
             }
             placed=placedStations[placedStations.Count-1];
             return true;
+        }
+
+        private TowerDefensePlacedStation CreatePlacedStation(TowerDefenseStationKind kind, Rect bounds)
+        {
+            Vector2 work = FindStationAccessAnchor(kind, bounds);
+            return new TowerDefensePlacedStation(nextStationId++, kind, bounds, work, StationPickupPosition(kind, bounds));
+        }
+
+        private Vector2 StationPickupPosition(TowerDefenseStationKind kind, Rect bounds) =>
+            kind == TowerDefenseStationKind.CocaBarrel || kind == TowerDefenseStationKind.BeerBarrel
+                ? new Vector2(bounds.center.x, bounds.yMin)
+                : new Vector2(bounds.center.x, bounds.yMin - 18f * worldUnitsPerLogicalPixel);
+
+        private static StreetWorkerRole StationWorkerRole(TowerDefenseStationKind kind)
+        {
+            switch (kind)
+            {
+                case TowerDefenseStationKind.NormalGrill: return StreetWorkerRole.Parrillero;
+                case TowerDefenseStationKind.PremiumGrill: return StreetWorkerRole.ParrilleroPremium;
+                case TowerDefenseStationKind.CocaBarrel:
+                case TowerDefenseStationKind.BeerBarrel: return StreetWorkerRole.Cocacolero;
+                case TowerDefenseStationKind.FernetTable: return StreetWorkerRole.Fernetero;
+                case TowerDefenseStationKind.NormalTable:
+                case TowerDefenseStationKind.PremiumTable: return StreetWorkerRole.Mozo;
+                default: return StreetWorkerRole.Parrillero;
+            }
         }
 
         public TowerDefensePlacementResult PreviewWorkerPlacement(StreetWorkerRole role, Vector2 position)
@@ -374,21 +565,38 @@ namespace HayChoriYPaty
             return true;
         }
 
-        private Rect StationFootprint(TowerDefenseStationKind kind, Vector2 position)
+        private Rect StationFootprint(TowerDefenseStationKind kind, Vector2 position) =>
+            StationFootprint(kind, position, true);
+
+        private Rect StationFootprint(TowerDefenseStationKind kind, Vector2 position, bool snapToGrid)
         {
             Vector2 sizeLogical;
-            switch (kind)
+            if (IsBocaKitchenLevel)
             {
-                case TowerDefenseStationKind.NormalGrill:
-                case TowerDefenseStationKind.PremiumGrill: sizeLogical = new Vector2(160f, 60f); break;
-                case TowerDefenseStationKind.NormalTable:
-                case TowerDefenseStationKind.PremiumTable: sizeLogical = new Vector2(160f, 58f); break;
-                case TowerDefenseStationKind.FernetTable: sizeLogical = new Vector2(88f, 68f); break;
-                case TowerDefenseStationKind.CocaBarrel:
-                case TowerDefenseStationKind.BeerBarrel: sizeLogical = new Vector2(72f, 68f); break;
-                default: return Rect.zero;
+                Rect boca = BocaKitchenSourceBounds(kind);
+                if (boca.width <= 0f || boca.height <= 0f) return Rect.zero;
+                sizeLogical = boca.size * BocaKitchenFitScale();
+                // StreetKitchenLayout's five-piece Boca row has a 1px transparent-art
+                // overlap by design. Keep physical collision bounds just clear of each
+                // other while preserving the same visible edge-to-edge lineup.
+                if (kind != TowerDefenseStationKind.NormalGrill && kind != TowerDefenseStationKind.PremiumGrill)
+                    sizeLogical.x = Mathf.Max(1f, sizeLogical.x - 2.5f);
             }
-            Vector2 center = Snap(position);
+            else
+            {
+                switch (kind)
+                {
+                    case TowerDefenseStationKind.NormalGrill:
+                    case TowerDefenseStationKind.PremiumGrill: sizeLogical = new Vector2(160f, 60f); break;
+                    case TowerDefenseStationKind.NormalTable:
+                    case TowerDefenseStationKind.PremiumTable: sizeLogical = new Vector2(160f, 58f); break;
+                    case TowerDefenseStationKind.FernetTable: sizeLogical = new Vector2(88f, 68f); break;
+                    case TowerDefenseStationKind.CocaBarrel:
+                    case TowerDefenseStationKind.BeerBarrel: sizeLogical = new Vector2(72f, 68f); break;
+                    default: return Rect.zero;
+                }
+            }
+            Vector2 center = snapToGrid ? Snap(position) : position;
             Vector2 size = sizeLogical * worldUnitsPerLogicalPixel;
             return new Rect(center - size * .5f, size);
         }
@@ -413,7 +621,8 @@ namespace HayChoriYPaty
         private Vector2 FindStationAccessAnchor(TowerDefenseStationKind kind, Rect bounds, Rect extraObstacle = default)
         {
             float pixel = worldUnitsPerLogicalPixel;
-            float workerWidth = kind == TowerDefenseStationKind.CocaBarrel || kind == TowerDefenseStationKind.BeerBarrel ? 94f : ConstructionWorkerWidthLogical;
+            StreetWorkerRole accessRole = StationWorkerRole(kind);
+            float workerWidth = accessRole == StreetWorkerRole.Cocacolero ? 94f : ConstructionWorkerWidthLogical;
             float halfWorker = workerWidth * .5f * pixel;
             float side = 8f * pixel;
             float maxFeetY = WorkBounds.yMax - ConstructionWorkerHeightLogical * (1f - WorkerVisualPivotY) * pixel;
@@ -427,15 +636,42 @@ namespace HayChoriYPaty
             };
             for (int i = 0; i < candidates.Length; i++)
             {
-                StreetWorkerRole accessRole = kind == TowerDefenseStationKind.CocaBarrel || kind == TowerDefenseStationKind.BeerBarrel
-                    ? StreetWorkerRole.Cocacolero : StreetWorkerRole.Parrillero;
-                Rect worker = WorkerBounds(candidates[i], accessRole);
-                if (!Contains(WorkBounds, worker) || Overlaps(worker, bounds) || Overlaps(worker, extraObstacle)) continue;
-                bool clear = true;
-                for (int s = 0; clear && s < placedStations.Count; s++) clear = !Overlaps(worker, placedStations[s].Bounds);
-                if (clear) return candidates[i];
+                if (IsStationAccessClear(kind, candidates[i], bounds, extraObstacle)) return candidates[i];
             }
+
+            // A dense authored starter layout can lack a worker-width side gap beside one
+            // particular prefab. Use the nearest open tile in the connected service aisle.
+            Vector2 best = new Vector2(float.NaN, float.NaN);
+            float bestDistance = float.PositiveInfinity;
+            float step = 16f * pixel;
+            for (float y = WorkBounds.yMin + ConstructionWorkerHeightLogical * WorkerVisualPivotY * pixel;
+                y <= WorkBounds.yMax - ConstructionWorkerHeightLogical * (1f - WorkerVisualPivotY) * pixel; y += step)
+                for (float x = WorkBounds.xMin + halfWorker; x <= WorkBounds.xMax - halfWorker; x += step)
+                {
+                    Vector2 candidate = new Vector2(x, y);
+                    if (!IsStationAccessClear(kind, candidate, bounds, extraObstacle)) continue;
+                    float distance = (candidate - bounds.center).sqrMagnitude;
+                    if (distance >= bestDistance) continue;
+                    best = candidate;
+                    bestDistance = distance;
+                }
+            if (IsFinite(best.x)) return best;
             return new Vector2(float.NaN, float.NaN);
+        }
+
+        private bool IsStationAccessClear(TowerDefenseStationKind kind, Vector2 position, Rect bounds, Rect extraObstacle)
+        {
+            StreetWorkerRole role = StationWorkerRole(kind);
+            Rect worker = WorkerBounds(position, role);
+            if (!Contains(WorkBounds, worker) || Overlaps(worker, bounds) || Overlaps(worker, extraObstacle)) return false;
+            for (int i = 0; i < placedStations.Count; i++)
+            {
+                TowerDefensePlacedStation station = placedStations[i];
+                if (Overlaps(worker, station.Bounds)) return false;
+                if (station.Bounds == bounds || !IsFinite(station.WorkPosition.x) || !IsFinite(station.WorkPosition.y)) continue;
+                if (Overlaps(worker, WorkerBounds(station.WorkPosition, StationWorkerRole(station.Kind)))) return false;
+            }
+            return true;
         }
 
         private TowerDefensePlacedStation RoleStation(StreetWorkerRole role)
@@ -502,7 +738,9 @@ namespace HayChoriYPaty
             if (!FreePositionClear(start, role, movingWorker, extraObstacle) || !FreePositionClear(target, role, movingWorker, extraObstacle)) return false;
             if (Vector2.Distance(start, target) <= worldUnitsPerLogicalPixel * .1f) return true;
             if (FreeSegmentClear(start,target,role,movingWorker,extraObstacle)) { path = new[] {target}; return true; }
-            float step = ConstructionGridLogical * worldUnitsPerLogicalPixel;
+            // A 32px placement grid can bridge over a narrow but passable alley underneath
+            // furniture; route waypoints therefore use half that spacing for free-build levels.
+            float step = (config.FreeConstruction ? ConstructionGridLogical * .5f : ConstructionGridLogical) * worldUnitsPerLogicalPixel;
             int columns = Mathf.Max(1, Mathf.FloorToInt(WorkBounds.width / step) + 1);
             int rows = Mathf.Max(1, Mathf.FloorToInt(WorkBounds.height / step) + 1), total = columns * rows;
             var points = new Vector2[total]; var open = new bool[total]; var previous = new int[total];

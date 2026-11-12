@@ -793,7 +793,8 @@ namespace HayChoriYPaty
 
         public bool TryPlaceTowerDefenseStation(TowerDefenseGameMode mode, TowerDefenseStationKind kind, Vector2 position)
         {
-            if (!playerActive || sim == null || mode == null || mode != towerDefenseMode || !sim.IsExternalCampaignRuntime) return false;
+            if (!playerActive || sim == null || mode == null || mode != towerDefenseMode || !sim.IsExternalCampaignRuntime ||
+                !mode.EquipmentPlacementAllowed) return false;
             TowerDefensePlacedStation placed;
             int cost = mode.StationCost(kind);
             if (!mode.TryPlaceStation(kind, position, out placed)) return false;

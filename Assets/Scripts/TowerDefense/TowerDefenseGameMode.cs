@@ -337,16 +337,19 @@ namespace HayChoriYPaty
             availableProducts = config.AvailableProducts.Length > 0 ? config.AvailableProducts : (int[])OrderProductIds.Clone();
 
             int sourceLevel = Mathf.Clamp(config.SourceCampaignLevelId, 0, StreetSimulation.LevelNames.Length - 1);
+            int[] configuredStartingCrew = config.StartingWorkersByRole;
             for (int role = 0; role < workerCounts.Length; role++)
             {
-                // Camioneros TD starts empty by contract. Keep constructor inputs for call-site
-                // compatibility, but never import campaign/ticket workers into this runtime.
-                workerCounts[role] = 0;
+                // Never import campaign/ticket workers into TD. A level may explicitly author a
+                // starting crew (Luján mirrors Boca's Parrillero + Mozo); other TDs remain empty.
+                workerCounts[role] = config.FreeConstruction && configuredStartingCrew != null && role < configuredStartingCrew.Length
+                    ? Mathf.Clamp(configuredStartingCrew[role], 0, config.MaximumWorkersPerRole) : 0;
                 ticketWorkersByRole[role] = 0L;
             }
             coins = startingCoins >= 0 ? startingCoins : TowerDefenseEconomyProfile.StartingCoins;
             Kitchen = new StreetKitchenProduction(sourceBalance.kitchen, availableProducts, null, true, false, !config.FreeConstruction);
             random = new System.Random(sourceBalance.randomSeed + sourceLevel * 97 + config.LevelId.GetHashCode());
+            InitializeStartingStations();
             BuildWorkers();
         }
 
@@ -390,7 +393,13 @@ namespace HayChoriYPaty
         public int HireCost(StreetWorkerRole role)
         {
             if (config.FreeConstruction)
-                return IsPlaceableRole(role) && IsRoleAvailable(role) ? config.HireCostForRole(role) : 0;
+            {
+                if (!IsPlaceableRole(role) || !IsRoleAvailable(role)) return 0;
+                if (config.UseCampaignEconomyPricing)
+                    return StreetSimulation.CalculateHireCost(sourceBalance, config.EconomicBalanceCampaignLevelId,
+                        role, workerCounts[(int)role], 0L);
+                return config.HireCostForRole(role);
+            }
             if (!IsPlaceableRole(role) || !IsRoleAvailable(role)) return 0;
             return TowerDefenseEconomyProfile.CalculateHireCost(role,
                 workerCounts[(int)role], ticketWorkersByRole[(int)role]);
@@ -435,7 +444,9 @@ namespace HayChoriYPaty
         }
 
         public int SpeedUpgradeCost => speedLevel >= MaximumSpeedLevel ? 0
-            : TowerDefenseEconomyProfile.CalculateSpeedCost(speedLevel);
+            : config.FreeConstruction && config.UseCampaignEconomyPricing
+                ? StreetSimulation.CalculateSpeedCost(sourceBalance, config.EconomicBalanceCampaignLevelId, speedLevel)
+                : TowerDefenseEconomyProfile.CalculateSpeedCost(speedLevel);
 
         public bool TryUpgradeSpeed()
         {
@@ -995,7 +1006,27 @@ namespace HayChoriYPaty
 
         private Vector2 ZoneWorkerPosition(StreetWorkerRole role, int zone, int roleIndex, int crewCount)
         {
-            if (config.FreeConstruction) return WorkZone(0);
+            if (config.FreeConstruction)
+            {
+                if (placedStations.Count > 0)
+                {
+                    Vector2 stationAccess = RoleStationAccess(role);
+                    if (IsFinite(stationAccess.x) && IsFinite(stationAccess.y) &&
+                        FreePositionClear(stationAccess, role, null, Rect.zero)) return stationAccess;
+                }
+                int startingCrewSize = 0;
+                for (int i = 0; i < workerCounts.Length; i++) startingCrewSize += workerCounts[i];
+                // Keep configured starters in one separated corridor. When the level has
+                // opening furniture, this places them just behind it; otherwise preserve the
+                // lower staging corridor used by free-construction fixtures.
+                float spacing = 102f * worldUnitsPerLogicalPixel;
+                float offset = (workers.Count - (startingCrewSize - 1) * .5f) * spacing;
+                float startRowLogical = placedStations.Count > 0 ? 190f : 110f;
+                float preferredY = WorkBounds.min.y + startRowLogical * worldUnitsPerLogicalPixel;
+                float maximumFeetY = WorkBounds.yMax - ConstructionWorkerHeightLogical * (1f - WorkerVisualPivotY) * worldUnitsPerLogicalPixel;
+                float workerY = Mathf.Clamp(preferredY, WorkBounds.min.y, maximumFeetY);
+                return new Vector2(WorkBounds.center.x + offset, workerY);
+            }
             if (IsCamionerosCrew(role, zone))
             {
                 float spacing = role == StreetWorkerRole.Parrillero

@@ -2,6 +2,7 @@
 using System;
 using System.Collections;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
@@ -131,7 +132,18 @@ namespace HayChoriYPaty.Tests
             Delegate handler = GetType().GetMethod("RecordReceipt", I).MakeGenericMethod(receiptType)
                 .CreateDelegate(deliveryEvent.EventHandlerType, this);
             deliveryEvent.AddEventHandler(mode, handler);
-            Assert.AreEqual(0, ((ICollection)Get(mode, "Workers")).Count);
+            Assert.AreEqual(requestedLevelId == 14 ? 2 : 0, ((ICollection)Get(mode, "Workers")).Count,
+                "Only Peregrinación has the explicitly configured Boca-style Parrillero + Mozo starter crew.");
+            if (requestedLevelId == 14)
+            {
+                IList openingStations = (IList)Get(mode, "PlacedStations");
+                Assert.AreEqual(7, openingStations.Count, "Luján opens with one physical copy of every station.");
+                CollectionAssert.AreEqual(new[] { "NormalGrill", "PremiumGrill", "CocaBarrel", "FernetTable", "BeerBarrel", "NormalTable", "PremiumTable" },
+                    new[] { Get(openingStations[0], "Kind").ToString(), Get(openingStations[1], "Kind").ToString(),
+                        Get(openingStations[2], "Kind").ToString(), Get(openingStations[3], "Kind").ToString(),
+                        Get(openingStations[4], "Kind").ToString(), Get(openingStations[5], "Kind").ToString(),
+                        Get(openingStations[6], "Kind").ToString() });
+            }
             Assert.IsTrue((bool)Get(game, "IsPlayerActive"));
             yield return null; yield return null;
         }
@@ -897,17 +909,12 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(14, requestedLevelId);
             Rect bounds = (Rect)Get(mode, "WorkBounds");
             float pixel = (float)Get(mode, "WorldUnitsPerLogicalPixel");
-            Type stationKind = T("TowerDefenseStationKind"), roleKind = T("StreetWorkerRole");
-            // Legal purchases only; no cash injection, follower-speed change or held QA targets.
-            Vector2[] locations = {new Vector2(128,64),new Vector2(384,64),new Vector2(256,320),
-                new Vector2(64,320),new Vector2(448,320),new Vector2(128,160),new Vector2(384,160)};
-            // Place all seven separate fixtures. A blocked access is a real test failure, not waived.
-            for (int i=0;i<7;i++)
-            {
-                Vector2 point=bounds.min+locations[i]*pixel;
-                Assert.IsTrue((bool)Call(game,"TryPlaceTowerDefenseStation",mode,Enum.ToObject(stationKind,i),point),"Equipment "+i);
-            }
-            var hired=new bool[5]; int count=0;
+            Type roleKind = T("StreetWorkerRole");
+            Assert.AreEqual(7, ((IList)Get(mode, "PlacedStations")).Count,
+                "The game starts with every station installed; the test must not buy or place equipment.");
+            Assert.IsFalse((bool)Get(mode, "EquipmentPlacementAllowed"));
+            var hired=requestedLevelId==14 ? new[]{true,false,false,false,true} : new bool[5];
+            int count=requestedLevelId==14 ? 2 : 0;
             for(int tick=0;tick<600 && count<5;tick++)
             {
                 if(tick%20==0)
@@ -971,6 +978,58 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
+        public IEnumerator PeregrinacionBocaWorkerGridAndEquipmentCardsCaptureAtPortrait()
+        {
+            Assert.AreEqual(2, ((IList)Get(mode, "Workers")).Count);
+            Assert.AreEqual(6, Get(view, "PilgrimItemCount"), "Speed plus five worker roles fit Boca's 3x2 block.");
+            Rect first = (Rect)Call(view, "PilgrimCardBounds", 0);
+            Rect third = (Rect)Call(view, "PilgrimCardBounds", 2);
+            Rect fourth = (Rect)Call(view, "PilgrimCardBounds", 3);
+            Rect sixth = (Rect)Call(view, "PilgrimCardBounds", 5);
+            Assert.AreEqual(70f, first.height);
+            Assert.That(third.y, Is.EqualTo(first.y).Within(.01f));
+            Assert.That(fourth.y, Is.GreaterThan(first.y));
+            Assert.That(sixth.x, Is.GreaterThan(fourth.x));
+            IList stations=(IList)Get(mode,"PlacedStations");Assert.AreEqual(7,stations.Count);
+            CollectionAssert.AreEqual(new[]{"NormalGrill","PremiumGrill","CocaBarrel","FernetTable","BeerBarrel","NormalTable","PremiumTable"},
+                Enumerable.Range(0,stations.Count).Select(i=>Get(stations[i],"Kind").ToString()).ToArray());
+            object presentation=Get(view,"towerDefensePresentation");Call(presentation,"Sync",mode);
+            GameObject presentationRoot=(GameObject)Get(presentation,"presentationRoot");
+            Assert.IsNotNull(presentationRoot,"The Tower Defense world presentation must own its scene roots.");
+            int visibleFurniture=0;
+            foreach(Transform child in presentationRoot.GetComponentsInChildren<Transform>(true))
+                if(child.name.StartsWith("Peregrinación placed ",StringComparison.Ordinal))visibleFurniture++;
+            Assert.AreEqual(7,visibleFurniture,"These must be actual rendered furniture roots, not only model entries or menu cards.");
+            yield return CaptureAtResolution("peregrinacion-boca-workers-with-stations-540x960", 540, 960);
+
+            yield return Tap(((Rect)Call(view, "PilgrimTabBounds", 1)).center);
+            Assert.AreEqual(7, Get(view, "PilgrimItemCount"), "The equipment tab exposes all seven stations.");
+            Assert.IsTrue((bool)Get(view, "pilgrimEquipmentTab"));
+            Assert.IsFalse((bool)Get(mode, "EquipmentPlacementAllowed"));
+            yield return CaptureAtResolution("peregrinacion-boca-equipment-540x960", 540, 960);
+            int equipmentCoins = (int)Get(mode, "Coins");
+            long equipmentSpend = (long)Get(mode, "EquipmentSpendCents");
+            yield return Tap(((Rect)Call(view, "PilgrimCardBounds", 0)).center);
+            Assert.AreEqual(-1, Get(view, "pilgrimSelection"), "Installed equipment cards are read-only, not placement buttons.");
+            Vector2 workCenter = ((Rect)Get(mode, "WorkBounds")).center;
+            yield return Tap(((Rect)Call(view, "PilgrimWorldToLogical", new Rect(workCenter, Vector2.zero))).position);
+            Assert.AreEqual(7, ((IList)Get(mode, "PlacedStations")).Count);
+            Assert.AreEqual(equipmentCoins, Get(mode, "Coins"));
+            Assert.AreEqual(equipmentSpend, Get(mode, "EquipmentSpendCents"));
+            yield return Tap(((Rect)Call(view, "PilgrimNextBounds")).center);
+            Assert.AreEqual(1, Get(view, "pilgrimPage"), "The seventh station is reachable on the second equipment page.");
+            Assert.AreEqual(186f, ((Rect)Call(view, "PilgrimCardBounds", 0)).x,
+                "Center the lone seventh station instead of pinning it to the left edge.");
+            yield return CaptureAtResolution("peregrinacion-boca-equipment-page2-540x960", 540, 960);
+
+            yield return Tap(((Rect)Call(view, "PilgrimTabBounds", 0)).center);
+            int openingCoins = (int)Get(mode, "Coins");
+            yield return Tap(((Rect)Call(view, "PilgrimCardBounds", 0)).center);
+            Assert.AreEqual(1, Get(mode, "SpeedLevel"), "The Boca-style speed card is an active upgrade control.");
+            Assert.AreEqual(openingCoins - 70, Get(mode, "Coins"), "The first Boca-priced speed upgrade costs70.");
+        }
+
+        [UnityTest]
         public IEnumerator PeregrinacionGameViewSingleFenceFreeConstructionAtThreeResolutions()
         {
             BuildPilgrimEquipmentAndInitialCrew();
@@ -987,30 +1046,30 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
-        public IEnumerator PeregrinacionPointerPreviewPlacesFurnitureAndRejectsOverlapWithoutCharge()
+        public IEnumerator PeregrinacionEquipmentCardsAreReadOnlyAndCannotBuyOrPlace()
         {
             yield return Tap(((Rect)Call(view,"PilgrimTabBounds",1)).center);
+            IList initial=(IList)Get(mode,"PlacedStations");Assert.AreEqual(7,initial.Count);
+            int coins=(int)Get(mode,"Coins");long equipmentSpend=(long)Get(mode,"EquipmentSpendCents");
             yield return Tap(((Rect)Call(view,"PilgrimCardBounds",0)).center);
-            Assert.AreEqual(0,Get(view,"pilgrimSelection"));
-            Rect work=(Rect)Get(mode,"WorkBounds");float pixel=(float)Get(mode,"WorldUnitsPerLogicalPixel");
-            Vector2 world=work.min+new Vector2(128,64)*pixel;
-            Vector2 logical=((Rect)Call(view,"PilgrimWorldToLogical",new Rect(world,Vector2.zero))).position;
+            Assert.AreEqual(-1,Get(view,"pilgrimSelection"),"Equipment cards must not enter placement mode.");
+            Vector2 work=((Rect)Get(mode,"WorkBounds")).center;
+            Vector2 logical=((Rect)Call(view,"PilgrimWorldToLogical",new Rect(work,Vector2.zero))).position;
             yield return Tap(logical);
-            Assert.AreEqual(1,((IList)Get(mode,"PlacedStations")).Count);Assert.AreEqual(-1,Get(view,"pilgrimSelection"));
-            int coins=(int)Get(mode,"Coins");
-            yield return Tap(((Rect)Call(view,"PilgrimCardBounds",0)).center);yield return Tap(logical);
-            Assert.AreEqual(1,((IList)Get(mode,"PlacedStations")).Count);Assert.AreEqual(coins,Get(mode,"Coins"));
-            Assert.IsNotEmpty((string)Get(view,"towerDefenseError"));
+            Assert.AreEqual(7,((IList)Get(mode,"PlacedStations")).Count);
+            Assert.AreEqual(coins,Get(mode,"Coins"));
+            Assert.AreEqual(equipmentSpend,Get(mode,"EquipmentSpendCents"));
+            Assert.AreEqual(-1,Call(mode,"StationCost",Enum.ToObject(T("TowerDefenseStationKind"),0)));
         }
 
         [UnityTest]
-        public IEnumerator PeregrinacionWithoutWorkersLosesAndPauseStopsSimulation()
+        public IEnumerator PeregrinacionOpeningEquipmentIsPresentAndPauseStopsSimulation()
         {
+            Assert.AreEqual(7,((IList)Get(mode,"PlacedStations")).Count);
             Call(mode,"Pause");float elapsed=(float)Get(mode,"Elapsed");Call(mode,"Step",20f);
             Assert.AreEqual(elapsed,Get(mode,"Elapsed"));Call(mode,"Resume");
-            for (int tick=0;tick<1800 && !(bool)Get(mode,"HasLost");tick++)
-            { Call(mode,"Step",.05f);if(tick%100==0)yield return null; }
-            Assert.IsTrue((bool)Get(mode,"HasLost"));Assert.AreEqual(0,Get(mode,"TotalDelivered"));
+            Assert.AreEqual("Playing",Get(mode,"Phase").ToString());
+            yield return null;
         }
 
         private IEnumerator RunAutomaticMixedFanWave(int campaignLevelId, int expectedFanCount)

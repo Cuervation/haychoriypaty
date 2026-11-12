@@ -11,6 +11,18 @@ namespace HayChoriYPaty
         NormalTable = 5, PremiumTable = 6
     }
 
+    [Serializable]
+    public struct TowerDefenseStartingStation
+    {
+        public TowerDefenseStationKind Kind;
+        [Tooltip("Position in logical pixels relative to the lower-left corner of WorkBounds.")]
+        public Vector2 PositionFromWorkBoundsMin;
+        [Tooltip("When true, use the authored worker access point (shared by stations used by the same role when appropriate).")]
+        public bool HasAccessPosition;
+        [Tooltip("Worker access point in logical pixels relative to the lower-left corner of WorkBounds.")]
+        public Vector2 AccessPositionFromWorkBoundsMin;
+    }
+
     /// <summary>Serializable configuration for the Tower Defense runtime attached to a campaign level.</summary>
     [CreateAssetMenu(menuName = "Hay Chori y Paty/Tower Defense/Level Config", fileName = "TD-Camioneros-PlazaDeMayo")]
     public sealed class TowerDefenseLevelConfig : ScriptableObject
@@ -56,9 +68,13 @@ namespace HayChoriYPaty
         [SerializeField] private string levelId = CamionerosLevelId;
         [SerializeField] private string displayName = "Camioneros / Plaza de Mayo";
         [SerializeField, Min(0)] private int sourceCampaignLevelId = 9;
+        [Tooltip("Optional campaign balance row used only for Tower Defense prices. Campaign identity/progression still uses SourceCampaignLevelId.")]
+        [SerializeField, Min(0)] private int economicBalanceCampaignLevelId = CommonEconomicBalanceLevelId;
+        [SerializeField] private bool useCampaignEconomyPricing;
         [SerializeField] private string backgroundResource = "street-background-camioneros-v1";
         [SerializeField] private TowerDefenseRouteKind routeKind = TowerDefenseRouteKind.Serpentine;
         [SerializeField] private bool freeConstruction;
+        [SerializeField] private bool equipmentPlacementAllowed = true;
         [SerializeField] private TowerDefenseRouteGeometryConfig route = new TowerDefenseRouteGeometryConfig
         {
             RowCount = 3,
@@ -88,8 +104,10 @@ namespace HayChoriYPaty
         [SerializeField, Min(0)] private int stationCost = 80;
         [SerializeField, Min(1)] private int maximumWorkersPerRole = 3;
         [SerializeField] private int[] freeStationCounts = { 1, 1, 1, 1, 1, 1, 1 };
+        [Tooltip("Optional physical stations placed at level start. Positions are logical pixels from the lower-left of WorkBounds.")]
+        [SerializeField] private TowerDefenseStartingStation[] startingStations = Array.Empty<TowerDefenseStartingStation>();
         [SerializeField] private int[] hireCostsByRole = { 60, 60, 60, 60, 60 };
-        [Tooltip("Defense starts without workers; retained for serialized layout compatibility.")]
+        [Tooltip("Explicit role-local starting crew for free-construction levels. This is level config, never imported from a saved campaign roster.")]
         [SerializeField] private int[] startingWorkersByRole = new int[5];
 
         public string ModeId => string.IsNullOrWhiteSpace(modeId) ? "tower-defense" : modeId;
@@ -97,9 +115,12 @@ namespace HayChoriYPaty
         public string DisplayName => string.IsNullOrWhiteSpace(displayName) ? "Camioneros / Plaza de Mayo" : displayName;
         /// <summary>Visual/campaign identity whose stable ID owns progression and persistence.</summary>
         public int SourceCampaignLevelId => sourceCampaignLevelId;
+        public int EconomicBalanceCampaignLevelId => Mathf.Clamp(economicBalanceCampaignLevelId, 0, StreetSimulation.LevelNames.Length - 1);
+        public bool UseCampaignEconomyPricing => useCampaignEconomyPricing;
         public string BackgroundResource => backgroundResource;
         public TowerDefenseRouteKind RouteKind => routeKind;
         public bool FreeConstruction => freeConstruction;
+        public bool EquipmentPlacementAllowed => equipmentPlacementAllowed;
         public int StartingCoins => Mathf.Max(0, startingCoins);
         public float FanSpawnIntervalSeconds => Mathf.Max(0.1f, fanSpawnIntervalSeconds);
         public int StationCost => Mathf.Max(0, stationCost);
@@ -114,6 +135,8 @@ namespace HayChoriYPaty
             int index = (int)kind;
             return freeStationCounts != null && index >= 0 && index < freeStationCounts.Length ? Mathf.Max(0, freeStationCounts[index]) : 1;
         }
+        public TowerDefenseStartingStation[] StartingStations => startingStations == null
+            ? Array.Empty<TowerDefenseStartingStation>() : (TowerDefenseStartingStation[])startingStations.Clone();
         public TowerDefenseRouteGeometryConfig Route => route;
         public GameObject StraightFencePrefab => straightFencePrefab;
         public GameObject TurnFencePrefab => turnFencePrefab;
@@ -124,8 +147,6 @@ namespace HayChoriYPaty
         public float FanSpeed => Mathf.Max(0f, fanSpeed);
         public int TotalFanCount => Mathf.Max(1, totalFanCount);
         public float MinimumEntrySpacingLogical => Mathf.Max(1f, minimumEntrySpacingLogical);
-        /// <summary>Legacy source-row compatibility metadata; runtime TD costs use the frozen profile.</summary>
-        public int EconomicBalanceCampaignLevelId => CommonEconomicBalanceLevelId;
         public float ServiceRange => Mathf.Max(0.01f, serviceRange);
         public Vector2 FirstWorkZoneOffset => firstWorkZoneOffset;
         public Vector2 SecondWorkZoneOffset => secondWorkZoneOffset;
