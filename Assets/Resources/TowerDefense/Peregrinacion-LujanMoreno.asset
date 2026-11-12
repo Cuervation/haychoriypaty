@@ -16,7 +16,7 @@ MonoBehaviour:
   levelId: tower-defense.peregrinacion-lujan.moreno.level-1
   displayName: Peregrinación a Luján – Moreno
   sourceCampaignLevelId: 14
-  backgroundResource: street-background-peregrinacion-moreno-v1
+  backgroundResource: street-background-peregrinacion-moreno-v4
   routeKind: 1
   freeConstruction: 1
   route:

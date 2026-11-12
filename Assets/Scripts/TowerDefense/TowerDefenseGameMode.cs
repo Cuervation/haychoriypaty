@@ -151,13 +151,17 @@ namespace HayChoriYPaty
         public const float StationRenderYOffsetLogical = 18f;
         private const float ParallelWorkerSpacingLogical = 84f;
         private const float ParallelCocacoleroSpacingLogical = 96f;
+        private const float CamionerosCrewVisualOverlapLogical = 10f;
+        // The Parrillero tight mesh has the source-frame aspect ratio (266x303) at this height.
+        // Subtract ten logical pixels so each adjacent worker silhouette overlaps slightly.
+        private const float CamionerosParrilleroSpacingLogical = WorkerVisualHeightLogical * 266f / 303f - CamionerosCrewVisualOverlapLogical;
+        // Unity's SpriteMeshType.Tight bounds for matched Cocacolero frame 0 are 68.10366 logical px
+        // at the 94 px render height; use this actual mesh width to calculate crew overlap.
+        private const float CamionerosCocacoleroStandingWidthLogical = 68.10366f;
+        private const float CamionerosCocacoleroSpacingLogical = CamionerosCocacoleroStandingWidthLogical - CamionerosCrewVisualOverlapLogical;
         private const float WorkerRoleRowSeparationLogical = 110f;
         private const float CompactStationSpacingLogical = 140f;
-        private const float CamionerosAreaOneTableLeftShiftLogical = 48f;
-        private const float CamionerosAreaTwoTableRightShiftLogical = 52f;
-        private const float CamionerosAreaTwoBarrelRightShiftLogical = 92f;
-        private const float CamionerosAreaTwoStationGapLogical = 32f;
-        private const float CamionerosAreaTwoStationRaiseLogical = 18f;
+        private const float CamionerosWorkerRowOffsetLogical = 8f;
         private static readonly int[] OrderProductIds = { 0, 4 };
         private const int MaximumSpeedLevel = 9;
         private static TowerDefenseGameMode activeInstance;
@@ -251,10 +255,13 @@ namespace HayChoriYPaty
             }
         }
 
-        public float CurrentStationSpacingLogical => UsesSplitWorkerRows
-            ? Mathf.Abs(StationPosition(StreetWorkerRole.Parrillero, 0).x -
-                StationPosition(StreetWorkerRole.Cocacolero, 0).x) / Mathf.Max(.0001f, worldUnitsPerLogicalPixel)
-            : CompactStationSpacingLogical;
+        public float CurrentStationSpacingLogical => config.SourceCampaignLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId
+            ? Mathf.Abs(StationVisualPosition(StreetWorkerRole.Parrillero, 0).x -
+                StationVisualPosition(StreetWorkerRole.Cocacolero, 0).x) / Mathf.Max(.0001f, worldUnitsPerLogicalPixel)
+            : UsesSplitWorkerRows
+                ? Mathf.Abs(StationPosition(StreetWorkerRole.Parrillero, 0).x -
+                    StationPosition(StreetWorkerRole.Cocacolero, 0).x) / Mathf.Max(.0001f, worldUnitsPerLogicalPixel)
+                : CompactStationSpacingLogical;
 
         // Stable base station/service anchors for the two player-selected work areas.
         // The presenter may apply a level-specific visual offset through StationVisualPosition;
@@ -287,85 +294,21 @@ namespace HayChoriYPaty
         }
 
         /// <summary>
-        /// Visual-only Camioneros station offsets. Keep station service anchors intact while
-        /// presenting the props and hired crew as one centered group in each fenced work area.
+        /// Visual-only Camioneros placement. Both stations share one depth line; each station
+        /// is centered on its own crew, with the two groups pushed to opposite safe edges.
         /// </summary>
         public Vector2 StationVisualPosition(StreetWorkerRole role, int zone)
         {
             Vector2 anchor = StationPosition(role, zone);
-            if (config.SourceCampaignLevelId != TowerDefenseLevelConfig.CamionerosCampaignLevelId ||
-                zone < 0 || zone > 1) return anchor;
+            if (!IsCamionerosCrew(role, zone)) return anchor;
 
-            float scale = worldUnitsPerLogicalPixel;
-            if (zone == 0 && role == StreetWorkerRole.Parrillero)
-                return ClampStationVisualPosition(role, zone,
-                    anchor.x - CamionerosAreaOneTableLeftShiftLogical * scale, anchor.y);
-
-            if (zone != 1) return anchor;
-
-            Vector2 table = StationPosition(StreetWorkerRole.Parrillero, zone);
-            Vector2 barrel = StationPosition(StreetWorkerRole.Cocacolero, zone);
-            float largestStationHalfHeight = Mathf.Max(StreetKitchenLayout.SandwichTableHeight,
-                StreetKitchenLayout.BarrelHeight) * .5f;
-            float maximumSafeCenterRaise = Mathf.Max(0f,
-                ClearHalfHeightLogical() - largestStationHalfHeight - StationOuterClearanceLogical);
-            float stationRaise = Mathf.Min(CamionerosAreaTwoStationRaiseLogical, maximumSafeCenterRaise);
-            float raisedCenterY = WorkZone(zone).y +
-                (StationRenderYOffsetLogical + stationRaise) * scale;
-            float tableX = ClampStationVisualX(StreetWorkerRole.Parrillero, zone,
-                table.x + CamionerosAreaTwoTableRightShiftLogical * scale);
-            float barrelX = ClampStationVisualX(StreetWorkerRole.Cocacolero, zone,
-                barrel.x + CamionerosAreaTwoBarrelRightShiftLogical * scale);
-            float requiredCenterGap = (StreetKitchenLayout.TableWidth + StreetKitchenLayout.BarrelWidth) * .5f +
-                CamionerosAreaTwoStationGapLogical;
-            if (barrelX - tableX < requiredCenterGap * scale)
-            {
-                float maxBarrelX = StationVisualMaxX(StreetWorkerRole.Cocacolero, zone);
-                float pushedBarrelX = Mathf.Min(maxBarrelX, tableX + requiredCenterGap * scale);
-                if (pushedBarrelX - tableX >= requiredCenterGap * scale)
-                    barrelX = pushedBarrelX;
-                else
-                {
-                    float pushedTableX = barrelX - requiredCenterGap * scale;
-                    if (pushedTableX >= StationVisualMinX(StreetWorkerRole.Parrillero, zone))
-                        tableX = pushedTableX;
-                    else
-                    {
-                        // If a narrow viewport cannot provide the requested larger gap,
-                        // preserve the original safe pair instead of letting the props overlap.
-                        tableX = table.x;
-                        barrelX = barrel.x;
-                    }
-                }
-            }
-
-            if (role == StreetWorkerRole.Parrillero) return new Vector2(tableX, raisedCenterY);
-            if (role == StreetWorkerRole.Cocacolero) return new Vector2(barrelX, raisedCenterY);
-            return anchor;
-        }
-
-        private Vector2 ClampStationVisualPosition(StreetWorkerRole role, int zone, float x, float y) =>
-            new Vector2(ClampStationVisualX(role, zone, x), y);
-
-        private float ClampStationVisualX(StreetWorkerRole role, int zone, float x)
-        {
-            float minimum = StationVisualMinX(role, zone);
-            float maximum = StationVisualMaxX(role, zone);
-            return maximum >= minimum ? Mathf.Clamp(x, minimum, maximum) : x;
-        }
-
-        private float StationVisualMinX(StreetWorkerRole role, int zone)
-        {
-            float width = role == StreetWorkerRole.Parrillero
-                ? StreetKitchenLayout.TableWidth : StreetKitchenLayout.BarrelWidth;
-            return WorkAreaHorizontalBounds(zone).x + (StationOuterClearanceLogical + width * .5f) * worldUnitsPerLogicalPixel;
-        }
-
-        private float StationVisualMaxX(StreetWorkerRole role, int zone)
-        {
-            float width = role == StreetWorkerRole.Parrillero
-                ? StreetKitchenLayout.TableWidth : StreetKitchenLayout.BarrelWidth;
-            return WorkAreaHorizontalBounds(zone).y - (StationOuterClearanceLogical + width * .5f) * worldUnitsPerLogicalPixel;
+            Vector2 groupBounds = CamionerosWorkerGroupCenterBoundsX(role, zone);
+            if (groupBounds.y < groupBounds.x) return anchor;
+            float x = role == StreetWorkerRole.Parrillero ? groupBounds.x : groupBounds.y;
+            // The renderer subtracts StationRenderYOffsetLogical, so this places both
+            // furniture roots on the centerline of the same work area.
+            float y = WorkZone(zone).y + StationRenderYOffsetLogical * worldUnitsPerLogicalPixel;
+            return new Vector2(x, y);
         }
 
         public TowerDefenseGameMode(TowerDefenseLevelConfig levelConfig, StreetBalance campaignBalance,
@@ -598,7 +541,9 @@ namespace HayChoriYPaty
                 TowerDefenseWorkerState worker = workers[i];
                 // A placed crew member remains in the area selected by the player after reflow.
                 worker.TargetZone = worker.ServiceZone;
-                if (!config.FreeConstruction) worker.Position = ZoneWorkerPosition(worker.Role, worker.ServiceZone, CountPriorWorkers(worker.Role, worker.ServiceZone, worker));
+                if (!config.FreeConstruction)
+                    worker.Position = ZoneWorkerPosition(worker.Role, worker.ServiceZone,
+                        CountPriorWorkers(worker.Role, worker.ServiceZone, worker), WorkersInZone(worker.Role, worker.ServiceZone));
                 worker.TransferRoute = Array.Empty<Vector2>();
                 worker.TransferIndex = 0;
                 worker.IsMoving = false;
@@ -956,20 +901,42 @@ namespace HayChoriYPaty
             return role == StreetWorkerRole.Parrillero ? lowerAnchor + WorkerRoleRowSeparationLogical : lowerAnchor;
         }
 
+        private float CamionerosWorkerRowAnchorLogical()
+        {
+            float halfHeight = ClearHalfHeightLogical();
+            float visualMinY = -WorkerVisualHeightLogical * WorkerVisualPivotY;
+            float visualMaxY = WorkerVisualHeightLogical * (1f - WorkerVisualPivotY);
+            float minimum = -halfHeight + WorkerFenceClearanceLogical - visualMinY;
+            float maximum = halfHeight - WorkerFenceClearanceLogical - visualMaxY;
+            if (maximum < minimum) return 0f;
+            return Mathf.Clamp(CamionerosWorkerRowOffsetLogical, minimum, maximum);
+        }
+
+        private bool IsCamionerosCrew(StreetWorkerRole role, int zone) =>
+            config.SourceCampaignLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId &&
+            zone >= 0 && zone < serviceZones.Length &&
+            (role == StreetWorkerRole.Parrillero || role == StreetWorkerRole.Cocacolero);
+
         private float CamionerosWorkerGroupCenterX(StreetWorkerRole role, int zone, float fallback)
         {
-            if (role != StreetWorkerRole.Parrillero && role != StreetWorkerRole.Cocacolero) return fallback;
+            if (!IsCamionerosCrew(role, zone)) return fallback;
+            Vector2 bounds = CamionerosWorkerGroupCenterBoundsX(role, zone);
+            if (bounds.y < bounds.x) return fallback;
+            return Mathf.Clamp(StationVisualPosition(role, zone).x, bounds.x, bounds.y);
+        }
+
+        private Vector2 CamionerosWorkerGroupCenterBoundsX(StreetWorkerRole role, int zone)
+        {
             Vector2 bounds = WorkAreaHorizontalBounds(zone);
             float visualWidth = role == StreetWorkerRole.Parrillero
                 ? ParrilleroVisualWidthLogical : CocacoleroVisualWidthLogical;
             float spacing = role == StreetWorkerRole.Parrillero
-                ? ParallelWorkerSpacingLogical : ParallelCocacoleroSpacingLogical;
+                ? CamionerosParrilleroSpacingLogical : CamionerosCocacoleroSpacingLogical;
             float halfGroup = spacing + visualWidth * .5f;
             float safeHalf = WorkerFenceClearanceLogical + halfGroup;
             float minimum = bounds.x + safeHalf * worldUnitsPerLogicalPixel;
             float maximum = bounds.y - safeHalf * worldUnitsPerLogicalPixel;
-            if (maximum < minimum) return fallback;
-            return Mathf.Clamp(StationVisualPosition(role, zone).x, minimum, maximum);
+            return new Vector2(minimum, maximum);
         }
 
         private void BuildWorkers()
@@ -985,7 +952,22 @@ namespace HayChoriYPaty
         private void AddWorker(StreetWorkerRole role, int zone)
         {
             int index = CountPriorWorkers(role, zone);
-            workers.Add(new TowerDefenseWorkerState(nextWorkerId++, role, zone, ZoneWorkerPosition(role, zone, index)));
+            int crewCount = index + 1;
+            workers.Add(new TowerDefenseWorkerState(nextWorkerId++, role, zone,
+                ZoneWorkerPosition(role, zone, index, crewCount)));
+            if (IsCamionerosCrew(role, zone)) RepositionCamionerosCrew(role, zone);
+        }
+
+        private void RepositionCamionerosCrew(StreetWorkerRole role, int zone)
+        {
+            int crewCount = WorkersInZone(role, zone);
+            for (int i = 0; i < workers.Count; i++)
+            {
+                TowerDefenseWorkerState worker = workers[i];
+                if (worker.Role != role || worker.ServiceZone != zone) continue;
+                worker.Position = ZoneWorkerPosition(role, zone,
+                    CountPriorWorkers(role, zone, worker), crewCount);
+            }
         }
 
         private int CountPriorWorkers(StreetWorkerRole role, int zone, TowerDefenseWorkerState current = null)
@@ -1011,9 +993,18 @@ namespace HayChoriYPaty
             return count;
         }
 
-        private Vector2 ZoneWorkerPosition(StreetWorkerRole role, int zone, int roleIndex)
+        private Vector2 ZoneWorkerPosition(StreetWorkerRole role, int zone, int roleIndex, int crewCount)
         {
             if (config.FreeConstruction) return WorkZone(0);
+            if (IsCamionerosCrew(role, zone))
+            {
+                float spacing = role == StreetWorkerRole.Parrillero
+                    ? CamionerosParrilleroSpacingLogical : CamionerosCocacoleroSpacingLogical;
+                float slotOffset = CamionerosWorkerSlotOffsetLogical(roleIndex, crewCount, spacing);
+                float centerX = CamionerosWorkerGroupCenterX(role, zone, WorkZone(zone).x);
+                return new Vector2(centerX + slotOffset * worldUnitsPerLogicalPixel,
+                    WorkZone(zone).y + CamionerosWorkerRowAnchorLogical() * worldUnitsPerLogicalPixel);
+            }
             if (UsesSplitWorkerRows)
             {
                 Vector2 table = StationPosition(StreetWorkerRole.Parrillero, zone);
@@ -1026,16 +1017,10 @@ namespace HayChoriYPaty
                 float rowCenterX = role == StreetWorkerRole.Parrillero
                     ? table.x + (StreetKitchenLayout.TableWidth * .5f + WorkerStationClearanceLogical + groupHalfWidth) * worldUnitsPerLogicalPixel
                     : barrel.x - (StreetKitchenLayout.BarrelWidth * .5f + WorkerStationClearanceLogical + groupHalfWidth) * worldUnitsPerLogicalPixel;
-                bool camioneros = config.SourceCampaignLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId &&
-                    zone >= 0 && zone <= 1 && (role == StreetWorkerRole.Parrillero || role == StreetWorkerRole.Cocacolero);
-                if (camioneros) rowCenterX = CamionerosWorkerGroupCenterX(role, zone, rowCenterX);
-                // Camioneros hires are staged center-first, then flanked, to match the requested
-                // compact composition. Other levels retain their established left-to-right order.
-                float lateralLogical = camioneros
-                    ? (roleIndex == 0 ? 0f : roleIndex == 1 ? -workerSpacing : workerSpacing)
-                    : (roleIndex - 1) * workerSpacing;
+                float lateralLogical = (roleIndex - 1) * workerSpacing;
+                float rowAnchor = WorkerRowAnchorLogical(role);
                 return new Vector2(rowCenterX + lateralLogical * worldUnitsPerLogicalPixel,
-                    WorkZone(zone).y + WorkerRowAnchorLogical(role) * worldUnitsPerLogicalPixel);
+                    WorkZone(zone).y + rowAnchor * worldUnitsPerLogicalPixel);
             }
 
             Vector2 basePoint = StationPosition(role, Mathf.Clamp(zone, 0, serviceZones.Length - 1));
@@ -1045,6 +1030,14 @@ namespace HayChoriYPaty
                 * worldUnitsPerLogicalPixel;
             float depth = -((roleIndex / 3) * worldUnitsPerLogicalPixel * 22f);
             return basePoint + new Vector2(lateral, depth);
+        }
+
+        private static float CamionerosWorkerSlotOffsetLogical(int roleIndex, int crewCount, float spacing)
+        {
+            if (roleIndex <= 0 || crewCount <= 1) return 0f;
+            // The first hire stays centered on the station; later hires take the left,
+            // then right slot as the group fills out.
+            return roleIndex == 1 ? -spacing : spacing;
         }
 
         private bool ContainsProduct(int product)

@@ -69,8 +69,10 @@ namespace HayChoriYPaty.Tests
             Func<string,object> property=n=>config.GetType().GetProperty(n,I).GetValue(config);
             Assert.AreEqual(14,property("SourceCampaignLevelId")); Assert.AreEqual(true,property("FreeConstruction"));
             CollectionAssert.AreEquivalent(new[]{0,1,2,3,4,5,6},(IEnumerable)property("AvailableProducts"));
+            Assert.AreEqual("street-background-peregrinacion-moreno-v4",property("BackgroundResource"));
+            Assert.NotNull(Resources.Load<Texture2D>((string)property("BackgroundResource")));
             object theme=T("ClubVisualTheme").GetMethod("ForLevel",S).Invoke(null,new object[]{14});
-            Assert.AreEqual("street-background-peregrinacion-moreno-v1",theme.GetType().GetProperty("MuralResource").GetValue(theme));
+            Assert.AreEqual(property("BackgroundResource"),theme.GetType().GetProperty("MuralResource").GetValue(theme));
             Assert.NotNull(Resources.Load<Texture2D>("street-peregrinacion-fans-walk-v1"));
             Assert.NotNull(Resources.Load<Texture2D>("street-peregrinacion-fans-front-v1"));
             Assert.NotNull(Resources.Load<Texture2D>("street-peregrinacion-crest-v1"));

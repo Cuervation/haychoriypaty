@@ -11,6 +11,7 @@ namespace HayChoriYPaty.Tests
         private const BindingFlags PublicInstance = BindingFlags.Public | BindingFlags.Instance;
         private const BindingFlags PublicStatic = BindingFlags.Public | BindingFlags.Static;
         private const BindingFlags PrivateInstance = BindingFlags.NonPublic | BindingFlags.Instance;
+        private const BindingFlags PrivateStatic = BindingFlags.NonPublic | BindingFlags.Static;
         private Type configType, routeType, geometryType, modeType, balanceType;
         private ScriptableObject config;
         private object balance, mode;
@@ -61,11 +62,14 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void CamionerosStationPresentationOffsetsMatchEachWorkAreaWithoutChangingServiceAnchors()
+        public void CamionerosStationsShareOneLineAndCenterOnTheirCrewSlotsInBothAreas()
         {
             object route = Get<object>(config, "Route");
-            routeType.GetField("SegmentLengths", PublicInstance).SetValue(route, new[] { 6f, 6f, 6f });
-            routeType.GetField("PlayableBounds", PublicInstance).SetValue(route, new Rect(-6f, -4.7f, 12f, 9.4f));
+            routeType.GetField("SegmentLengths", PublicInstance).SetValue(route, new[] { 8f, 8f, 8f });
+            routeType.GetField("CorridorWidth", PublicInstance).SetValue(route, 1.92f);
+            routeType.GetField("HorizontalCorridorWidth", PublicInstance).SetValue(route, 1.536f);
+            routeType.GetField("RowSpacing", PublicInstance).SetValue(route, 6f);
+            routeType.GetField("PlayableBounds", PublicInstance).SetValue(route, new Rect(-6f, -6.96f, 12f, 13.92f));
             mode = CreateMode(.02f);
 
             object parrillero = Enum.Parse(RuntimeType("StreetWorkerRole"), "Parrillero");
@@ -74,28 +78,32 @@ namespace HayChoriYPaty.Tests
             Vector2 areaOneTableVisual = (Vector2)Invoke(mode, "StationVisualPosition", new[] { parrillero, (object)0 });
             Vector2 areaOneBarrel = (Vector2)Invoke(mode, "StationPosition", new[] { cocacolero, (object)0 });
             Vector2 areaOneBarrelVisual = (Vector2)Invoke(mode, "StationVisualPosition", new[] { cocacolero, (object)0 });
-            Assert.Less(areaOneTableVisual.x, areaOneTable.x, "Area 1's chori table moves left.");
-            Assert.AreEqual(areaOneBarrel, areaOneBarrelVisual, "Area 1's Coca barrel is not part of this adjustment.");
+            Assert.AreNotEqual(areaOneTable.y, areaOneBarrel.y,
+                "The non-rendered service anchors remain at their existing role-specific points.");
+            Assert.AreEqual(areaOneTableVisual.y, areaOneBarrelVisual.y, .0001f,
+                "Both stations render on one shared depth line in area 1.");
+            Assert.Less(areaOneTableVisual.x, areaOneBarrelVisual.x,
+                "The Parrillero table stays to the left of the Coca barrel.");
 
             Vector2 areaTwoTable = (Vector2)Invoke(mode, "StationPosition", new[] { parrillero, (object)1 });
             Vector2 areaTwoBarrel = (Vector2)Invoke(mode, "StationPosition", new[] { cocacolero, (object)1 });
             Vector2 areaTwoTableVisual = (Vector2)Invoke(mode, "StationVisualPosition", new[] { parrillero, (object)1 });
             Vector2 areaTwoBarrelVisual = (Vector2)Invoke(mode, "StationVisualPosition", new[] { cocacolero, (object)1 });
-            Assert.Greater(areaTwoTableVisual.x, areaTwoTable.x, "Area 2's chori table moves right.");
-            Assert.Greater(areaTwoBarrelVisual.x, areaTwoBarrel.x, "Area 2's Coca barrel moves right.");
+            Assert.AreNotEqual(areaTwoTable.y, areaTwoBarrel.y,
+                "The non-rendered area-2 service anchors remain role-specific.");
             float scale = Get<float>(mode, "WorldUnitsPerLogicalPixel");
-            float renderOffset = (float)modeType.GetField("StationRenderYOffsetLogical", PublicStatic).GetRawConstantValue();
-            float raise = 18f;
-            Vector2 areaTwoCenter = (Vector2)Invoke(mode, "WorkZone", new object[] { 1 });
-            float expectedRenderedY = areaTwoCenter.y + raise * scale;
-            Assert.AreEqual(expectedRenderedY, areaTwoTableVisual.y - renderOffset * scale, .0001f,
-                "Area 2's table is raised slightly above the work area's vertical midpoint.");
-            Assert.AreEqual(expectedRenderedY, areaTwoBarrelVisual.y - renderOffset * scale, .0001f,
-                "Area 2's barrel is aligned with the raised table.");
+            Assert.AreEqual(areaTwoTableVisual.y, areaTwoBarrelVisual.y, .0001f,
+                "Both stations render on one shared depth line in area 2.");
+            Assert.Less(areaTwoTableVisual.x, areaTwoBarrelVisual.x,
+                "The Parrillero table stays to the left of the Coca barrel.");
             float tableWidth = (float)RuntimeType("StreetKitchenLayout").GetField("TableWidth", PublicStatic).GetRawConstantValue();
             float barrelWidth = (float)RuntimeType("StreetKitchenLayout").GetField("BarrelWidth", PublicStatic).GetRawConstantValue();
             float clearGap = areaTwoBarrelVisual.x - areaTwoTableVisual.x - (tableWidth + barrelWidth) * scale * .5f;
-            Assert.GreaterOrEqual(clearGap, 32f * scale - .0001f, "The area 2 table and barrel keep at least 32 logical pixels of clear space between footprints.");
+            Assert.GreaterOrEqual(clearGap, 23.5f * scale - .0001f,
+                "Both stations remain individually separated after aligning each with its full crew.");
+            Assert.AreEqual(Mathf.Abs(areaOneBarrelVisual.x - areaOneTableVisual.x) / scale,
+                Get<float>(mode, "CurrentStationSpacingLogical"), .001f,
+                "The exposed station spacing follows the actual presentation anchors.");
             AssertStationVisualInsideArea(0, areaOneTableVisual, tableWidth, scale);
             AssertStationVisualInsideArea(0, areaOneBarrelVisual, barrelWidth, scale);
             AssertStationVisualInsideArea(1, areaTwoTableVisual, tableWidth, scale);
@@ -284,7 +292,21 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(1, Get<int>(mode, "SpawnedFans"),
                 "At 2 seconds the first fan has not yet opened the 96 px entry gap for another fan.");
 
-            Invoke(mode, "Step", new object[] { .1f });
+            var fans = (System.Collections.IList)Get<object>(mode, "Fans");
+            object follower = Get<object>(fans[0], "RouteFollower");
+            float minimumWorldGap = Get<float>(mode, "WorldUnitsPerLogicalPixel") * Get<float>(config, "MinimumEntrySpacingLogical");
+            float remainingGap = Mathf.Max(0f, minimumWorldGap - Get<float>(follower, "Progress"));
+            float speed = Get<float>(follower, "Speed");
+            Assert.Greater(speed, 0f);
+            float stepSeconds = remainingGap / speed + .1f;
+            while (Get<float>(follower, "Progress") < minimumWorldGap && stepSeconds > 0f)
+            {
+                float step = Mathf.Min(1f, stepSeconds);
+                Invoke(mode, "Step", new object[] { step });
+                stepSeconds -= step;
+            }
+            Assert.GreaterOrEqual(Get<float>(follower, "Progress"), minimumWorldGap,
+                "The first fan must clear the configured route gap before the next enters.");
             Assert.AreEqual(2, Get<int>(mode, "SpawnedFans"), "A second fan enters only after the first clears the minimum gap.");
 
             Invoke(mode, "Step", new object[] { 1f });
@@ -575,7 +597,11 @@ namespace HayChoriYPaty.Tests
             CallPrivate("DeliverWithinServiceRanges");
             Assert.AreEqual(1, Get<int>(first, "PendingUnits"));
             Assert.IsFalse(Get<bool>(first, "IsDeparting"));
-            for (int n = 0; n < 119; n++) CallPrivate("DeliverWithinServiceRanges");
+            for (int n = 0; n < 119; n++)
+            {
+                ClearWorkerDeliveryCooldowns();
+                CallPrivate("DeliverWithinServiceRanges");
+            }
             foreach (object fan in fans)
             {
                 Assert.IsTrue(Get<bool>(fan, "IsDeparting"));
@@ -700,7 +726,144 @@ namespace HayChoriYPaty.Tests
 
         [TestCase(0)]
         [TestCase(1)]
-        public void TallPortraitStagesBothWorkerRowsBehindTheirStationsWithinTheArea(int zone)
+        public void CamionerosCrewGroupsShareOneLineAndStayCenteredBehindTheirStations(int zone)
+        {
+            object route = Get<object>(config, "Route");
+            routeType.GetField("SegmentLengths", PublicInstance).SetValue(route, new[] {8f, 8f, 8f});
+            routeType.GetField("RowSpacing", PublicInstance).SetValue(route, 5.88f);
+            routeType.GetField("CorridorWidth", PublicInstance).SetValue(route, 1.92f);
+            routeType.GetField("HorizontalCorridorWidth", PublicInstance).SetValue(route, 1.68f);
+            routeType.GetField("PlayableBounds", PublicInstance).SetValue(route, new Rect(-6f, -8f, 12f, 16f));
+
+            mode = CreateMode(.02f);
+            Invoke(mode, "Begin");
+            Set(mode, "coins", 10000);
+            for (int i = 0; i < 3; i++) Hire("Parrillero", zone);
+            for (int i = 0; i < 3; i++) Hire("Cocacolero", zone);
+
+            var workers = (System.Collections.IList)Get<object>(mode, "Workers");
+            Assert.AreEqual(6, workers.Count);
+            float pixel = Get<float>(mode, "WorldUnitsPerLogicalPixel");
+            float clearHeight = (5.88f - 1.68f) / pixel;
+            float workerHeight = (float)modeType.GetField("WorkerVisualHeightLogical", PublicStatic).GetRawConstantValue();
+            float fenceClearance = (float)modeType.GetField("WorkerFenceClearanceLogical", PublicStatic).GetRawConstantValue();
+            float sharedRowY = Get<Vector2>(workers[0], "Position").y;
+
+            float pivot = (float)modeType.GetField("WorkerVisualPivotY", PublicStatic).GetRawConstantValue();
+            Type streetViewType = RuntimeType("StreetView");
+            Rect[] parrilleroPoses = (Rect[])streetViewType.GetProperty("WorkerFoodPoseBounds",
+                BindingFlags.NonPublic | BindingFlags.Static).GetValue(null, null);
+            Rect[] cocacoleroPoses = (Rect[])streetViewType.GetMethod("WorkerDrinkPoseBounds",
+                BindingFlags.NonPublic | BindingFlags.Static).Invoke(null, new object[] {true});
+            float pWidth = MaxPoseWidthLogical(parrilleroPoses, workerHeight, "street-parrillero");
+            float cWidth = MaxPoseWidthLogical(cocacoleroPoses, workerHeight,
+                "street-cocacolero-levels3-5-v1", true);
+            float pSpacing = pWidth - 10f;
+            float cSpacing = cWidth - 10f;
+            Vector2 bounds = (Vector2)CallPrivate("WorkAreaHorizontalBounds", zone);
+            Vector2 center = (Vector2)Invoke(mode, "WorkZone", new object[] {zone});
+            var envelopesByRole = new Rect[2][] { new Rect[3], new Rect[3] };
+            object parrilleroRole = Enum.Parse(RuntimeType("StreetWorkerRole"), "Parrillero");
+            object cocacoleroRole = Enum.Parse(RuntimeType("StreetWorkerRole"), "Cocacolero");
+            Vector2 tablePosition = (Vector2)Invoke(mode, "StationVisualPosition", new[] { parrilleroRole, (object)zone });
+            Vector2 barrelPosition = (Vector2)Invoke(mode, "StationVisualPosition", new[] { cocacoleroRole, (object)zone });
+            for (int i = 0; i < workers.Count; i++)
+            {
+                bool parrillero = Get<object>(workers[i], "Role").ToString() == "Parrillero";
+                Vector2 position = Get<Vector2>(workers[i], "Position");
+                Rect envelope = WorkerVisualEnvelope(position, parrillero ? pWidth : cWidth,
+                    workerHeight, pivot, pixel);
+                int roleIndex = parrillero ? 0 : 1;
+                int slotIndex = i % 3;
+                envelopesByRole[roleIndex][slotIndex] = envelope;
+                Assert.GreaterOrEqual(envelope.xMin, bounds.x - .0001f);
+                Assert.LessOrEqual(envelope.xMax, bounds.y + .0001f);
+                Assert.GreaterOrEqual(envelope.yMin,
+                    center.y - clearHeight * pixel * .5f + fenceClearance * pixel - .0001f);
+                Assert.LessOrEqual(envelope.yMax,
+                    center.y + clearHeight * pixel * .5f - fenceClearance * pixel + .0001f);
+                Assert.AreEqual(sharedRowY, position.y, .0001f,
+                    "Both teams share the same horizontal/depth line in this work area.");
+            }
+
+            Assert.AreEqual(tablePosition.x, Get<Vector2>(workers[0], "Position").x, .0001f,
+                "The first Parrillero stays in the center slot.");
+            Assert.AreEqual(tablePosition.x - pSpacing * pixel, Get<Vector2>(workers[1], "Position").x, .0001f,
+                "The second Parrillero takes the left slot.");
+            Assert.AreEqual(tablePosition.x + pSpacing * pixel, Get<Vector2>(workers[2], "Position").x, .0001f,
+                "The third Parrillero takes the right slot.");
+            Assert.AreEqual(barrelPosition.x, Get<Vector2>(workers[3], "Position").x, .0001f,
+                "The first Cocacolero stays in the center slot.");
+            Assert.AreEqual(barrelPosition.x - cSpacing * pixel, Get<Vector2>(workers[4], "Position").x, .0001f,
+                "The second Cocacolero takes the left slot.");
+            Assert.AreEqual(barrelPosition.x + cSpacing * pixel, Get<Vector2>(workers[5], "Position").x, .0001f,
+                "The third Cocacolero takes the right slot.");
+            Assert.AreEqual(tablePosition.y, barrelPosition.y, .0001f,
+                "The table and barrel share one depth line behind both crews.");
+            Assert.AreEqual(-10f * pixel, envelopesByRole[0][0].xMin - envelopesByRole[0][1].xMax, .0001f,
+                "The left and center Parrillero bounds overlap by ten logical pixels.");
+            Assert.AreEqual(-10f * pixel, envelopesByRole[0][2].xMin - envelopesByRole[0][0].xMax, .0001f,
+                "The center and right Parrillero bounds overlap by ten logical pixels.");
+            Assert.AreEqual(-10f * pixel, envelopesByRole[1][0].xMin - envelopesByRole[1][1].xMax, .0001f,
+                "The left and center Cocacolero bounds overlap by ten logical pixels.");
+            Assert.AreEqual(-10f * pixel, envelopesByRole[1][2].xMin - envelopesByRole[1][0].xMax, .0001f,
+                "The center and right Cocacolero bounds overlap by ten logical pixels.");
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        public void CamionerosFirstHireStaysInCenterAndLaterHiresFlankIt(int zone)
+        {
+            object route = Get<object>(config, "Route");
+            routeType.GetField("SegmentLengths", PublicInstance).SetValue(route, new[] {8f, 8f, 8f});
+            routeType.GetField("RowSpacing", PublicInstance).SetValue(route, 5.88f);
+            routeType.GetField("CorridorWidth", PublicInstance).SetValue(route, 1.92f);
+            routeType.GetField("HorizontalCorridorWidth", PublicInstance).SetValue(route, 1.68f);
+            routeType.GetField("PlayableBounds", PublicInstance).SetValue(route, new Rect(-6f, -8f, 12f, 16f));
+
+            mode = CreateMode(.02f);
+            Invoke(mode, "Begin");
+            Set(mode, "coins", 10000);
+            string[] roles = { "Parrillero", "Cocacolero" };
+            Rect[] parrilleroPoses = (Rect[])RuntimeType("StreetView").GetProperty("WorkerFoodPoseBounds",
+                BindingFlags.NonPublic | BindingFlags.Static).GetValue(null, null);
+            Type streetViewType = RuntimeType("StreetView");
+            Rect[] cocacoleroPoses = (Rect[])streetViewType.GetMethod("WorkerDrinkPoseBounds",
+                BindingFlags.NonPublic | BindingFlags.Static).Invoke(null, new object[] {true});
+            float targetHeight = (float)modeType.GetField("WorkerVisualHeightLogical", PublicStatic).GetRawConstantValue();
+            float[] spacings = { MaxPoseWidthLogical(parrilleroPoses, targetHeight, "street-parrillero") - 10f,
+                MaxPoseWidthLogical(cocacoleroPoses, targetHeight, "street-cocacolero-levels3-5-v1", true) - 10f };
+            for (int roleIndex = 0; roleIndex < roles.Length; roleIndex++)
+            {
+                object role = Enum.Parse(RuntimeType("StreetWorkerRole"), roles[roleIndex]);
+                for (int hireCount = 1; hireCount <= 3; hireCount++)
+                {
+                    Hire(roles[roleIndex], zone);
+                    var crew = new System.Collections.ArrayList();
+                    System.Collections.IList allWorkers = (System.Collections.IList)Get<object>(mode, "Workers");
+                    for (int i = 0; i < allWorkers.Count; i++)
+                        if (Get<object>(allWorkers[i], "Role").ToString() == roles[roleIndex] &&
+                            Get<int>(allWorkers[i], "ServiceZone") == zone) crew.Add(allWorkers[i]);
+                    Assert.AreEqual(hireCount, crew.Count);
+                    float centerX = ((Vector2)Invoke(mode, "StationVisualPosition", new[] { role, (object)zone })).x;
+                    float scale = Get<float>(mode, "WorldUnitsPerLogicalPixel");
+                    for (int hireIndex = 0; hireIndex < hireCount; hireIndex++)
+                    {
+                        float slotOffset = hireIndex == 0 ? 0f : hireIndex == 1
+                            ? -spacings[roleIndex] : spacings[roleIndex];
+                        Assert.AreEqual(centerX + slotOffset * scale,
+                            Get<Vector2>(crew[hireIndex], "Position").x, .0001f,
+                            hireIndex == 0
+                                ? "The first hire remains centered as the crew grows."
+                                : "Subsequent hires take the left slot, then the right slot.");
+                    }
+                }
+            }
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        public void TallPortraitStagesBothCamionerosCrewsOnOneLineBehindTheirStations(int zone)
         {
             object route = Get<object>(config, "Route");
             routeType.GetField("SegmentLengths", PublicInstance).SetValue(route, new[] {8f, 8f, 8f});
@@ -719,38 +882,40 @@ namespace HayChoriYPaty.Tests
             var hiredWorkers = (System.Collections.IList)Get<object>(mode, "Workers");
             Assert.AreEqual(6, hiredWorkers.Count, "The target-area roster must permit the full 3+3 staff cap.");
             Vector2 workCenter = (Vector2)Invoke(mode, "WorkZone", new object[] {zone});
-            object parrillero = Enum.Parse(RuntimeType("StreetWorkerRole"), "Parrillero");
-            object cocacolero = Enum.Parse(RuntimeType("StreetWorkerRole"), "Cocacolero");
+            object parrilleroRole = Enum.Parse(RuntimeType("StreetWorkerRole"), "Parrillero");
+            object cocacoleroRole = Enum.Parse(RuntimeType("StreetWorkerRole"), "Cocacolero");
             float workerHeight = (float)modeType.GetField("WorkerVisualHeightLogical", PublicStatic).GetRawConstantValue();
-            float pivotY = (float)modeType.GetField("WorkerVisualPivotY", PublicStatic).GetRawConstantValue();
+            float pivotY = (float)RuntimeType("TowerDefenseGameMode")
+                .GetField("WorkerVisualPivotY", PublicStatic).GetRawConstantValue();
             float fenceClearance = (float)modeType.GetField("WorkerFenceClearanceLogical", PublicStatic).GetRawConstantValue();
             float parrilleroVisualWidth = (float)modeType.GetField("ParrilleroVisualWidthLogical", PublicStatic).GetRawConstantValue();
             float cocacoleroVisualWidth = (float)modeType.GetField("CocacoleroVisualWidthLogical", PublicStatic).GetRawConstantValue();
             const float pixelScale = .02f;
-            const float rowSeparation = 110f;
-            const float parrilleroSpacing = 84f;
-            const float cocacoleroSpacing = 96f;
+            float parrilleroSpacing;
+            float cocacoleroSpacing;
             float rowSpacing = (float)routeType.GetField("RowSpacing", PublicInstance).GetValue(route);
             float horizontalCorridor = (float)routeType.GetField("HorizontalCorridorWidth", PublicInstance).GetValue(route);
             float halfClearHeight = (rowSpacing - horizontalCorridor) / (2f * pixelScale);
             float visualMinY = -workerHeight * pivotY;
             float visualMaxY = workerHeight * (1f - pivotY);
-            float lowerRowBase = ((-halfClearHeight + fenceClearance - visualMinY) +
-                (halfClearHeight - fenceClearance - rowSeparation - visualMaxY)) * .5f;
             Type streetViewType = RuntimeType("StreetView");
             Rect[] parrilleroPoses = (Rect[])streetViewType.GetProperty("WorkerFoodPoseBounds",
                 BindingFlags.NonPublic | BindingFlags.Static).GetValue(null, null);
             Rect[] cocacoleroPoses = (Rect[])streetViewType.GetMethod("WorkerDrinkPoseBounds",
                 BindingFlags.NonPublic | BindingFlags.Static).Invoke(null, new object[] {true});
-            float parrilleroWidth = MaxPoseWidthLogical(parrilleroPoses, workerHeight);
-            float cocacoleroWidth = MaxPoseWidthLogical(cocacoleroPoses, workerHeight);
+            float parrilleroWidth = MaxPoseWidthLogical(parrilleroPoses, workerHeight, "street-parrillero");
+            float cocacoleroWidth = MaxPoseWidthLogical(cocacoleroPoses, workerHeight,
+                "street-cocacolero-levels3-5-v1", true);
+            parrilleroSpacing = parrilleroWidth - 10f;
+            cocacoleroSpacing = cocacoleroWidth - 10f;
             Assert.LessOrEqual(parrilleroWidth, parrilleroVisualWidth,
                 "The position envelope must include all four visible Parrillero poses.");
             Assert.LessOrEqual(cocacoleroWidth, cocacoleroVisualWidth,
                 "The position envelope must include all four visible Cocacolero poses.");
-            var workerEnvelopes = new System.Collections.Generic.List<Rect>(6);
-            Vector2 tableAnchor = (Vector2)Invoke(mode, "StationVisualPosition", new[] {parrillero, (object)zone});
-            Vector2 barrelAnchor = (Vector2)Invoke(mode, "StationVisualPosition", new[] {cocacolero, (object)zone});
+            var workerEnvelopes = new Rect[2][] {new Rect[3], new Rect[3]};
+            var standingEnvelopes = new Rect[2][] {new Rect[3], new Rect[3]};
+            Vector2 tableAnchor = (Vector2)Invoke(mode, "StationVisualPosition", new[] {parrilleroRole, (object)zone});
+            Vector2 barrelAnchor = (Vector2)Invoke(mode, "StationVisualPosition", new[] {cocacoleroRole, (object)zone});
             Type kitchenLayout = RuntimeType("StreetKitchenLayout");
             float tableWidth = (float)kitchenLayout.GetField("TableWidth", PublicStatic).GetRawConstantValue();
             float tableHeight = (float)kitchenLayout.GetField("SandwichTableHeight", PublicStatic).GetRawConstantValue();
@@ -761,28 +926,23 @@ namespace HayChoriYPaty.Tests
                 .Invoke(mode, new object[] {zone});
             float tableHalfGroup = parrilleroSpacing + parrilleroVisualWidth * .5f;
             float barrelHalfGroup = cocacoleroSpacing + cocacoleroVisualWidth * .5f;
-            float workerStationClearance = (float)modeType.GetField("WorkerStationClearanceLogical", PublicStatic).GetRawConstantValue();
-            Vector2 tableServiceAnchor = (Vector2)Invoke(mode, "StationPosition", new[] {parrillero, (object)zone});
-            Vector2 barrelServiceAnchor = (Vector2)Invoke(mode, "StationPosition", new[] {cocacolero, (object)zone});
-            float fallbackParrilleroCenterX = tableServiceAnchor.x +
-                (tableWidth * .5f + workerStationClearance + tableHalfGroup) * pixelScale;
-            float fallbackCocacoleroCenterX = barrelServiceAnchor.x -
-                (barrelWidth * .5f + workerStationClearance + barrelHalfGroup) * pixelScale;
-            float parrilleroMin = horizontalBounds.x + (fenceClearance + tableHalfGroup) * pixelScale;
-            float parrilleroMax = horizontalBounds.y - (fenceClearance + tableHalfGroup) * pixelScale;
-            float cocacoleroMin = horizontalBounds.x + (fenceClearance + barrelHalfGroup) * pixelScale;
-            float cocacoleroMax = horizontalBounds.y - (fenceClearance + barrelHalfGroup) * pixelScale;
-            float expectedParrilleroCenterX = parrilleroMax < parrilleroMin ? fallbackParrilleroCenterX
-                : Mathf.Clamp(tableAnchor.x, parrilleroMin, parrilleroMax);
-            float expectedCocacoleroCenterX = cocacoleroMax < cocacoleroMin ? fallbackCocacoleroCenterX
-                : Mathf.Clamp(barrelAnchor.x, cocacoleroMin, cocacoleroMax);
-            float expectedStationSpacing = (horizontalBounds.y - horizontalBounds.x) / pixelScale -
-                2f * (float)modeType.GetField("StationOuterClearanceLogical", PublicStatic).GetRawConstantValue() -
-                (tableWidth + barrelWidth) * .5f;
-            Assert.AreEqual(expectedStationSpacing, Get<float>(mode, "CurrentStationSpacingLogical"), .001f,
-                "The table and barrel spread to the edges of the chosen area without crossing its fences.");
+            float expectedParrilleroCenterX = horizontalBounds.x +
+                (fenceClearance + tableHalfGroup) * pixelScale;
+            float expectedCocacoleroCenterX = horizontalBounds.y -
+                (fenceClearance + barrelHalfGroup) * pixelScale;
+            Assert.AreEqual(expectedParrilleroCenterX, tableAnchor.x, .0001f,
+                "The table is centered on its crew while the complete trio clears the outer fence.");
+            Assert.AreEqual(expectedCocacoleroCenterX, barrelAnchor.x, .0001f,
+                "The barrel is centered on its crew while the complete trio clears the outer fence.");
+            Assert.AreEqual((expectedCocacoleroCenterX - expectedParrilleroCenterX) / pixelScale,
+                Get<float>(mode, "CurrentStationSpacingLogical"), .001f,
+                "The spacing property reports the actual side-by-side visual anchors.");
             Vector2 table = tableAnchor - Vector2.up * stationRenderOffset * pixelScale;
             Vector2 barrel = barrelAnchor - Vector2.up * stationRenderOffset * pixelScale;
+            Assert.AreEqual(workCenter.y, table.y, .0001f,
+                "The table render center uses the middle of the fenced area.");
+            Assert.AreEqual(table.y, barrel.y, .0001f,
+                "The table and barrel render on the same depth line.");
             Rect tableEnvelope = Rect.MinMaxRect(table.x - tableWidth * pixelScale * .5f,
                 table.y - tableHeight * pixelScale * .5f,
                 table.x + tableWidth * pixelScale * .5f,
@@ -807,6 +967,13 @@ namespace HayChoriYPaty.Tests
                 "The full-size barrel does not cross the lower horizontal fence.");
             Assert.LessOrEqual(barrelEnvelope.yMax, workCenter.y + halfClearHeight * pixelScale + .0001f,
                 "The full-size barrel does not cross the upper horizontal fence.");
+            Assert.GreaterOrEqual(barrel.x - table.x - (tableWidth + barrelWidth) * pixelScale * .5f,
+                0f, "The two full-size stations remain separated on their shared depth line.");
+            float workerRowOffset = (float)modeType.GetField("CamionerosWorkerRowOffsetLogical", PrivateStatic).GetRawConstantValue();
+            float expectedRowAnchor = Mathf.Clamp(workerRowOffset,
+                -halfClearHeight + fenceClearance - visualMinY,
+                halfClearHeight - fenceClearance - visualMaxY);
+            float expectedWorkerY = workCenter.y + expectedRowAnchor * pixelScale;
             for (int i = 0; i < 3; i++)
             {
                 object parrilleroState = hiredWorkers[i];
@@ -823,22 +990,27 @@ namespace HayChoriYPaty.Tests
                     parrilleroPosition.x, .0001f);
                 Assert.AreEqual(expectedCocacoleroCenterX + cocacoleroSide * pixelScale,
                     cocacoleroPosition.x, .0001f);
-                Assert.AreEqual(workCenter.y + (lowerRowBase + rowSeparation) * pixelScale,
-                    parrilleroPosition.y, .0001f, "Parrillero row must account for its foot-level Sprite pivot.");
-                Assert.AreEqual(workCenter.y + lowerRowBase * pixelScale,
-                    cocacoleroPosition.y, .0001f, "Cocacolero row must account for its foot-level Sprite pivot.");
+                Assert.AreEqual(expectedWorkerY, parrilleroPosition.y, .0001f,
+                    "All Parrilleros share the common worker line; the first hire stays centered.");
+                Assert.AreEqual(expectedWorkerY, cocacoleroPosition.y, .0001f,
+                    "All Cocacoleros share the same line as the Parrilleros; the first hire stays centered.");
                 Rect parrilleroEnvelope = WorkerVisualEnvelope(parrilleroPosition, parrilleroVisualWidth,
                     workerHeight, pivotY, pixelScale);
                 Rect cocacoleroEnvelope = WorkerVisualEnvelope(cocacoleroPosition, cocacoleroVisualWidth,
                     workerHeight, pivotY, pixelScale);
-                workerEnvelopes.Add(parrilleroEnvelope);
-                workerEnvelopes.Add(cocacoleroEnvelope);
+                workerEnvelopes[0][i] = parrilleroEnvelope;
+                workerEnvelopes[1][i] = cocacoleroEnvelope;
+                standingEnvelopes[0][i] = WorkerVisualEnvelope(parrilleroPosition, parrilleroWidth,
+                    workerHeight, pivotY, pixelScale);
+                standingEnvelopes[1][i] = WorkerVisualEnvelope(cocacoleroPosition, cocacoleroWidth,
+                    workerHeight, pivotY, pixelScale);
             }
 
             float innerTurnFenceX = FindInnerTurnFenceX(geometry, zone, workCenter.y);
-            for (int i = 0; i < workerEnvelopes.Count; i++)
+            for (int roleIndex = 0; roleIndex < workerEnvelopes.Length; roleIndex++)
+            for (int i = 0; i < workerEnvelopes[roleIndex].Length; i++)
             {
-                Rect worker = workerEnvelopes[i];
+                Rect worker = workerEnvelopes[roleIndex][i];
                 Assert.GreaterOrEqual(worker.xMin, horizontalBounds.x - .0001f,
                     "The complete sprite stays inside the outer edge of its selected zone.");
                 Assert.LessOrEqual(worker.xMax, horizontalBounds.y + .0001f,
@@ -853,24 +1025,43 @@ namespace HayChoriYPaty.Tests
                 else
                     Assert.GreaterOrEqual(worker.xMin, innerTurnFenceX + fenceClearance * pixelScale - .0001f,
                         "The complete worker sprite must stay inside the left U-turn fence.");
-                for (int j = 0; j < i; j++)
-                    Assert.IsFalse(worker.Overlaps(workerEnvelopes[j]),
-                        "Three workers of each role must fit without any full-sprite overlap.");
             }
 
-            float furnitureGap = Mathf.Abs(table.x - barrel.x) / pixelScale - (tableWidth + barrelWidth) * .5f;
-            Assert.GreaterOrEqual(furnitureGap, 32f,
-                "The full-size table and barrel stay horizontally separated as the crews are staged behind them.");
+            for (int roleIndex = 0; roleIndex < standingEnvelopes.Length; roleIndex++)
+            {
+                Assert.AreEqual(-10f * pixelScale, standingEnvelopes[roleIndex][0].xMin - standingEnvelopes[roleIndex][1].xMax,
+                    .0001f, "The left and center standing workers overlap by ten logical pixels.");
+                Assert.AreEqual(-10f * pixelScale, standingEnvelopes[roleIndex][2].xMin - standingEnvelopes[roleIndex][0].xMax,
+                    .0001f, "The center and right standing workers overlap by ten logical pixels.");
+            }
 
         }
 
-        private static float MaxPoseWidthLogical(Rect[] poses, float targetHeight)
+        private static float MaxPoseWidthLogical(Rect[] poses, float targetHeight, string textureResource,
+            bool matchedCocacolero = false)
         {
             Assert.IsNotNull(poses);
             Assert.GreaterOrEqual(poses.Length, 4);
+            Texture2D texture = Resources.Load<Texture2D>(textureResource);
+            Assert.IsNotNull(texture, "The production worker texture is available for SpriteMeshType.Tight measurement.");
+            Vector2 importScale = matchedCocacolero
+                ? new Vector2(texture.width / 1247f, texture.height / 1261f) : Vector2.one;
+            float pivotY = (float)RuntimeType("TowerDefenseGameMode")
+                .GetField("WorkerVisualPivotY", PublicStatic).GetRawConstantValue();
             float width = 0f;
             for (int i = 0; i < 4; i++)
-                width = Mathf.Max(width, targetHeight * poses[i].width / Mathf.Max(.001f, poses[i].height));
+            {
+                Rect pose = poses[i];
+                Rect scaledPose = new Rect(pose.x * importScale.x, pose.y * importScale.y,
+                    pose.width * importScale.x, pose.height * importScale.y);
+                Rect spriteRect = new Rect(scaledPose.x, texture.height - scaledPose.yMax,
+                    scaledPose.width, scaledPose.height);
+                Sprite sprite = Sprite.Create(texture, spriteRect, new Vector2(.5f, pivotY), 100f, 0,
+                    SpriteMeshType.Tight);
+                width = Mathf.Max(width, targetHeight * sprite.bounds.size.x /
+                    Mathf.Max(.001f, sprite.bounds.size.y));
+                UnityEngine.Object.DestroyImmediate(sprite);
+            }
             return width;
         }
 
@@ -1040,6 +1231,17 @@ namespace HayChoriYPaty.Tests
         {
             object role = Enum.Parse(RuntimeType("StreetWorkerRole"), roleName);
             Assert.IsTrue((bool)Invoke(mode, "TryHire", new[] { role, (object)zone }), "Expected successful placement: " + roleName + " in area " + zone + ".");
+        }
+
+        private void ClearWorkerDeliveryCooldowns()
+        {
+            var workers = (System.Collections.IList)Get<object>(mode, "Workers");
+            for (int i = 0; i < workers.Count; i++)
+            {
+                FieldInfo cooldown = workers[i].GetType().GetField("<DeliveryCooldownSeconds>k__BackingField", PrivateInstance);
+                Assert.IsNotNull(cooldown, "Expected the delivery cooldown backing field on worker state.");
+                cooldown.SetValue(workers[i], 0f);
+            }
         }
 
         private static object Invoke(object target, string methodName, object[] arguments = null)

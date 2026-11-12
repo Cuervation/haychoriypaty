@@ -16,6 +16,7 @@
 
 ## Unity y producto
 - Usar la versión de `ProjectSettings/ProjectVersion.txt`. Preferir el editor ya abierto mediante Unity MCP: consultas de solo lectura primero, seleccionar el checkout correcto entre varias instancias y comprobar resultados. No duplicar endpoint, editor ni servidor; no cerrar/reiniciar procesos sin autorización.
+- En cada interacción con Unity (abrir/reconectar, probar o compilar), revisar la interfaz y los logs/Console disponibles antes y después para detectar popups, diálogos y errores. No descartarlos a ciegas: identificar el mensaje y su causa, usar solo una opción segura y confirmar que desapareció y que Editor/licencia siguen operativos. Si macOS u otra política impide automatizarlo, informar con precisión y dar el paso manual necesario; no cambiar permisos globales ni forzar cierres.
 - Preservar assets, GUIDs y todos los `.meta`; no versionar `Library`, `Temp`, `Logs`, `Obj`, builds o ajustes de usuario. Sin dependencias nuevas por conveniencia.
 - Mantener siete productos y puesto callejero argentino sin mesas para sentarse: [product.md](specs/product.md). No modificar economía, objetivos, tiempos, inventario ni pendientes fuera del pedido.
 - Consultar [visual-reference.md](specs/visual-reference.md) al cambiar arte/UI. Reutilizar arte original y `StreetView.DrawStandardButton` para botones comunes; cards de mejoras y selector mural son excepciones existentes. La geometría activa es `StreetKitchenLayout`/cocina modular, no los tamaños históricos de `StreetWorkstationLayout`.

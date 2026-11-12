@@ -953,6 +953,24 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
+        public IEnumerator PeregrinacionMorenoBackdropLoadsAndRendersInUnityGameView()
+        {
+            const string expectedBackground = "street-background-peregrinacion-moreno-v4";
+            Assert.AreEqual(expectedBackground, Get(Get(view, "towerDefenseSourceConfig"), "BackgroundResource"));
+            Assert.AreEqual(expectedBackground, ((Texture2D)Get(view, "towerDefenseBackdrop")).name);
+
+            Assert.IsTrue((bool)Call(mode, "TrySpawnFan", new[] {0}, new[] {1}));
+            object fan = ((IList)Get(mode, "Fans"))[0];
+            object follower = Get(fan, "RouteFollower");
+            float distance = (float)Get(follower, "TotalDistance");
+            float speed = (float)Get(follower, "Speed");
+            Call(follower, "Advance", distance * .4f / speed);
+            Call(Get(view, "towerDefensePresentation"), "Sync", mode);
+
+            yield return CaptureAtResolution("peregrinacion-moreno-v4-live-gameview-540x960", 540, 960);
+        }
+
+        [UnityTest]
         public IEnumerator PeregrinacionGameViewSingleFenceFreeConstructionAtThreeResolutions()
         {
             BuildPilgrimEquipmentAndInitialCrew();
@@ -1141,6 +1159,79 @@ namespace HayChoriYPaty.Tests
             yield return PlaceAndCaptureThreePlusThreeWorkers(1);
         }
 
+        [UnityTest]
+        public IEnumerator ThreeParrillerosAndThreeCocacolerosInBothAreasRenderOnSharedLines()
+        {
+            Set(mode, "coins", 10000);
+            Rect[] cards = Cards(), areas = Areas();
+            for (int zone = 0; zone < 2; zone++)
+                for (int role = 0; role < 2; role++)
+                    for (int i = 0; i < 3; i++)
+                    {
+                        yield return Tap(cards[role].center);
+                        yield return Tap(areas[zone].center);
+                    }
+
+            for (int zone = 0; zone < 2; zone++)
+            {
+                Assert.AreEqual(3, Count("Parrillero", zone));
+                Assert.AreEqual(3, Count("Cocacolero", zone));
+            }
+
+            yield return CaptureAtResolution("workers-3-plus-3-both-areas-576x1280", 576, 1280);
+            for (int zone = 0; zone < 2; zone++)
+            {
+                AssertBothCamionerosCrewsShareLineInsideRails(zone);
+            }
+
+        }
+
+        void AssertBothCamionerosCrewsShareLineInsideRails(int zone)
+        {
+            Vector2 center = (Vector2)Call(mode, "WorkZone", new object[] {zone});
+            object route = Get(mode, "RouteConfig");
+            float rowSpacing = (float)route.GetType().GetField("RowSpacing", I).GetValue(route);
+            float corridor = (float)route.GetType().GetField("HorizontalCorridorWidth", I).GetValue(route);
+            float halfClearHeight = (rowSpacing - corridor) * .5f;
+            float pixel = (float)Get(mode, "WorldUnitsPerLogicalPixel");
+            IDictionary workerViews = (IDictionary)Get(Get(view, "towerDefensePresentation"), "workerViews");
+            IList workers = (IList)Get(mode, "Workers");
+            Bounds[][] crewBounds = { new Bounds[3], new Bounds[3] };
+            int[] crewCounts = new int[2];
+            float row = float.NaN;
+            int count = 0;
+
+            for (int i = 0; i < workers.Count; i++)
+            {
+                object worker = workers[i];
+                if ((int)Get(worker, "ServiceZone") != zone) continue;
+                Vector2 position = (Vector2)Get(worker, "Position");
+                if (float.IsNaN(row)) row = position.y;
+                Assert.AreEqual(row, position.y, .0001f,
+                    "Both roles in area " + zone + " share the same horizontal line.");
+                SpriteRenderer renderer = (SpriteRenderer)Get(workerViews[(int)Get(worker, "Id")], "Renderer");
+                Assert.GreaterOrEqual(renderer.bounds.min.y, center.y - halfClearHeight - .0001f,
+                    "Area " + zone + " workers remain above the lower fence rail.");
+                Assert.LessOrEqual(renderer.bounds.max.y, center.y + halfClearHeight + .0001f,
+                    "Area " + zone + " workers remain below the upper fence rail.");
+                int crewIndex = Get(worker, "Role").ToString() == "Parrillero" ? 0 : 1;
+                crewBounds[crewIndex][crewCounts[crewIndex]++] = renderer.bounds;
+                count++;
+            }
+
+            Assert.AreEqual(6, count, "Both three-person teams are present in area " + zone + ".");
+            Assert.AreEqual(Station(zone, "Station_NormalTable").transform.position.y,
+                Station(zone, "Station_CocaBarrel").transform.position.y, .0001f,
+                "Both stations in area " + zone + " share the worker line.");
+            for (int crew = 0; crew < 2; crew++)
+            {
+                Assert.AreEqual(-10f * pixel, crewBounds[crew][0].min.x - crewBounds[crew][1].max.x, .00025f,
+                    "The left and center rendered workers overlap by ten logical pixels.");
+                Assert.AreEqual(-10f * pixel, crewBounds[crew][2].min.x - crewBounds[crew][0].max.x, .00025f,
+                    "The center and right rendered workers overlap by ten logical pixels.");
+            }
+        }
+
         IEnumerator PlaceAndCaptureThreePlusThreeWorkers(int zone)
         {
             Set(mode, "coins", 10000);
@@ -1170,20 +1261,14 @@ namespace HayChoriYPaty.Tests
             float fenceClearance = (float)T("TowerDefenseGameMode").GetField("WorkerFenceClearanceLogical", S).GetRawConstantValue() * pixel;
             IDictionary workerViews = (IDictionary)Get(Get(view, "towerDefensePresentation"), "workerViews");
             IList workers = (IList)Get(mode, "Workers");
-            IList stations = (IList)Get(Get(view, "towerDefensePresentation"), "stationObjects");
-            var zoneStations = new System.Collections.Generic.List<Rect>();
-            for (int i = 0; i < stations.Count; i++)
-            {
-                GameObject station = (GameObject)stations[i];
-                if (!station.name.Contains("zone " + zone + " ")) continue;
-                foreach (SpriteRenderer renderer in station.GetComponentsInChildren<SpriteRenderer>(true))
-                {
-                    if (renderer == null || !renderer.enabled || renderer.sprite == null) continue;
-                    Bounds bounds = renderer.bounds;
-                    zoneStations.Add(Rect.MinMaxRect(bounds.min.x, bounds.min.y, bounds.max.x, bounds.max.y));
-                }
-            }
-            Assert.Greater(zoneStations.Count, 0, "Both original-size station sprites and their stock displays are present.");
+            GameObject table = Station(zone, "Station_NormalTable");
+            GameObject barrel = Station(zone, "Station_CocaBarrel");
+            int tableMinimumSortingOrder = MinimumSortingOrder(table);
+            int barrelMinimumSortingOrder = MinimumSortingOrder(barrel);
+            float parrilleroCenterSum = 0f, cocacoleroCenterSum = 0f;
+            float sharedWorkerRowY = float.NaN;
+            int parrilleroCount = 0, cocacoleroCount = 0;
+            Bounds[] parrilleroBounds = new Bounds[3], cocacoleroBounds = new Bounds[3];
 
             for (int i = 0; i < workers.Count; i++)
             {
@@ -1201,21 +1286,69 @@ namespace HayChoriYPaty.Tests
                 Assert.GreaterOrEqual(envelope.yMin, center.y - halfClearHeight + fenceClearance - .0001f,
                     "The full rendered sprite clears the lower rail.");
                 Assert.LessOrEqual(envelope.yMax, center.y + halfClearHeight - fenceClearance + .0001f,
-                    "The full rendered sprite clears the upper rail.");
-                for (int s = 0; s < zoneStations.Count; s++)
-                    Assert.IsFalse(envelope.Overlaps(zoneStations[s]),
-                        "No Parrillero or Cocacolero sprite may cover the table, barrel, or stocked product displays.");
-                for (int j = 0; j < i; j++)
+                    "Area " + zone + ": the full rendered sprite clears the upper rail.");
+                bool cocacolero = Get(worker, "Role").ToString() == "Cocacolero";
+                int stationMinimumSortingOrder = cocacolero
+                    ? barrelMinimumSortingOrder : tableMinimumSortingOrder;
+                Assert.Less(renderer.sortingOrder, stationMinimumSortingOrder,
+                    "The assigned station must draw in front of its worker; silhouette overlap with the counter is intentional.");
+                Vector2 workerPosition = (Vector2)Get(worker, "Position");
+                if (float.IsNaN(sharedWorkerRowY)) sharedWorkerRowY = workerPosition.y;
+                Assert.AreEqual(sharedWorkerRowY, workerPosition.y, .0001f,
+                    "Both teams share the same horizontal/depth line in this work area.");
+                if (cocacolero)
                 {
-                    object prior = workers[j];
-                    if ((int)Get(prior, "ServiceZone") != zone) continue;
-                    SpriteRenderer priorRenderer = (SpriteRenderer)Get(workerViews[(int)Get(prior, "Id")], "Renderer");
-                    Bounds priorBounds = priorRenderer.bounds;
-                    Rect priorEnvelope = Rect.MinMaxRect(priorBounds.min.x, priorBounds.min.y, priorBounds.max.x, priorBounds.max.y);
-                    Assert.IsFalse(envelope.Overlaps(priorEnvelope),
-                        "All six rendered sprites must have clear space between each other.");
+                    float spacing = bounds.size.x / pixel - 10f;
+                    float side = cocacoleroCount == 0 ? 0f : cocacoleroCount == 1 ? -spacing : spacing;
+                    Assert.AreEqual(barrel.transform.position.x + side * pixel, workerPosition.x, .001f,
+                        "The first Cocacolero stays centered; later hires take the left then right slot.");
+                    cocacoleroBounds[cocacoleroCount] = bounds;
+                    cocacoleroCenterSum += workerPosition.x;
+                    cocacoleroCount++;
+                }
+                else
+                {
+                    float spacing = bounds.size.x / pixel - 10f;
+                    float side = parrilleroCount == 0 ? 0f : parrilleroCount == 1 ? -spacing : spacing;
+                    Assert.AreEqual(table.transform.position.x + side * pixel, workerPosition.x, .001f,
+                        "The first Parrillero stays centered; later hires take the left then right slot.");
+                    parrilleroBounds[parrilleroCount] = bounds;
+                    parrilleroCenterSum += workerPosition.x;
+                    parrilleroCount++;
                 }
             }
+            Assert.AreEqual(3, parrilleroCount);
+            Assert.AreEqual(3, cocacoleroCount);
+            Assert.AreEqual(table.transform.position.y, barrel.transform.position.y, .0001f,
+                "The table and barrel are centered on the same depth line.");
+            Assert.AreEqual(-10f * pixel, parrilleroBounds[0].min.x - parrilleroBounds[1].max.x, .00025f,
+                "The left and center rendered Parrillero bounds overlap by ten logical pixels.");
+            Assert.AreEqual(-10f * pixel, parrilleroBounds[2].min.x - parrilleroBounds[0].max.x, .00025f,
+                "The center and right rendered Parrillero bounds overlap by ten logical pixels.");
+            Assert.AreEqual(-10f * pixel, cocacoleroBounds[0].min.x - cocacoleroBounds[1].max.x, .00025f,
+                "The left and center rendered Cocacolero bounds overlap by ten logical pixels.");
+            Assert.AreEqual(-10f * pixel, cocacoleroBounds[2].min.x - cocacoleroBounds[0].max.x, .00025f,
+                "The center and right rendered Cocacolero bounds overlap by ten logical pixels.");
+            float centeringTolerance = 20f * pixel;
+            Assert.LessOrEqual(Mathf.Abs(parrilleroCenterSum / parrilleroCount - table.transform.position.x),
+                centeringTolerance, "The Parrillero trio stays centered behind its table.");
+            Assert.LessOrEqual(Mathf.Abs(cocacoleroCenterSum / cocacoleroCount - barrel.transform.position.x),
+                centeringTolerance, "The Cocacolero trio stays centered behind the Coca barrel.");
+            float tableWidth = (float)T("StreetKitchenLayout").GetField("TableWidth", S).GetRawConstantValue();
+            float barrelWidth = (float)T("StreetKitchenLayout").GetField("BarrelWidth", S).GetRawConstantValue();
+            Assert.GreaterOrEqual(barrel.transform.position.x - table.transform.position.x -
+                (tableWidth + barrelWidth) * pixel * .5f, 23.5f * pixel - .0001f,
+                "The full-size table and barrel remain separately readable despite the shared staff line.");
+        }
+
+        int MinimumSortingOrder(GameObject station)
+        {
+            int minimum = int.MaxValue;
+            foreach (SpriteRenderer renderer in station.GetComponentsInChildren<SpriteRenderer>(true))
+                if (renderer != null && renderer.enabled && renderer.sprite != null)
+                    minimum = Mathf.Min(minimum, renderer.sortingOrder);
+            Assert.AreNotEqual(int.MaxValue, minimum, station.name + " has no visible SpriteRenderer.");
+            return minimum;
         }
 
         [UnityTest]

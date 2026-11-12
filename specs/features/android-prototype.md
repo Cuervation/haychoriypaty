@@ -216,6 +216,16 @@ Incluye el cambio local de veredita de Ferro. Al terminar el build aún no estab
 
 # Entrega Android — 2026-10-31: APK Development 0.2.81/code83
 
+# Entrega Android — 2026-11-11: APK 0.2.83/code85
+
+Build aislado con Unity 6000.6.3f1, IL2CPP/ARM64, escenas `Main` y `SampleScene`, Firebase local y `BuildOptions.None`. BuildPipeline: **Succeeded**, 0 errores, 5 warnings, 668,8 s. No se cambió ni se usó como destino el Editor/proyecto activo.
+
+- APK ignorada por Git: `Builds/Android/Archive/HayChoriYPaty-0.2.83-code85-fa38cfc-20261111.apk`, 386.743.960 bytes. Package `com.haychoriypaty.game`, versión `0.2.83`/código `85`, min API 26, target API 36, `arm64-v8a`.
+- ZIP íntegro, `zipalign -c -v 4` PASS, firma APK v2 PASS. Firmante Android Debug local; no es firma de distribución Play Store. SHA-256 `998c7fb041a43454ce02a70fe559a571dc03e844d54951278a413935f7e887fe`.
+- `TowerDefenseGameModeTests`: 28/29. El único fallo constata que el desplazamiento visual a la izquierda de la mesa del área 1 queda anulado por el clamp de seguridad en el límite izquierdo del área; no se relajó el límite para evitar sacar la mesa de su zona. Queda como validación pendiente/decisión visual, no como error del build.
+- El popup visible era el reporte de macOS “Unity.Licensing.Client se cerró inesperadamente”. La licencia se recuperó y los clientes Editor completaron handshakes; el BuildPipeline funcionó. El popup no se puede cerrar desde esta sesión porque macOS deniega el envío de eventos/automatización; la acción segura para cerrarlo sin cerrar Unity es pulsar **Ignorar**. No se cambió privacidad ni configuración global.
+- No se instaló en teléfono ni se hizo QA visual/performance del APK. No se hizo commit ni push; el APK queda como artefacto local ignorado por Git.
+
 Se generó desde el checkout activo con Unity 6000.6.3f1, Android IL2CPP/ARM64 y escena única `Assets/Scenes/Main.unity`. Build job `build-64f4c1ff3e`: **Succeeded, 342.412726 s, 0 errores/8 advertencias**. Player Settings `0.2.81`/code`83`, package `com.haychoriypaty.game`, min API26/target API36/ABI arm64-v8a.
 
 Artefacto `Builds/Android/Archive/HayChoriYPaty-0.2.81-code83-current-local-updates-20261031.apk`, **396,691,742 bytes**, SHA-256 `b1a57cf18a76c0e37511d48ac73b0e6d1371a704ffea962259d9a6f059ff0232`. Validaciones: ZIP íntegro, `zipalign -c 4`, `apksigner verify` (v2), `aapt` package/version/API/ABI y flags de Analytics/Ad-ID; IL2CPP metadata contiene `DrawHubLayeredEnvironment`. Android Debug firmado, no es firma Play Store.
