@@ -236,7 +236,7 @@ namespace HayChoriYPaty.Tests
 
             Assert.IsTrue((bool)Invoke(game, "IsLevelUnlocked", 12), "The historical win keeps its old Argentinos unlock meaning.");
             Assert.IsFalse((bool)Invoke(game, "IsLevelUnlocked", 4));
-            Assert.IsTrue((bool)Invoke(game, "Save"));
+            Assert.IsTrue((bool)InvokeAny(game, "Save"));
             Assert.IsFalse((bool)Invoke(game, "IsLevelUnlocked", 4), "Persisting a legacy ID10 win must not reinterpret it as a TD ID10 campaign transition.");
         }
 

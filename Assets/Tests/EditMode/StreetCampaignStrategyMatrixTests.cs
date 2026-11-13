@@ -36,7 +36,8 @@ namespace HayChoriYPaty.Tests
 
         public static IEnumerable<TestCaseData> RestockCases()
         {
-            for (int level = 1; level < 11; level++)
+            // Ids 9 (Camioneros) and 10 (Los Redondos) are Tower Defense levels now: no traditional restock economy.
+            for (int level = 1; level < 9; level++)
                 for (int funding = 0; funding < FundingNames.Length; funding++)
                     for (int tactic = 0; tactic < TacticNames.Length; tactic++)
                         yield return new TestCaseData(level, funding, tactic)

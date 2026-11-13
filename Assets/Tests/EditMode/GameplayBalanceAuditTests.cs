@@ -24,7 +24,7 @@ namespace HayChoriYPaty.Tests
         }
         [Test] public void InvariantCheckUsesTrueTerminalPhaseAndPreservesBalance()
         { StringAssert.StartsWith("PASS",(string)Invoke("SelfCheck")); }
-        [TestCase(0)][TestCase(1)][TestCase(2)][TestCase(3)][TestCase(4)][TestCase(5)][TestCase(6)][TestCase(7)][TestCase(8)][TestCase(9)][TestCase(10)]
+        [TestCase(0)][TestCase(1)][TestCase(2)][TestCase(3)][TestCase(4)][TestCase(5)][TestCase(6)][TestCase(7)][TestCase(8)]
         public void EachLevelDiagnosticHonorsPhysicalGoalsAndRealMoney(int level)
         {
             object b=Invoke("LoadEffective");Runner.GetField("effective",BindingFlags.NonPublic|BindingFlags.Static).SetValue(null,b);

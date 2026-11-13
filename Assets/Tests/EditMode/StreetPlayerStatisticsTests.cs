@@ -502,7 +502,7 @@ namespace HayChoriYPaty.Tests
                 string written = null;
                 Assert.IsTrue(Activate(game, null, (json, match) => { written = json; return true; }));
                 Assert.IsTrue((bool)ReadProperty(game, "IsPlayerActive"));
-                StringAssert.Contains("\"version\":7", written);
+                StringAssert.Contains("\"version\":9", written);
                 Assert.IsTrue((bool)Invoke(game, "SuspendPlayer"));
                 Assert.IsFalse((bool)ReadProperty(game, "IsPlayerActive"));
                 Assert.IsNull(ReadProperty(game, "Sim"));

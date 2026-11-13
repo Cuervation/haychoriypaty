@@ -90,7 +90,7 @@ namespace HayChoriYPaty.Tests
                 bool activeCooks = (bool)Get(sim, "UsesActiveCooks");
                 for (int product = 0; product < 7; product++)
                 {
-                    if (((activeCooks || level == 2) && product < 4) || product == 4 || product == 6) continue;
+                    if (((activeCooks || level == 2) && product < 4) || product == 4 || product == 5 || product == 6) continue; // Fernet (5) is inexhaustible too
                     // Active-cook and Vélez sandwiches, plus Coca/beer barrels, are inexhaustible Market-independent servings.
                     int delivered = (int)Call(sim, "GetProductDelivered", product);
                     int[] recipe = (int[])Runtime("StreetIngredientCatalog").GetMethod("Recipe").Invoke(null, new object[] { product });

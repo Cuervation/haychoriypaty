@@ -173,7 +173,7 @@ namespace HayChoriYPaty.Tests
         [Test] public void CampaignMarketGateUsesExplicitStableIdUnlocksInsteadOfLegacyFrontier()
         {
             object market = Market();
-            bool[] unlocked = new bool[13]; unlocked[0] = true; unlocked[1] = true;
+            bool[] unlocked = new bool[15]; unlocked[0] = true; unlocked[1] = true;
             Assert.IsTrue((bool)Call(market, "IsIngredientUnlocked", 0, unlocked, 10));
             Assert.IsFalse((bool)Call(market, "IsIngredientUnlocked", 8, unlocked, 10),
                 "A high legacy frontier must not unlock Fernet ingredients after campaign reorder.");
@@ -317,7 +317,7 @@ namespace HayChoriYPaty.Tests
             for(int level=0;level<11;level++)
             {
                 object sim=Sim(level); long cost=(long)Call(market,"MinimumPurchaseCostCents",sim);
-                if (level == 9) Assert.AreEqual(0L, cost, "Defense has no legacy quota stock requirement.");
+                if (level == 9 || level == 10) Assert.AreEqual(0L, cost, "Defense has no legacy quota stock requirement.");
                 else Assert.Greater(cost,0L, "Traditional level " + level);
                 Assert.Less(cost,long.MaxValue);
             }
