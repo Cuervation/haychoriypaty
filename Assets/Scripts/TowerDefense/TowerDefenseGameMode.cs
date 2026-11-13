@@ -341,7 +341,7 @@ namespace HayChoriYPaty
             for (int role = 0; role < workerCounts.Length; role++)
             {
                 // Never import campaign/ticket workers into TD. A level may explicitly author a
-                // starting crew (Luján mirrors Boca's Parrillero + Mozo); other TDs remain empty.
+                // starting crew; Luján's explicit roster is authored by its level config.
                 workerCounts[role] = config.FreeConstruction && configuredStartingCrew != null && role < configuredStartingCrew.Length
                     ? Mathf.Clamp(configuredStartingCrew[role], 0, config.MaximumWorkersPerRole) : 0;
                 ticketWorkersByRole[role] = 0L;

@@ -772,6 +772,14 @@ namespace HayChoriYPaty
             {
                 towerDefenseTitle = new GUIStyle(towerDefenseLabel) { fontSize = 26 };
             }
+            // Keep the Luján identity caption on the same Luckiest Guy face used by
+            // the regular level badge instead of Unity's default IMGUI label font.
+            if (IsPilgrimConstruction && menuFont != null)
+            {
+                towerDefenseTitle.font = menuFont;
+                towerDefenseTitle.fontStyle = FontStyle.Normal;
+                towerDefenseTitle.wordWrap = false;
+            }
         }
 
         private void DrawTowerDefensePanel(Rect bounds, Color color)

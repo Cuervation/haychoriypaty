@@ -72,7 +72,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(8,property("EconomicBalanceCampaignLevelId")); Assert.AreEqual(true,property("UseCampaignEconomyPricing"));
             Assert.AreEqual(1200,property("StartingCoins"),"The level keeps its own opening cash.");
             Assert.AreEqual(false,property("EquipmentPlacementAllowed"),"Every Luján station is preinstalled and equipment cannot be placed or purchased.");
-            CollectionAssert.AreEqual(new[]{1,0,0,0,1},(int[])property("StartingWorkersByRole"));
+            CollectionAssert.AreEqual(new[]{1,0,0,0,0},(int[])property("StartingWorkersByRole"));
             Array startingStations=(Array)property("StartingStations");
             Assert.AreEqual(7,startingStations.Length,"Luján starts with one real instance of every station type.");
             CollectionAssert.AreEqual(new[]{0,1,2,3,4,5,6},startingStations.Cast<object>()

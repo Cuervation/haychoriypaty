@@ -132,10 +132,13 @@ namespace HayChoriYPaty.Tests
             Delegate handler = GetType().GetMethod("RecordReceipt", I).MakeGenericMethod(receiptType)
                 .CreateDelegate(deliveryEvent.EventHandlerType, this);
             deliveryEvent.AddEventHandler(mode, handler);
-            Assert.AreEqual(requestedLevelId == 14 ? 2 : 0, ((ICollection)Get(mode, "Workers")).Count,
-                "Only Peregrinación has the explicitly configured Boca-style Parrillero + Mozo starter crew.");
+            Assert.AreEqual(requestedLevelId == 14 ? 1 : 0, ((ICollection)Get(mode, "Workers")).Count,
+                "Only Peregrinación has one explicitly configured Parrillero at start.");
             if (requestedLevelId == 14)
             {
+                CollectionAssert.AreEqual(new[] { 1, 0, 0, 0, 0 }, (int[])Get(mode, "WorkerCountsByRole"));
+                IList initialWorkers = (IList)Get(mode, "Workers");
+                Assert.AreEqual("Parrillero", Get(initialWorkers[0], "Role").ToString());
                 IList openingStations = (IList)Get(mode, "PlacedStations");
                 Assert.AreEqual(7, openingStations.Count, "Luján opens with one physical copy of every station.");
                 CollectionAssert.AreEqual(new[] { "NormalGrill", "PremiumGrill", "CocaBarrel", "FernetTable", "BeerBarrel", "NormalTable", "PremiumTable" },
@@ -904,7 +907,7 @@ namespace HayChoriYPaty.Tests
             yield return CaptureAtResolution("la-renga-service-720x1280", 720, 1280);
         }
 
-        private void BuildPilgrimEquipmentAndInitialCrew()
+        private void BuildPilgrimStationsAndInitialCrew()
         {
             Assert.AreEqual(14, requestedLevelId);
             Rect bounds = (Rect)Get(mode, "WorkBounds");
@@ -913,12 +916,14 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(7, ((IList)Get(mode, "PlacedStations")).Count,
                 "The game starts with every station installed; the test must not buy or place equipment.");
             Assert.IsFalse((bool)Get(mode, "EquipmentPlacementAllowed"));
-            var hired=requestedLevelId==14 ? new[]{true,false,false,false,true} : new bool[5];
-            int count=requestedLevelId==14 ? 2 : 0;
+            var hired=requestedLevelId==14 ? new[]{true,false,false,false,false} : new bool[5];
+            int count=requestedLevelId==14 ? 1 : 0;
             for(int tick=0;tick<600 && count<5;tick++)
             {
                 if(tick%20==0)
-                foreach(int role in new[]{0,4,1,2,3})
+                // The initial Parrillero is already hired. Add the Fernetero before
+                // filling the shared lower aisle with more crews.
+                foreach(int role in new[]{0,4,3,1,2})
                 {
                     if(hired[role])continue;
                     foreach(int y in new[]{192,224,160,256,128,96,64})
@@ -934,21 +939,71 @@ namespace HayChoriYPaty.Tests
                 }
                 if(count<5)Call(mode,"Step",.05f);
             }
-            Assert.AreEqual(5,((IList)Get(mode,"Workers")).Count,"A legal progressive strategy must afford and reach all five roles.");
+            string missingRoles = string.Join(",", Enumerable.Range(0, 5).Where(role => !hired[role])
+                .Select(role => Enum.GetName(roleKind, role)));
+            string missingDiagnostics = string.Empty;
+            if (!string.IsNullOrEmpty(missingRoles))
+            {
+                int missingRoleIndex = Enumerable.Range(0, 5).First(role => !hired[role]);
+                object missingRole = Enum.ToObject(roleKind, missingRoleIndex);
+                string lastPlacementReason = string.Empty;
+                bool anyLegalPlacement = false;
+                var placementReasons = new System.Collections.Generic.HashSet<string>();
+                for (int y = 64; y <= bounds.height / pixel - 40 && !anyLegalPlacement; y += 32)
+                for (int x = 64; x < bounds.width / pixel - 40 && !anyLegalPlacement; x += 32)
+                {
+                    Vector2 point = bounds.min + new Vector2(x, y) * pixel;
+                    object preview = Call(mode, "PreviewWorkerPlacement", missingRole, point);
+                    anyLegalPlacement = (bool)Get(preview, "IsValid");
+                    lastPlacementReason = (string)Get(preview, "Reason");
+                    if (!anyLegalPlacement) placementReasons.Add(lastPlacementReason);
+                }
+                missingDiagnostics = "; role=" + missingRole + ", coins=" + Get(mode, "Coins") +
+                    ", cost=" + Call(mode, "HireCost", missingRole) + ", available=" + Call(mode, "IsRoleAvailable", missingRole) +
+                    ", anyLegalPlacement=" + anyLegalPlacement + ", reasons=" + string.Join(" | ", placementReasons);
+            }
+            Assert.AreEqual(5,((IList)Get(mode,"Workers")).Count,
+                "A legal progressive strategy must afford and reach all five roles. Missing: " + missingRoles + missingDiagnostics);
             Assert.AreEqual(7,((IList)Get(mode,"PlacedStations")).Count);
         }
 
         [UnityTest]
         public IEnumerator PeregrinacionNaturalSixtyWithSevenProductsUsesLegalConstructionAndCanWin()
         {
-            BuildPilgrimEquipmentAndInitialCrew();
+            BuildPilgrimStationsAndInitialCrew();
             int[] delivered;
+            string escapedOrder = "none";
             for (int tick=0;tick<24000 && Get(mode,"Phase").ToString()=="Playing";tick++)
             {
+                object[] before = ((IEnumerable)Get(mode, "Fans")).Cast<object>().ToArray();
                 Call(mode,"Step",.05f);
+                if ((bool)Get(mode, "HasLost"))
+                {
+                    int[] remainingIds = ((IEnumerable)Get(mode, "Fans")).Cast<object>().Select(f => (int)Get(f, "Id")).ToArray();
+                    object escaped = before.FirstOrDefault(f => !remainingIds.Contains((int)Get(f, "Id")) && !(bool)Get(f, "OrderComplete"));
+                    if (escaped != null)
+                    {
+                        string lines = string.Join(",", ((IEnumerable)Get(escaped, "Order")).Cast<object>()
+                            .Select(line => Get(line, "Product") + ":" + Get(line, "Remaining")).ToArray());
+                        escapedOrder = "id=" + Get(escaped, "Id") + " order=" + lines;
+                    }
+                }
                 if (tick % 120 == 0) yield return null;
             }
-            Assert.IsTrue((bool)Get(mode,"HasWon"),"Natural full wave must win without teleport, cash or speed changes.");
+            string deliveredSummary = string.Join(",", (int[])Get(mode, "DeliveredByProduct"));
+            string activeFanSummary = string.Join(" | ", ((IEnumerable)Get(mode, "Fans")).Cast<object>().Select(f =>
+                "id=" + Get(f, "Id") + " progress=" + Get(Get(f, "RouteFollower"), "Progress") + " order=" +
+                string.Join(",", ((IEnumerable)Get(f, "Order")).Cast<object>()
+                    .Select(line => Get(line, "Product") + ":" + Get(line, "Remaining")).ToArray())).ToArray());
+            string workerSummary = string.Join(" | ", ((IEnumerable)Get(mode, "Workers")).Cast<object>().Select(w =>
+                Get(w, "Role") + "@" + Get(w, "Position") + " moving=" + Get(w, "IsMoving") +
+                " stage=" + Get(w, "ServiceStage") + " pending=" + Get(w, "PendingProduct") +
+                " cookUnit=" + Get(w, "CookUnitId")).ToArray());
+            Assert.IsTrue((bool)Get(mode,"HasWon"),"Natural full wave must win without teleport, cash or speed changes. " +
+                "phase=" + Get(mode, "Phase") + ", spawned=" + Get(mode, "SpawnedFans") + ", served=" + Get(mode, "ServedFans") +
+                ", escaped=" + Get(mode, "EscapedFans") + ", active=" + Get(mode, "ActiveFanCount") +
+                ", delivered=" + Get(mode, "TotalDelivered") + ", byProduct=" + deliveredSummary + ", coins=" + Get(mode, "Coins") +
+                ", escapedFan=" + escapedOrder + ", activeOrders=" + activeFanSummary + ", workers=" + workerSummary);
             Assert.AreEqual(60,Get(mode,"SpawnedFans")); Assert.AreEqual(60,Get(mode,"ServedFans"));
             delivered=(int[])Get(mode,"DeliveredByProduct");
             for (int product=0;product<7;product++) Assert.Greater(delivered[product],0,"Real deliveries product " + product);
@@ -978,9 +1033,11 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
-        public IEnumerator PeregrinacionBocaWorkerGridAndEquipmentCardsCaptureAtPortrait()
+        public IEnumerator PeregrinacionBocaWorkerGridWithoutCategoryTabsCaptureAtPortrait()
         {
-            Assert.AreEqual(2, ((IList)Get(mode, "Workers")).Count);
+            Assert.AreEqual(1, ((IList)Get(mode, "Workers")).Count);
+            CollectionAssert.AreEqual(new[] { 1, 0, 0, 0, 0 }, (int[])Get(mode, "WorkerCountsByRole"));
+            Assert.AreEqual("Parrillero", Get(((IList)Get(mode, "Workers"))[0], "Role").ToString());
             Assert.AreEqual(6, Get(view, "PilgrimItemCount"), "Speed plus five worker roles fit Boca's 3x2 block.");
             Rect first = (Rect)Call(view, "PilgrimCardBounds", 0);
             Rect third = (Rect)Call(view, "PilgrimCardBounds", 2);
@@ -1000,29 +1057,128 @@ namespace HayChoriYPaty.Tests
             foreach(Transform child in presentationRoot.GetComponentsInChildren<Transform>(true))
                 if(child.name.StartsWith("Peregrinación placed ",StringComparison.Ordinal))visibleFurniture++;
             Assert.AreEqual(7,visibleFurniture,"These must be actual rendered furniture roots, not only model entries or menu cards.");
-            yield return CaptureAtResolution("peregrinacion-boca-workers-with-stations-540x960", 540, 960);
+            foreach (object station in stations)
+            {
+                string kind = Get(station, "Kind").ToString();
+                if (kind != "NormalTable" && kind != "PremiumTable") continue;
+                int id = (int)Get(station, "Id");
+                Transform rootForTable = presentationRoot.transform.Find("Peregrinación placed " + kind + " " + id);
+                Assert.IsNotNull(rootForTable);
+                Transform furniture = rootForTable.Find(kind == "NormalTable" ? "Station_NormalTable" : "Station_PremiumTable");
+                Assert.IsNotNull(furniture, kind + " must use Boca's same board-and-trestle sandwich-table prefab.");
+                Assert.IsNotNull(furniture.Find("Tabletop"));
+                Assert.IsNotNull(furniture.Find("Trestle_Left"));
+                Assert.IsNotNull(furniture.Find("Trestle_Right"));
+                Assert.IsNull(rootForTable.Find("Station_FernetTable"), "Do not substitute the Fernet counter for a sandwich table.");
+            }
 
-            yield return Tap(((Rect)Call(view, "PilgrimTabBounds", 1)).center);
-            Assert.AreEqual(7, Get(view, "PilgrimItemCount"), "The equipment tab exposes all seven stations.");
-            Assert.IsTrue((bool)Get(view, "pilgrimEquipmentTab"));
+            object fernetStationModel = stations.Cast<object>().First(station => Get(station, "Kind").ToString() == "FernetTable");
+            Transform fernetStationRoot = presentationRoot.transform.Find("Peregrinación placed FernetTable " + Get(fernetStationModel, "Id"));
+            Assert.IsNotNull(fernetStationRoot);
+            Transform fernetStation = fernetStationRoot.Find("Station_FernetTable");
+            Assert.IsNotNull(fernetStation);
+            Transform fernetBottleDisplay = fernetStation.Find("FernetBottleDisplay");
+            Assert.IsNotNull(fernetBottleDisplay, "The Fernet table must copy Boca's two display rows of Coca/Fernet bottles.");
+            Assert.AreEqual(8, fernetBottleDisplay.GetComponentsInChildren<SpriteRenderer>(true)
+                .Count(renderer => renderer.name.StartsWith("CocaColaBottle_Row", StringComparison.Ordinal)
+                    || renderer.name.StartsWith("FernetBrancaBottle_Row", StringComparison.Ordinal)));
+            Assert.IsNull(presentationRoot.transform.Find("Station product label"),
+                "Do not add oversized floating drink labels that Boca does not use.");
+
+            int[] tableUnits = new int[7], grillUnits = new int[7];
+            object kitchen = Get(mode, "Kitchen");
+            foreach (object unit in (IEnumerable)Get(kitchen, "Units"))
+            {
+                int product = (int)Get(unit, "Product");
+                string location = Get(unit, "Location").ToString();
+                if (location == "Table") tableUnits[product]++;
+                if (location == "Grill") grillUnits[product]++;
+            }
+            CollectionAssert.AreEqual(new[] { 0, 0, 0, 0, 12, 45, 12 }, tableUnits,
+                "The Boca opening stocks Fernet/Coca/beer, with all sandwich tables empty.");
+            CollectionAssert.AreEqual(new int[7], grillUnits,
+                "Boca's full grill art is visual-only and must not seed extra inventory.");
+            int ambientGrillMeat = 0;
+            foreach (Transform child in presentationRoot.GetComponentsInChildren<Transform>(true))
+                if (child.name.StartsWith("Peregrinación Boca ambient grill P", StringComparison.Ordinal)) ambientGrillMeat++;
+            int expectedAmbientGrillMeat = 0;
+            for (int product = 0; product < 4; product++) expectedAmbientGrillMeat += (int)Call(kitchen, "GrillCapacity", product);
+            Assert.AreEqual(expectedAmbientGrillMeat, ambientGrillMeat,
+                "Every free Boca grill slot has its render-only meat displayed at start.");
+            int fernetUnitId = -1;
+            int cocaUnitId = -1;
+            int beerUnitId = -1;
+            foreach (object unit in (IEnumerable)Get(kitchen, "Units"))
+            {
+                if (Get(unit, "Location").ToString() != "Table") continue;
+                int product = (int)Get(unit, "Product");
+                if (product == 5 && fernetUnitId < 0) fernetUnitId = (int)Get(unit, "Id");
+                else if (product == 4 && cocaUnitId < 0) cocaUnitId = (int)Get(unit, "Id");
+                else if (product == 6 && beerUnitId < 0) beerUnitId = (int)Get(unit, "Id");
+            }
+            foreach (var expectedVisual in new[]
+                {
+                    new { UnitId = fernetUnitId, Sprite = "fernet-cup-800cc-v1" },
+                    new { UnitId = cocaUnitId, Sprite = "coca" },
+                    new { UnitId = beerUnitId, Sprite = "beer" }
+                })
+            {
+                Assert.Greater(expectedVisual.UnitId, 0);
+                Transform item = presentationRoot.transform.Find("Physical kitchen unit " + expectedVisual.UnitId);
+                Assert.IsNotNull(item);
+                Assert.AreEqual(expectedVisual.Sprite, item.GetComponent<SpriteRenderer>().sprite.name,
+                    "Physical Luján stock must use the same cup/bottle sprite as Boca.");
+            }
+            SpriteRenderer fernetTableRenderer = fernetStation.GetComponent<SpriteRenderer>();
+            Assert.IsNotNull(fernetTableRenderer);
+            int fernetBottleDisplayFrontOrder = fernetBottleDisplay.GetComponentsInChildren<SpriteRenderer>(true)
+                .Max(renderer => renderer.sortingOrder);
+            int renderedFernetCups = 0;
+            foreach (object unit in (IEnumerable)Get(kitchen, "Units"))
+            {
+                if ((int)Get(unit, "Product") != 5 || Get(unit, "Location").ToString() != "Table") continue;
+                int id = (int)Get(unit, "Id");
+                int slot = (int)Get(unit, "Slot");
+                Transform cup = presentationRoot.transform.Find("Physical kitchen unit " + id);
+                Assert.IsNotNull(cup);
+                SpriteRenderer cupRenderer = cup.GetComponent<SpriteRenderer>();
+                Bounds tableVisualBounds = fernetTableRenderer.bounds;
+                Bounds cupVisualBounds = cupRenderer.bounds;
+                Assert.IsTrue(tableVisualBounds.Intersects(cupVisualBounds),
+                    "Every Boca-positioned Fernet cup must overlap the tabletop artwork. Cup " + id
+                    + " bounds=" + cupVisualBounds + " table=" + tableVisualBounds + ".");
+                Assert.GreaterOrEqual(cupVisualBounds.min.x, tableVisualBounds.min.x - .01f,
+                    "A Fernet cup must not spill off the table's left edge.");
+                Assert.LessOrEqual(cupVisualBounds.max.x, tableVisualBounds.max.x + .01f,
+                    "A Fernet cup must not spill off the table's right edge.");
+                Assert.That(cupVisualBounds.min.y,
+                    Is.InRange(tableVisualBounds.min.y - .01f, tableVisualBounds.max.y + .01f),
+                    "The cup base must rest within the tabletop artwork, not float above or below it.");
+                Assert.AreEqual(fernetTableRenderer.sortingOrder + 10 + slot, cupRenderer.sortingOrder,
+                    "Fernet cups must use Boca's foreground-on-station sorting band.");
+                Assert.Greater(cupRenderer.sortingOrder, fernetBottleDisplayFrontOrder,
+                    "Prepared cups must render over the Fernet counter and its bottle display.");
+                renderedFernetCups++;
+            }
+            Assert.AreEqual(45, renderedFernetCups, "All initial Fernet servings must be visible on the Fernet table.");
             Assert.IsFalse((bool)Get(mode, "EquipmentPlacementAllowed"));
-            yield return CaptureAtResolution("peregrinacion-boca-equipment-540x960", 540, 960);
-            int equipmentCoins = (int)Get(mode, "Coins");
-            long equipmentSpend = (long)Get(mode, "EquipmentSpendCents");
-            yield return Tap(((Rect)Call(view, "PilgrimCardBounds", 0)).center);
-            Assert.AreEqual(-1, Get(view, "pilgrimSelection"), "Installed equipment cards are read-only, not placement buttons.");
-            Vector2 workCenter = ((Rect)Get(mode, "WorkBounds")).center;
-            yield return Tap(((Rect)Call(view, "PilgrimWorldToLogical", new Rect(workCenter, Vector2.zero))).position);
-            Assert.AreEqual(7, ((IList)Get(mode, "PlacedStations")).Count);
-            Assert.AreEqual(equipmentCoins, Get(mode, "Coins"));
-            Assert.AreEqual(equipmentSpend, Get(mode, "EquipmentSpendCents"));
-            yield return Tap(((Rect)Call(view, "PilgrimNextBounds")).center);
-            Assert.AreEqual(1, Get(view, "pilgrimPage"), "The seventh station is reachable on the second equipment page.");
-            Assert.AreEqual(186f, ((Rect)Call(view, "PilgrimCardBounds", 0)).x,
-                "Center the lone seventh station instead of pinning it to the left edge.");
-            yield return CaptureAtResolution("peregrinacion-boca-equipment-page2-540x960", 540, 960);
+            Assert.IsNull(vt.GetField("pilgrimEquipmentTab", S),
+                "Luján must not keep a hidden equipment tab or alternate screen.");
+            Assert.IsNull(vt.GetMethod("PilgrimTabBounds", S),
+                "The Luján footer must not expose category tabs.");
+            float top = (float)Get(view, "logicalCanvasHeight") - (float)T("TowerDefenseResponsiveLayout")
+                .GetField("FooterReserve", BindingFlags.Public | BindingFlags.Static).GetRawConstantValue();
+            Assert.AreSame(Get(view, "menuFont"), ((GUIStyle)Get(view, "towerDefenseTitle")).font,
+                "Luján's title must use the same Luckiest Guy font as the standard level badge.");
+            Assert.AreEqual(0, Call(view, "HitPilgrimAction", new Vector2(460f, top + 20f)),
+                "The removed pause button must not leave an invisible touch target.");
+            Assert.AreEqual(0, Call(view, "HitPilgrimAction", new Vector2(508f, top + 20f)),
+                "The removed back button must not leave an invisible touch target.");
+            foreach (Vector2 oldTabCenter in new[] { new Vector2(98f, top + 57.5f), new Vector2(272f, top + 57.5f), new Vector2(445f, top + 57.5f) })
+                Assert.AreEqual(0, Call(view, "HitPilgrimAction", oldTabCenter),
+                    "Former Trabajadores/Equipamiento/Estaciones tab positions must no longer activate a control.");
+            yield return CaptureAtResolution("peregrinacion-boca-exact-opening-state-540x960", 540, 960);
 
-            yield return Tap(((Rect)Call(view, "PilgrimTabBounds", 0)).center);
             int openingCoins = (int)Get(mode, "Coins");
             yield return Tap(((Rect)Call(view, "PilgrimCardBounds", 0)).center);
             Assert.AreEqual(1, Get(mode, "SpeedLevel"), "The Boca-style speed card is an active upgrade control.");
@@ -1032,7 +1188,7 @@ namespace HayChoriYPaty.Tests
         [UnityTest]
         public IEnumerator PeregrinacionGameViewSingleFenceFreeConstructionAtThreeResolutions()
         {
-            BuildPilgrimEquipmentAndInitialCrew();
+            BuildPilgrimStationsAndInitialCrew();
             for (int tick=0;tick<1600 && receipts.Count==0;tick++)
             { Call(mode,"Step",.05f); if (tick%50==0) yield return null; }
             Assert.Greater(receipts.Count,0,"Capture needs real production and delivery.");
@@ -1046,13 +1202,11 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
-        public IEnumerator PeregrinacionEquipmentCardsAreReadOnlyAndCannotBuyOrPlace()
+        public IEnumerator PeregrinacionStationsStartInstalledAndCannotBuyOrPlace()
         {
-            yield return Tap(((Rect)Call(view,"PilgrimTabBounds",1)).center);
             IList initial=(IList)Get(mode,"PlacedStations");Assert.AreEqual(7,initial.Count);
             int coins=(int)Get(mode,"Coins");long equipmentSpend=(long)Get(mode,"EquipmentSpendCents");
-            yield return Tap(((Rect)Call(view,"PilgrimCardBounds",0)).center);
-            Assert.AreEqual(-1,Get(view,"pilgrimSelection"),"Equipment cards must not enter placement mode.");
+            Assert.IsFalse((bool)Get(mode,"EquipmentPlacementAllowed"),"There is no equipment-placement flow on Luján.");
             Vector2 work=((Rect)Get(mode,"WorkBounds")).center;
             Vector2 logical=((Rect)Call(view,"PilgrimWorldToLogical",new Rect(work,Vector2.zero))).position;
             yield return Tap(logical);
@@ -1063,7 +1217,7 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
-        public IEnumerator PeregrinacionOpeningEquipmentIsPresentAndPauseStopsSimulation()
+        public IEnumerator PeregrinacionOpeningStationsArePresentAndPauseStopsSimulation()
         {
             Assert.AreEqual(7,((IList)Get(mode,"PlacedStations")).Count);
             Call(mode,"Pause");float elapsed=(float)Get(mode,"Elapsed");Call(mode,"Step",20f);

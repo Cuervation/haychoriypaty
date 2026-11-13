@@ -13,7 +13,7 @@ namespace HayChoriYPaty
         private const int RenderScale = 2;
         private const float CarriedSandwichScale = 1.25f;
         private const float SandwichTableReflowSeconds = .18f;
-        private const float BarrelDrinkScale = 1.35f * 1.08f;
+        internal const float BarrelDrinkScale = 1.35f * 1.08f;
         private const float AmbientSmokeCycleSpeed = .32f, AmbientSmokeMaxAlpha = .18f;
         private static readonly Vector2 AmbientSmokeSize = new Vector2(12f, 26f);
         private const float FernetBottleHeightFraction = .25f, CocaBottleHeightFraction = .333f;
@@ -380,7 +380,7 @@ namespace HayChoriYPaty
             }
         }
 
-        private static Sprite CreateFernetContactShadowSprite()
+        internal static Sprite CreateFernetContactShadowSprite()
         {
             const int width = 48, height = 20;
             Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
@@ -409,7 +409,7 @@ namespace HayChoriYPaty
             return sprite;
         }
 
-        private static Sprite CreateRuntimeSprite(Texture2D texture, string spriteName)
+        internal static Sprite CreateRuntimeSprite(Texture2D texture, string spriteName)
         {
             Sprite sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height),
                 new Vector2(.5f, .5f), 100f, 0, SpriteMeshType.FullRect);
@@ -420,17 +420,28 @@ namespace HayChoriYPaty
         private void EnsureFernetTableDisplay(GameObject station)
         {
             if (station == null || fernetBottleSprite == null) return;
+            if (fernetContactShadowSprite == null) fernetContactShadowSprite = CreateFernetContactShadowSprite();
+            EnsureFernetTableDisplay(station, fernetBottleSprite, cocaTableBottleSprite,
+                FirstSprite("coca"), fernetContactShadowSprite, PropLayer);
+        }
+
+        /// <summary>Shared Boca-style Fernet station bottles; TD levels reuse this exact prop composition.</summary>
+        internal static void EnsureFernetTableDisplay(GameObject station, Sprite fernetBottleSprite,
+            Sprite cocaTableBottleSprite, Sprite fallbackCocaSprite, Sprite fernetContactShadowSprite, int propLayer)
+        {
+            if (station == null || fernetBottleSprite == null) return;
             if (station.transform.Find("FernetBottleDisplay") != null) return;
             Transform legacyShelf = station.transform.Find("FernetBottleShelf");
             if (legacyShelf != null)
             {
                 legacyShelf.gameObject.SetActive(false);
-                Destroy(legacyShelf.gameObject);
+                UnityEngine.Object.Destroy(legacyShelf.gameObject);
             }
 
             SpriteRenderer table = station.GetComponentInChildren<SpriteRenderer>(true);
-            Sprite colaSprite = cocaTableBottleSprite != null ? cocaTableBottleSprite : FirstSprite("coca");
+            Sprite colaSprite = cocaTableBottleSprite != null ? cocaTableBottleSprite : fallbackCocaSprite;
             if (table == null || table.sprite == null || colaSprite == null) return;
+            if (fernetContactShadowSprite == null) return;
 
             // Convert the table sprite's actual corners into station-local space. For the live prefab,
             // its SpriteRenderer is on the station root; using localPosition there double-adds the
@@ -490,7 +501,7 @@ namespace HayChoriYPaty
             float rowStartX = groupLeftX + (groupWidth - rowUsedWidth) * .5f + gap;
             Transform display = new GameObject("FernetBottleDisplay").transform;
             display.SetParent(station.transform, false);
-            display.gameObject.layer = PropLayer;
+            display.gameObject.layer = propLayer;
             for (int row = 0; row < rowCount; row++)
             {
                 // Keep the same Coca/Fernet size ratio and tight spacing, while offsetting the
@@ -511,7 +522,7 @@ namespace HayChoriYPaty
                     float visibleBaseInset = fernet ? 0f : sprite.bounds.size.y * CocaBottleVisibleBaseInsetFraction;
                     string bottleName = fernet ? "FernetBrancaBottle_Row" : "CocaColaBottle_Row";
                     GameObject bottle = new GameObject(bottleName + row + "_" + bottleIndex);
-                    bottle.layer = PropLayer;
+                    bottle.layer = propLayer;
                     bottle.transform.SetParent(display, false);
                     bottle.transform.localPosition = new Vector3(nextX + bottleWidth * .5f,
                         tabletopY + height * .5f - visibleBaseInset * bottleScale, -.01f);
@@ -522,7 +533,7 @@ namespace HayChoriYPaty
                     renderer.sortingOrder = table.sortingOrder + (row == 0 ? 2 : 4);
 
                     GameObject shadow = new GameObject("TabletopContactShadow");
-                    shadow.layer = PropLayer;
+                    shadow.layer = propLayer;
                     shadow.transform.SetParent(bottle.transform, false);
                     shadow.transform.localPosition = new Vector3(0f,
                         -sprite.bounds.size.y * .5f + visibleBaseInset, 0f);
@@ -541,7 +552,7 @@ namespace HayChoriYPaty
             }
         }
 
-        private static Vector2 FernetDrinkDisplayPosition(StreetKitchenLayout layout, int slot)
+        internal static Vector2 FernetDrinkDisplayPosition(StreetKitchenLayout layout, int slot)
         {
             if (layout == null || !layout.HasFernetTable) return Vector2.zero;
             Rect table = layout.FernetTableBounds;

@@ -35,6 +35,7 @@ namespace HayChoriYPaty
         private const float BocaKitchenWorkerLaneLogical = WorkerVisualHeightLogical + 6f;
         private static readonly StreetKitchenLayout BocaKitchenLayout =
             new StreetKitchenLayout(new[] { 0, 1, 2, 3, 4, 5, 6 }, true);
+        internal static StreetKitchenLayout LujanBocaKitchenVisualLayout => BocaKitchenLayout;
         private readonly List<TowerDefensePlacedStation> placedStations = new List<TowerDefensePlacedStation>();
         private long equipmentSpendCents;
         private int nextStationId = 1;
@@ -195,7 +196,7 @@ namespace HayChoriYPaty
             return Rect.MinMaxRect(xMin, yMin, xMax, yMax);
         }
 
-        private Rect BocaKitchenSourceBounds(TowerDefenseStationKind kind)
+        internal Rect BocaKitchenSourceBounds(TowerDefenseStationKind kind)
         {
             switch (kind)
             {
@@ -210,7 +211,7 @@ namespace HayChoriYPaty
             }
         }
 
-        private float BocaKitchenFitScale()
+        internal float BocaKitchenFitScale()
         {
             Rect source = BocaKitchenSourceBounds();
             float pixel = Mathf.Max(.0001f, worldUnitsPerLogicalPixel);
@@ -361,8 +362,11 @@ namespace HayChoriYPaty
                 foreach (var unit in Kitchen.Units) if (unit.Id == worker.CookUnitId) { carried = unit; break; }
                 if (carried != null && carried.Location == StreetFoodLocation.Carried)
                 {
-                    // A cooked unit stays attached to its real carrier until the table is reached.
-                    if (!WorkerAt(worker, table.WorkPosition)) { QueueFreeWorkerPath(worker, table.WorkPosition); continue; }
+                    // Keep the table's Mozo pickup point free while the cook carries a
+                    // real sandwich to its own nearby handoff point.
+                    Vector2 handoff = CookTableHandoffPosition(worker, table);
+                    if (!IsFinite(handoff.x) || !IsFinite(handoff.y)) continue;
+                    if (!WorkerAt(worker, handoff)) { QueueFreeWorkerPath(worker, handoff); continue; }
                     if (Kitchen.DepositCooked(carried.Id, worker.Id)) worker.CookUnitId = 0;
                     continue;
                 }
@@ -387,9 +391,39 @@ namespace HayChoriYPaty
                 if (Kitchen.AdvanceCook(carried.Id, worker.Id, deltaTime, cookRate) && Kitchen.TakeCooked(carried.Id, worker.Id))
                 {
                     worker.IsCooking = false;
-                    QueueFreeWorkerPath(worker, table.WorkPosition);
+                    Vector2 handoff = CookTableHandoffPosition(worker, table);
+                    if (IsFinite(handoff.x) && IsFinite(handoff.y)) QueueFreeWorkerPath(worker, handoff);
                 }
             }
+        }
+
+        private Vector2 CookTableHandoffPosition(TowerDefenseWorkerState worker, TowerDefensePlacedStation table)
+        {
+            if (worker == null || table == null) return new Vector2(float.NaN, float.NaN);
+            TowerDefenseStationKind grillKind = worker.Role == StreetWorkerRole.Parrillero
+                ? TowerDefenseStationKind.NormalGrill : TowerDefenseStationKind.PremiumGrill;
+            TowerDefensePlacedStation grill = FindPlacedStation(grillKind);
+            if (grill == null || !IsFinite(table.WorkPosition.x) || !IsFinite(grill.WorkPosition.x))
+                return new Vector2(float.NaN, float.NaN);
+
+            Vector2 direction = grill.WorkPosition - table.WorkPosition;
+            if (Mathf.Abs(direction.x) >= Mathf.Abs(direction.y)) direction = new Vector2(Mathf.Sign(direction.x), 0f);
+            else direction = new Vector2(0f, Mathf.Sign(direction.y));
+            if (direction.sqrMagnitude < .5f) direction = Vector2.right;
+
+            float pixel = worldUnitsPerLogicalPixel;
+            float halfWidth = (worker.Role == StreetWorkerRole.Cocacolero ? 94f : ConstructionWorkerWidthLogical) * .5f;
+            float minimumOffset = halfWidth * 2f + 8f;
+            // The closest clear spot is preferred, keeping the cook visibly at the table
+            // edge while leaving its shared Mozo access unobstructed.
+            for (float offset = minimumOffset; offset <= minimumOffset + 256f; offset += 16f)
+            {
+                Vector2 candidate = table.WorkPosition + direction * (offset * pixel);
+                if (!Contains(WorkBounds, WorkerBounds(candidate, worker.Role))) continue;
+                if (!TryBuildWorkerPath(worker, worker.Position, candidate, Rect.zero, out _)) continue;
+                return candidate;
+            }
+            return new Vector2(float.NaN, float.NaN);
         }
 
         private TowerDefensePlacedStation FindPlacedStation(TowerDefenseStationKind kind)
@@ -414,8 +448,10 @@ namespace HayChoriYPaty
                     TowerDefenseOrderLine order = (TowerDefenseOrderLine)fan.Order[line];
                     if (order.Remaining <= 0) continue;
                     StreetWorkerRole role = GetDeliveryRole(order.Product);
+                    if (order.Product < 4 && Kitchen.AvailableTableCount(order.Product) <= 0) continue;
                     TowerDefenseWorkerState worker = FindWorkerForFreeService(role);
                     if (worker == null || !HasStationForRole(role)) continue;
+                    if (order.Product < 4 && Kitchen.ReserveTableUnit(order.Product, worker.Id) == null) continue;
                     worker.PendingFanId = fan.Id; worker.PendingProduct = order.Product; worker.ServiceStage = 1;
                     fan.ReservedByWorker = worker.Id;
                     if (!QueueWorkerToPickup(worker)) ReleaseFreeService(worker, fan);
@@ -513,6 +549,7 @@ namespace HayChoriYPaty
         private void ReleaseFreeService(TowerDefenseWorkerState worker, TowerDefenseFanState fan)
         {
             if (fan != null && fan.ReservedByWorker == worker.Id) fan.ReservedByWorker = 0;
+            Kitchen.ReleaseTableReservation(worker.Id);
             worker.PendingFanId = 0; worker.PendingProduct = -1; worker.ServiceStage = 0; worker.ServiceUnitId = 0;
         }
 

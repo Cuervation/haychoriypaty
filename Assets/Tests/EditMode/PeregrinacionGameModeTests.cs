@@ -125,7 +125,7 @@ namespace HayChoriYPaty.Tests
             Set(config, "sourceCampaignLevelId", 14);
             Set(config, "economicBalanceCampaignLevelId", 8);
             Set(config, "useCampaignEconomyPricing", true);
-            Set(config, "startingWorkersByRole", new[] { 1, 0, 0, 0, 1 });
+            Set(config, "startingWorkersByRole", new[] { 1, 0, 0, 0, 0 });
             Set(config, "hireCostsByRole", new[] { 55, 55, 70, 65, 65 });
             mode = Activator.CreateInstance(RuntimeType("TowerDefenseGameMode"), new object[]
             {
@@ -136,7 +136,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(14, Get<int>(config, "SourceCampaignLevelId"), "Economy-source ID must not replace Luján's campaign identity.");
             Assert.AreEqual(8, Get<int>(config, "EconomicBalanceCampaignLevelId"));
             Assert.AreEqual(1200, Get<int>(mode, "Coins"), "Luján's opening cash remains level-specific.");
-            CollectionAssert.AreEqual(new[] { 1, 0, 0, 0, 1 }, Get<int[]>(mode, "WorkerCountsByRole"));
+            CollectionAssert.AreEqual(new[] { 1, 0, 0, 0, 0 }, Get<int[]>(mode, "WorkerCountsByRole"));
             Type roleType = RuntimeType("StreetWorkerRole");
             Assert.AreEqual(55, Invoke(mode, "HireCost", new[] { Enum.ToObject(roleType, 0) }));
             Assert.AreEqual(55, Invoke(mode, "HireCost", new[] { Enum.ToObject(roleType, 1) }));
@@ -145,9 +145,8 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(65, Invoke(mode, "HireCost", new[] { Enum.ToObject(roleType, 4) }));
             Assert.AreEqual(70, Get<int>(mode, "SpeedUpgradeCost"));
             IList workers = Get<IList>(mode, "Workers");
-            Assert.AreEqual(2, workers.Count);
-            Vector2 first = Get<Vector2>(workers[0], "Position"), second = Get<Vector2>(workers[1], "Position");
-            Assert.That(Mathf.Abs(first.x - second.x), Is.GreaterThan(88.5f), "Starter workers must not overlap on spawn.");
+            Assert.AreEqual(1, workers.Count, "Luján opens with exactly one Parrillero and no other worker.");
+            Assert.AreEqual("Parrillero", Get<object>(workers[0], "Role").ToString());
         }
 
         [Test]
@@ -165,6 +164,25 @@ namespace HayChoriYPaty.Tests
                 config, balance, route, logicalPixelScale, Vector2.zero, Vector2.zero,
                 new int[5], new long[5], Get<int>(config, "StartingCoins")
             });
+
+            CollectionAssert.AreEqual(new[] { 1, 0, 0, 0, 0 }, Get<int[]>(mode, "WorkerCountsByRole"));
+            IList openingWorkers = Get<IList>(mode, "Workers");
+            Assert.AreEqual(1, openingWorkers.Count, "Exactly one Parrillero starts at Luján.");
+            Assert.AreEqual("Parrillero", Get<object>(openingWorkers[0], "Role").ToString());
+
+            object kitchen = Get<object>(mode, "Kitchen");
+            int[] openingTableUnits = new int[7], openingGrillUnits = new int[7];
+            foreach (object unit in (IEnumerable)Get<object>(kitchen, "Units"))
+            {
+                int product = Get<int>(unit, "Product");
+                string location = Get<object>(unit, "Location").ToString();
+                if (location == "Table") openingTableUnits[product]++;
+                if (location == "Grill") openingGrillUnits[product]++;
+            }
+            CollectionAssert.AreEqual(new[] { 0, 0, 0, 0, 12, 45, 12 }, openingTableUnits,
+                "Boca's active-cook opening leaves every sandwich table empty and preloads Fernet, Coca and beer.");
+            CollectionAssert.AreEqual(new int[7], openingGrillUnits,
+                "Full grill meat is render-only, not extra cooking inventory.");
 
             IList stations = Get<IList>(mode, "PlacedStations");
             Assert.AreEqual(7, stations.Count, "The complete Luján kitchen is physically installed before the run starts.");
@@ -278,14 +296,9 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(7, Get<IList>(mode, "PlacedStations").Count);
             Assert.AreEqual(openingCoins, Get<int>(mode, "Coins"));
             Assert.AreEqual(0L, Get<long>(mode, "EquipmentSpendCents"));
-            IList openingWorkers = Get<IList>(mode, "Workers");
-            Assert.AreEqual(2, openingWorkers.Count, "The Boca-like Parrillero + Mozo starting roster is unchanged.");
-            MethodInfo workerBounds = RuntimeType("TowerDefenseGameMode").GetMethod("WorkerBounds", PrivateInstance);
-            Rect firstWorker = (Rect)workerBounds.Invoke(mode, new[]
-                { Get<Vector2>(openingWorkers[0], "Position"), Get<object>(openingWorkers[0], "Role") });
-            Rect secondWorker = (Rect)workerBounds.Invoke(mode, new[]
-                { Get<Vector2>(openingWorkers[1], "Position"), Get<object>(openingWorkers[1], "Role") });
-            Assert.IsFalse(Overlaps(firstWorker, secondWorker), "Opening workers cannot overlap at their access points.");
+            openingWorkers = Get<IList>(mode, "Workers");
+            Assert.AreEqual(1, openingWorkers.Count, "Luján starts with only Boca's Parrillero, without a Mozo or other extra crew.");
+            Assert.AreEqual("Parrillero", Get<object>(openingWorkers[0], "Role").ToString());
         }
 
         private void BuildFreeConstructionMode()
