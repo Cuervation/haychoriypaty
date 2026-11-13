@@ -60,9 +60,12 @@ namespace HayChoriYPaty.Tests
         private readonly List<string> decisionSequence = new List<string>();
         private readonly List<CampaignObservation> observations = new List<CampaignObservation>();
 
+        private readonly TutorialPrefsGuard tutorialPrefs = new TutorialPrefsGuard();
+
         [UnitySetUp]
         public IEnumerator SetUp()
         {
+            tutorialPrefs.Suppress();
             bool requiresSanLorenzoCheckpoint = TestContext.CurrentContext.Test.Name.StartsWith(
                 "ModeB_ResumeFromLevel7Checkpoint_", StringComparison.Ordinal);
             if (requiresSanLorenzoCheckpoint && !File.Exists(ModeBLevel7CheckpointPath))
@@ -147,6 +150,7 @@ namespace HayChoriYPaty.Tests
         [UnityTearDown]
         public IEnumerator TearDown()
         {
+            tutorialPrefs.Restore();
             // Keep the production PlayerPrefs boot gate off until this test owner is destroyed.
             GameType.GetField("AllowEditorTestInitialization", StaticField).SetValue(null, false);
             if (root != null) UnityEngine.Object.Destroy(root);
@@ -474,6 +478,7 @@ namespace HayChoriYPaty.Tests
             yield return RunRealEconomyProgression(true, false, 17);
         }
 
+        [Ignore("Revision visual manual del 2026-10-20: requiere Audits/GameplayBalance-20261020/configuration.json y checkpoints de partidas anteriores que no estan en el repo.")]
         [UnityTest]
         [Timeout(600000)]
         public IEnumerator ModeB_ResumeFromLevel6Checkpoint_VisualReview_20261020()
@@ -481,6 +486,7 @@ namespace HayChoriYPaty.Tests
             yield return RunRealEconomyProgression(true, false, 20);
         }
 
+        [Ignore("Revision visual manual del 2026-10-20: requiere Audits/GameplayBalance-20261020/configuration.json y checkpoints de partidas anteriores que no estan en el repo.")]
         [UnityTest]
         [Timeout(1200000)]
         public IEnumerator ModeB_ResumeFromLevel6Checkpoint_AfterCorrections_VisualReview_20261020()
@@ -490,6 +496,9 @@ namespace HayChoriYPaty.Tests
 
         private IEnumerator RunUnrestrictedAttempt(int levelIndex, int attempt = 1)
         {
+            bool towerDefense = (bool)Type.GetType("HayChoriYPaty.StreetSimulation, Assembly-CSharp", true)
+                .GetMethod("IsTowerDefenseLevel", BindingFlags.Public | BindingFlags.Static).Invoke(null, new object[] { levelIndex });
+            if (towerDefense) Assert.Ignore("Nivel Tower Defense: no usa el flujo Mercado/JUGAR PARTIDO de rondas de parrilla; se cubre en TowerDefense*Tests.");
             string prefix = "L" + (levelIndex + 1).ToString("00") + "-A-attempt" + attempt.ToString("00") + "-";
             string strategy;
             int extraParrilleros, extraCocacoleros, extraPremium, extraFerneteros, extraMozos;
@@ -549,28 +558,39 @@ namespace HayChoriYPaty.Tests
                 yield return Click(InvokeStaticRectNoArgs("MarketBackBounds").center); // Return to the barrio before selecting a level.
             }
             yield return Click(InvokeViewRect("HubArtworkActionBounds", 200).center); // Visible JUGAR hotspot on the current hub.
-            if (levelIndex != 0) yield return SelectLevelThroughUi(levelIndex);
+            yield return SelectLevelThroughUi(levelIndex);
 
             object sim = Get(game, "Sim"), market = Get(game, "Market");
             Assert.AreEqual(levelIndex, Get(sim, "LevelIndex"), "The UI card must select the requested club.");
-            Assert.IsTrue((bool)Get(view, "marketActive"), "The selected level must be in its authentic Mercado screen.");
             long marketCentsStarting = (long)Get(market, "BalanceCents");
             object marketData = Get(market, "Data");
             long purchaseSpendBefore = (long)marketData.GetType().GetField("cumulativePurchaseSpendCents", PublicInstance).GetValue(marketData);
-            string marketShot = prefix + "market.png";
-            yield return Capture(marketShot);
-            long missingCost = (long)Call(market, "MinimumPurchaseCostCents", sim);
-            if (missingCost > 0)
+            string marketShot = "";
+            if (levelIndex == 0)
             {
-                Assert.LessOrEqual(missingCost, (long)Get(market, "BalanceCents"), "The isolated Mercado budget should cover real catalog prices.");
-                yield return ClickMarket(InvokeMarketBuyMissingBounds().center);
-                decisionSequence.Add("market:buy-missing:" + missingCost.ToString());
-                yield return new WaitForSecondsRealtime(.35f); // Honor the real market's purchase debounce.
+                // All Boys starts directly (tutorial or immediate round); there is no separate Mercado screen.
+                if ((bool)Get(view, "levelOneTutorialActive"))
+                    yield return Click(InvokeViewRectNoArgs("LevelOneTutorialSkipBounds").center);
+                yield return null;
             }
-            Assert.IsTrue((bool)Call(market, "HasRequiredStock", sim), "All objective ingredients must come from the authentic kit or Mercado.");
-            Assert.IsTrue((bool)Get(game, "CanStartRound"), "Market stock gate should open only after required stock exists.");
-            if (missingCost > 0) yield return Capture(prefix + "market-restocked.png");
-            yield return ClickMarket(InvokeViewRectNoArgs("MarketPlayBounds").center);
+            else
+            {
+                Assert.IsTrue((bool)Get(view, "marketActive"), "The selected level must be in its authentic Mercado screen.");
+                marketShot = prefix + "market.png";
+                yield return Capture(marketShot);
+                long missingCost = (long)Call(market, "MinimumPurchaseCostCents", sim);
+                if (missingCost > 0)
+                {
+                    Assert.LessOrEqual(missingCost, (long)Get(market, "BalanceCents"), "The isolated Mercado budget should cover real catalog prices.");
+                    yield return ClickMarket(InvokeMarketBuyMissingBounds().center);
+                    decisionSequence.Add("market:buy-missing:" + missingCost.ToString());
+                    yield return new WaitForSecondsRealtime(.35f); // Honor the real market's purchase debounce.
+                }
+                Assert.IsTrue((bool)Call(market, "HasRequiredStock", sim), "All objective ingredients must come from the authentic kit or Mercado.");
+                Assert.IsTrue((bool)Get(game, "CanStartRound"), "Market stock gate should open only after required stock exists.");
+                if (missingCost > 0) yield return Capture(prefix + "market-restocked.png");
+                yield return ClickMarket(InvokeViewRectNoArgs("MarketPlayBounds").center);
+            }
             Assert.AreEqual("Playing", Get(sim, "Phase").ToString(), "JUGAR PARTIDO must start the real match through the UI.");
             int staffCoinsStarting = (int)Get(sim, "Coins"); // StartRound applies the real per-attempt opening balance here.
             yield return Capture(prefix + "start.png");
@@ -737,7 +757,14 @@ namespace HayChoriYPaty.Tests
                         if (levelIndex == 0) marketShot = "L01-B-attempt01-market.png"; // All Boys starts directly; retry has no separate Mercado screen.
                     }
 
-                    if (Get(sim, "Phase").ToString() == "Ready")
+                    if (Get(sim, "Phase").ToString() == "Ready" && levelIndex == 0)
+                    {
+                        // All Boys has no Mercado screen: the tutorial (if shown) is skipped and the round starts directly.
+                        if ((bool)Get(view, "levelOneTutorialActive"))
+                            yield return Click(InvokeViewRectNoArgs("LevelOneTutorialSkipBounds").center);
+                        yield return null;
+                    }
+                    else if (Get(sim, "Phase").ToString() == "Ready")
                     {
                         Assert.IsTrue((bool)Get(view, "marketActive"), "The authentic Mercado must appear before this level starts.");
                         marketCentsStarting = (long)Get(market, "BalanceCents");
@@ -1403,7 +1430,9 @@ namespace HayChoriYPaty.Tests
 
         private IEnumerator WaitForMenu()
         {
-            PropertyInfo property = ViewType.GetProperty("HubAccountActionRendered", PublicInstance);
+            // The hub account action is no longer rendered (HubAccountActionRendered is a constant false);
+            // AccountMenuVisible is true once the intro has handed over to the hub.
+            PropertyInfo property = ViewType.GetProperty("AccountMenuVisible", PublicInstance);
             Assert.NotNull(property, "Hub readiness property moved; update the test locator rather than bypassing the UI.");
             float deadline = Time.realtimeSinceStartup + 12f;
             while (!(bool)property.GetValue(view, null) && Time.realtimeSinceStartup < deadline) yield return null;
@@ -1420,7 +1449,10 @@ namespace HayChoriYPaty.Tests
             Assert.NotNull(viewportMethod, "Selector viewport locator missing.");
             Assert.NotNull(maximumScrollMethod, "Selector scroll limit locator missing.");
             Rect viewport = (Rect)viewportMethod.Invoke(null, new object[] { logicalHeight });
-            Rect card = InvokeStaticRect("LevelSelectCardBounds", levelIndex);
+            // Selector cards are laid out in campaign order; the test works with stable level IDs.
+            int cardPosition = (int)Type.GetType("HayChoriYPaty.StreetSimulation, Assembly-CSharp", true)
+                .GetMethod("CampaignPositionOf", BindingFlags.Public | BindingFlags.Static).Invoke(null, new object[] { levelIndex });
+            Rect card = InvokeStaticRect("LevelSelectCardBounds", cardPosition);
             float maximumScroll = (float)maximumScrollMethod.Invoke(null, new object[] { logicalHeight });
             float targetScroll = Mathf.Clamp(card.center.y - viewport.center.y, 0f, maximumScroll);
             int swipes = 0;

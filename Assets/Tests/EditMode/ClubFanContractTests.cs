@@ -17,7 +17,7 @@ namespace HayChoriYPaty.Tests
         public void EveryRegisteredLevelHasCompleteMatchedFrontWalkAndTwoRiotFrames()
         {
             string[] names = (string[])Runtime("StreetSimulation").GetField("LevelNames").GetValue(null);
-            int[] expected = { 9, 8, 9, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12 };
+            int[] expected = { 9, 8, 9, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12 };
             Assert.AreEqual(expected.Length, names.Length, "New levels need an explicit expected wardrobe count and visual DoD review.");
             for (int level = 0; level < names.Length; level++)
             {
@@ -59,8 +59,8 @@ namespace HayChoriYPaty.Tests
         public void IncompleteGenericAndOnePoseDefinitionsCannotPassTheContract()
         {
             Type layoutType = Runtime("FanAtlasLayout"), kindType = Runtime("FanAtlasLayoutKind");
-            object grid = Activator.CreateInstance(layoutType, 3, 4, Enum.Parse(kindType, "Grid"), false);
-            object paired = Activator.CreateInstance(layoutType, 6, 4, Enum.Parse(kindType, "PairedColumns"), false);
+            object grid = Activator.CreateInstance(layoutType, 3, 4, Enum.Parse(kindType, "Grid"), false, false);
+            object paired = Activator.CreateInstance(layoutType, 6, 4, Enum.Parse(kindType, "PairedColumns"), false, false);
             foreach (string riot in new[] { null, "", "street-riot-fans-v1" })
             {
                 object d = Activator.CreateInstance(Runtime("ClubFanDefinition"), "front", "walk", riot, 12, 3, grid, grid, paired, 2, 3);
