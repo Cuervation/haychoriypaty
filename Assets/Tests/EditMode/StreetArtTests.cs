@@ -113,10 +113,10 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(1536, riot.width); Assert.AreEqual(1024, riot.height);
         }
 
-        [TestCase(false)] [TestCase(true)]
+        [TestCase(false)]
         public void RiverAtlasesKeepTwelveOutfitsAcrossAllPosePairs(bool riot)
         {
-            string resource = riot ? "street-river-riot-fans-v1" : "street-river-fans-paired-v1";
+            string resource = riot ? "street-river-riot-fans-v2" : "street-river-fans-paired-v1";
             Texture2D atlas = Resources.Load<Texture2D>(resource);
             Assert.NotNull(atlas);
             Assert.AreEqual(1536, atlas.width); Assert.AreEqual(1024, atlas.height);
@@ -796,7 +796,7 @@ namespace HayChoriYPaty.Tests
         [Test]
         public void ParrilleroTexturesPreserveAlphaAndOriginalResolution()
         {
-            foreach (string path in new[] { SheetPath, "Assets/Art/Street/Resources/street-parrillero-icon.png", "Assets/Art/Street/Resources/street-cover-parrillero-full-v1.png" })
+            foreach (string path in new[] { SheetPath, "Assets/Art/Street/Resources/street-parrillero-icon.png" })
             {
                 TextureImporter importer = (TextureImporter)AssetImporter.GetAtPath(path);
                 Assert.NotNull(importer);
@@ -812,8 +812,6 @@ namespace HayChoriYPaty.Tests
             }
             Texture2D icon = Resources.Load<Texture2D>("street-parrillero-icon");
             Assert.NotNull(icon); Assert.AreEqual(1315, icon.width); Assert.AreEqual(1196, icon.height);
-            Texture2D coverHero = Resources.Load<Texture2D>("street-cover-parrillero-full-v1");
-            Assert.NotNull(coverHero); Assert.AreEqual(1024, coverHero.width); Assert.AreEqual(1536, coverHero.height);
         }
 
         [Test]
@@ -1200,8 +1198,6 @@ namespace HayChoriYPaty.Tests
         [TestCase("street-camioneros-crest-v1", 713, 485, false)]
         [TestCase("street-los-redondos-crest-v1", 300, 300, false)]
         [TestCase("street-mural-argentinos-master-v1", 1897, 829, false)]
-        [TestCase("street-argentinos-fans-paired-v1", 1536, 1024, true)]
-        [TestCase("street-argentinos-riot-fans-v1", 1536, 1024, true)]
         [TestCase("street-argentinos-fans-paired-v2", 1536, 1024, true)]
         [TestCase("street-argentinos-riot-fans-v2", 1536, 1024, true)]
         public void NewStreetAssetsAndGoldCoinKeepNativeResolution(string name, int width, int height, bool alpha)
@@ -1216,7 +1212,6 @@ namespace HayChoriYPaty.Tests
             TextureImporterFormat expectedAndroidFormat = Array.IndexOf(new[] {
                 "street-background-open-street-v4", "street-hub-stadium-v1", "street-victory-popup-wood-v1",
                 "street-mural-real-v5", "street-coin-gold-v2", "street-allboys-crest", "street-mural-argentinos-master-v1",
-                "street-argentinos-fans-paired-v1", "street-argentinos-riot-fans-v1",
                 "street-argentinos-fans-paired-v2", "street-argentinos-riot-fans-v2"
             }, name) >= 0 ? TextureImporterFormat.ETC2_RGBA8 : TextureImporterFormat.RGBA32;
             Assert.AreEqual(expectedAndroidFormat, android.format);

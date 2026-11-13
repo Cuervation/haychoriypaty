@@ -128,7 +128,6 @@ namespace HayChoriYPaty.Tests
         [TestCase("street-river-riot-fans-v2")]
         [TestCase("street-boca-riot-fans-v2")]
         [TestCase("street-losredondos-riot-fans-v1")]
-        [TestCase("street-argentinos-riot-fans-v1")]
         [TestCase("street-argentinos-riot-fans-v2")]
         public void NewRiotAtlasKeepsEveryPoseInsideItsOwnCell(string name)
         {
