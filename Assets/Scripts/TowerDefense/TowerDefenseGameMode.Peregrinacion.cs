@@ -257,7 +257,7 @@ namespace HayChoriYPaty
             // A new obstacle can change a previous station's accessible side.
             for (int i=0;i<placedStations.Count;i++)
             {
-                var old=placedStations[i]; Vector2 access=FindStationAccessAnchor(old.Kind,old.Bounds);
+                var old=placedStations[i]; Vector2 access=FindStationAccessAnchor(old.Kind,old.Bounds); if(!IsFinite(access.x)||!IsFinite(access.y)) access=old.WorkPosition; // never strand a station that was reachable when placed
                 placedStations[i]=new TowerDefensePlacedStation(old.Id,old.Kind,old.Bounds,access,old.PickupPosition);
             }
             placed=placedStations[placedStations.Count-1];
