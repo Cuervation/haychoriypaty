@@ -23,6 +23,7 @@ namespace HayChoriYPaty.Tests
         private Mouse mouse;
         private bool hadSavedProgress;
         private string previousSavedProgress;
+        private bool previousEditorTestInitialization;
         private bool hadTutorialCompletion;
         private int previousTutorialCompletion;
         private string tutorialCompletedKey;
@@ -61,6 +62,9 @@ namespace HayChoriYPaty.Tests
             Time.timeScale = 1f;
             Application.runInBackground = true;
             gameType = Type.GetType("HayChoriYPaty.StreetGame, Assembly-CSharp", true);
+            FieldInfo editorTestInitialization = gameType.GetField("AllowEditorTestInitialization", BindingFlags.Public | BindingFlags.Static);
+            previousEditorTestInitialization = (bool)editorTestInitialization.GetValue(null);
+            editorTestInitialization.SetValue(null, true);
             string key = (string)gameType.GetField("ProgressKey", BindingFlags.Public | BindingFlags.Static).GetValue(null);
             hadSavedProgress = PlayerPrefs.HasKey(key);
             previousSavedProgress = hadSavedProgress ? PlayerPrefs.GetString(key) : null;
@@ -69,6 +73,15 @@ namespace HayChoriYPaty.Tests
             mouse = InputSystem.AddDevice<Mouse>();
             root = new GameObject("Street pointer test (temporary)");
             game = root.AddComponent(gameType);
+            if (!(bool)gameType.GetProperty("IsPlayerActive", PublicInstance).GetValue(game))
+            {
+                MethodInfo activate = gameType.GetMethod("ActivatePlayer", PublicInstance);
+                Delegate testSave = Delegate.CreateDelegate(activate.GetParameters()[1].ParameterType, this,
+                    GetType().GetMethod("PersistEditorTestSave", PrivateInstance));
+                Assert.IsTrue((bool)gameType.GetMethod("ActivatePlayer", PublicInstance)
+                    .Invoke(game, new object[] { null, testSave }),
+                    "The PlayMode fixture must explicitly initialize its isolated local player save.");
+            }
             Type viewType = Type.GetType("HayChoriYPaty.StreetView, Assembly-CSharp", true);
             tutorialCompletedKey = (string)viewType.GetField("LevelOneTutorialCompletedKey", StaticPrivate).GetRawConstantValue();
             hadTutorialCompletion = PlayerPrefs.HasKey(tutorialCompletedKey);
@@ -128,6 +141,8 @@ namespace HayChoriYPaty.Tests
             else PlayerPrefs.DeleteKey(levelFiveTutorialCompletedKey);
             if (hadLevelSixTutorialCompletion) PlayerPrefs.SetInt(levelSixTutorialCompletedKey, previousLevelSixTutorialCompletion);
             else PlayerPrefs.DeleteKey(levelSixTutorialCompletedKey);
+            gameType.GetField("AllowEditorTestInitialization", BindingFlags.Public | BindingFlags.Static)
+                .SetValue(null, previousEditorTestInitialization);
             PlayerPrefs.Save();
             Time.timeScale = previousTimeScale;
             Application.runInBackground = previousBackground;
@@ -146,6 +161,14 @@ namespace HayChoriYPaty.Tests
             string key = (string)gameType.GetField("ProgressKey", BindingFlags.Public | BindingFlags.Static).GetValue(null);
             PlayerPrefs.SetString(key, JsonUtility.ToJson(data));
             PlayerPrefs.Save();
+        }
+
+        private bool PersistEditorTestSave(string json, object match)
+        {
+            string key = (string)gameType.GetField("ProgressKey", BindingFlags.Public | BindingFlags.Static).GetValue(null);
+            PlayerPrefs.SetString(key, json);
+            PlayerPrefs.Save();
+            return true;
         }
 
         private object Get(string name) { return gameType.GetProperty(name, PublicInstance).GetValue(game, null); }
@@ -1349,7 +1372,8 @@ namespace HayChoriYPaty.Tests
             viewType.GetField("introActive", PrivateInstance).SetValue(view, false);
             viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, false);
             object save = gameType.GetField("save", PrivateInstance).GetValue(game);
-            save.GetType().GetField("unlockedLevel").SetValue(save, 5);
+            save.GetType().GetField("unlockedLevel").SetValue(save, 6);
+            ((Array)save.GetType().GetField("unlockedLevelIds").GetValue(save)).SetValue(true, 5);
             Assert.IsTrue((bool)CallGame("SelectLevel", 5), "The visual regression uses Racing to verify its Chulengo club flags.");
             Invoke(game, "StartRound");
             Assert.AreEqual(5, Get("Sim").GetType().GetProperty("LevelIndex", PublicInstance).GetValue(Get("Sim"), null));
@@ -1387,17 +1411,25 @@ namespace HayChoriYPaty.Tests
             }
             finally { UnityEngine.Object.Destroy(chulengoCapture); }
             MethodInfo collectBounds = viewType.GetMethod("ChulengoCollectBounds", PrivateInstance);
+            MethodInfo multiplyBounds = viewType.GetMethod("ChulengoMultiplyBounds", PrivateInstance);
             MethodInfo levelsBounds = viewType.GetMethod("ChulengoLevelsBounds", PrivateInstance);
             Rect collect = (Rect)collectBounds.Invoke(view, null);
+            Rect multiply = (Rect)multiplyBounds.Invoke(view, null);
             Rect chulengoLevels = (Rect)levelsBounds.Invoke(view, null);
             int collectAction = (int)viewType.GetField("ChulengoCollectAction", StaticPrivate).GetRawConstantValue();
+            int multiplyAction = (int)viewType.GetField("ChulengoMultiplyAction", StaticPrivate).GetRawConstantValue();
             int levelsAction = (int)viewType.GetField("ResultLevelsAction", StaticPrivate).GetRawConstantValue();
-            Assert.AreEqual(0, hit.Invoke(view, new object[] { new Vector2(chulengoLevels.center.x, chulengoLevels.center.y / verticalScale) }),
-                "The level selector remains locked while the Chulengo reward is pending.");
+            Assert.AreNotEqual(levelsAction, hit.Invoke(view, new object[] { new Vector2(chulengoLevels.center.x, chulengoLevels.center.y / verticalScale) }),
+                "NIVELES must remain inaccessible while the Chulengo reward is pending, even where its resolved-state bounds overlap a visible choice.");
             Assert.AreEqual(collectAction, hit.Invoke(view, new object[] { new Vector2(collect.center.x, collect.center.y / verticalScale) }),
                 "COBRAR is the available way to settle the ordinary turn reward.");
+            Assert.AreEqual(multiplyAction, hit.Invoke(view, new object[] { new Vector2(multiply.center.x, multiply.center.y / verticalScale) }),
+                "MULTIPLICAR is the second pending choice and must have a distinct hit target.");
             yield return Click(collect.center.x, collect.center.y / verticalScale);
+            for (int frame = 0; frame < 120 && (bool)Get("HasPendingChulengo"); frame++) yield return null;
             Assert.IsFalse((bool)Get("HasPendingChulengo"));
+            FieldInfo shutterStarted = viewType.GetField("rewardShutterStarted", PrivateInstance);
+            for (int frame = 0; frame < 120 && (float)shutterStarted.GetValue(view) >= 0f; frame++) yield return null;
             chulengoLevels = (Rect)levelsBounds.Invoke(view, null);
             Assert.AreEqual(levelsAction, hit.Invoke(view, new object[] { new Vector2(chulengoLevels.center.x, chulengoLevels.center.y / verticalScale) }));
             yield return Click(chulengoLevels.center.x, chulengoLevels.center.y / verticalScale);

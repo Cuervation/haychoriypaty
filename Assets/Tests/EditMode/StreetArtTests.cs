@@ -2628,21 +2628,30 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
         [TestCase(700f)]
         [TestCase(960f)]
         [TestCase(1200f)]
-        public void ChulengoVictoryButtonsStayStackedWithoutOverlap(float canvasHeight)
+        public void ChulengoPendingButtonsSharePopupWidthOnOneRow25PixelsBelowIt(float canvasHeight)
         {
             Rect frame = (Rect)View.GetMethod("VictoryPopupBounds", BindingFlags.Static | BindingFlags.NonPublic)
                 .Invoke(null, new object[] { canvasHeight, true });
-            Rect multiply = (Rect)View.GetMethod("ChulengoMultiplyBoundsForFrame", BindingFlags.Static | BindingFlags.Public)
-                .Invoke(null, new object[] { frame });
-            Rect collect = (Rect)View.GetMethod("ChulengoCollectBoundsForFrame", BindingFlags.Static | BindingFlags.Public)
+            Rect collect = (Rect)View.GetMethod("ChulengoPendingCollectBoundsForFrame", BindingFlags.Static | BindingFlags.Public)
                 .Invoke(null, new object[] { frame, canvasHeight });
-            Rect levels = (Rect)View.GetMethod("ChulengoLevelsBoundsForFrame", BindingFlags.Static | BindingFlags.Public)
+            Rect multiply = (Rect)View.GetMethod("ChulengoPendingMultiplyBoundsForFrame", BindingFlags.Static | BindingFlags.Public)
                 .Invoke(null, new object[] { frame, canvasHeight });
 
-            Assert.Greater(multiply.yMax, frame.yMax, "The main action intentionally overlaps the wood's lower edge.");
-            Assert.GreaterOrEqual(collect.yMin, multiply.yMax + 7f);
-            Assert.GreaterOrEqual(levels.yMin, collect.yMax + 13f);
-            Assert.LessOrEqual(levels.yMax, canvasHeight - 4f);
+            Assert.AreEqual(frame.xMin, collect.xMin, .001f);
+            Assert.AreEqual(25f, collect.yMin - frame.yMax, .001f);
+            Assert.AreEqual(collect.yMin, multiply.yMin, .001f, "Both actions must share one horizontal line.");
+            Assert.AreEqual(collect.xMax + 8f, multiply.xMin, .001f, "Keep a small gap between the buttons.");
+            Assert.AreEqual(frame.xMax, multiply.xMax, .001f);
+            Assert.AreEqual(collect.height, multiply.height, .001f);
+            Assert.AreEqual(52f * 1.30f * Mathf.Clamp(canvasHeight / 1200f, .65f, 1f), collect.height, .001f,
+                "The pending-action buttons are 30% taller while retaining their current larger font size.");
+            Assert.AreEqual(1.30f, View.GetField("ChulengoPendingButtonHeightMultiplier", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null));
+            Assert.AreEqual(Color.black, View.GetField("ChulengoPendingButtonTextColor", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null));
+            Assert.AreEqual((frame.width - 8f) * .5f, collect.width, .001f);
+            Assert.AreEqual(collect.width, multiply.width, .001f);
+            Assert.AreEqual(frame.width, collect.width + 8f + multiply.width, .001f,
+                "The two controls and their gap must span the popup width exactly.");
+            Assert.LessOrEqual(multiply.yMax, canvasHeight - 16f, "Keep the aligned action row inside the lower safe margin.");
         }
 
         [TestCase(700f)]
@@ -2651,10 +2660,9 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
         public void ChulengoVictoryReferenceHeadlineAndTicketFitThePopup(float canvasHeight)
         {
             const BindingFlags flags = BindingFlags.Static | BindingFlags.NonPublic;
-            Assert.AreEqual("MISIÓN", View.GetField("ChulengoVictoryTitleFirstLine", flags).GetValue(null));
-            Assert.AreEqual("COMPLETADA", View.GetField("ChulengoVictoryTitleSecondLine", flags).GetValue(null));
+            Assert.AreEqual("NIVEL", View.GetField("ChulengoVictoryTitleFirstLine", flags).GetValue(null));
+            Assert.AreEqual("COMPLETADO", View.GetField("ChulengoVictoryTitleSecondLine", flags).GetValue(null));
             Assert.AreEqual("+1 TICKET", View.GetField("ChulengoTicketCaption", flags).GetValue(null));
-            Assert.AreEqual(Color.white, View.GetField("ChulengoZeroWarningFill", flags).GetValue(null));
 
             Rect frame = (Rect)View.GetMethod("VictoryPopupBounds", flags)
                 .Invoke(null, new object[] { canvasHeight, true });

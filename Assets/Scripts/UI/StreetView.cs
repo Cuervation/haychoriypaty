@@ -492,10 +492,9 @@ namespace HayChoriYPaty
         private const string VictoryPopupResource = "street-victory-popup-wood-v1";
         private const string ChulengoBowlResource = "street-chulengo-bowl-v1";
         private static readonly Vector2 VictoryPopupArtSize = new Vector2(1122, 1402);
-        private const string ChulengoVictoryTitleFirstLine = "MISIÓN";
-        private const string ChulengoVictoryTitleSecondLine = "COMPLETADA";
+        private const string ChulengoVictoryTitleFirstLine = "NIVEL";
+        private const string ChulengoVictoryTitleSecondLine = "COMPLETADO";
         private const string ChulengoTicketCaption = "+1 TICKET";
-        private static readonly Color ChulengoZeroWarningFill = Color.white;
         private static readonly Color ChulengoTitleOutline = new Color(.015f, .055f, .19f, .99f);
         private static readonly Rect ChulengoTitleFirstLineSlot = new Rect(.235f, .125f, .53f, .085f);
         private static readonly Rect ChulengoTitleSecondLineSlot = new Rect(.115f, .216f, .77f, .089f);
@@ -554,7 +553,7 @@ namespace HayChoriYPaty
         private Texture2D victoryPopup, clubColoredVictoryPopup;
         private int clubColoredVictoryPopupLevel = int.MinValue;
         private Texture2D chulengoMeter, chulengoNeedle, chulengoHub, chulengoParchment, chulengoBowl, chulengoTicketTexture;
-        private Texture2D coverArt, hubBackdrop, titleLogo, menuButton, googleButtonSurface, hudBarTexture, cutoutHudBarTexture, hudQuotaCardTexture, hudQuotaCardOutlineTexture, gameplayFooterTexture, riotBackdrop, riotFanAtlas, riotImpactCloud;
+        private Texture2D coverArt, hubBackdrop, titleLogo, menuButton, chulengoCollectButton, chulengoMultiplyButton, googleButtonSurface, hudBarTexture, cutoutHudBarTexture, hudQuotaCardTexture, hudQuotaCardOutlineTexture, gameplayFooterTexture, riotBackdrop, riotFanAtlas, riotImpactCloud;
         private readonly System.Collections.Generic.Dictionary<string, Texture2D> glossyUpgradeCardTextures =
             new System.Collections.Generic.Dictionary<string, Texture2D>();
         private readonly System.Collections.Generic.Dictionary<string, Texture2D> affordableUpgradeBorderTextures =
@@ -908,6 +907,10 @@ namespace HayChoriYPaty
             yield return LoadStartupResourceAsync<Font>("Menu/LuckiestGuy-Regular", loaded => menuFont = loaded);
             yield return LoadStartupResourceAsync<Font>("Google/GoogleSans-Medium", loaded => googleSansFont = loaded);
             menuButton = CreateMenuButton();
+            chulengoCollectButton = CreateMenuButton(new Color(.73f, .92f, .32f), new Color(.07f, .28f, .02f),
+                new Color(.69f, .90f, .10f), new Color(.45f, .70f, .035f), "Glossy lime-green Chulengo collect button");
+            chulengoMultiplyButton = CreateMenuButton(new Color(1f, 1f, .77f), new Color(.42f, .24f, .03f),
+                new Color(1f, .90f, .23f), new Color(.93f, .53f, .01f), "Glossy yellow Chulengo multiply button");
             googleButtonSurface = CreateGoogleButtonSurface();
             startupArtReady = true;
 #if DEVELOPMENT_BUILD
@@ -1090,6 +1093,10 @@ namespace HayChoriYPaty
             chulengoTicketTexture = null;
             if (menuButton != null) Destroy(menuButton);
             menuButton = null;
+            if (chulengoCollectButton != null) Destroy(chulengoCollectButton);
+            chulengoCollectButton = null;
+            if (chulengoMultiplyButton != null) Destroy(chulengoMultiplyButton);
+            chulengoMultiplyButton = null;
             if (googleButtonSurface != null) Destroy(googleButtonSurface);
             googleButtonSurface = null;
             if (hudBarTexture != null) Destroy(hudBarTexture);
@@ -2504,7 +2511,7 @@ namespace HayChoriYPaty
         private Rect ChulengoCollectBounds()
         {
             Rect frame = VictoryPopupBounds(logicalCanvasHeight, true);
-            return ChulengoCollectBoundsForFrame(frame, logicalCanvasHeight);
+            return ChulengoPendingCollectBoundsForFrame(frame, logicalCanvasHeight);
         }
         public static Rect ChulengoCollectBoundsForFrame(Rect frame, float canvasHeight)
         {
@@ -5058,7 +5065,8 @@ namespace HayChoriYPaty
         }
 
         private void DrawStandardButton(Rect bounds, int action, string caption, bool enabled = true,
-            System.Action activated = null, Texture2D leadingIcon = null, GUIContent buttonContent = null)
+            System.Action activated = null, Texture2D leadingIcon = null, GUIContent buttonContent = null,
+            Texture2D backgroundOverride = null, Color? textColorOverride = null, float fontScale = 1f)
         {
             bool interactive = enabled && GUI.enabled;
             bool pressed = interactive && pressedAction == action;
@@ -5069,15 +5077,16 @@ namespace HayChoriYPaty
             try
             {
                 GUI.color = StandardButtonTint(interactive, pressed);
-                DrawStandardButtonBackground(drawn);
+                DrawStandardButtonBackground(drawn, backgroundOverride);
                 GUI.color = Color.white;
                 float iconInset = leadingIcon != null ? drawn.height * .64f : 0f;
                 Rect fitBounds = bounds;
                 fitBounds.width = Mathf.Max(1f, fitBounds.width - iconInset * 2f);
-                int fontSize = FitStandardButtonFontSize(menuTitle, caption, fitBounds);
-                var captionStyle = CreateStandardButtonLabelStyle(menuTitle, fontSize,
-                    interactive ? Color.white : new Color(.80f, .87f, .94f));
-                var borderStyle = CreateStandardButtonLabelStyle(menuTitle, fontSize, new Color(.035f, .075f, .16f));
+                int fontSize = FitStandardButtonFontSize(menuTitle, caption, fitBounds, fontScale);
+                Color captionColor = textColorOverride ?? (interactive ? Color.white : new Color(.80f, .87f, .94f));
+                Color borderColor = textColorOverride ?? new Color(.035f, .075f, .16f);
+                var captionStyle = CreateStandardButtonLabelStyle(menuTitle, fontSize, captionColor);
+                var borderStyle = CreateStandardButtonLabelStyle(menuTitle, fontSize, borderColor);
                 float textScale = bounds.height / 92f;
                 Rect letters = new Rect(drawn.x + iconInset, drawn.y - 2f * textScale,
                     drawn.width - iconInset * 2f, drawn.height - 8f * textScale);
@@ -5088,12 +5097,15 @@ namespace HayChoriYPaty
                     GUI.DrawTexture(new Rect(drawn.x + sideInset, drawn.center.y - iconSize * .5f,
                         iconSize, iconSize), leadingIcon, ScaleMode.ScaleToFit, true);
                 }
-                float outline = 2.2f * captionStyle.fontSize / 38f;
-                for (int y = -1; y <= 1; y++)
-                for (int x = -1; x <= 1; x++)
-                    if (x != 0 || y != 0)
-                        GUI.Label(new Rect(letters.x + x * outline, letters.y + y * outline,
-                            letters.width, letters.height), caption, borderStyle);
+                if (!textColorOverride.HasValue)
+                {
+                    float outline = 2.2f * captionStyle.fontSize / 38f;
+                    for (int y = -1; y <= 1; y++)
+                    for (int x = -1; x <= 1; x++)
+                        if (x != 0 || y != 0)
+                            GUI.Label(new Rect(letters.x + x * outline, letters.y + y * outline,
+                                letters.width, letters.height), caption, borderStyle);
+                }
                 GUI.Label(letters, caption, captionStyle);
                 GUI.enabled = interactive;
                 if (GUI.Button(hitBounds, buttonContent ?? GUIContent.none, invisible) && !SuppressLevelSelectorNativeTap && !SuppressMarketNativeTap)
@@ -5124,10 +5136,10 @@ namespace HayChoriYPaty
             return style;
         }
 
-        private static int FitStandardButtonFontSize(GUIStyle style, string caption, Rect bounds)
+        private static int FitStandardButtonFontSize(GUIStyle style, string caption, Rect bounds, float fontScale = 1f)
         {
             int original = style.fontSize;
-            int preferred = Mathf.Max(11, Mathf.RoundToInt(38f * bounds.height / 92f));
+            int preferred = Mathf.Max(11, Mathf.RoundToInt(38f * bounds.height / 92f * Mathf.Max(1f, fontScale)));
             float width = Mathf.Max(1f, bounds.width - 24f * bounds.height / 92f);
             float height = Mathf.Max(1f, bounds.height - 8f * bounds.height / 92f);
             try
@@ -5151,20 +5163,21 @@ namespace HayChoriYPaty
                 : new Rect(bounds.xMax - cap, bounds.y, cap, bounds.height);
         }
 
-        private void DrawStandardButtonBackground(Rect bounds)
+        private void DrawStandardButtonBackground(Rect bounds, Texture2D backgroundOverride = null)
         {
-            if (menuButton == null) return;
+            Texture2D background = backgroundOverride != null ? backgroundOverride : menuButton;
+            if (background == null) return;
             // The original cover aspect uses its original exact texture mapping.
-            if (Mathf.Abs(bounds.width / bounds.height - menuButton.width / (float)menuButton.height) < .03f)
+            if (Mathf.Abs(bounds.width / bounds.height - background.width / (float)background.height) < .03f)
             {
-                GUI.DrawTexture(bounds, menuButton, ScaleMode.StretchToFill, true);
+                GUI.DrawTexture(bounds, background, ScaleMode.StretchToFill, true);
                 return;
             }
             // Resize only the straight middle; end caps, gloss, rim and shadow retain their proportions.
             for (int slice = 0; slice < 3; slice++)
             {
                 Rect dest = StandardButtonSliceBounds(bounds, slice);
-                Rect source = StandardButtonSliceBounds(new Rect(0, 0, menuButton.width, menuButton.height), slice);
+                Rect source = StandardButtonSliceBounds(new Rect(0, 0, background.width, background.height), slice);
                 if (dest.width <= 0f) continue;
                 // Fractional portrait transforms can round adjacent IMGUI rectangles apart.
                 // Overlap their internal edges by less than one physical pixel, extending matching UVs.
@@ -5172,16 +5185,22 @@ namespace HayChoriYPaty
                 float sourceSeam = seam * source.width / dest.width;
                 if (slice > 0) { dest.xMin -= seam; source.xMin -= sourceSeam; }
                 if (slice < 2) { dest.xMax += seam; source.xMax += sourceSeam; }
-                DrawRaw(dest, menuButton, source, true, false);
+                DrawRaw(dest, background, source, true, false);
             }
         }
 
         private static Texture2D CreateMenuButton()
         {
+            return CreateMenuButton(new Color(.73f, .96f, 1f), new Color(.025f, .12f, .57f),
+                new Color(.2f, .81f, 1f), new Color(.02f, .22f, .98f), "Original glossy blue startup button");
+        }
+
+        private static Texture2D CreateMenuButton(Color rimTop, Color rimBottom, Color faceTop, Color faceBottom, string buttonName)
+        {
             const int width = 512, height = 164;
             var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
             {
-                name = "Original glossy blue startup button",
+                name = buttonName,
                 wrapMode = TextureWrapMode.Clamp,
                 filterMode = FilterMode.Bilinear,
                 hideFlags = HideFlags.HideAndDontSave
@@ -5194,9 +5213,9 @@ namespace HayChoriYPaty
                 float px = x + .5f, py = height - y - .5f;
                 float t = Mathf.Clamp01((py - face.y) / face.height);
                 Color color = new Color(.015f, .06f, .18f, .6f * RoundedCoverage(px, py, shadow, 70));
-                color = Over(color, Color.Lerp(new Color(.73f, .96f, 1f), new Color(.025f, .12f, .57f), t), RoundedCoverage(px, py, rim, 72));
+                color = Over(color, Color.Lerp(rimTop, rimBottom, t), RoundedCoverage(px, py, rim, 72));
                 float faceAlpha = RoundedCoverage(px, py, face, 67);
-                color = Over(color, Color.Lerp(new Color(.2f, .81f, 1f), new Color(.02f, .22f, .98f), t), faceAlpha);
+                color = Over(color, Color.Lerp(faceTop, faceBottom, t), faceAlpha);
                 float gloss = .48f * (1f - IntroEase((t - .02f) / .48f));
                 color = Over(color, Color.white, faceAlpha * gloss);
                 float dx = (px - 47f) / 13f, dy = (py - 25f) / 5f;
@@ -6701,14 +6720,37 @@ namespace HayChoriYPaty
             return !(negative && positive);
         }
         private static Rect LevelButton(int i){return new Rect(108+i*67,912,57,35);}
+        private const float ChulengoPendingButtonGap = 25f;
+        private const float ChulengoPendingButtonSpacing = 8f;
+        private const float ChulengoPendingButtonBottomInset = 16f;
+        private const float ChulengoPendingButtonHeightMultiplier = 1.30f;
+        private static readonly Color ChulengoPendingButtonTextColor = Color.black;
+        private static float ChulengoPendingButtonHeight(float canvasHeight) =>
+            52f * ChulengoPendingButtonHeightMultiplier * Mathf.Clamp(canvasHeight / 1200f, .65f, 1f);
+
+        public static Rect ChulengoPendingCollectBoundsForFrame(Rect frame, float canvasHeight)
+        {
+            float width = (frame.width - ChulengoPendingButtonSpacing) * .5f;
+            return new Rect(frame.x, frame.yMax + ChulengoPendingButtonGap, width,
+                ChulengoPendingButtonHeight(canvasHeight));
+        }
+
+        public static Rect ChulengoPendingMultiplyBoundsForFrame(Rect frame, float canvasHeight)
+        {
+            Rect collect = ChulengoPendingCollectBoundsForFrame(frame, canvasHeight);
+            return new Rect(collect.xMax + ChulengoPendingButtonSpacing, collect.y, collect.width, collect.height);
+        }
+
         private static Rect VictoryPopupBounds(float canvasHeight, bool chulengo = false)
         {
             float topHudReserve = chulengo ? 224f : 110f;
             const float screenInset = 16f;
-            float resultButtonTopInset = chulengo ? 123f : 72f;
-            const float resultButtonGap = 8f;
-            // Chulengo reserves space for three lower actions and keeps the status HUD visible above the crest.
-            float availableHeight = Mathf.Max(1f, canvasHeight - topHudReserve - screenInset - resultButtonTopInset - resultButtonGap);
+            float resultActionReserve = chulengo
+                ? ChulengoPendingButtonGap + ChulengoPendingButtonHeight(canvasHeight)
+                : 72f;
+            float resultButtonGap = chulengo ? ChulengoPendingButtonBottomInset : 8f;
+            // Chulengo reserves the shared horizontal action row below the popup and keeps the status HUD above the crest.
+            float availableHeight = Mathf.Max(1f, canvasHeight - topHudReserve - screenInset - resultActionReserve - resultButtonGap);
             float horizontalInset = chulengo ? 32f : 24f;
             float scale = Mathf.Min((W - horizontalInset) / VictoryPopupArtSize.x, availableHeight / VictoryPopupArtSize.y);
             Vector2 size = VictoryPopupArtSize * scale;
@@ -6797,7 +6839,14 @@ namespace HayChoriYPaty
                 return sourceIsLightStripe ? secondary : primary;
             return sourceIsLightStripe == primaryIsDarker ? secondary : primary;
         }
-        private Rect ChulengoMultiplyBounds() => ChulengoMultiplyBoundsForFrame(VictoryPopupBounds(logicalCanvasHeight, true));
+        private Rect ChulengoMultiplyBounds()
+        {
+            bool pendingHorizontalActions = game != null && game.HasPendingChulengo && !game.ChulengoChoiceLocked;
+            Rect frame = VictoryPopupBounds(logicalCanvasHeight, true);
+            return pendingHorizontalActions
+                ? ChulengoPendingMultiplyBoundsForFrame(frame, logicalCanvasHeight)
+                : ChulengoMultiplyBoundsForFrame(frame);
+        }
         // Public for focused geometry checks; pointer and visible control share this normalized frame.
         public static Rect ChulengoMultiplyBoundsForFrame(Rect frame) => VictorySlot(frame, new Rect(.20f, .935f, .60f, .095f));
         public static int ChulengoSectorAtPosition(float position) => StreetChulengo.SectorAtPosition(position);
@@ -7295,22 +7344,9 @@ namespace HayChoriYPaty
         {
             float fontScale = frame.width / 516f;
             Color brown = new Color(.20f, .055f, .02f);
-            Color cream = new Color(1f, .94f, .78f);
-            if (pending)
-            {
-                long baseReward = game.ChulengoBaseRewardCents;
-                long maximum = baseReward <= long.MaxValue / 2L ? baseReward * 2L : long.MaxValue;
-                VictoryText(VictorySlot(frame, new Rect(.12f, .748f, .76f, .039f)),
-                    "FRENÁ LA AGUJA EN LA ZONA DORADA", Mathf.RoundToInt(22f * fontScale), cream, TextAnchor.MiddleCenter);
-                VictoryText(VictorySlot(frame, new Rect(.14f, .792f, .36f, .064f)),
-                    "HASTA ×2:", Mathf.RoundToInt(44f * fontScale), cream, TextAnchor.MiddleRight);
-                VictoryText(VictorySlot(frame, new Rect(.535f, .788f, .38f, .072f)),
-                    FormatChulengoMoney(maximum), Mathf.RoundToInt(68f * fontScale), new Color(1f, .69f, .14f), TextAnchor.MiddleLeft);
-                VictoryText(VictorySlot(frame, new Rect(.10f, .87f, .80f, .037f)),
-                    "¡EN ×0 PERDÉS TODO EL PREMIO DEL TURNO!", Mathf.RoundToInt(22f * fontScale),
-                    ChulengoZeroWarningFill, TextAnchor.MiddleCenter);
-            }
-            else if (lockedRetry)
+            if (pending) return;
+            // The pending claim stays uncluttered: prize, wheel and actions communicate the choice.
+            if (lockedRetry)
             {
                 VictoryText(VictorySlot(frame, new Rect(.15f, .75f, .70f, .043f)),
                     sector < 0 ? "EL COBRO SE REINTENTA SIN PERDER EL PREMIO" : "RESULTADO GUARDADO · NO SE VUELVE A MULTIPLICAR",
@@ -7393,15 +7429,18 @@ namespace HayChoriYPaty
                         !pending, sector, Mathf.RoundToInt(29f * fontScale));
                     DrawChulengoTicketBadge(frame, fontScale);
                     DrawChulengoFooter(frame, pending, lockedRetry, sector);
-                    if (pending || lockedRetry)
+                    if (pending)
                     {
-                        DrawStandardButton(ChulengoMultiplyBounds(), ChulengoMultiplyAction, lockedRetry
-                            ? sector < 0 ? "REINTENTAR COBRO" : "REINTENTAR RESULTADO"
-                            : "MULTIPLICAR");
-                        if (pending)
-                            DrawStandardButton(ChulengoCollectBounds(), ChulengoCollectAction,
-                                "COBRAR " + FormatChulengoMoney(game.ChulengoBaseRewardCents));
-                        DrawStandardButton(ChulengoLevelsBounds(), ResultLevelsAction, "NIVELES", false);
+                        DrawStandardButton(ChulengoCollectBounds(), ChulengoCollectAction,
+                            "COBRAR " + FormatChulengoMoney(game.ChulengoBaseRewardCents),
+                            true, null, null, null, chulengoCollectButton, ChulengoPendingButtonTextColor);
+                        DrawStandardButton(ChulengoMultiplyBounds(), ChulengoMultiplyAction, "MULTIPLICAR",
+                            true, null, null, null, chulengoMultiplyButton, ChulengoPendingButtonTextColor);
+                    }
+                    else if (lockedRetry)
+                    {
+                        DrawStandardButton(ChulengoMultiplyBounds(), ChulengoMultiplyAction,
+                            sector < 0 ? "REINTENTAR COBRO" : "REINTENTAR RESULTADO");
                     }
                     else
                     {
