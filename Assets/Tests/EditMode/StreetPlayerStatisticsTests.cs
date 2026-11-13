@@ -425,6 +425,7 @@ namespace HayChoriYPaty.Tests
             {
                 SetEditorTestInitialization(gameType, false);
                 object seed = Activator.CreateInstance(saveDataType);
+                ((bool[])ReadField(seed, "unlockedLevelIds"))[0] = true; // a raw SaveData must still carry the campaign's first unlock
                 object stats = ReadField(seed, "statistics");
                 long[] expected = { 499L, 500L, 2499L, 2500L, 4999L, 5000L, 16000L };
                 WriteField(stats, "deliveredByProduct", expected);

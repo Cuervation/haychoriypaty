@@ -401,7 +401,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(3L, Read(game, "TicketBalance"), "The second run earns one regular ticket and the first-time three-star extra.");
             Assert.AreEqual(2, Read(lastMatch, "bonusTickets"));
             Assert.IsTrue((bool)Read(Read(game, "BonusTrackProgress"), "threeStarTicketAwarded"));
-            Assert.IsTrue((bool)Call(game, "IsLevelUnlocked", 5));
+            Assert.IsTrue((bool)Call(game, "IsLevelUnlocked", 10), "Winning Chicago (11) unlocks its campaign successor, Los Redondos (10).");
 
             Assert.IsTrue((bool)Call(game, "Retry"));
             CompleteRound(Read(game, "Sim"));

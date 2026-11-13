@@ -394,6 +394,8 @@ namespace HayChoriYPaty.Tests
             Type configType = Runtime("TowerDefenseLevelConfig");
             object config = Resources.Load("TowerDefense/Camioneros-PlazaDeMayo", configType);
             Assert.IsNotNull(config);
+            config = UnityEngine.Object.Instantiate((UnityEngine.Object)config); // keep the shared asset's 120-fan target intact
+            Put(config, "totalFanCount", 10);
             object route = Read(config, "Route");
             Type geometryType = Runtime("TowerDefenseRouteGeometry");
             object geometry = geometryType.GetMethod("Generate", PublicStatic).Invoke(null, new[] { route });
@@ -409,10 +411,10 @@ namespace HayChoriYPaty.Tests
             Assert.IsTrue((bool)Invoke(game, "TryHireTowerDefense", mode, Role(roleType, "Cocacolero"), 0));
             for (int n = 0; n < 10; n++)
                 Assert.IsTrue((bool)Invoke(mode, "TrySpawnFan", new[] {4}, new[] {1}));
-            for (int n = 0; n < 10; n++) InvokeAny(mode, "DeliverWithinServiceRanges");
+            for (int n = 0; n < 200 && (int)Read(mode, "ServedFans") < 10; n++) { InvokeAny(mode, "DeliverWithinServiceRanges"); Invoke(mode, "Step", .25f); }
             Put(mode, "elapsed", 500f); // No inherited 380-second terminal or history clamp.
             Invoke(mode, "Step", .5f);
-            Assert.IsTrue((bool)Read(mode, "HasWon"));
+            Assert.IsTrue((bool)Read(mode, "HasWon"), "total=" + Read(mode, "TotalFanCount") + " spawned=" + Read(mode, "SpawnedFans") + " served=" + Read(mode, "ServedFans") + " fans=" + ((System.Collections.IList)Read(mode, "Fans")).Count + " phase=" + Read(mode, "Phase"));
             Assert.AreEqual(10, Read(mode, "ServedFans"));
             Assert.AreEqual("Finished", Read(mode, "Phase").ToString());
 

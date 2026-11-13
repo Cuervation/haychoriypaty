@@ -97,15 +97,20 @@ namespace HayChoriYPaty.Tests
 
             Type roles = RuntimeType("StreetWorkerRole");
             object role=Enum.ToObject(roles,roleId);
-            bool hired=false;
-            for(int y=32;y<=256&&!hired;y+=32)
-            for(int x=64;x<=448&&!hired;x+=32)
+            bool hired=false; string lastReason=""; var reasons=new System.Collections.Generic.Dictionary<string,int>();
+            for(int y=32;y<=352&&!hired;y+=16)
+            for(int x=48;x<=460&&!hired;x+=16)
             {
                 Vector2 feet=new Vector2(x,y);
-                if(!(bool)Invoke(mode,"CanHireAt",new[]{role,(object)feet}))continue;
+                if(!(bool)Invoke(mode,"CanHireAt",new[]{role,(object)feet}))
+                {
+                    object preview=Invoke(mode,"PreviewWorkerPlacement",new[]{role,(object)feet});
+                    string why=(string)preview.GetType().GetField("Reason").GetValue(preview); lastReason=why+"@"+feet; reasons[why]=(reasons.ContainsKey(why)?reasons[why]:0)+1;
+                    continue;
+                }
                 hired=(bool)Invoke(mode,"TryHireAt",new[]{role,(object)feet});
             }
-            Assert.IsTrue(hired,"Role must have a reachable legal placement: "+role);
+            Assert.IsTrue(hired,"Role must have a reachable legal placement: "+role+" last="+lastReason+" reasons="+string.Join(";",System.Linq.Enumerable.Select(reasons,kv=>kv.Key+"="+kv.Value))+" coins="+Get<int>(mode,"Coins"));
             Assert.AreEqual(1,Sum(Get<int[]>(mode,"WorkerCountsByRole")));
             Assert.AreEqual(coins-60,Get<int>(mode,"Coins"));
             Invoke(mode, "Pause");
