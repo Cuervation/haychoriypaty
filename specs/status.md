@@ -2,6 +2,12 @@
 
 > **HISTÓRICO:** este archivo registra el estado en la fecha de cada entrada. Una entrada marcada PASS no valida el runtime actual ni reemplaza el contrato vigente. Consultar [current-state](current-state.md), [índice SDD](README.md) y la [tabla maestra](../docs/BALANCE_ACTUAL_NIVELES.md).
 
+## 2026-11-13 — APK del humo Chulengo publicada
+
+Se publicó el commit `dab10dd` (`Implement Chulengo smoke claim transition`) a `origin/codex/street-automation`, con solo los 13 archivos intencionales de runtime, tests y contrato; se dejaron fuera `.meta`, preferencias de `ProjectSettings`, escenas/capturas temporales y auditorías locales.
+
+Unity 6000.6.3f1 Build Profiles Android, no-Development, IL2CPP/ARM64, escenas Main + SampleScene: **Succeeded en 509 s**, Console **0 errores / 5 warnings** (diagnóstico y cuatro avisos existentes `UAC0009`). APK local ignorada por Git: `Builds/Android/Archive/HayChoriYPaty-0.2.83-code85-dab10dd-chulengo-smoke-20261113.apk`, 509.979.897 bytes, SHA-256 `ac9c19ca821a33c5e95a9110b97f465bed75c5e270e1e7f5f671fffc62bf6ce3`. ZIP, zipalign, firma Android v2 y metadata de paquete/versión/API/ABI **PASS**; firma Android Debug, no Play Store. No se instaló ni se ejecutó smoke físico; Firebase/gameplay integral **NOT_RUN**. El perfil Android creado para el build se retiró y los ajustes locales versionados conservaron su hash previo.
+
 ## 2026-11-13 — Chulengo: COBRAR el resultado y volver al selector
 
 Se reemplazaron las acciones posteriores al resultado Chulengo (`SIGUIENTE PARTIDO` y `NIVELES`) por un único botón verde `COBRAR $<importe final>`. `MULTIPLICAR` ahora bloquea/persiste el sector elegido sin acreditar todavía; el botón inicia la persiana, confirma el importe una sola vez cuando queda cubierta y deja el selector listo detrás de la apertura. El cobro normal sin multiplicar usa el mismo flujo. La copia histórica de contexto no se tocó.
