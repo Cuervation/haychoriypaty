@@ -29,9 +29,12 @@ namespace HayChoriYPaty.Tests
         private InputSettings.BackgroundBehavior previousInputBackground;
         private InputSettings.EditorInputBehaviorInPlayMode previousEditorInput;
 
+        private readonly TutorialPrefsGuard tutorialPrefs = new TutorialPrefsGuard();
+
         [UnitySetUp]
         public IEnumerator SetUp()
         {
+            tutorialPrefs.Suppress();
             previousTimeScale = Time.timeScale;
             previousBackground = Application.runInBackground;
             previousInputBackground = InputSystem.settings.backgroundBehavior;
@@ -58,6 +61,7 @@ namespace HayChoriYPaty.Tests
         [UnityTearDown]
         public IEnumerator TearDown()
         {
+            tutorialPrefs.Restore();
             if (root != null) UnityEngine.Object.Destroy(root);
             if (mouse != null && mouse.added) InputSystem.RemoveDevice(mouse);
             InputSystem.settings.backgroundBehavior = previousInputBackground;
@@ -109,7 +113,17 @@ namespace HayChoriYPaty.Tests
                 parameter => Expression.Parameter(parameter.ParameterType, parameter.Name));
             Delegate callback = Expression.Lambda(callbackType, Expression.Constant(true), parameters).Compile();
             string key = (string)gameType.GetField("ProgressKey", BindingFlags.Public | BindingFlags.Static).GetValue(null);
-            string savedJson = PlayerPrefs.HasKey(key) ? PlayerPrefs.GetString(key) : null;
+            // Hermetic fixture: never inherit the editor's real PlayerPrefs save. Start from a raw v9 save with every campaign level unlocked.
+            Type saveType = gameType.GetNestedType("SaveData", BindingFlags.Public);
+            object seed = Activator.CreateInstance(saveType);
+            saveType.GetField("unlockedLevelIds").SetValue(seed, new[] { true, true, true, true, true, true, true, true, true, true, true, true, true, true, true });
+            saveType.GetField("unlockedLevel").SetValue(seed, 10);
+            foreach (string flag in new[] { "huracanUnlocked", "legacyRacingUnlocked", "racingUnlockedByHuracan", "argentinosUnlocked" })
+            {
+                FieldInfo unlockFlag = saveType.GetField(flag);
+                if (unlockFlag != null) unlockFlag.SetValue(seed, true);
+            }
+            string savedJson = JsonUtility.ToJson(seed);
             Assert.IsTrue((bool)activate.Invoke(game, new object[] { savedJson, callback }),
                 "The temporary fixture must activate from its snapshot without writing PlayerPrefs.");
         }
