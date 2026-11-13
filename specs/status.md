@@ -2,6 +2,18 @@
 
 > **HISTÓRICO:** este archivo registra el estado en la fecha de cada entrada. Una entrada marcada PASS no valida el runtime actual ni reemplaza el contrato vigente. Consultar [current-state](current-state.md), [índice SDD](README.md) y la [tabla maestra](../docs/BALANCE_ACTUAL_NIVELES.md).
 
+## 2026-11-13 — Chulengo: COBRAR el resultado y volver al selector
+
+Se reemplazaron las acciones posteriores al resultado Chulengo (`SIGUIENTE PARTIDO` y `NIVELES`) por un único botón verde `COBRAR $<importe final>`. `MULTIPLICAR` ahora bloquea/persiste el sector elegido sin acreditar todavía; el botón inicia la persiana, confirma el importe una sola vez cuando queda cubierta y deja el selector listo detrás de la apertura. El cobro normal sin multiplicar usa el mismo flujo. La copia histórica de contexto no se tocó.
+
+**Validación estática y compilación Unity: PASS acotado.** `git diff --check` de los archivos intencionales pasó. El Editor abierto del checkout correcto compiló los scripts/tests tras editar (`Tundra build success`, sin errores C#); conserva el warning conocido `CS0162` en `StreetView.cs:1624`. Durante la edición concurrente Unity mostró un `Import Error Code:(4)` de `SourceDataChangedDuringImport`; el log indica que reescaneó los archivos y las compilaciones posteriores finalizaron correctamente.
+
+**Tests Unity EditMode/PlayMode y Game View: NOT_RUN.** Se añadieron pruebas para escrow del multiplicador, geometría del nuevo botón y toque→persiana→selector, pero no se ejecutaron ni se revisó una captura de esta variante. El Editor ya estaba abierto y no había herramientas Unity MCP disponibles; no se abrió otra instancia. APK, instalación, commit y push: **NOT_REQUESTED**. [Contrato](features/market-fridge.md).
+
+### Validación posterior — 2026-11-13
+
+Esta entrada actualiza únicamente la aceptación/validación de arriba: tras importar en el Unity Editor ya abierto, EditMode focalizado **PASS 16/16** (`StreetChulengoTests` + `StreetVictoryTransitionTests`); PlayMode focalizado **PASS 4/4** (`StreetPointerTests`, incluyendo humo/capturas, consumo del release/skip, `MULTIPLICAR`→COBRAR final y COBRAR base, ambos con persiana y selector detrás). Game View real **720×1280** revisado: humo naciente, cobertura completa, comienzo de reveal a través del humo, disipación y Chulengo final; capturas bajo `Logs/Acceptance/VictoryTransition-20261113/`. La captura determinista de ×2 muestra la recompensa base de $500 convertida a **COBRAR $1.000** en verde; vista animada de 8 fotogramas en `victory-white-smoke-chulengo-720x1280.png`. El test de UI inyecta los eventos a través de `HandlePointer` para que la geometría/puntería de producción sea determinista con el `timeScale=0` de la fixture, sin depender de que el Editor reenvíe eventos de mouse. No se ejecutó campaña completa, Android o APK; sin commit/push. [Contrato y evidencia](features/market-fridge.md).
+
 ## 2026-11-11 — Camioneros: layout compartido, Unity reabierto y captura final (checkpoint anterior)
 
 Se cerró de forma controlada el Unity Editor que mantenía el lock del checkout activo y se reabrió Unity 6000.6.3f1 en `/Users/celestino/HayChoriYPaty`. El dibujo del usuario se implementó en ambas áreas: los dos oficios comparten una línea detrás de las estaciones; Parrilleros/mesa a la izquierda y Cocacoleros/barril a la derecha; cada cuadrilla queda centrada en su puesto y, **en ese checkpoint**, la contratación nueva ocupaba el centro del trío. Luego el usuario cambió el requisito: mantener al primero al centro y solapar 10 px; ver la entrada vigente inferior. El claro de mesa/barril medido en aquel checkpoint era 23,52 px lógicos; criterio corregido a ≥23,5 px.

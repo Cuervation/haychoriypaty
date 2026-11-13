@@ -16,6 +16,7 @@ namespace HayChoriYPaty.Tests
         private void Observe(bool playing, bool won, float now) => type.GetMethod("Observe").Invoke(clock, new[] { attempt, (object)playing, won, now });
         private bool Active(float now) => (bool)type.GetMethod("Active").Invoke(clock, new object[] { now });
         private float Elapsed(float now) => (float)type.GetMethod("Elapsed").Invoke(clock, new object[] { now });
+        private float SmokeCoverage(float elapsed) => (float)type.GetMethod("SmokeCoverageAt").Invoke(null, new object[] { elapsed });
 
         [Test] public void LiveWinRunsForThreeUnscaledSecondsAndClampsElapsed()
         {
@@ -50,6 +51,17 @@ namespace HayChoriYPaty.Tests
         {
             Observe(true, false, 1); attempt = new object(); Observe(false, true, 2);
             Assert.IsFalse(Active(2));
+        }
+
+        [Test] public void WhiteSmokeFillsViewportBeforeChulengoRevealThenClears()
+        {
+            float revealAt = (float)type.GetField("ChulengoRevealStart").GetRawConstantValue();
+            Assert.AreEqual(0f, SmokeCoverage(.65f), .001f, "Smoke stays out of the opening victory lettering.");
+            Assert.Greater(SmokeCoverage(1.5f), .5f, "The white plume visibly rises during the middle of the transition.");
+            Assert.AreEqual(1f, SmokeCoverage(2.05f), .001f, "The smoke reaches full-screen coverage before the reveal.");
+            Assert.Greater(SmokeCoverage(revealAt), .99f, "The real Chulengo panel starts behind the full smoke layer.");
+            Assert.Greater(SmokeCoverage(2.64f), 0f, "Smoke dissipates gradually as the Chulengo arrives.");
+            Assert.AreEqual(0f, SmokeCoverage(3f), .001f, "The full result is clear at the end of the presentation.");
         }
     }
 }

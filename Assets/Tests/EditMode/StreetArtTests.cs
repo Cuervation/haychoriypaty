@@ -2657,6 +2657,25 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
         [TestCase(700f)]
         [TestCase(960f)]
         [TestCase(1200f)]
+        public void ChulengoFinalCollectReusesTheOldNextMatchSlotInsideThePopup(float canvasHeight)
+        {
+            Rect frame = (Rect)View.GetMethod("VictoryPopupBounds", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { canvasHeight, true });
+            Rect collect = (Rect)View.GetMethod("ChulengoFinalCollectBoundsForFrame", BindingFlags.Static | BindingFlags.Public)
+                .Invoke(null, new object[] { frame });
+            Rect oldNextSlot = (Rect)View.GetField("VictoryExit", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+            Rect expected = (Rect)View.GetMethod("VictorySlot", BindingFlags.Static | BindingFlags.NonPublic)
+                .Invoke(null, new object[] { frame, oldNextSlot });
+
+            Assert.AreEqual(expected, collect, "The final COBRAR action occupies the familiar primary result-button slot.");
+            Assert.IsTrue(frame.Contains(collect.min));
+            Assert.IsTrue(frame.Contains(collect.max));
+            Assert.Greater(collect.yMin, frame.center.y);
+        }
+
+        [TestCase(700f)]
+        [TestCase(960f)]
+        [TestCase(1200f)]
         public void ChulengoVictoryReferenceHeadlineAndTicketFitThePopup(float canvasHeight)
         {
             const BindingFlags flags = BindingFlags.Static | BindingFlags.NonPublic;

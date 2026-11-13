@@ -1295,9 +1295,9 @@ namespace HayChoriYPaty.Tests
         public IEnumerator VictoryTransitionCapturesStagesAndConsumesReleaseAfterTimeout()
         {
             PrepareLiveVictoryTransition();
-            string dir = System.IO.Path.GetFullPath(System.IO.Path.Combine(Application.dataPath, "../Logs/Acceptance/VictoryTransition-20261026"));
+            string dir = System.IO.Path.GetFullPath(System.IO.Path.Combine(Application.dataPath, "../Logs/Acceptance/VictoryTransition-20261113"));
             System.IO.Directory.CreateDirectory(dir);
-            foreach (float elapsed in new[] { .65f, 1.18f, 1.5f, 2.95f })
+            foreach (float elapsed in new[] { .65f, 1.18f, 1.75f, 2.12f, 2.5f, 2.85f, 2.95f })
             {
                 SetVictoryElapsed(elapsed);
                 yield return WaitForRenderedFrame();
@@ -1369,6 +1369,11 @@ namespace HayChoriYPaty.Tests
         public IEnumerator VictoryPopupTouchBoundsReturnToSelectorAndBlockBackgroundUpgrades()
         {
             Type viewType = view.GetType();
+            Type chulengoType = Type.GetType("HayChoriYPaty.StreetChulengo, Assembly-CSharp", true);
+            const BindingFlags PublicStatic = BindingFlags.Public | BindingFlags.Static;
+            MethodInfo positionAtTime = chulengoType.GetMethod("PositionAtTime", PublicStatic);
+            MethodInfo sectorAtPosition = chulengoType.GetMethod("SectorAtPosition", PublicStatic);
+            MethodInfo multiplierNumerator = chulengoType.GetMethod("MultiplierNumerator", PublicStatic);
             viewType.GetField("introActive", PrivateInstance).SetValue(view, false);
             viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, false);
             object save = gameType.GetField("save", PrivateInstance).GetValue(game);
@@ -1379,6 +1384,8 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(5, Get("Sim").GetType().GetProperty("LevelIndex", PublicInstance).GetValue(Get("Sim"), null));
             SetSim("Phase", Enum.Parse(Sim.GetType().GetProperty("Phase", PublicInstance).PropertyType, "Won"));
             yield return null;
+            // This fixture covers the result actions, not the three-second animation or its skip input.
+            SetVictoryElapsed(3.1f);
             Rect viewport = (Rect)viewType.GetMethod("CanvasViewport", StaticPrivate)
                 .Invoke(null, new object[] { new Vector2(Screen.width, Screen.height), Screen.safeArea });
             float canvasHeight = (float)viewType.GetMethod("CanvasLogicalHeight", StaticPrivate).Invoke(null, new object[] { viewport });
@@ -1425,16 +1432,102 @@ namespace HayChoriYPaty.Tests
                 "COBRAR is the available way to settle the ordinary turn reward.");
             Assert.AreEqual(multiplyAction, hit.Invoke(view, new object[] { new Vector2(multiply.center.x, multiply.center.y / verticalScale) }),
                 "MULTIPLICAR is the second pending choice and must have a distinct hit target.");
+            int expectedSector = -1;
+            for (int frame = 0; frame < 120; frame++)
+            {
+                float position = (float)positionAtTime.Invoke(null, new object[] { Time.unscaledTime });
+                int currentSector = (int)sectorAtPosition.Invoke(null, new object[] { position });
+                if ((int)multiplierNumerator.Invoke(null, new object[] { currentSector }) > 2)
+                {
+                    expectedSector = currentSector;
+                    break;
+                }
+                yield return null;
+            }
+            Assert.GreaterOrEqual(expectedSector, 0, "Wait for a >×1 needle sector so the final COBRAR amount is visibly multiplied.");
+            // Exercise the production screen-to-layout pointer path directly. InputSystem mouse
+            // events can be swallowed by the Editor Game View when the fixture has timeScale=0.
+            MethodInfo handlePointer = viewType.GetMethod("HandlePointer", PrivateInstance);
+            Vector2 multiplyPixel = Pixel(multiply.center.x, multiply.center.y / verticalScale);
+            handlePointer.Invoke(view, new object[] { multiplyPixel, true, false });
+            Assert.AreEqual(multiplyAction, viewType.GetField("pressedAction", PrivateInstance).GetValue(view),
+                "The production screen-to-layout transform must map the multiplier tap to its button.");
+            handlePointer.Invoke(view, new object[] { multiplyPixel, false, true });
+            Assert.IsTrue((bool)Get("HasPendingChulengo"), "Selecting the multiplier records the outcome but keeps its payout escrowed until COBRAR.");
+            Assert.IsTrue((bool)Get("ChulengoChoiceLocked"), "The chosen multiplier cannot be rerolled while waiting for collection.");
+            Assert.AreEqual(expectedSector, Get("ChulengoSelectedSector"), "The pointer locks the moving needle's exact selected sector.");
+            Assert.Greater((long)Get("ChulengoFinalRewardCents"), (long)Get("ChulengoBaseRewardCents"),
+                "The green COBRAR action must show a genuinely multiplied amount for this fixture.");
+            yield return new WaitForEndOfFrame();
+            Texture2D multipliedCapture = ScreenCapture.CaptureScreenshotAsTexture();
+            Assert.IsNotNull(multipliedCapture);
+            string multipliedCapturePath = System.IO.Path.Combine(System.IO.Path.GetTempPath(),
+                "hay-chori-chulengo-collect-" + Screen.width + "x" + Screen.height + ".png");
+            try
+            {
+                System.IO.File.WriteAllBytes(multipliedCapturePath, multipliedCapture.EncodeToPNG());
+                Debug.Log("Chulengo multiplied Game View capture saved to " + multipliedCapturePath + " (" + multipliedCapture.width + "x" + multipliedCapture.height + ")");
+            }
+            finally { UnityEngine.Object.Destroy(multipliedCapture); }
+            collect = (Rect)collectBounds.Invoke(view, null);
+            Assert.AreEqual(collectAction, hit.Invoke(view, new object[] { new Vector2(collect.center.x, collect.center.y / verticalScale) }),
+                "The resolved amount is collected by the green COBRAR action.");
+            Assert.AreNotEqual(levelsAction, hit.Invoke(view, new object[] { new Vector2(chulengoLevels.center.x, chulengoLevels.center.y / verticalScale) }),
+                "The separate NIVELES navigation action is removed from the Chulengo result.");
             yield return Click(collect.center.x, collect.center.y / verticalScale);
             for (int frame = 0; frame < 120 && (bool)Get("HasPendingChulengo"); frame++) yield return null;
             Assert.IsFalse((bool)Get("HasPendingChulengo"));
             FieldInfo shutterStarted = viewType.GetField("rewardShutterStarted", PrivateInstance);
             for (int frame = 0; frame < 120 && (float)shutterStarted.GetValue(view) >= 0f; frame++) yield return null;
-            chulengoLevels = (Rect)levelsBounds.Invoke(view, null);
-            Assert.AreEqual(levelsAction, hit.Invoke(view, new object[] { new Vector2(chulengoLevels.center.x, chulengoLevels.center.y / verticalScale) }));
-            yield return Click(chulengoLevels.center.x, chulengoLevels.center.y / verticalScale);
             Assert.AreEqual("Ready", Phase);
             Assert.IsTrue((bool)viewType.GetField("levelSelectActive", PrivateInstance).GetValue(view));
+        }
+
+        [UnityTest]
+        public IEnumerator VictoryPopupBaseCollectUsesShutterThenRevealsLevels()
+        {
+            Type viewType = view.GetType();
+            viewType.GetField("introActive", PrivateInstance).SetValue(view, false);
+            viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, false);
+            object save = gameType.GetField("save", PrivateInstance).GetValue(game);
+            save.GetType().GetField("unlockedLevel").SetValue(save, 6);
+            ((Array)save.GetType().GetField("unlockedLevelIds").GetValue(save)).SetValue(true, 5);
+            Assert.IsTrue((bool)CallGame("SelectLevel", 5));
+            Invoke(game, "StartRound");
+            SetSim("Phase", Enum.Parse(Sim.GetType().GetProperty("Phase", PublicInstance).PropertyType, "Won"));
+            yield return null;
+            SetVictoryElapsed(3.1f);
+
+            object market = Get("Market");
+            long balanceBeforeClaim = (long)market.GetType().GetProperty("BalanceCents", PublicInstance).GetValue(market, null);
+            long baseReward = (long)Get("ChulengoBaseRewardCents");
+            Assert.IsTrue((bool)Get("HasPendingChulengo"));
+            Assert.IsFalse((bool)Get("ChulengoChoiceLocked"), "Ordinary COBRAR must not require or invent a multiplier outcome.");
+            Rect viewport = (Rect)viewType.GetMethod("CanvasViewport", StaticPrivate)
+                .Invoke(null, new object[] { new Vector2(Screen.width, Screen.height), Screen.safeArea });
+            float verticalScale = (float)viewType.GetMethod("CanvasLogicalHeight", StaticPrivate).Invoke(null, new object[] { viewport }) / 960f;
+            Rect collect = (Rect)viewType.GetMethod("ChulengoCollectBounds", PrivateInstance).Invoke(view, null);
+            int collectAction = (int)viewType.GetField("ChulengoCollectAction", StaticPrivate).GetRawConstantValue();
+            MethodInfo hit = viewType.GetMethod("HitAction", PrivateInstance);
+            Vector2 actionPoint = new Vector2(collect.center.x, collect.center.y / verticalScale);
+            Assert.AreEqual(collectAction, hit.Invoke(view, new object[] { actionPoint }));
+
+            MethodInfo handlePointer = viewType.GetMethod("HandlePointer", PrivateInstance);
+            Vector2 pixel = Pixel(actionPoint.x, actionPoint.y);
+            handlePointer.Invoke(view, new object[] { pixel, true, false });
+            Assert.AreEqual(collectAction, viewType.GetField("pressedAction", PrivateInstance).GetValue(view));
+            handlePointer.Invoke(view, new object[] { pixel, false, true });
+            FieldInfo shutterStarted = viewType.GetField("rewardShutterStarted", PrivateInstance);
+            Assert.GreaterOrEqual((float)shutterStarted.GetValue(view), 0f, "COBRAR starts the shutter before settlement.");
+            Assert.IsTrue((bool)Get("HasPendingChulengo"), "The normal reward stays escrowed until the shutter fully closes.");
+
+            for (int frame = 0; frame < 120 && (bool)Get("HasPendingChulengo"); frame++) yield return null;
+            Assert.IsFalse((bool)Get("HasPendingChulengo"));
+            Assert.AreEqual(balanceBeforeClaim + baseReward,
+                (long)market.GetType().GetProperty("BalanceCents", PublicInstance).GetValue(market, null));
+            for (int frame = 0; frame < 120 && (float)shutterStarted.GetValue(view) >= 0f; frame++) yield return null;
+            Assert.IsTrue((bool)viewType.GetField("levelSelectActive", PrivateInstance).GetValue(view));
+            Assert.AreEqual("Ready", Phase);
         }
 
         [UnityTest]

@@ -2,6 +2,10 @@
 
 > **HISTÓRICO:** estas entradas conservan el contexto y la decisión en su fecha; no son una especificación acumulativa vigente. Para las reglas activas, prevalecen el código/configuración y el contrato indexado en [specs/README.md](README.md).
 
+## 2026-11-13 — Separar el resultado multiplicado del cobro Chulengo
+
+`MULTIPLICAR` fija y guarda el resultado exacto sin acreditar todavía; un único `COBRAR $<importe final>` dispara la persiana, confirma el pago al cerrarse y revela el selector de niveles al abrirse. Se quitan `SIGUIENTE PARTIDO` y `NIVELES` de ese resultado. Así el texto/acción de cobro coincide con el momento en que se entrega la recompensa; la elección bloqueada y los reintentos siguen siendo durables y no rerolleables.
+
 ## 2026-10-29 — Adopt River's U opening setup for River and Boca
 
 At the user's request, set River and Boca to the River U experiment's start: $800 per attempt, one free normal Parrillero, no other free starters, ×1.00, and 340 seconds. Preserve their distinct quotas and all role/speed price curves. The isolated River U experiment produced 2/10 wins without a three-win streak; treat this as a provisional user-directed balance choice, not proven robust balance. LegacySpeed3ThenRoster_v1 remains an audit purchase policy, not shipped automation.

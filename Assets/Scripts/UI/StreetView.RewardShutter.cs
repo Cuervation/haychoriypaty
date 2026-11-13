@@ -28,9 +28,20 @@ namespace HayChoriYPaty
             float elapsed = Time.unscaledTime - rewardShutterStarted;
             if (!rewardShutterCommitted && elapsed >= RewardShutterTravel)
             {
-                // The real durable settlement remains the sole source of the reward.
+                // Commit only after the original shutter fully covers the claim screen.
                 rewardShutterCommitted = true;
-                if (game != null) game.TryCollectVictoryReward();
+                if (game == null) return;
+
+                bool claimed = !game.HasPendingChulengo ||
+                    (game.ChulengoChoiceLocked && game.ChulengoSelectedSector >= 0
+                        ? game.TryCollectSelectedVictoryReward()
+                        : game.TryCollectVictoryReward());
+                if (claimed && game.ReturnToLevels())
+                {
+                    marketActive = false;
+                    levelSelectActive = true;
+                    levelSelectScroll = 0f;
+                }
             }
             if (elapsed >= RewardShutterTravel * 2f + RewardShutterHold)
                 rewardShutterStarted = -1f;

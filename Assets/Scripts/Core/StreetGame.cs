@@ -180,7 +180,17 @@ namespace HayChoriYPaty
         public float ChulengoSelectedPosition => market?.LastResult != null && market.LastResult.chulengoHasNeedlePosition
             ? market.LastResult.chulengoNeedlePosition : (ChulengoSelectedSector + .5f) / StreetChulengo.SectorCount;
         public long ChulengoBaseRewardCents => market?.LastResult == null ? 0L : market.LastResult.chulengoBaseRewardCents;
-        public long ChulengoFinalRewardCents => market?.LastResult == null ? 0L : market.LastResult.earnedCents;
+        public long ChulengoFinalRewardCents
+        {
+            get
+            {
+                StreetMarketResult result = market?.LastResult;
+                if (result == null) return 0L;
+                if (result.chulengoPending && result.chulengoChoiceLocked)
+                    return StreetChulengo.ScaleCents(result.chulengoBaseRewardCents, result.chulengoMultiplierNumerator);
+                return result.earnedCents;
+            }
+        }
         public bool CanStartRound => !HasPendingChulengo && !resumedChulengoResult && playerActive && sim != null && sim.Phase == RoundPhase.Ready &&
             (sim.IsBonusTrack || (market != null && !market.Data.attemptActive && market.CanMeetRequiredStockWithLevelOneFloor(sim)));
 
@@ -543,6 +553,29 @@ namespace HayChoriYPaty
         }
 
         public bool TryCollectVictoryReward() => playerActive && ResolveVictoryChoice(-1);
+        /// <summary>Persists the stopped needle outcome but leaves its payout in escrow until COBRAR.</summary>
+        public bool TrySelectVictoryRewardMultiplierAtPosition(float position)
+        {
+            if (!playerActive || float.IsNaN(position) || float.IsInfinity(position) || position < 0f || position > 1f ||
+                !HasPendingChulengo || market == null || market.LastResult == null) return false;
+            StreetMarketResult receipt = market.LastResult;
+            if (receipt.chulengoChoiceLocked) return false;
+            int sector = StreetChulengo.SectorAtPosition(position);
+            if (!market.LockChulengoChoice(sector)) return false;
+            receipt.chulengoHasNeedlePosition = true;
+            receipt.chulengoNeedlePosition = position;
+            return Save(); // Persist the exact outcome before presenting its claim action.
+        }
+
+        /// <summary>Commits the already-locked multiplier outcome without allowing another spin.</summary>
+        public bool TryCollectSelectedVictoryReward()
+        {
+            StreetMarketResult receipt = market?.LastResult;
+            if (!playerActive || !HasPendingChulengo || receipt == null || !receipt.chulengoChoiceLocked || receipt.chulengoSector < 0)
+                return false;
+            return ResolveVictoryChoice(receipt.chulengoSector);
+        }
+
         public bool TryMultiplyVictoryReward(int sector)
         {
             if (!playerActive || sector < 0 || sector >= StreetChulengo.SectorCount) return false;

@@ -196,6 +196,36 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
+        public void MultiplierOutcomeRemainsEscrowedUntilItsFinalCollectAction()
+        {
+            object game = NewGame();
+            object market = Read(game, "Market");
+            Put(Read(market, "Data"), "balanceCents", 1_000_000L);
+            ForgeWonPhase(game);
+
+            long originalBalance = (long)Read(market, "BalanceCents");
+            long baseReward = (long)Read(game, "ChulengoBaseRewardCents");
+            const float x2Position = .5f;
+            Assert.IsTrue((bool)Invoke(game, "TrySelectVictoryRewardMultiplierAtPosition", x2Position));
+            Assert.IsTrue((bool)Read(game, "HasPendingChulengo"), "Stopping the needle must not pay before the player presses COBRAR.");
+            Assert.IsTrue((bool)Read(game, "ChulengoChoiceLocked"));
+            Assert.AreEqual(3, Read(game, "ChulengoSelectedSector"));
+            Assert.AreEqual(baseReward * 2L, Read(game, "ChulengoFinalRewardCents"));
+            Assert.AreEqual(originalBalance, Read(market, "BalanceCents"), "The multiplied amount stays in escrow until collection.");
+            Assert.IsNull(capturedMatch, "No finalized match/outbox record is emitted before COBRAR.");
+
+            object persistedSave = JsonUtility.FromJson(savedJson, gameType.GetNestedType("SaveData", BindingFlags.Public));
+            object persistedResult = Field(Field(persistedSave, "market"), "lastResult");
+            Assert.IsTrue(Field(persistedResult, "chulengoPending") is bool && (bool)Field(persistedResult, "chulengoPending"));
+            Assert.AreEqual(x2Position, Field(persistedResult, "chulengoNeedlePosition"));
+            Assert.IsTrue((bool)Invoke(game, "TryCollectSelectedVictoryReward"));
+            Assert.IsFalse((bool)Read(game, "HasPendingChulengo"));
+            Assert.AreEqual(originalBalance + baseReward * 2L, Read(market, "BalanceCents"));
+            Assert.IsNotNull(capturedMatch);
+            Assert.AreEqual(baseReward * 2L, Field(capturedMatch, "rewardCents"));
+        }
+
+        [Test]
         public void EachSectorFreezesExactOutcomeAndZeroLosesOnlyTurnReward()
         {
             int[] numerators = { 0, 3, 2, 4, 2, 3, 0 };
@@ -293,13 +323,17 @@ namespace HayChoriYPaty.Tests
             host = new GameObject("Chulengo latest level fixture");
             object latest = NewGame();
             object save = Field(latest, "save");
-            Put(save, "unlockedLevel", 10);
-            Assert.IsTrue((bool)Invoke(latest, "SelectLevel", 10));
+            Type simulationType = Runtime("StreetSimulation");
+            int[] campaignOrder = (int[])simulationType.GetField("CampaignOrder", StaticPublic).GetValue(null);
+            int latestCampaignLevel = (int)simulationType.GetMethod("CampaignLevelAt", StaticPublic)
+                .Invoke(null, new object[] { campaignOrder.Length - 1 });
+            ((bool[])Field(save, "unlockedLevelIds"))[latestCampaignLevel] = true;
+            Assert.IsTrue((bool)Invoke(latest, "SelectLevel", latestCampaignLevel));
             object latestData = Read(Read(latest, "Market"), "Data");
             // Test-only inventory fixture satisfies the last level's shared-recipe stock gate.
             Put(latestData, "stockUnits", new int[] { 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000 });
             ForgeWonPhase(latest);
-            Assert.AreEqual(10, Read(latest, "SelectedLevel"));
+            Assert.AreEqual(latestCampaignLevel, Read(latest, "SelectedLevel"));
             Assert.IsFalse((bool)Invoke(latest, "NextLevel"));
             Assert.IsTrue((bool)Invoke(latest, "TryCollectVictoryReward"));
         }

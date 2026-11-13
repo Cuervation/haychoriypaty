@@ -1469,13 +1469,10 @@ namespace HayChoriYPaty
             if (game.ShowChulengoResult)
             {
                 Vector2 resultPoint = new Vector2(p.x, p.y * layoutVerticalScale);
-                if (game.HasPendingChulengo && game.ChulengoChoiceLocked)
-                    return ChulengoMultiplyBounds().Contains(resultPoint) ? ChulengoMultiplyAction : 0;
-                if (game.HasPendingChulengo)
+                if (game.HasPendingChulengo && !game.ChulengoChoiceLocked)
                     return ChulengoMultiplyBounds().Contains(resultPoint) ? ChulengoMultiplyAction
                         : ChulengoCollectBounds().Contains(resultPoint) ? ChulengoCollectAction : 0;
-                return game.CanAdvanceAfterResult && VictoryExitBounds().Contains(resultPoint)
-                    ? VictoryExitAction : ChulengoLevelsBounds().Contains(resultPoint) ? ResultLevelsAction : 0;
+                return ChulengoCollectBounds().Contains(resultPoint) ? ChulengoCollectAction : 0;
             }
             if (marketActive) { p.y *= layoutVerticalScale; return HitMarketAction(p); }
             if (introActive) return 0;
@@ -1597,29 +1594,19 @@ namespace HayChoriYPaty
             }
             if (game.ShowChulengoResult)
             {
-                bool lockedRetry = game.HasPendingChulengo && game.ChulengoChoiceLocked;
-                if (game.HasPendingChulengo &&
-                    (a == ChulengoCollectAction && (!lockedRetry || game.ChulengoSelectedSector < 0) ||
-                     a == ChulengoMultiplyAction && lockedRetry && game.ChulengoSelectedSector < 0))
+                if (a == ChulengoCollectAction)
                 {
                     StartRewardShutter();
                     return;
                 }
-                bool chulengoOk = a == ChulengoMultiplyAction ? (lockedRetry
-                        ? game.ChulengoSelectedSector < 0 ? game.TryCollectVictoryReward()
-                            : game.TryMultiplyVictoryReward(game.ChulengoSelectedSector)
-                        : game.TryMultiplyVictoryRewardAtPosition(StreetChulengo.PositionAtTime(Time.unscaledTime)))
-                    : a == ChulengoCollectAction ? game.TryCollectVictoryReward()
-                    : a == VictoryExitAction && !game.HasPendingChulengo ? game.NextLevel()
-                    : a == ResultLevelsAction && !game.HasPendingChulengo ? game.ReturnToLevels() : false;
-                if (chulengoOk && a == VictoryExitAction)
+                bool selected = a == ChulengoMultiplyAction && game.HasPendingChulengo && !game.ChulengoChoiceLocked &&
+                    game.TrySelectVictoryRewardMultiplierAtPosition(StreetChulengo.PositionAtTime(Time.unscaledTime));
+                if (a == ChulengoMultiplyAction || a == ChulengoCollectAction)
                 {
-                    if (game.Sim.IsBonusTrack) game.TryStartRound();
-                    else { marketActive = true; marketFromSelector = true; marketTab = 0; marketOtherExpanded = false; marketMessage = ""; }
+                    lastAction = a;
+                    feedbackUntil = Time.unscaledTime + .22f;
+                    feedbackScale = selected || a == ChulengoCollectAction ? 1.04f : .97f;
                 }
-                if (chulengoOk && a == ResultLevelsAction) { marketActive = false; levelSelectActive = true; levelSelectScroll = 0f; }
-                if (a == ChulengoMultiplyAction || a == ChulengoCollectAction || a == VictoryExitAction || a == ResultLevelsAction)
-                { lastAction = a; feedbackUntil = Time.unscaledTime + .22f; feedbackScale = chulengoOk ? 1.04f : .97f; }
                 return;
             }
             if (introActive) return;
@@ -2511,7 +2498,9 @@ namespace HayChoriYPaty
         private Rect ChulengoCollectBounds()
         {
             Rect frame = VictoryPopupBounds(logicalCanvasHeight, true);
-            return ChulengoPendingCollectBoundsForFrame(frame, logicalCanvasHeight);
+            return game != null && game.HasPendingChulengo && !game.ChulengoChoiceLocked
+                ? ChulengoPendingCollectBoundsForFrame(frame, logicalCanvasHeight)
+                : ChulengoFinalCollectBoundsForFrame(frame);
         }
         public static Rect ChulengoCollectBoundsForFrame(Rect frame, float canvasHeight)
         {
@@ -6741,6 +6730,8 @@ namespace HayChoriYPaty
             return new Rect(collect.xMax + ChulengoPendingButtonSpacing, collect.y, collect.width, collect.height);
         }
 
+        public static Rect ChulengoFinalCollectBoundsForFrame(Rect frame) => VictorySlot(frame, VictoryExit);
+
         private static Rect VictoryPopupBounds(float canvasHeight, bool chulengo = false)
         {
             float topHudReserve = chulengo ? 224f : 110f;
@@ -7282,7 +7273,7 @@ namespace HayChoriYPaty
         private void DrawChulengoPaper(Rect frame)
         {
             // Keep the original bolt plates visible while expanding the authored parchment into the reference's reward-card hierarchy.
-            // The legacy popup has a baked green CTA at the bottom; extend the paper behind the replacement blue action to hide its exposed edge.
+            // The legacy popup has a baked green CTA at the bottom; extend the paper behind the live replacement action to hide its exposed edge.
             Rect paper = VictorySlot(frame, new Rect(.07f, .31f, .86f, .64f));
             if (chulengoParchment != null) GUI.DrawTexture(paper, chulengoParchment, ScaleMode.StretchToFill, true);
             else FillRect(paper, new Color(.98f, .89f, .68f));
@@ -7437,18 +7428,9 @@ namespace HayChoriYPaty
                         DrawStandardButton(ChulengoMultiplyBounds(), ChulengoMultiplyAction, "MULTIPLICAR",
                             true, null, null, null, chulengoMultiplyButton, ChulengoPendingButtonTextColor);
                     }
-                    else if (lockedRetry)
-                    {
-                        DrawStandardButton(ChulengoMultiplyBounds(), ChulengoMultiplyAction,
-                            sector < 0 ? "REINTENTAR COBRO" : "REINTENTAR RESULTADO");
-                    }
-                    else
-                    {
-                        bool canAdvanceChulengo = game.CanAdvanceAfterResult;
-                        DrawStandardButton(VictorySlot(frame, VictoryExit), VictoryExitAction,
-                            canAdvanceChulengo ? "SIGUIENTE PARTIDO" : "ÚLTIMO NIVEL", canAdvanceChulengo);
-                        DrawStandardButton(ChulengoLevelsBounds(), ResultLevelsAction, "NIVELES");
-                    }
+                    else DrawStandardButton(ChulengoCollectBounds(), ChulengoCollectAction,
+                        "COBRAR " + FormatChulengoMoney(game.ChulengoFinalRewardCents), true,
+                        null, null, null, chulengoCollectButton, ChulengoPendingButtonTextColor);
                     return;
                 }
                 VictoryText(VictorySlot(frame, new Rect(.095f, .149f, .81f, .189f)),
