@@ -49,3 +49,11 @@ tools/firebase/node_modules/
 /Assets/GeneratedLocalRepo/
 /Assets/GeneratedLocalRepo.meta
 /Assets/StreamingAssets.meta
+
+# Unity Test Runner / crash-recovery leftovers and local captures (never part of the game).
+/Assets/InitTestScene*.unity
+/Assets/InitTestScene*.unity.meta
+/Assets/_Recovery/
+/Assets/_Recovery.meta
+/Assets/Screenshots/
+/Assets/Screenshots.meta
