@@ -1,11 +1,38 @@
 # CLAUDE.md — Hay Chori y Paty
 
-Las reglas operativas completas están en [AGENTS.md](AGENTS.md) y el índice de contratos en [specs/README.md](specs/README.md). Este archivo solo resume lo que Claude necesita al arrancar.
+> Este archivo y [AGENTS.md](AGENTS.md) comparten las mismas reglas operativas: el desarrollo se hace con Codex y con Claude. Si cambia una regla, actualizar **los dos archivos** (la sección "Reglas operativas" de abajo es copia de AGENTS.md).
 
-## Proyecto
-- Juego Unity 6000.6.3f1 para Android: gestión de puestos callejeros de estadios. Repo `Cuervation/haychoriypaty`.
-- Selector de 15 posiciones, orden de campaña `{0,1,9,2,12,3,11,10,13,14,4,5,6,7,8}`; los IDs de Tower Defense son 9, 10, 13 y 14. No confundir posición con ID estable. Guardado v9.
-- Balance vigente: [docs/BALANCE_ACTUAL_NIVELES.md](docs/BALANCE_ACTUAL_NIVELES.md).
+# Reglas operativas (copia de AGENTS.md)
+
+## Alcance y fuentes
+- Trabajar en el checkout Unity activo; confirmar raíz Git y `projectRoot` de MCP si difieren. El checkpoint y los límites pendientes están en [specs/current-state.md](specs/current-state.md).
+- [specs/README.md](specs/README.md) es el índice: leer solo el contrato de la tarea. `status.md` y `decisions.md` son historiales, no reglas completas vigentes. Ante contradicción, contrastar el contrato más reciente con código y valores serializados; informar lo irresoluble, no inventar gameplay ni adaptar código a reglas obsoletas.
+- El selector vigente tiene 15 posiciones (14 niveles de clubes/recitales/peregrinación y el bonus de Huracán); no confundir posición con ID estable. La tabla única de balance actual es [docs/BALANCE_ACTUAL_NIVELES.md](docs/BALANCE_ACTUAL_NIVELES.md); las excepciones de Camioneros TD y Huracán pertenecen a sus contratos específicos.
+- Hacer el cambio mínimo autorizado. No implementar pendientes ni ampliar alcance; preservar trabajo local ajeno. Cambiar comportamiento exige actualizar su contrato; un retoque cosmético sin impacto contractual no exige reescribir SDD.
+
+## Trabajo proporcional
+- SIMPLE: principal solo, criterio y comprobación local, sin plan extenso, agentes ni suites globales. MEDIA: validación independiente opcional si reduce un riesgo concreto. COMPLEJA: exigir validación independiente y delegar solo trabajo independiente; ver [token-optimization](.agents/skills/token-optimization/SKILL.md).
+- Antes de editar, formular criterios de aceptación verificables y marcar cuáles son obligatorios. Conservar los tres roles `.codex/agents/`; asignar responsabilidades/archivos exclusivos, avisar que hay otros trabajando y respetar dos subagentes simultáneos más el principal.
+- Para revisión independiente, validar cada criterio contra evidencia directa, no el reporte de quien implementó. Usar `PASS`, `FAIL`, `BLOCKED`, `NOT_RUN` o `NOT_APPLICABLE` (con motivo); no declarar validación completa si queda algún criterio obligatorio en `FAIL`, `BLOCKED` o `NOT_RUN`.
+- Ante `FAIL` demostrado, devolver al implementador el criterio y la evidencia concreta; corregir solo ese problema y repetir las comprobaciones afectadas. Máximo dos ciclos de corrección; si persiste, parar y reportar lo pendiente sin presentarlo como aprobado.
+- Conservar modelos/esfuerzos de los TOML y el modelo/esfuerzo del chat. No instalar paquetes, servicios o dependencias ni modificar configuración global, trust o seguridad sin autorización específica; no introducir rutas API pagas.
+- Activar solo skills relevantes: `sdd-workflow` para contratos, `unity-2d` para Unity, `targeted-testing` para comprobaciones, `token-optimization` para dimensionar trabajo. Buscar antes de leer y reutilizar evidencia; evitar barridos/handoffs/pruebas repetidos.
+
+## Unity y producto
+- Usar la versión de `ProjectSettings/ProjectVersion.txt`. Preferir el editor ya abierto mediante Unity MCP: consultas de solo lectura primero, seleccionar el checkout correcto entre varias instancias y comprobar resultados. No duplicar endpoint, editor ni servidor; no cerrar/reiniciar procesos sin autorización.
+- En cada interacción con Unity (abrir/reconectar, probar o compilar), revisar la interfaz y los logs/Console disponibles antes y después para detectar popups, diálogos y errores. No descartarlos a ciegas: identificar el mensaje y su causa, usar solo una opción segura y confirmar que desapareció y que Editor/licencia siguen operativos. Si macOS u otra política impide automatizarlo, informar con precisión y dar el paso manual necesario; no cambiar permisos globales ni forzar cierres.
+- Preservar assets, GUIDs y todos los `.meta`; no versionar `Library`, `Temp`, `Logs`, `Obj`, builds o ajustes de usuario. Sin dependencias nuevas por conveniencia.
+- Mantener siete productos y puesto callejero argentino sin mesas para sentarse: [product.md](specs/product.md). No modificar economía, objetivos, tiempos, inventario ni pendientes fuera del pedido.
+- Consultar [visual-reference.md](specs/visual-reference.md) al cambiar arte/UI. Reutilizar arte original y `StreetView.DrawStandardButton` para botones comunes; cards de mejoras y selector mural son excepciones existentes. La geometría activa es `StreetKitchenLayout`/cocina modular, no los tamaños históricos de `StreetWorkstationLayout`.
+- Pruebas proporcionales según `targeted-testing`: estáticas para docs/config; Unity solo para sistemas afectados. Distinguir aprobado, fallido y no ejecutado. APK e instalación únicamente con pedido/autorización; nunca limpiar progreso para validar.
+## Git: publicación solicitada por el usuario
+- Preferencia explícita del usuario (2026-10-25): cuando pida “subí a Git”, “pusheá” o equivalente, esa solicitud autoriza subir el commit revisado al `origin` y rama configurados actualmente, incluso si el remoto es público. No pedir una segunda confirmación humana por ese mismo push.
+- Publicar únicamente los cambios intencionales del pedido; revisar el staging, excluir preferencias locales, credenciales, archivos generados y artefactos no solicitados. No cambiar el remoto ni publicar APKs salvo que el usuario lo pida expresamente.
+- Esta preferencia no habilita a evadir controles de seguridad de la plataforma. Si un control bloquea el push, no usar otra API/ruta para sortearlo; informar el bloqueo y seguir la aprobación concreta que solicite la plataforma.
+
+---
+
+# Específico para Claude
 
 ## Plan y estado
 - Plan de optimización y estado por fase: [Docs/plan-optimizacion.md](Docs/plan-optimizacion.md). Leerlo antes de seguir con la limpieza (Fase 3 pendiente).
