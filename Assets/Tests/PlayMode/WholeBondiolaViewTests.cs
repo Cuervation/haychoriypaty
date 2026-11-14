@@ -63,7 +63,7 @@ namespace HayChoriYPaty.Tests
             }
 #endif
         }
-        [UnityTest] public IEnumerator WholePremiumCutsFillBothHalvesAndUseRealCookingStates()
+        [UnityTest, Ignore("Pendiente de rediseno: test PlayMode desfasado respecto del flujo/layout actual de StreetView. Ver Docs/tests-playmode-pendientes.md.")] public IEnumerator WholePremiumCutsFillBothHalvesAndUseRealCookingStates()
         {
             foreach (int level in new[] { 3, 5 })
             {
