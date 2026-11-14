@@ -50,7 +50,7 @@ namespace HayChoriYPaty
         private void Play()
         {
             if (deliveryClip == null) deliveryClip = Resources.Load<AudioClip>(ClipResourcePath);
-            if (deliveryClip == null) return;
+            if (deliveryClip == null || audioSource == null) return;
 
             audioSource.pitch = Random.Range(1f - pitchVariation, 1f + pitchVariation);
             audioSource.PlayOneShot(deliveryClip, Mathf.Clamp01(volume));

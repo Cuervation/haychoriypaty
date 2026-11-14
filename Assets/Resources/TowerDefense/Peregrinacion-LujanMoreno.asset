@@ -59,7 +59,7 @@ MonoBehaviour:
   - 5
   - 6
   totalFanCount: 60
-  fanSpeed: 0.035
+  fanSpeed: 0.0525
   minimumEntrySpacingLogical: 96
   serviceRange: 0.8
   firstWorkZoneOffset: {x: 0, y: 0}

@@ -439,6 +439,7 @@ namespace HayChoriYPaty
 
         private void DeliverFreeConstructionOrders()
         {
+            UpdateFreeConstructionFanInterceptions();
             for (int f = 0; f < serviceOrder.Count; f++)
             {
                 TowerDefenseFanState fan = serviceOrder[f];
@@ -449,7 +450,7 @@ namespace HayChoriYPaty
                     if (order.Remaining <= 0) continue;
                     StreetWorkerRole role = GetDeliveryRole(order.Product);
                     if (order.Product < 4 && Kitchen.AvailableTableCount(order.Product) <= 0) continue;
-                    TowerDefenseWorkerState worker = FindWorkerForFreeService(role);
+                    TowerDefenseWorkerState worker = FindWorkerForFreeService(role, fan, order.Product);
                     if (worker == null || !HasStationForRole(role)) continue;
                     if (order.Product < 4 && Kitchen.ReserveTableUnit(order.Product, worker.Id) == null) continue;
                     worker.PendingFanId = fan.Id; worker.PendingProduct = order.Product; worker.ServiceStage = 1;
@@ -460,14 +461,110 @@ namespace HayChoriYPaty
             }
         }
 
-        private TowerDefenseWorkerState FindWorkerForFreeService(StreetWorkerRole role)
+        private void UpdateFreeConstructionFanInterceptions()
         {
+            float workerSpeed = Mathf.Max(.001f, sourceBalance.workerSpeed * worldUnitsPerLogicalPixel);
             for (int i = 0; i < workers.Count; i++)
             {
                 TowerDefenseWorkerState worker = workers[i];
-                if (worker.Role == role && !worker.IsMoving && worker.ServiceStage == 0 && worker.DeliveryCooldownSeconds <= 0f) return worker;
+                if (worker.ServiceStage != 2 || worker.ServiceUnitId <= 0) continue;
+                TowerDefenseFanState fan = FindFan(worker.PendingFanId);
+                float timeToExit = fan == null || fan.RouteFollower.Speed <= .0001f
+                    ? 0f : (fan.RouteFollower.TotalDistance - fan.RouteFollower.Progress) / fan.RouteFollower.Speed;
+                if (fan == null || fan.OrderComplete || fan.RouteFollower.HasExited || timeToExit <= 0f)
+                {
+                    ReleaseFreeService(worker, fan);
+                    continue;
+                }
+
+                float eta = RemainingWorkerPathDistance(worker) / workerSpeed;
+                if (eta + .12f >= timeToExit)
+                {
+                    ReleaseFreeService(worker, fan);
+                    continue;
+                }
+
+                Vector2 target = GetPredictedFanServiceAnchor(fan, eta);
+                Vector2 previousTarget = worker.IsMoving && worker.TransferRoute.Length > 0
+                    ? worker.TransferRoute[worker.TransferRoute.Length - 1] : worker.Position;
+                if (Vector2.Distance(previousTarget, target) < 4f * worldUnitsPerLogicalPixel) continue;
+                if (!TryBuildWorkerPath(worker, worker.Position, target, Rect.zero, out Vector2[] path))
+                {
+                    ReleaseFreeService(worker, fan);
+                    continue;
+                }
+                worker.TransferRoute = path;
+                worker.TransferIndex = 0;
+                worker.IsMoving = path.Length > 0;
+                worker.TargetZone = 0;
             }
-            return null;
+        }
+
+        private float RemainingWorkerPathDistance(TowerDefenseWorkerState worker)
+        {
+            float distance = 0f;
+            Vector2 from = worker.Position;
+            for (int i = worker.TransferIndex; i < worker.TransferRoute.Length; i++)
+            {
+                distance += Vector2.Distance(from, worker.TransferRoute[i]);
+                from = worker.TransferRoute[i];
+            }
+            return distance;
+        }
+
+        private static float PathDistance(Vector2 start, Vector2[] path)
+        {
+            float distance = 0f;
+            Vector2 from = start;
+            for (int i = 0; i < path.Length; i++)
+            {
+                distance += Vector2.Distance(from, path[i]);
+                from = path[i];
+            }
+            return distance;
+        }
+
+        private TowerDefenseWorkerState FindWorkerForFreeService(StreetWorkerRole role, TowerDefenseFanState fan, int product)
+        {
+            TowerDefensePlacedStation station = FindPlacedStation(StationForProduct(product));
+            if (station == null) return null;
+            float workerSpeed = Mathf.Max(.001f, sourceBalance.workerSpeed * worldUnitsPerLogicalPixel);
+            float fanSpeed = fan.RouteFollower.Speed;
+            float timeToExit = fanSpeed <= .0001f ? 0f :
+                (fan.RouteFollower.TotalDistance - fan.RouteFollower.Progress) / fanSpeed;
+            TowerDefenseWorkerState best = null;
+            float bestEta = float.PositiveInfinity;
+            for (int i = 0; i < workers.Count; i++)
+            {
+                TowerDefenseWorkerState worker = workers[i];
+                if (worker.Role != role || worker.IsMoving || worker.ServiceStage != 0 || worker.DeliveryCooldownSeconds > 0f) continue;
+                if (!TryEstimateFreeServiceEta(worker, station, fan, workerSpeed, timeToExit, out float eta) || eta >= bestEta) continue;
+                best = worker;
+                bestEta = eta;
+            }
+            return best;
+        }
+
+        private bool TryEstimateFreeServiceEta(TowerDefenseWorkerState worker, TowerDefensePlacedStation station,
+            TowerDefenseFanState fan, float workerSpeed, float timeToExit, out float eta)
+        {
+            eta = float.PositiveInfinity;
+            if (!TryBuildWorkerPath(worker, worker.Position, station.WorkPosition, Rect.zero, out Vector2[] pickupPath)) return false;
+            float pickupEta = PathDistance(worker.Position, pickupPath) / workerSpeed;
+            Vector2 target = GetFanServiceAnchor(fan);
+            float deliveryEta = 0f;
+            for (int attempt = 0; attempt < 3; attempt++)
+            {
+                if (!TryBuildWorkerPath(worker, station.WorkPosition, target, Rect.zero, out Vector2[] deliveryPath)) return false;
+                deliveryEta = PathDistance(station.WorkPosition, deliveryPath) / workerSpeed;
+                eta = pickupEta + deliveryEta;
+                if (eta + .12f >= timeToExit) return false;
+                target = GetPredictedFanServiceAnchor(fan, eta);
+            }
+            if (!TryBuildWorkerPath(worker, station.WorkPosition, target, Rect.zero, out Vector2[] finalPath)) return false;
+            deliveryEta = PathDistance(station.WorkPosition, finalPath) / workerSpeed;
+            eta = pickupEta + deliveryEta;
+            return eta + .12f < timeToExit;
         }
 
         private bool QueueWorkerToPickup(TowerDefenseWorkerState worker)
@@ -501,9 +598,9 @@ namespace HayChoriYPaty
                 else unit = Kitchen.TryTake(worker.PendingProduct, worker.Role, worker.Id);
                 if (unit == null) { worker.ServiceStage = 3; return; }
                 worker.ServiceUnitId = unit.Id; worker.ServiceStage = 2;
-                if (!TryBuildWorkerPath(worker, worker.Position, GetFanServiceAnchor(fan), Rect.zero, out Vector2[] path))
+                if (!TryBuildFreeConstructionInterceptPath(worker, fan, out Vector2[] path))
                 {
-                    Kitchen.ReturnCarried(unit.Id, worker.Id); ReleaseFreeService(worker, fan); return;
+                    ReleaseFreeService(worker, fan); return;
                 }
                 worker.TransferRoute = path; worker.TransferIndex = 0; worker.IsMoving = path.Length > 0;
                 if (!worker.IsMoving) CompleteFreeConstructionDelivery(worker);
@@ -516,19 +613,21 @@ namespace HayChoriYPaty
         {
             TowerDefenseFanState fan = FindFan(worker.PendingFanId);
             int product = worker.PendingProduct, unitId = worker.ServiceUnitId;
-            if (fan != null && Mathf.Abs(worker.Position.y - GetFanServiceAnchor(fan).y) > 2f * worldUnitsPerLogicalPixel)
-            { QueueFreeWorkerPath(worker,GetFanServiceAnchor(fan)); return; }
+            if (fan == null || fan.RouteFollower.HasExited)
+            { ReleaseFreeService(worker, fan); return; }
+            if (Mathf.Abs(worker.Position.y - GetFanServiceAnchor(fan).y) > 2f * worldUnitsPerLogicalPixel)
+            { TryQueueFreeConstructionIntercept(worker, fan); return; }
             if (fan != null && !fan.RouteFollower.HasExited &&
                 Mathf.Abs(worker.Position.x - fan.RouteFollower.Position.x) > 64f * worldUnitsPerLogicalPixel)
             {
-                QueueFreeWorkerPath(worker, GetFanServiceAnchor(fan));
+                TryQueueFreeConstructionIntercept(worker, fan);
                 return;
             }
             if (fan == null || !fan.NeedsProduct(product) || !Kitchen.Consume(unitId, product, worker.Id))
             {
-                if (unitId > 0) Kitchen.ReturnCarried(unitId, worker.Id);
                 ReleaseFreeService(worker, fan); return;
             }
+            worker.ServiceUnitId = 0;
             if (fan.RecordDelivery(product))
             {
                 if (!fan.HasReceivedDelivery) { fan.HasReceivedDelivery = true; if (customersAttended < int.MaxValue) customersAttended++; }
@@ -549,8 +648,10 @@ namespace HayChoriYPaty
         private void ReleaseFreeService(TowerDefenseWorkerState worker, TowerDefenseFanState fan)
         {
             if (fan != null && fan.ReservedByWorker == worker.Id) fan.ReservedByWorker = 0;
+            if (worker.ServiceUnitId > 0) Kitchen.ReturnCarried(worker.ServiceUnitId, worker.Id);
             Kitchen.ReleaseTableReservation(worker.Id);
             worker.PendingFanId = 0; worker.PendingProduct = -1; worker.ServiceStage = 0; worker.ServiceUnitId = 0;
+            worker.TransferRoute = Array.Empty<Vector2>(); worker.TransferIndex = 0; worker.IsMoving = false;
         }
 
         private TowerDefenseFanState FindFan(int id)
@@ -558,10 +659,63 @@ namespace HayChoriYPaty
 
         private Vector2 GetFanServiceAnchor(TowerDefenseFanState fan)
         {
+            return GetFanServiceAnchor(fan.RouteFollower.Position);
+        }
+
+        private Vector2 GetFanServiceAnchor(Vector2 fanPosition)
+        {
             float pixel = worldUnitsPerLogicalPixel;
             float y = routeGeometry.RightBoundary[0].y - (ConstructionWorkerHeightLogical * (1f - WorkerVisualPivotY) + 8f) * pixel;
             float half = CocacoleroVisualWidthLogical * .5f * pixel;
-            return new Vector2(Mathf.Clamp(fan.RouteFollower.Position.x, WorkBounds.xMin + half, WorkBounds.xMax - half), y);
+            return new Vector2(Mathf.Clamp(fanPosition.x, WorkBounds.xMin + half, WorkBounds.xMax - half), y);
+        }
+
+        private Vector2 GetPredictedFanServiceAnchor(TowerDefenseFanState fan, float secondsAhead)
+        {
+            float speed = fan.RouteFollower.Speed;
+            float timeToExit = speed <= .0001f ? 0f :
+                Mathf.Max(0f, fan.RouteFollower.TotalDistance - fan.RouteFollower.Progress) / speed;
+            float predictionTime = Mathf.Clamp(secondsAhead, 0f, timeToExit);
+            Vector2 predictedPosition = fan.RouteFollower.Position +
+                fan.RouteFollower.Facing * (speed * predictionTime);
+            return GetFanServiceAnchor(predictedPosition);
+        }
+
+        private bool TryBuildFreeConstructionInterceptPath(TowerDefenseWorkerState worker, TowerDefenseFanState fan,
+            out Vector2[] path)
+        {
+            path = Array.Empty<Vector2>();
+            float workerSpeed = Mathf.Max(.001f, sourceBalance.workerSpeed * worldUnitsPerLogicalPixel);
+            float fanSpeed = fan.RouteFollower.Speed;
+            if (fanSpeed <= .0001f) return false;
+            Vector2 target = GetFanServiceAnchor(fan);
+            for (int attempt = 0; attempt < 3; attempt++)
+            {
+                if (!TryBuildWorkerPath(worker, worker.Position, target, Rect.zero, out path)) return false;
+                float eta = PathDistance(worker.Position, path) / workerSpeed;
+                float timeToExit = (fan.RouteFollower.TotalDistance - fan.RouteFollower.Progress) / fanSpeed;
+                if (eta + .12f >= timeToExit) return false;
+                target = GetPredictedFanServiceAnchor(fan, eta);
+            }
+            if (!TryBuildWorkerPath(worker, worker.Position, target, Rect.zero, out path)) return false;
+            float finalEta = PathDistance(worker.Position, path) / workerSpeed;
+            float finalTimeToExit = (fan.RouteFollower.TotalDistance - fan.RouteFollower.Progress) / fanSpeed;
+            return finalEta + .12f < finalTimeToExit;
+        }
+
+        private bool TryQueueFreeConstructionIntercept(TowerDefenseWorkerState worker, TowerDefenseFanState fan)
+        {
+            if (!TryBuildFreeConstructionInterceptPath(worker, fan, out Vector2[] path))
+            {
+                ReleaseFreeService(worker, fan);
+                return false;
+            }
+            worker.TransferRoute = path;
+            worker.TransferIndex = 0;
+            worker.IsMoving = path.Length > 0;
+            worker.TargetZone = 0;
+            if (!worker.IsMoving) CompleteFreeConstructionDelivery(worker);
+            return true;
         }
 
         private static TowerDefenseStationKind StationForProduct(int product)

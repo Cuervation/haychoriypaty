@@ -2,6 +2,18 @@
 
 > **HISTÓRICO:** este archivo registra el estado en la fecha de cada entrada. Una entrada marcada PASS no valida el runtime actual ni reemplaza el contrato vigente. Consultar [current-state](current-state.md), [índice SDD](README.md) y la [tabla maestra](../docs/BALANCE_ACTUAL_NIVELES.md).
 
+## 2026-11-13 — Luján: velocidad de peregrinos +50%
+
+A pedido del usuario, Peregrinación ID14 sube su `fanSpeed` serializado de `.035` a `.0525` (+50%; base300: 10.5→15.75 px lógicos/s). Se modificó solo esa velocidad: quedan iguales los 96 px de separación, los 9 s de intervalo de entrada, cantidad de peregrinos, demanda, caja y precios. Se añadió una aserción a `PeregrinacionThemeAndConfigOwnTheirIdentityAndSevenProducts`.
+
+**Validación:** `git diff --check` y revisión estática de valor/config **PASS**. La prueba EditMode y el balance natural con `.0525` **NOT_RUN**: Unity estaba abierto pero la inspección de su ventana expiró (`getApp` timeout); no se abrió una segunda instancia. La ganabilidad con el valor nuevo no está certificada; [contrato](features/peregrinacion-lujan.md).
+
+## 2026-11-13 — Luján: entrega dirigida a peregrinos móviles
+
+ID14 conserva prioridad de pedidos por progreso del peregrino y desempate por ID. Para productos de Mozo, Cocacolero y Fernetero, el despacho ahora calcula cuál worker compatible llega antes desde su posición pasando por la estación y predice la intercepción según movimiento horizontal del follower; durante el tramo con unidad cargada actualiza el destino y cancela limpiando la reserva, la ruta y devolviendo el producto aún no consumido. Acotado a `TowerDefenseGameMode.Peregrinacion.cs`; se añadió `LujanServiceTargetPredictsTheMovingPilgrimIntercept`.
+
+**Validación:** revisión estática independiente de roles/prioridad/cleanup y `git diff --check` **PASS**. Unity MCP no respondió al ping; el test focalizado no llegó a inicializarse/ejecutarse, sin resultado de compilación ni consola. Entregas reales, selección/ETA en runtime y retorno de stock **NOT_RUN**; PL5/PL6 permanecen sin aprobar. No se modificó el motor compartido, niveles 9/10/13 ni la velocidad/configuración. [Contrato](features/peregrinacion-lujan.md).
+
 ## 2026-11-13 — APK del humo Chulengo publicada
 
 Se publicó el commit `dab10dd` (`Implement Chulengo smoke claim transition`) a `origin/codex/street-automation`, con solo los 13 archivos intencionales de runtime, tests y contrato; se dejaron fuera `.meta`, preferencias de `ProjectSettings`, escenas/capturas temporales y auditorías locales.
