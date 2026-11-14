@@ -30,10 +30,8 @@ public sealed class FirebaseAndroidBuildGuard : IPreprocessBuildWithReport, IPro
     {
         string[] paths = {
             "Assets/Scripts/Core/StreetGame.cs", "Assets/Scripts/UI/StreetView.cs",
-            "Assets/Scripts/UI/StreetKitchenRenderer.cs", "Assets/Scripts/Core/GameController.cs",
-            "Assets/Scripts/UI/PrototypeView.cs" };
-        System.Type[] expected = { typeof(StreetGame), typeof(StreetView), typeof(StreetKitchenRenderer),
-            typeof(GameController), typeof(PrototypeView) };
+            "Assets/Scripts/UI/StreetKitchenRenderer.cs" };
+        System.Type[] expected = { typeof(StreetGame), typeof(StreetView), typeof(StreetKitchenRenderer) };
         for (int i = 0; i < paths.Length; i++)
         {
             var script = AssetDatabase.LoadAssetAtPath<MonoScript>(paths[i]);

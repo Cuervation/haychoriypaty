@@ -25,7 +25,6 @@
 | APK/instalaciones y comprobaciones de entrega | [android-prototype.md](features/android-prototype.md) (consultar encabezado reciente) |
 | Evidencia histórica de avances y pruebas | [status.md](status.md) (buscar fecha/sistema) |
 | Decisiones históricas y reemplazos | [decisions.md](decisions.md) (buscar tema/fecha) |
-| Primer prototipo, no runtime actual | [floresta-prototype.md](features/floresta-prototype.md) |
 | Continuidad histórica completa hasta 2026-10-25 (no vigente) | [history/continuity-log-through-20261025.md](history/continuity-log-through-20261025.md) |
 | Snapshot anterior de `current-state.md` (histórico; no usar para reglas) | [history/current-state-snapshot-through-20261106.md](history/current-state-snapshot-through-20261106.md) |
 | Checkpoint anterior completo, solo antecedentes | [history/continuity-before-20261015-audit.md](history/continuity-before-20261015-audit.md) |

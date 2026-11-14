@@ -441,13 +441,11 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 990010002}
-  - component: {fileID: 990010003}
-  - component: {fileID: 990010004}
   - component: {fileID: 990010006}
   - component: {fileID: 990010005}
   - component: {fileID: 990010007}
   m_Layer: 0
-  m_Name: Floresta Round Controller
+  m_Name: Street Game
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -468,51 +466,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &990010003
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 990010001}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: be491e99de2f48edad0bd81d3579b17c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  balance:
-    roundDurationSeconds: 150
-    customersToWin: 12
-    arrivalIntervalSeconds: 5.2
-    customerPatienceSeconds: 46
-    crowdPressurePerSecond: 0.06
-    crowdDeparturePenalty: 15
-    startingCrowdPatience: 100
-    startingCoins: 16
-    hireCost: 30
-    speedUpgradeCost: 24
-    coinsPerOrder: 18
-    grillCapacity: 1
-    maxQueueCapacity: 6
-    choriCookSeconds: 8
-    condimentSeconds: 1.4
-    handoffSeconds: 1.1
-    helperCookBonus: 0.35
-    speedUpgradeCookBonus: 0.2
-    speedUpgradeHandoffBonus: 0.45
-    maxSpeedUpgrades: 3
---- !u!114 &990010004
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 990010001}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 91c6b60955134cc1b0e59c9a1e33d416, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!114 &990010005
 MonoBehaviour:
   m_ObjectHideFlags: 0
