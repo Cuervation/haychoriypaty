@@ -2547,8 +2547,8 @@ namespace HayChoriYPaty
             string message = game != null && game.Sim != null && StreetSimulation.IsTowerDefenseLevel(game.Sim.LevelIndex)
                 ? "Un hincha llegó a la salida sin su pedido." : "Los hinchas se cansaron de esperar......";
             int fontSize = FitStandardButtonFontSize(menuTitle, message, bounds);
-            GUIStyle caption = CreateStandardButtonLabelStyle(menuTitle, fontSize, Color.white);
-            GUIStyle outline = CreateStandardButtonLabelStyle(menuTitle, fontSize, new Color(.035f, .075f, .16f));
+            GUIStyle caption = CachedStandardButtonLabelStyle(menuTitle, fontSize, Color.white);
+            GUIStyle outline = CachedStandardButtonLabelStyle(menuTitle, fontSize, new Color(.035f, .075f, .16f));
             float stroke = 2.2f * fontSize / 38f;
             Rect letters = new Rect(bounds.x, bounds.y - 2f * bounds.height / 92f,
                 bounds.width, bounds.height - 8f * bounds.height / 92f);
@@ -4987,7 +4987,7 @@ namespace HayChoriYPaty
                 float iconInset = googleMark != null ? drawn.height * .64f : 0f;
                 Rect fitBounds = new Rect(0f, 0f, Mathf.Max(1f, bounds.width - iconInset * 2f), bounds.height);
                 int fontSize = FitStandardButtonFontSize(menuTitle, caption, fitBounds);
-                var label = CreateStandardButtonLabelStyle(menuTitle, fontSize,
+                var label = CachedStandardButtonLabelStyle(menuTitle, fontSize,
                     interactive ? new Color(.06f, .06f, .06f) : new Color(.46f, .46f, .46f));
                 float textScale = bounds.height / 92f;
                 Rect letters = new Rect(drawn.x + iconInset, drawn.y - 2f * textScale,
@@ -5074,8 +5074,8 @@ namespace HayChoriYPaty
                 int fontSize = FitStandardButtonFontSize(menuTitle, caption, fitBounds, fontScale);
                 Color captionColor = textColorOverride ?? (interactive ? Color.white : new Color(.80f, .87f, .94f));
                 Color borderColor = textColorOverride ?? new Color(.035f, .075f, .16f);
-                var captionStyle = CreateStandardButtonLabelStyle(menuTitle, fontSize, captionColor);
-                var borderStyle = CreateStandardButtonLabelStyle(menuTitle, fontSize, borderColor);
+                var captionStyle = CachedStandardButtonLabelStyle(menuTitle, fontSize, captionColor);
+                var borderStyle = CachedStandardButtonLabelStyle(menuTitle, fontSize, borderColor);
                 float textScale = bounds.height / 92f;
                 Rect letters = new Rect(drawn.x + iconInset, drawn.y - 2f * textScale,
                     drawn.width - iconInset * 2f, drawn.height - 8f * textScale);
@@ -5117,6 +5117,23 @@ namespace HayChoriYPaty
         private static Color StandardButtonTint(bool enabled, bool pressed) =>
             !enabled ? new Color(.50f, .62f, .75f) : pressed ? new Color(.78f, .88f, 1f) : Color.white;
 
+        private const int StandardButtonCacheLimit = 256;
+        private static readonly System.Collections.Generic.Dictionary<(GUIStyle, int, Color), GUIStyle> standardButtonLabelStyleCache =
+            new System.Collections.Generic.Dictionary<(GUIStyle, int, Color), GUIStyle>();
+        private static readonly System.Collections.Generic.Dictionary<(GUIStyle, string, float, float, float), int> standardButtonFontSizeCache =
+            new System.Collections.Generic.Dictionary<(GUIStyle, string, float, float, float), int>();
+
+        // Shared read-only label style for per-frame button text; callers must not mutate it.
+        private static GUIStyle CachedStandardButtonLabelStyle(GUIStyle source, int fontSize, Color color)
+        {
+            var key = (source, fontSize, color);
+            if (standardButtonLabelStyleCache.TryGetValue(key, out GUIStyle cached) && cached != null) return cached;
+            if (standardButtonLabelStyleCache.Count >= StandardButtonCacheLimit) standardButtonLabelStyleCache.Clear();
+            GUIStyle created = CreateStandardButtonLabelStyle(source, fontSize, color);
+            standardButtonLabelStyleCache[key] = created;
+            return created;
+        }
+
         private static GUIStyle CreateStandardButtonLabelStyle(GUIStyle source, int fontSize, Color color)
         {
             var style = new GUIStyle(source) { fontSize = fontSize };
@@ -5126,6 +5143,16 @@ namespace HayChoriYPaty
         }
 
         private static int FitStandardButtonFontSize(GUIStyle style, string caption, Rect bounds, float fontScale = 1f)
+        {
+            var key = (style, caption, bounds.width, bounds.height, fontScale);
+            if (standardButtonFontSizeCache.TryGetValue(key, out int cachedSize)) return cachedSize;
+            if (standardButtonFontSizeCache.Count >= StandardButtonCacheLimit) standardButtonFontSizeCache.Clear();
+            int fitted = FitStandardButtonFontSizeUncached(style, caption, bounds, fontScale);
+            standardButtonFontSizeCache[key] = fitted;
+            return fitted;
+        }
+
+        private static int FitStandardButtonFontSizeUncached(GUIStyle style, string caption, Rect bounds, float fontScale)
         {
             int original = style.fontSize;
             int preferred = Mathf.Max(11, Mathf.RoundToInt(38f * bounds.height / 92f * Mathf.Max(1f, fontScale)));
