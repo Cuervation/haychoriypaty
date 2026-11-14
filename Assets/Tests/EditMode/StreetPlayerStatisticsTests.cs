@@ -425,6 +425,7 @@ namespace HayChoriYPaty.Tests
             {
                 SetEditorTestInitialization(gameType, false);
                 object seed = Activator.CreateInstance(saveDataType);
+                ((bool[])ReadField(seed, "unlockedLevelIds"))[0] = true; // a raw SaveData must still carry the campaign's first unlock
                 object stats = ReadField(seed, "statistics");
                 long[] expected = { 499L, 500L, 2499L, 2500L, 4999L, 5000L, 16000L };
                 WriteField(stats, "deliveredByProduct", expected);
@@ -502,7 +503,7 @@ namespace HayChoriYPaty.Tests
                 string written = null;
                 Assert.IsTrue(Activate(game, null, (json, match) => { written = json; return true; }));
                 Assert.IsTrue((bool)ReadProperty(game, "IsPlayerActive"));
-                StringAssert.Contains("\"version\":7", written);
+                StringAssert.Contains("\"version\":9", written);
                 Assert.IsTrue((bool)Invoke(game, "SuspendPlayer"));
                 Assert.IsFalse((bool)ReadProperty(game, "IsPlayerActive"));
                 Assert.IsNull(ReadProperty(game, "Sim"));

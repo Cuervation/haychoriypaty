@@ -42,7 +42,7 @@ namespace HayChoriYPaty.Tests
             for (int seed = 0; seed < Seeds.Length; seed++)
             {
                 int caseIndex = profile * Seeds.Length + seed;
-                int level = caseIndex % 11;
+                int level = caseIndex % 9; // ids 9/10 are Tower Defense now
                 int carryPercent = (profile % 5) * 20;
                 yield return new TestCaseData(level, purchase, staff, cadence, seed, carryPercent)
                     .SetName("L" + (level + 1).ToString("00") + "_" + PurchasePlans[purchase] + "_" + StaffPlans[staff] +
@@ -217,7 +217,7 @@ namespace HayChoriYPaty.Tests
             for (int slot = 0; slot < (int)Get(sim, "ProductCount"); slot++)
             {
                 int product = (int)Call(sim, "GetAvailableProduct", slot);
-                if ((activeCooks && product < 4) || (levelIndex == 2 && product < 4) || product == 4 || product == 6)
+                if ((activeCooks && product < 4) || (levelIndex == 2 && product < 4) || product == 4 || product == 5 || product == 6)
                     continue; // Active/Vélez sandwiches and inexhaustible barrels bypass Market ingredients.
                 int goal = (int)Call(sim, "GetProductGoal", product);
                 int actual = (int)Call(sim, "GetProductDelivered", product);

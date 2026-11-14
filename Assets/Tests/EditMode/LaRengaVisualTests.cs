@@ -27,7 +27,7 @@ namespace HayChoriYPaty.Tests
             Texture2D mural = Resources.Load<Texture2D>((string)Get(theme, "MuralResource"));
             Assert.NotNull(mural); Assert.That(mural.width / (float)mural.height, Is.EqualTo(3f).Within(.02f));
             string[] crests = (string[])T("StreetView").GetField("LevelCrestResourceNames", S).GetValue(null);
-            Assert.AreEqual(14, crests.Length); Assert.AreEqual("street-larenga-crest-v1", crests[13]);
+            Assert.AreEqual(15, crests.Length); Assert.AreEqual("street-larenga-crest-v1", crests[13]);
             Assert.NotNull(Resources.Load<Texture2D>(crests[13]));
             object fans = Fans(13);
             Assert.AreEqual(12, Get(fans, "VariantCount")); Assert.AreEqual(2, Get(fans, "WalkingPoseCount"));

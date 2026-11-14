@@ -156,7 +156,7 @@ namespace HayChoriYPaty.Tests
             Assert.IsTrue((bool)Invoke(game, "TryStartTowerDefenseRound"));
             object sim = ReadProperty(game, "Sim");
             int[] deliveries = new int[7]; deliveries[0] = 1;
-            int[] workers = (int[])Get(sim, "WorkerCountsByRole");
+            int[] workers = (int[])ReadProperty(sim, "WorkerCountsByRole");
             Assert.IsTrue((bool)InvokeAny(sim, "ImportTowerDefenseState", 240f, 600, 250, 1, workers,
                 deliveries, 8, 7, true, true));
             Assert.IsTrue((bool)Invoke(game, "ProcessRoundResult"));

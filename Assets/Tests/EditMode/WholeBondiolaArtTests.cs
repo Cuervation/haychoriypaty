@@ -82,7 +82,7 @@ namespace HayChoriYPaty.Tests
                 .Invoke(null, new object[] { product, Enum.Parse(foodState, state) }));
         }
 
-        [TestCase(3)] [TestCase(4)] [TestCase(5)] [TestCase(10)]
+        [TestCase(3)] [TestCase(4)] [TestCase(5)] [TestCase(8)]
         public void SixWholeBondiolasFillTheirGrillAreaWithoutTouchingVacio(int level)
         {
             Type st = Type.GetType("HayChoriYPaty.StreetSimulation, Assembly-CSharp", true);
@@ -206,7 +206,7 @@ namespace HayChoriYPaty.Tests
             finally { UnityEngine.Object.DestroyImmediate(root); }
         }
 
-        [TestCase(5)] [TestCase(10)]
+        [TestCase(5)] [TestCase(8)]
         public void FourWholeVaciosFillTheRightHalfInTwoColumnsAndTwoRows(int level)
         {
             Type st = Type.GetType("HayChoriYPaty.StreetSimulation, Assembly-CSharp", true);

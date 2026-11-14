@@ -55,8 +55,8 @@ namespace HayChoriYPaty.Tests
             object balance = NewBalance();
             string[] ids = (string[])TypeOf("StreetBalance").GetField("levelProductIds", PublicInstance).GetValue(balance);
             ids[0] = "0,3,5";
-            ids[10] = "0,3,5";
-            foreach (int level in new[] { 0, 10 })
+            ids[8] = "0,3,5"; // ids 9/10 are Tower Defense now; Boca (8) is the last traditional level
+            foreach (int level in new[] { 0, 8 })
             {
                 object synthetic = Make(level, balance: balance);
                 Assert.IsTrue(Has(synthetic, "Parrillero"));
@@ -210,7 +210,7 @@ namespace HayChoriYPaty.Tests
         {
             object balance = NewBalance();
             Set(balance, "maxCustomers", 1);
-            object sim = Make(10, balance: balance);
+            object sim = Make(8, balance: balance);
             Call(sim, "StartRound");
             SetProperty(sim, "Coins", 10000);
             Call(sim, "TryHire", Role("Cocacolero"));
@@ -251,7 +251,7 @@ namespace HayChoriYPaty.Tests
                 saveType.GetField("parrilleros").SetValue(save, 3);
                 saveType.GetField("cocacoleros").SetValue(save, 2);
                 object migrated = migrate.Invoke(null, new[] { save });
-                Assert.AreEqual(4, saveType.GetField("version").GetValue(migrated));
+                Assert.AreEqual(9, saveType.GetField("version").GetValue(migrated));
                 Assert.AreEqual(7, saveType.GetField("unlockedLevel").GetValue(migrated));
                 Assert.AreEqual(0, saveType.GetField("premiumParrilleros").GetValue(migrated));
                 Assert.AreEqual(0, saveType.GetField("ferneteros").GetValue(migrated));

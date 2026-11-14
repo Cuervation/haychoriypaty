@@ -143,12 +143,12 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(1100L, sales[11]); Assert.AreEqual(1200L, sales[12]);
             Assert.IsTrue(paid[11]); Assert.IsFalse(paid[12]);
         }
-        [Test] public void ArgentinosLegacyProgressionRepairUsesLosRedondosAsItsPredecessor()
+        [Test] public void ArgentinosLegacyProgressionRepairUsesCampaignPredecessor()
         {
             object balance = Activator.CreateInstance(balanceType), data = Activator.CreateInstance(dataType);
             long[] sales = (long[])dataType.GetField("highestRecognizedSalesByLevel").GetValue(data);
             bool[] paid = (bool[])dataType.GetField("bonusPaidByLevel").GetValue(data);
-            sales[10] = long.MaxValue; paid[10] = true;
+            sales[2] = long.MaxValue; paid[2] = true; // campaign predecessor of Argentinos is level 2 in the 15-level order
             object market = Market(data, balance), argentinos = Sim(12);
             long expected = (long)Call(market, "MinimumPurchaseCostCents", argentinos);
 
@@ -173,7 +173,7 @@ namespace HayChoriYPaty.Tests
         [Test] public void CampaignMarketGateUsesExplicitStableIdUnlocksInsteadOfLegacyFrontier()
         {
             object market = Market();
-            bool[] unlocked = new bool[13]; unlocked[0] = true; unlocked[1] = true;
+            bool[] unlocked = new bool[15]; unlocked[0] = true; unlocked[1] = true;
             Assert.IsTrue((bool)Call(market, "IsIngredientUnlocked", 0, unlocked, 10));
             Assert.IsFalse((bool)Call(market, "IsIngredientUnlocked", 8, unlocked, 10),
                 "A high legacy frontier must not unlock Fernet ingredients after campaign reorder.");
@@ -317,7 +317,7 @@ namespace HayChoriYPaty.Tests
             for(int level=0;level<11;level++)
             {
                 object sim=Sim(level); long cost=(long)Call(market,"MinimumPurchaseCostCents",sim);
-                if (level == 9) Assert.AreEqual(0L, cost, "Defense has no legacy quota stock requirement.");
+                if (level == 9 || level == 10) Assert.AreEqual(0L, cost, "Defense has no legacy quota stock requirement.");
                 else Assert.Greater(cost,0L, "Traditional level " + level);
                 Assert.Less(cost,long.MaxValue);
             }

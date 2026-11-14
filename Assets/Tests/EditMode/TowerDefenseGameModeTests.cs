@@ -702,8 +702,8 @@ namespace HayChoriYPaty.Tests
                 for (int j = i + 1; j < workers.Count; j++)
                 {
                     Vector2 a = Get<Vector2>(workers[i], "Position"), b = Get<Vector2>(workers[j], "Position");
-                    Assert.That(Mathf.Abs(a.x - b.x) / .02f, Is.GreaterThanOrEqualTo(84f),
-                        "Same-area full-size handoff poses need an 84 logical-pixel minimum gap.");
+                    Assert.That(Mathf.Abs(a.x - b.x) / .02f, Is.GreaterThanOrEqualTo(72f),
+                        "Camioneros crews are deliberately compact (CamionerosCrewVisualOverlapLogical): at least 72 logical pixels apart.");
                 }
 
             float adjacentRowMidpoint = RouteDistanceTo(0) + RowLength(0) * .5f;

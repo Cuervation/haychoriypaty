@@ -119,7 +119,7 @@ namespace HayChoriYPaty.Tests
             // The restored original prep row separates production from service. Use the real
             // hired cooks' grill-side starts, not the historical counter-side delivery home.
             object cookSim=Simulation(7);
-            cookSim.GetType().GetMethod("StartRound").Invoke(cookSim,null);
+            cookSim.GetType().GetMethod("StartRound",Type.EmptyTypes).Invoke(cookSim,null);
             Type roleType=Runtime("StreetWorkerRole");
             Assert.IsTrue((bool)cookSim.GetType().GetMethod("TryHire",new[]{roleType}).Invoke(cookSim,new[]{Enum.Parse(roleType,"ParrilleroPremium")}));
             var cooks=(System.Collections.IList)cookSim.GetType().GetProperty("Workers").GetValue(cookSim);

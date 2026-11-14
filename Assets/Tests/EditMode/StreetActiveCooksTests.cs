@@ -71,6 +71,13 @@ namespace HayChoriYPaty.Tests
             }
         }
 
+        // StartRound is only legal from Ready; a "new attempt" returns the simulation to Ready first.
+        private static void RestartRound(object sim)
+        {
+            sim.GetType().GetProperty("Phase").SetValue(sim, Enum.Parse(sim.GetType().GetProperty("Phase").PropertyType, "Ready"), null);
+            Call(sim, "StartRound");
+        }
+
         [Test]
         public void CookingProgressRingUsesPureWhiteForNormalAndExactBlueForPremium()
         {
@@ -326,7 +333,7 @@ namespace HayChoriYPaty.Tests
         {
             int[] expectedNormal = { 0, 1, 0, 1 };
             int[] expectedPremium = { 2, 3, 2, 3 };
-            for (int level = 5; level < 11; level++)
+            for (int level = 5; level < 9; level++) // ids 9/10 are Tower Defense levels now
             {
                 object normal = MakeActiveSimulation(level, 100000);
                 Assert.IsTrue((bool)Get(normal, "UsesActiveCooks"), "Racing through Los Redondos must use active cooks.");
@@ -1198,7 +1205,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(50, Get(sim, "MozoHireCost"), "The free starter must not advance the paid-hire tier.");
             Assert.IsFalse((bool)Get(sim, "CanHireMozo"), "Mozo purchases remain unavailable until play starts.");
 
-            Call(sim, "StartRound");
+            RestartRound(sim);
             Assert.AreEqual(250, Get(sim, "Coins"));
             Assert.AreEqual(260f, Get(sim, "TimeRemaining"));
             Assert.AreEqual(1, Get(sim, "ParrilleroCount"));
@@ -1224,7 +1231,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(75, Get(sim, "Coins"));
             Assert.AreEqual(250, Get(sim, "MozoHireCost"), "Subsequent role-local progression remains unchanged.");
 
-            Call(sim, "StartRound");
+            RestartRound(sim);
             Assert.AreEqual(250, Get(sim, "Coins"));
             Assert.AreEqual(1, Get(sim, "MozoCount"), "A new attempt must discard all previously hired Mozos.");
             Assert.AreEqual(1, Get(sim, "ParrilleroCount"));
@@ -1244,7 +1251,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(0, Get(sim, "ParrilleroPremiumCount"), "San Lorenzo must not receive a free Premium Parrillero.");
             Assert.AreEqual(55, Get(sim, "MozoHireCost"), "The free starter must not consume San Lorenzo's first paid $55 hire.");
 
-            Call(sim, "StartRound");
+            RestartRound(sim);
             Assert.AreEqual(250, Get(sim, "Coins"));
             Assert.AreEqual(0, Get(sim, "CoinsEarned"), "The free starter does not count as earned or spent money.");
             Assert.AreEqual(300f, Get(sim, "TimeRemaining"));
@@ -1263,7 +1270,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(275, Get(sim, "MozoHireCost"), "Third paid Mozo preserves the role-local ×5 tier.");
             Assert.IsFalse((bool)Get(sim, "CanHireMozo"), "The next hire remains gated by real funds.");
 
-            Call(sim, "StartRound");
+            RestartRound(sim);
             Assert.AreEqual(250, Get(sim, "Coins"));
             Assert.AreEqual(2, Get(sim, "ParrilleroCount"));
             Assert.AreEqual(1, Get(sim, "MozoCount"), "Retry discards hired Mozos and restores exactly one free starter.");
@@ -1293,7 +1300,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(45, Get(sim, "ParrilleroHireCost"));
             for (int attempt = 0; attempt < 3; attempt++)
             {
-                Call(sim, "StartRound");
+                RestartRound(sim);
                 Assert.AreEqual(2, Get(sim, "ParrilleroCount"));
                 Assert.AreEqual(1, Get(sim, "MozoCount"));
                 Assert.AreEqual(0, Get(sim, "ParrilleroPremiumCount"));

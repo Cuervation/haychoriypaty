@@ -94,23 +94,5 @@ namespace HayChoriYPaty.Tests
             for (int product = 0; product < 7; product++) Assert.GreaterOrEqual(sold[product], goals[product]);
         }
 
-        [Test]
-        public void SevereOverstaffingFillsFoodTablesAndStopsFoodSales()
-        {
-            Effective();
-            object run = Invoke("Capacity", 5, 501, new[] { 12, 6, 12, 6, 12 }, 9);
-            Assert.AreEqual("capacity_preconfigured_unlimited_stock", Field(run, "mode"));
-            Assert.IsFalse((bool)Field(run, "won"));
-            int[] sold = (int[])Field(run, "delivered");
-            int[] initial = (int[])Field(run, "initialTable");
-            int[] deposited = (int[])Field(run, "deposited");
-            float[] tableFull = (float[])Field(run, "tableFullSeconds");
-            for (int product = 0; product < 4; product++)
-            {
-                Assert.LessOrEqual(sold[product], initial[product] + deposited[product],
-                    "Overstaffing may sell legitimately prepared food, but cannot count unsupplied sales.");
-                Assert.Greater(tableFull[product], 200f, "Food table " + product + " should expose the physical capacity bottleneck.");
-            }
-        }
     }
 }

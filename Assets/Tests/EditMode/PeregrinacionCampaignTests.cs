@@ -71,6 +71,8 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(14,property("SourceCampaignLevelId")); Assert.AreEqual(true,property("FreeConstruction"));
             Assert.AreEqual(8,property("EconomicBalanceCampaignLevelId")); Assert.AreEqual(true,property("UseCampaignEconomyPricing"));
             Assert.AreEqual(1200,property("StartingCoins"),"The level keeps its own opening cash.");
+            Assert.That((float)property("FanSpeed"), Is.EqualTo(.0525f).Within(.000001f),
+                "Lujan's configured route speed is 50% above the previous .035 value.");
             Assert.AreEqual(false,property("EquipmentPlacementAllowed"),"Every Luján station is preinstalled and equipment cannot be placed or purchased.");
             CollectionAssert.AreEqual(new[]{1,0,0,0,0},(int[])property("StartingWorkersByRole"));
             Array startingStations=(Array)property("StartingStations");

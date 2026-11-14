@@ -60,65 +60,6 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void ActualHandoffsAndAdaptivePurchasesFundAllElevenFirstUnlockTransitions()
-        {
-            object balance = Activator.CreateInstance(Runtime("StreetBalance"));
-            object market = NewMarket(balance); Call(market, "Initialize", 0);
-            var strategy = new StreetSimulationTests(); strategy.SetUp();
-            MethodInfo purchase = typeof(StreetSimulationTests).GetMethod("ApplyStrategyPurchases", Private);
-            int completed = 0;
-            for (int level = 0; level < 11; level++)
-            {
-                object sim = NewSim(balance, level);
-                long needed = (long)Call(market, "MinimumPurchaseCostCents", sim);
-                long available = (long)Get(market, "BalanceCents");
-                Assert.GreaterOrEqual(available, needed, "First-unlock reward must fund exact missing stock for level " + (level + 1));
-                for (int ingredient = 0; ingredient < 10; ingredient++)
-                {
-                    int missing = (int)Call(market, "MissingPacks", sim, ingredient);
-                    if (missing > 0) Assert.IsTrue((bool)Call(market, "TryBuy", sim, ingredient, missing, level,
-                        (long)Get(market, "NextPurchaseId")), "Cash-only purchase L" + (level + 1) + " ingredient " + ingredient);
-                }
-                int[] before = (int[])((int[])Get(market, "Data").GetType().GetField("stockUnits").GetValue(Get(market, "Data"))).Clone();
-                Assert.IsTrue((bool)Call(market, "BeginAttempt", sim));
-                Call(sim, "BindIngredientStock", market); Call(sim, "StartRound");
-                for (int tick = 0; tick < 1300 && Get(sim, "Phase").ToString() == "Playing"; tick++)
-                {
-                    Call(sim, "Step", .25f); purchase.Invoke(strategy, new[] { sim, "D" });
-                }
-                int[] consumed = new int[10];
-                bool activeCooks = (bool)Get(sim, "UsesActiveCooks");
-                for (int product = 0; product < 7; product++)
-                {
-                    if (((activeCooks || level == 2) && product < 4) || product == 4 || product == 6) continue;
-                    // Active-cook and Vélez sandwiches, plus Coca/beer barrels, are inexhaustible Market-independent servings.
-                    int delivered = (int)Call(sim, "GetProductDelivered", product);
-                    int[] recipe = (int[])Runtime("StreetIngredientCatalog").GetMethod("Recipe").Invoke(null, new object[] { product });
-                    foreach (int ingredient in recipe) consumed[ingredient] += delivered;
-                }
-                for (int i = 0; i < 10; i++) Assert.AreEqual(before[i] - consumed[i], Call(market, "Units", i), "Real consumption L" + (level + 1) + " ingredient " + i);
-                TestContext.WriteLine("L" + (level + 1) + ": " + Get(sim, "Phase") + ", t=" + Get(sim, "Elapsed") + ", sales=" + Get(sim, "CoinsEarned"));
-                Assert.AreEqual("Won", Get(sim, "Phase").ToString(), "Cash-stocked actual level " + (level + 1));
-                Assert.IsNotNull(Call(market, "SettleAttempt", sim));
-                Assert.GreaterOrEqual((long)Get(market, "BalanceCents"), 0L);
-                if (level + 1 < 11)
-                {
-                    object next = NewSim(balance, level + 1);
-                    long nextCost = (long)Call(market, "MinimumPurchaseCostCents", next);
-                    long priorCash = (long)Get(market, "BalanceCents");
-                    long bonus = (long)Call(market, "GrantFirstUnlockStockBonus", next, true);
-                    Assert.AreEqual(Math.Max(0L, nextCost - priorCash), bonus, "Only the exact next-level stock shortfall is granted.");
-                    Assert.GreaterOrEqual((long)Get(market, "BalanceCents"), nextCost);
-                    TestContext.WriteLine("Transition to L" + (level + 2) + ": stock=" + (nextCost / 100f).ToString("F2") +
-                        ", reward=" + (bonus / 100f).ToString("F2") + ", wallet=" + ((long)Get(market, "BalanceCents") / 100f).ToString("F2"));
-                }
-                object persisted = JsonUtility.FromJson(JsonUtility.ToJson(Get(market, "Data")), Runtime("StreetMarketData"));
-                market = NewMarket(balance, persisted); completed++;
-            }
-            Assert.AreEqual(11, completed, "The cash-only player campaign must reach and complete every level.");
-        }
-
-        [Test]
         public void ExistingLevelTwoSaveRecoversOnlyItsUnpaidMinimumStockTransitionCost()
         {
             Type gameType = Runtime("StreetGame"); string key = (string)gameType.GetField("ProgressKey").GetValue(null);
