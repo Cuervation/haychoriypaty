@@ -68,7 +68,7 @@ namespace HayChoriYPaty
         }
         private void PrepareIntroLogoShines()
         {
-            if (introLogoShines != null || titleLogo == null) return;
+            if ((introLogoShines != null && introLogoShines.Length > 0) || titleLogo == null) return;
             const int size = 256, frames = 24;
             RenderTexture previous = RenderTexture.active;
             RenderTexture rt = RenderTexture.GetTemporary(size, size, 0, RenderTextureFormat.ARGB32);
@@ -121,10 +121,11 @@ namespace HayChoriYPaty
             GUI.DrawTexture(LayoutRect(bounds), titleLogo, ScaleMode.ScaleToFit, true);
             PrepareIntroLogoShines();
             float sweep = elapsed >= 2.65f ? elapsed - 2.65f : elapsed - 1.05f;
-            if (sweep >= 0f && sweep < .65f && introLogoShines != null)
+            if (sweep >= 0f && sweep < .65f && introLogoShines != null && introLogoShines.Length > 0)
             {
                 int frame = Mathf.Clamp(Mathf.FloorToInt(sweep / .65f * introLogoShines.Length), 0, introLogoShines.Length - 1);
-                GUI.DrawTexture(LayoutRect(bounds), introLogoShines[frame], ScaleMode.ScaleToFit, true);
+                if (introLogoShines[frame] != null)
+                    GUI.DrawTexture(LayoutRect(bounds), introLogoShines[frame], ScaleMode.ScaleToFit, true);
             }
         }
         private void DrawIntroProgress(float elapsed)
