@@ -285,7 +285,7 @@ namespace HayChoriYPaty
             {
                 int baseFontSize = Mathf.Max(12, preferredFontSize);
                 style.fontSize = baseFontSize;
-                Vector2 needed = style.CalcSize(new GUIContent(value));
+                Vector2 needed = CachedCalcSize(style, value);
                 float fitWidth = (bounds.width - 4f) / Mathf.Max(1f, needed.x);
                 float fitHeight = (bounds.height - 2f) / Mathf.Max(1f, needed.y);
                 float fitScale = Mathf.Min(1f, fitWidth, fitHeight);

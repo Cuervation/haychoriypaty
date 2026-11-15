@@ -56,7 +56,7 @@ namespace HayChoriYPaty
                 int visibleLines = Mathf.Min(StreetCustomer.MaxVisibleOrderProducts, pendingLines);
                 float quantityWidth = 20f;
                 for (int i = 0; i < visibleLines; i++)
-                    quantityWidth = Mathf.Max(quantityWidth, text.CalcSize(new GUIContent(c.GetVisibleOrderLine(i).Remaining.ToString())).x);
+                    quantityWidth = Mathf.Max(quantityWidth, CachedCalcSize(text, c.GetVisibleOrderLine(i).Remaining.ToString()).x);
                 // Transform the anchor once; local content offsets must not grow on tall screens.
                 Rect logicalBubble = OrderBubbleBounds(position, pendingLines, quantityWidth);
                 float contentScale = OrderBubbleContentScale(logicalBubble.height, layoutVerticalScale);
@@ -136,7 +136,7 @@ namespace HayChoriYPaty
         private static int FitOrderQuantityFontSize(GUIStyle style, string value, float maxWidth)
         {
             int original = style.fontSize;
-            float measured = style.CalcSize(new GUIContent(value)).x;
+            float measured = CachedCalcSize(style, value).x;
             return measured > maxWidth ? Mathf.Max(11, Mathf.FloorToInt(original * maxWidth / measured)) : original;
         }
 

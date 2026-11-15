@@ -95,6 +95,19 @@ namespace HayChoriYPaty
             return style;
         }
 
+        // GUIStyle.CalcSize is costly on mobile and the same short strings are measured every frame
+        // (order quantities, HUD counters, upgrade prices). Cache by style, font size and text.
+        private static readonly System.Collections.Generic.Dictionary<(GUIStyle, int, string), Vector2> textSizeCache =
+            new System.Collections.Generic.Dictionary<(GUIStyle, int, string), Vector2>();
+        private static Vector2 CachedCalcSize(GUIStyle style, string value)
+        {
+            var key = (style, style.fontSize, value);
+            if (textSizeCache.TryGetValue(key, out Vector2 size)) return size;
+            if (textSizeCache.Count >= 1024) textSizeCache.Clear();
+            size = style.CalcSize(new GUIContent(value));
+            textSizeCache[key] = size;
+            return size;
+        }
         private static int FitStandardButtonFontSize(GUIStyle style, string caption, Rect bounds, float fontScale = 1f)
         {
             var key = (style, caption, bounds.width, bounds.height, fontScale);

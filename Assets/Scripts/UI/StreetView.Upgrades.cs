@@ -270,12 +270,12 @@ namespace HayChoriYPaty
         }
         private static int FitUpgradePriceFontSize(GUIStyle style,string value,float maxWidth)
         {
-            int original=style.fontSize;float needed=style.CalcSize(new GUIContent(value)).x;
+            int original=style.fontSize;float needed=CachedCalcSize(style,value).x;
             return needed>maxWidth-2?Mathf.Max(14,Mathf.FloorToInt(original*(maxWidth-2)/needed)):original;
         }
         private static int FitUpgradeStatusFontSize(GUIStyle style,string value,float maxWidth)
         {
-            int original=style.fontSize;float needed=style.CalcSize(new GUIContent(value)).x;
+            int original=style.fontSize;float needed=CachedCalcSize(style,value).x;
             return needed>maxWidth-2?Mathf.Max(10,Mathf.FloorToInt(original*(maxWidth-2)/needed)):original;
         }
         private void UpgradeOutline(Rect bounds,string value,GUIStyle style,Color fill)

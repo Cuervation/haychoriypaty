@@ -52,3 +52,11 @@ Medición en el teléfono (hub quieto, CPU por hilo con `top -H`; el juego corre
 
 ## Mipmaps (2026-11-15): descartado
 47 texturas de `Resources` siguen con mipmaps. Con ASTC 6x6 los niveles extra suman solo ~10 MB en total (≈0,445 B/px × 1/3). Casi todas son hojas de sprites de cocina y hinchas que se dibujan reducidas (p. ej. atlas de 2172 px mostrados a ~80–200 px); ahí los mipmaps evitan el aliasing. El ahorro no compensa el riesgo visual: se dejan como están.
+
+## Partida en el teléfono (2026-11-15) — medición y primera ronda de arreglos
+Partida de Nivel 1 en el Motorola Edge 60 Fusion (build release, ASTC, 30 fps):
+- CPU por hilo: principal ~72 %, render ~48 %, total ~137 % de un núcleo (hub quieto: ~40 %). Memoria: PSS ~1,03 GB, gráficos ~698 MB.
+- Desglose por sección (ms por frame, cronómetros temporales ya retirados): `OnGUI` ≈ 9,7 (Repaint) + 2,7 (Layout); hinchas y pedidos ≈ 3,3 + 0,9; tarjetas de mejoras (solo 2) ≈ 2,9 + 0,3; contadores/HUD ≈ 1,4 + 0,3; preparación de cocina ≈ 1,0 + 1,1; renderer de cocina (`LateUpdate`) ≈ 1,0; `Update` ≈ 0,2. Presupuesto a 30 fps: 33 ms.
+- Arreglo aplicado: caché de `GUIStyle.CalcSize` (`CachedCalcSize`) para cantidades de pedidos, números del HUD y precios/estados de tarjetas (mismas cadenas cortas medidas cada frame). Mismo resultado visual; tests: 315 EditMode y 81 PlayMode (52 pasan, 29 ignorados), sin fallos.
+- **No medido**: el efecto del caché en el dispositivo (se detuvo la sesión antes de repetir la medición). Descartado por no verificado visualmente: reducir el contorno de textos de 8 a 4 copias (ahorra más pero cambia el trazo); queda como idea.
+- Pendiente: volver a medir en el teléfono y atacar `crowd`/tarjetas/contorno; medir Tower Defense en el dispositivo.
