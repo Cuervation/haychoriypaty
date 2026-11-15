@@ -9,6 +9,13 @@ namespace HayChoriYPaty.Tests
 {
     public sealed class StreetArtTests
     {
+        /// <summary>Android keeps an alpha-capable compressed override: ETC2 RGBA8, or ASTC 6x6 for large art (smaller, same look).</summary>
+        private static void AssertCompressedAndroidAlphaFormat(TextureImporterFormat format, string message = null)
+        {
+            Assert.IsTrue(format == TextureImporterFormat.ETC2_RGBA8 || format == TextureImporterFormat.ASTC_6x6,
+                (message ?? "Android must keep a compressed alpha override") + " (was " + format + ")");
+        }
+
         private const int HuracanBonusLevelId = 11;
 
         [Test]
@@ -807,7 +814,7 @@ namespace HayChoriYPaty.Tests
                 Assert.AreEqual(TextureImporterCompression.Uncompressed, importer.textureCompression);
                 var android = importer.GetPlatformTextureSettings("Android");
                 Assert.IsTrue(android.overridden);
-                Assert.AreEqual(TextureImporterFormat.ETC2_RGBA8, android.format);
+                AssertCompressedAndroidAlphaFormat(android.format);
                 Assert.GreaterOrEqual(android.maxTextureSize, 1315);
             }
             Texture2D icon = Resources.Load<Texture2D>("street-parrillero-icon");
@@ -834,7 +841,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(TextureImporterCompression.Uncompressed, importer.textureCompression);
             var android = importer.GetPlatformTextureSettings("Android");
             Assert.IsTrue(android.overridden);
-            Assert.AreEqual(TextureImporterFormat.ETC2_RGBA8, android.format);
+            AssertCompressedAndroidAlphaFormat(android.format);
             Assert.GreaterOrEqual(android.maxTextureSize, 1536);
 
             Rect[] bounds = (Rect[])View.GetField("ParrilleroDiagonalPoses", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
@@ -897,7 +904,7 @@ namespace HayChoriYPaty.Tests
                 Assert.AreEqual(TextureImporterCompression.Uncompressed, importer.textureCompression);
                 var android = importer.GetPlatformTextureSettings("Android");
                 Assert.IsTrue(android.overridden);
-                Assert.AreEqual(TextureImporterFormat.ETC2_RGBA8, android.format);
+                AssertCompressedAndroidAlphaFormat(android.format);
             }
 
             int count = (int)View.GetField("AllBoysFanVariantCount", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue();
@@ -956,7 +963,7 @@ namespace HayChoriYPaty.Tests
                 Assert.AreEqual(TextureImporterCompression.Uncompressed, importer.textureCompression);
                 var android = importer.GetPlatformTextureSettings("Android");
                 Assert.IsTrue(android.overridden);
-                Assert.AreEqual(TextureImporterFormat.ETC2_RGBA8, android.format);
+                AssertCompressedAndroidAlphaFormat(android.format);
             }
 
             int variantCount = (int)View.GetField("ChicagoFanVariantCount", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue();
@@ -1010,7 +1017,7 @@ namespace HayChoriYPaty.Tests
                 if (pair.Alpha) Assert.IsTrue(importer.alphaIsTransparency);
                 var android = importer.GetPlatformTextureSettings("Android");
                 Assert.IsTrue(android.overridden);
-                Assert.AreEqual(TextureImporterFormat.ETC2_RGBA8, android.format, "Android uses the established ETC2 override; source textures remain uncompressed.");
+                AssertCompressedAndroidAlphaFormat(android.format, "Android uses the established ETC2 override; source textures remain uncompressed.");
             }
 
             float duration = (float)View.GetField("IntroDuration", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue();
@@ -1098,7 +1105,8 @@ namespace HayChoriYPaty.Tests
                 "street-mural-real-v5", "street-coin-gold-v2", "street-allboys-crest", "street-mural-argentinos-master-v1",
                 "street-argentinos-fans-paired-v2", "street-argentinos-riot-fans-v2"
             }, name) >= 0 ? TextureImporterFormat.ETC2_RGBA8 : TextureImporterFormat.RGBA32;
-            Assert.AreEqual(expectedAndroidFormat, android.format);
+            if (expectedAndroidFormat == TextureImporterFormat.ETC2_RGBA8) AssertCompressedAndroidAlphaFormat(android.format);
+            else Assert.AreEqual(expectedAndroidFormat, android.format);
             Assert.GreaterOrEqual(android.maxTextureSize, Math.Max(width, height));
         }
 
@@ -1422,7 +1430,7 @@ namespace HayChoriYPaty.Tests
             Assert.IsTrue(importer.DoesSourceTextureHaveAlpha());
             Assert.IsFalse(importer.mipmapEnabled); Assert.AreEqual(TextureImporterNPOTScale.None, importer.npotScale);
             Assert.AreEqual(TextureImporterCompression.Uncompressed, importer.textureCompression);
-            Assert.AreEqual(TextureImporterFormat.ETC2_RGBA8, importer.GetPlatformTextureSettings("Android").format);
+            AssertCompressedAndroidAlphaFormat(importer.GetPlatformTextureSettings("Android").format);
         }
 
         [Test]
@@ -1461,7 +1469,7 @@ namespace HayChoriYPaty.Tests
             Assert.IsTrue(chicagoGrillImporter.alphaIsTransparency); Assert.IsFalse(chicagoGrillImporter.mipmapEnabled);
             Assert.AreEqual(TextureImporterCompression.Uncompressed, chicagoGrillImporter.textureCompression);
             Assert.AreEqual(TextureImporterNPOTScale.None, chicagoGrillImporter.npotScale);
-            Assert.AreEqual(TextureImporterFormat.ETC2_RGBA8, chicagoGrillImporter.GetPlatformTextureSettings("Android").format);
+            AssertCompressedAndroidAlphaFormat(chicagoGrillImporter.GetPlatformTextureSettings("Android").format);
             foreach (string name in new[] { "street-new-chicago-crest-v1", "street-coca-bottle-v1", "street-beverage-barrel-v1" })
             {
                 TextureImporter importer = (TextureImporter)AssetImporter.GetAtPath("Assets/Art/Street/Resources/" + name + ".png");
@@ -1469,7 +1477,7 @@ namespace HayChoriYPaty.Tests
                 Assert.IsFalse(importer.mipmapEnabled);
                 Assert.AreEqual(TextureImporterNPOTScale.None, importer.npotScale);
                 Assert.AreEqual(TextureImporterCompression.Uncompressed, importer.textureCompression);
-                Assert.AreEqual(TextureImporterFormat.ETC2_RGBA8, importer.GetPlatformTextureSettings("Android").format);
+                AssertCompressedAndroidAlphaFormat(importer.GetPlatformTextureSettings("Android").format);
             }
 
             Rect grill = (Rect)View.GetMethod("GrillRectForLevel", BindingFlags.Static | BindingFlags.NonPublic, null, new[] { typeof(int), typeof(int) }, null)
@@ -1554,7 +1562,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(TextureImporterNPOTScale.None, importer.npotScale);
             Assert.AreEqual(TextureImporterCompression.Uncompressed, importer.textureCompression);
             var android = importer.GetPlatformTextureSettings("Android");
-            Assert.IsTrue(android.overridden); Assert.AreEqual(TextureImporterFormat.ETC2_RGBA8, android.format);
+            Assert.IsTrue(android.overridden); AssertCompressedAndroidAlphaFormat(android.format);
             Assert.GreaterOrEqual(android.maxTextureSize, texture.width);
             Assert.NotNull(Resources.Load<Texture2D>("street-parrilla-large"), "Retain the previous grill resource");
             Assert.AreNotEqual(AssetDatabase.AssetPathToGUID(path), AssetDatabase.AssetPathToGUID("Assets/Art/Street/Resources/street-parrilla-large.png"));
@@ -1946,7 +1954,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(TextureImporterCompression.Uncompressed, importer.textureCompression);
             var android = importer.GetPlatformTextureSettings("Android");
             Assert.IsTrue(android.overridden);
-            Assert.AreEqual(TextureImporterFormat.ETC2_RGBA8, android.format);
+            AssertCompressedAndroidAlphaFormat(android.format);
             Assert.GreaterOrEqual(android.maxTextureSize, Math.Max(width, height));
         }
 
@@ -2634,7 +2642,7 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
                 Assert.AreEqual(TextureImporterNPOTScale.None, importer.npotScale);
                 Assert.AreEqual(TextureImporterCompression.Uncompressed, importer.textureCompression);
                 var android = importer.GetPlatformTextureSettings("Android");
-                Assert.IsTrue(android.overridden); Assert.AreEqual(TextureImporterFormat.ETC2_RGBA8, android.format);
+                Assert.IsTrue(android.overridden); AssertCompressedAndroidAlphaFormat(android.format);
             }
 
             int count = (int)View.GetField("VelezFanVariantCount", BindingFlags.Static | BindingFlags.NonPublic).GetRawConstantValue();
@@ -2872,7 +2880,7 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
                 Assert.IsFalse(importer.mipmapEnabled); Assert.AreEqual(TextureImporterNPOTScale.None, importer.npotScale);
                 Assert.AreEqual(TextureImporterCompression.Uncompressed, importer.textureCompression);
                 var android = importer.GetPlatformTextureSettings("Android");
-                Assert.IsTrue(android.overridden); Assert.AreEqual(TextureImporterFormat.ETC2_RGBA8, android.format);
+                Assert.IsTrue(android.overridden); AssertCompressedAndroidAlphaFormat(android.format);
             }
 
             Texture2D ferroFront = Resources.Load<Texture2D>("street-ferro-fans-front-v1");

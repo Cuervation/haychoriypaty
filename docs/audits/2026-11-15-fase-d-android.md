@@ -26,3 +26,16 @@ El botón CUENTA escalado dejaba asomar la pastilla horneada en la ilustración.
 - ETC2 RGB (sin alfa) en fondos opacos (4 bpp).
 - 46 texturas de Resources (87 MB de PNG) mantienen mipmaps; probablemente innecesarios en IMGUI.
 - CPU alto en el hub quieto (IMGUI con ambientación animada): candidato a medir con el profiler en un build de desarrollo.
+
+## Prueba ASTC 6x6 (2026-11-15, aprobada por el usuario)
+Cambio: el override de Android de **136 texturas de `Resources` con lado ≥ 1024 px** pasó de ETC2 RGBA8 (formato 47) a ASTC 6x6 (formato 50), solo en sus `.meta`; el arte fuente no se modificó. Las menores a 1024 px, los escudos RGBA32 y las demás quedaron igual. Para volver atrás: revertir ese commit (ETC2 es 47 en el mismo campo).
+
+| Métrica (mismo teléfono, hub) | ETC2 (`opt-test`) | ASTC 6x6 (`opt-astc`) |
+|---|---|---|
+| Tamaño del APK | 345 MB | **219 MB (−37 %)** |
+| Memoria gráfica | 614 MB | **428 MB (−30 %)** |
+| PSS total | 1,00 GB | **0,80 GB (−20 %)** |
+| CPU hub quieto | 75–81 % de un núcleo | 59–82 % (igual dentro del ruido) |
+
+Calidad: comparado a 1:1 el cartel "JUGAR" del hub, no se distingue diferencia visible (ASTC incluso se ve algo más suave que los bloques de ETC2). **No se revisaron aún las demás pantallas en el dispositivo** (partida, Mercado, victoria, selector): conviene mirar una partida con personajes y comida en el teléfono antes de darlo por definitivo.
+Tests: `StreetArtTests` aceptaba solo ETC2_RGBA8; ahora acepta ETC2_RGBA8 o ASTC_6x6 (el criterio sigue siendo "override comprimido con alfa"). 353 tests de arte/tema/cocina en verde. El Editor sigue usando la configuración de Standalone, así que no ve diferencia.
