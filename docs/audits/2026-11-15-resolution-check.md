@@ -32,5 +32,10 @@ Misma metodología (prueba temporal, retirada) en 540x960, 720x1280, 720x1600, 1
 ## Tutoriales (2026-11-15)
 Los seis tutoriales de nivel se forzaron activando su bandera con el nivel seleccionado y se capturaron en 540x960, 720x1600, 1080x2400 y 1200x1600 (24 capturas locales en `Logs/Acceptance/Tutorials/`; revisadas a mano: Nivel 1, 2, 5 y 6 en varios tamaños). Prueba temporal retirada.
 - **Teléfonos (540x960, 720x1600, 1080x2400):** burbuja, cola apuntando al elemento correcto, SIGUIENTE y SALTAR caben y se leen. Sin problemas.
-- **Tablet 3:4 (1200x1600), tutorial del Nivel 6 (6 tarjetas):** el pie de cartas queda apretado. Se recortan los títulos de las tarjetas ("PARRILLERC", ":OCACOLERC" por cortarse la O/C del borde) y el precio de VELOCIDAD pisa el texto "+10%". Es el único problema de layout hallado en esta revisión; no se corrigió (toca la geometría del pie de mejoras y su contrato).
+- **Tablet 3:4 (1200x1600), tutorial del Nivel 6 (6 tarjetas):** el pie de cartas queda apretado. Se recortan los títulos de las tarjetas ("PARRILLERC", ":OCACOLERC" por cortarse la O/C del borde) y el precio de VELOCIDAD pisa el texto "+10%". Es el único problema de layout hallado en esta revisión; corregido más abajo.
 - **Observación menor:** SALTAR es un rectángulo blanco pequeño (~170x55 px en 1080x2400); aceptable pero chico como zona de toque en pantallas muy densas.
+
+## Corrección del pie de mejoras en tablet (2026-11-15, a pedido)
+Causa: en canvases cortos (`layoutVerticalScale < 1`, p. ej. 3:4) `ScaleCardBounds` achica el ancho y el alto de cada tarjeta, pero su contenido interno (título, estado, precio, medallón) usa offsets y tipografías fijos; con el rectángulo reducido se recortaban los títulos y el precio pisaba el estado.
+Arreglo (`StreetView.Upgrades.cs`, `Upgrade`): el contenido se dibuja con el tamaño original de la tarjeta (ancho/alto divididos por la escala) bajo una matriz que lo reduce en bloque; el área táctil sigue siendo el rectángulo real. En escala 1 (teléfonos) no hay cambio.
+Verificación: capturas a 1200x1600 (Nivel 6, 6 tarjetas) con títulos y precios completos; 720x1600 sin cambios; PlayMode `StreetPointerTests`+`StreetActiveCooksPointerTests`+`TowerDefensePlacementViewTests`+`StreetHubViewTests`: 78 pasan, 0 fallan, 34 ignorados.

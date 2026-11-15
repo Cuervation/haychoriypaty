@@ -12,6 +12,18 @@ namespace HayChoriYPaty
             float previousVertical = layoutVerticalScale;
             r.y *= previousVertical;
             layoutVerticalScale = 1f;
+            // On short canvases (e.g. 3:4 tablets) the card footprint shrinks with the vertical scale. Lay the
+            // content out at the authored card size and scale it down as a whole, so titles, status and price
+            // keep their designed proportions instead of clipping or overlapping.
+            Rect hitBounds = r;
+            Matrix4x4 savedMatrix = GUI.matrix;
+            float cardScale = Mathf.Min(1f, Mathf.Max(.01f, previousVertical));
+            if (cardScale < .999f)
+            {
+                GUI.matrix = savedMatrix * Matrix4x4.TRS(new Vector3(r.x, r.y, 0f), Quaternion.identity,
+                    new Vector3(cardScale, cardScale, 1f));
+                r = new Rect(0f, 0f, r.width / cardScale, r.height / cardScale);
+            }
             bool available=affordable&&game.Sim.Phase==RoundPhase.Playing;
             Color old=GUI.color;GUI.color=available?Color.white:new Color(.57f,.57f,.57f,1);
             Rect drawn=r;if(lastAction==action&&Time.unscaledTime<feedbackUntil){drawn.width*=feedbackScale;drawn.height*=feedbackScale;drawn.center=r.center;}
@@ -59,8 +71,9 @@ namespace HayChoriYPaty
             upgradePrice.fontSize=FitUpgradePriceFontSize(upgradePrice,priceText,UpgradePriceTextBounds(drawn).width);
             UpgradeOutline(UpgradePriceTextBounds(drawn),priceText,upgradePrice,new Color(.98f,.99f,1f));
             upgradePrice.fontSize=originalPriceSize;
+            GUI.matrix = savedMatrix;
             bool prev=GUI.enabled;GUI.enabled=available;
-            if(GUI.Button(LayoutRect(r),"",invisible))NativeAction(action);GUI.enabled=prev;
+            if(GUI.Button(LayoutRect(hitBounds),"",invisible))NativeAction(action);GUI.enabled=prev;
             layoutVerticalScale = previousVertical;
         }
         private void DrawAffordableUpgradeBorder(Rect card)
