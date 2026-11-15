@@ -118,12 +118,6 @@ namespace HayChoriYPaty
             bounds.height *= scale;
             return bounds;
         }
-        private static Rect ScaleCardChild(Rect child, Rect card, float scale)
-        {
-            float left = card.x + (card.width - card.width * scale) * .5f;
-            return new Rect(left + (child.x - card.x) * scale, card.y + (child.y - card.y) * scale,
-                child.width * scale, child.height * scale);
-        }
         private Rect ResponsiveUpgradeCardBounds(StreetSimulation sim, int action)
         {
             ResponsiveFooterLayout footer = CurrentResponsiveFooter(sim, logicalCanvasHeight);
@@ -781,14 +775,6 @@ namespace HayChoriYPaty
                 ok=game.ReturnToLevels(); if(ok){marketActive=false;levelSelectActive=true;levelSelectScroll=0f;}
             }
             lastAction=a; feedbackUntil=Time.unscaledTime+0.22f; feedbackScale=ok?1.04f:0.97f;
-        }
-        private static void QuitGame()
-        {
-#if UNITY_EDITOR
-            UnityEditor.EditorApplication.isPlaying = false;
-#else
-            Application.Quit();
-#endif
         }
         private void NativeAction(int a)
         {

@@ -719,7 +719,6 @@ namespace HayChoriYPaty
             long balance = game.Market.BalanceCents, cost = game.Market.MinimumPurchaseCostCents(game.Sim);
             return "FALTANTES " + FormatMarketMoney(cost) + " · SALDO DESPUÉS " + (cost <= balance ? FormatMarketMoney(balance - cost) : "INSUFICIENTE");
         }
-        private static string FormatBottleStock(int units) => (units/4)+" botella(s) + "+(units%4)+"/4 porción";
         private bool MarketHasMissing()
         {
             for (int i = 0; i < StreetIngredientCatalog.Names.Length; i++) if (game.Market.MissingPacks(game.Sim, i) > 0) return true;

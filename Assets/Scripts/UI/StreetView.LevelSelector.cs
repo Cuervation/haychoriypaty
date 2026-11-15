@@ -164,59 +164,6 @@ namespace HayChoriYPaty
         {
             DrawLevelSelectorCardPresentation(index, baseBounds);
         }
-        private void DrawLevelSelectArtwork(int index, Rect bounds, float cardScale)
-        {
-            if (index == 0 && muralArt != null)
-            {
-                DrawRawCover(LayoutRect(bounds), muralArt, AllBoysSelectorMuralSource);
-                if (allBoysCrest != null)
-                    DrawLevelCrest(LayoutRect(new Rect(bounds.x + 5 * cardScale, bounds.y + 5 * cardScale,
-                        30 * cardScale, 34 * cardScale)), allBoysCrest);
-                return;
-            }
-            if (index == 1 && chicagoBackground != null)
-            {
-                DrawRawCover(LayoutRect(bounds), chicagoBackground, ChicagoSelectorMuralSource);
-                if (chicagoCrest != null)
-                    DrawLevelCrest(LayoutRect(new Rect(bounds.x + 5 * cardScale, bounds.y + 5 * cardScale,
-                        30 * cardScale, 34 * cardScale)), chicagoCrest);
-                return;
-            }
-            ClubVisualTheme theme = ClubVisualTheme.ForLevel(index);
-            if (index >= 2 && !string.IsNullOrEmpty(theme.MuralResource))
-            {
-                Texture2D art = Resources.Load<Texture2D>(theme.MuralResource);
-                if (art != null)
-                {
-                    Rect source = theme.MuralSource;
-                    DrawRawCover(LayoutRect(bounds), art, new Rect(source.x * art.width, source.y * art.height,
-                        source.width * art.width, source.height * art.height));
-                    FillRect(new Rect(bounds.x, bounds.y, bounds.width, 5 * cardScale), theme.PrimaryColor);
-                    Texture2D crest = LevelCrestForLevel(index);
-                    if (crest != null)
-                        DrawLevelCrest(LayoutRect(new Rect(bounds.x + 5 * cardScale, bounds.y + 5 * cardScale,
-                            30 * cardScale, 34 * cardScale)), crest);
-                    return;
-                }
-            }
-
-            // Later locations preview their expanding product lineup on the original game grill art.
-            if (largeGrill != null) GUI.DrawTexture(LayoutRect(bounds), largeGrill, ScaleMode.ScaleAndCrop, true);
-            Color accent = LevelSelectAccent(index);
-            FillRect(new Rect(bounds.x, bounds.y, bounds.width, 6 * cardScale), accent);
-            FillRect(new Rect(bounds.x, bounds.y + 6 * cardScale, bounds.width, 2 * cardScale), new Color(1f, 1f, 1f, .8f));
-            int[] featured = LaterLevelCardProducts[Mathf.Clamp(index - 2, 0, LaterLevelCardProducts.Length - 1)];
-            float iconWidth = 43f, gap = 12f;
-            float start = bounds.center.x
-                - (iconWidth * featured.Length + gap * (featured.Length - 1)) * cardScale * .5f;
-            for (int i = 0; i < featured.Length; i++)
-            {
-                Rect icon = new Rect(start + i * (iconWidth + gap) * cardScale, bounds.y + 38 * cardScale,
-                    iconWidth * cardScale, 43 * cardScale);
-                FillRect(icon, new Color(.08f, .045f, .025f, .8f));
-                DrawProductIcon(new Rect(icon.x + 3, icon.y + 3, icon.width - 6, icon.height - 6), featured[i]);
-            }
-        }
         private static Color LevelSelectAccent(int levelIndex)
         {
             switch (levelIndex)

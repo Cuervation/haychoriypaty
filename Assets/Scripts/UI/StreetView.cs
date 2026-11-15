@@ -35,36 +35,17 @@ namespace HayChoriYPaty
             SanLorenzoCrestResource, RiverCrestResource, BocaCrestResource,
             CamionerosCrestResource, LosRedondosCrestResource, HuracanCrestResource, ArgentinosCrestResource, LaRengaCrestResource, "street-peregrinacion-crest-v1"
         };
-        private const string VelezFrontFansResource = "street-velez-fans-front-v1";
-        private const string VelezWalkingFansResource = "street-velez-fans-walk-v1";
-        private const string VelezRiotFansResource = "street-velez-riot-fans-v1";
         private const string VelezGrillResource = "street-parrilla-velez-v1";
         private const string FerroBackgroundResource = "street-background-ferro-v2";
-        private const string FerroFrontFansResource = "street-ferro-fans-front-v2";
-        private const string FerroWalkingFansResource = "street-ferro-fans-walk-v2";
-        private const string FerroRiotFansResource = "street-ferro-riot-fans-v2";
         private const string IndependienteBackgroundResource = "street-background-independiente-v2";
-        private const string IndependienteFrontFansResource = "street-independiente-fans-front-v2";
-        private const string IndependienteWalkingFansResource = "street-independiente-fans-walk-v2";
-        private const string IndependienteRiotFansResource = "street-independiente-riot-fans-v3";
         private const string RacingBackgroundResource = "street-background-racing-v1";
-        private const string RacingFansResource = "street-racing-fans-paired-v1";
-        private const string RacingRiotFansResource = "street-racing-riot-fans-v2";
         private const string SanLorenzoBackgroundResource = "street-background-sanlorenzo-v1";
-        private const string SanLorenzoFansResource = "street-sanlorenzo-fans-paired-v1";
-        private const string SanLorenzoRiotFansResource = "street-sanlorenzo-riot-fans-v2";
         private const string BocaBackgroundResource = "street-background-boca-v1";
         private const int RiverVisualLevelIndex = 7;
         private const string RiverMuralResource = "street-mural-river-master-v1";
         private const string RiverHeaderExtensionResource = "street-river-header-extension-v1";
-        private const string RiverFansResource = "street-river-fans-paired-v1";
-        private const string RiverRiotFansResource = "street-river-riot-fans-v2";
-        private const string BocaFansResource = "street-boca-fans-paired-v1";
-        private const string BocaRiotFansResource = "street-boca-riot-fans-v2";
         private const string CamionerosBackgroundResource = "street-background-camioneros-v1";
         private const string LosRedondosBackgroundResource = "street-background-losredondos-v1";
-        private const string LosRedondosFrontFansResource = "street-losredondos-fans-front-v1";
-        private const string LosRedondosWalkingFansResource = "street-losredondos-fans-walk-v1";
         private const string FourZoneGrillResource = "street-grill-four-zones-v1";
         private const string BeerBarrelResource = "street-beer-barrel-v1";
         private const string FernetTableResource = "street-fernet-table-v1";
@@ -83,18 +64,12 @@ namespace HayChoriYPaty
         // Nine monochrome All Boys outfits stay integrated in front, walk, and timeout poses.
         // All three atlases use the same customer-ID variant so apparel persists across contexts.
         // The old four uniformed silhouettes remain a safe fallback if an atlas is missing.
-        private const string AllBoysFrontFansResource = "street-allboys-fans-front-v1";
-        private const string AllBoysWalkingFansResource = "street-allboys-fans-walk-v1";
-        private const string AllBoysRiotFansResource = "street-allboys-riot-fans-v1";
         private const int AllBoysFanVariantCount = 9;
         private const int AllBoysFanAtlasColumns = 3;
         private const int AllBoysLegacyFrontFanFirstFrame = 8;
         private const int AllBoysLegacyWalkingFanFirstFrame = 12;
         private const int AllBoysLegacyFanVariantCount = 4;
         // Eight original Nueva Chicago outfits are integrated into complete character poses.
-        private const string ChicagoFrontFansResource = "street-chicago-fans-front-v1";
-        private const string ChicagoWalkingFansResource = "street-chicago-fans-walk-v1";
-        private const string ChicagoRiotFansResource = "street-chicago-riot-fans-v2";
         private const int ChicagoFanVariantCount = 8;
         private const int ChicagoFanAtlasColumns = 3;
         private static readonly Rect PlayingLevelBadge = new Rect(45, 886, 450, 38);
@@ -154,10 +129,8 @@ namespace HayChoriYPaty
         // Standard station dimensions come from live Floresta, not per-level fitting.
         private const string ChicagoGrillResource = "street-parrilla-large-v4";
         private static readonly Rect ServingTableRect = StreetWorkstationLayout.FoodTableBounds;
-        private static readonly Rect ChicagoServingTableRect = StreetWorkstationLayout.FoodTableBounds;
         private static readonly Rect ChicagoBarrelRect = StreetWorkstationLayout.CocaBounds;
         private static readonly Rect VelezBarrelRect = StreetWorkstationLayout.CocaBounds;
-        private static Rect ServingTableBounds(int productCount) => StreetWorkstationLayout.FoodTableBounds;
         private static Rect ServingTableBoundsForLevel(int productCount, int levelIndex) => StreetWorkstationLayout.FoodTableBounds;
         private static readonly Rect Start = new Rect(161, 555, 218, 61);
         private static readonly Rect Speed = new Rect(28, 710, 234, 120);
@@ -236,15 +209,6 @@ namespace HayChoriYPaty
                 canvasHeight + Mathf.Max(0f, bottomBleed));
         }
 
-        private static float MaximumResponsiveFooterPanelHeight(float compactScale)
-        {
-            // Reserve against the tallest supported footer (four-action, two-row layout),
-            // so decorative flags do not change size with the level's upgrade catalog.
-            float fourActionPanel = 22f + 6f + 2f * 104f + 8f;
-            float fiveActionPanel = 20f + 6f + 2f * 100f + 8f;
-            float readyPanel = 26f + 6f + 120f + 6f + ReadyLevelSelector.height;
-            return Mathf.Max(fourActionPanel, Mathf.Max(fiveActionPanel, readyPanel)) * compactScale;
-        }
 
         private static ResponsiveFooterLayout BuildResponsiveFooterLayoutCore(
             StreetSimulation sim, float canvasHeight, bool showUpgrades, bool showReadySelector, float decorationBottom)
@@ -359,8 +323,6 @@ namespace HayChoriYPaty
             rect.height /= Mathf.Max(.01f, layoutVerticalScale);
             return rect;
         }
-        private Rect CatalogLevelBadge() => CatalogUpgradeActions(game.Sim).Length == 5
-            ? new Rect(45, 716, 450, 20) : CatalogUpgradeActions(game.Sim).Length == 4 ? new Rect(45, 934, 450, 22) : PlayingLevelBadge;
         private static Rect UpgradeTouchBounds(int action, bool specialists, float verticalScale)
         {
             Rect rect = UpgradeCardBounds(action, specialists);
@@ -372,9 +334,6 @@ namespace HayChoriYPaty
             if (!specialists) return action == 3 ? Speed : HireParrillero;
             return action == 3 ? new Rect(24,710,156,120) : action == 2 ? new Rect(192,710,156,120) : HireCocacolero;
         }
-        private static readonly Rect MenuPlay = new Rect(126, 704, 288, 92);
-        private static readonly Rect MenuQuit = new Rect(126, 816, 288, 92);
-        private const int MenuPlayAction = 6, MenuQuitAction = 7;
         private const int LevelSelectorBackAction = 8, VictoryExitAction = 9, RiotReturnAction = 15, LevelSelectFirstAction = 30;
         private const int HubPlayAction = 200, HubMarketAction = 201, HubBadgesAction = 202, HubRankingAction = 203, HubAccountAction = 204;
         private const int BadgeBackAction = 205, RankingBackAction = 206;
@@ -418,7 +377,6 @@ namespace HayChoriYPaty
         private const int LevelOneTutorialPrimaryAction = 300, LevelOneTutorialSkipAction = 301;
         private const float LevelOneTutorialBubbleWidth = 320f;
         private const float LevelOneTutorialBubbleHeight = 140f;
-        private const float LevelOneTutorialBubbleTailWidth = 52f;
         private const float LevelOneTutorialBackdropDimAlpha = .50f;
         private static Color LevelOneTutorialBackdropDimColor() =>
             new Color(0f, 0f, 0f, LevelOneTutorialBackdropDimAlpha);
@@ -552,15 +510,15 @@ namespace HayChoriYPaty
         private float clubPennantLogicalHeight = -1f;
         private Texture2D clubMuralTexture;
         private string clubMuralResource;
-        private Texture2D allBoysFrontFans, allBoysWalkingFans, allBoysRiotFans;
-        private Texture2D chicagoFrontFans, chicagoWalkingFans, chicagoRiotFans;
-        private Texture2D velezFrontFans, velezWalkingFans, velezRiotFans;
-        private Texture2D ferroBackground, ferroFrontFans, ferroWalkingFans, ferroRiotFans;
-        private Texture2D independienteBackground, independienteFrontFans, independienteWalkingFans, independienteRiotFans;
-        private Texture2D racingBackground, racingFans, racingRiotFans;
-        private Texture2D sanLorenzoBackground, sanLorenzoFans, sanLorenzoRiotFans;
-        private Texture2D bocaBackground, bocaFans, bocaRiotFans;
-        private Texture2D riverMural, riverHeaderExtension, riverFans, riverRiotFans;
+        private Texture2D allBoysFrontFans, allBoysWalkingFans;
+        private Texture2D chicagoFrontFans, chicagoWalkingFans;
+        private Texture2D velezFrontFans, velezWalkingFans;
+        private Texture2D ferroBackground, ferroFrontFans, ferroWalkingFans;
+        private Texture2D independienteBackground, independienteFrontFans, independienteWalkingFans;
+        private Texture2D racingBackground, racingFans;
+        private Texture2D sanLorenzoBackground, sanLorenzoFans;
+        private Texture2D bocaBackground, bocaFans;
+        private Texture2D riverMural, riverHeaderExtension, riverFans;
         private Texture2D camionerosBackground;
         private Texture2D losRedondosBackground, losRedondosFrontFans, losRedondosWalkingFans;
         private Texture2D fourZoneGrill, premiumGrill, beerBarrel, fernetTable;
@@ -1468,7 +1426,6 @@ namespace HayChoriYPaty
             else if (levelSixRacingTutorialActive) DrawLevelSixRacingTutorial();
             GUI.color=old;GUI.matrix=m;
         }
-        private static Rect ScreenBounds(Vector2 size) => new Rect(0, 0, size.x, size.y);
 
 
         private const float CookingRingRadius = 10f;
@@ -1711,28 +1668,6 @@ namespace HayChoriYPaty
 
         private static Rect GrillRect(int productCount) => StreetWorkstationLayout.GrillBounds;
         private static Rect GrillRectForLevel(int productCount, int levelIndex) => StreetWorkstationLayout.GrillBounds;
-        private void DrawGrill()
-        {
-            StreetSimulation sim = game.Sim;
-            if (sim.HasRole(StreetWorkerRole.Parrillero))
-            {
-                // No premium meat artwork can be rendered on this grill.
-                Texture2D normal = sim.IsProductAvailable(1) && velezGrill != null ? velezGrill
-                    : sim.LevelIndex == 0 ? largeGrill : chicagoGrill;
-                DrawGrillArtwork(StreetWorkstationLayout.GrillBounds, normal);
-            }
-            if (sim.HasParrilleroPremium && premiumGrill != null)
-            {
-                Rect drawn = DrawGrillArtwork(StreetWorkstationLayout.PremiumGrillBounds, premiumGrill);
-                // Keep unavailable meat out of the grate while retaining the complete separate frame.
-                if (!sim.IsProductAvailable(3))
-                    DrawRaw(new Rect(drawn.x + drawn.width * .5f, drawn.y, drawn.width * .5f, drawn.height),
-                        premiumGrill, new Rect(0,0,premiumGrill.width*.5f,premiumGrill.height),true,false);
-                else if (!sim.IsProductAvailable(2))
-                    DrawRaw(new Rect(drawn.x, drawn.y, drawn.width * .5f, drawn.height),
-                        premiumGrill, new Rect(premiumGrill.width*.5f,0,premiumGrill.width*.5f,premiumGrill.height),true,false);
-            }
-        }
         private Rect DrawGrillArtwork(Rect bounds, Texture2D art)
         {
             if (art == null) { Item(bounds,7); return LayoutRect(bounds); }
@@ -1743,21 +1678,6 @@ namespace HayChoriYPaty
         private static string StationLabelForProduct(int product)
         {
             return product == 4 ? "COCA 600 ml" : product == 6 ? "CERVEZA" : product == 5 ? "FERNET 1 L" : string.Empty;
-        }
-        private void DrawStation(int i, bool unlocked)
-        {
-            if (!unlocked) return;
-            Rect station = StreetWorkstationLayout.BoundsForProduct(i,game.Sim.HasParrilleroPremium);
-            if (i >= 4)
-            {
-                Texture2D art = i == 4 ? beverageBarrel : i == 6 ? beerBarrel : fernetTable;
-                if (art != null) Draw(station, art, new Rect(0, 0, art.width, art.height), false, false);
-            }
-            if (i >= 4) return;
-            if (game.Sim.LevelIndex == 0) return;
-            // Labels/icons identify finished products on the one standard table, never on the cooking grate.
-            float x = station.x + 25 + (i % 2) * 46;
-            DrawProductIcon(new Rect(x - 17, station.y + 3, 34, 25), i);
         }
         private static bool ShouldDrawStationProductBadge(int productIndex)
         {

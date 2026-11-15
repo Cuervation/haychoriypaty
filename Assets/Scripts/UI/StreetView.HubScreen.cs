@@ -359,15 +359,6 @@ namespace HayChoriYPaty
             return new Rect((screenSize.x - drawnWidth) * .5f,
                 (screenSize.y - drawnHeight) * .5f, drawnWidth, drawnHeight);
         }
-        private static Rect HubArtworkActionScreenBounds(int action, Vector2 screenSize)
-        {
-            Rect source = HubSignageTouchSourceBounds(action);
-            Rect artwork = HubArtworkScreenBounds(HubArtworkSize, screenSize);
-            if (source.width <= 0f || source.height <= 0f || artwork.width <= 0f) return Rect.zero;
-            float scale = artwork.width / HubArtworkSize.x;
-            return new Rect(artwork.xMin + source.x * scale, artwork.yMin + source.y * scale,
-                source.width * scale, source.height * scale);
-        }
         private static Rect HubArtworkRectToLayout(Rect artRect, Vector2 artSize, Vector2 screenSize, Rect safeArea)
         {
             if (artSize.x <= 0f || artSize.y <= 0f || screenSize.x <= 0f || screenSize.y <= 0f) return Rect.zero;

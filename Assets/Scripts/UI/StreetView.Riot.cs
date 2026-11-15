@@ -194,18 +194,6 @@ namespace HayChoriYPaty
                 cellWidth, cellHeight);
         }
 
-        private static Rect ChicagoRiotFanFrameSource(Texture2D atlas, int customerId, int pose)
-        {
-            if (atlas == null) return Rect.zero;
-            int variant = GetChicagoFanVariant(customerId);
-            float cellWidth = atlas.width / 4f;
-            float cellHeight = atlas.height / 4f;
-            int outfitColumn = variant % 2;
-            int pairedPoseColumn = outfitColumn * 2 + (pose & 1);
-            int rowFromTop = variant / 2;
-            return new Rect(pairedPoseColumn * cellWidth, atlas.height - (rowFromTop + 1) * cellHeight,
-                cellWidth, cellHeight);
-        }
 
         private static Rect RiotFanFrameSource(Texture2D atlas, int customerId, int pose)
         {

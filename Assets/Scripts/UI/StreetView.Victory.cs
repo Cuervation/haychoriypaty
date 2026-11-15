@@ -137,7 +137,6 @@ namespace HayChoriYPaty
         }
         // Public for focused geometry checks; pointer and visible control share this normalized frame.
         public static Rect ChulengoMultiplyBoundsForFrame(Rect frame) => VictorySlot(frame, new Rect(.20f, .935f, .60f, .095f));
-        public static int ChulengoSectorAtPosition(float position) => StreetChulengo.SectorAtPosition(position);
         private static readonly string[] ChulengoLabels = { "×0", "×1,5", "×1", "×2", "×1", "×1,5", "×0" };
         private static readonly Color[] ChulengoColors = {
             new Color(.76f, .12f, .055f), new Color(.94f, .78f, .15f), new Color(.12f, .46f, .82f),

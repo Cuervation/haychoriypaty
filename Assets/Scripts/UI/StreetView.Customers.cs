@@ -268,17 +268,6 @@ namespace HayChoriYPaty
             return new Rect(column * cellWidth, atlas.height - (rowFromTop + 1) * cellHeight,
                 cellWidth, cellHeight);
         }
-        private void DrawVelezFan(Rect person, int customerId, bool walking, bool flip)
-        {
-            Texture2D atlas = walking ? velezWalkingFans : velezFrontFans;
-            if (atlas == null)
-            {
-                Person(person, GetLegacyAllBoysFanFrame(customerId, walking), walking && !flip);
-                return;
-            }
-            int variant = GetAllBoysFanVariant(customerId);
-            Draw(person, atlas, VelezFanSourceRect(atlas, variant), false, flip);
-        }
         private static Rect VelezFanSourceRect(Texture2D atlas, int variant)
         {
             int index = variant % VelezFanVariantCount;
@@ -289,18 +278,6 @@ namespace HayChoriYPaty
             return new Rect(column * cellWidth, atlas.height - (rowFromTop + 1) * cellHeight,
                 cellWidth, cellHeight);
         }
-        private void DrawFerroFan(Rect person, int customerId, bool walking, bool flip)
-        {
-            Texture2D atlas = walking ? ferroWalkingFans : ferroFrontFans;
-            if (atlas == null)
-            {
-                Person(person, GetLegacyAllBoysFanFrame(customerId, walking), walking && !flip);
-                return;
-            }
-            int variant = customerId % FerroFanVariantCount;
-            if (variant < 0) variant += FerroFanVariantCount;
-            Draw(person, atlas, FerroFanSourceRect(atlas, variant), false, flip);
-        }
         private static Rect FerroFanSourceRect(Texture2D atlas, int variant)
         {
             if (atlas == null) return Rect.zero;
@@ -310,16 +287,6 @@ namespace HayChoriYPaty
             int rowFromTop = variant / TeamFanAtlasColumns;
             return new Rect(column * cellWidth, atlas.height - (rowFromTop + 1) * cellHeight,
                 cellWidth, cellHeight);
-        }
-        private void DrawLosRedondosFan(Rect person, int customerId, bool walking, bool flip)
-        {
-            Texture2D atlas = walking ? losRedondosWalkingFans : losRedondosFrontFans;
-            if (atlas == null)
-            {
-                Person(person, GetLegacyAllBoysFanFrame(customerId, walking), walking && !flip);
-                return;
-            }
-            Draw(person, atlas, LosRedondosFanSourceRect(atlas, customerId), false, flip);
         }
         private static Rect LosRedondosFanSourceRect(Texture2D atlas, int customerId)
         {
@@ -333,34 +300,6 @@ namespace HayChoriYPaty
             return new Rect(column * cellWidth, atlas.height - (rowFromTop + 1) * cellHeight,
                 cellWidth, cellHeight);
         }
-        private void DrawIndependienteFan(Rect person, int customerId, bool walking, bool flip)
-        {
-            Texture2D atlas = walking ? independienteWalkingFans : independienteFrontFans;
-            if (atlas == null)
-            {
-                Person(person, GetLegacyAllBoysFanFrame(customerId, walking), walking && !flip);
-                return;
-            }
-            int variant = customerId % IndependienteFanVariantCount;
-            if (variant < 0) variant += IndependienteFanVariantCount;
-            float cellWidth = atlas.width / (float)TeamFanAtlasColumns;
-            float cellHeight = atlas.height / 4f;
-            int column = variant % TeamFanAtlasColumns;
-            int rowFromTop = variant / TeamFanAtlasColumns;
-            Rect source = new Rect(column * cellWidth, atlas.height - (rowFromTop + 1) * cellHeight,
-                cellWidth, cellHeight);
-            Draw(person, atlas, source, false, flip);
-        }
-        private void DrawTeamFan(Rect person, int customerId, bool walking, bool flip, Texture2D front, Texture2D walk)
-        {
-            Texture2D atlas = walking ? walk : front;
-            if (atlas == null)
-            {
-                Person(person, GetLegacyAllBoysFanFrame(customerId, walking), walking && !flip);
-                return;
-            }
-            Draw(person, atlas, TeamFanSourceRect(atlas, customerId), false, flip);
-        }
         private static Rect TeamFanSourceRect(Texture2D atlas, int customerId)
         {
             if (atlas == null) return Rect.zero;
@@ -371,19 +310,6 @@ namespace HayChoriYPaty
             int column = variant % TeamFanAtlasColumns;
             int rowFromTop = variant / TeamFanAtlasColumns;
             return new Rect(column * cellWidth, atlas.height - (rowFromTop + 1) * cellHeight,
-                cellWidth, cellHeight);
-        }
-        private static Rect FerroRiotFanFrameSource(Texture2D atlas, int customerId, int pose)
-        {
-            if (atlas == null) return Rect.zero;
-            int variant = customerId % FerroFanVariantCount;
-            if (variant < 0) variant += FerroFanVariantCount;
-            float cellWidth = atlas.width / 6f;
-            float cellHeight = atlas.height / 4f;
-            int outfitColumn = (variant % TeamFanAtlasColumns) * 2;
-            int pairedPoseColumn = outfitColumn + (pose & 1);
-            int rowFromTop = variant / TeamFanAtlasColumns;
-            return new Rect(pairedPoseColumn * cellWidth, atlas.height - (rowFromTop + 1) * cellHeight,
                 cellWidth, cellHeight);
         }
         private static Rect TeamRiotFanFrameSource(Texture2D atlas, int customerId, int pose)
@@ -397,52 +323,6 @@ namespace HayChoriYPaty
             int rowFromTop = variant / TeamFanAtlasColumns;
             return new Rect(pairedPoseColumn * cellWidth, atlas.height - (rowFromTop + 1) * cellHeight,
                 cellWidth, cellHeight);
-        }
-        private static Rect IndependienteRiotFanFrameSource(Texture2D atlas, int customerId, int pose)
-        {
-            if (atlas == null) return Rect.zero;
-            int variant = customerId % IndependienteFanVariantCount;
-            if (variant < 0) variant += IndependienteFanVariantCount;
-            float cellWidth = atlas.width / 6f;
-            float cellHeight = atlas.height / 4f;
-            int pairedPoseColumn = (variant % TeamFanAtlasColumns) * 2 + (pose & 1);
-            int rowFromTop = variant / TeamFanAtlasColumns;
-            return new Rect(pairedPoseColumn * cellWidth, atlas.height - (rowFromTop + 1) * cellHeight,
-                cellWidth, cellHeight);
-        }
-        private void DrawRacingFan(Rect person, int customerId, bool walking, bool flip)
-        {
-            if (racingFans == null)
-            {
-                Person(person, GetLegacyAllBoysFanFrame(customerId, walking), walking && !flip);
-                return;
-            }
-            Draw(person, racingFans, RacingFanSourceRect(racingFans, customerId, walking), false, flip);
-        }
-        private void DrawSanLorenzoFan(Rect person, int customerId, bool walking, bool flip)
-        {
-            if (sanLorenzoFans == null)
-            {
-                Person(person, GetLegacyAllBoysFanFrame(customerId, walking), walking && !flip);
-                return;
-            }
-            // This paired 6x4 atlas shares the established twelve-variant outfit/pose grid.
-            Draw(person, sanLorenzoFans, RacingFanSourceRect(sanLorenzoFans, customerId, walking), false, flip);
-        }
-        private void DrawBocaFan(Rect person, int customerId, bool walking, bool flip)
-        {
-            if (bocaFans == null)
-            {
-                Person(person, GetLegacyAllBoysFanFrame(customerId, walking), walking && !flip);
-                return;
-            }
-            // The Boca atlas shares the established paired 6x4 grid with twelve outfit variants.
-            Draw(person, bocaFans, RacingFanSourceRect(bocaFans, customerId, walking), false, flip);
-        }
-        private void DrawRiverFan(Rect person, int customerId, bool walking, bool flip)
-        {
-            if (riverFans == null) return;
-            Draw(person, riverFans, RacingFanSourceRect(riverFans, RiverAtlasVariant(customerId), walking), false, flip);
         }
         private static int RiverAtlasVariant(int customerId)
         {
@@ -458,18 +338,6 @@ namespace HayChoriYPaty
             float cellWidth = atlas.width / 6f;
             float cellHeight = atlas.height / 4f;
             int pairedPoseColumn = (variant % 3) * 2 + (walking ? 1 : 0);
-            int rowFromTop = variant / 3;
-            return new Rect(pairedPoseColumn * cellWidth, atlas.height - (rowFromTop + 1) * cellHeight,
-                cellWidth, cellHeight);
-        }
-        private static Rect RacingRiotFanFrameSource(Texture2D atlas, int customerId, int pose)
-        {
-            if (atlas == null) return Rect.zero;
-            int variant = customerId % RacingFanVariantCount;
-            if (variant < 0) variant += RacingFanVariantCount;
-            float cellWidth = atlas.width / 6f;
-            float cellHeight = atlas.height / 4f;
-            int pairedPoseColumn = (variant % 3) * 2 + (pose & 1);
             int rowFromTop = variant / 3;
             return new Rect(pairedPoseColumn * cellWidth, atlas.height - (rowFromTop + 1) * cellHeight,
                 cellWidth, cellHeight);
