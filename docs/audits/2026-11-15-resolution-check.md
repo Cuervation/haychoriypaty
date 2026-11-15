@@ -20,3 +20,11 @@ Corrección posible: multiplicar esas medidas por `Screen.width / 540` (con tope
 `StreetView.HubScreen.cs`: nuevo `HubControlScale(screenSize) = clamp(ancho/540, 1, 3)`. Escalan con él el botón de cuenta (rect completo), los mínimos de toque de ajustes (48) y música (44), y los márgenes/huecos del fallback de música. A 540 px o menos no cambia nada; en 1080 px mide el doble; el tope es 3x. La ilustración del hub (engranaje y altavoz horneados en el arte) no se tocó: solo crecen las zonas táctiles y el botón de cuenta.
 Pruebas: nuevo `StreetHubControlScaleTests` (EditMode: escala, límites en pantalla y no solapamiento a 540x960, 720x1600 y 1080x2400); `StreetHubSignageTests` 14/14 con él; PlayMode `StreetHubViewTests`+`HubTouchAnimationViewTests`+`StreetPointerTests`: 47 pasan, 0 fallan, 28 ignorados.
 Sin verificar visualmente el botón de cuenta (el arnés de pruebas lo desactiva) ni en dispositivo.
+
+## Segunda pasada: victoria, derrota, Tower Defense (2026-11-15)
+Misma metodología (prueba temporal, retirada) en 540x960, 720x1280, 720x1600, 1080x2400 y 1200x1600. Capturas locales en `Logs/Acceptance/Screens/` (no versionadas).
+- **Victoria (Chulengo):** panel, medidor, "COBRAR" y "MULTIPLICAR" caben y se leen en todos los tamaños revisados (720x1600 y referencia 540x960 comparados). La mitad inferior vacía del pergamino es igual en la referencia, no depende de la resolución.
+- **Derrota (Game Over):** escena, texto y "VOLVER A NIVELES" completos en 720x1600.
+- **Tower Defense (Camioneros):** mapa, vallas, mesas, barriles y las dos tarjetas de contratación completas en 720x1600 y 1200x1600; sin recortes.
+- **Sin resultado:** los **tutoriales** no se pudieron mostrar (la prueba terminó en la partida normal) y quedan sin verificar; tampoco se cubrió el notch (requiere dispositivo).
+- No se encontraron problemas nuevos de layout en estas pantallas.
