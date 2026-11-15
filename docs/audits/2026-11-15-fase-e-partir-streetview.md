@@ -13,9 +13,13 @@ Fecha: 2026-11-15. Movimiento mecánico a archivos `partial class StreetView`; s
 | Victoria, Chulengo, recibo | `StreetView.Victory.cs` | ~780 | (lote 2) |
 | Tutoriales de nivel | `StreetView.Tutorials.cs` | ~540 | (lote 2) |
 | Tarjetas de mejoras | `StreetView.Upgrades.cs` | ~280 | (lote 2) |
-| Introducción | `StreetView.Intro.cs` | ~200 | (lote 2) |
+| Introducción | `StreetView.Intro.cs` | ~200 | 6d9ce3b |
+| Entrada de puntero y acciones | `StreetView.Input.cs` | ~800 | (lote 3) |
+| Fondos, murales, banderines | `StreetView.Backdrop.cs` | ~310 | (lote 3) |
+| Botones estándar | `StreetView.StandardButtons.cs` | ~245 | (lote 3) |
+| Trabajadores (poses) | `StreetView.Workers.cs` | ~125 | (lote 3) |
 
-`StreetView.cs`: 7.622 → 3.318 líneas (−4.304) tras el lote 2; HUD verificado con 30 tests EditMode (StreetSpecialtyPresentation, TowerDefenseScreenLayout).
+`StreetView.cs`: 7.622 → 1.871 líneas (−5.751, −75 %) tras el lote 3; HUD verificado con 30 tests EditMode (StreetSpecialtyPresentation, TowerDefenseScreenLayout).
 
 ## Verificación
 - Compila sin errores CS tras cada paso.
@@ -33,3 +37,6 @@ Fecha: 2026-11-15. Movimiento mecánico a archivos `partial class StreetView`; s
 - No se modificó ningún test. Una solución real exige rediseñar la inyección de input (p. ej. invocar acciones sin mouse) o fijar el Game view; queda como trabajo aparte.
 
 - Lote 2: `StreetPointerTests.AffordableUpgradeCardsCaptureDoubleWhiteBorderOnlyWithEnoughCoins` falla (1080 vs 1601, tamaño del Game view) con y sin los cambios; es el mismo tipo de fallo de entorno de los otros tests frágiles.
+
+## Cierre
+`StreetView.cs` conserva campos/constantes, OnEnable/carga de recursos, música del hub, `DrawGameGui` y helpers pequeños. Seguir partiendo da rendimientos decrecientes: lo restante es mayormente estado compartido (campos) y métodos pequeños acoplados. Verificación del lote 3: compila, 45 EditMode OK, PlayMode (StreetPointer/HubView/MarketView/KitchenRenderer/ActiveCooksPointer) 115 tests sin fallos nuevos (solo el fallo de entorno de 1080 vs 1601, preexistente).
