@@ -23,6 +23,7 @@
 | Portada y hub de día de partido | [home-hub.md](features/home-hub.md) |
 | Límites de código/render/persistencia | [architecture.md](architecture.md) |
 | APK/instalaciones y comprobaciones de entrega | [android-prototype.md](features/android-prototype.md) (consultar encabezado reciente) |
+| Agentes/skills compartidos Codex + Claude, trabajo en paralelo y worktrees futuros | [.agents/README.md](../.agents/README.md) (reglas en `AGENTS.md`) |
 | Evidencia histórica de avances y pruebas | [status.md](status.md) (buscar fecha/sistema) |
 | Decisiones históricas y reemplazos | [decisions.md](decisions.md) (buscar tema/fecha) |
 | Continuidad histórica completa hasta 2026-10-25 (no vigente) | [history/continuity-log-through-20261025.md](history/continuity-log-through-20261025.md) |

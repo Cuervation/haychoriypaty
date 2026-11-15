@@ -11,11 +11,10 @@ description: Investigate or modify Unity 2D gameplay, including reviewing local 
 - Visual acceptance requires a real capture from the affected Unity view. Label full Game View, PlayMode/projection, or physical device correctly; verify only the shown criteria and resolutions/safe areas actually captured. A camera/projection image is not a full-screen or device test.
 - Preserve actual saves during validation and restore any temporary QA state. Reuse current cameras, art, fonts and packages; no dependencies/services installed by this skill. Choose only affected checks with `targeted-testing`; build/install only when authorized.
 
-## Git publication
+## Git and concurrent agents
 
-- The user explicitly grants this project a standing preference: a direct request to “subí a Git”/push authorizes pushing the reviewed, scoped commit to the currently configured `origin` and branch, including when the repository is public. Do not ask a redundant second confirmation for that requested push.
-- Stage only requested product/docs changes; exclude unrelated local preferences, credentials, generated/audit/recovery files, and APK binaries unless explicitly requested. Never silently change the remote.
-- This preference does not override platform safety controls. If a control rejects a push, do not route around it with another API/tool; explain the block and follow any specific approval flow it requires.
+- Git, commit, push and publication rules live only in `AGENTS.md` (“Git y trabajo local” and “Git: publicación solicitada por el usuario”); follow them, do not restate them here.
+- If another agent may be using the same checkout, follow the Unity lock protocol in `.agents/README.md` before any Unity action that mutates the Editor, scenes, assets, compilation or saves.
 
 ## Local gameplay-video inspection (especially WhatsApp MP4)
 

@@ -49,3 +49,8 @@ tools/firebase/node_modules/
 /Assets/GeneratedLocalRepo/
 /Assets/GeneratedLocalRepo.meta
 /Assets/StreamingAssets.meta
+
+# Agent tooling: local-only Claude settings, Claude-managed worktrees and the Unity coordination lock.
+.claude/settings.local.json
+.claude/worktrees/
+.agents/locks/
