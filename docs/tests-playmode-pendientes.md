@@ -1,6 +1,6 @@
 # Tests PlayMode pendientes de rediseño
 
-Fecha: 2026-11-15. Total ignorados: 46.
+Fecha: 2026-11-15. Total ignorados: 47 en PlayMode (más 1 en EditMode).
 
 Estos tests llevan `[Ignore]` porque quedaron desfasados respecto del flujo/layout actual de `StreetView` (hub, selector por posición de campana, tutoriales, mercado). Ya fallaban antes de la limpieza de las fases 1-2b. No se borraron ni se corrigieron; rehacerlos exige contrastar cada uno con el contrato vigente en `specs/` (ver `specs/current-state.md`).
 
@@ -69,6 +69,10 @@ Al rediseñar uno: quitar su `[Ignore]`, ajustarlo al flujo actual y moverlo fue
 - `LaRengaGameViewShowsBothStaffedAreasFansAndPhysicalThrowsAtThreeResolutions` (línea 885)
 - `PeregrinacionNaturalSixtyWithSevenProductsUsesLegalConstructionAndCanWin` (línea 974)
 - `PeregrinacionGameViewSingleFenceFreeConstructionAtThreeResolutions` (línea 1193)
+## WholeBondiolaViewTests.cs (1)
+
+- `WholePremiumCutsFillBothHalvesAndUseRealCookingStates` (línea 66; atributo `[UnityTest, Ignore(...)]`, omitido en la primera lista).
+
 ## Fuera de PlayMode (1)
 
 - `Assets/Tests/EditMode/PeregrinacionGameModeTests.cs` (línea 74): ignorado por un bug latente de colocación libre en `TowerDefenseGameMode.Peregrinacion` (no es un test desfasado; el motivo está en su atributo `[Ignore]`).
