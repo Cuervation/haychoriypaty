@@ -165,15 +165,31 @@ namespace HayChoriYPaty
         private static readonly Rect HireCocacolero = new Rect(360, 710, 156, 120);
         private const int HireCocacoleroAction = 16;
         private const int HirePremiumAction = 20, HireFerneteroAction = 21, HireMozoAction = 22;
+        // Called several times per frame; the result only depends on these flags, so share read-only arrays.
+        private static readonly System.Collections.Generic.Dictionary<int, int[]> catalogUpgradeActionsCache =
+            new System.Collections.Generic.Dictionary<int, int[]>();
         private static int[] CatalogUpgradeActions(StreetSimulation sim)
         {
+            bool active = sim.UsesActiveCooks;
+            int key = active ? 1 : 0;
+            if (!active)
+            {
+                if (sim.HasRole(StreetWorkerRole.Parrillero)) key |= 2;
+                if (sim.HasRole(StreetWorkerRole.ParrilleroPremium)) key |= 4;
+                if (sim.HasRole(StreetWorkerRole.Cocacolero)) key |= 8;
+                if (sim.HasRole(StreetWorkerRole.Fernetero)) key |= 16;
+            }
+            int[] cached;
+            if (catalogUpgradeActionsCache.TryGetValue(key, out cached)) return cached;
             var actions = new System.Collections.Generic.List<int> { 3 };
-            if (sim.UsesActiveCooks)
+            if (active)
                 actions.AddRange(new[] { 2, HirePremiumAction, HireCocacoleroAction, HireFerneteroAction, HireMozoAction });
             else
                 foreach (var role in new[] { StreetWorkerRole.Parrillero, StreetWorkerRole.ParrilleroPremium, StreetWorkerRole.Cocacolero, StreetWorkerRole.Fernetero })
                     if (sim.HasRole(role)) actions.Add(ActionForRole(role));
-            return actions.ToArray();
+            cached = actions.ToArray();
+            catalogUpgradeActionsCache[key] = cached;
+            return cached;
         }
         private static int ActionForRole(StreetWorkerRole role) => role == StreetWorkerRole.Parrillero ? 2
             : role == StreetWorkerRole.ParrilleroPremium ? HirePremiumAction : role == StreetWorkerRole.Cocacolero ? HireCocacoleroAction : role == StreetWorkerRole.Fernetero ? HireFerneteroAction : HireMozoAction;
@@ -554,10 +570,10 @@ namespace HayChoriYPaty
         private int clubColoredVictoryPopupLevel = int.MinValue;
         private Texture2D chulengoMeter, chulengoNeedle, chulengoHub, chulengoParchment, chulengoBowl, chulengoTicketTexture;
         private Texture2D coverArt, hubBackdrop, titleLogo, menuButton, chulengoCollectButton, chulengoMultiplyButton, googleButtonSurface, hudBarTexture, cutoutHudBarTexture, hudQuotaCardTexture, hudQuotaCardOutlineTexture, gameplayFooterTexture, riotBackdrop, riotFanAtlas, riotImpactCloud;
-        private readonly System.Collections.Generic.Dictionary<string, Texture2D> glossyUpgradeCardTextures =
-            new System.Collections.Generic.Dictionary<string, Texture2D>();
-        private readonly System.Collections.Generic.Dictionary<string, Texture2D> affordableUpgradeBorderTextures =
-            new System.Collections.Generic.Dictionary<string, Texture2D>();
+        private readonly System.Collections.Generic.Dictionary<(int, int), Texture2D> glossyUpgradeCardTextures =
+            new System.Collections.Generic.Dictionary<(int, int), Texture2D>();
+        private readonly System.Collections.Generic.Dictionary<(int, int), Texture2D> affordableUpgradeBorderTextures =
+            new System.Collections.Generic.Dictionary<(int, int), Texture2D>();
         private Font menuFont, googleSansFont;
         private GUIStyle menuTitle, levelTitle;
         private GUIStyle introStatusStyle;
@@ -6007,7 +6023,7 @@ namespace HayChoriYPaty
         {
             int width = Mathf.Clamp(Mathf.RoundToInt(card.width * 2f), 128, 1024);
             int height = Mathf.Clamp(Mathf.RoundToInt(card.height * 2f), 96, 768);
-            string key = width + "x" + height;
+            var key = (width, height);
             if (affordableUpgradeBorderTextures.TryGetValue(key, out Texture2D cached) && cached != null) return cached;
             Texture2D created = CreateAffordableUpgradeBorderTexture(width, height);
             affordableUpgradeBorderTextures[key] = created;
@@ -6062,7 +6078,7 @@ namespace HayChoriYPaty
         {
             int width = Mathf.Clamp(Mathf.RoundToInt(card.width * 2f), 128, 1024);
             int height = Mathf.Clamp(Mathf.RoundToInt(card.height * 2f), 96, 768);
-            string key = width + "x" + height;
+            var key = (width, height);
             if (glossyUpgradeCardTextures.TryGetValue(key, out Texture2D cached) && cached != null) return cached;
             Texture2D created = CreateGlossyUpgradeCardTexture(width, height);
             glossyUpgradeCardTextures[key] = created;

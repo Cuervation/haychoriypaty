@@ -38,6 +38,8 @@ namespace HayChoriYPaty
         private readonly Dictionary<int, GameObject> foodObjects = new Dictionary<int, GameObject>();
         private readonly Dictionary<string, Sprite[]> spriteCache = new Dictionary<string, Sprite[]>();
         private readonly Dictionary<string, GameObject> prefabCache = new Dictionary<string, GameObject>();
+        private readonly Dictionary<string, GameObject> stationObjects = new Dictionary<string, GameObject>();
+        private readonly Dictionary<(string, string), Sprite> stateSpriteCache = new Dictionary<(string, string), Sprite>();
         private readonly Dictionary<int, SpriteRenderer> foodRenderers = new Dictionary<int, SpriteRenderer>();
         private readonly Dictionary<int, GameObject> cookingEffects = new Dictionary<int, GameObject>();
         private readonly Dictionary<int, GameObject> heatEffects = new Dictionary<int, GameObject>();
@@ -275,22 +277,34 @@ namespace HayChoriYPaty
         private void EnsureStation(string prefabName, Rect bounds, bool visible)
         {
             string key = "station:" + prefabName;
-            for (int i = 0; i < propsRoot.transform.childCount; i++)
-                if (propsRoot.transform.GetChild(i).name == key)
-                {
-                    GameObject existing = propsRoot.transform.GetChild(i).gameObject;
-                    existing.SetActive(visible);
-                    SetStationTransform(existing.transform, bounds);
-                    if (IsFoodTableStation(prefabName)) FitFoodTable(existing, bounds);
-                    else FitStation(existing, bounds, PreserveStationAspect(prefabName));
-                    ApplyStationDepth(existing, StationDepth(bounds));
-                    if (prefabName == "Station_FernetTable") EnsureFernetTableDisplay(existing);
-                    return;
-                }
+            // Transform.name allocates a string per read, so remember each station once found by name.
+            GameObject existing;
+            if (!stationObjects.TryGetValue(prefabName, out existing) || existing == null)
+            {
+                existing = null;
+                for (int i = 0; i < propsRoot.transform.childCount; i++)
+                    if (propsRoot.transform.GetChild(i).name == key)
+                    {
+                        existing = propsRoot.transform.GetChild(i).gameObject;
+                        stationObjects[prefabName] = existing;
+                        break;
+                    }
+            }
+            if (existing != null)
+            {
+                existing.SetActive(visible);
+                SetStationTransform(existing.transform, bounds);
+                if (IsFoodTableStation(prefabName)) FitFoodTable(existing, bounds);
+                else FitStation(existing, bounds, PreserveStationAspect(prefabName));
+                ApplyStationDepth(existing, StationDepth(bounds));
+                if (prefabName == "Station_FernetTable") EnsureFernetTableDisplay(existing);
+                return;
+            }
             GameObject source = Prefab(prefabName);
             if (source == null) return;
             GameObject instance = Instantiate(source, propsRoot.transform);
             instance.name = key;
+            stationObjects[prefabName] = instance;
             SetLayerRecursively(instance, PropLayer);
             SetStationTransform(instance.transform, bounds);
             if (IsFoodTableStation(prefabName)) FitFoodTable(instance, bounds);
@@ -1070,6 +1084,17 @@ namespace HayChoriYPaty
         }
 
         private Sprite StateSprite(string name, string state)
+        {
+            // Sprite.name and the suffix concat allocate per call; the result is stable per (art, state).
+            var cacheKey = (name, state);
+            Sprite cached;
+            if (stateSpriteCache.TryGetValue(cacheKey, out cached) && cached != null) return cached;
+            Sprite resolved = ResolveStateSprite(name, state);
+            if (resolved != null) stateSpriteCache[cacheKey] = resolved;
+            return resolved;
+        }
+
+        private Sprite ResolveStateSprite(string name, string state)
         {
             // Passed keeps the existing cooked+tint projection; Bondiola and Vacío share their whole-cut state art.
             string artState = ArtStateName(state);
