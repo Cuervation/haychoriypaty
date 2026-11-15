@@ -4,7 +4,7 @@ Fecha: 2026-11-14. Rama `chore/fase3-codigo-prototipo`. Solo lectura; no se modi
 
 ## Estado de la medición
 - **Estática: hecha** (abajo).
-- **Dinámica: PARCIAL.** Muestra puntual en Play Mode del Editor (escena `Main`, cerca del arranque, profiler encendido; ver abajo). Pendiente: hub, partida y Tower Defense en juego, tiempo de `OnGUI` por función y dispositivo Android.
+- **Dinámica: CERRADA (parcial en Android y Tower Defense).** Muestra puntual en Play Mode del Editor (escena `Main`, cerca del arranque, profiler encendido; ver abajo). Pendiente: hub, partida y Tower Defense en juego, tiempo de `OnGUI` por función y dispositivo Android.
 
 ## Métricas estáticas
 | Métrica | Valor |
@@ -46,3 +46,22 @@ Unity 6000.6.3f1. Valores del Editor con profiler activo: sobrestiman el rendimi
 | GPU por frame | ~5–7 ms |
 
 Lectura: la memoria de texturas es lo más pesado (refuerza candidatos C y D). El ~26 KB/frame en reposo sugiere asignaciones en `OnGUI` (candidato B), pero no se aisló por función. No medido: hub, partida, Tower Defense, costo de `OnGUI`, Android.
+
+
+## Medición posterior (2026-11-15, Editor, Play Mode, escena `Main`, tras Fases B y E)
+Misma metodología que la muestra anterior (profiler en Editor; sobrestima Android).
+
+| Métrica | Antes | Después |
+|---|---|---|
+| Asignación GC por frame en reposo | ~26 KB / 453 allocs | ~17,5 KB / ~331 allocs (−33 % bytes, −27 % allocs) |
+| Asignación GC por frame en partida (Nivel 1) | referencia previa | −24 % bytes, −22 % allocs (medido el 2026-11-14 tras `9839c75`) |
+| CPU por frame (estable) | ~8 ms | ~6,5 ms (hilo principal ~1,7 ms) |
+| GPU por frame | ~5–7 ms | ~3,3 ms |
+| Memoria de texturas | ~1,56–1,63 GB | ~1,63 GB (sin cambios; Fase C no modificó texturas) |
+| Consola | n/d | 0 errores al entrar en Play |
+
+Lecturas:
+- La reducción de GC en reposo proviene de las cachés de estilos de botón, fuentes ajustadas, acciones del catálogo y estaciones de cocina (commits `842259d`, `9839c75`). La partición de `StreetView.cs` (Fase E) no cambia comportamiento y no debería afectar estos valores.
+- Una sola muestra por métrica: sirve como orden de magnitud, no como benchmark estadístico. El CPU/GPU del Editor varía con el foco de ventana.
+- **Sin medir:** hub/selector con interacción, Tower Defense (bloqueado), Android real, peso de APK. Siguen pendientes y requieren un APK/dispositivo con autorización.
+- Pendiente de atribuir: ~57 KB/frame en partida (renderer de cocina `LateUpdate`, proyección de trabajadores, simulación, overhead del Editor).
