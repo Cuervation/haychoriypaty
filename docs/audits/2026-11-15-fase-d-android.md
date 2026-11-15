@@ -39,3 +39,13 @@ Cambio: el override de Android de **136 texturas de `Resources` con lado ≥ 102
 
 Calidad: comparado a 1:1 el cartel "JUGAR" del hub, no se distingue diferencia visible (ASTC incluso se ve algo más suave que los bloques de ETC2). **No se revisaron aún las demás pantallas en el dispositivo** (partida, Mercado, victoria, selector): conviene mirar una partida con personajes y comida en el teléfono antes de darlo por definitivo.
 Tests: `StreetArtTests` aceptaba solo ETC2_RGBA8; ahora acepta ETC2_RGBA8 o ASTC_6x6 (el criterio sigue siendo "override comprimido con alfa"). 353 tests de arte/tema/cocina en verde. El Editor sigue usando la configuración de Standalone, así que no ve diferencia.
+
+## CPU del hub quieto: diagnóstico y arreglo (2026-11-15)
+Medición en el teléfono (hub quieto, CPU por hilo con `top -H`; el juego corre a **30 fps fijos** a resolución nativa 1220x2712):
+- Antes: hilo de render de Unity ~29 %, hilo principal ~10 %, hilos del driver gráfico ~13 %; total ~62 % de un núcleo.
+- Bajar la resolución de render al 60 % **no cambió** el hilo de render (31,5 %): el costo no era de relleno de píxeles sino de comandos por frame.
+- Frame Debugger en el Editor (hub): 61 eventos por frame, de los cuales ~20 eran el posprocesado de URP (LUT de color, **Bloom** con 11 pasos de bajada/subida y Uber) más el skybox, aplicados a un fondo vacío; el IMGUI se dibuja después, sin pasar por eso. El `Global Volume` (Bloom + Vignette + Tonemapping) venía de la plantilla de URP.
+- Arreglo: `StreetView.PostProcessing.cs` apaga `renderPostProcessing` de la cámara principal salvo en Tower Defense (sus sprites podrían usarlo). Comprueba la política cada frame, sin asignaciones.
+- Después (hub quieto): render ~19 %, principal ~9 %, driver ~7,5 %; total ~40 % (**−35 %**). El hub se ve idéntico (captura comparada).
+- Tests: PlayMode `StreetHubViewTests` + `TowerDefensePlacementViewTests` 36 pasan, 0 fallan.
+- Riesgo/pendiente: no se verificó Tower Defense en el dispositivo (no se jugó para no tocar el guardado); su política de posprocesado queda igual que antes.

@@ -1173,6 +1173,7 @@ namespace HayChoriYPaty
 
         private void Update()
         {
+            UpdatePostProcessingPolicy();
             UpdateRewardShutter();
             UpdateHubMusic();
             // The branded presentation belongs to startup, not to the authenticated game session.
