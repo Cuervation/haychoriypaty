@@ -49,3 +49,6 @@ Medición en el teléfono (hub quieto, CPU por hilo con `top -H`; el juego corre
 - Después (hub quieto): render ~19 %, principal ~9 %, driver ~7,5 %; total ~40 % (**−35 %**). El hub se ve idéntico (captura comparada).
 - Tests: PlayMode `StreetHubViewTests` + `TowerDefensePlacementViewTests` 36 pasan, 0 fallan.
 - Riesgo/pendiente: no se verificó Tower Defense en el dispositivo (no se jugó para no tocar el guardado); su política de posprocesado queda igual que antes.
+
+## Mipmaps (2026-11-15): descartado
+47 texturas de `Resources` siguen con mipmaps. Con ASTC 6x6 los niveles extra suman solo ~10 MB en total (≈0,445 B/px × 1/3). Casi todas son hojas de sprites de cocina y hinchas que se dibujan reducidas (p. ej. atlas de 2172 px mostrados a ~80–200 px); ahí los mipmaps evitan el aliasing. El ahorro no compensa el riesgo visual: se dejan como están.
