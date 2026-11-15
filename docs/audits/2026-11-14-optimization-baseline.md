@@ -65,3 +65,17 @@ Lecturas:
 - Una sola muestra por métrica: sirve como orden de magnitud, no como benchmark estadístico. El CPU/GPU del Editor varía con el foco de ventana.
 - **Sin medir:** hub/selector con interacción, Tower Defense (bloqueado), Android real, peso de APK. Siguen pendientes y requieren un APK/dispositivo con autorización.
 - Pendiente de atribuir: ~57 KB/frame en partida (renderer de cocina `LateUpdate`, proyección de trabajadores, simulación, overhead del Editor).
+
+
+## Atribución del GC en partida (2026-11-15, Nivel 1, ~28 clientes, Editor, 120 frames)
+Método: prueba temporal de PlayMode con `ProfilerRecorder` ("GC Allocated In Frame") apagando subsistemas; luego retirada (no se versiona).
+
+| Configuración | Asignación por frame |
+|---|---|
+| Partida completa | ~49 KB / ~1.225 allocs |
+| Sin `StreetKitchenRenderer` | ~46 KB / ~1.155 allocs (el renderer aporta ~2,7 KB) |
+| `StreetView` deshabilitado (sin OnGUI/Update/LateUpdate) | ~16 KB / ~360 allocs |
+| Piso (juego y vista deshabilitados) | ~15,6 KB / ~355 allocs (overhead del Editor/cámara) |
+
+Lectura: `StreetView` explica ~33 KB y ~870 allocs por frame; la cocina, ~2,7 KB; el piso del Editor, ~16 KB. Un intento de atribuir por sección con `GC.GetTotalMemory` dio ~0 B por sección (el código propio ya casi no asigna: contadores, cuotas, mejoras, cocina y trabajadores medidos individualmente cerca de 0). Eso indica que las asignaciones restantes ocurren dentro de las llamadas IMGUI de Unity (`GUI.Label`/`DrawTexture`/`GUIClip`) y se multiplican porque `OnGUI` corre en dos eventos por frame (Layout y Repaint). Reducirlas más exigiría sacar IMGUI del camino de partida (renderizado por sprites) o evitar el pase Layout, y el juego depende del pase Layout en Android (`NativeAction`), por lo que no se tocó sin un dispositivo para verificarlo.
+Conclusión: el GC por frame de código propio ya está en el piso razonable; el resto es costo inherente de IMGUI.
