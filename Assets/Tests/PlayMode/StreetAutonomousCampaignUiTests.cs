@@ -44,6 +44,9 @@ namespace HayChoriYPaty.Tests
         private Component view;
         private Type firebaseSessionType;
         private Mouse mouse;
+#if UNITY_EDITOR
+        private PortraitGameView portraitView;
+#endif
         private AudioListener addedAudioListener;
         private bool previousEditorPersistence;
         private float previousTimeScale;
@@ -89,8 +92,15 @@ namespace HayChoriYPaty.Tests
             InputSystem.settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
             Time.timeScale = 1f;
             Application.runInBackground = true;
-            Screen.SetResolution(540, 960, false); // The campaign UI is authored for portrait; keep hitboxes on the same logical scale.
+#if UNITY_EDITOR
+            // Screen.SetResolution does not resize the Editor Game view; pin a deterministic portrait view instead.
+            portraitView = new PortraitGameView();
+            portraitView.Begin();
+            yield return portraitView.WaitUntilApplied();
+#else
+            Screen.SetResolution(540, 960, false);
             yield return null;
+#endif
             TestContext.WriteLine("Campaign UI resolution=" + Screen.width + "x" + Screen.height);
 
             Directory.CreateDirectory(OutputDirectory);
@@ -152,8 +162,13 @@ namespace HayChoriYPaty.Tests
             if (mouse != null && mouse.added) InputSystem.RemoveDevice(mouse);
             InputSystem.settings.backgroundBehavior = previousInputBackground;
             InputSystem.settings.editorInputBehaviorInPlayMode = previousEditorInput;
+#if UNITY_EDITOR
+            portraitView?.End();
+            portraitView = null;
+#else
             if (previousScreenWidth > 0 && previousScreenHeight > 0)
                 Screen.SetResolution(previousScreenWidth, previousScreenHeight, false);
+#endif
             yield return null; // StreetGame.OnDisable persists only into the in-memory delegate.
             Time.timeScale = previousTimeScale;
             Application.runInBackground = previousBackground;

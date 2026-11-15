@@ -20,7 +20,7 @@ namespace HayChoriYPaty.Tests
         bool hadTutorialMarker;
         int previousTutorialMarker;
         float oldScale;
-        int gameViewWidth = 1080, gameViewHeight = 1920;
+        int gameViewWidth = PortraitGameView.DefaultWidth, gameViewHeight = PortraitGameView.DefaultHeight;
 #if UNITY_EDITOR
         UnityEditor.EditorWindow gameWindow;
         PropertyInfo selectedSize;
@@ -45,7 +45,7 @@ namespace HayChoriYPaty.Tests
             object size = Activator.CreateInstance(editor.GetType("UnityEditor.GameViewSize"), new object[] { Enum.Parse(kind, "FixedResolution"), gameViewWidth, gameViewHeight, "Temporary hub QA" });
             sizeGroup.GetType().GetMethod("AddCustomSize", flags).Invoke(sizeGroup, new[] { size });
             addedSize = (int)sizeGroup.GetType().GetMethod("GetTotalCount", flags).Invoke(sizeGroup, null) - 1;
-            selectedSize.SetValue(gameWindow, addedSize); gameWindow.Repaint();
+            selectedSize.SetValue(gameWindow, addedSize); gameWindow.Focus(); gameWindow.Repaint();
         }
 #endif
         object Field(string name) => vt.GetField(name, P).GetValue(view);

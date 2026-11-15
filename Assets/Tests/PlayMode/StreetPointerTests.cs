@@ -1817,6 +1817,13 @@ namespace HayChoriYPaty.Tests
         {
             if (Application.isBatchMode) Assert.Ignore("Game-view captures require the interactive Editor.");
 
+#if UNITY_EDITOR
+            var portraitView = new PortraitGameView();
+            portraitView.Begin();
+            try
+            {
+                yield return portraitView.WaitUntilApplied();
+#endif
             PlayerPrefs.SetInt(tutorialCompletedKey, 1);
             Invoke(game, "SelectLevel", 0);
             Invoke(game, "StartRound");
@@ -1850,6 +1857,10 @@ namespace HayChoriYPaty.Tests
             Assert.IsTrue((bool)canUpgradeSpeed.GetValue(Sim, null));
             yield return WaitForRenderedFrame();
             SaveUpgradeBorderReviewScreenshot(directory, "con-monedas-suficientes");
+#if UNITY_EDITOR
+            }
+            finally { portraitView.End(); }
+#endif
         }
 
         private static void SaveUpgradeBorderReviewScreenshot(string directory, string state)
@@ -1857,8 +1868,9 @@ namespace HayChoriYPaty.Tests
             Texture2D capture = ScreenCapture.CaptureScreenshotAsTexture();
             try
             {
-                Assert.AreEqual(1080, capture.width, "Review capture should use the portrait reference width.");
-                Assert.AreEqual(1920, capture.height, "Review capture should use the portrait reference height.");
+                Assert.AreEqual(Screen.width, capture.width, "Review capture should match the current Game view width.");
+                Assert.Greater(capture.height, capture.width, "Review capture must be portrait.");
+                Assert.AreEqual(Screen.height, capture.height, "Review capture should match the current Game view height.");
                 System.IO.File.WriteAllBytes(System.IO.Path.Combine(directory, state + ".png"), capture.EncodeToPNG());
             }
             finally { UnityEngine.Object.Destroy(capture); }
