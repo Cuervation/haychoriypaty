@@ -69,3 +69,6 @@ Al rediseñar uno: quitar su `[Ignore]`, ajustarlo al flujo actual y moverlo fue
 - `LaRengaGameViewShowsBothStaffedAreasFansAndPhysicalThrowsAtThreeResolutions` (línea 885)
 - `PeregrinacionNaturalSixtyWithSevenProductsUsesLegalConstructionAndCanWin` (línea 974)
 - `PeregrinacionGameViewSingleFenceFreeConstructionAtThreeResolutions` (línea 1193)
+## Fuera de PlayMode (1)
+
+- `Assets/Tests/EditMode/PeregrinacionGameModeTests.cs` (línea 74): ignorado por un bug latente de colocación libre en `TowerDefenseGameMode.Peregrinacion` (no es un test desfasado; el motivo está en su atributo `[Ignore]`).
