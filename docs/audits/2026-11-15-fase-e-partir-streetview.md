@@ -44,3 +44,8 @@ Se eliminaron ~300 líneas sin referencias en todo `Scripts`/`Tests`/`Editor`: f
 ## Bug del intro (IndexOutOfRangeException en `DrawIntroLogo`)
 Evidencia: `Logs/Editor-prev.log` registró 3.680 excepciones `DrawIntroLogo` → `introLogoShines[frame]` en una corrida de tests con "Reload Domain disabled". Con `Mathf.Clamp(x, 0, Length-1)` y `Length == 0`, el índice resulta −1. El array existía pero vacío (estado persistente con la recarga de dominio desactivada); `PrepareIntroLogoShines` lo daba por preparado con solo `!= null`.
 Corrección mínima (`StreetView.Intro.cs`): tratar el array vacío como no preparado, exigir `Length > 0` antes de indexar y omitir texturas destruidas. No se reprodujo el fallo antes del cambio en esta sesión, por lo que la causa del array vacío es una inferencia a partir del código y del log; verificado: compila, `StreetHubViewTests` 10/10 y sin errores en consola.
+
+## Verificación de la suite completa (2026-11-15, HEAD tras la limpieza y el helper de Game view)
+- **PlayMode completo:** 181 tests → 123 pasan, 0 fallan, 58 ignorados (los documentados en `Docs/tests-playmode-pendientes.md` más los de nivel Tower Defense y checkpoints, que se saltan por diseño). Con los tests fijando su propio Game view de 720x1280.
+- **EditMode (por grupos, 1.235 tests):** 545 + 404 + 15 + 150 + 121; 1.230 pasan, 0 fallan, 5 ignorados (`PeregrinacionGameModeTests`). `StreetEconomyCampaignAuditTests` es `[Explicit]` (benchmark manual) y no corre.
+- **Nota operativa:** correr EditMode completo de una sola vez deja a Unity sin responder ~10 min porque `StreetCompletePlayerStrategyTests` ejecuta 150 simulaciones largas en el hilo principal (491 s). No es un fallo; conviene correr EditMode por grupos o esa clase aparte.
