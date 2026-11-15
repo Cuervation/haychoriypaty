@@ -7,8 +7,9 @@ Fecha: 2026-11-15. Movimiento mecánico a archivos `partial class StreetView`; s
 | Mercado | `StreetView.Market.cs` | ~730 | 8116674 |
 | Riot / resultado | `StreetView.Riot.cs` | ~340 | 362379f |
 | Pantalla Hub | `StreetView.HubScreen.cs` | ~390 | 48d46c6 |
+| HUD de partida | `StreetView.Hud.cs` | ~430 | (ver git log) |
 
-`StreetView.cs`: 7.622 → 6.190 líneas (−1.432).
+`StreetView.cs`: 7.622 → 5.761 líneas (−1.861) tras agregar HUD; HUD verificado con 30 tests EditMode (StreetSpecialtyPresentation, TowerDefenseScreenLayout).
 
 ## Verificación
 - Compila sin errores CS tras cada paso.
