@@ -36,6 +36,7 @@ namespace HayChoriYPaty.Tests
             Rect wide = Bounds("HubAccountButtonScreenBounds", new Vector2(1080, 2400), false);
             Assert.AreEqual(reference.width * 2f, wide.width, .01f);
             Assert.AreEqual(reference.height * 2f, wide.height, .01f);
+            Assert.AreEqual(reference.y, wide.y, .01f, "The top offset stays so the button keeps covering the baked account pill.");
             Assert.LessOrEqual(wide.xMax, 1080f);
             Assert.GreaterOrEqual(wide.xMin, 0f);
         }

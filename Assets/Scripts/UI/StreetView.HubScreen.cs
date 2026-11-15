@@ -171,7 +171,9 @@ namespace HayChoriYPaty
         internal static Rect HubAccountButtonScreenBounds(Vector2 screenSize)
         {
             float scale = HubControlScale(screenSize);
-            return new Rect(screenSize.x - HubAccountButtonRightInset * scale, HubAccountButtonTop * scale,
+            // Keep the authored top offset: the artwork bakes a small account pill at the very top-right edge and the
+            // button must keep covering it, so only the size and the horizontal inset grow.
+            return new Rect(screenSize.x - HubAccountButtonRightInset * scale, HubAccountButtonTop,
                 HubAccountButtonWidth * scale, HubAccountButtonHeight * scale);
         }
 
