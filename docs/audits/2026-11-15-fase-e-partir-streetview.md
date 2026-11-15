@@ -29,17 +29,13 @@ Fecha: 2026-11-15. Movimiento mecánico a archivos `partial class StreetView`; s
 
 ## Pendiente (fuera de esta fase)
 - Más bloques candidatos: HUD (contadores/chips), selector de niveles, upgrades.
-- Investigar la fragilidad por orden de ejecución de Level03/04 y del test de Hub a 1080.
+- (Resuelto) La fragilidad de Level03/04 y del test de Hub a 1080 era el tamaño del Game view; ver diagnóstico.
 
-## Diagnóstico de tests frágiles (2026-11-15)
-- `StreetAutonomousCampaignUiTests` corrida sola: fallaron Level01, Level02 y OperationalSmoke_AllBoys ("Dragging the selector ... scroll position" = 0), con `editor_is_focused: false`. En la suite completa habían fallado otros (Level03/04, "authentic kit or Mercado"). Los fallos cambian de una corrida a otra y todos pasan aislados.
-- Causa probable: estos tests inyectan mouse real en el Game view y dependen de foco del Editor, resolución del Game view (1080x1920 vs `Screen.SetResolution(540, 960)`, que no aplica en Editor) y del orden/timing de frames. No es un efecto de los movimientos de código de la Fase E (se reprodujeron con y sin ellos).
-- No se modificó ningún test. Una solución real exige rediseñar la inyección de input (p. ej. invocar acciones sin mouse) o fijar el Game view; queda como trabajo aparte.
-
-- Lote 2: `StreetPointerTests.AffordableUpgradeCardsCaptureDoubleWhiteBorderOnlyWithEnoughCoins` falla (1080 vs 1601, tamaño del Game view) con y sin los cambios; es el mismo tipo de fallo de entorno de los otros tests frágiles.
-
-## Cierre
-`StreetView.cs` conserva campos/constantes, OnEnable/carga de recursos, música del hub, `DrawGameGui` y helpers pequeños. Seguir partiendo da rendimientos decrecientes: lo restante es mayormente estado compartido (campos) y métodos pequeños acoplados. Verificación del lote 3: compila, 45 EditMode OK, PlayMode (StreetPointer/HubView/MarketView/KitchenRenderer/ActiveCooksPointer) 115 tests sin fallos nuevos (solo el fallo de entorno de 1080 vs 1601, preexistente).
+## Diagnóstico de tests frágiles (corregido 2026-11-15)
+**Causa raíz confirmada:** los tests PlayMode de UI dependen del tamaño del Game view del Editor. Con "Free Aspect" (lo que queda tras reabrir Unity o un layout distinto) `Screen.width` es 1601 o 480 en vez de 1080: fallan `AffordableUpgradeCards...` (1080 vs 1601), el test de Hub a 1080 y las inyecciones de drag del selector (`Level01`, `Level02`, `OperationalSmoke_AllBoys`). Los fallos de Level03/04 en la suite completa eran del mismo tipo de entorno. No era un efecto de la Fase E.
+**Verificación:** con el Game view en `1920x1080 Portrait`, `StreetAutonomousCampaignUiTests` + `StreetPointerTests` + `StreetHubViewTests`: 96 tests, 57 pasan, 0 fallan, 39 ignorados (los documentados).
+**Requisito para correr estos tests:** Game view en `1920x1080 Portrait` (Editor, pestaña Game). Se puede fijar por código con `GameView.selectedSizeIndex = 5` vía reflexión. No se modificó ningún test; una mejora futura sería fijar ese tamaño en el `SetUp`.
+Descartado: el robo de `Mouse.current` por un mouse físico (se probó deshabilitar otros mouse y no cambió el resultado).
 
 ## Limpieza de código muerto (2026-11-15)
 Se eliminaron ~300 líneas sin referencias en todo `Scripts`/`Tests`/`Editor`: funciones `Draw*Fan` y `*RiotFanFrameSource` por club, `DrawLevelSelectArtwork`, `DrawGrill`, `DrawStation`, `QuitGame`, `ScaleCardChild`, `ScreenBounds`, `CatalogLevelBadge`, `ServingTableBounds`, `MaximumResponsiveFooterPanelHeight`, `FormatBottleStock`, `ChulengoSectorAtPosition`, `HubArtworkActionScreenBounds`, 25 constantes `*FansResource` duplicadas (las texturas siguen cargándose vía `ClubVisualTheme`), campos `*RiotFans` y `MenuPlay/MenuQuit`. No se tocaron los ganchos `*ForTesting` ni `DrawRankingShine`/`DrawPlaySweep`/`DrawHubLayeredEnvironment`/`HubAmbientLayoutBounds`. `StreetView.cs`: 1.871 → 1.791 líneas. Verificación: 322 EditMode OK; 88 PlayMode con solo el fallo de entorno 1080 vs 1601 preexistente.
