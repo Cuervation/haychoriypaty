@@ -163,16 +163,22 @@ namespace HayChoriYPaty
         private static Rect HubSettingsButtonScreenBounds(Vector2 screenSize, Rect safeArea)
         {
             return HubArtworkControlTouchBounds(HubSettingsArtworkSourceBounds, screenSize, safeArea,
-                HubSettingsButtonWidth, false);
+                HubSettingsButtonWidth * HubControlScale(screenSize), false);
         }
-        internal static Rect HubAccountButtonScreenBounds(Vector2 screenSize) =>
-            new Rect(screenSize.x - HubAccountButtonRightInset, HubAccountButtonTop,
-                HubAccountButtonWidth, HubAccountButtonHeight);
+        // The top controls were authored for the 540-wide reference canvas; grow them with wider screens so
+        // they stay tappable on high-resolution phones (never below the reference size).
+        internal static float HubControlScale(Vector2 screenSize) => Mathf.Clamp(screenSize.x / W, 1f, 3f);
+        internal static Rect HubAccountButtonScreenBounds(Vector2 screenSize)
+        {
+            float scale = HubControlScale(screenSize);
+            return new Rect(screenSize.x - HubAccountButtonRightInset * scale, HubAccountButtonTop * scale,
+                HubAccountButtonWidth * scale, HubAccountButtonHeight * scale);
+        }
 
         private static Rect HubTopMusicButtonScreenBounds(Vector2 screenSize, Rect safeArea)
         {
             return HubArtworkControlTouchBounds(HubMusicArtworkSourceBounds, screenSize, safeArea,
-                HubTopMusicButtonSize, true);
+                HubTopMusicButtonSize * HubControlScale(screenSize), true);
         }
 
         private static Rect HubArtworkControlTouchBounds(Rect source, Vector2 screenSize, Rect safeArea,
@@ -188,11 +194,12 @@ namespace HayChoriYPaty
             Rect account = HubAccountButtonScreenBounds(screenSize);
             // Leave extra room beside Ranking on compact 9:16 previews when the artwork's
             // own lower speaker control has been cropped out.
-            float fallbackMusicCenterX = Mathf.Min(account.xMin - HubTopControlsGap - 22f - width * .5f,
-                viewport.xMax - 8f - width * .5f);
+            float controlScale = HubControlScale(screenSize);
+            float fallbackMusicCenterX = Mathf.Min(account.xMin - (HubTopControlsGap + 22f) * controlScale - width * .5f,
+                viewport.xMax - 8f * controlScale - width * .5f);
             float centerX = visible ? artwork.center.x : fallbackRight
-                ? fallbackMusicCenterX : viewport.xMin + 8f + width * .5f;
-            float centerY = visible ? artwork.center.y : viewport.yMin + 8f + height * .5f;
+                ? fallbackMusicCenterX : viewport.xMin + 8f * controlScale + width * .5f;
+            float centerY = visible ? artwork.center.y : viewport.yMin + 8f * controlScale + height * .5f;
             centerX = Mathf.Clamp(centerX, viewport.xMin + width * .5f, viewport.xMax - width * .5f);
             centerY = Mathf.Clamp(centerY, viewport.yMin + height * .5f, viewport.yMax - height * .5f);
             return new Rect(centerX - width * .5f, centerY - height * .5f, width, height);
