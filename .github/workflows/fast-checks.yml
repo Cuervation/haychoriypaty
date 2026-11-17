@@ -1,0 +1,41 @@
+# Validación rápida sin Unity: estructura Git/Unity, .meta, GUID, rutas prohibidas,
+# tamaños, credenciales y sintaxis de configuración. Gratis en repositorios públicos
+# (runners estándar de GitHub), ~1 min incluido el clon. No usa secretos ni servicios externos.
+# Unity (compilación/EditMode/PlayMode) se valida en el Editor local: ver CONTRIBUTING.md.
+name: Fast checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fast-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repo-structure:
+    name: Repo structure (no Unity)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout (historia completa, solo tools/ en disco)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: false
+          sparse-checkout: tools
+          sparse-checkout-cone-mode: true
+
+      - name: Cambios del Pull Request
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: bash tools/git/check-repo.sh --range "origin/${BASE_REF}...HEAD"
+
+      - name: Árbol completo
+        run: bash tools/git/check-repo.sh --tree HEAD

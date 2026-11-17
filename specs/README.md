@@ -24,6 +24,7 @@
 | Límites de código/render/persistencia | [architecture.md](architecture.md) |
 | APK/instalaciones y comprobaciones de entrega | [android-prototype.md](features/android-prototype.md) (consultar encabezado reciente) |
 | Agentes/skills compartidos Codex + Claude, trabajo en paralelo y worktrees futuros | [.agents/README.md](../.agents/README.md) (reglas en `AGENTS.md`) |
+| Flujo Git/GitHub, commits, validación rápida/Unity/versión y recuperación | [CONTRIBUTING.md](../CONTRIBUTING.md); ramas y migración a `main`: [GIT_AUDIT_2026-11-17](../docs/reports/GIT_AUDIT_2026-11-17.md) |
 | Evidencia histórica de avances y pruebas | [status.md](status.md) (buscar fecha/sistema) |
 | Decisiones históricas y reemplazos | [decisions.md](decisions.md) (buscar tema/fecha) |
 | Continuidad histórica completa hasta 2026-10-25 (no vigente) | [history/continuity-log-through-20261025.md](history/continuity-log-through-20261025.md) |
