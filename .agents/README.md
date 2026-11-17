@@ -13,7 +13,8 @@ Arquitectura para que Codex y Claude Code trabajen con el mismo SDD, los mismos 
 | Skills | `.agents/skills/<skill>/SKILL.md` | `.agents/skills/` | `.claude/skills` → symlink a `../.agents/skills` |
 | Límite de subagentes | `.codex/config.toml` (2 + principal) | config | `CLAUDE.md` lo recuerda; misma regla en `AGENTS.md` |
 | Guardas de permisos | — | aprobaciones propias de Codex | `.claude/settings.json` (`ask` para ramas, reset/clean/stash, worktrees, `gh`, deploy Firebase) |
-| Unity MCP | servidor ya abierto (`127.0.0.1:8080`) | config MCP de Codex | `.mcp.json` local (sin versionar) |
+| Unity MCP | servidor ya abierto (`127.0.0.1:8080`) | config MCP de Codex | `.mcp.json` local (ignorado por Git) |
+| Flujo Git y validación rápida | `CONTRIBUTING.md`, `tools/git/check-repo.sh`, hooks opt-in `tools/git/hooks/`, CI `.github/workflows/fast-checks.yml` | igual | igual (los hooks actúan sobre `git`, así que protegen a ambos) |
 
 Reglas de mantenimiento:
 - Cambiar una regla → `AGENTS.md`. Cambiar un rol → su TOML (el adaptador Claude no se toca salvo que cambie el nombre o el esfuerzo del rol). Nueva skill → `.agents/skills/<nombre>/SKILL.md`; Claude la ve por el symlink.
@@ -28,7 +29,8 @@ Codex y Claude comparten `/Users/celestino/HayChoriYPaty` y la misma rama. Funci
 3. **Archivos de alta colisión** (`specs/current-state.md`, `specs/status.md`, `specs/decisions.md`, `docs/BALANCE_ACTUAL_NIVELES.md`, `AGENTS.md`, escenas `.unity`, prefabs, `ProjectSettings/`): un solo agente por vez, por asignación del usuario. En los historiales, solo agregar entradas fechadas; nunca reescribir las ajenas.
 4. **Unity: un solo dueño a la vez.** Las lecturas sin efecto (Console, `editor_state`, búsquedas de objetos, leer archivos) son libres. Requieren el lock de abajo: tests EditMode/PlayMode, entrar a Play Mode, guardar o modificar escenas/prefabs/assets por MCP, refresh/reimport, ítems de menú con efectos, builds, y cualquier acción que escriba saves. Mientras otro tenga el lock, no escribir en `Assets/`, `Packages/` ni `ProjectSettings/` (provocaría recompilación o reimport en medio de su ejecución).
 5. **Saves compartidos.** El Editor guarda progreso en PlayerPrefs/`persistentDataPath` (`DefaultCompany/Hay Chori y Paty`), común a todo checkout y worktree de esta Mac. Nunca limpiar progreso; restaurar cualquier estado temporal de QA al terminar.
-6. **Commits, push e integración:** solo el usuario, según `AGENTS.md`.
+6. **Commits, push e integración:** según los niveles de permiso de `AGENTS.md`. El índice de Git es uno solo por checkout: un único agente stagea/commitea por vez, solo con rutas propias explícitas, y revisa `git diff --cached --stat` antes; nunca `git add -A`, `stash`, `restore` ni `checkout -- <ruta>` sobre archivos ajenos.
+7. **Reutilizar evidencia:** el estado de ramas y la migración están en `docs/reports/GIT_AUDIT_2026-11-17.md`; no repetir la auditoría completa por tarea. `tools/git/check-repo.sh --staged` sugiere qué validación Unity corresponde según las rutas tocadas.
 
 ### Lock de Unity
 
@@ -51,14 +53,16 @@ grep -q '^owner=claude$' .agents/locks/unity.lock && rm .agents/locks/unity.lock
 
 No crear worktrees hasta que el usuario lo decida. Cuando lo haga, el objetivo es que cada agente tenga su propia carpeta y rama para editar los mismos archivos sin pisarse; la integración sigue siendo del usuario.
 
-**Creación (la hace o autoriza el usuario):**
+**Cuándo conviene:** tareas paralelas largas que tocan los mismos archivos, o trabajo sin Unity (docs, scripts, CI) mientras otro agente tiene el Editor. **No conviene** para cambios cortos ni para dos tareas que necesitan Unity a la vez: cada worktree exige otro Editor y otra `Library/` (importación larga, varios GB) y los saves siguen compartidos.
+
+**Creación (la hace o autoriza el usuario; ramas con los prefijos de `CONTRIBUTING.md`; antes de la migración usar `origin/chore/fase3-codigo-prototipo` como base):**
 
 ```bash
-git worktree add ../HayChoriYPaty-codex -b codex/<tarea>
+git worktree add ../HayChoriYPaty-codex -b chore/<tarea-codex> origin/main
 ```
 
 ```bash
-git worktree add ../HayChoriYPaty-claude -b claude/<tarea>
+git worktree add ../HayChoriYPaty-claude -b fix/<tarea-claude> origin/main
 ```
 
 - Usar carpetas hermanas fuera del repo (no `.claude/worktrees/` ni dentro de `Assets/`), para que Unity, búsquedas y `git status` del checkout principal no las vean.

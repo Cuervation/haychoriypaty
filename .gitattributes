@@ -1,0 +1,100 @@
+# Hay Chori y Paty — atributos Git (Mac + Windows).
+# El índice ya está 100% en LF: estas reglas no renormalizan nada existente;
+# fijan que Windows no introduzca CRLF en archivos serializados de Unity, código y scripts.
+# Sin Git LFS ni merge drivers externos (ver CONTRIBUTING.md › Unity y archivos grandes).
+
+* text=auto
+
+# Código, scripts y configuración: siempre LF en el repo y en el disco.
+*.cs        text eol=lf diff=csharp
+*.java      text eol=lf diff=java
+*.sh        text eol=lf
+tools/git/hooks/* text eol=lf
+*.md        text eol=lf diff=markdown
+*.json      text eol=lf
+*.toml      text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.xml       text eol=lf
+*.txt       text eol=lf
+*.csv       text eol=lf
+*.tsv       text eol=lf
+*.rules     text eol=lf
+*.gradle    text eol=lf
+*.properties text eol=lf
+*.pro       text eol=lf
+*.uss       text eol=lf
+*.uxml      text eol=lf
+*.shader    text eol=lf
+*.hlsl      text eol=lf
+*.cginc     text eol=lf
+*.asmdef    text eol=lf
+*.asmref    text eol=lf
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+
+# Unity YAML (Asset Serialization = Force Text). LF fijo; merge de texto estándar.
+# Escenas/prefabs con conflicto se resuelven a mano o con UnityYAMLMerge configurado localmente.
+*.unity             text eol=lf
+*.prefab            text eol=lf
+*.asset             text eol=lf
+*.meta              text eol=lf
+*.mat               text eol=lf
+*.anim              text eol=lf
+*.controller        text eol=lf
+*.overrideController text eol=lf
+*.spriteatlas       text eol=lf
+*.spriteatlasv2     text eol=lf
+*.preset            text eol=lf
+*.playable          text eol=lf
+*.mixer             text eol=lf
+*.physicsMaterial2D text eol=lf
+*.guiskin           text eol=lf
+*.fontsettings      text eol=lf
+*.renderTexture     text eol=lf
+*.lighting          text eol=lf
+*.inputactions      text eol=lf
+*.wlt               text eol=lf
+
+# Binarios: nunca convertir ni intentar merge de texto.
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.psd    binary
+*.tga    binary
+*.tif    binary
+*.tiff   binary
+*.bmp    binary
+*.exr    binary
+*.hdr    binary
+*.webp   binary
+*.ico    binary
+*.wav    binary
+*.mp3    binary
+*.ogg    binary
+*.aif    binary
+*.aiff   binary
+*.flac   binary
+*.m4a    binary
+*.mp4    binary
+*.mov    binary
+*.webm   binary
+*.ttf    binary
+*.otf    binary
+*.fbx    binary
+*.blend  binary
+*.tgz    binary
+*.gz     binary
+*.zip    binary
+*.7z     binary
+*.jar    binary
+*.aar    binary
+*.so     binary
+*.dll    binary
+*.a      binary
+*.pdf    binary
+*.bytes  binary
+*.unitypackage binary
+*.apk    binary
+*.aab    binary

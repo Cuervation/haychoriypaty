@@ -54,3 +54,21 @@ tools/firebase/node_modules/
 .claude/settings.local.json
 .claude/worktrees/
 .agents/locks/
+# Local MCP endpoint config and ad-hoc transfer bundles between machines/sessions (never versioned).
+/.mcp.json
+/_transfer/
+
+# Unity Test Runner / crash-recovery leftovers (never part of the game).
+/Assets/InitTestScene*.unity
+/Assets/InitTestScene*.unity.meta
+/Assets/_Recovery/
+/Assets/_Recovery.meta
+
+# Build outputs and signing material anywhere in the tree (APK/AAB belong in ignored Builds/).
+*.apk
+*.aab
+*.apks
+*.keystore
+*.jks
+.env
+.env.*

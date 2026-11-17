@@ -7,6 +7,7 @@ Map the change to its acceptance criteria and use the smallest meaningful check:
 
 | Change | Check |
 |---|---|
+| Any change before commit/PR | `bash tools/git/check-repo.sh --staged` (or `--range <base>...HEAD`): structure, `.meta`/GUID, forbidden/large files, secrets, config syntax; it also prints the Unity check suggested by the touched paths |
 | Documentation / agent / skill config | TOML/frontmatter syntax, paths, references and scope diff; no Unity/PlayMode |
 | Text, style, color | Inspect the changed value/output; one affected visual check when appearance matters |
 | Layout / routes | Geometry checks plus visual review at affected resolution/safe area, not every device |

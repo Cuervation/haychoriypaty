@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Hook opt-in (no se instala solo). Activar en este clon con:
+#   git config core.hooksPath tools/git/hooks
+# Corre la validación rápida sobre lo staged (~1 s, sin Unity).
+# Saltar una vez, conscientemente: git commit --no-verify
+root=$(git rev-parse --show-toplevel) || exit 1
+branch=$(git symbolic-ref --short -q HEAD || echo "")
+if [ "$branch" = "main" ] && [ "${HCYP_ALLOW_MAIN_COMMIT:-0}" != "1" ]; then
+  echo "pre-commit: 'main' se actualiza solo por Pull Request. Creá una rama (feature/, fix/, chore/…)." >&2
+  echo "            Excepción consciente: HCYP_ALLOW_MAIN_COMMIT=1 git commit …" >&2
+  exit 1
+fi
+exec bash "$root/tools/git/check-repo.sh" --staged

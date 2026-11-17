@@ -1,0 +1,56 @@
+# Validación rápida sin Unity: estructura Git/Unity, .meta, GUID, rutas prohibidas,
+# tamaños, credenciales y sintaxis de configuración. Gratis en repositorios públicos
+# (runners estándar de GitHub). No usa secretos ni servicios externos.
+# Unity (compilación/EditMode/PlayMode) se valida en el Editor local: ver CONTRIBUTING.md.
+#
+# PR: clon sin blobs (sparse) + historia completa; solo se descargan los blobs de los
+#     archivos cambiados y los .meta (~10 s). Pares .meta, GUID y mayúsculas igual
+#     se verifican sobre el árbol completo.
+# main / manual: checkout normal de profundidad 1 y barrido del árbol completo
+#     (secretos y sintaxis en todos los archivos).
+name: Fast checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fast-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repo-structure:
+    name: Repo structure (no Unity)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout PR (historia completa, sin blobs, solo tools/ en disco)
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: false
+          sparse-checkout: tools
+          sparse-checkout-cone-mode: true
+
+      - name: Cambios del Pull Request
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: bash tools/git/check-repo.sh --range "origin/${BASE_REF}...HEAD"
+
+      - name: Checkout completo (profundidad 1)
+        if: github.event_name != 'pull_request'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          lfs: false
+
+      - name: Árbol completo
+        if: github.event_name != 'pull_request'
+        run: bash tools/git/check-repo.sh --tree HEAD
