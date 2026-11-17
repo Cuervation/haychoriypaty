@@ -124,6 +124,19 @@ namespace HayChoriYPaty
             UpdatePositionAndFacing();
         }
 
+        /// <summary>Read-only route sample for local traffic clearance; does not change progress/facing.</summary>
+        internal Vector2 PositionAtProgress(float progress)
+        {
+            progress = Mathf.Clamp(progress, 0f, TotalDistance);
+            for (int i = 1; i < _waypoints.Length; i++)
+            {
+                float length = _cumulativeDistances[i] - _cumulativeDistances[i - 1];
+                if (length <= 0f || progress > _cumulativeDistances[i]) continue;
+                return Vector2.Lerp(_waypoints[i - 1], _waypoints[i], (progress - _cumulativeDistances[i - 1]) / length);
+            }
+            return _waypoints[_waypoints.Length - 1];
+        }
+
         private int FindFirstNonZeroSegment()
         {
             for (int segment = 0; segment < _waypoints.Length - 1; segment++)

@@ -13,12 +13,12 @@ namespace HayChoriYPaty
             GUI.BeginGroup(new Rect(0, 0, W, CustomerCounterTopY()));
             try
             {
-                for (int row = 4; row >= 0; row--)
+                for (int row = StreetSimulation.QueueRowCount - 1; row >= 0; row--)
                 for (int i = 0; i < sim.Customers.Count; i++)
                 {
                     StreetCustomer customer = sim.Customers[i];
                     if (Mathf.Clamp(Mathf.RoundToInt((StreetSimulation.FrontQueueY - customer.Position.y)
-                        / StreetSimulation.QueueRowSpacing), 0, 4) != row) continue;
+                        / StreetSimulation.QueueRowSpacing), 0, StreetSimulation.QueueRowCount - 1) != row) continue;
                     DrawCustomer(customer, ShouldDrawOrderBubble(row));
                 }
             }

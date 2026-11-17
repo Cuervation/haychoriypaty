@@ -57,6 +57,10 @@ namespace HayChoriYPaty
             panelOverlap = panelWorldLength * 0.42f;
         }
 
+        /// <summary>Half the drawn length of an entry/exit terminal panel (it is centered on the rail end).</summary>
+        public float TerminalPanelHalfLength => panelWorldLength * .5f *
+            (fencePanelSprite != null && fencePanelSprite.name == "fence-panel-v1" ? 1328f / 2172f : 1f);
+
         /// <summary>Extend the generated fence panels to the camera's horizontal edges.</summary>
         public bool SetVisualHorizontalBounds(float worldLeft, float worldRight)
         {
@@ -131,8 +135,9 @@ namespace HayChoriYPaty
             SetLayerRecursively(generatedRoot.gameObject, presentationLayer);
             ClearGeneratedChildren();
             bool singleFence = levelConfig.RouteKind == TowerDefenseRouteKind.HorizontalSingleFence;
-            if (!singleFence) BuildRail(FitVisualRailToHorizontalBounds(latestGeometry.LeftBoundary), 0);
-            BuildRail(FitVisualRailToHorizontalBounds(latestGeometry.RightBoundary), 1);
+            bool mergeRowTongues = HasSideWorkColumn(levelConfig.Route);
+            if (!singleFence) BuildRail(FitVisualRailToHorizontalBounds(latestGeometry.LeftBoundary), 0, mergeRowTongues);
+            BuildRail(FitVisualRailToHorizontalBounds(latestGeometry.RightBoundary), 1, mergeRowTongues);
             // Simulation/collision keep using the original route; only fence art snaps
             // to the screen edges, so screen framing cannot change follower waypoints.
             if (!singleFence) BuildEdge("Fence rail 0 collider", latestGeometry.LeftBoundary);
@@ -194,13 +199,99 @@ namespace HayChoriYPaty
             if (Application.isPlaying) Destroy(visiblePanelSprite); else DestroyImmediate(visiblePanelSprite);
         }
 
-        private void BuildRail(Vector2[] points, int railIndex)
+        /// <summary>A serpentine with a side work column (Los Redondos ID10).</summary>
+        private static bool HasSideWorkColumn(TowerDefenseRouteGeometryConfig route) =>
+            route != null && route.RouteKind == TowerDefenseRouteKind.Serpentine &&
+            route.WorkBounds.width > 0f && route.WorkBounds.height > 0f;
+
+        /// <summary>Drawn thickness of one fence panel (the full sprite, transparent padding included).</summary>
+        private float PanelArtThickness => fencePanelSprite == null || fencePanelSprite.rect.width <= 0f ? 0f
+            : panelWorldLength * fencePanelSprite.rect.height / fencePanelSprite.rect.width;
+
+        private void BuildRail(Vector2[] points, int railIndex, bool mergeRowTongues)
         {
             float totalLength = PolylineLength(points);
             if (points == null || points.Length < 2 || totalLength <= 0f) return;
 
             List<Vector2> corners = CollapseCollinearPoints(points);
+            Vector2 entryAnchor = points[0];
+            Vector2 exitAnchor = points[points.Length - 1];
+            List<List<Vector2>> strokes = mergeRowTongues
+                ? SplitRowTongues(corners, PanelArtThickness, ref entryAnchor, ref exitAnchor)
+                : new List<List<Vector2>> { corners };
             int count = 0;
+            foreach (List<Vector2> stroke in strokes)
+                BuildRailLegs(CollapseCollinearPoints(stroke.ToArray()), railIndex, ref count);
+
+            // Explicit end pieces communicate where the continuous rail terminates at entry/exit.
+            float longScale = panelWorldLength * (visiblePanelSprite != null ? 1328f / 2172f : 1f) / Mathf.Max(0.0001f, RenderPanelSprite.bounds.size.x);
+            CreatePiece("Fence rail " + railIndex + " terminal entry", entryAnchor, FirstTangent(points),
+                longScale, railIndex, count, TowerDefenseFencePieceKind.Terminal);
+            CreatePiece("Fence rail " + railIndex + " terminal exit", exitAnchor, LastTangent(points),
+                longScale, railIndex, count + 1, TowerDefenseFencePieceKind.Terminal);
+        }
+
+        /// <summary>
+        /// Visual only. Between two stacked runs, a rail folds back on itself around the
+        /// U-turn: run k's inner rail, a short vertical tip (the rail gap) and run k+1's
+        /// inner rail. When that gap is no wider than one fence panel's art, drawing both
+        /// sides produces a doubled barrier, so the fold is drawn once on its midline (the
+        /// art band still covers both rails). Collision edges keep the original rails.
+        /// </summary>
+        internal static List<List<Vector2>> SplitRowTongues(List<Vector2> corners, float maximumGap,
+            ref Vector2 entryAnchor, ref Vector2 exitAnchor)
+        {
+            const float epsilon = 0.0001f;
+            var strokes = new List<List<Vector2>>();
+            if (corners == null || corners.Count < 2) return strokes;
+            var current = new List<Vector2> { corners[0] };
+            int last = corners.Count - 1;
+            int i = 1;
+            while (i <= last)
+            {
+                if (i + 2 <= last && IsRowTongue(corners[i - 1], corners[i], corners[i + 1], corners[i + 2], maximumGap, epsilon))
+                {
+                    Vector2 a = corners[i - 1], b = corners[i + 2];
+                    float midY = (corners[i].y + corners[i + 1].y) * .5f;
+                    float tipX = corners[i].x;
+                    float farX = Mathf.Abs(a.x - tipX) >= Mathf.Abs(b.x - tipX) ? a.x : b.x;
+                    strokes.Add(new List<Vector2> { new Vector2(farX, midY), new Vector2(tipX, midY) });
+
+                    bool startsRail = i - 1 == 0;
+                    bool endsRail = i + 2 == last;
+                    if (startsRail) entryAnchor = new Vector2(entryAnchor.x, midY);
+                    if (endsRail) exitAnchor = new Vector2(exitAnchor.x, midY);
+                    // The wall that holds the fold meets the single fence on its midline.
+                    if (startsRail) current.Clear();
+                    else current[current.Count - 1] = new Vector2(a.x, midY);
+                    bool sameWallContinues = !startsRail && !endsRail && Mathf.Abs(a.x - b.x) <= epsilon;
+                    if (!sameWallContinues)
+                    {
+                        if (current.Count > 1) strokes.Add(current);
+                        current = endsRail ? new List<Vector2>() : new List<Vector2> { new Vector2(b.x, midY) };
+                    }
+                    i += 3;
+                    continue;
+                }
+                current.Add(corners[i]);
+                i++;
+            }
+            if (current.Count > 1) strokes.Add(current);
+            return strokes;
+        }
+
+        private static bool IsRowTongue(Vector2 p0, Vector2 p1, Vector2 p2, Vector2 p3, float maximumGap, float epsilon)
+        {
+            Vector2 first = p1 - p0, tip = p2 - p1, second = p3 - p2;
+            bool firstHorizontal = Mathf.Abs(first.y) <= epsilon && Mathf.Abs(first.x) > epsilon;
+            bool secondHorizontal = Mathf.Abs(second.y) <= epsilon && Mathf.Abs(second.x) > epsilon;
+            bool shortVerticalTip = Mathf.Abs(tip.x) <= epsilon && Mathf.Abs(tip.y) > epsilon &&
+                Mathf.Abs(tip.y) <= maximumGap + epsilon;
+            return firstHorizontal && secondHorizontal && shortVerticalTip && first.x * second.x < 0f;
+        }
+
+        private void BuildRailLegs(List<Vector2> corners, int railIndex, ref int count)
+        {
             for (int legIndex = 1; legIndex < corners.Count; legIndex++)
             {
                 Vector2 start = corners[legIndex - 1];
@@ -251,13 +342,6 @@ namespace HayChoriYPaty
                     count++;
                 }
             }
-
-            // Explicit end pieces communicate where the continuous rail terminates at entry/exit.
-            float longScale = panelWorldLength * (visiblePanelSprite != null ? 1328f / 2172f : 1f) / Mathf.Max(0.0001f, RenderPanelSprite.bounds.size.x);
-            CreatePiece("Fence rail " + railIndex + " terminal entry", points[0], FirstTangent(points),
-                longScale, railIndex, count, TowerDefenseFencePieceKind.Terminal);
-            CreatePiece("Fence rail " + railIndex + " terminal exit", points[points.Length - 1], LastTangent(points),
-                longScale, railIndex, count + 1, TowerDefenseFencePieceKind.Terminal);
         }
 
         private void CreatePiece(string objectName, Vector2 position, Vector2 tangent, float uniformScale,
@@ -308,6 +392,9 @@ namespace HayChoriYPaty
             if (directionArrowSprite == null || directionSignPrefab == null || geometry.Centerline == null) return;
             TowerDefenseRouteGeometryConfig route = levelConfig.Route;
             int stride = route.TurnSegments + 1;
+            // A serpentine with a side work column (Los Redondos) keeps its arrows on the
+            // connector axis: the default outer offset would land inside the worker strip.
+            bool sideWorkColumn = HasSideWorkColumn(route);
             for (int turn = 0; turn < route.RowCount - 1; turn++)
             {
                 int arcMiddle = turn * stride + 1 + route.TurnSegments / 2;
@@ -316,8 +403,8 @@ namespace HayChoriYPaty
                 Vector2 tangent = geometry.Centerline[Mathf.Min(arcMiddle + 1, geometry.Centerline.Length - 1)] -
                     geometry.Centerline[Mathf.Max(arcMiddle - 1, 0)];
                 if (tangent.sqrMagnitude < 0.000001f) tangent = Vector2.down;
-                CreateDirectionSign("Route direction sign " + turn,
-                    point + Perpendicular(tangent.normalized) * (route.CorridorWidth * 0.85f), tangent);
+                CreateDirectionSign("Route direction sign " + turn, sideWorkColumn ? point
+                    : point + Perpendicular(tangent.normalized) * (route.CorridorWidth * 0.85f), tangent);
             }
         }
 

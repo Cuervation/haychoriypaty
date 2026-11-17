@@ -79,13 +79,19 @@ namespace HayChoriYPaty
         public StreetKitchenProduction(StreetKitchenBalance balance, int[] availableProducts,
             IStreetKitchenStock ingredientStock, bool activeCooks, bool unlimitedSandwiches,
             bool activeCookSelfDelivery)
+            : this(balance, availableProducts, ingredientStock, activeCooks, unlimitedSandwiches,
+                activeCookSelfDelivery, false) { }
+
+        public StreetKitchenProduction(StreetKitchenBalance balance, int[] availableProducts,
+            IStreetKitchenStock ingredientStock, bool activeCooks, bool unlimitedSandwiches,
+            bool activeCookSelfDelivery, bool premiumTableStartsLikeNormalTable)
         {
             this.balance = balance ?? new StreetKitchenBalance();
             this.ingredientStock = ingredientStock;
             this.unlimitedSandwiches = unlimitedSandwiches && !activeCooks;
             this.activeCookSelfDelivery = activeCookSelfDelivery && activeCooks;
             ActiveCooks = activeCooks;
-            Initialize(availableProducts ?? new int[0]);
+            Initialize(availableProducts ?? new int[0], premiumTableStartsLikeNormalTable);
         }
 
         public StreetKitchenProduction(StreetKitchenBalance balance, int[] availableProducts,
@@ -492,15 +498,17 @@ namespace HayChoriYPaty
             }
         }
 
-        private void Initialize(int[] products)
+        private void Initialize(int[] products, bool premiumTableStartsLikeNormalTable)
         {
             bool[] available = new bool[7];
             for (int i = 0; i < products.Length; i++) if (products[i] >= 0 && products[i] < 7) available[products[i]] = true;
-            // The serialized normal/Premium balances still divide Levels 1-5 starting stock
-            // across available products. Physical sandwich table capacity is now 48 per product
-            // in every level; Racing+ still starts with no prepared sandwich inventory.
+            // The serialized normal/Premium balances divide traditional starting stock across
+            // available products. Independiente explicitly matches Premium's starting stock to
+            // Normal; physical sandwich capacity remains 48 per product in every level.
             SetGroupCapacities(available, 0, 1, Mathf.Max(1, balance.normalTableCapacity));
-            SetGroupCapacities(available, 2, 3, Mathf.Max(1, balance.premiumTableCapacity));
+            int premiumStartingCapacity = premiumTableStartsLikeNormalTable
+                ? balance.normalTableCapacity : balance.premiumTableCapacity;
+            SetGroupCapacities(available, 2, 3, Mathf.Max(1, premiumStartingCapacity));
             int[] initialSandwichStock = new int[4];
             Array.Copy(tableCapacity, initialSandwichStock, initialSandwichStock.Length);
             for (int product = 0; product < 4; product++)

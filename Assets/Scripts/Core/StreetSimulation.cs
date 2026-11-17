@@ -35,7 +35,7 @@ namespace HayChoriYPaty
     [Serializable]
     public sealed class StreetBalance
     {
-        [Range(1, 28)] public int maxCustomers = 28;
+        [Range(1, 21)] public int maxCustomers = 21;
         public int randomSeed = 1337;
         [Range(.1f,4f)] public float priceSensitivity=2.5f;
         [HideInInspector, Tooltip("Legacy serialized limit retained for save/scene compatibility; worker hiring is unlimited when the role is enabled.")]
@@ -305,7 +305,8 @@ namespace HayChoriYPaty
         public const float FrontQueueY = 324f, QueueRowSpacing = 56f;
         // Legacy public name retained for callers; all levels use the shared scene service line.
         public const float ChicagoCounterServiceY = StreetSceneLayout.WorkerServiceY;
-        private const int QueueColumns = 7, QueueRows = 4, QueueSlots = QueueColumns * QueueRows;
+        public const int QueueRowCount = 3;
+        private const int QueueColumns = 7, QueueSlots = QueueColumns * QueueRowCount;
         public static readonly string[] ProductNames = { "Chori", "Paty", "Bondiola", "Vacío", "Coca 600 ml", "Fernet con Coca 1 L", "Cerveza en lata" };
         public const int HuracanBonusLevelId = 11;
         public const int ArgentinosJuniorsLevelId = 12;
@@ -986,7 +987,10 @@ namespace HayChoriYPaty
         }
         private void StepSlice(float dt)
         {
-            Kitchen.Advance(dt, CookWorkRate, WorkRate, ParrilleroCount > 0, ParrilleroPremiumCount > 0,
+            // Independiente's traditional kitchen lets its existing Parrillero keep the Premium grill replenishing too.
+            bool independentAutomaticPremiumCook = !UsesActiveCooks && LevelIndex == 4 && ParrilleroCount > 0;
+            Kitchen.Advance(dt, CookWorkRate, WorkRate, ParrilleroCount > 0,
+                ParrilleroPremiumCount > 0 || independentAutomaticPremiumCook,
                 CocacoleroCount > 0, FerneteroCount > 0);
             float duration = LevelDuration;
             Elapsed = Mathf.Min(duration, Elapsed + dt);
@@ -1933,7 +1937,9 @@ namespace HayChoriYPaty
             nextNormalCookProduct = 0;
             nextPremiumCookProduct = 2;
             nextCookQueueTicket = 0;
-            Kitchen = new StreetKitchenProduction(balance.kitchen, availableProductsByLevel[LevelIndex], ingredientStock, UsesActiveCooks, !UsesActiveCooks && LevelIndex == 2);
+            bool independentPremiumTableMatchesNormal = !UsesActiveCooks && LevelIndex == 4;
+            Kitchen = new StreetKitchenProduction(balance.kitchen, availableProductsByLevel[LevelIndex], ingredientStock,
+                UsesActiveCooks, !UsesActiveCooks && LevelIndex == 2, false, independentPremiumTableMatchesNormal);
             workers.Clear();
             Array.Clear(ticketWorkersByRole, 0, ticketWorkersByRole.Length);
             nextWorker = 1;

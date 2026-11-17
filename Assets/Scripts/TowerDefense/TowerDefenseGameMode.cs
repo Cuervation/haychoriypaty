@@ -50,6 +50,8 @@ namespace HayChoriYPaty
         internal int ReservedByWorker;
         public int Id { get; }
         public TowerDefenseFanRouteFollower RouteFollower { get; internal set; }
+        public int AppearanceId { get; internal set; }
+        public CamionerosFanProfile Profile { get; internal set; }
         public IReadOnlyList<TowerDefenseOrderLine> Order => order;
         public float AnimationTime { get; internal set; }
         public bool IsReceiving { get; internal set; }
@@ -71,6 +73,7 @@ namespace HayChoriYPaty
         internal TowerDefenseFanState(int id, TowerDefenseFanRouteFollower follower, int[] products, int[] quantities)
         {
             Id = id;
+            AppearanceId = id;
             RouteFollower = follower;
             order = new List<TowerDefenseOrderLine>(products.Length);
             for (int i = 0; i < products.Length; i++) order.Add(new TowerDefenseOrderLine(products[i], quantities[i]));
@@ -141,6 +144,12 @@ namespace HayChoriYPaty
         public const float DeliveryCueDurationSeconds = DeliveryIntervalSeconds;
         public const float WorkerVisualHeightLogical = 94f;
         public const float WorkerVisualPivotY = 0.02f;
+        // Los Redondos sector composition (full-size Camioneros art): the station sits on
+        // the sector floor and its crew stands behind it with feet hidden at this fraction
+        // of the station height, like the Camioneros counter.
+        public const float LosRedondosStationFloorInsetLogical = 1f;
+        public const float LosRedondosCrewFeetStationFraction = .38f;
+        public const float LosRedondosSectorSideInsetLogical = 2f;
         public const float WorkerFenceClearanceLogical = 8f;
         public const float StationOuterClearanceLogical = 2f;
         public const float WorkerStationClearanceLogical = 4f;
@@ -258,6 +267,9 @@ namespace HayChoriYPaty
         public float CurrentStationSpacingLogical => config.SourceCampaignLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId
             ? Mathf.Abs(StationVisualPosition(StreetWorkerRole.Parrillero, 0).x -
                 StationVisualPosition(StreetWorkerRole.Cocacolero, 0).x) / Mathf.Max(.0001f, worldUnitsPerLogicalPixel)
+            : config.SourceCampaignLevelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId
+                ? Vector2.Distance(StationPosition(StreetWorkerRole.Parrillero, 0),
+                    StationPosition(StreetWorkerRole.Cocacolero, 0)) / Mathf.Max(.0001f, worldUnitsPerLogicalPixel)
             : UsesSplitWorkerRows
                 ? Mathf.Abs(StationPosition(StreetWorkerRole.Parrillero, 0).x -
                     StationPosition(StreetWorkerRole.Cocacolero, 0).x) / Mathf.Max(.0001f, worldUnitsPerLogicalPixel)
@@ -269,6 +281,8 @@ namespace HayChoriYPaty
         public Vector2 StationPosition(StreetWorkerRole role, int zone)
         {
             Vector2 center = WorkZone(zone);
+            if (IsLosRedondos)
+                return LosRedondosStationCenter(role, zone);
             if (!UsesSplitWorkerRows)
                 return center + Vector2.right * ((role == StreetWorkerRole.Parrillero ? -.5f : .5f) *
                     CompactStationSpacingLogical * worldUnitsPerLogicalPixel);
@@ -300,6 +314,9 @@ namespace HayChoriYPaty
         public Vector2 StationVisualPosition(StreetWorkerRole role, int zone)
         {
             Vector2 anchor = StationPosition(role, zone);
+            // The presenter lowers every station root by StationRenderYOffsetLogical.
+            if (IsLosRedondos)
+                return anchor + Vector2.up * StationRenderYOffsetLogical * worldUnitsPerLogicalPixel;
             if (!IsCamionerosCrew(role, zone)) return anchor;
 
             Vector2 groupBounds = CamionerosWorkerGroupCenterBoundsX(role, zone);
@@ -309,6 +326,101 @@ namespace HayChoriYPaty
             // furniture roots on the centerline of the same work area.
             float y = WorkZone(zone).y + StationRenderYOffsetLogical * worldUnitsPerLogicalPixel;
             return new Vector2(x, y);
+        }
+
+        private bool IsLosRedondos => config.SourceCampaignLevelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId;
+
+        /// <summary>
+        /// Los Redondos sector for a role/zone (P0, C0, P1, C1 from top to bottom), taken from
+        /// the same right-side work column that the route layout validated. Other levels
+        /// have no right-side sectors and return an empty rect.
+        /// </summary>
+        public Rect RightBayBounds(StreetWorkerRole role, int zone) => IsLosRedondos
+            ? LosRedondosLayout.WorldSector(route.WorkBounds, LosRedondosLayout.SectorIndex(role, zone))
+            : Rect.zero;
+
+        /// <summary>World footprint of a Los Redondos table/barrel at its full Camioneros size.</summary>
+        public Rect LosRedondosStationBounds(StreetWorkerRole role, int zone)
+        {
+            Vector2 center = LosRedondosStationCenter(role, zone);
+            float width = (role == StreetWorkerRole.Parrillero ? StreetKitchenLayout.TableWidth : StreetKitchenLayout.BarrelWidth) *
+                worldUnitsPerLogicalPixel;
+            float height = LosRedondosStationHeightLogical(role) * worldUnitsPerLogicalPixel;
+            return new Rect(center.x - width * .5f, center.y - height * .5f, width, height);
+        }
+
+        /// <summary>World footprint of a full-size (94 px) worker standing at its feet position.</summary>
+        public Rect LosRedondosWorkerBounds(TowerDefenseWorkerState worker)
+        {
+            float width = (worker.Role == StreetWorkerRole.Parrillero
+                ? WorkerVisualHeightLogical * 266f / 303f : CamionerosCocacoleroStandingWidthLogical) * worldUnitsPerLogicalPixel;
+            float height = WorkerVisualHeightLogical * worldUnitsPerLogicalPixel;
+            return new Rect(worker.Position.x - width * .5f, worker.Position.y - height * WorkerVisualPivotY, width, height);
+        }
+
+        /// <summary>
+        /// Audits the live ID10 placement: the shared route validator plus every station and
+        /// worker inside its own right-side sector, clear of the fenced route (and its art),
+        /// and never overlapping another sector's objects or another station. Empty = valid.
+        /// </summary>
+        public string[] AuditLosRedondosLayout()
+        {
+            var issues = new List<string>();
+            if (!IsLosRedondos) return issues.ToArray();
+            float px = worldUnitsPerLogicalPixel;
+            TowerDefenseRouteLayoutReport report = TowerDefenseResponsiveLayout.ValidateLosRedondos(route, routeGeometry, px);
+            for (int i = 0; i < report.Issues.Count; i++) issues.Add(report.Issues[i].ToString());
+            float art = LosRedondosLayout.FenceArtHalfThicknessLogical * px;
+            Rect routeArt = Rect.MinMaxRect(route.PlayableBounds.xMin - art, route.PlayableBounds.yMin - art,
+                route.PlayableBounds.xMax + art, route.PlayableBounds.yMax + art);
+            float tol = .01f * px;
+            var rects = new List<Rect>();
+            var sectorOf = new List<int>();
+            var labels = new List<string>();
+            for (int zone = 0; zone < 2; zone++)
+            for (int r = 0; r < 2; r++)
+            {
+                StreetWorkerRole role = r == 0 ? StreetWorkerRole.Parrillero : StreetWorkerRole.Cocacolero;
+                rects.Add(LosRedondosStationBounds(role, zone));
+                sectorOf.Add(LosRedondosLayout.SectorIndex(role, zone));
+                labels.Add((role == StreetWorkerRole.Parrillero ? "mesa " : "barril ") + "zona " + zone);
+            }
+            for (int i = 0; i < workers.Count; i++)
+            {
+                rects.Add(LosRedondosWorkerBounds(workers[i]));
+                sectorOf.Add(LosRedondosLayout.SectorIndex(workers[i].Role, workers[i].ServiceZone));
+                labels.Add(workers[i].Role + " #" + workers[i].Id + " zona " + workers[i].ServiceZone);
+            }
+            for (int i = 0; i < rects.Count; i++)
+            {
+                Rect sector = LosRedondosLayout.WorldSector(route.WorkBounds, sectorOf[i]);
+                if (rects[i].xMin < sector.xMin - tol || rects[i].xMax > sector.xMax + tol ||
+                    rects[i].yMin < sector.yMin - tol || rects[i].yMax > sector.yMax + tol)
+                    issues.Add(labels[i] + " " + rects[i] + " sale de su sector " + sectorOf[i] + " " + sector);
+                if (RectsOverlap(rects[i], routeArt, tol))
+                    issues.Add(labels[i] + " " + rects[i] + " invade el recorrido vallado " + routeArt);
+                for (int j = i + 1; j < rects.Count; j++)
+                {
+                    bool bothStations = i < 4 && j < 4;
+                    if ((bothStations || sectorOf[i] != sectorOf[j]) && RectsOverlap(rects[i], rects[j], tol))
+                        issues.Add(labels[i] + " se superpone con " + labels[j] + " en " + rects[i].center);
+                }
+            }
+            return issues.ToArray();
+        }
+
+        private static bool RectsOverlap(Rect a, Rect b, float tol) =>
+            a.xMin < b.xMax - tol && a.xMax > b.xMin + tol && a.yMin < b.yMax - tol && a.yMax > b.yMin + tol;
+
+        private static float LosRedondosStationHeightLogical(StreetWorkerRole role) =>
+            role == StreetWorkerRole.Parrillero ? StreetKitchenLayout.SandwichTableHeight : StreetKitchenLayout.BarrelHeight;
+
+        private Vector2 LosRedondosStationCenter(StreetWorkerRole role, int zone)
+        {
+            Rect sector = RightBayBounds(role, zone);
+            float bottom = sector.yMin + LosRedondosStationFloorInsetLogical * worldUnitsPerLogicalPixel;
+            return new Vector2(sector.center.x,
+                bottom + LosRedondosStationHeightLogical(role) * .5f * worldUnitsPerLogicalPixel);
         }
 
         public TowerDefenseGameMode(TowerDefenseLevelConfig levelConfig, StreetBalance campaignBalance,
@@ -506,6 +618,9 @@ namespace HayChoriYPaty
             float[] normalized = new float[fans.Count];
             for (int i = 0; i < fans.Count; i++) normalized[i] = fans[i].RouteFollower.TotalDistance <= 0f ? 0f :
                 fans[i].RouteFollower.Progress / fans[i].RouteFollower.TotalDistance;
+            Vector2[] nextWaypoints = BuildFanRouteWaypoints(nextGeometry, runtimeRoute.FanEntryExtensionWorldUnits);
+            float[] profileProgress = UsesCamionerosProfiles ? CamionerosReflowProgress(normalized, nextWaypoints, logicalPixelScale) : null;
+            if (UsesCamionerosProfiles && profileProgress == null) { Pause(); return; }
             route = CloneRoute(runtimeRoute);
             routeGeometry = nextGeometry;
             fanRouteWaypoints = BuildFanRouteWaypoints(routeGeometry, route.FanEntryExtensionWorldUnits);
@@ -542,9 +657,10 @@ namespace HayChoriYPaty
             {
                 TowerDefenseFanState fan = fans[i];
                 var follower = new TowerDefenseFanRouteFollower(fan.Id, fanRouteWaypoints,
-                    sourceBalance.customerSpeed * config.FanSpeed * logicalPixelScale);
-                if (follower.Speed > 0f && normalized[i] > 0f)
-                    follower.Advance(normalized[i] * follower.TotalDistance / follower.Speed);
+                    FanSpeedForProfile(fan.Profile, logicalPixelScale));
+                float progress = profileProgress == null ? normalized[i] * follower.TotalDistance : profileProgress[i];
+                if (follower.Speed > 0f && progress > 0f)
+                    follower.Advance(progress / follower.Speed);
                 fan.RouteFollower = follower;
             }
             for (int i = 0; i < workers.Count; i++)
@@ -601,6 +717,13 @@ namespace HayChoriYPaty
 
         private bool HasEntrySpacing()
         {
+            if (UsesCamionerosProfiles)
+            {
+                float headway = NextCamionerosProfile.HeadwayLogical * worldUnitsPerLogicalPixel;
+                for (int i = 0; i < fans.Count; i++)
+                    if (!fans[i].IsDeparting && fans[i].RouteFollower.Progress < headway) return false;
+                return true;
+            }
             float minimumSpacing = config.MinimumEntrySpacingLogical * worldUnitsPerLogicalPixel;
             for (int i = 0; i < fans.Count; i++)
                 if (fans[i].RouteFollower.Progress < minimumSpacing) return false;
@@ -610,6 +733,7 @@ namespace HayChoriYPaty
         private void SpawnNextFan()
         {
             if (stopSpawning || spawnedFans >= TotalFanCount || fans.Count >= TotalFanCount) return;
+            if (UsesCamionerosProfiles) { SpawnCamionerosOrder(); return; }
             if (config.FreeConstruction)
             {
                 int index = spawnedFans;
@@ -642,9 +766,11 @@ namespace HayChoriYPaty
             if (stopSpawning || spawnedFans >= TotalFanCount || fans.Count >= TotalFanCount ||
                 routeGeometry == null || routeGeometry.Centerline.Length < 2) return false;
             int id = nextFanId++;
+            int appearance = UsesCamionerosProfiles ? CamionerosFanProfile.AppearanceForSpawn(spawnedFans) : id;
+            CamionerosFanProfile profile = UsesCamionerosProfiles ? CamionerosFanProfile.ForAppearance(appearance) : null;
             var follower = new TowerDefenseFanRouteFollower(id, fanRouteWaypoints,
-                sourceBalance.customerSpeed * config.FanSpeed * worldUnitsPerLogicalPixel);
-            fans.Add(new TowerDefenseFanState(id, follower, products, quantities));
+                FanSpeedForProfile(profile, worldUnitsPerLogicalPixel));
+            fans.Add(new TowerDefenseFanState(id, follower, products, quantities) { AppearanceId = appearance, Profile = profile });
             spawnedFans++;
             if (spawnedFans >= TotalFanCount) stopSpawning = true;
             return true;
@@ -652,6 +778,7 @@ namespace HayChoriYPaty
 
         private void AdvanceFans(float deltaTime)
         {
+            if (UsesCamionerosProfiles) { AdvanceCamionerosFans(deltaTime); return; }
             for (int i = fans.Count - 1; i >= 0; i--)
             {
                 TowerDefenseFanState fan = fans[i];
@@ -726,7 +853,7 @@ namespace HayChoriYPaty
                     if (fan.OrderComplete) break;
                     TowerDefenseWorkerState worker = workers[w];
                     if (worker.IsMoving || worker.DeliveryCooldownSeconds > 0f || servicedWorkers.Contains(worker.Id) ||
-                        !IsAdjacentToArea(fan, worker.ServiceZone)) continue;
+                        !IsAdjacentToRoleArea(fan, worker.Role, worker.ServiceZone)) continue;
                     for (int line = 0; line < fan.Order.Count; line++)
                     {
                         TowerDefenseOrderLine order = (TowerDefenseOrderLine)fan.Order[line];
@@ -783,14 +910,21 @@ namespace HayChoriYPaty
             return progress != 0 ? progress : a.Id.CompareTo(b.Id);
         }
 
-        private bool IsAdjacentToArea(TowerDefenseFanState fan, int zone)
+        // Kept as the original two-argument reflection/test hook for the shared-zone modes.
+        private bool IsAdjacentToArea(TowerDefenseFanState fan, int zone) =>
+            IsAdjacentToRoleArea(fan, StreetWorkerRole.Parrillero, zone);
+
+        private bool IsAdjacentToRoleArea(TowerDefenseFanState fan, StreetWorkerRole role, int zone)
         {
             if (config.FreeConstruction) return zone == 0 && !fan.RouteFollower.HasExited;
             if (zone < 0 || zone >= serviceZones.Length || fan.RouteFollower.HasExited) return false;
+            // Los Redondos has four right-side sectors; sector k serves runs k and k+1 and
+            // their connector, exactly as a Camioneros area serves its two bordering runs.
+            int areaIndex = IsLosRedondos ? LosRedondosLayout.SectorIndex(role, zone) : zone;
             // Each shared area borders its upper/lower horizontal rows and their
             // own connecting turn. The next connector and third row are not adjacent.
             int stride = route.TurnSegments + 1;
-            int start = zone * stride, end = (zone + 1) * stride + 1;
+            int start = areaIndex * stride, end = (areaIndex + 1) * stride + 1;
             Vector2[] points = routeGeometry.Centerline;
             if (end >= points.Length) return false;
             float from = 0f, to = 0f;
@@ -804,7 +938,7 @@ namespace HayChoriYPaty
             return progress >= from && progress <= to;
         }
 
-        private static Vector2[] BuildFanRouteWaypoints(TowerDefenseRouteGeometryResult geometry, float entryExtension)
+        internal static Vector2[] BuildFanRouteWaypoints(TowerDefenseRouteGeometryResult geometry, float entryExtension)
         {
             Vector2[] centerline = geometry == null ? null : geometry.Centerline;
             if (centerline == null || centerline.Length < 2) return Array.Empty<Vector2>();
@@ -967,6 +1101,20 @@ namespace HayChoriYPaty
             workers.Add(new TowerDefenseWorkerState(nextWorkerId++, role, zone,
                 ZoneWorkerPosition(role, zone, index, crewCount)));
             if (IsCamionerosCrew(role, zone)) RepositionCamionerosCrew(role, zone);
+            else if (IsLosRedondos)
+                RepositionLosRedondosCrew(role, zone);
+        }
+
+        private void RepositionLosRedondosCrew(StreetWorkerRole role, int zone)
+        {
+            int crewCount = WorkersInZone(role, zone);
+            for (int i = 0; i < workers.Count; i++)
+            {
+                TowerDefenseWorkerState worker = workers[i];
+                if (worker.Role != role || worker.ServiceZone != zone) continue;
+                worker.Position = ZoneWorkerPosition(role, zone,
+                    CountPriorWorkers(role, zone, worker), crewCount);
+            }
         }
 
         private void RepositionCamionerosCrew(StreetWorkerRole role, int zone)
@@ -1035,6 +1183,24 @@ namespace HayChoriYPaty
                 float centerX = CamionerosWorkerGroupCenterX(role, zone, WorkZone(zone).x);
                 return new Vector2(centerX + slotOffset * worldUnitsPerLogicalPixel,
                     WorkZone(zone).y + CamionerosWorkerRowAnchorLogical() * worldUnitsPerLogicalPixel);
+            }
+            if (IsLosRedondos)
+            {
+                // Full-size crew (Camioneros widths/spacing) centered behind its station,
+                // compressed only as needed to stay inside the 34.5% sector.
+                Rect sector = RightBayBounds(role, zone);
+                float sectorWidth = sector.width / Mathf.Max(.0001f, worldUnitsPerLogicalPixel) - LosRedondosSectorSideInsetLogical * 2f;
+                float workerWidth = role == StreetWorkerRole.Parrillero
+                    ? WorkerVisualHeightLogical * 266f / 303f : CamionerosCocacoleroStandingWidthLogical;
+                float preferred = role == StreetWorkerRole.Parrillero
+                    ? CamionerosParrilleroSpacingLogical : CamionerosCocacoleroSpacingLogical;
+                float spacing = crewCount > 1
+                    ? Mathf.Min(preferred, Mathf.Max(0f, (sectorWidth - workerWidth) / (crewCount - 1))) : 0f;
+                float centeredIndex = roleIndex - (crewCount - 1) * .5f;
+                float stationBottom = sector.yMin + LosRedondosStationFloorInsetLogical * worldUnitsPerLogicalPixel;
+                float feetY = stationBottom + LosRedondosStationHeightLogical(role) * LosRedondosCrewFeetStationFraction *
+                    worldUnitsPerLogicalPixel;
+                return new Vector2(sector.center.x + centeredIndex * spacing * worldUnitsPerLogicalPixel, feetY);
             }
             if (UsesSplitWorkerRows)
             {

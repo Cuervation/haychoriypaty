@@ -41,6 +41,29 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
+        public void ElapsedClockStartsAtZeroCountsOnlyPlayingTimeAndResetsOnNewAttempt()
+        {
+            mode = CreateMode(0.02f);
+            Assert.AreEqual(0f, Get<float>(mode, "Elapsed"));
+            Invoke(mode, "Step", new object[] { .5f });
+            Assert.AreEqual(0f, Get<float>(mode, "Elapsed"));
+            Invoke(mode, "Begin");
+            Invoke(mode, "Step", new object[] { .5f });
+            Assert.That(Get<float>(mode, "Elapsed"), Is.EqualTo(.5f).Within(.001f));
+            Invoke(mode, "Pause");
+            Invoke(mode, "Step", new object[] { .5f });
+            Assert.That(Get<float>(mode, "Elapsed"), Is.EqualTo(.5f).Within(.001f));
+            Invoke(mode, "Resume");
+            Invoke(mode, "Step", new object[] { .5f });
+            Assert.That(Get<float>(mode, "Elapsed"), Is.EqualTo(1f).Within(.001f));
+            Invoke(mode, "Stop");
+            Invoke(mode, "Step", new object[] { .5f });
+            Assert.That(Get<float>(mode, "Elapsed"), Is.EqualTo(1f).Within(.001f));
+            mode = CreateMode(0.02f);
+            Assert.AreEqual(0f, Get<float>(mode, "Elapsed"));
+        }
+
+        [Test]
         public void BeginsOwnCamionerosLevelUsingOnlyExistingLevelBalance()
         {
             Set(config, "totalFanCount", 120);
@@ -112,8 +135,10 @@ namespace HayChoriYPaty.Tests
             int losRedondosCampaignLevelId = (int)RuntimeType("TowerDefenseLevelConfig")
                 .GetField("LosRedondosCampaignLevelId", PublicStatic).GetRawConstantValue();
             Set(config, "sourceCampaignLevelId", losRedondosCampaignLevelId);
-            Assert.AreEqual(areaTwoTable, Invoke(mode, "StationVisualPosition", new[] { parrillero, (object)1 }),
-                "This visual adjustment is limited to Camioneros.");
+            Vector2 redondosVisual = (Vector2)Invoke(mode, "StationVisualPosition", new[] { parrillero, (object)1 });
+            // ID10 places stations in its own right-side sectors (LosRedondosRightLayoutTests).
+            Assert.AreNotEqual(areaTwoTable, redondosVisual,
+                "ID10's dedicated bay layout must not inherit the Camioneros-only adjustment.");
         }
 
         [Test]
@@ -640,7 +665,9 @@ namespace HayChoriYPaty.Tests
                 {
                     object follower = Get<object>(fan, "RouteFollower");
                     follower.GetType().GetProperty("Speed").SetValue(follower, 1f);
-                    Invoke(follower, "Advance", new object[] {Mathf.Max(0f, 2f - Get<float>(follower, "Progress"))});
+                    // The next ID9 profile may require up to 106 px (2.12 world units here).
+                    // Keep the fixture well beyond every profile's headway before testing the cap.
+                    Invoke(follower, "Advance", new object[] {Mathf.Max(0f, 3f - Get<float>(follower, "Progress"))});
                     follower.GetType().GetProperty("Speed").SetValue(follower, 0f);
                 }
                 Invoke(mode, "Step", new object[] {.05f});

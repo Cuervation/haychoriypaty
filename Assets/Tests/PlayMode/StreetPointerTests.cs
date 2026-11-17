@@ -822,6 +822,39 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
+        public IEnumerator IndependentPremiumTableFullGameViewShowsBothSandwichTablesRestocked()
+        {
+            object save = gameType.GetField("save", PrivateInstance).GetValue(game);
+            bool[] unlockedIds = (bool[])save.GetType().GetField("unlockedLevelIds").GetValue(save);
+            for (int level = 0; level <= 4; level++) unlockedIds[level] = true;
+            save.GetType().GetField("unlockedLevel").SetValue(save, 4);
+            Assert.IsTrue((bool)CallGame("SelectLevel", 4), "The isolated fixture selects Independiente without changing the real player's save.");
+
+            object gameBalance = Get("Balance");
+            object kitchenBalance = gameBalance.GetType().GetField("kitchen", PublicInstance).GetValue(gameBalance);
+            kitchenBalance.GetType().GetField("cookSeconds", PublicInstance).SetValue(kitchenBalance, .1f);
+            StockSelectedLevel();
+            Assert.IsTrue((bool)Get("CanStartRound"));
+            Invoke(game, "StartRound");
+            Assert.AreEqual("Playing", Phase);
+            Assert.AreEqual(1, Sim.GetType().GetProperty("ParrilleroCount", PublicInstance).GetValue(Sim, null));
+            Assert.AreEqual(0, Sim.GetType().GetProperty("ParrilleroPremiumCount", PublicInstance).GetValue(Sim, null));
+
+            Sim.GetType().GetField("arrival", PrivateInstance).SetValue(Sim, 10000f);
+            Command(Sim.GetType(), "Step", 1).Invoke(Sim, new object[] { 2f });
+            object kitchen = Sim.GetType().GetProperty("Kitchen", PublicInstance).GetValue(Sim, null);
+            foreach (int product in new[] { 0, 1, 2, 3 })
+                Assert.AreEqual(48, (int)Command(kitchen.GetType(), "TableCount", 1).Invoke(kitchen, new object[] { product }),
+                    "Both tables are filled by real automatic cooking units.");
+
+            yield return null;
+            yield return new WaitForEndOfFrame();
+            Texture2D capture = ScreenCapture.CaptureScreenshotAsTexture();
+            try { System.IO.File.WriteAllBytes("/private/tmp/hcyp-independent-premium-table-full.png", capture.EncodeToPNG()); }
+            finally { UnityEngine.Object.Destroy(capture); }
+        }
+
+        [UnityTest]
         [Ignore("Pendiente de rediseno: test PlayMode desfasado respecto del flujo/layout actual de StreetView (hub, selector por posicion de campana, tutoriales, mercado). Fallo previo a la limpieza; StreetView.cs no fue modificado por las fases 1-2b. Ver Docs/tests-playmode-pendientes.md.")]
         public IEnumerator LevelSixRacingTutorialExplainsActiveKitchenMozoAndAngryCue()
         {
@@ -2017,6 +2050,21 @@ namespace HayChoriYPaty.Tests
             Texture2D capture = ScreenCapture.CaptureScreenshotAsTexture();
             try { System.IO.File.WriteAllBytes(System.IO.Path.Combine(directory, "level" + (level + 1).ToString("00") + "-" + state + ".png"), capture.EncodeToPNG()); }
             finally { UnityEngine.Object.Destroy(capture); }
+        }
+
+        [UnityTest]
+        public IEnumerator DefeatShowsLargerRetryMessageWithoutGameOverCapture()
+        {
+            SetSim("Phase", Enum.Parse(Sim.GetType().GetProperty("Phase").PropertyType, "Lost"));
+            yield return null;
+            yield return new WaitForSecondsRealtime(1.6f);
+            Assert.IsTrue((bool)view.GetType().GetField("riotScreenActive", PrivateInstance).GetValue(view));
+            Assert.IsNull(view.GetType().GetMethod("DrawAnimatedGameOver", PrivateInstance));
+            yield return new WaitForEndOfFrame();
+            string directory = System.IO.Path.GetFullPath(System.IO.Path.Combine(Application.dataPath,
+                "../Logs/Acceptance/DefeatRetryMessage-20261116"));
+            System.IO.Directory.CreateDirectory(directory);
+            SaveRiotReviewScreenshot(directory, 0, "retry-message");
         }
 
         [UnityTest]

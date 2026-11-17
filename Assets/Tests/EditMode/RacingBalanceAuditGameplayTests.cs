@@ -87,6 +87,10 @@ namespace HayChoriYPaty.Tests
             Effective();
             object run = Invoke("Capacity", 5, 501, new[] { 4, 2, 3, 1, 3 }, 9);
             Assert.AreEqual("capacity_preconfigured_unlimited_stock", Field(run, "mode"));
+            TestContext.WriteLine("Theoretical capacity result: phase=" + Field(run, "phase") +
+                ", elapsed=" + Field(run, "elapsed") + ", goals=" + string.Join(",", (int[])Field(run, "goals")) +
+                ", delivered=" + string.Join(",", (int[])Field(run, "delivered")) +
+                ", team=" + string.Join(",", (int[])Field(run, "team")) + ", speed=" + Field(run, "speed"));
             Assert.IsTrue((bool)Field(run, "won"));
             CollectionAssert.AreEqual(new[] { 4, 2, 3, 1, 3 }, (int[])Field(run, "team"));
             Assert.AreEqual(9, Field(run, "speed"));

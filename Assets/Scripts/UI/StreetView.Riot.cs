@@ -109,7 +109,7 @@ namespace HayChoriYPaty
             try
             {
                 // Use the frozen queue itself rather than introducing a new, unrelated crowd.
-                for (int row = 4; row >= 0; row--)
+                for (int row = StreetSimulation.QueueRowCount - 1; row >= 0; row--)
                 for (int i = 0; i < sim.Customers.Count; i++)
                 {
                     StreetCustomer customer = sim.Customers[i];
@@ -117,7 +117,8 @@ namespace HayChoriYPaty
                         customer.State != StreetCustomerState.Receiving &&
                         customer.State != StreetCustomerState.Advancing) continue;
                     int customerRow = Mathf.Clamp(Mathf.RoundToInt(
-                        (StreetSimulation.FrontQueueY - customer.Position.y) / StreetSimulation.QueueRowSpacing), 0, 4);
+                        (StreetSimulation.FrontQueueY - customer.Position.y) / StreetSimulation.QueueRowSpacing),
+                        0, StreetSimulation.QueueRowCount - 1);
                     if (customerRow != row) continue;
                     DrawRiotCustomer(customer, sim.LevelIndex, elapsed);
                 }
@@ -278,9 +279,8 @@ namespace HayChoriYPaty
             layoutVerticalScale = 1f;
             try
             {
-                Rect titleBounds = RiotGameOverBounds(logicalCanvasHeight);
-                DrawRiotWaitMessage(new Rect(22f, titleBounds.y - 66f, W - 44f, 56f));
-                DrawAnimatedGameOver(titleBounds, Mathf.Max(0f, Time.unscaledTime - riotStartedAt));
+                // Center the paragraph over the wrecked counter, not above the stall.
+                DrawRiotWaitMessage(new Rect(22f, logicalCanvasHeight * .5f - 72f, W - 44f, 144f));
                 DrawStandardButton(RiotResultButtonBounds(), RiotReturnAction, "VOLVER A NIVELES");
             }
             finally { layoutVerticalScale = previousVertical; }
@@ -288,9 +288,8 @@ namespace HayChoriYPaty
 
         private void DrawRiotWaitMessage(Rect bounds)
         {
-            string message = game != null && game.Sim != null && StreetSimulation.IsTowerDefenseLevel(game.Sim.LevelIndex)
-                ? "Un hincha llegó a la salida sin su pedido." : "Los hinchas se cansaron de esperar......";
-            int fontSize = FitStandardButtonFontSize(menuTitle, message, bounds);
+            const string message = "Los hinchas se cansaron\nde esperar,\nintentalo nuevamente";
+            const int fontSize = 30;
             GUIStyle caption = CachedStandardButtonLabelStyle(menuTitle, fontSize, Color.white);
             GUIStyle outline = CachedStandardButtonLabelStyle(menuTitle, fontSize, new Color(.035f, .075f, .16f));
             float stroke = 2.2f * fontSize / 38f;
@@ -304,27 +303,5 @@ namespace HayChoriYPaty
             Label(letters, message, caption);
         }
 
-        private void DrawAnimatedGameOver(Rect bounds, float elapsed)
-        {
-            float pulse = 1f + Mathf.Sin(elapsed * 7f) * .055f;
-            float shake = Mathf.Sin(elapsed * 19f) * 1.25f;
-            float bob = Mathf.Sin(elapsed * 4.5f) * 1.5f;
-            Rect animated = new Rect(bounds.center.x + shake - bounds.width * pulse * .5f,
-                bounds.center.y + bob - bounds.height * pulse * .5f,
-                bounds.width * pulse, bounds.height * pulse);
-            float flash = .5f + .5f * Mathf.Sin(elapsed * 5.5f);
-            Color fill = Color.Lerp(new Color(1f, .32f, .07f), new Color(1f, .82f, .16f), flash);
-            int previousSize = menuTitle.fontSize;
-            TextAnchor previousAlignment = menuTitle.alignment;
-            menuTitle.alignment = TextAnchor.MiddleCenter;
-            Rect gameLine = new Rect(animated.x, animated.y, animated.width, animated.height * .5f);
-            Rect overLine = new Rect(animated.x, animated.y + animated.height * .5f, animated.width, animated.height * .5f);
-            menuTitle.fontSize = FitVictoryFont(menuTitle, "GAME", 190, gameLine);
-            OutlineLabel(gameLine, "GAME", menuTitle, fill, 2f);
-            menuTitle.fontSize = FitVictoryFont(menuTitle, "OVER", 190, overLine);
-            OutlineLabel(overLine, "OVER", menuTitle, fill, 2f);
-            menuTitle.fontSize = previousSize;
-            menuTitle.alignment = previousAlignment;
-        }
     }
 }

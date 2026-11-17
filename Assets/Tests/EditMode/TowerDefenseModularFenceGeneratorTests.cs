@@ -265,6 +265,60 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
+        public void LosRedondosDrawsBothRailsAlongTheWholeFiveRunRoute()
+        {
+            Type generatorType = Type.GetType("HayChoriYPaty.TowerDefenseModularFenceGenerator, Assembly-CSharp", true);
+            Type pieceType = Type.GetType("HayChoriYPaty.TowerDefenseFencePiece, Assembly-CSharp", true);
+            var config = Resources.Load("TowerDefense/LosRedondos-Tandil") as ScriptableObject;
+            Assert.IsNotNull(config);
+            var owner = new GameObject("Los Redondos five-run fence test");
+            var texture = new Texture2D(128, 48, TextureFormat.RGBA32, false);
+            Sprite sprite = Sprite.Create(texture, new Rect(0f, 0f, 128f, 48f), new Vector2(.5f, .5f), 100f);
+
+            try
+            {
+                Component generator = owner.AddComponent(generatorType);
+                Set(generator, "levelConfig", config);
+                Set(generator, "fencePanelSprite", sprite);
+                generatorType.GetMethod("SetLogicalPanelSize", PublicInstance).Invoke(generator, new object[] { .01f });
+                Assert.IsTrue((bool)generatorType.GetMethod("Generate", PublicInstance).Invoke(generator, null),
+                    Get<string>(generator, "LatestError"));
+
+                Transform generatedRoot = owner.transform.GetChild(0);
+                object geometry = generatorType.GetProperty("LatestGeometry", PublicInstance).GetValue(generator, null);
+                Vector2[] lowerBoundary = (Vector2[])geometry.GetType().GetProperty("RightBoundary", PublicInstance)
+                    .GetValue(geometry, null);
+                float bottomY = float.PositiveInfinity;
+                foreach (Vector2 point in lowerBoundary) bottomY = Mathf.Min(bottomY, point.y);
+
+                int lowestRunPanels = 0, exitTerminals = 0;
+                foreach (SpriteRenderer panel in generatedRoot.GetComponentsInChildren<SpriteRenderer>(true))
+                {
+                    Component metadata = panel.GetComponent(pieceType);
+                    if (metadata == null) continue;
+                    int rail = (int)metadata.GetType().GetProperty("RailIndex", PublicInstance).GetValue(metadata, null);
+                    if (rail == 1 && Mathf.Abs(panel.transform.position.y - bottomY) < .0001f) lowestRunPanels++;
+                    if (panel.gameObject.name.EndsWith("terminal exit")) exitTerminals++;
+                }
+                Assert.Greater(lowestRunPanels, 0, "The last run keeps its lower fence; no rail of the corridor is omitted.");
+                Assert.AreEqual(2, exitTerminals, "Both rails end with an exit terminal, leaving the exit mouth open.");
+
+                EdgeCollider2D[] colliders = generatedRoot.GetComponentsInChildren<EdgeCollider2D>(true);
+                Assert.AreEqual(2, colliders.Length, "The gameplay path retains both continuous collider boundaries.");
+                EdgeCollider2D lowerCollider = Array.Find(colliders, candidate => candidate.gameObject.name == "Fence rail 1 collider");
+                Assert.IsNotNull(lowerCollider);
+                Assert.AreEqual(lowerBoundary.Length, lowerCollider.pointCount,
+                    "Collider and drawn rail come from the same boundary polyline.");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(owner);
+                UnityEngine.Object.DestroyImmediate(sprite);
+                UnityEngine.Object.DestroyImmediate(texture);
+            }
+        }
+
+        [Test]
         public void InvalidRouteDoesNotCreateAnyFencePieces()
         {
             Type configType = Type.GetType("HayChoriYPaty.TowerDefenseLevelConfig, Assembly-CSharp", true);

@@ -162,6 +162,11 @@ namespace HayChoriYPaty
                 new Vector3(cameraPixels.xMin, cameraPixels.center.y, depth));
             Vector3 rightEdge = sourceCamera.ScreenToWorldPoint(
                 new Vector3(cameraPixels.xMax, cameraPixels.center.y, depth));
+            // ID10's exit ends inside the screen, next to the worker strip: stop the exit rails
+            // so that even the centered exit terminal panel ends at the fenced route's edge.
+            if (visualLevelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId)
+                rightEdge.x = Mathf.Min(rightEdge.x,
+                    mode.RouteConfig.PlayableBounds.xMax - fenceGenerator.TerminalPanelHalfLength);
             if (!fenceGenerator.SetVisualHorizontalBounds(
                     Mathf.Min(leftEdge.x, rightEdge.x),
                     Mathf.Max(leftEdge.x, rightEdge.x)))
@@ -591,7 +596,7 @@ namespace HayChoriYPaty
                 int walkingPose = FanWalkingFrameIndex(visualLevelId, fan.Id, fan.RouteFollower.Progress,
                     gameMode.WorldUnitsPerLogicalPixel);
                 bool walkingDownwards = IsWalkingDownwards(fan.RouteFollower.Facing);
-                Sprite sprite = FanSpriteForFacing(fan.Id, receivingOrDeparting, walkingPose, walkingDownwards);
+                Sprite sprite = FanSpriteForFacing(fan.AppearanceId, receivingOrDeparting, walkingPose, walkingDownwards);
                 if (sprite != null)
                 {
                     fanView.Renderer.sprite = sprite;
@@ -686,7 +691,7 @@ namespace HayChoriYPaty
                 Sprite activeSprite = workerView.Renderer.sprite;
                 if (activeSprite != null)
                 {
-                    float targetHeight = 94f * gameMode.WorldUnitsPerLogicalPixel;
+                    float targetHeight = TowerDefenseGameMode.WorkerVisualHeightLogical * gameMode.WorldUnitsPerLogicalPixel;
                     workerView.GameObject.transform.localScale = Vector3.one *
                         (targetHeight / Mathf.Max(.001f, activeSprite.bounds.size.y));
                 }
@@ -738,7 +743,7 @@ namespace HayChoriYPaty
             renderer.sprite = frames[0];
             renderer.sortingLayerName = "Default";
             renderer.sortingOrder = 28;
-            float targetHeight = 94f * mode.WorldUnitsPerLogicalPixel;
+            float targetHeight = TowerDefenseGameMode.WorkerVisualHeightLogical * mode.WorldUnitsPerLogicalPixel;
             obj.transform.localScale = Vector3.one * (targetHeight / Mathf.Max(.001f, frames[0].bounds.size.y));
             SetLayerRecursively(obj, presentationLayer);
             return new WorkerView { GameObject = obj, Renderer = renderer, Frames = frames, HandoffFrames = handoffFrames };
@@ -808,10 +813,12 @@ namespace HayChoriYPaty
             }
             if (texture == null) texture = fans.LoadFrontFans();
             if (texture == null) return null;
-            Rect source = receiving ? fans.FrontSourceRect(texture.width, texture.height, customerId)
-                : directionalPairedWalk ? fans.WalkingAnimationSourceRect(texture.width, texture.height, customerId,
+            int atlasId = visualLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId
+                ? CamionerosFanProfile.AtlasIdForAppearance(customerId) : customerId;
+            Rect source = receiving ? fans.FrontSourceRect(texture.width, texture.height, atlasId)
+                : directionalPairedWalk ? fans.WalkingAnimationSourceRect(texture.width, texture.height, atlasId,
                     walkingPose % fans.WalkingPoseCount)
-                : fans.WalkingSourceRect(texture.width, texture.height, customerId);
+                : fans.WalkingSourceRect(texture.width, texture.height, atlasId);
             string key = texture.name + ":" + source.x + ":" + source.y + ":" + source.width + ":" + source.height;
             Sprite sprite;
             if (fanSpriteCache.TryGetValue(key, out sprite)) return sprite;

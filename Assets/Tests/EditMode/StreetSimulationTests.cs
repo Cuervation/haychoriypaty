@@ -1044,21 +1044,21 @@ var sim = Make(level: 1); Start(sim); Set(sim, "Coins", 10000);
         }
 
         [Test]
-        public void TwentyEightCrowdUsesFourRowsOfSevenDistinctSlots()
+        public void TwentyOneCrowdUsesThreeRowsOfSevenDistinctSlots()
         {
             object balance = NewBalance(); object sim = Make(balance: balance);
-            Assert.AreEqual(28, Get(balance, "maxCustomers"), "Default level balance must restore the fourth row.");
-            for (int i = 0; i < 28; i++) Assert.IsTrue(Spawn(sim, 0, 999), "Admission failed at queue slot " + i);
-            Assert.IsFalse(Spawn(sim, 0, 1));
+            Assert.AreEqual(21, Get(balance, "maxCustomers"), "Default capacity must match the three visible rows.");
+            for (int i = 0; i < 21; i++) Assert.IsTrue(Spawn(sim, 0, 999), "Admission failed at queue slot " + i);
+            Assert.IsFalse(Spawn(sim, 0, 1), "The 22nd supporter must not create an invisible fourth row.");
             IList customers = Customers(sim);
-            Assert.AreEqual(28, customers.Count);
+            Assert.AreEqual(21, customers.Count);
             for (int i = 0; i < customers.Count; i++)
             {
                 Assert.AreEqual(i, Get(customers[i], "Slot"), "Initial admission remains front-row-first and FIFO.");
                 Assert.AreEqual(new Vector2(58 + 70 * (i % 7), 324 - 56 * (i / 7)), Get(customers[i], "Target"),
                     "Customer should be assigned to its matching queue column and row.");
             }
-            Assert.AreEqual(156f, ((Vector2)Get(customers[21], "Target")).y, "The fourth row must be reachable and distinct.");
+            Assert.AreEqual(212f, ((Vector2)Get(customers[14], "Target")).y, "The third row must be reachable and distinct.");
             for (int i = 0; i < customers.Count; i++)
                 for (int j = i + 1; j < customers.Count; j++)
                     Assert.AreNotEqual(Get(customers[i], "Target"), Get(customers[j], "Target"));
@@ -1896,6 +1896,28 @@ string[] names = (string[])simType.GetField("LevelNames", BindingFlags.Public | 
         }
 
         [Test]
+        public void IndependientePremiumTableStartsAndRefillsLikeNormalTable()
+        {
+            object balance = NewBalance();
+            object kitchenBalance = Get(balance, "kitchen");
+            kitchenBalance.GetType().GetField("cookSeconds", BindingFlags.Instance | BindingFlags.Public).SetValue(kitchenBalance, .1f);
+            object sim = Make(level: 4, balance: balance);
+            Start(sim);
+
+            Assert.AreEqual(1, Get(sim, "ParrilleroCount"));
+            Assert.AreEqual(0, Get(sim, "ParrilleroPremiumCount"), "The fix must not add or hire a worker.");
+            object kitchen = Get(sim, "Kitchen");
+            foreach (int product in new[] { 0, 1, 2, 3 })
+                Assert.AreEqual(24, Call(kitchen, "TableCount", product), "Normal and Premium tables start with the same real sandwich stock.");
+
+            simType.GetField("arrival", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(sim, 10000f);
+            for (int frame = 0; frame < 40; frame++) Step(sim, .05f);
+
+            foreach (int product in new[] { 0, 1, 2, 3 })
+                Assert.AreEqual(48, Call(kitchen, "TableCount", product), "Each real table fills to its 48-serving capacity through automatic legacy cooking.");
+        }
+
+        [Test]
         public void FerroAndIndependienteMixedTicketsUseEveryRequiredSpecialtyAndComplete()
         {
             foreach (int level in new[] { 3, 4 })
@@ -2055,7 +2077,8 @@ string[] names = (string[])simType.GetField("LevelNames", BindingFlags.Public | 
         private object FullSettledQueue(int coins = 0)
         {
             object sim = Make(); Start(sim); Set(sim, "Coins", coins);
-            for (int i = 0; i < 28; i++) Assert.IsTrue(Spawn(sim, 0, 4));
+            for (int i = 0; i < 21; i++) Assert.IsTrue(Spawn(sim, 0, 4));
+            Assert.IsFalse(Spawn(sim, 0, 4), "A settled three-row queue cannot admit a hidden fourth row.");
             foreach (object c in Customers(sim)) { Set(c, "Position", Get(c, "Target")); State(c, "Waiting"); }
             return sim;
         }
@@ -2075,24 +2098,21 @@ string[] names = (string[])simType.GetField("LevelNames", BindingFlags.Public | 
         public void ServedFrontAdvancesExistingLaneAndAdmitsNewcomerOnlyAtTail()
         {
             object sim = FullSettledQueue(); IList queue = Customers(sim);
-            object front = queue[0], second = queue[7], third = queue[14], fourth = queue[21];
+            object front = queue[0], second = queue[7], third = queue[14];
             Vector2 secondFrom = (Vector2)Get(second, "Position"), thirdFrom = (Vector2)Get(third, "Position");
             int secondId = (int)Get(second, "Id"), thirdId = (int)Get(third, "Id");
-            int fourthId = (int)Get(fourth, "Id");
             Set(front, "Remaining", 0); State(front, "Receiving"); SetField(front, "ReceiveRemaining", 0f);
             HiddenCall(sim, "AdvanceCustomers", .01f);
             Assert.AreEqual("Leaving", Get(front, "State").ToString()); Assert.AreEqual(-1, Field(front, "Slot"));
             Assert.AreEqual(0, Field(second, "Slot")); Assert.AreEqual(7, Field(third, "Slot"));
-            Assert.AreEqual(14, Field(fourth, "Slot"));
             Assert.AreEqual("Advancing", Get(second, "State").ToString()); Assert.AreEqual("Advancing", Get(third, "State").ToString());
-            Assert.AreEqual("Advancing", Get(fourth, "State").ToString());
             Assert.AreEqual(secondFrom, Get(second, "Position")); Assert.AreEqual(thirdFrom, Get(third, "Position"));
             Assert.AreEqual(secondId, Get(second, "Id")); Assert.AreEqual(thirdId, Get(third, "Id"));
             Assert.AreEqual(4, Get(second, "Remaining")); Assert.AreEqual(4, Get(third, "Remaining"));
             Assert.IsFalse(Spawn(sim, 0, 1), "Leaver counts toward capacity until offscreen");
             HiddenCall(sim, "RemoveCustomer", front); Assert.IsTrue(Spawn(sim, 0, 1));
-            object newcomer = queue[queue.Count - 1]; Assert.AreEqual(21, Field(newcomer, "Slot"));
-            Assert.Greater((int)Get(newcomer, "Id"), fourthId);
+            object newcomer = queue[queue.Count - 1]; Assert.AreEqual(14, Field(newcomer, "Slot"));
+            Assert.Greater((int)Get(newcomer, "Id"), thirdId);
             HiddenCall(sim, "AdvanceCustomers", .05f);
             Assert.Greater(((Vector2)Get(second, "Position")).y, secondFrom.y);
             Assert.Less(((Vector2)Get(second, "Position")).y, ((Vector2)Get(second, "Target")).y);
@@ -2314,8 +2334,8 @@ object sim = Make(level: level);
                     }
                 Assert.IsNotNull(game);
                 object balance = gameType.GetProperty("Balance", BindingFlags.Instance | BindingFlags.Public).GetValue(game, null);
-                Assert.AreEqual(28, balanceType.GetField("maxCustomers", Instance).GetValue(balance),
-                    "Serialized Main must not override the four-row default with the old 21-customer cap.");
+                Assert.AreEqual(21, balanceType.GetField("maxCustomers", Instance).GetValue(balance),
+                    "Serialized Main must use the shared three-row capacity.");
                 int[][] expectedGoals = {
                     new[] {200,0,0,0,0,0,0}, new[] {200,0,0,0,200,0,0}, new[] {180,120,0,0,150,0,0},
                     new[] {185,125,60,0,155,0,75}, new[] {190,130,70,65,160,65,80},

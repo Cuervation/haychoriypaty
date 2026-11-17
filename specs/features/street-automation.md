@@ -55,6 +55,13 @@ La primera vez que se inicia Independiente (índice 4), conservar el gate de Mer
 - [x] PASS: PlayMode `LevelFiveSpecialistsTutorialExplainsVacioAndFernetRolesBeforeStarting`, `SkippingLevelFiveSpecialistsTutorialStartsAndRemembersIt` y `DirectReadyStartOpensLevelFiveSpecialistsTutorial`, más regresiones del tutorial de Nivel 4 y LevelThree (7/7): gate de stock, targets reales, bloqueo/Ready congelado, avance, omisión, marcador posterior al inicio e inicio directo.
 - [x] PASS: capturas reales Game View 1080×1920 revisadas; se ven y alinean las tarjetas Premium y Fernetero y el texto es legible. Archivos: `/private/tmp/hcyp-level-five-specialists-step-1-premium-vacio.png` y `/private/tmp/hcyp-level-five-specialists-step-2-fernetero-fernet.png`. Sin validación de safe area física ni prueba en teléfono.
 
+### Reposición de la mesa Premium en Independiente — 2026-11-16
+
+En Independiente (índice 4), igualar al comportamiento de la mesa normal sin añadir personal ni inventar unidades: el stock real inicial Premium usa la misma capacidad de familia que Normal (48 en total, dividido entre los productos disponibles), y el Parrillero gratuito habilita también la cocción automática de la parrilla Premium dentro del modo tradicional. Las entregas de Bondiola/Vacío siguen requiriendo un Parrillero Premium. No cambian el roster inicial, precios, objetivos, recetas, requisitos de Mercado, economía ni otros niveles; la parrilla Premium usa el stock de ingredientes ya preparado según las reglas actuales. La capacidad física de cada producto sigue siendo 48 y toda unidad mostrada proviene de la simulación.
+
+- [x] PASS: EditMode `StreetSimulationTests.IndependientePremiumTableStartsAndRefillsLikeNormalTable` (1/1) demuestra stock inicial real parejo (24 por producto) y llenado hasta48 por producto con el Parrillero gratuito, sin Premium contratado. La regresión `FerroAndIndependienteMixedTicketsUseEveryRequiredSpecialtyAndComplete` también pasó (1/1); Bondiola/Vacío siguen necesitando su rol para entrega.
+- [x] PASS: PlayMode `StreetPointerTests.IndependentPremiumTableFullGameViewShowsBothSandwichTablesRestocked` (1/1) produjo y revisó la captura completa de Game View 1200×1600 `/private/tmp/hcyp-independent-premium-table-full.png`; las cuatro mesas de sándwich (Normal y Premium) se ven llenas. No es captura de dispositivo físico ni valida safe areas de teléfono.
+
 ### Nivel 6 — tutorial de cocina activa y Mozos (2026-10-30)
 
 La primera vez que se inicia Racing (índice 5), con el gate vigente de Mercado/stock satisfecho, un tutorial de dos pasos sobre Ready explica el cambio de Racing+: el Parrillero normal y el Premium cocinan sándwiches unidad por unidad y los dejan listos en la mesa; el Mozo recoge y entrega la unidad pedida. También informa la señal existente de espera: si el Mozo se enoja, el sándwich de ese pedido todavía no está listo en mesa; al recogerlo, se calma. Los apuntadores señalan las tarjetas responsive reales de Parrillero y Mozo, visibles durante el tutorial aunque Ready normalmente oculte las seis tarjetas. **SIGUIENTE** avanza/inicia y **SALTAR** inicia vía `TryStartRound`; bloquear controles de fondo y mantener Ready/tiempo detenido. El inicio desde Mercado y desde Ready directo comparten el mismo gate/tutorial. Guardar marcador local UI-only versionado únicamente tras inicio exitoso. No contratar automáticamente ni cambiar recetas, roles, productos, cuotas, tiempos, precios, stock, economía, progresión o Firebase. Sin stock, mantener Mercado sin mostrar ni completar el tutorial; no repetirlo tras verlo/omitirlo con éxito.
@@ -399,6 +406,15 @@ This checkpoint used fixed $25 speed/$200 helper costs; these prices are superse
 **Validation:** Source-only changes. Existing hard-coded old-cost/staff-preservation test assertions need adapting before later combined checks. User's no-tests/no-APK instruction remains in force; no Play/device/build or compilation verification this turn.
 
 
+## Queue depth: three supporter rows (vigente — 2026-11-16)
+
+En todos los niveles servidos por `StreetSimulation`, mostrar como máximo tres filas de hinchas que esperan pedir: siete columnas FIFO por tres profundidades (21 hinchas simultáneos). Capacidad, valor serializado de `Main` y renderizado deben coincidir; el Game Over reutiliza la misma cola y tampoco debe proyectar una cuarta fila. Mantener el espaciado existente, el orden FIFO, la atención únicamente a la primera fila y las burbujas de pedido de las dos primeras. No cambiar ritmo de llegada, pedidos, servicio ni economía. Tower Defense mantiene sus rutas y filas propias.
+
+- [ ] EditMode confirma 21 posiciones únicas en exactamente tres filas, acepta la número 21 y rechaza la número 22.
+- [ ] Unity Game View confirma tres filas en juego y en Game Over, sin una cuarta fila ni desborde en el HUD/mostrador.
+
+Este criterio reemplaza la restauración de cuatro filas del 2026-10-31 que sigue abajo.
+
 ## FIFO customer columns — historical three-row update (2026-10-04; superseded 2026-10-31)
 
 The existing seven columns/three rows were FIFO lanes in every level. Once a served or sold-out-extras customer starts leaving, release its queue slot; the older people immediately behind advance continuously into the earlier positions of that column. Preserve customer ID, product and remaining quantity; keep order bubbles visible while advancing. New arrivals append after the last queued person in an available lane, never into a gap ahead of that lane's existing people. Empty lanes may accept their first customer; initial admission retains the original front-row-first layout. Leaving people still count toward the bounded population until their exit walk finishes. The four-row restoration below supersedes the three-row capacity/layout but keeps these per-column FIFO rules.
@@ -411,7 +427,9 @@ Only settled front-row Waiting customers receive worker reservations; Receiving 
 
 **Validation:** Source-only implementation; no tests, Play, visual/device review, APK or compile/import confirmation by the user's standing instruction. Historical free-slot/rear-row service checks do not validate this new policy; update affected fixtures before combined validation.
 
-## Four-row supporter queue — source update (2026-10-31)
+## Four-row supporter queue — source update (2026-10-31; superseded 2026-11-16)
+
+**Estado:** criterio histórico reemplazado por la profundidad vigente de tres filas anterior; sus pendientes de validación ya no rigen.
 
 Restore the larger visible crowd requested by the user: seven FIFO columns and four queue rows (28 simultaneous customers) in every active level. Admission/capacity and serialized Main balance both default to 28. The fourth row uses the same spacing/order as the first three; row positions remain the source of truth for each column's FIFO order. Keep the existing queue renderer's order-bubble rule (bubbles only for the front two rows), animation and service behavior unchanged. This supersedes the prior 21-customer/three-row cap; it does not alter customer order, service assignment or demand pacing.
 

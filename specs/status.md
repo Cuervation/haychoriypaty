@@ -2,6 +2,34 @@
 
 > **HISTÓRICO:** este archivo registra el estado en la fecha de cada entrada. Una entrada marcada PASS no valida el runtime actual ni reemplaza el contrato vigente. Consultar [current-state](current-state.md), [índice SDD](README.md) y la [tabla maestra](../docs/BALANCE_ACTUAL_NIVELES.md).
 
+## 2026-11-17 — Los Redondos: una sola valla entre filas
+
+Entre tramos consecutivos de ID10 el riel interior se plegaba a 20 px de sí mismo y se veía como una barrera doble. `TowerDefenseModularFenceGenerator` ahora dibuja cada pliegue una vez sobre su línea media (sólo en serpentinas con columna lateral); colliders, rieles validados y waypoints no cambian. `LosRedondosLayout` limita el paso de filas a 76,8 + 40 px para que el espacio entre rieles nunca supere el arte de una valla. EditMode (LosRedondosRightLayout, ModularFenceGenerator, ScreenLayout, GameMode) 73/73 `PASS`, con la prueba nueva `EachRowSeparationIsDrawnAsOneFenceWhileCollidersKeepBothRails` en 540×960 y 540×1200; PlayMode `TowerDefensePlacementViewTests` 30/30 `PASS` (5 ignorados preexistentes); capturas Game View reales regeneradas en `Logs/Acceptance/TowerDefenseLosRedondosFiveRuns20261116/` y `.../TowerDefenseReadyStations20261106/Level10/`. Dispositivo/APK: `NOT_RUN`.
+
+## 2026-11-16 — Los Redondos: cinco tramos y cuatro sectores derechos (fuente única)
+
+ID10 vuelve a un único recorrido serpenteante de cinco tramos (3%–61,8% del ancho) y cuatro sectores derechos (65,5%–100%, 15% más anchos que la franja de 30%). Causa de los intentos previos: ruta, bahías y escalas se calculaban en tres sistemas con constantes independientes, más parches del diseño de siete rectas. Ahora `LosRedondosLayout` es la fuente única y `TowerDefenseRouteLayoutValidator` la valida (tramo y coordenadas). Se quitaron la omisión del riel inferior, el alcance inflado por distancia y las escalas 43%; las flechas de giro de ID10 van sobre el eje. Asset ID10: `RowCount 5` y bounds originales.
+
+**Validación (Unity 6000.6.3f1 por MCP):** EditMode Tower Defense 113/113 PASS (5 ignorados preexistentes); PlayMode `TowerDefensePlacementViewTests` 30/30 PASS (5 ignorados preexistentes), incluidas la ola de 60 de ID10 y la de 120 de Camioneros. Console sin errores (sólo avisos de AudioListener de los fixtures). Capturas Game View 540×960 en `Logs/Acceptance/TowerDefenseLosRedondosFiveRuns20261116/` y 540×960/720×1280/1080×1920 en `Level10/`. Sin APK, dispositivo ni commit. [Contrato](features/tower-defense.md).
+
+## 2026-11-16 — Los Redondos: recorrido de siete rectas
+
+ID10 adopta las siete rectas serpenteantes del dibujo (entrada arriba-izquierda, primer tramo a la derecha), sin dibujar el último tramo del riel inferior; el collider permanece completo. Fans y sprites siguen a 76 px. En 540×960, centros a 54 px y corredor/rieles a 53 px, conservando el claro visible de76px bajo la vereda y la distribución70/30. El asset extiende sus bounds verticales a11,7 para alojar la configuración serializada de siete filas. La separación entre centros de las dos zonas se fijó a154px para que sus cuatro bahías de77px no se solapen.
+
+**Validación focalizada:** EditMode `LosRedondosUsesSevenRouteRowsAndFourIndependentRightSideBays` **PASS 1/1** después de corregir la separación de zonas; PlayMode `LosRedondosEntryStartsTopLeftAndFirstStraightReachesSeventyPercentEnd` y `LosRedondosSevenRowRightBaysShowFansAndActualDeliveries` **PASS 1/1** antes del último ajuste de anclas. Capturas Game View 540×960 en `Logs/Acceptance/TowerDefenseLosRedondosSpacing20261116/`. La prueba EditMode del riel (`LosRedondosLeavesOnlyItsLowestExitRailOpenAndKeepsTheRouteCollider`) falló antes de ampliar los bounds; la nueva versión no se reejecutó. Tras intentar importar/filtrar la suite, Test Runner cargó 1273 casos y el Editor dejó de responder a CUA; no hay evidencia posterior del collider, entregas con las zonas reubicadas ni aislamiento ID9. `git diff --check` **PASS**. Mantener esos puntos **NOT_RUN**; no se generó APK ni se probó dispositivo.
+
+## 2026-11-16 — Camioneros: perfiles por vestimenta implementados
+
+Solo ID9: los12looks existentes determinan velocidad/pedido/hueco libre10/20/30px. Ola120(48casuales/36deportivos/36abrigados), primeros12casuales; convoy sin adelantamiento, clearance visual de curvas/reflow, identidad visual separada y tutorialv2de5pasos. Se corrigió el orden de filas legacy del atlas únicamente para Camioneros para que cada comportamiento coincida con la ropa numerada top-down. Se preservaron precios/productos/reglas terminales y los otros modos.
+
+**Validación:** Unity6000.6.3f1, compilación sin errores C#; EditMode18casos únicos PASS (run17/18, corregido fixture de convoy+clearance de reflow, rerun1/1), PlayMode3casos únicos PASS con reruns afectados2/2 y1/1. XMLs en `/private/tmp/hcyp-camioneros-profile-check/`; Game View540×960 del tutorial y de un fixture pausado con3perfiles revisados. Revisión independiente de lógica/reflow/atlas y resultados XML: PASS. No es prueba de ganabilidad de la ola natural120ni de teléfono. El Editor existente se usó con runner temporal al estar MCP desconectado; se retiró el runner, se preservaron datos reales y Main quedó fuera de PlayMode. Sin APK/commit/push. [Contrato](features/tower-defense.md).
+
+## 2026-11-16 — Niveles de atención: cola de tres filas
+
+A pedido del usuario, los niveles que usan `StreetSimulation` vuelven a tres filas de siete hinchas (máximo 21), no cuatro. Capacidad y límite serializado de `Main` se alinearon, y el renderer de juego/Game Over recorre únicamente esas tres filas. Se preservan FIFO, espaciado, burbujas y ritmo de llegada; Tower Defense mantiene sus rutas separadas. Se agregó la regresión EditMode `TwentyOneCrowdUsesThreeRowsOfSevenDistinctSlots` y se reemplazaron las expectativas de 28 en el chequeo de `Main`.
+
+**Validación:** revisión estática de capacidad, targets, renderers y escena, más `git diff --check`: **PASS**. EditMode y Game View en Unity: **NOT_RUN**; la instancia correcta está registrada, pero no respondió al ping de Unity MCP (`ping not answered`), tampoco permitió leer Console/estado. No se reinició ni abrió otra instancia. [Contrato vigente](features/street-automation.md).
+
 ## 2026-11-13 — Luján: velocidad de peregrinos +50%
 
 A pedido del usuario, Peregrinación ID14 sube su `fanSpeed` serializado de `.035` a `.0525` (+50%; base300: 10.5→15.75 px lógicos/s). Se modificó solo esa velocidad: quedan iguales los 96 px de separación, los 9 s de intervalo de entrada, cantidad de peregrinos, demanda, caja y precios. Se añadió una aserción a `PeregrinacionThemeAndConfigOwnTheirIdentityAndSevenProducts`.

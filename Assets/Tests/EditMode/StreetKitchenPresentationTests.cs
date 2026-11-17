@@ -31,7 +31,9 @@ namespace HayChoriYPaty.Tests
             int count = (firstAvailable ? 1 : 0) + (secondAvailable ? 1 : 0);
             if (count == 0) return 0;
             object balance = Get(Get(sim, "Kitchen"), "Balance");
-            string capacityField = first == 0 ? "normalTableCapacity" : "premiumTableCapacity";
+            bool independentPremiumMatchesNormal = first == 2 && (int)Get(sim, "LevelIndex") == 4;
+            string capacityField = first == 0 || independentPremiumMatchesNormal
+                ? "normalTableCapacity" : "premiumTableCapacity";
             int configured = (int)balance.GetType().GetField(capacityField, BindingFlags.Public | BindingFlags.Instance).GetValue(balance);
             int each = configured / count, remainder = configured % count;
             int initial = each + (product == first && remainder > 0 ? 1 :

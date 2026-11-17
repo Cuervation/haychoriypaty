@@ -18,16 +18,22 @@ namespace HayChoriYPaty
         private const float TowerDefenseMinimumFanRevealBeforeOrderBubbleLogical =
             TowerDefenseResponsiveLayout.FanFrameWidthLogical * .5f;
         private const float TowerDefenseOrderBubbleHeadClearanceLogical = 6f;
-        private const string CamionerosTutorialCompletedKey = "HayChoriYPaty.TowerDefense.Camioneros.Tutorial.Completed.v1";
+        private const string CamionerosTutorialCompletedKey = "HayChoriYPaty.TowerDefense.Camioneros.Tutorial.Completed.v2";
         private static readonly string[] CamionerosTutorialHeadlines =
         {
             "Para el chori,\ncontratá al Parrillero.",
-            "Para la Coca,\ncontratá al Cocacolero."
+            "Para la Coca,\ncontratá al Cocacolero.",
+            "Deportivos:\nrápidos, pedidos chicos.",
+            "Casuales:\nritmo intermedio.",
+            "Abrigados:\ntranquilos, piden más."
         };
         private static readonly string[] CamionerosTutorialExplanations =
         {
             "Tocá Parrillero y elegí\ncualquiera de las dos áreas.",
-            "Tocá Cocacolero y elegí\ncualquiera de las dos áreas."
+            "Tocá Cocacolero y elegí\ncualquiera de las dos áreas.",
+            "Van más juntos (10 px).\nPiden 1 por producto.",
+            "Separación de 20 px.\nPiden de 1 a 3 por producto.",
+            "Separación de 30 px.\nPiden de 2 a 4 por producto."
         };
         private static readonly StreetWorkerRole[] TowerDefenseHireRoles =
         {
@@ -45,8 +51,6 @@ namespace HayChoriYPaty
         private TowerDefenseWorldPresentation towerDefensePresentation;
         private Texture2D towerDefenseBackdrop;
         private Texture2D towerDefenseCrest;
-        private Texture2D towerDefenseCoinHud;
-        private Rect towerDefenseCoinHudGap;
         private GUIStyle towerDefenseLabel, towerDefenseSmallLabel, towerDefenseTitle;
         private Vector2 towerDefenseScreenSize;
         private Rect towerDefenseSafeArea;
@@ -62,8 +66,6 @@ namespace HayChoriYPaty
 
         private void ResetTowerDefenseUi()
         {
-            if (towerDefenseCoinHud != null) Destroy(towerDefenseCoinHud);
-            towerDefenseCoinHud = null;
             towerDefenseActive = false;
             towerDefenseTutorialActive = false;
             towerDefenseTutorialStep = 0;
@@ -313,8 +315,6 @@ namespace HayChoriYPaty
 
         private void EndTowerDefenseRun()
         {
-            if (towerDefenseCoinHud != null) Destroy(towerDefenseCoinHud);
-            towerDefenseCoinHud = null;
             towerDefenseTutorialActive = false;
             towerDefenseTutorialStep = 0;
             towerDefenseSelectedRole = -1;
@@ -507,6 +507,26 @@ namespace HayChoriYPaty
             Camera camera = Camera.main;
             if (camera == null || towerDefenseMode == null || towerDefenseRuntimeConfig == null || viewport.width <= 0f)
                 return Array.Empty<Rect>();
+            if (towerDefenseRuntimeConfig.SourceCampaignLevelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId)
+            {
+                StreetWorkerRole selectedRole = towerDefenseSelectedRole >= 0 && towerDefenseSelectedRole < TowerDefenseHireRoles.Length
+                    ? TowerDefenseHireRoles[towerDefenseSelectedRole] : StreetWorkerRole.Parrillero;
+                float scale = viewport.width / W;
+                float redondosScreenHeight = TowerDefenseRenderSize(camera).y;
+                var bays = new Rect[2];
+                for (int zone = 0; zone < bays.Length; zone++)
+                {
+                    Rect world = towerDefenseMode.RightBayBounds(selectedRole, zone);
+                    Vector3 upperLeft = camera.WorldToScreenPoint(new Vector3(world.xMin, world.yMax, 0f));
+                    Vector3 lowerRight = camera.WorldToScreenPoint(new Vector3(world.xMax, world.yMin, 0f));
+                    float left = (upperLeft.x - viewport.x) / scale;
+                    float right = (lowerRight.x - viewport.x) / scale;
+                    float top = (redondosScreenHeight - upperLeft.y - viewport.y) / scale - TowerDefenseResponsiveLayout.VisualStageLift;
+                    float bottom = (redondosScreenHeight - lowerRight.y - viewport.y) / scale - TowerDefenseResponsiveLayout.VisualStageLift;
+                    bays[zone] = Rect.MinMaxRect(left, top, right, bottom);
+                }
+                return bays;
+            }
             TowerDefenseRouteGeometryConfig route = towerDefenseRuntimeConfig.Route;
             Vector2[] centerline = towerDefenseMode.RouteGeometry.Centerline;
             int stride = route.TurnSegments + 1;
@@ -565,57 +585,38 @@ namespace HayChoriYPaty
             FillRect(new Rect(bounds.xMax - thickness, bounds.y, thickness, bounds.height), color);
         }
 
-        private void DrawTowerDefenseCampaignHud() => DrawTowerDefenseCoinsHud(towerDefenseMode.Coins);
+        private void DrawTowerDefenseCampaignHud() =>
+            DrawTowerDefenseStatusHud(towerDefenseMode.Coins, towerDefenseMode.Elapsed);
 
-        private void DrawTowerDefenseCoinsHud(int coins)
+        private void DrawTowerDefenseStatusHud(int coins, float elapsed)
         {
-            Rect cutout = TopHudCutoutBounds(new Vector2(Screen.width, Screen.height), Screen.cutouts);
-            if (towerDefenseCoinHud == null || towerDefenseCoinHudGap != cutout)
+            Matrix4x4 previous = GUI.matrix;
+            Color previousColor = GUI.color;
+            float previousVertical = layoutVerticalScale;
+            try
             {
-                if (towerDefenseCoinHud != null) Destroy(towerDefenseCoinHud);
-                towerDefenseCoinHud = CreateTowerDefenseCoinHud(cutout);
-                towerDefenseCoinHudGap = cutout;
+                // Read-only HUD matches campaign: physical top, independent of the safe-area viewport.
+                layoutVerticalScale = 1f;
+                GUI.matrix = Matrix4x4.Scale(new Vector3(Screen.width / W, Screen.width / W, 1f));
+                GUI.color = Color.white;
+                Rect cutout = TopHudCutoutBounds(new Vector2(Screen.width, Screen.height), Screen.cutouts);
+                EnsureHudBarTexture(cutout);
+                Texture2D bar = cutout.width > 0f ? cutoutHudBarTexture : hudBarTexture;
+                GUI.DrawTexture(new Rect(0f, 0f, W, HudBarHeightFor(cutout)), bar, ScaleMode.StretchToFill, true);
+                DrawHudIcon(HudCoinIconBounds(cutout), 10);
+                float statusScale = HudStatusScale(cutout);
+                DrawHudNumber(HudStatusTextBounds(0, cutout), coins.ToString(),
+                    Mathf.RoundToInt(HudStatusValueFontSize * statusScale));
+                DrawHudNumber(HudStatusTextBounds(1, cutout), FormatElapsedTime(elapsed),
+                    Mathf.RoundToInt(HudClockFontSize * statusScale));
+                hudQuotaProductCount = 0; // Defense has no traditional product quotas or deadline.
             }
-            Rect bar = new Rect(0f, 0f, W, HudBarHeightFor(cutout));
-            GUI.DrawTexture(LayoutRect(bar), towerDefenseCoinHud, ScaleMode.StretchToFill, true);
-            DrawHudIcon(HudCoinIconBounds(cutout), 10);
-            Rect amount = cutout.width > 0f ? HudStatusTextBounds(0, cutout)
-                : new Rect(42f, 0f, W - 54f, bar.height);
-            DrawHudNumber(amount, coins.ToString(), HudStatusValueFontSize);
-            hudQuotaProductCount = 0; // Defense has no traditional product quota HUD.
-        }
-
-        // Reuse the campaign's original glossy vector palette, but no clock motif
-        // or second status cell is baked into this Defense-only texture.
-        private static Texture2D CreateTowerDefenseCoinHud(Rect gap)
-        {
-            const int width = 1080;
-            int height = Mathf.CeilToInt(HudBarHeightFor(gap) * 2f);
-            float logicalHeight = height * .5f;
-            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+            finally
             {
-                name = "Defense coins only HUD", wrapMode = TextureWrapMode.Clamp,
-                filterMode = FilterMode.Bilinear, hideFlags = HideFlags.HideAndDontSave
-            };
-            var pixels = new Color[width * height];
-            var shadow = new Rect(0, 5, W, logicalHeight - 5f);
-            var rim = new Rect(0, 0, W, logicalHeight);
-            var face = new Rect(2, 2, W - 4f, logicalHeight - 4f);
-            Rect cell = gap.width > 0f ? HudStatusCellBounds(0, gap)
-                : new Rect(3f, 3f, W - 6f, logicalHeight - 6f);
-            for (int y = 0; y < height; y++)
-            for (int x = 0; x < width; x++)
-            {
-                float px = (x + .5f) * .5f, py = (height - y - .5f) * .5f;
-                Color color = new Color(.008f, .025f, .12f, .58f * RoundedCoverage(px, py, shadow, 22));
-                color = Over(color, new Color(.012f, .045f, .17f), RoundedCoverage(px, py, rim, 22));
-                color = Over(color, Color.Lerp(new Color(.10f, .47f, .90f), new Color(.025f, .14f, .48f),
-                    Mathf.Clamp01(py / Mathf.Max(1f, logicalHeight))), RoundedCoverage(px, py, face, 20));
-                pixels[y * width + x] = HudCapsule(color, px, py, cell,
-                    new Color(.30f, .86f, 1f), new Color(.02f, .22f, .72f));
+                GUI.matrix = previous;
+                GUI.color = previousColor;
+                layoutVerticalScale = previousVertical;
             }
-            texture.SetPixels(pixels); texture.Apply(false, true);
-            return texture;
         }
 
         private void DrawTowerDefenseOrderBubbles(Rect viewport)
@@ -660,7 +661,8 @@ namespace HayChoriYPaty
                     // The new directional atlas uses a foot pivot, not a centered frame.
                     // Anchor ID13 to the actual rendered head, including its gait bob.
                     Bounds visualBounds;
-                    if ((levelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId || IsPilgrimConstruction) && towerDefensePresentation != null &&
+                    if ((levelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId ||
+                        levelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId || IsPilgrimConstruction) && towerDefensePresentation != null &&
                         towerDefensePresentation.TryGetFanVisualBounds(fan.Id, out visualBounds))
                     {
                         Vector3 head = camera.WorldToScreenPoint(new Vector3(visualBounds.center.x, visualBounds.max.y, 0f));
@@ -810,6 +812,8 @@ namespace HayChoriYPaty
 
         private Rect CamionerosTutorialTargetBounds()
         {
+            if (towerDefenseTutorialStep >= 2)
+                return new Rect((W - 78f) * .5f, logicalCanvasHeight - 360f, 78f, 76f);
             Rect[] cards = TowerDefenseHireBounds(logicalCanvasHeight);
             return cards.Length > towerDefenseTutorialStep
                 ? cards[towerDefenseTutorialStep]
@@ -838,6 +842,12 @@ namespace HayChoriYPaty
             DrawIntroScreen(Texture2D.whiteTexture, LevelOneTutorialBackdropDimColor(), ScaleMode.StretchToFill);
             Rect panel = CamionerosTutorialPanelBounds();
             Rect target = CamionerosTutorialTargetBounds();
+            if (towerDefenseTutorialStep >= 2)
+            {
+                int appearance = towerDefenseTutorialStep == 2 ? 0 : towerDefenseTutorialStep == 3 ? 3 : 7;
+                DrawFan(target, CamionerosFanProfile.AtlasIdForAppearance(appearance), false, false,
+                    ClubVisualTheme.ForLevel(TowerDefenseLevelConfig.CamionerosCampaignLevelId).Fans);
+            }
             const bool targetAbove = false;
             const float tailWidth = 42f;
             float baseX = Mathf.Clamp(target.center.x, panel.x + tailWidth * .5f, panel.xMax - tailWidth * .5f);

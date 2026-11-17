@@ -18,8 +18,10 @@ MonoBehaviour:
   sourceCampaignLevelId: 10
   backgroundResource: street-background-losredondos-v1
   route:
-    RowCount: 3
+    RowCount: 5
     SegmentLengths:
+    - 3.8
+    - 3.8
     - 3.8
     - 3.8
     - 3.8

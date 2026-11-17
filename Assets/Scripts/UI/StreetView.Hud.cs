@@ -57,7 +57,7 @@ namespace HayChoriYPaty
                 {
                     GUI.matrix = Matrix4x4.Scale(new Vector3(Screen.width / W, Screen.width / W, 1f));
                     GUI.color = Color.white;
-                    DrawTowerDefenseCoinsHud(sim.Coins);
+                    DrawTowerDefenseStatusHud(sim.Coins, 0f);
                     return;
                 }
                 EnsureHudBarTexture(cutoutGap);
@@ -272,6 +272,11 @@ namespace HayChoriYPaty
             float scale = Mathf.Min(slot.width / sourceSize.x, slot.height / sourceSize.y);
             Vector2 size = sourceSize * scale;
             return new Rect(slot.center - size * .5f, size);
+        }
+        private static string FormatElapsedTime(float elapsed)
+        {
+            int seconds = Mathf.Max(0, Mathf.FloorToInt(elapsed));
+            return (seconds / 60) + ":" + (seconds % 60).ToString("00");
         }
         private static string FormatRemainingTime(float remaining)
         {

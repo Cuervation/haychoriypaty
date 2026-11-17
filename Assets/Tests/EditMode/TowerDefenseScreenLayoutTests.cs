@@ -7,6 +7,19 @@ namespace HayChoriYPaty.Tests
 {
     public sealed class TowerDefenseScreenLayoutTests
     {
+        [TestCase(0f, "0:00")]
+        [TestCase(.99f, "0:00")]
+        [TestCase(1f, "0:01")]
+        [TestCase(59.99f, "0:59")]
+        [TestCase(60f, "1:00")]
+        [TestCase(125.5f, "2:05")]
+        public void DefenseClockFormatsCompletedElapsedSeconds(float elapsed, string expected)
+        {
+            MethodInfo format = RuntimeType("StreetView").GetMethod("FormatElapsedTime", BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.IsNotNull(format);
+            Assert.AreEqual(expected, format.Invoke(null, new object[] { elapsed }));
+        }
+
         [TestCase(0f, 0f, 1f, 1f)]
         [TestCase(.5f, 8f, .9f, .5f)]
         [TestCase(1f, 16f, .8f, 0f)]
@@ -56,11 +69,17 @@ namespace HayChoriYPaty.Tests
             CollectionAssert.AreEqual((int[])Read(camioneros, "StartingWorkersByRole"), (int[])Read(redondos, "StartingWorkersByRole"));
             object camionerosRoute = Read(camioneros, "Route");
             object redondosRoute = Read(redondos, "Route");
-            Assert.AreEqual(Read(camionerosRoute, "RowCount"), Read(redondosRoute, "RowCount"));
-            CollectionAssert.AreEqual((float[])Read(camionerosRoute, "SegmentLengths"), (float[])Read(redondosRoute, "SegmentLengths"));
+            Assert.AreEqual(3, Read(camionerosRoute, "RowCount"), "Camioneros retains its original three-row route.");
+            Assert.AreEqual(5, Read(redondosRoute, "RowCount"), "Los Redondos has five horizontal runs and four connectors.");
+            CollectionAssert.AreEqual(new[] { 3.8f, 3.8f, 3.8f }, (float[])Read(camionerosRoute, "SegmentLengths"));
+            CollectionAssert.AreEqual(new[] { 3.8f, 3.8f, 3.8f, 3.8f, 3.8f }, (float[])Read(redondosRoute, "SegmentLengths"));
             Assert.AreEqual(Read(camionerosRoute, "CorridorWidth"), Read(redondosRoute, "CorridorWidth"));
             Assert.AreEqual(Read(camionerosRoute, "RowSpacing"), Read(redondosRoute, "RowSpacing"));
-            Assert.AreEqual(Read(camionerosRoute, "PlayableBounds"), Read(redondosRoute, "PlayableBounds"));
+            Rect camionerosBounds = (Rect)Read(camionerosRoute, "PlayableBounds");
+            Rect redondosBounds = (Rect)Read(redondosRoute, "PlayableBounds");
+            Assert.AreEqual(9.4f, camionerosBounds.height, .001f, "Camioneros retains its original authored route bounds.");
+            Assert.AreEqual(camionerosBounds, redondosBounds,
+                "Five authored 1.8-unit rows plus the 0.9-unit corridor fit the original route bounds.");
             Assert.AreEqual(Read(camioneros, "ServiceRange"), Read(redondos, "ServiceRange"));
 
             Type themeType = RuntimeType("ClubVisualTheme");
@@ -337,6 +356,8 @@ namespace HayChoriYPaty.Tests
                         .SetValue(redondosSource, Convert.ToInt32(configType
                             .GetField("LosRedondosCampaignLevelId", BindingFlags.Public | BindingFlags.Static)
                             .GetRawConstantValue()));
+                    object authoredRedondosRoute = configType.GetProperty("Route").GetValue(redondosSource, null);
+                    routeType.GetField("RowCount").SetValue(authoredRedondosRoute, 5);
                     object[] redondosArguments = (object[])arguments.Clone();
                     redondosArguments[0] = redondosSource;
                     Assert.IsTrue((bool)create.Invoke(null, redondosArguments), redondosArguments[10] as string);
@@ -344,8 +365,8 @@ namespace HayChoriYPaty.Tests
                     object redondosRoute = redondosArguments[6];
                     float redondosEntryExtension = (float)routeType.GetField("FanEntryExtensionWorldUnits")
                         .GetValue(redondosRoute);
-                    Assert.That(redondosEntryExtension / worldPerPixel, Is.EqualTo(31f).Within(.1f),
-                        "Los Redondos keeps its existing full-frame-at-edge entry.");
+                    Assert.That(redondosEntryExtension / worldPerPixel, Is.EqualTo(540f * .03f + 48f - 39f).Within(.1f),
+                        "ID10 keeps its full-frame-at-edge entry: from the 39 px frame center to its first run at 3% + half a connector.");
                 }
                 finally
                 {

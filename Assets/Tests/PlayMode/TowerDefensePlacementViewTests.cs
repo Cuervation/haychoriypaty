@@ -1,6 +1,7 @@
 #if UNITY_EDITOR
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -170,7 +171,9 @@ namespace HayChoriYPaty.Tests
             Texture2D image = ScreenCapture.CaptureScreenshotAsTexture();
             Assert.AreEqual(540, image.width); Assert.AreEqual(960, image.height);
             Directory.CreateDirectory(CaptureDirectory);
-            string directory = requestedLevelId >= 13 ? Path.Combine(CaptureDirectory, "Level"+requestedLevelId) : CaptureDirectory;
+            string directory = requestedLevelId == 10 && name.StartsWith("los-redondos-", StringComparison.Ordinal)
+                ? Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/TowerDefenseLosRedondosFiveRuns20261116"))
+                : requestedLevelId >= 13 ? Path.Combine(CaptureDirectory, "Level"+requestedLevelId) : CaptureDirectory;
             Directory.CreateDirectory(directory);
             File.WriteAllBytes(Path.Combine(directory, name + ".png"), image.EncodeToPNG());
             UnityEngine.Object.Destroy(image);
@@ -189,6 +192,48 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
+        public IEnumerator CamionerosOutfitProfilesRenderTheSameLookWhileWalkingAndReceiving()
+        {
+            // Projection-only fixture: retain one real instance of each profile without advancing an entire wave.
+            for (int i = 0; i < 17; i++) Call(mode, "SpawnNextFan");
+            IList live = (IList)Get(mode, "Fans");
+            var retained = new List<object>(); var kinds = new HashSet<string>();
+            foreach (object fan in live)
+                if (kinds.Add(Get(Get(fan, "Profile"), "Kind").ToString())) retained.Add(fan);
+            Assert.AreEqual(3, retained.Count);
+            for (int i = live.Count - 1; i >= 0; i--) if (!retained.Contains(live[i])) live.RemoveAt(i);
+            for (int i = 0; i < live.Count; i++)
+            {
+                object follower = Get(live[i], "RouteFollower");
+                float scale = (float)Get(mode, "WorldUnitsPerLogicalPixel");
+                Call(follower, "Advance", (360f - i * 125f) * scale / (float)Get(follower, "Speed"));
+            }
+            Call(mode, "Pause");
+            object presentation = Get(view, "towerDefensePresentation");
+            Call(presentation, "SyncFans", mode);
+            IDictionary visuals = (IDictionary)Get(presentation, "activeFans");
+            foreach (object fan in live)
+            {
+                object visual = visuals[Get(fan, "Id")];
+                SpriteRenderer renderer = (SpriteRenderer)Get(visual, "Renderer");
+                StringAssert.Contains(":" + Get(fan, "AppearanceId") + " walk", renderer.sprite.name);
+                int appearance = (int)Get(fan, "AppearanceId");
+                Assert.AreEqual((3 - appearance / 3) * renderer.sprite.texture.height / 4f, renderer.sprite.rect.y,
+                    "Appearance must select the actual numbered top-down sheet row, not merely name the sprite correctly.");
+                Set(fan, "<IsReceiving>k__BackingField", true);
+            }
+            Call(presentation, "SyncFans", mode);
+            foreach (object fan in live)
+            {
+                SpriteRenderer renderer = (SpriteRenderer)Get(visuals[Get(fan, "Id")], "Renderer");
+                StringAssert.Contains(":" + Get(fan, "AppearanceId") + " front", renderer.sprite.name);
+                Set(fan, "<IsReceiving>k__BackingField", false);
+            }
+            Call(presentation, "SyncFans", mode);
+            yield return CaptureCamionerosTutorialStep("outfit-profiles-live");
+        }
+
+        [UnityTest]
         public IEnumerator CamionerosTutorialExplainsExistingHireCardsAndKeepsDefensePausedUntilContinue()
         {
             Assert.IsTrue((bool)Get(view, "towerDefenseTutorialActive"));
@@ -200,12 +245,14 @@ namespace HayChoriYPaty.Tests
             Rect[] cards = Cards();
             string[] headlines = (string[])vt.GetField("CamionerosTutorialHeadlines", S).GetValue(null);
             string[] explanations = (string[])vt.GetField("CamionerosTutorialExplanations", S).GetValue(null);
-            CollectionAssert.AreEqual(new[] {"Para el chori,\ncontratá al Parrillero.", "Para la Coca,\ncontratá al Cocacolero."}, headlines);
+            CollectionAssert.AreEqual(new[] {"Para el chori,\ncontratá al Parrillero.", "Para la Coca,\ncontratá al Cocacolero."}, new[] { headlines[0], headlines[1] });
             CollectionAssert.AreEqual(new[]
             {
                 "Tocá Parrillero y elegí\ncualquiera de las dos áreas.",
                 "Tocá Cocacolero y elegí\ncualquiera de las dos áreas."
-            }, explanations);
+            }, new[] { explanations[0], explanations[1] });
+            Assert.AreEqual(5, headlines.Length);
+            Assert.AreEqual(5, explanations.Length);
             Rect firstTarget = (Rect)Call(view, "CamionerosTutorialTargetBounds");
             Assert.AreEqual(cards[0], firstTarget, "The first callout targets the existing Parrillero card.");
             Assert.AreEqual(300, (int)Call(view, "HitTowerDefenseAction",
@@ -220,6 +267,15 @@ namespace HayChoriYPaty.Tests
             yield return CaptureCamionerosTutorialStep("cocacolero");
 
             Call(view, "HandleTowerDefenseAction", 300);
+            for (int step = 2; step < 5; step++)
+            {
+                Assert.AreEqual(step, Get(view, "towerDefenseTutorialStep"));
+                Assert.AreEqual("Paused", Get(mode, "Phase").ToString());
+                Assert.AreEqual(0, ((ICollection)Get(mode, "Fans")).Count);
+                StringAssert.Contains(step == 2 ? "10 px" : step == 3 ? "20 px" : "30 px", explanations[step]);
+                yield return CaptureCamionerosTutorialStep("profile-" + step);
+                Call(view, "HandleTowerDefenseAction", 300);
+            }
             Assert.IsFalse((bool)Get(view, "towerDefenseTutorialActive"));
             Assert.AreEqual("Playing", Get(mode, "Phase").ToString());
             Assert.AreEqual(1, PlayerPrefs.GetInt(camionerosTutorialCompletedKey, 0),
@@ -320,6 +376,7 @@ namespace HayChoriYPaty.Tests
             object normalLayout = Activator.CreateInstance(layoutType, new object[] { new[] { 0 }, false });
             Rect normalTableBounds = (Rect)Get(normalLayout, "NormalTableBounds");
             float pixel = (float)Get(mode, "WorldUnitsPerLogicalPixel");
+            const float stationScale = 1f; // every Defense level, ID10 included, uses full-size stations
             int tables = 0, barrels = 0;
             foreach (GameObject station in stations)
             {
@@ -352,7 +409,7 @@ namespace HayChoriYPaty.Tests
                             new[] { typeof(int), typeof(int), typeof(bool), typeof(int) }, null)
                             .Invoke(normalLayout, new object[] { 0, slot, false, fullyLoadedLevelOneTable });
                         Vector2 expectedOffset = new Vector2(point.x - normalTableBounds.center.x,
-                            -(point.y - normalTableBounds.center.y)) * pixel;
+                            -(point.y - normalTableBounds.center.y)) * pixel * stationScale;
                         Vector2 actualOffset = (Vector2)display.position - (Vector2)station.transform.position;
                         Assert.Less(Vector2.Distance(expectedOffset, actualOffset), .0001f,
                             "TD preserves the regular Level 1 table's exact slot placement.");
@@ -368,10 +425,10 @@ namespace HayChoriYPaty.Tests
                     Assert.IsNotNull(barrel);
                     Assert.IsNotNull(barrel.sprite);
                     Assert.AreEqual((float)StaticValue(layoutType, "BarrelWidth"),
-                        barrel.sprite.bounds.size.x * station.transform.lossyScale.x / pixel, .001f,
+                        barrel.sprite.bounds.size.x * station.transform.lossyScale.x / pixel / stationScale, .001f,
                         "TD Coca barrel must render at the regular level's exact logical width.");
                     Assert.AreEqual((float)StaticValue(layoutType, "BarrelHeight"),
-                        barrel.sprite.bounds.size.y * station.transform.lossyScale.y / pixel, .001f,
+                        barrel.sprite.bounds.size.y * station.transform.lossyScale.y / pixel / stationScale, .001f,
                         "TD Coca barrel must render at the regular level's exact logical height.");
                 }
             }
@@ -857,6 +914,196 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
+        public IEnumerator CamionerosPreviousAreaWidthProvidesRedondosBaseline()
+        {
+            Assert.AreEqual(9, requestedLevelId);
+            Rect[] areas = Areas();
+            Assert.AreEqual(2, areas.Length);
+            TestContext.WriteLine("Prior Camioneros area widths at 540x960: " + areas[0].width + ", " + areas[1].width);
+            Assert.That(areas[0].width, Is.EqualTo(404f).Within(.5f));
+            Assert.That(areas[1].width, Is.EqualTo(404f).Within(.5f));
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator LosRedondosEntryTopLeftOneFiveRunRouteAndNoDuplicatedLayout()
+        {
+            Assert.AreEqual(10, requestedLevelId);
+            object route = Get(mode, "RouteConfig");
+            object geometry = Get(mode, "RouteGeometry");
+            Assert.AreEqual(5, Get(route, "RowCount"));
+            Vector2[] centerline = (Vector2[])Get(geometry, "Centerline");
+            Assert.Greater(centerline[1].x, centerline[0].x, "The first run goes right from the upper-left entry.");
+            Assert.That(centerline[0].y, Is.EqualTo(centerline.Max(point => point.y)).Within(.001f));
+            Assert.That(centerline[centerline.Length - 1].y, Is.EqualTo(centerline.Min(point => point.y)).Within(.001f),
+                "The exit is the end of the bottom run.");
+            Assert.Greater(centerline[centerline.Length - 1].x, centerline[centerline.Length - 2].x, "The last run goes right.");
+            string[] audit = (string[])Call(mode, "AuditLosRedondosLayout");
+            Assert.IsEmpty(audit, string.Join("\n", audit));
+
+            // Exactly one presentation, one fence generator and one route: no earlier layout survives.
+            Type generatorType = T("TowerDefenseModularFenceGenerator");
+            UnityEngine.Object[] generators = UnityEngine.Object.FindObjectsByType(generatorType, FindObjectsSortMode.None);
+            Assert.AreEqual(1, generators.Length, "Only one fence generator may exist in the scene.");
+            object fenceGeometry = Get(generators[0], "LatestGeometry");
+            Assert.AreSame(Get(Get(generators[0], "LevelConfig"), "Route").GetType(), route.GetType());
+            CollectionAssert.AreEqual(centerline, (Vector2[])Get(fenceGeometry, "Centerline"),
+                "Fences and navigation are generated from the same centerline.");
+            CollectionAssert.AreEqual((Vector2[])Get(geometry, "LeftBoundary"), (Vector2[])Get(fenceGeometry, "LeftBoundary"));
+            CollectionAssert.AreEqual((Vector2[])Get(geometry, "RightBoundary"), (Vector2[])Get(fenceGeometry, "RightBoundary"));
+            Assert.AreEqual(2, UnityEngine.Object.FindObjectsByType<EdgeCollider2D>(FindObjectsSortMode.None).Length);
+            object presentation = Get(view, "towerDefensePresentation");
+            Assert.AreEqual(4, ((IList)Get(presentation, "stationObjects")).Count, "One table and one barrel per area, once.");
+            int roots = 0;
+            foreach (GameObject candidate in UnityEngine.Object.FindObjectsByType<GameObject>(FindObjectsSortMode.None))
+                if (candidate.transform.parent == null && candidate.name.StartsWith("Tower Defense —", StringComparison.Ordinal)) roots++;
+            Assert.AreEqual(1, roots, "A single Tower Defense scene-object root.");
+
+            // No fence art reaches the worker column; the visual entry extends to the left screen edge.
+            Rect work = (Rect)Get(route, "WorkBounds");
+            float pixel = (float)Get(mode, "WorldUnitsPerLogicalPixel");
+            Type pieceType = T("TowerDefenseFencePiece");
+            int pieces = 0;
+            foreach (Component piece in UnityEngine.Object.FindObjectsByType(pieceType, FindObjectsSortMode.None))
+            {
+                SpriteRenderer renderer = piece.GetComponent<SpriteRenderer>();
+                if (renderer == null || renderer.sprite == null) continue;
+                pieces++;
+                Assert.Less(renderer.bounds.max.x, work.xMin + .5f * pixel,
+                    piece.name + " fence art must stay left of the worker column.");
+            }
+            Assert.Greater(pieces, 40);
+
+            Assert.IsTrue((bool)Call(mode, "TrySpawnFan", new[] { 0 }, new[] { 1 }));
+            Set(mode, "stopSpawning", true);
+            object follower = Get(((IList)Get(mode, "Fans"))[0], "RouteFollower");
+            Vector2 entry = (Vector2)Get(follower, "Position");
+            Assert.That(camera.WorldToScreenPoint(entry).x, Is.EqualTo(39f).Within(.5f), "Fans enter at the left edge.");
+            Assert.That(entry.y, Is.EqualTo(centerline[0].y).Within(.001f), "Fans enter on the top run.");
+            Call(presentation, "SyncFans", mode);
+            yield return Capture("los-redondos-five-runs-entry");
+        }
+
+        [UnityTest]
+        public IEnumerator LosRedondosFiveRunsRightSectorsFullCrewsAndActualDeliveries()
+        {
+            Assert.AreEqual(10, requestedLevelId);
+            object route = Get(mode, "RouteConfig");
+            Rect envelope = (Rect)Get(route, "PlayableBounds");
+            float pixel = (float)Get(mode, "WorldUnitsPerLogicalPixel");
+            foreach (int role in new[] { 0, 1 })
+            foreach (int zone in new[] { 0, 1 })
+            {
+                yield return Tap(Cards()[role].center);
+                Rect[] areas = Areas();
+                Assert.AreEqual(2, areas.Length);
+                Assert.GreaterOrEqual(areas[zone].xMin, 540f * .655f - .5f, "Hiring areas are only on the right strip.");
+                yield return Tap(areas[zone].center);
+                Assert.AreEqual(1, Count(role == 0 ? "Parrillero" : "Cocacolero", zone));
+            }
+            Set(mode, "coins", 100000);
+            foreach (int role in new[] { 0, 1 })
+            foreach (int zone in new[] { 0, 1 })
+                for (int extra = 0; extra < 2; extra++)
+                    Assert.IsTrue((bool)Call(mode, "TryHire", Enum.ToObject(T("StreetWorkerRole"), role), zone));
+            Assert.AreEqual(12, ((IList)Get(mode, "Workers")).Count);
+            yield return null;
+            string[] audit = (string[])Call(mode, "AuditLosRedondosLayout");
+            Assert.IsEmpty(audit, string.Join("\n", audit));
+
+            // Real rendered bounds: workers and stations inside their sector, right of the route, stations apart.
+            object presentation = Get(view, "towerDefensePresentation");
+            IDictionary renderedWorkers = (IDictionary)Get(presentation, "workerViews");
+            float tolerance = 1.5f * pixel;
+            foreach (object worker in (IList)Get(mode, "Workers"))
+            {
+                SpriteRenderer renderer = (SpriteRenderer)Get(renderedWorkers[(int)Get(worker, "Id")], "Renderer");
+                Rect sector = (Rect)Call(mode, "RightBayBounds", Get(worker, "Role"), Get(worker, "ServiceZone"));
+                Bounds b = renderer.bounds;
+                Assert.That(b.size.y / pixel, Is.EqualTo(94f).Within(.2f), "Workers keep the Camioneros size.");
+                Assert.IsTrue(b.min.x >= sector.xMin - tolerance && b.max.x <= sector.xMax + tolerance &&
+                    b.min.y >= sector.yMin - tolerance && b.max.y <= sector.yMax + tolerance,
+                    Get(worker, "Role") + " " + b + " outside sector " + sector);
+                Assert.Greater(b.min.x, envelope.xMax, "No worker on the route side.");
+            }
+            IList stations = (IList)Get(presentation, "stationObjects");
+            var stationBounds = new List<Bounds>();
+            foreach (GameObject station in stations)
+            {
+                SpriteRenderer[] parts = station.GetComponentsInChildren<SpriteRenderer>(true);
+                Assert.IsNotEmpty(parts);
+                Bounds b = parts[0].bounds;
+                foreach (SpriteRenderer part in parts) b.Encapsulate(part.bounds);
+                bool table = station.name.EndsWith("Station_NormalTable");
+                int zone = station.name.Contains("zone 1") ? 1 : 0;
+                Rect sector = (Rect)Call(mode, "RightBayBounds", Role(table ? "Parrillero" : "Cocacolero"), zone);
+                TestContext.WriteLine(station.name + " bounds " + b + " sector " + sector);
+                Assert.IsTrue(b.min.x >= sector.xMin - tolerance && b.max.x <= sector.xMax + tolerance &&
+                    b.min.y >= sector.yMin - tolerance && b.max.y <= sector.yMax + tolerance,
+                    station.name + " " + b + " outside sector " + sector);
+                foreach (Bounds other in stationBounds)
+                    Assert.IsFalse(b.Intersects(other) && b.min.y < other.max.y - tolerance && other.min.y < b.max.y - tolerance,
+                        station.name + " overlaps another station.");
+                stationBounds.Add(b);
+            }
+
+            // Stage one fan on every run and capture the full layout.
+            int stride = (int)Get(route, "TurnSegments") + 1;
+            Vector2[] centerline = (Vector2[])Get(Get(mode, "RouteGeometry"), "Centerline");
+            float prefix = (float)Get(route, "FanEntryExtensionWorldUnits");
+            float[] speeds = new float[5];
+            for (int row = 0; row < 5; row++)
+            {
+                int first = row * stride;
+                for (int j = row == 0 ? 1 : (row - 1) * stride + 1; j <= first; j++)
+                    prefix += Vector2.Distance(centerline[j - 1], centerline[j]);
+                float rowLength = Vector2.Distance(centerline[first], centerline[first + 1]);
+                Assert.IsTrue((bool)Call(mode, "TrySpawnFan", new[] { 0, 4 }, new[] { 4, 4 }));
+                IList fans = (IList)Get(mode, "Fans");
+                object follower = Get(fans[fans.Count - 1], "RouteFollower");
+                speeds[row] = (float)Get(follower, "Speed");
+                Call(follower, "Advance", (prefix + rowLength * .5f) / speeds[row]);
+                follower.GetType().GetProperty("Speed", I).SetValue(follower, 0f);
+            }
+            Set(mode, "stopSpawning", true);
+            yield return Capture("los-redondos-five-runs-full-crew");
+            IDictionary renderedFans = (IDictionary)Get(presentation, "activeFans");
+            int visibleFans = 0;
+            foreach (DictionaryEntry pair in renderedFans)
+            {
+                SpriteRenderer fanRenderer = (SpriteRenderer)Get(pair.Value, "Renderer");
+                if (fanRenderer == null || fanRenderer.sprite == null) continue;
+                visibleFans++;
+                Assert.Less(fanRenderer.bounds.max.x, ((Rect)Get(route, "WorkBounds")).xMin, "Fans never enter the worker strip.");
+            }
+            Assert.AreEqual(5, visibleFans);
+
+            // Release the staged fans and wait for real deliveries from all four sectors.
+            IList staged = (IList)Get(mode, "Fans");
+            for (int i = 0; i < staged.Count; i++)
+            {
+                object follower = Get(staged[i], "RouteFollower");
+                follower.GetType().GetProperty("Speed", I).SetValue(follower, speeds[i]);
+            }
+            bool[,] served = new bool[2, 2];
+            for (int tick = 0; tick < 1600; tick++)
+            {
+                Call(mode, "Step", .05f);
+                foreach (object receipt in receipts)
+                {
+                    int product = (int)Get(receipt, "Product"), zone = (int)Get(receipt, "Zone");
+                    if (zone >= 0 && zone < 2) served[product == 0 ? 0 : 1, zone] = true;
+                }
+                if (served[0, 0] && served[0, 1] && served[1, 0] && served[1, 1]) break;
+                if (tick % 20 == 0) yield return null;
+            }
+            yield return Capture("los-redondos-five-runs-deliveries");
+            for (int role = 0; role < 2; role++)
+                for (int zone = 0; zone < 2; zone++)
+                    Assert.IsTrue(served[role, zone], "Expected actual delivery from role=" + role + ", zone=" + zone);
+        }
+
+        [UnityTest]
         public IEnumerator AutomaticMixedSixtyFanWaveCanWinWithCoinHiresAndNormalMovementForLosRedondos()
         {
             yield return RunAutomaticMixedFanWave(10, 60);
@@ -1241,9 +1488,12 @@ namespace HayChoriYPaty.Tests
                 : campaignLevelId == 10 ? "street-losredondos-fans-walk-v1" : "street-ferro-fans-walk-v2";
             Assert.AreEqual(expectedWalkArt, ((Sprite)Call(Get(view, "towerDefensePresentation"), "FanSprite", 1, false, 0)).texture.name);
             AssertPreparedStations();
-            // Legal player strategy: one Coca covers the upper/shared path; prioritize
-            // Chori throughput and reinvest actual receipts, never inject money/stock.
-            foreach (int[] placement in new[] {new[] {0, 0}, new[] {1, 0}, new[] {0, 1}, new[] {0, 1}})
+            // ID10 now has distinct service windows: staff both Coca bays instead of
+            // assuming the old upper shared Coca area covers the whole route.
+            int[][] opening = campaignLevelId == 10
+                ? new[] {new[] {0, 0}, new[] {1, 0}, new[] {0, 1}, new[] {1, 1}}
+                : new[] {new[] {0, 0}, new[] {1, 0}, new[] {0, 1}, new[] {0, 1}};
+            foreach (int[] placement in opening)
             { yield return Tap(Cards()[placement[0]].center); yield return Tap(Areas()[placement[1]].center); }
             Assert.AreEqual(4, ((IList)Get(mode, "Workers")).Count);
             int afterHires = Coins, additionalSpend = 0, requested = 0;

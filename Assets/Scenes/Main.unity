@@ -491,7 +491,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HayChoriYPaty.StreetGame
   balance:
-    maxCustomers: 28
+    maxCustomers: 21
     randomSeed: 1337
     priceSensitivity: 2.5
     maxStaff: 5

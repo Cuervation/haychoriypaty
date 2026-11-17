@@ -13,6 +13,8 @@ namespace HayChoriYPaty
         public const float CorridorWidthLogical = 96f;
         // Display-only clearance for the full-height fence artwork above the footer.
         public const float VisualStageLift = 24f;
+        // Full fan body height shared by Camioneros and Los Redondos.
+        public const float LosRedondosFanBodyLogical = 76f;
 
         public static bool TryCreate(TowerDefenseLevelConfig source, Camera camera, Rect viewport,
             float logicalWidth, float logicalHeight, out TowerDefenseLevelConfig runtimeConfig,
@@ -50,6 +52,9 @@ namespace HayChoriYPaty
 
             if (authored.RouteKind == TowerDefenseRouteKind.HorizontalSingleFence)
                 return TryCreateHorizontal(source, camera, viewport, logicalWidth, logicalHeight, canvasScale,
+                    worldUnitsPerLogicalPixel, out runtimeConfig, out route, out firstServiceZone, out secondServiceZone, out error);
+            if (source.SourceCampaignLevelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId)
+                return TryCreateLosRedondos(source, camera, viewport, logicalWidth, logicalHeight, canvasScale,
                     worldUnitsPerLogicalPixel, out runtimeConfig, out route, out firstServiceZone, out secondServiceZone, out error);
 
             const float horizontalMargin = 16f;
@@ -120,6 +125,106 @@ namespace HayChoriYPaty
             firstServiceZone = runtimeConfig.WorkZonePosition(geometry, 0);
             secondServiceZone = runtimeConfig.WorkZonePosition(geometry, Mathf.Min(1, route.RowCount - 2));
             return true;
+        }
+
+        /// <summary>
+        /// Los Redondos ID10: one continuous five-run serpentine on the left 3%..62% of the
+        /// width and four worker sectors on the right 34.5%. Route, rails, navigation and
+        /// work areas all come from <see cref="LosRedondosLayout"/>; the result is rejected
+        /// with the concrete defect if the shared validator finds any problem.
+        /// </summary>
+        private static bool TryCreateLosRedondos(TowerDefenseLevelConfig source, Camera camera, Rect viewport,
+            float logicalWidth, float logicalHeight, float canvasScale, float pixel,
+            out TowerDefenseLevelConfig runtimeConfig, out TowerDefenseRouteGeometryConfig route,
+            out Vector2 firstServiceZone, out Vector2 secondServiceZone, out string error)
+        {
+            runtimeConfig = null;
+            route = null;
+            firstServiceZone = secondServiceZone = Vector2.zero;
+            error = null;
+            if (source.Route.RowCount != LosRedondosLayout.RowCount)
+            {
+                error = "Los Redondos must author exactly " + LosRedondosLayout.RowCount + " route rows.";
+                return false;
+            }
+            LosRedondosLayoutResult layout = LosRedondosLayout.Compute(logicalWidth, logicalHeight);
+            if (!layout.IsValid)
+            {
+                error = layout.Error;
+                return false;
+            }
+
+            var lengths = new float[LosRedondosLayout.RowCount];
+            for (int i = 0; i < lengths.Length; i++) lengths[i] = layout.SegmentLength * pixel;
+            route = new TowerDefenseRouteGeometryConfig
+            {
+                RouteKind = TowerDefenseRouteKind.Serpentine,
+                RowCount = LosRedondosLayout.RowCount,
+                SegmentLengths = lengths,
+                CorridorWidth = layout.VerticalCorridor * pixel,
+                HorizontalCorridorWidth = layout.HorizontalCorridor * pixel,
+                RowSpacing = layout.RowPitch * pixel,
+                TurnRadius = source.Route.TurnRadius,
+                PlayableBounds = LogicalRectToWorld(camera, viewport, logicalWidth, canvasScale, layout.RouteEnvelope),
+                // Serpentine routes ignore WorkBounds; ID10 uses it for its right-side worker column.
+                WorkBounds = LogicalRectToWorld(camera, viewport, logicalWidth, canvasScale, layout.WorkColumn),
+                TurnSegments = source.Route.TurnSegments
+            };
+            TowerDefenseRouteGeometryResult geometry = TowerDefenseRouteGeometry.Generate(route);
+            if (geometry == null || !geometry.IsValid)
+            {
+                error = geometry == null ? "Route generator returned no layout." : string.Join("; ", geometry.Validation.Errors);
+                return false;
+            }
+
+            // Supporters enter flush with the left screen edge, as before for ID10.
+            Vector2 screenEntry = LogicalToWorld(camera, viewport, logicalWidth, canvasScale,
+                new Vector2(FanFrameWidthLogical * .5f, logicalHeight * .5f));
+            route.FanEntryExtensionWorldUnits = Mathf.Max(0f, geometry.Centerline[0].x - screenEntry.x);
+
+            TowerDefenseRouteLayoutReport report = ValidateLosRedondos(route, geometry, pixel);
+            if (!report.IsValid)
+            {
+                error = "Los Redondos route layout is invalid: " + report;
+                return false;
+            }
+
+            runtimeConfig = Object.Instantiate(source);
+            runtimeConfig.name = source.name + " (runtime viewport)";
+            runtimeConfig.ConfigureRoute(route);
+            Rect firstPair = Rect.MinMaxRect(LosRedondosLayout.WorldSector(route.WorkBounds, 1).xMin,
+                LosRedondosLayout.WorldSector(route.WorkBounds, 1).yMin, route.WorkBounds.xMax,
+                LosRedondosLayout.WorldSector(route.WorkBounds, 0).yMax);
+            Rect secondPair = Rect.MinMaxRect(LosRedondosLayout.WorldSector(route.WorkBounds, 3).xMin,
+                LosRedondosLayout.WorldSector(route.WorkBounds, 3).yMin, route.WorkBounds.xMax,
+                LosRedondosLayout.WorldSector(route.WorkBounds, 2).yMax);
+            firstServiceZone = firstPair.center;
+            secondServiceZone = secondPair.center;
+            return true;
+        }
+
+        /// <summary>Runs the shared route validator against ID10's exact route, navigation and four sectors.</summary>
+        public static TowerDefenseRouteLayoutReport ValidateLosRedondos(TowerDefenseRouteGeometryConfig route,
+            TowerDefenseRouteGeometryResult geometry, float pixel)
+        {
+            var sectors = new Rect[LosRedondosLayout.SectorCount];
+            for (int i = 0; i < sectors.Length; i++) sectors[i] = LosRedondosLayout.WorldSector(route.WorkBounds, i);
+            var clearance = new TowerDefenseRouteClearance
+            {
+                FanWidth = FanFrameWidthLogical * pixel,
+                FanDepth = LosRedondosFanBodyLogical * pixel,
+                FenceHalfThickness = LosRedondosLayout.FenceArtHalfThicknessLogical * pixel,
+                Tolerance = .01f * pixel
+            };
+            return TowerDefenseRouteLayoutValidator.Validate(geometry, route, clearance, sectors,
+                TowerDefenseGameMode.BuildFanRouteWaypoints(geometry, route.FanEntryExtensionWorldUnits));
+        }
+
+        private static Rect LogicalRectToWorld(Camera camera, Rect viewport, float logicalWidth, float canvasScale, Rect logical)
+        {
+            Vector2 a = LogicalToWorld(camera, viewport, logicalWidth, canvasScale, new Vector2(logical.xMin, logical.yMin));
+            Vector2 b = LogicalToWorld(camera, viewport, logicalWidth, canvasScale, new Vector2(logical.xMax, logical.yMax));
+            return Rect.MinMaxRect(Mathf.Min(a.x, b.x), Mathf.Min(a.y, b.y), Mathf.Max(a.x, b.x), Mathf.Max(a.y, b.y));
         }
 
         private static bool TryCreateHorizontal(TowerDefenseLevelConfig source, Camera camera, Rect viewport,
