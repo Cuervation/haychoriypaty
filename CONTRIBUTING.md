@@ -69,3 +69,4 @@ Hooks opcionales (no se instalan solos; cada clon decide): `git config core.hook
 - Archivo equivocado publicado en una rama de trabajo: commit que lo quita (`git rm --cached` + regla en `.gitignore`). Si era una credencial, **rotarla primero**: borrarla de la historia requiere reescritura y aprobación explícita.
 - Commit publicado en la rama equivocada: llevarlo a la correcta (`cherry-pick` con aprobación) y revertirlo en la equivocada.
 - Force push accidental: el SHA anterior está en el reflog local (`git reflog show origin/<rama>`) o en la actividad de la rama en GitHub; restaurarlo es otro force push y requiere aprobación.
+- Push que falla con `HTTP 408` o `RPC failed` tras mover/renombrar binarios: el recorrido *sparse* de Git reenvía blobs que el remoto ya tiene bajo otra ruta. Repetir solo ese push con `git -c pack.useSparse=false push …` (sin cambiar la configuración; 2026-11-17: 6 MiB → 1,5 KiB).
