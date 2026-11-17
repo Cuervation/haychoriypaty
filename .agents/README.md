@@ -55,7 +55,7 @@ No crear worktrees hasta que el usuario lo decida. Cuando lo haga, el objetivo e
 
 **Cuándo conviene:** tareas paralelas largas que tocan los mismos archivos, o trabajo sin Unity (docs, scripts, CI) mientras otro agente tiene el Editor. **No conviene** para cambios cortos ni para dos tareas que necesitan Unity a la vez: cada worktree exige otro Editor y otra `Library/` (importación larga, varios GB) y los saves siguen compartidos.
 
-**Creación (la hace o autoriza el usuario; ramas con los prefijos de `CONTRIBUTING.md`; antes de la migración usar `origin/chore/fase3-codigo-prototipo` como base):**
+**Creación (la hace o autoriza el usuario; ramas con los prefijos de `CONTRIBUTING.md`):**
 
 ```bash
 git worktree add ../HayChoriYPaty-codex -b chore/<tarea-codex> origin/main

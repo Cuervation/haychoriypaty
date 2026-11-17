@@ -6,7 +6,7 @@ Guía única del flujo Git/GitHub para personas, Claude Code y Codex. Los **perm
 
 | Rama | Uso |
 |---|---|
-| `main` | Única rama permanente: integrada y validada. Solo cambia por Pull Request. *(Hoy la predeterminada sigue siendo `codex/street-automation`; ver migración.)* |
+| `main` | Única rama permanente: integrada y validada. Solo cambia por Pull Request. Protegida por el ruleset `main-protection`: sin borrado, sin force push, PR obligatorio con el check `Repo structure (no Unity)`. |
 | `feature/<tema>` | Funcionalidad nueva |
 | `fix/<tema>` | Corrección de error |
 | `refactor/<tema>` | Reestructura sin cambio de comportamiento |
