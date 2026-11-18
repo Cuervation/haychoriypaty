@@ -67,7 +67,9 @@ namespace HayChoriYPaty.Tests
                 object priorRoute = Get<object>(level, "Route");
                 object priorGeometry = geometryType.GetMethod("Generate", BindingFlags.Public | BindingFlags.Static).Invoke(null, new[] { priorRoute });
                 Assert.IsTrue(Get<bool>(priorGeometry, "IsValid"), "Prior level route regressed: " + id);
-                Assert.AreEqual(0, Convert.ToInt32(Get<object>(priorRoute, "RouteKind")), "Prior level should remain serpentine: " + id);
+                // Camioneros (9) and Los Redondos (10) became horizontal single-fence kitchen levels; La Renga (13) stays serpentine for now.
+                Assert.AreEqual(id == 9 || id == 10 ? 1 : 0, Convert.ToInt32(Get<object>(priorRoute, "RouteKind")),
+                    (id == 9 || id == 10 ? "Camioneros and Los Redondos should be a horizontal single fence: " : "Prior level should remain serpentine: ") + id);
             }
         }
 
@@ -121,6 +123,22 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
+        public void HandOverCrossesStraightFromHandToHandWithoutAnArc()
+        {
+            MethodInfo handOver = RuntimeType("TowerDefenseWorldPresentation").GetMethod("HandOverPoint", BindingFlags.Static | BindingFlags.NonPublic);
+            Vector2 hand = new Vector2(1f, 2f), pilgrimHand = new Vector2(3f, 5f);
+            Assert.AreEqual(hand, (Vector2)handOver.Invoke(null, new object[] { hand, pilgrimHand, 0f }));
+            Assert.AreEqual(pilgrimHand, (Vector2)handOver.Invoke(null, new object[] { hand, pilgrimHand, 1f }));
+            Vector2 direction = pilgrimHand - hand;
+            for (float progress = .1f; progress < 1f; progress += .1f)
+            {
+                Vector2 point = (Vector2)handOver.Invoke(null, new object[] { hand, pilgrimHand, progress });
+                float cross = direction.x * (point.y - hand.y) - direction.y * (point.x - hand.x);
+                Assert.That(cross, Is.EqualTo(0f).Within(.0001f), "The product travels in a straight line: no throw arc.");
+            }
+        }
+
+        [Test]
         public void BocaPricingAndStarterRosterAreOptInAndKeepLujanIdentity()
         {
             BuildFreeConstructionMode();
@@ -131,7 +149,7 @@ namespace HayChoriYPaty.Tests
             Set(config, "sourceCampaignLevelId", 14);
             Set(config, "economicBalanceCampaignLevelId", 8);
             Set(config, "useCampaignEconomyPricing", true);
-            Set(config, "startingWorkersByRole", new[] { 1, 0, 0, 0, 0 });
+            Set(config, "startingWorkersByRole", new[] { 1, 0, 0, 0, 1 });
             Set(config, "hireCostsByRole", new[] { 55, 55, 70, 65, 65 });
             mode = Activator.CreateInstance(RuntimeType("TowerDefenseGameMode"), new object[]
             {
@@ -142,17 +160,18 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(14, Get<int>(config, "SourceCampaignLevelId"), "Economy-source ID must not replace Luján's campaign identity.");
             Assert.AreEqual(8, Get<int>(config, "EconomicBalanceCampaignLevelId"));
             Assert.AreEqual(1200, Get<int>(mode, "Coins"), "Luján's opening cash remains level-specific.");
-            CollectionAssert.AreEqual(new[] { 1, 0, 0, 0, 0 }, Get<int[]>(mode, "WorkerCountsByRole"));
+            CollectionAssert.AreEqual(new[] { 1, 0, 0, 0, 1 }, Get<int[]>(mode, "WorkerCountsByRole"));
             Type roleType = RuntimeType("StreetWorkerRole");
             Assert.AreEqual(55, Invoke(mode, "HireCost", new[] { Enum.ToObject(roleType, 0) }));
             Assert.AreEqual(55, Invoke(mode, "HireCost", new[] { Enum.ToObject(roleType, 1) }));
             Assert.AreEqual(70, Invoke(mode, "HireCost", new[] { Enum.ToObject(roleType, 2) }));
             Assert.AreEqual(65, Invoke(mode, "HireCost", new[] { Enum.ToObject(roleType, 3) }));
-            Assert.AreEqual(65, Invoke(mode, "HireCost", new[] { Enum.ToObject(roleType, 4) }));
+            Assert.AreEqual(65, Invoke(mode, "HireCost", new[] { Enum.ToObject(roleType, 4) }), "Like Boca, the starter Mozo is free and the first paid Mozo costs 65.");
             Assert.AreEqual(70, Get<int>(mode, "SpeedUpgradeCost"));
             IList workers = Get<IList>(mode, "Workers");
-            Assert.AreEqual(1, workers.Count, "Luján opens with exactly one Parrillero and no other worker.");
+            Assert.AreEqual(2, workers.Count, "Luján opens like Boca with one Parrillero and one Mozo.");
             Assert.AreEqual("Parrillero", Get<object>(workers[0], "Role").ToString());
+            Assert.AreEqual("Mozo", Get<object>(workers[1], "Role").ToString());
         }
 
         [Test]
@@ -204,10 +223,11 @@ namespace HayChoriYPaty.Tests
                 new int[5], new long[5], Get<int>(config, "StartingCoins")
             });
 
-            CollectionAssert.AreEqual(new[] { 1, 0, 0, 0, 0 }, Get<int[]>(mode, "WorkerCountsByRole"));
+            CollectionAssert.AreEqual(new[] { 1, 0, 0, 0, 1 }, Get<int[]>(mode, "WorkerCountsByRole"));
             IList openingWorkers = Get<IList>(mode, "Workers");
-            Assert.AreEqual(1, openingWorkers.Count, "Exactly one Parrillero starts at Luján.");
+            Assert.AreEqual(2, openingWorkers.Count, "One Parrillero and one Mozo start at Luján, as in Boca.");
             Assert.AreEqual("Parrillero", Get<object>(openingWorkers[0], "Role").ToString());
+            Assert.AreEqual("Mozo", Get<object>(openingWorkers[1], "Role").ToString());
 
             object kitchen = Get<object>(mode, "Kitchen");
             int[] openingTableUnits = new int[7], openingGrillUnits = new int[7];
@@ -271,7 +291,8 @@ namespace HayChoriYPaty.Tests
                     workArea.center.x + (sourceBounds.center.x - bocaEnvelope.center.x) * fitScale * pixel,
                     workArea.min.y + (bocaEnvelope.yMax - sourceBounds.center.y) * fitScale * pixel);
                 Vector2 expectedSize = sourceBounds.size * fitScale * pixel;
-                if (kind >= 2) expectedSize.x -= 2.5f * pixel;
+                // Only Boca's own 1.2 px art overlap is trimmed so the collision bounds abut.
+                if (kind >= 2) expectedSize.x -= (1.2f * fitScale + .05f) * pixel;
                 Assert.That(Vector2.Distance(actual.center, expectedCenter), Is.LessThan(pixel * .2f),
                     "Station centers must follow Boca's shared kitchen layout, kind " + kind + ".");
                 Assert.That(Vector2.Distance(actual.size, expectedSize), Is.LessThan(pixel * .2f),
@@ -293,29 +314,50 @@ namespace HayChoriYPaty.Tests
                 "Boca's two grills share one horizontal row.");
             Assert.Less(normalGrill.center.x, premiumGrill.center.x);
             Assert.Less(normalGrill.yMax, rowBottom, "The grills sit below the tables and drink stations.");
-            Assert.AreEqual(Get<Vector2>(stations[2], "WorkPosition"), Get<Vector2>(stations[4], "WorkPosition"),
-                "Coca and beer use the same Cocacolero access point; a single hire handles both barrels.");
-            Assert.AreEqual(Get<Vector2>(stations[5], "WorkPosition"), Get<Vector2>(stations[6], "WorkPosition"),
-                "The Mozo uses one shared access point for both sandwich tables.");
-            var uniqueAccess = new List<(Vector2 position, int role, Rect bounds)>();
-            MethodInfo stationRole = RuntimeType("TowerDefenseGameMode").GetMethod("StationWorkerRole", BindingFlags.Static | BindingFlags.NonPublic);
-            MethodInfo workerBoundsForRole = RuntimeType("TowerDefenseGameMode").GetMethod("WorkerBounds", PrivateInstance);
-            for (int i = 0; i < stations.Count; i++)
+            // Each role works where Boca's StreetKitchenLayout puts it, mapped through the same fit as the furniture.
+            Vector2[] bocaPosts =
             {
-                object station = stations[i];
-                int role = Convert.ToInt32(stationRole.Invoke(null, new[] { Get<object>(station, "Kind") }));
-                Vector2 point = Get<Vector2>(station, "WorkPosition");
-                if (uniqueAccess.Any(item => item.role == role)) continue;
-                Rect worker = (Rect)workerBoundsForRole.Invoke(mode,
-                    new[] { (object)point, Enum.ToObject(RuntimeType("StreetWorkerRole"), role) });
-                Assert.IsTrue(Contains(Get<Rect>(mode, "WorkBounds"), worker), "Role access stays inside the play area.");
-                foreach (object otherStation in stations)
-                    Assert.IsFalse(Overlaps(worker, Get<Rect>(otherStation, "Bounds")), "Role access cannot collide with installed furniture.");
-                foreach (var previous in uniqueAccess)
-                    Assert.IsFalse(Overlaps(worker, previous.bounds), "Different role access points cannot overlap.");
-                uniqueAccess.Add((point, role, worker));
+                (Vector2)bocaLayout.GetType().GetMethod("GrillWorkPosition", new[] { typeof(int), typeof(int), typeof(int) }).Invoke(bocaLayout, new object[] { 0, 0, 1 }),
+                (Vector2)bocaLayout.GetType().GetMethod("GrillWorkPosition", new[] { typeof(int), typeof(int), typeof(int) }).Invoke(bocaLayout, new object[] { 2, 0, 1 }),
+                (Vector2)bocaLayout.GetType().GetMethod("PickupPosition", new[] { typeof(int) }).Invoke(bocaLayout, new object[] { 4 }),
+                (Vector2)bocaLayout.GetType().GetMethod("PickupPosition", new[] { typeof(int) }).Invoke(bocaLayout, new object[] { 5 }),
+                (Vector2)bocaLayout.GetType().GetMethod("PickupPosition", new[] { typeof(int) }).Invoke(bocaLayout, new object[] { 6 }),
+                (Vector2)bocaLayout.GetType().GetMethod("PickupPosition", new[] { typeof(int) }).Invoke(bocaLayout, new object[] { 0 }),
+                (Vector2)bocaLayout.GetType().GetMethod("PickupPosition", new[] { typeof(int) }).Invoke(bocaLayout, new object[] { 2 })
+            };
+            Type roleType = RuntimeType("StreetWorkerRole");
+            MethodInfo feetOf = RuntimeType("TowerDefenseGameMode").GetMethod("WorkerFeet", PrivateInstance);
+            for (int kind = 0; kind < stations.Count; kind++)
+            {
+                Rect actual = Get<Rect>(stations[kind], "Bounds");
+                Rect sourceBounds = bocaByKind[kind];
+                Vector2 expectedPost = new Vector2(
+                    actual.center.x + (bocaPosts[kind].x - sourceBounds.center.x) * fitScale * pixel,
+                    actual.yMin + (sourceBounds.yMax - bocaPosts[kind].y) * fitScale * pixel);
+                float half = (kind == 2 || kind == 4 ? 94f : 83f) * .5f * pixel;
+                expectedPost.x = Mathf.Clamp(expectedPost.x, workArea.xMin + half, workArea.xMax - half);
+                Vector2 actualPost = Get<Vector2>(stations[kind], "WorkPosition");
+                Assert.That(Vector2.Distance(actualPost, expectedPost), Is.LessThan(pixel * .2f),
+                    "Worker post for station " + kind + " must follow Boca's layout. expected=" + expected + " actual=" + actualPost);
+                Rect feet = (Rect)feetOf.Invoke(mode, new object[] { actualPost });
+                foreach (object other in stations)
+                {
+                    Rect solid = Get<Rect>(other, "Bounds");
+                    int otherKind = Convert.ToInt32(Get<object>(other, "Kind"));
+                    if (otherKind == 3 || otherKind == 5 || otherKind == 6)
+                        solid = new Rect(solid.xMin, solid.yMin, solid.width, Mathf.Min(solid.height, 20f * fitScale * pixel));
+                    Assert.IsFalse(Overlaps(feet, solid), "Feet at post " + kind + " cannot stand on a furniture base.");
+                }
             }
-            Assert.AreEqual(5, uniqueAccess.Count, "The seven physical stations use five collision-free role access points.");
+            // Cooks work between their grill and their table; the Mozo/Fernetero/Cocacolero work from the fence side of theirs.
+            Rect normalTable = Get<Rect>(stations[5], "Bounds"), premiumTable = Get<Rect>(stations[6], "Bounds");
+            Assert.That(Get<Vector2>(stations[0], "WorkPosition").y, Is.InRange(normalGrill.yMax, normalTable.yMin),
+                "The Parrillero stands in the apron between its grill and its table.");
+            Assert.That(Get<Vector2>(stations[1], "WorkPosition").y, Is.InRange(premiumGrill.yMax, premiumTable.yMin),
+                "The Premium cook stands in the apron between its grill and its table.");
+            Assert.Greater(Get<Vector2>(stations[5], "WorkPosition").y, normalTable.yMin, "The Mozo works behind the table.");
+            Assert.AreNotEqual(Get<Vector2>(stations[5], "WorkPosition"), Get<Vector2>(stations[6], "WorkPosition"),
+                "Each sandwich table keeps its own Boca pickup.");
             Assert.AreEqual(1200, Get<int>(mode, "Coins"));
             Assert.AreEqual(0L, Get<long>(mode, "EquipmentSpendCents"), "Configured opening stations are free and do not charge the run.");
             Assert.IsFalse(Get<bool>(config, "EquipmentPlacementAllowed"));
@@ -336,8 +378,9 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(openingCoins, Get<int>(mode, "Coins"));
             Assert.AreEqual(0L, Get<long>(mode, "EquipmentSpendCents"));
             openingWorkers = Get<IList>(mode, "Workers");
-            Assert.AreEqual(1, openingWorkers.Count, "Luján starts with only Boca's Parrillero, without a Mozo or other extra crew.");
+            Assert.AreEqual(2, openingWorkers.Count, "Luján starts with Boca's crew: one Parrillero and one Mozo, no extra crew.");
             Assert.AreEqual("Parrillero", Get<object>(openingWorkers[0], "Role").ToString());
+            Assert.AreEqual("Mozo", Get<object>(openingWorkers[1], "Role").ToString());
         }
 
         private void BuildFreeConstructionMode()

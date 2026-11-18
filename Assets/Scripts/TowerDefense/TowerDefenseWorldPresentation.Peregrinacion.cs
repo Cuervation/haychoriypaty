@@ -130,7 +130,8 @@ namespace HayChoriYPaty
                     || kind == TowerDefenseStationKind.PremiumGrill
                     || kind == TowerDefenseStationKind.FernetTable;
                 if (preserveAspect) scaleX = scaleY = Mathf.Min(scaleX, scaleY);
-                obj.transform.localScale = new Vector3(scaleX, scaleY, 1f);
+                // Boca stretches its kitchen art vertically with the screen height (FitStation: scale.y *= verticalScale).
+                obj.transform.localScale = new Vector3(scaleX, scaleY * mode.KitchenVerticalScale, 1f);
             }
 
             SetLayerRecursively(obj, presentationLayer);
@@ -167,15 +168,17 @@ namespace HayChoriYPaty
             float topDepth = visual.height * StreetKitchenLayout.SandwichTableTopDepthRatio;
             float supportHeight = visual.height - topDepth + StreetKitchenLayout.SandwichTableSupportOverlap;
             float scale = mode.BocaKitchenFitScale() * mode.WorldUnitsPerLogicalPixel;
-            FitTablePart(station, "Tabletop", visual.center.x, visual.yMin + topDepth * .5f,
-                bounds.width, topDepth, scale, depth + 2);
+            // Boca's FitFoodTable multiplies every vertical position and height by the screen's vertical scale.
+            float stretch = mode.KitchenVerticalScale;
+            FitTablePart(station, "Tabletop", visual.center.x, (visual.yMin + topDepth * .5f) * stretch,
+                bounds.width, topDepth * stretch, scale, depth + 2);
             float supportWidth = bounds.width * StreetKitchenLayout.SandwichTableSupportWidthFraction;
             float leftCenterX = visual.xMin + visual.width * StreetKitchenLayout.SandwichTableSupportCenterFraction;
             float rightCenterX = visual.xMax - visual.width * StreetKitchenLayout.SandwichTableSupportCenterFraction;
             float supportCenterY = visual.yMax - supportHeight * .5f;
-            FitTablePart(station, "Trestle_Left", leftCenterX, supportCenterY, supportWidth, supportHeight,
+            FitTablePart(station, "Trestle_Left", leftCenterX, supportCenterY * stretch, supportWidth, supportHeight * stretch,
                 scale, depth);
-            FitTablePart(station, "Trestle_Right", rightCenterX, supportCenterY, supportWidth, supportHeight,
+            FitTablePart(station, "Trestle_Right", rightCenterX, supportCenterY * stretch, supportWidth, supportHeight * stretch,
                 scale, depth);
         }
         private void SyncPilgrimFood()
@@ -183,7 +186,7 @@ namespace HayChoriYPaty
             staleIds.Clear(); foreach (int id in pilgrimFood.Keys) staleIds.Add(id);
             if (mode.Kitchen == null) return;
             occupiedPilgrimGrillSlots.Clear();
-            StreetKitchenLayout layout = TowerDefenseGameMode.LujanBocaKitchenVisualLayout;
+            StreetKitchenLayout layout = mode.SourceKitchenLayout;
             float kitchenScale = mode.BocaKitchenFitScale();
             foreach (StreetFoodUnit unit in mode.Kitchen.Units)
             {
@@ -300,11 +303,12 @@ namespace HayChoriYPaty
             return null;
         }
 
-        private static Vector2 MapBocaKitchenPointToStation(Vector2 point, Rect sourceBounds,
+        private Vector2 MapBocaKitchenPointToStation(Vector2 point, Rect sourceBounds,
             TowerDefensePlacedStation station, float fitScale, float pixelScale)
         {
+            // Boca's item positions are stretched vertically with the screen height, like its stations.
             Vector2 offset = point - sourceBounds.center;
-            return station.Bounds.center + new Vector2(offset.x, -offset.y) * (fitScale * pixelScale);
+            return station.Bounds.center + new Vector2(offset.x, -offset.y * mode.KitchenVerticalScale) * (fitScale * pixelScale);
         }
 
         private void SyncPilgrimAmbientGrillMeat(StreetKitchenLayout layout, float kitchenScale)
@@ -358,7 +362,7 @@ namespace HayChoriYPaty
         private PilgrimAmbientGrillMeat CreatePilgrimAmbientGrillMeat(int product, int slot,
             TowerDefensePlacedStation station, Rect sourceBounds, float kitchenScale, Vector2 meatSize)
         {
-            Vector2 sourcePoint = TowerDefenseGameMode.LujanBocaKitchenVisualLayout.GrillSlotPosition(product, slot,
+            Vector2 sourcePoint = mode.SourceKitchenLayout.GrillSlotPosition(product, slot,
                 mode.Kitchen.GrillCapacity(product ^ 1) > 0, mode.Kitchen.GrillCapacity(product));
             Vector2 position = MapBocaKitchenPointToStation(sourcePoint, sourceBounds, station, kitchenScale,
                 mode.WorldUnitsPerLogicalPixel);

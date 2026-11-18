@@ -337,7 +337,7 @@ namespace HayChoriYPaty.Tests
             Type simulationType = Runtime("StreetSimulation");
             int[] order = (int[])simulationType.GetField("CampaignOrder", PublicStatic).GetValue(null);
             Assert.AreEqual(15, order.Length);
-            CollectionAssert.AreEqual(new[] { 0, 1, 9, 2, 12, 3, 11, 10, 13, 14, 4, 5, 6, 7, 8 }, order);
+            CollectionAssert.AreEqual(new[] { 0, 1, 9, 2, 12, 3, 10, 11, 13, 14, 4, 5, 6, 7, 8 }, order);
 
             long[] reservedForOtherLevels = { 1, 1, 0, 0, 0 };
             object game = NewGame(Json(NewLegacySave(9, null, Tickets(4, 0, reservedForOtherLevels))));
@@ -383,6 +383,28 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(2, Read(Read(game, "Sim"), "LevelIndex"), "The successor follows the reordered campaign rather than numeric stable-ID order.");
         }
 
+        // These ticket-settlement tests only need a running Tower Defense mode. Camioneros' live config is now a horizontal
+        // kitchen level that needs a real phone layout, so they use a copy of it in its former serpentine form.
+        private object SerpentineCamionerosConfig()
+        {
+            Type configType = Runtime("TowerDefenseLevelConfig");
+            object live = Resources.Load("TowerDefense/Camioneros-PlazaDeMayo", configType);
+            Assert.IsNotNull(live);
+            object config = UnityEngine.Object.Instantiate((UnityEngine.Object)live);
+            Put(config, "freeConstruction", false);
+            Put(config, "routeKind", Enum.ToObject(Runtime("TowerDefenseRouteKind"), 0));
+            Type routeType = Runtime("TowerDefenseRouteGeometryConfig");
+            object route = Activator.CreateInstance(routeType);
+            routeType.GetField("RowCount").SetValue(route, 3);
+            routeType.GetField("SegmentLengths").SetValue(route, new[] { 3.8f, 3.8f, 3.8f });
+            routeType.GetField("CorridorWidth").SetValue(route, .9f);
+            routeType.GetField("RowSpacing").SetValue(route, 1.8f);
+            routeType.GetField("PlayableBounds").SetValue(route, new Rect(-3.3f, -4.7f, 6.6f, 9.4f));
+            routeType.GetField("TurnSegments").SetValue(route, 16);
+            Put(config, "route", route);
+            return config;
+        }
+
         [Test]
         public void ExitAtTowerDefenseCompletionSettlesVictoryInsteadOfAbandoning()
         {
@@ -392,9 +414,7 @@ namespace HayChoriYPaty.Tests
             object campaign = Read(game, "Sim");
 
             Type configType = Runtime("TowerDefenseLevelConfig");
-            object config = Resources.Load("TowerDefense/Camioneros-PlazaDeMayo", configType);
-            Assert.IsNotNull(config);
-            config = UnityEngine.Object.Instantiate((UnityEngine.Object)config); // keep the shared asset's 120-fan target intact
+            object config = SerpentineCamionerosConfig(); // a copy: keeps the shared asset's 120-fan target intact
             Put(config, "totalFanCount", 10);
             object route = Read(config, "Route");
             Type geometryType = Runtime("TowerDefenseRouteGeometry");
@@ -437,7 +457,7 @@ namespace HayChoriYPaty.Tests
             object game = NewGame(Json(NewLegacySave(9, null, Tickets(4))));
             Assert.IsTrue((bool)Invoke(game, "SelectLevel", 9));
             Assert.IsTrue((bool)Invoke(game, "TryStartTowerDefenseRound"));
-            object config = Resources.Load("TowerDefense/Camioneros-PlazaDeMayo", Runtime("TowerDefenseLevelConfig"));
+            object config = SerpentineCamionerosConfig();
             object route = Read(config, "Route");
             object geometry = Runtime("TowerDefenseRouteGeometry").GetMethod("Generate", PublicStatic).Invoke(null, new[] {route});
             Vector2 first = (Vector2)Invoke(config, "WorkZonePosition", geometry, 0);

@@ -70,7 +70,6 @@ namespace HayChoriYPaty
             towerDefenseTutorialActive = false;
             towerDefenseTutorialStep = 0;
             towerDefenseSelectedRole = -1;
-            ResetPilgrimPlacement();
             towerDefenseError = null;
             towerDefenseBackdrop = null;
             towerDefenseCrest = null;
@@ -284,8 +283,7 @@ namespace HayChoriYPaty
                 if (!game.AttachTowerDefenseRuntime(towerDefenseMode))
                     throw new InvalidOperationException("No se pudo guardar el comienzo de la partida de campaña.");
                 towerDefenseSelectedRole = -1;
-                ResetPilgrimPlacement();
-                towerDefenseActive = true;
+                    towerDefenseActive = true;
                 hubActive = false;
                 levelSelectActive = false;
                 towerDefenseScreenSize = screenSize;
@@ -293,7 +291,8 @@ namespace HayChoriYPaty
                 logicalCanvasHeight = logicalHeight;
                 layoutVerticalScale = logicalHeight / H;
                 TowerDefenseGameMode.SetCampaignStepSuspended(true);
-                if (campaignLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId &&
+                // The old tutorial explains choosing one of two shared areas; the horizontal kitchen version hires with one tap.
+                if (campaignLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId && !towerDefenseMode.FreeConstruction &&
                     PlayerPrefs.GetInt(CamionerosTutorialCompletedKey, 0) == 0)
                 {
                     towerDefenseTutorialActive = true;
@@ -507,7 +506,7 @@ namespace HayChoriYPaty
             Camera camera = Camera.main;
             if (camera == null || towerDefenseMode == null || towerDefenseRuntimeConfig == null || viewport.width <= 0f)
                 return Array.Empty<Rect>();
-            if (towerDefenseRuntimeConfig.SourceCampaignLevelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId)
+            if (towerDefenseRuntimeConfig.SourceCampaignLevelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId && !towerDefenseMode.FreeConstruction)
             {
                 StreetWorkerRole selectedRole = towerDefenseSelectedRole >= 0 && towerDefenseSelectedRole < TowerDefenseHireRoles.Length
                     ? TowerDefenseHireRoles[towerDefenseSelectedRole] : StreetWorkerRole.Parrillero;
@@ -561,7 +560,7 @@ namespace HayChoriYPaty
 
         private void DrawTowerDefensePlacementOverlay(Rect viewport)
         {
-            if (IsPilgrimConstruction) { DrawPilgrimPlacementOverlay(); return; }
+            if (IsPilgrimConstruction) return;
             if (towerDefenseSelectedRole < 0 || !TowerDefensePlacementInputAllowed) return;
             StreetWorkerRole role = TowerDefenseHireRoles[towerDefenseSelectedRole];
             Rect[] areas = TowerDefensePlacementAreaBounds(viewport);
@@ -746,7 +745,9 @@ namespace HayChoriYPaty
             Rect sourceNearSidewalk = new Rect(100f * sx, 495f * sy, 740f * sx, 50f * sy);
             float sidewalkTop = mural.yMax;
             const float farSidewalkHeight = 24f, nearSidewalkHeight = 30f, stallSpaceHeight = 90f;
-            float footerTop = canvasHeight - TowerDefenseResponsiveLayout.FooterReserve;
+            float footerTop = IsPilgrimConstruction
+                ? TowerDefenseResponsiveLayout.PilgrimFooterTop(canvasHeight, visualLevelId)
+                : canvasHeight - TowerDefenseResponsiveLayout.FooterReserve;
             float roadBottom = footerTop - nearSidewalkHeight - stallSpaceHeight;
             Rect cleanRoad = new Rect(0f, sidewalkTop + farSidewalkHeight, W,
                 Mathf.Max(1f, roadBottom - sidewalkTop - farSidewalkHeight));

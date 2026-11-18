@@ -1,5 +1,54 @@
 # Tower Defense — Camioneros, Los Redondos, La Renga y Peregrinación
 
+## Los Redondos ID10: valla horizontal con la cocina y el footer de Ferro, después de Ferro — 2026-11-18 (vigente)
+
+Supersede el recorrido de cinco tramos con cuatro sectores laterales (secciones de Los Redondos más abajo). A pedido del usuario: Los Redondos es el nivel que sigue a Ferro y pasa a funcionar como Camioneros y Peregrinación (una valla horizontal, los hinchas entran por un lado y salen por el otro), pero con la cocina y el footer de **Ferro (ID3)**. La valla se dibuja como está hoy.
+
+**Orden y desbloqueos:** `CampaignOrder = [0,1,9,2,12,3,10,11,13,14,4,5,6,7,8]`; Ferro abre Los Redondos, Los Redondos abre Huracán y Huracán (con estrellas) abre La Renga. No se migraron partidas guardadas con otro estado de desbloqueo.
+
+**Cocina de Ferro:** `StreetKitchenLayout({0,1,2,4,6}, false)` con el estiramiento vertical de la pantalla: parrilla normal y premium, mesa normal y premium, barril de Coca y de cerveza (sin Fernet), en las mismas filas de pantalla que Ferro (footer en la fila 665 × vs). Cocina pasiva como Camioneros: nadie cocina y las mesas siempre están llenas; cada especialidad entrega lo suyo (`GetDeliveryRole` por producto: Parrillero 0 y 1, Parrillero Premium 2, Cocacolero 4 y 6). El footer sale del código de footer de Ferro: cuatro tarjetas de 234×104 en 2×2 (Velocidad, Parrillero, Parrillero Premium, Cocacolero), título y banderines. Las tarjetas de contratación se calculan del catálogo del nivel de origen (`PilgrimWorkerCardRoles`). Las mesas no son obstáculo para el equipo de una cocina pasiva (Ferro las pone casi pegadas: 27 px) y los tiempos del trabajador son los de Chicago (ver Camioneros).
+
+**Números:** 60 hinchas, 500 monedas, sin trabajadores iniciales, contratación 60/60 y 70 para el Parrillero Premium, máximo 3 por rol, productos 0, 1, 2, 4 y 6 (una unidad por producto). **Balance (ajustado a pedido, 2026-11-18):** se conservan los valores originales del nivel, `fanSpeed 0.1575` y separación de entrada 58 px. Una primera versión más lenta (`0.054` / 96 px) resultó demasiado fácil: ganaba con 3 trabajadores, y la velocidad casi no cambiaba la dificultad, que depende de la densidad de hinchas. Barrido con una partida completa de 60 hinchas y una estrategia simple (contratar lo antes posible en el orden Parrillero, Cocacolero, Premium, y repetir; máximo el número indicado): con 2 trabajadores se pierde en 0,4 min (14/60 atendidos), con 3 se pierde en 1,2 min (50/60), con 4 o más se gana en 1,3 min con 0 fugas y 500-700 monedas sobrantes. Hace falta al menos un segundo Parrillero además de los tres especialistas. Prueba explícita `LosRedondosBalanceCase` (barrido). **Balance NO certificado como definitivo**: una sola estrategia simulada, sin jugador humano ni dispositivo.
+
+**Se corrigió además** un defecto latente del motor de colocación: un rectángulo vacío (`Rect.zero`, "sin obstáculo extra") contaba como obstáculo si el cuerpo de un trabajador cruzaba el origen del mundo (`Overlaps`).
+
+| Criterio | Estado | Evidencia |
+|---|---|---|
+| Cocina y footer de Ferro en las mismas filas de pantalla en un celu alto (610×1356) | `PASS` | PlayMode `LosRedondosKitchenAndFooterSitAtFerroScreenRows` |
+| Seis estaciones, cocina pasiva, mesas llenas y cuatro tarjetas | `PASS` | PlayMode `LosRedondosFerroKitchenStartsWithSixStationsAndTheFerroFooter` |
+| Cada producto lo entrega su especialidad, solo el menú de Ferro | `PASS` | PlayMode `LosRedondosCrewDeliversEachProductWithItsOwnRole` |
+| Ganabilidad / dispositivo / APK | `NOT_RUN` | — |
+| Pruebas del diseño anterior (3 PlayMode y 5 EditMode del recorrido serpenteante) | `IGNORED` | Marcadas `[Ignore]` con el motivo |
+| La Renga | pendiente | Sigue serpenteante hasta el próximo paso |
+
+
+## Camioneros ID9: valla horizontal con la cocina y el footer de Nueva Chicago — 2026-11-18 (vigente)
+
+Supersede el recorrido serpenteante de tres filas con dos áreas compartidas y las secciones de Camioneros más abajo (perfiles por vestimenta, cuadrillas en línea común, formación 3+3, tutorial de áreas, entrada de globos en conectores). Solo cambia Camioneros ID9; Los Redondos ID10, La Renga y Peregrinación no cambian.
+
+**Pedido del usuario:** que Camioneros funcione como Peregrinación (una valla horizontal con los hinchas pasando por detrás; los trabajadores salen a la valla y entregan en la mano; contratación de un toque), pero con el **footer y la zona de trabajo exactamente como Nueva Chicago (ID1)**, y detrás de las vallas el mural actual de Camioneros.
+
+**Qué copia de Chicago (mismas filas en pantalla):** la cocina de `StreetKitchenLayout({0,4}, false)`: una parrilla normal, una mesa de sándwiches y el barril de Coca, con el estiramiento vertical de la pantalla (`vs = altura lógica / 960`, igual que Boca; ver Peregrinación) y los puestos de los trabajadores de Chicago (`GrillWorkPosition`, `PickupPosition`). El footer arranca en la fila `PlayfieldBottom (665) × vs` y usa el código de footer de Chicago (`PilgrimFooter` con una simulación de referencia del nivel 1): título del club, banderines del club (el nivel 1 los conserva), tres tarjetas 156×120 en una fila: Velocidad, Parrillero y Cocacolero ("EQUIPO n"). No hay mozo, fernetero ni premium.
+
+**Cómo funciona:** `TowerDefenseGameMode.IsChicagoKitchenLevel` (Camioneros con `freeConstruction` y valla horizontal) generaliza la lógica de cocina derivada de Luján con la cocina que corresponde al nivel (`KitchenLayoutForLevel`). **Cocina pasiva como Chicago (corrección del usuario, 2026-11-18):** nadie cocina y la mesa de sándwiches está siempre llena (`StreetKitchenProduction` tradicional con sándwiches ilimitados; `AdvanceFreeConstructionCooks` no hace nada); el Parrillero se queda en su puesto y solo entrega los sándwiches (`GetDeliveryRole`) caminando a la mesa y a la valla. Peregrinación conserva su cocina activa. El Cocacolero lleva la Coca y no necesita barril de cerveza (el nivel no vende ese producto). Los pedidos de la partida salen solo de lo que el nivel vende (sándwich y Coca), una unidad por producto (`SpawnNextFan`). Estaciones preinstaladas (no se compran ni se ubican), sin trabajadores iniciales, 500 monedas, contratación a 60/60 y velocidad de contratación de un toque en su puesto. Colisión de Chicago: pies de 2 px (la parrilla está a 4 px de la mesa) y fondo de la parrilla no sólido (`ChicagoFootDepthLogical`, `ChicagoGrillOpenBackLogical`).
+
+**Tiempos del trabajador iguales a Chicago (pedido del usuario, 2026-11-18):** el Cocacolero y el Parrillero de Camioneros usan los tiempos de `StreetSimulation` de Chicago: velocidad de caminata `workerSpeed × (1 + nivel de velocidad × incremento)` (Parrillero `1 + nivel × 0,06`), **agarre** de `pickupSeconds / workRate` (0,28 s a velocidad base) al llegar a la mesa o al barril, **entrega** de la misma duración al llegar al hincha antes de registrar la venta, el hincha tarda 0,3 s en recibir (`ChicagoReceiveSeconds`) y no hay espera entre entregas (antes: agarre 0 s, entrega 0,62 s de animación más 0,62 s de enfriamiento y velocidad plana). La producción de bebidas del barril (`drinkPrepareSeconds` 0,28 s) ya era la misma. Las distancias de ida y vuelta dependen de la posición del hincha sobre la valla (en una partida de prueba ~375 px, 1,3 s por tramo). Luján conserva su tiempo propio (`DeliveryIntervalSeconds` 0,62 s). Test `CamionerosWorkersFollowChicagosGrabAndHandOverTiming`.
+
+**Espera en el medio (pedido del usuario, 2026-11-18):** el Parrillero y el Cocacolero de Camioneros que no tienen nada que entregar esperan en un punto al azar de la franja intermedia entre la cocina y la valla, cada uno en su propio lugar (distinto de los demás y sin pisarse), y lo sortean de nuevo después de cada entrega (`WaitSpot`, `HasWaitSpot`); no vuelven al puesto ni se quedan en la valla. Luján sigue esperando en su puesto. Test `CamionerosIdleWorkersWaitHalfWayBetweenPostAndFence`.
+
+**Se mantiene:** 120 hinchas, separación de entrada de 96 px, precios y 500 monedas. **Velocidad (a pedido del usuario, 2026-11-18):** `fanSpeed` baja de `0.20475` a **`0.0775`**, que conserva el tiempo en pantalla del recorrido serpenteante anterior (~28 s) sobre una sola valla; con `0.20475` cada hincha cruzaba en ~9 s y la partida de prueba se perdía antes de los 45 s. Se **pierde** (no aplicables a la valla horizontal): los perfiles por vestimenta (velocidad y separación por perfil, cantidades 1–4) y el recorrido de tres filas; las órdenes pasan a una unidad por producto. El tutorial de "elegir área" ya no se muestra en esta versión.
+
+**Balance NO certificado:** con `fanSpeed 0.0775` (cruce de ~28 s) y la mesa llena, una partida de prueba con tres trabajadores contratados al inicio aguantó los ~50 s grabados sin pérdida; la partida completa de 120 hinchas no se corrió. Ganabilidad pendiente de validar.
+
+| Criterio | Estado | Evidencia |
+|---|---|---|
+| Footer y 3 estaciones en las mismas filas que Chicago en un celu alto (610×1356) | `PASS` | PlayMode `CamionerosKitchenAndFooterSitAtChicagoScreenRows`; captura `Logs/Acceptance/TowerDefenseReadyStations20261106/Level09/camioneros-chicago-screen-rows-610x1356.png` |
+| Parrillero entrega sándwiches y Cocacolero Coca, solo productos 0 y 4 | `PASS` | PlayMode `CamionerosParrilleroAndCocacoleroDeliverOnlyWhatTheKitchenSells` |
+| Arranque con 3 estaciones y 3 tarjetas | `PASS` | PlayMode `CamionerosChicagoKitchenStartsWithThreeStationsAndTheChicagoFooter` |
+| Ganabilidad / dispositivo / APK | `NOT_RUN` | — |
+| Pruebas del diseño anterior (16 PlayMode + 1 EditMode de áreas compartidas) | `IGNORED` | Marcadas `[Ignore]` con el motivo; cubrían la serpentina de dos áreas que ya no existe |
+
+
 ## Los Redondos: cinco tramos a la izquierda y cuatro sectores a la derecha — 2026-11-16 (vigente)
 
 Supersede las variantes de siete rectas, 70/30, bahías de 77 px y escalas 43% de abajo. Solo cambia Los Redondos ID10; Camioneros ID9, La Renga y Peregrinación no cambian.

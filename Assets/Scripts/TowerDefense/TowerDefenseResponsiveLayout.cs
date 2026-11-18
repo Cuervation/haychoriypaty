@@ -7,6 +7,13 @@ namespace HayChoriYPaty
     {
         public const float RouteTopReserve = 240f;
         public const float FooterReserve = 240f;
+
+        /// <summary>
+        /// Top of a kitchen-derived level's footer: the same place as its source campaign level's (Boca's for Luján,
+        /// Nueva Chicago's for Camioneros): the kitchen field bottom, stretched with the screen height.
+        /// </summary>
+        public static float PilgrimFooterTop(float logicalHeight, int sourceCampaignLevelId) =>
+            TowerDefenseGameMode.KitchenLayoutForLevel(sourceCampaignLevelId).PlayfieldBottom * logicalHeight / StreetSceneLayout.Height;
         // Shared visual frame width used to anchor follower entry to the viewport edge.
         public const float FanFrameWidthLogical = 78f;
         // The 96px corridor leaves a visible margin around the fan frame.
@@ -237,12 +244,20 @@ namespace HayChoriYPaty
             firstServiceZone = secondServiceZone = Vector2.zero;
             error = null;
             const float margin = 16f;
-            const float corridorLogical = 88f;
+            // The fence stays where the 88 px corridor put it; the narrower corridor walks the pilgrims right
+            // behind it so workers hand the order over instead of reaching across a wide yard.
+            const float fenceOffsetLogical = 88f;
+            const float corridorLogical = 24f;
             const float fenceClearanceLogical = 8f;
-            float footer = FooterReserve;
-            float routeY = RouteTopReserve + corridorLogical * .5f;
-            float workTop = routeY + corridorLogical * .5f + fenceClearanceLogical;
-            float workBottom = logicalHeight - footer - margin;
+            float routeY = RouteTopReserve + fenceOffsetLogical - corridorLogical * .5f;
+            float workTop = RouteTopReserve + fenceOffsetLogical + fenceClearanceLogical;
+            // The kitchen is Boca's own: its footer starts where Boca's does and the furniture sits at Boca's
+            // (vertically stretched) positions, so the work area ends at the bottom of Boca's lowest piece, the grills.
+            float kitchenVerticalScale = logicalHeight / StreetSceneLayout.Height;
+            // The stage is drawn VisualStageLift logical px above the coordinates it is computed from (the route and
+            // mural already account for it), so add it back to make the grills end exactly where Boca's end.
+            float workBottom = TowerDefenseGameMode.BocaStationsBottomLogical(
+                TowerDefenseGameMode.KitchenLayoutForLevel(source.SourceCampaignLevelId), kitchenVerticalScale) + VisualStageLift;
             if (logicalWidth <= margin * 2f + corridorLogical || workBottom - workTop < 160f)
             {
                 error = "Horizontal single-fence layout needs a usable lower work area above the footer.";
@@ -257,9 +272,13 @@ namespace HayChoriYPaty
                 new Vector2(exitX + corridorLogical * .5f, routeY + corridorLogical * .5f));
             Rect worldRouteBounds = Rect.MinMaxRect(Mathf.Min(routeTopLeft.x, routeBottomRight.x), Mathf.Min(routeTopLeft.y, routeBottomRight.y),
                 Mathf.Max(routeTopLeft.x, routeBottomRight.x), Mathf.Max(routeTopLeft.y, routeBottomRight.y));
-            Vector2 workTopLeft = LogicalToWorld(camera, viewport, logicalWidth, canvasScale, new Vector2(margin, workTop));
+            // Boca's kitchen row spans the whole 540 px canvas, so the work area has no side margin: only that keeps
+            // the furniture at Boca's size. The bottom margin above the footer stays.
+            // Boca's row overhangs the 540 px canvas by 1.2 px on each side, so the work area does too.
+            const float workSideMarginLogical = -1.2f;
+            Vector2 workTopLeft = LogicalToWorld(camera, viewport, logicalWidth, canvasScale, new Vector2(workSideMarginLogical, workTop));
             Vector2 workBottomRight = LogicalToWorld(camera, viewport, logicalWidth, canvasScale,
-                new Vector2(logicalWidth - margin, workBottom));
+                new Vector2(logicalWidth - workSideMarginLogical, workBottom));
             Rect workBounds = Rect.MinMaxRect(Mathf.Min(workTopLeft.x, workBottomRight.x), Mathf.Min(workTopLeft.y, workBottomRight.y),
                 Mathf.Max(workTopLeft.x, workBottomRight.x), Mathf.Max(workTopLeft.y, workBottomRight.y));
 
@@ -275,6 +294,7 @@ namespace HayChoriYPaty
                 TurnRadius = source.Route.TurnRadius,
                 PlayableBounds = worldRouteBounds,
                 WorkBounds = workBounds,
+                KitchenVerticalScale = kitchenVerticalScale,
                 TurnSegments = Mathf.Clamp(source.Route.TurnSegments, 4, 128)
             };
             runtimeConfig = UnityEngine.Object.Instantiate(source);

@@ -10,7 +10,13 @@ namespace HayChoriYPaty
         private float rewardShutterStarted = -1f;
         private bool rewardShutterCommitted;
         private Texture2D rewardShutterPanel;
+        private bool rewardShutterOpenSounded;
+        private AudioSource rewardShutterAudio;
+        private AudioClip rewardShutterCloseClip, rewardShutterSlamClip, rewardShutterOpenClip, rewardCoinsClip, rewardCoinsBrightClip;
         private bool RewardShutterActive => rewardShutterStarted >= 0f;
+
+        public const int ClaimSoundNone = 0, ClaimSoundCoins = 1, ClaimSoundBright = 2;
+        private const float RewardShutterSoundVolume = .5f, RewardShutterSlamVolume = .7f, RewardCoinsVolume = .6f;
 
         private void StartRewardShutter()
         {
@@ -18,8 +24,37 @@ namespace HayChoriYPaty
             if (rewardShutterPanel == null)
                 rewardShutterPanel = Resources.Load<Texture2D>("street-reward-shutter-v1");
             rewardShutterCommitted = false;
+            rewardShutterOpenSounded = false;
             rewardShutterStarted = Time.unscaledTime;
             pressedAction = 0;
+            PlayRewardShutterSound(ref rewardShutterCloseClip, "Audio/reward-shutter-close", RewardShutterSoundVolume);
+        }
+
+        /// <summary>Coins only when the claim pays: base or x1 claims are plain, x1.5/x2 are bright, a zero sector is silent.</summary>
+        public static int RewardClaimSoundKind(bool hasPendingChulengo, bool choiceLocked, int selectedSector)
+        {
+            if (!hasPendingChulengo) return ClaimSoundNone;
+            if (!choiceLocked || selectedSector < 0) return ClaimSoundCoins;
+            int numerator = StreetChulengo.MultiplierNumerator(selectedSector);
+            return numerator == 0 ? ClaimSoundNone : numerator > 2 ? ClaimSoundBright : ClaimSoundCoins;
+        }
+
+        private void PlayRewardShutterSound(ref AudioClip clip, string resourcePath, float volume)
+        {
+            if (clip == null) clip = Resources.Load<AudioClip>(resourcePath);
+            if (clip == null) return;
+            if (rewardShutterAudio == null)
+            {
+                Transform child = transform.Find("RewardShutterAudio");
+                GameObject audioObject = child != null ? child.gameObject : new GameObject("RewardShutterAudio");
+                if (child == null) audioObject.transform.SetParent(transform, false);
+                rewardShutterAudio = audioObject.GetComponent<AudioSource>();
+                if (rewardShutterAudio == null) rewardShutterAudio = audioObject.AddComponent<AudioSource>();
+                rewardShutterAudio.playOnAwake = false;
+                rewardShutterAudio.loop = false;
+                rewardShutterAudio.spatialBlend = 0f;
+            }
+            rewardShutterAudio.PlayOneShot(clip, volume);
         }
 
         private void UpdateRewardShutter()
@@ -30,18 +65,29 @@ namespace HayChoriYPaty
             {
                 // Commit only after the original shutter fully covers the claim screen.
                 rewardShutterCommitted = true;
+                PlayRewardShutterSound(ref rewardShutterSlamClip, "Audio/reward-shutter-slam", RewardShutterSlamVolume);
                 if (game == null) return;
 
+                int soundKind = RewardClaimSoundKind(game.HasPendingChulengo, game.ChulengoChoiceLocked, game.ChulengoSelectedSector);
                 bool claimed = !game.HasPendingChulengo ||
                     (game.ChulengoChoiceLocked && game.ChulengoSelectedSector >= 0
                         ? game.TryCollectSelectedVictoryReward()
                         : game.TryCollectVictoryReward());
+                if (claimed && soundKind == ClaimSoundBright)
+                    PlayRewardShutterSound(ref rewardCoinsBrightClip, "Audio/reward-claim-coins-bright", RewardCoinsVolume);
+                else if (claimed && soundKind == ClaimSoundCoins)
+                    PlayRewardShutterSound(ref rewardCoinsClip, "Audio/reward-claim-coins", RewardCoinsVolume);
                 if (claimed && game.ReturnToLevels())
                 {
                     marketActive = false;
                     levelSelectActive = true;
                     levelSelectScroll = 0f;
                 }
+            }
+            if (!rewardShutterOpenSounded && elapsed >= RewardShutterTravel + RewardShutterHold)
+            {
+                rewardShutterOpenSounded = true;
+                PlayRewardShutterSound(ref rewardShutterOpenClip, "Audio/reward-shutter-open", RewardShutterSoundVolume);
             }
             if (elapsed >= RewardShutterTravel * 2f + RewardShutterHold)
                 rewardShutterStarted = -1f;

@@ -41,7 +41,7 @@ namespace HayChoriYPaty.Tests
             CollectionAssert.AreEqual(new[] {0, 4}, (int[])type.GetProperty("AvailableProducts").GetValue(config));
             CollectionAssert.AreEqual(new int[5], (int[])type.GetProperty("StartingWorkersByRole").GetValue(config));
             Assert.AreEqual(120, type.GetProperty("TotalFanCount").GetValue(config));
-            Assert.That((float)type.GetProperty("FanSpeed").GetValue(config), Is.EqualTo(.20475f).Within(.00001f));
+            Assert.That((float)type.GetProperty("FanSpeed").GetValue(config), Is.EqualTo(.0775f).Within(.00001f));
         }
 
         [Test]
@@ -63,16 +63,19 @@ namespace HayChoriYPaty.Tests
 
             Assert.AreEqual(120, Read(camioneros, "TotalFanCount"));
             Assert.AreEqual(60, Read(redondos, "TotalFanCount"));
-            Assert.That((float)Read(camioneros, "FanSpeed"), Is.EqualTo(.20475f).Within(0.00001f));
+            // Camioneros' horizontal kitchen version slows its fans to keep the old on-screen time over a single fence.
+            Assert.That((float)Read(camioneros, "FanSpeed"), Is.EqualTo(.0775f).Within(0.00001f));
+            // Los Redondos keeps its original fan speed in the horizontal Ferro-kitchen version.
             Assert.That((float)Read(redondos, "FanSpeed"), Is.EqualTo(.1575f).Within(0.00001f));
-            CollectionAssert.AreEqual((int[])Read(camioneros, "AvailableProducts"), (int[])Read(redondos, "AvailableProducts"));
+            CollectionAssert.AreEqual(new[] { 0, 4 }, (int[])Read(camioneros, "AvailableProducts"));
+            CollectionAssert.AreEqual(new[] { 0, 1, 2, 4, 6 }, (int[])Read(redondos, "AvailableProducts"), "Los Redondos sells Ferro's menu.");
             CollectionAssert.AreEqual((int[])Read(camioneros, "StartingWorkersByRole"), (int[])Read(redondos, "StartingWorkersByRole"));
             object camionerosRoute = Read(camioneros, "Route");
             object redondosRoute = Read(redondos, "Route");
-            Assert.AreEqual(3, Read(camionerosRoute, "RowCount"), "Camioneros retains its original three-row route.");
-            Assert.AreEqual(5, Read(redondosRoute, "RowCount"), "Los Redondos has five horizontal runs and four connectors.");
-            CollectionAssert.AreEqual(new[] { 3.8f, 3.8f, 3.8f }, (float[])Read(camionerosRoute, "SegmentLengths"));
-            CollectionAssert.AreEqual(new[] { 3.8f, 3.8f, 3.8f, 3.8f, 3.8f }, (float[])Read(redondosRoute, "SegmentLengths"));
+            Assert.AreEqual(1, Read(camionerosRoute, "RowCount"), "Camioneros is now one horizontal fence with Nueva Chicago's kitchen.");
+            Assert.AreEqual(1, Read(redondosRoute, "RowCount"), "Los Redondos is now one horizontal fence with Ferro's kitchen.");
+            CollectionAssert.AreEqual(new[] { 1f }, (float[])Read(camionerosRoute, "SegmentLengths"));
+            CollectionAssert.AreEqual(new[] { 1f }, (float[])Read(redondosRoute, "SegmentLengths"));
             Assert.AreEqual(Read(camionerosRoute, "CorridorWidth"), Read(redondosRoute, "CorridorWidth"));
             Assert.AreEqual(Read(camionerosRoute, "RowSpacing"), Read(redondosRoute, "RowSpacing"));
             Rect camionerosBounds = (Rect)Read(camionerosRoute, "PlayableBounds");

@@ -824,6 +824,20 @@ namespace HayChoriYPaty
             return PersistTowerDefenseProgress(mode);
         }
 
+        public bool TryHireTowerDefenseAtPost(TowerDefenseGameMode mode, StreetWorkerRole role)
+        {
+            int index = (int)role;
+            if (!playerActive || sim == null || mode == null || !sim.IsExternalCampaignRuntime ||
+                mode != towerDefenseMode || index < 0 || index >= 5 || !mode.CanHireAtPost(role)) return false;
+            int cost = mode.HireCost(role);
+            if (cost <= 0 || !mode.TryHireAtPost(role)) return false;
+            long cents = (long)cost * 100L;
+            save.statistics.paidHiresByRole[index]++;
+            save.statistics.hireSpendCentsByRole[index] += cents;
+            save.statistics.hireSpendTotalCents += cents;
+            return PersistTowerDefenseProgress(mode);
+        }
+
         public bool TryPlaceTowerDefenseStation(TowerDefenseGameMode mode, TowerDefenseStationKind kind, Vector2 position)
         {
             if (!playerActive || sim == null || mode == null || mode != towerDefenseMode || !sim.IsExternalCampaignRuntime ||

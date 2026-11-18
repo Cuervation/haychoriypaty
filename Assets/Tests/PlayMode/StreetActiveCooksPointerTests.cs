@@ -359,6 +359,198 @@ namespace HayChoriYPaty.Tests
             yield return null;
         }
 
+        // Records Boca's opening at phone proportion (same hires as the Luján video) for side-by-side review; run it by name only.
+        [UnityTest]
+        [Explicit("Records Boca gameplay frames to Logs/Acceptance/BocaVideo-20261118")]
+        public IEnumerator RecordBocaOpeningVideoFrames()
+        {
+            const int width = 610, height = 1356;
+            string directory = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/BocaVideo-20261118/frames"));
+            if (Directory.Exists(directory)) Directory.Delete(directory, true);
+            Directory.CreateDirectory(directory);
+            Assembly editorAssembly = Type.GetType("UnityEditor.EditorWindow, UnityEditor", true).Assembly;
+            Type gameViewType = editorAssembly.GetType("UnityEditor.GameView");
+            Type windowType = editorAssembly.GetType("UnityEditor.EditorWindow");
+            MethodInfo getWindow = windowType.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+                .FirstOrDefault(m => m.Name == "GetWindow" && m.GetParameters().Length == 1 && m.GetParameters()[0].ParameterType == typeof(Type));
+            object window = getWindow.Invoke(null, new object[] { gameViewType });
+            PropertyInfo selected = gameViewType.GetProperty("selectedSizeIndex", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            int previous = Convert.ToInt32(selected.GetValue(window, null));
+            Type sizesType = editorAssembly.GetType("UnityEditor.GameViewSizes");
+            object registry = sizesType.GetProperty("instance", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.FlattenHierarchy).GetValue(null, null);
+            object groupKind = sizesType.GetProperty("currentGroupType", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).GetValue(registry, null);
+            object group = sizesType.GetMethod("GetGroup", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Invoke(registry, new[] { groupKind });
+            MethodInfo countMethod = group.GetType().GetMethod("GetTotalCount", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            Type sizeType = editorAssembly.GetType("UnityEditor.GameViewSize");
+            object kind = Enum.Parse(editorAssembly.GetType("UnityEditor.GameViewSizeType"), "FixedResolution");
+            object newSize = Activator.CreateInstance(sizeType, new[] { kind, (object)width, height, "Temporary Boca video " + width + "x" + height });
+            group.GetType().GetMethod("AddCustomSize", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Invoke(group, new[] { newSize });
+            int added = Convert.ToInt32(countMethod.Invoke(group, null)) - 1;
+            int written = 0;
+            try
+            {
+                selected.SetValue(window, added, null);
+                yield return null; yield return null;
+                Assert.AreEqual(width, Screen.width);
+                ActivateTestGameWithoutPersisting();
+                Assert.IsTrue((bool)CallGame("SelectLevel", 8), "Boca is campaign level 8.");
+                StockSelectedLevel();
+                Assert.IsTrue((bool)CallGame("TryStartRound"), "Boca must start.");
+                foreach (string flag in new[] { "hubActive", "marketActive", "levelSelectActive", "introActive" })
+                    viewType.GetField(flag, PrivateInstance)?.SetValue(view, false);
+                Time.captureDeltaTime = 1f / 20f;
+                // Same hire schedule as the Luján video: (frame, hire method).
+                var hires = new System.Collections.Generic.Dictionary<int, string>
+                    { { 5, "TryHireCocacolero" }, { 25, "TryHireParrillero" }, { 45, "TryHireMozo" }, { 65, "TryHireFernetero" } };
+                for (int frame = 0; frame < 1000 && Sim.GetType().GetProperty("Phase", PublicInstance).GetValue(Sim, null).ToString() == "Playing"; frame++)
+                {
+                    if (hires.TryGetValue(frame, out string hire)) CallGame(hire);
+                    Call(Sim, "Step", .05f);
+                    yield return new WaitForEndOfFrame();
+                    Texture2D image = ScreenCapture.CaptureScreenshotAsTexture();
+                    File.WriteAllBytes(Path.Combine(directory, "f" + written.ToString("00000") + ".jpg"), image.EncodeToJPG(88));
+                    UnityEngine.Object.Destroy(image);
+                    written++;
+                }
+            }
+            finally
+            {
+                Time.captureDeltaTime = 0f;
+                selected.SetValue(window, Mathf.Clamp(previous, 0, Convert.ToInt32(countMethod.Invoke(group, null)) - 1), null);
+                group.GetType().GetMethod("RemoveCustomSize", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Invoke(group, new object[] { added });
+            }
+            Debug.Log("BOCA VIDEO frames=" + written);
+            Assert.Greater(written, 100);
+        }
+
+        // Records Nueva Chicago's opening at phone proportion for side-by-side review; run it by name only.
+        [UnityTest]
+        [Explicit("Records Chicago gameplay frames to Logs/Acceptance/ChicagoVideo-20261118")]
+        public IEnumerator RecordChicagoOpeningFrames()
+        {
+            const int width = 610, height = 1356;
+            string directory = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/ChicagoVideo-20261118/frames"));
+            if (Directory.Exists(directory)) Directory.Delete(directory, true);
+            Directory.CreateDirectory(directory);
+            Assembly editorAssembly = Type.GetType("UnityEditor.EditorWindow, UnityEditor", true).Assembly;
+            Type gameViewType = editorAssembly.GetType("UnityEditor.GameView");
+            Type windowType = editorAssembly.GetType("UnityEditor.EditorWindow");
+            MethodInfo getWindow = windowType.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+                .FirstOrDefault(m => m.Name == "GetWindow" && m.GetParameters().Length == 1 && m.GetParameters()[0].ParameterType == typeof(Type));
+            object window = getWindow.Invoke(null, new object[] { gameViewType });
+            PropertyInfo selected = gameViewType.GetProperty("selectedSizeIndex", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            int previous = Convert.ToInt32(selected.GetValue(window, null));
+            Type sizesType = editorAssembly.GetType("UnityEditor.GameViewSizes");
+            object registry = sizesType.GetProperty("instance", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.FlattenHierarchy).GetValue(null, null);
+            object groupKind = sizesType.GetProperty("currentGroupType", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).GetValue(registry, null);
+            object group = sizesType.GetMethod("GetGroup", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Invoke(registry, new[] { groupKind });
+            MethodInfo countMethod = group.GetType().GetMethod("GetTotalCount", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            Type sizeType = editorAssembly.GetType("UnityEditor.GameViewSize");
+            object kind = Enum.Parse(editorAssembly.GetType("UnityEditor.GameViewSizeType"), "FixedResolution");
+            object newSize = Activator.CreateInstance(sizeType, new[] { kind, (object)width, height, "Temporary Boca video " + width + "x" + height });
+            group.GetType().GetMethod("AddCustomSize", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Invoke(group, new[] { newSize });
+            int added = Convert.ToInt32(countMethod.Invoke(group, null)) - 1;
+            int written = 0;
+            try
+            {
+                selected.SetValue(window, added, null);
+                yield return null; yield return null;
+                Assert.AreEqual(width, Screen.width);
+                ActivateTestGameWithoutPersisting();
+                Assert.IsTrue((bool)CallGame("SelectLevel", 1), "Nueva Chicago is campaign level 1.");
+                StockSelectedLevel();
+                Assert.IsTrue((bool)CallGame("TryStartRound"), "Chicago must start.");
+                foreach (string flag in new[] { "hubActive", "marketActive", "levelSelectActive", "introActive" })
+                    viewType.GetField(flag, PrivateInstance)?.SetValue(view, false);
+                Time.captureDeltaTime = 1f / 20f;
+                // Same hire schedule as the Luján video: (frame, hire method).
+                var hires = new System.Collections.Generic.Dictionary<int, string>
+                    { { 5, "TryHireCocacolero" }, { 25, "TryHireParrillero" } };
+                for (int frame = 0; frame < 1000 && Sim.GetType().GetProperty("Phase", PublicInstance).GetValue(Sim, null).ToString() == "Playing"; frame++)
+                {
+                    if (hires.TryGetValue(frame, out string hire)) CallGame(hire);
+                    Call(Sim, "Step", .05f);
+                    yield return new WaitForEndOfFrame();
+                    Texture2D image = ScreenCapture.CaptureScreenshotAsTexture();
+                    File.WriteAllBytes(Path.Combine(directory, "f" + written.ToString("00000") + ".jpg"), image.EncodeToJPG(88));
+                    UnityEngine.Object.Destroy(image);
+                    written++;
+                }
+            }
+            finally
+            {
+                Time.captureDeltaTime = 0f;
+                selected.SetValue(window, Mathf.Clamp(previous, 0, Convert.ToInt32(countMethod.Invoke(group, null)) - 1), null);
+                group.GetType().GetMethod("RemoveCustomSize", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Invoke(group, new object[] { added });
+            }
+            Debug.Log("CHICAGO VIDEO frames=" + written);
+            Assert.Greater(written, 100);
+        }
+
+        // Records Ferro's opening at phone proportion for side-by-side review; run it by name only.
+        [UnityTest]
+        [Explicit("Records Chicago gameplay frames to Logs/Acceptance/FerroVideo-20261118")]
+        public IEnumerator RecordFerroOpeningFrames()
+        {
+            const int width = 610, height = 1356;
+            string directory = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/FerroVideo-20261118/frames"));
+            if (Directory.Exists(directory)) Directory.Delete(directory, true);
+            Directory.CreateDirectory(directory);
+            Assembly editorAssembly = Type.GetType("UnityEditor.EditorWindow, UnityEditor", true).Assembly;
+            Type gameViewType = editorAssembly.GetType("UnityEditor.GameView");
+            Type windowType = editorAssembly.GetType("UnityEditor.EditorWindow");
+            MethodInfo getWindow = windowType.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+                .FirstOrDefault(m => m.Name == "GetWindow" && m.GetParameters().Length == 1 && m.GetParameters()[0].ParameterType == typeof(Type));
+            object window = getWindow.Invoke(null, new object[] { gameViewType });
+            PropertyInfo selected = gameViewType.GetProperty("selectedSizeIndex", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            int previous = Convert.ToInt32(selected.GetValue(window, null));
+            Type sizesType = editorAssembly.GetType("UnityEditor.GameViewSizes");
+            object registry = sizesType.GetProperty("instance", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.FlattenHierarchy).GetValue(null, null);
+            object groupKind = sizesType.GetProperty("currentGroupType", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).GetValue(registry, null);
+            object group = sizesType.GetMethod("GetGroup", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Invoke(registry, new[] { groupKind });
+            MethodInfo countMethod = group.GetType().GetMethod("GetTotalCount", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            Type sizeType = editorAssembly.GetType("UnityEditor.GameViewSize");
+            object kind = Enum.Parse(editorAssembly.GetType("UnityEditor.GameViewSizeType"), "FixedResolution");
+            object newSize = Activator.CreateInstance(sizeType, new[] { kind, (object)width, height, "Temporary Boca video " + width + "x" + height });
+            group.GetType().GetMethod("AddCustomSize", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Invoke(group, new[] { newSize });
+            int added = Convert.ToInt32(countMethod.Invoke(group, null)) - 1;
+            int written = 0;
+            try
+            {
+                selected.SetValue(window, added, null);
+                yield return null; yield return null;
+                Assert.AreEqual(width, Screen.width);
+                ActivateTestGameWithoutPersisting();
+                Assert.IsTrue((bool)CallGame("SelectLevel", 3), "Ferro is campaign level 3.");
+                StockSelectedLevel();
+                Assert.IsTrue((bool)CallGame("TryStartRound"), "Ferro must start.");
+                foreach (string flag in new[] { "hubActive", "marketActive", "levelSelectActive", "introActive" })
+                    viewType.GetField(flag, PrivateInstance)?.SetValue(view, false);
+                Time.captureDeltaTime = 1f / 20f;
+                // Same hire schedule as the Luján video: (frame, hire method).
+                var hires = new System.Collections.Generic.Dictionary<int, string>
+                    { { 5, "TryHireParrillero" }, { 25, "TryHireCocacolero" }, { 45, "TryHireParrilleroPremium" }, { 65, "TryHireParrillero" } };
+                for (int frame = 0; frame < 1000 && Sim.GetType().GetProperty("Phase", PublicInstance).GetValue(Sim, null).ToString() == "Playing"; frame++)
+                {
+                    if (hires.TryGetValue(frame, out string hire)) CallGame(hire);
+                    Call(Sim, "Step", .05f);
+                    yield return new WaitForEndOfFrame();
+                    Texture2D image = ScreenCapture.CaptureScreenshotAsTexture();
+                    File.WriteAllBytes(Path.Combine(directory, "f" + written.ToString("00000") + ".jpg"), image.EncodeToJPG(88));
+                    UnityEngine.Object.Destroy(image);
+                    written++;
+                }
+            }
+            finally
+            {
+                Time.captureDeltaTime = 0f;
+                selected.SetValue(window, Mathf.Clamp(previous, 0, Convert.ToInt32(countMethod.Invoke(group, null)) - 1), null);
+                group.GetType().GetMethod("RemoveCustomSize", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Invoke(group, new object[] { added });
+            }
+            Debug.Log("FERRO VIDEO frames=" + written);
+            Assert.Greater(written, 100);
+        }
+
         [UnityTest]
         public IEnumerator CaptureSandwichTableRowsAndMozoCarryAtPortraitSizes()
         {

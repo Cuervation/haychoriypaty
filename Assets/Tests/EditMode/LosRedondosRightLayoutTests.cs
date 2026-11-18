@@ -43,6 +43,7 @@ namespace HayChoriYPaty.Tests
         [TestCase(960f)]
         [TestCase(1170f)]
         [TestCase(1200f)]
+        [Ignore("Los Redondos (ID10) is now a horizontal Ferro kitchen level; this test covered its former five-run serpentine route and right-hand bays.")]
         public void FiveRunRouteAndFourRightSectorsPassTheSharedValidatorWithFullCrews(float logicalHeight)
         {
             object mode = CreateLosRedondosMode(logicalHeight, out object route, out float px);
@@ -91,6 +92,7 @@ namespace HayChoriYPaty.Tests
 
         [TestCase(960f)]
         [TestCase(1200f)]
+        [Ignore("Los Redondos (ID10) is now a horizontal Ferro kitchen level; this test covered its former five-run serpentine route and right-hand bays.")]
         public void EachRowSeparationIsDrawnAsOneFenceWhileCollidersKeepBothRails(float logicalHeight)
         {
             CreateLosRedondosMode(logicalHeight, out object _, out float px);
@@ -187,6 +189,7 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
+        [Ignore("Los Redondos (ID10) is now a horizontal Ferro kitchen level; this test covered its former five-run serpentine route and right-hand bays.")]
         public void SectorsServeTheirAdjacentRunsInTopToBottomOrder()
         {
             object mode = CreateLosRedondosMode(960f, out object route, out float px);
@@ -222,6 +225,7 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
+        [Ignore("Los Redondos (ID10) is now a horizontal Ferro kitchen level; this test covered its former five-run serpentine route and right-hand bays.")]
         public void ValidatorReportsTheSegmentAndCoordinatesOfConcreteDefects()
         {
             object mode = CreateLosRedondosMode(960f, out object route, out float px);
@@ -256,6 +260,7 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
+        [Ignore("Los Redondos (ID10) is now a horizontal Ferro kitchen level; this test covered its former five-run serpentine route and right-hand bays.")]
         public void SeveralFansWalkTheWholeRouteThroughAllFourTurnsInsideTheRails()
         {
             object mode = CreateLosRedondosMode(960f, out object route, out float px);
@@ -301,6 +306,7 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
+        [Ignore("Camioneros (ID9) is now a horizontal Nueva Chicago kitchen level: it no longer has two shared-role zones.")]
         public void IdNineKeepsTheExistingTwoZoneSharedRoleAnchors()
         {
             object config = Resources.Load("TowerDefense/Camioneros-PlazaDeMayo");

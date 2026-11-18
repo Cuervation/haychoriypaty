@@ -32,6 +32,8 @@ namespace HayChoriYPaty
         [Tooltip("Number of samples along each straight vertical connector; retained to preserve route-row indexing.")]
         [Range(4, 128)] public int TurnSegments = 12;
         [NonSerialized] public float FanEntryExtensionWorldUnits;
+        // Boca-style kitchens stretch their layout's y positions by this screen-height factor (1 = the 540x960 reference).
+        [NonSerialized] public float KitchenVerticalScale = 1f;
     }
 
     /// <summary>A public, inspectable report of route configuration/layout errors.</summary>
