@@ -59,7 +59,18 @@ namespace HayChoriYPaty.Tests
         private object GetGame(string name) => gameType.GetProperty(name, Pub).GetValue(game, null);
         private object Sim => GetGame("Sim");
         private object Market => GetGame("Market");
-        private void Dispatch(int action) => viewType.GetMethod("DispatchAction", Priv).Invoke(view, new object[] { action });
+        private void Dispatch(int action)
+        {
+            viewType.GetMethod("DispatchAction", Priv).Invoke(view, new object[] { action });
+            // The level tap and JUGAR PARTIDO run behind the reward shutter: let it close, run its action and open.
+            FieldInfo started = viewType.GetField("rewardShutterStarted", Priv);
+            MethodInfo update = viewType.GetMethod("UpdateRewardShutter", Priv);
+            for (int i = 0; i < 3 && (float)started.GetValue(view) >= 0f; i++)
+            {
+                started.SetValue(view, Time.unscaledTime - 5f);
+                update.Invoke(view, null);
+            }
+        }
         private Vector2 Pixel(float x, float y)
         {
             Rect viewport = (Rect)viewType.GetMethod("CanvasViewport", PrivStatic)
@@ -138,6 +149,51 @@ namespace HayChoriYPaty.Tests
             viewType.GetField("marketLastPurchaseTime", Priv).SetValue(view, -100f);
             Dispatch(120); Dispatch(140);
             Assert.AreEqual(goal+10, stock[0], "Extra stock never bypasses the cash-only guard.");
+            yield return null;
+        }
+
+        private bool ShutterActive => (float)viewType.GetField("rewardShutterStarted", Priv).GetValue(view) >= 0f;
+        private void CoverShutter()
+        {
+            // Jump to the instant the panels fully cover the screen: the hidden action runs now.
+            viewType.GetField("rewardShutterStarted", Priv).SetValue(view, Time.unscaledTime - .6f);
+            viewType.GetMethod("UpdateRewardShutter", Priv).Invoke(view, null);
+        }
+
+        [UnityTest]
+        public IEnumerator TappingALevelAndPlayingFromTheMarketBothCloseTheShutterFirst()
+        {
+            MethodInfo dispatchRaw = viewType.GetMethod("DispatchAction", Priv);
+            // 1. A level tap does nothing until the shutter covers the screen, then it opens that level's Market.
+            viewType.GetField("levelSelectActive", Priv).SetValue(view, true);
+            dispatchRaw.Invoke(view, new object[] { 31 });
+            Assert.IsTrue(ShutterActive, "Tapping a level closes the shutter.");
+            Assert.IsTrue((bool)viewType.GetField("levelSelectActive", Priv).GetValue(view), "The selector stays under the closing shutter.");
+            Assert.IsFalse((bool)viewType.GetField("marketActive", Priv).GetValue(view));
+            dispatchRaw.Invoke(view, new object[] { 31 }); // input is ignored while the shutter moves
+            CoverShutter();
+            Assert.IsTrue((bool)viewType.GetField("marketActive", Priv).GetValue(view), "Behind the shutter the level's Market opens.");
+            Assert.IsFalse((bool)viewType.GetField("levelSelectActive", Priv).GetValue(view));
+            for (int i = 0; i < 3 && ShutterActive; i++)
+            {
+                viewType.GetField("rewardShutterStarted", Priv).SetValue(view, Time.unscaledTime - 5f);
+                viewType.GetMethod("UpdateRewardShutter", Priv).Invoke(view, null);
+            }
+            Assert.IsFalse(ShutterActive, "The shutter opens again afterwards.");
+
+            // 2. JUGAR PARTIDO in the Market also closes it first and starts the round only once it is shut.
+            object data = Market.GetType().GetProperty("Data", Pub).GetValue(Market, null);
+            data.GetType().GetField("balanceCents", Pub).SetValue(data, 150000L);
+            for (int id = 0; id < 10; id++)
+                if ((int)Market.GetType().GetMethod("MissingPacks", Pub).Invoke(Market, new[] { Sim, (object)id }) > 0)
+                    Assert.IsTrue((bool)gameType.GetMethod("BuyMissingIngredient", Pub).Invoke(game, new object[] { id }));
+            Assert.IsTrue((bool)GetGame("CanStartRound"));
+            dispatchRaw.Invoke(view, new object[] { 160 });
+            Assert.IsTrue(ShutterActive, "Playing from the Market closes the shutter.");
+            Assert.AreEqual("Ready", Sim.GetType().GetProperty("Phase", Pub).GetValue(Sim, null).ToString(), "The round has not started yet.");
+            CoverShutter();
+            Assert.AreEqual("Playing", Sim.GetType().GetProperty("Phase", Pub).GetValue(Sim, null).ToString(), "The round starts behind the shutter.");
+            Assert.IsFalse((bool)viewType.GetField("marketActive", Priv).GetValue(view));
             yield return null;
         }
 

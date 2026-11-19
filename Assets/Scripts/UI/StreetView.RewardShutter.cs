@@ -14,13 +14,18 @@ namespace HayChoriYPaty
         private AudioSource rewardShutterAudio;
         private AudioClip rewardShutterCloseClip, rewardShutterSlamClip, rewardShutterOpenClip, rewardCoinsClip, rewardCoinsBrightClip;
         private bool RewardShutterActive => rewardShutterStarted >= 0f;
+        // What a shutter hides: run once the panels fully cover the screen (null = the Chulengo reward claim).
+        private System.Action rewardShutterWhenCovered;
 
         public const int ClaimSoundNone = 0, ClaimSoundCoins = 1, ClaimSoundBright = 2;
         private const float RewardShutterSoundVolume = .5f, RewardShutterSlamVolume = .7f, RewardCoinsVolume = .6f;
 
-        private void StartRewardShutter()
+        /// <summary>Closes the shutter over the screen, runs <paramref name="whenCovered"/> once it is fully shut and opens it again.
+        /// Without an action it is the reward claim's shutter.</summary>
+        private void StartRewardShutter(System.Action whenCovered = null)
         {
             if (RewardShutterActive) return;
+            rewardShutterWhenCovered = whenCovered;
             if (rewardShutterPanel == null)
                 rewardShutterPanel = Resources.Load<Texture2D>("street-reward-shutter-v1");
             rewardShutterCommitted = false;
@@ -66,6 +71,13 @@ namespace HayChoriYPaty
                 // Commit only after the original shutter fully covers the claim screen.
                 rewardShutterCommitted = true;
                 PlayRewardShutterSound(ref rewardShutterSlamClip, "Audio/reward-shutter-slam", RewardShutterSlamVolume);
+                if (rewardShutterWhenCovered != null)
+                {
+                    System.Action action = rewardShutterWhenCovered;
+                    rewardShutterWhenCovered = null;
+                    action();
+                    return;
+                }
                 if (game == null) return;
 
                 int soundKind = RewardClaimSoundKind(game.HasPendingChulengo, game.ChulengoChoiceLocked, game.ChulengoSelectedSector);

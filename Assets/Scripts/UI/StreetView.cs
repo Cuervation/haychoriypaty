@@ -1028,6 +1028,7 @@ namespace HayChoriYPaty
         private void OnDisable()
         {
             rewardShutterStarted = -1f; // Uncommitted choices remain pending in the existing save.
+            rewardShutterWhenCovered = null;
             DisposeTowerDefenseUi();
             if (hubMusicAudioSource != null) hubMusicAudioSource.Stop();
             ReleaseHubSignageResources();

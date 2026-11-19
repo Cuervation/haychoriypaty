@@ -12,6 +12,19 @@ namespace HayChoriYPaty.Tests
     // Exercise the actual StreetView pointer path while keeping runtime in Assembly-CSharp.
     public sealed class StreetPointerTests
     {
+        // The level tap and the Market's JUGAR PARTIDO now run behind the reward shutter: let it close, run its action and open.
+        private static void SettleShutter(object view)
+        {
+            Type t = view.GetType();
+            FieldInfo started = t.GetField("rewardShutterStarted", BindingFlags.NonPublic | BindingFlags.Instance);
+            MethodInfo update = t.GetMethod("UpdateRewardShutter", BindingFlags.NonPublic | BindingFlags.Instance);
+            for (int i = 0; i < 3 && (float)started.GetValue(view) >= 0f; i++)
+            {
+                started.SetValue(view, Time.unscaledTime - 5f);
+                update.Invoke(view, null);
+            }
+        }
+
         private const BindingFlags PublicInstance = BindingFlags.Public | BindingFlags.Instance;
         private const BindingFlags PrivateInstance = BindingFlags.NonPublic | BindingFlags.Instance;
         private const BindingFlags StaticPrivate = BindingFlags.NonPublic | BindingFlags.Static;
@@ -405,6 +418,7 @@ namespace HayChoriYPaty.Tests
             viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, true);
             MethodInfo dispatch = viewType.GetMethod("DispatchAction", PrivateInstance);
             dispatch.Invoke(view, new object[] { 30 }); // Select Floresta from the unlocked level selector.
+            SettleShutter(view);
 
             Assert.IsTrue((bool)viewType.GetField("levelOneTutorialActive", PrivateInstance).GetValue(view));
             Assert.AreEqual(0, viewType.GetField("levelOneTutorialStep", PrivateInstance).GetValue(view));
@@ -995,6 +1009,7 @@ namespace HayChoriYPaty.Tests
             viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, true);
             MethodInfo dispatch = viewType.GetMethod("DispatchAction", PrivateInstance);
             dispatch.Invoke(view, new object[] { 30 });
+            SettleShutter(view);
             Assert.IsTrue((bool)viewType.GetField("levelOneTutorialActive", PrivateInstance).GetValue(view));
             Rect skipBounds = (Rect)viewType.GetMethod("LevelOneTutorialSkipBounds", PrivateInstance).Invoke(view, null);
             yield return Click(skipBounds.center.x, skipBounds.center.y);
@@ -1011,6 +1026,7 @@ namespace HayChoriYPaty.Tests
             Type viewType = view.GetType();
             viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, true);
             viewType.GetMethod("DispatchAction", PrivateInstance).Invoke(view, new object[] { 30 });
+            SettleShutter(view);
             Assert.IsTrue((bool)viewType.GetField("levelOneTutorialActive", PrivateInstance).GetValue(view),
                 "The temporary QA override must show the tutorial even if an old completion marker exists.");
             Assert.AreEqual(0, viewType.GetField("levelOneTutorialStep", PrivateInstance).GetValue(view));
@@ -1183,6 +1199,7 @@ namespace HayChoriYPaty.Tests
             Assert.IsTrue((bool)gameType.GetProperty("CanStartRound", PublicInstance).GetValue(game, null),
                 "Prepare the selected level's real stock before choosing it.");
             viewType.GetMethod("DispatchAction", PrivateInstance).Invoke(view, new object[] { 30 });
+            SettleShutter(view);
             Assert.IsFalse((bool)viewType.GetField("levelSelectActive", PrivateInstance).GetValue(view));
             Assert.IsTrue((bool)viewType.GetField("levelOneTutorialActive", PrivateInstance).GetValue(view),
                 "A first-time player sees the required Level 1 tutorial before the round.");
