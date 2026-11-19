@@ -35,7 +35,7 @@ namespace HayChoriYPaty
         // Workers lean on the fence while serving: feet stay below the rail, the head rises above it, so the
         // order is handed over from close by instead of across the whole yard.
         private const float ServiceLeanLogical = 56f;
-        private const float CShapedKitchenSideMarginLogical = 12f;
+        private const float CShapedKitchenSideMarginLogical = 12f, CShapedKitchenDropLogical = 40f;
         // Visible body width of a worker in Boca's own pixels (StreetKitchenLayout.GrillWorkPosition reserves 30 px per side).
         private const float BocaBodyWidthPx = 60f;
         // Boca's counter row pieces overlap by this many of its own pixels (tables/barrels are 1.2 px wider than their step).
@@ -328,7 +328,9 @@ namespace HayChoriYPaty
             // Centered, unless the pocket is so short that the Cocacolero's head would leave the worker area over the top rail.
             float free = WorkBounds.height - height;
             float headroom = Mathf.Max(0f, ConstructionWorkerHeightLogical - ServiceLeanLogical) * worldUnitsPerLogicalPixel;
-            return WorkBounds.yMin + Mathf.Max(0f, Mathf.Min(free * .5f, free - headroom));
+            // The beer barrel stands on the Coca barrel and reaches high: the kitchen sits lower so a worker (feet over the barrel, head
+            // inside the lean allowance) can still walk over it between the top lane and the right side.
+            return WorkBounds.yMin + Mathf.Max(0f, Mathf.Min(free * .5f, free - headroom) - CShapedKitchenDropLogical * worldUnitsPerLogicalPixel);
         }
 
         // A Boca piece -> world space rectangle. Boca stretches its kitchen art vertically with the screen height
@@ -1399,6 +1401,104 @@ namespace HayChoriYPaty
                 foreach (var worker in workers) if (worker != ignore && Overlaps(swept, WorkerBounds(worker.Position, worker.Role))) return false;
             return true;
         }
+        // The waypoint lattice only depends on the stations and the worker's body, not on where the other workers are (paths
+        // ignore them), so it is built once per role and reused until a station changes. Searching it used to recompute every
+        // node of the grid on every call, which made a crew that cannot reach its targets cost hundreds of milliseconds a frame.
+        private sealed class PathLattice
+        {
+            public Vector2[] Points; public bool[] Open; public sbyte[] Edges; public int Columns, Rows; public float Step; public long Signature;
+        }
+        private readonly Dictionary<StreetWorkerRole, PathLattice> pathLattices = new Dictionary<StreetWorkerRole, PathLattice>();
+        private static readonly int[] LatticeDx = { -1, 1, 0, 0, -1, 1, -1, 1 }, LatticeDy = { 0, 0, -1, 1, -1, -1, 1, 1 };
+
+        private long PathLatticeSignature()
+        {
+            unchecked
+            {
+                long hash = 17 + placedStations.Count;
+                foreach (var station in placedStations)
+                {
+                    Rect b = station.Bounds;
+                    hash = hash * 31 + (int)station.Kind;
+                    hash = hash * 31 + Mathf.RoundToInt(b.xMin * 1000f); hash = hash * 31 + Mathf.RoundToInt(b.yMin * 1000f);
+                    hash = hash * 31 + Mathf.RoundToInt(b.width * 1000f); hash = hash * 31 + Mathf.RoundToInt(b.height * 1000f);
+                }
+                return hash;
+            }
+        }
+
+        private PathLattice GetPathLattice(StreetWorkerRole role, TowerDefenseWorkerState movingWorker)
+        {
+            long signature = PathLatticeSignature();
+            if (pathLattices.TryGetValue(role, out PathLattice cached) && cached.Signature == signature) return cached;
+            float step = (config.FreeConstruction ? ConstructionGridLogical * .5f : ConstructionGridLogical) * worldUnitsPerLogicalPixel;
+            // La Renga's cooks work from a strip a few pixels tall between two solid rows. One row of waypoints is laid exactly on
+            // it, otherwise no node falls inside the strip and a cook standing there could never reach anything.
+            float originY = WorkBounds.yMin;
+            if (IsCShapedLevel)
+            {
+                TowerDefensePlacedStation grill = FindPlacedStation(TowerDefenseStationKind.NormalGrill);
+                if (grill != null && IsFinite(grill.WorkPosition.y)) originY = WorkBounds.yMin + Mathf.Repeat(grill.WorkPosition.y - WorkBounds.yMin, step);
+            }
+            int columns = Mathf.Max(1, Mathf.FloorToInt(WorkBounds.width / step) + 1);
+            int rows = Mathf.Max(1, Mathf.FloorToInt((WorkBounds.yMax - originY) / step) + 1), total = columns * rows;
+            var lattice = new PathLattice
+            {
+                Points = new Vector2[total], Open = new bool[total], Edges = new sbyte[total * 8], Columns = columns, Rows = rows, Step = step, Signature = signature
+            };
+            for (int y = 0; y < rows; y++) for (int x = 0; x < columns; x++)
+            {
+                int id = y * columns + x;
+                lattice.Points[id] = new Vector2(WorkBounds.xMin + x * step, originY + y * step);
+                lattice.Open[id] = FreePositionClear(lattice.Points[id], role, movingWorker, Rect.zero, false);
+            }
+            pathLattices[role] = lattice;
+            return lattice;
+        }
+
+        /// <summary>Waypoints a worker of this role could stand on but never reach from the grill post: 0 when the pocket is connected.</summary>
+        internal int UnreachableWorkerNodes(StreetWorkerRole role)
+        {
+            PathLattice lattice = GetPathLattice(role, null);
+            TowerDefensePlacedStation grill = FindPlacedStation(TowerDefenseStationKind.NormalGrill);
+            if (grill == null) return 0;
+            int start = -1; float best = float.MaxValue;
+            for (int i = 0; i < lattice.Points.Length; i++)
+            {
+                float d = Vector2.Distance(lattice.Points[i], grill.WorkPosition);
+                if (lattice.Open[i] && d < best) { best = d; start = i; }
+            }
+            if (start < 0) return lattice.Points.Length;
+            var seen = new bool[lattice.Points.Length]; var queue = new Queue<int>(); queue.Enqueue(start); seen[start] = true;
+            while (queue.Count > 0)
+            {
+                int current = queue.Dequeue();
+                for (int direction = 0; direction < 8; direction++)
+                {
+                    int nx = current % lattice.Columns + LatticeDx[direction], ny = current / lattice.Columns + LatticeDy[direction];
+                    if (nx < 0 || nx >= lattice.Columns || ny < 0 || ny >= lattice.Rows) continue;
+                    int next = ny * lattice.Columns + nx;
+                    if (seen[next] || !LatticeEdgeClear(lattice, current, direction, role, null)) continue;
+                    seen[next] = true; queue.Enqueue(next);
+                }
+            }
+            int unreachable = 0;
+            for (int i = 0; i < seen.Length; i++) if (lattice.Open[i] && !seen[i]) unreachable++;
+            return unreachable;
+        }
+
+        private bool LatticeEdgeClear(PathLattice lattice, int from, int direction, StreetWorkerRole role, TowerDefenseWorkerState movingWorker)
+        {
+            int x = from % lattice.Columns + LatticeDx[direction], y = from / lattice.Columns + LatticeDy[direction];
+            if (x < 0 || x >= lattice.Columns || y < 0 || y >= lattice.Rows) return false;
+            int to = y * lattice.Columns + x;
+            if (!lattice.Open[to]) return false;
+            int slot = from * 8 + direction;
+            if (lattice.Edges[slot] == 0)
+                lattice.Edges[slot] = (sbyte)(FreeSegmentClear(lattice.Points[from], lattice.Points[to], role, movingWorker, Rect.zero, false) ? 1 : -1);
+            return lattice.Edges[slot] > 0;
+        }
+
         private bool TryBuildWorkerPath(TowerDefenseWorkerState movingWorker, Vector2 start, Vector2 target,
             Rect extraObstacle, out Vector2[] path, StreetWorkerRole pathRole = StreetWorkerRole.Parrillero)
         {
@@ -1409,6 +1509,44 @@ namespace HayChoriYPaty
             if (FreeSegmentClear(start,target,role,movingWorker,extraObstacle,false)) { path = new[] {target}; return true; }
             // A 32px placement grid can bridge over a narrow but passable alley underneath
             // furniture; route waypoints therefore use half that spacing for free-build levels.
+            if (extraObstacle != Rect.zero) return TryBuildWorkerPathUncached(movingWorker, start, target, extraObstacle, out path, role);
+            PathLattice lattice = GetPathLattice(role, movingWorker);
+            int total = lattice.Points.Length;
+            var previous = new int[total];
+            for (int i = 0; i < total; i++) previous[i] = -2;
+            var queue = new Queue<int>();
+            float attachDistance = lattice.Step * 1.5f;
+            for (int id = 0; id < total; id++)
+                if (lattice.Open[id] && Vector2.Distance(start, lattice.Points[id]) <= attachDistance &&
+                    FreeSegmentClear(start, lattice.Points[id], role, movingWorker, Rect.zero, false))
+                { previous[id] = -1; queue.Enqueue(id); }
+            if (queue.Count == 0) return false;
+            int reached = -1;
+            while (queue.Count > 0)
+            {
+                int current = queue.Dequeue();
+                if (Vector2.Distance(lattice.Points[current], target) <= attachDistance &&
+                    FreeSegmentClear(lattice.Points[current], target, role, movingWorker, Rect.zero, false)) { reached = current; break; }
+                for (int direction = 0; direction < 8; direction++)
+                {
+                    int next = (current / lattice.Columns + LatticeDy[direction]) * lattice.Columns + current % lattice.Columns + LatticeDx[direction];
+                    int nx = current % lattice.Columns + LatticeDx[direction], ny = current / lattice.Columns + LatticeDy[direction];
+                    if (nx < 0 || nx >= lattice.Columns || ny < 0 || ny >= lattice.Rows || previous[next] != -2) continue;
+                    if (!LatticeEdgeClear(lattice, current, direction, role, movingWorker)) continue;
+                    previous[next] = current; queue.Enqueue(next);
+                }
+            }
+            if (reached < 0) return false;
+            var reverse = new List<Vector2>();
+            for (int node = reached; node >= 0; node = previous[node]) reverse.Add(lattice.Points[node]);
+            reverse.Reverse(); reverse.Add(target);
+            path = SmoothWorkerPath(start, reverse, role, movingWorker, extraObstacle); return true;
+        }
+
+        private bool TryBuildWorkerPathUncached(TowerDefenseWorkerState movingWorker, Vector2 start, Vector2 target,
+            Rect extraObstacle, out Vector2[] path, StreetWorkerRole role)
+        {
+            path = Array.Empty<Vector2>();
             float step = (config.FreeConstruction ? ConstructionGridLogical * .5f : ConstructionGridLogical) * worldUnitsPerLogicalPixel;
             int columns = Mathf.Max(1, Mathf.FloorToInt(WorkBounds.width / step) + 1);
             int rows = Mathf.Max(1, Mathf.FloorToInt(WorkBounds.height / step) + 1), total = columns * rows;

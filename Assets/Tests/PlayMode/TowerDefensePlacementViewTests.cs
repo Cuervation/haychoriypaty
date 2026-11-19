@@ -2124,6 +2124,10 @@ namespace HayChoriYPaty.Tests
             {
                 Call(mode, "Step", .05f);
                 if (tick % 100 == 0) diagnostic = DescribeLujanService(mode, mozo);
+            // Every spot a worker can stand on must be reachable from the grill post: a pocket cut in two (for instance by the stacked
+            // barrels leaving no room to walk over them) left the cooks unable to leave their strip and retrying every frame.
+            foreach (int role in new[] { 0, 1 })
+                Assert.AreEqual(0, (int)Call(mode, "UnreachableWorkerNodes", Enum.ToObject(roleKind, role)), "role " + role + " reaches the whole pocket");
                 if (tick % 40 == 0) yield return null;
             }
             Assert.GreaterOrEqual((int)Get(mode, "TotalDelivered"), 2, "Natural pilgrims must be served. " + diagnostic +
