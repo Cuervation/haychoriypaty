@@ -2,6 +2,8 @@
 
 **Contrato nuevo — 2026-11-10. Estado: implementación incorporada; aceptación Unity pendiente por bloqueo MCP.** Este delta se aplica únicamente a La Renga y a la ampliación aditiva de campaña/persistencia. Reutiliza [Tower Defense](tower-defense.md), [Mercado](market-fridge.md), [Firebase](firebase-player.md) y el límite de [siete productos](../product.md); no reemplaza sus reglas compartidas ni sus pendientes históricos.
 
+> **Delta 2026-11-18 (vigente para ruta, cocina, footer y equipo inicial):** La Renga es un nivel de **valla en C** con la cocina de Huracán y el footer de Camioneros, ver [tower-defense.md](tower-defense.md#la-renga-id13-valla-en-c-con-la-cocina-de-huracán-y-el-footer-de-camioneros--2026-11-18-vigente). Lo que dice este registro sobre "tres tramos S", "dos áreas" y "trabajadores iniciales 0" quedó superado.
+
 > Delta posterior del mismo día: [Peregrinación ID14](peregrinacion-lujan.md) se inserta entre13 y4; campaña vigente15 y sucesión13→14→4. El resto de este registro conserva el alcance original de la incorporación de La Renga. No cambia su balance ni sus assets.
 
 ## Identidad y campaña

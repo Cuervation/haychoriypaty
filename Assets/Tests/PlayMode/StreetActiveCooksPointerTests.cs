@@ -551,6 +551,68 @@ namespace HayChoriYPaty.Tests
             Assert.Greater(written, 100);
         }
 
+        // Captures Huracán's real screen at phone proportion (cooking, and with the bonus choice cards open) as the La Renga reference.
+        [UnityTest]
+        [Explicit("Captures Huracán to Logs/Acceptance/RengaEmptyStage-20261118/huracan-*.png")]
+        public IEnumerator CaptureHuracanKitchenAndFooter()
+        {
+            const int width = 610, height = 1356;
+            string directory = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/RengaEmptyStage-20261118"));
+            Directory.CreateDirectory(directory);
+            Assembly editorAssembly = Type.GetType("UnityEditor.EditorWindow, UnityEditor", true).Assembly;
+            Type gameViewType = editorAssembly.GetType("UnityEditor.GameView");
+            Type windowType = editorAssembly.GetType("UnityEditor.EditorWindow");
+            MethodInfo getWindow = windowType.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+                .FirstOrDefault(m => m.Name == "GetWindow" && m.GetParameters().Length == 1 && m.GetParameters()[0].ParameterType == typeof(Type));
+            object window = getWindow.Invoke(null, new object[] { gameViewType });
+            PropertyInfo selected = gameViewType.GetProperty("selectedSizeIndex", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            int previous = Convert.ToInt32(selected.GetValue(window, null));
+            Type sizesType = editorAssembly.GetType("UnityEditor.GameViewSizes");
+            object registry = sizesType.GetProperty("instance", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.FlattenHierarchy).GetValue(null, null);
+            object groupKind = sizesType.GetProperty("currentGroupType", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).GetValue(registry, null);
+            object group = sizesType.GetMethod("GetGroup", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Invoke(registry, new[] { groupKind });
+            MethodInfo countMethod = group.GetType().GetMethod("GetTotalCount", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            Type sizeType = editorAssembly.GetType("UnityEditor.GameViewSize");
+            object kind = Enum.Parse(editorAssembly.GetType("UnityEditor.GameViewSizeType"), "FixedResolution");
+            object newSize = Activator.CreateInstance(sizeType, new[] { kind, (object)width, height, "Temporary Huracan capture " + width + "x" + height });
+            group.GetType().GetMethod("AddCustomSize", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Invoke(group, new[] { newSize });
+            int added = Convert.ToInt32(countMethod.Invoke(group, null)) - 1;
+            try
+            {
+                selected.SetValue(window, added, null);
+                yield return null; yield return null;
+                ActivateTestGameWithoutPersisting();
+                Assert.IsTrue((bool)CallGame("SelectLevel", 11), "Huracán is campaign level 11.");
+                StockSelectedLevel();
+                Assert.IsTrue((bool)CallGame("TryStartRound"), "Huracán must start.");
+                foreach (string flag in new[] { "hubActive", "marketActive", "levelSelectActive", "introActive" })
+                    viewType.GetField(flag, PrivateInstance)?.SetValue(view, false);
+                Time.captureDeltaTime = 1f / 20f;
+                int shots = 0;
+                for (int frame = 0; frame < 600 && shots < 2; frame++)
+                {
+                    Call(Sim, "Step", .05f);
+                    yield return new WaitForEndOfFrame();
+                    bool cooking = frame == 90; // ~4.5 s of play
+                    bool choice = frame >= 420; // after the first 20 s decision opens
+                    if (cooking || (choice && shots == 1))
+                    {
+                        Texture2D image = ScreenCapture.CaptureScreenshotAsTexture();
+                        File.WriteAllBytes(Path.Combine(directory, shots == 0 ? "huracan-cooking.png" : "huracan-choice.png"), image.EncodeToPNG());
+                        UnityEngine.Object.Destroy(image);
+                        shots++;
+                    }
+                }
+            }
+            finally
+            {
+                Time.captureDeltaTime = 0f;
+                selected.SetValue(window, Mathf.Clamp(previous, 0, Convert.ToInt32(countMethod.Invoke(group, null)) - 1), null);
+                group.GetType().GetMethod("RemoveCustomSize", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Invoke(group, new object[] { added });
+            }
+            Assert.AreEqual(2, File.Exists(Path.Combine(directory, "huracan-choice.png")) ? 2 : 0);
+        }
+
         [UnityTest]
         public IEnumerator CaptureSandwichTableRowsAndMozoCarryAtPortraitSizes()
         {

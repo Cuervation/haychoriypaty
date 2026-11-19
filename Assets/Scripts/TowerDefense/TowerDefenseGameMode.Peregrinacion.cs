@@ -50,12 +50,16 @@ namespace HayChoriYPaty
         // Ferro's kitchen: normal and premium grill and table, Coca and beer barrels (products 0, 1, 2, 4 and 6).
         private static readonly StreetKitchenLayout FerroKitchenLayoutStatic =
             new StreetKitchenLayout(new[] { 0, 1, 2, 4, 6 }, false);
+        // Huracán's kitchen (normal grill, table and Coca barrel with active cooks): La Renga's work area, exactly as Huracán lays it out.
+        private static readonly StreetKitchenLayout HuracanKitchenLayoutStatic =
+            new StreetKitchenLayout(new[] { 0, 1, 4 }, true);
         internal static StreetKitchenLayout LujanBocaKitchenVisualLayout => BocaKitchenLayoutStatic;
 
         /// <summary>The campaign kitchen a kitchen-derived level copies: Chicago's for Camioneros, Boca's for Luján.</summary>
         internal static StreetKitchenLayout KitchenLayoutForLevel(int sourceCampaignLevelId) =>
             sourceCampaignLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId ? ChicagoKitchenLayoutStatic
             : sourceCampaignLevelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId ? FerroKitchenLayoutStatic
+            : sourceCampaignLevelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId ? HuracanKitchenLayoutStatic
             : BocaKitchenLayoutStatic;
         private StreetKitchenLayout BocaKitchenLayout => KitchenLayoutForLevel(config.SourceCampaignLevelId);
         internal StreetKitchenLayout SourceKitchenLayout => BocaKitchenLayout;
@@ -198,7 +202,14 @@ namespace HayChoriYPaty
                     !TryBuildWorkerPath(null, premiumGrill.WorkPosition, HandoffTarget(premiumTable), Rect.zero, out _, StreetWorkerRole.ParrilleroPremium) ||
                 cocaBarrel != null && beerBarrel != null &&
                     !TryBuildWorkerPath(null, cocaBarrel.WorkPosition, beerBarrel.WorkPosition, Rect.zero, out _, StreetWorkerRole.Cocacolero))
-                throw new ArgumentException("Starting stations are not connected by their role's worker path for " + config.LevelId + ".", nameof(config));
+                throw new ArgumentException("Starting stations are not connected by their role's worker path for " + config.LevelId + "." +
+                    (normalGrill != null && normalTable != null ? " grillWork=" + normalGrill.WorkPosition + " tableDeposit=" + HandoffTarget(normalTable) +
+                        " grillBounds=" + normalGrill.Bounds + " tableBounds=" + normalTable.Bounds + " work=" + WorkBounds + " area=" + WorkerArea() +
+                        " startClear=" + FreePositionClear(normalGrill.WorkPosition, StreetWorkerRole.Parrillero, null, Rect.zero, false) +
+                        " targetClear=" + FreePositionClear(HandoffTarget(normalTable), StreetWorkerRole.Parrillero, null, Rect.zero, false) +
+                        " startBody=" + WorkerBounds(normalGrill.WorkPosition) + " targetBody=" + WorkerBounds(HandoffTarget(normalTable)) +
+                        " startFeet=" + WorkerFeet(normalGrill.WorkPosition) + " grillSolid=" + StationSolidRect(normalGrill.Kind, normalGrill.Bounds) +
+                        " tableSolid=" + StationSolidRect(normalTable.Kind, normalTable.Bounds) : ""), nameof(config));
         }
 
         // After a viewport change the whole kitchen is mapped again from Boca's layout (the new screen height changes
@@ -224,12 +235,16 @@ namespace HayChoriYPaty
         // Luján copies Boca's kitchen and the horizontal Camioneros copies Nueva Chicago's: both derive their furniture,
         // worker posts, footer and work area from a campaign kitchen layout.
         private bool IsBocaKitchenLevel => config.SourceCampaignLevelId == TowerDefenseLevelConfig.PeregrinacionLujanCampaignLevelId
-            || IsPassiveKitchenLevel;
+            || IsPassiveKitchenLevel || IsCShapedLevel;
+        // La Renga: Huracán's kitchen inside the pocket of a "C"-shaped fence; the fans walk around the outside of it.
+        internal bool IsCShapedLevel => config.FreeConstruction && config.RouteKind == TowerDefenseRouteKind.CShapedSingleFence;
         // Kitchen-derived horizontal levels that copy a traditional (passive) campaign kitchen: Camioneros (Nueva Chicago's)
-        // and Los Redondos (Ferro's). Nobody cooks, the tables are always full and each worker only serves.
+        // and Los Redondos (Ferro's), plus La Renga on its C-shaped fence (Huracán's kitchen layout, the same two products as
+        // Camioneros). Nobody cooks, the tables are always full and each worker only serves.
         internal bool IsPassiveKitchenLevel => (config.SourceCampaignLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId ||
-            config.SourceCampaignLevelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId)
-            && config.FreeConstruction && config.RouteKind == TowerDefenseRouteKind.HorizontalSingleFence;
+            config.SourceCampaignLevelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId ||
+            config.SourceCampaignLevelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId)
+            && config.FreeConstruction && (config.RouteKind == TowerDefenseRouteKind.HorizontalSingleFence || IsCShapedLevel);
 
         private Vector2 BocaStationAccess(TowerDefensePlacedStation station)
         {
@@ -293,8 +308,24 @@ namespace HayChoriYPaty
         {
             float scale = BocaKitchenFitScale() * worldUnitsPerLogicalPixel;
             float bottom = BocaStationsBottomLogical(BocaKitchenLayout, BocaVerticalScale);
-            return new Vector2(WorkBounds.center.x + (boca.x - StreetSceneLayout.Width * .5f) * scale,
-                WorkBounds.yMin + (bottom - boca.y * BocaVerticalScale) * scale);
+            return new Vector2(KitchenWorldX(boca.x, scale),
+                KitchenWorldBottomY(scale, bottom) + (bottom - boca.y * BocaVerticalScale) * scale);
+        }
+
+        // The campaign kitchens span the work area from side to side, centered on it. La Renga's pocket is wider and taller than
+        // Huracán's kitchen: the kitchen keeps its exact size and distances and sits in the middle of the pocket.
+        private float KitchenWorldX(float bocaX, float scale) => IsCShapedLevel
+            ? WorkBounds.center.x + (bocaX - BocaKitchenSourceBounds().center.x) * scale
+            : WorkBounds.center.x + (bocaX - StreetSceneLayout.Width * .5f) * scale;
+        private float KitchenWorldBottomY(float scale, float bottomLogical)
+        {
+            if (!IsCShapedLevel) return WorkBounds.yMin;
+            Rect source = BocaKitchenSourceBounds();
+            float height = (bottomLogical - source.yMin * BocaVerticalScale) * scale;
+            // Centered, unless the pocket is so short that the Cocacolero's head would leave the worker area over the top rail.
+            float free = WorkBounds.height - height;
+            float headroom = Mathf.Max(0f, ConstructionWorkerHeightLogical - ServiceLeanLogical) * worldUnitsPerLogicalPixel;
+            return WorkBounds.yMin + Mathf.Max(0f, Mathf.Min(free * .5f, free - headroom));
         }
 
         // A Boca piece -> world space rectangle. Boca stretches its kitchen art vertically with the screen height
@@ -303,8 +334,8 @@ namespace HayChoriYPaty
         {
             float scale = BocaKitchenFitScale() * worldUnitsPerLogicalPixel;
             float bottom = BocaStationsBottomLogical(BocaKitchenLayout, BocaVerticalScale);
-            float x = WorkBounds.center.x + (boca.xMin - StreetSceneLayout.Width * .5f) * scale;
-            float y = WorkBounds.yMin + (bottom - boca.yMax * BocaVerticalScale) * scale;
+            float x = KitchenWorldX(boca.xMin, scale);
+            float y = KitchenWorldBottomY(scale, bottom) + (bottom - boca.yMax * BocaVerticalScale) * scale;
             return new Rect(x, y, boca.width * scale, boca.height * BocaVerticalScale * scale);
         }
 
@@ -457,6 +488,8 @@ namespace HayChoriYPaty
             // Preserve one worker-height service lane behind the furniture before fitting
             // the same Boca station proportions into the smaller TD workfield.
             float availableHeight = WorkBounds.height / pixel - BocaKitchenWorkerLaneLogical;
+            // La Renga's crew stands behind the furniture with their heads over the top rail (the worker area leans over it).
+            if (IsCShapedLevel) availableHeight += ServiceLeanLogical;
             return Mathf.Min(1f, Mathf.Min(availableWidth / source.width, availableHeight / (source.height * BocaVerticalScale)));
         }
 
@@ -969,10 +1002,14 @@ namespace HayChoriYPaty
             int product = worker.PendingProduct, unitId = worker.ServiceUnitId;
             if (fan == null || fan.RouteFollower.HasExited)
             { ReleaseFreeService(worker, fan); return; }
-            if (Mathf.Abs(worker.Position.y - GetFanServiceAnchor(fan).y) > 2f * worldUnitsPerLogicalPixel)
+            Vector2 serviceAnchor = GetFanServiceAnchor(fan);
+            bool rightRun = ServiceLane(fan.RouteFollower.Position) == 1;
+            float acrossLane = rightRun ? Mathf.Abs(worker.Position.x - serviceAnchor.x) : Mathf.Abs(worker.Position.y - serviceAnchor.y);
+            float alongLane = rightRun ? Mathf.Abs(worker.Position.y - fan.RouteFollower.Position.y)
+                : Mathf.Abs(worker.Position.x - fan.RouteFollower.Position.x);
+            if (acrossLane > 2f * worldUnitsPerLogicalPixel)
             { TryQueueFreeConstructionIntercept(worker, fan); return; }
-            if (fan != null && !fan.RouteFollower.HasExited &&
-                Mathf.Abs(worker.Position.x - fan.RouteFollower.Position.x) > 64f * worldUnitsPerLogicalPixel)
+            if (fan != null && !fan.RouteFollower.HasExited && alongLane > 64f * worldUnitsPerLogicalPixel)
             {
                 TryQueueFreeConstructionIntercept(worker, fan);
                 return;
@@ -1028,10 +1065,37 @@ namespace HayChoriYPaty
             return GetFanServiceAnchor(fan.RouteFollower.Position);
         }
 
+        // On the C-shaped fence the kitchen sits right next to the entry and the exit: a fan is only served once it is fully on
+        // screen, otherwise it would be handed its order the moment it appears (or while it leaves) and never walk the fence.
+        private bool FanIsServiceable(TowerDefenseFanState fan) =>
+            !IsCShapedLevel || fan.RouteFollower.Position.x >= WorkBounds.xMin + TowerDefenseResponsiveLayout.FanFrameWidthLogical * .5f * worldUnitsPerLogicalPixel;
+
+        // Which side of the fence a fan is served from: 0 top run, 1 right run, 2 bottom run (only the "C" fence has more than one).
+        private int ServiceLane(Vector2 fanPosition)
+        {
+            if (!IsCShapedLevel) return 0;
+            Vector2[] center = routeGeometry.Centerline;
+            float dTop = Mathf.Abs(fanPosition.y - center[0].y), dBottom = Mathf.Abs(fanPosition.y - center[center.Length - 1].y),
+                dRight = Mathf.Abs(fanPosition.x - center[1].x);
+            return dRight < dTop && dRight < dBottom ? 1 : dBottom < dTop ? 2 : 0;
+        }
+
         private Vector2 GetFanServiceAnchor(Vector2 fanPosition)
         {
             float pixel = worldUnitsPerLogicalPixel;
             float lean = IsBocaKitchenLevel ? ServiceLeanLogical : 0f;
+            int lane = ServiceLane(fanPosition);
+            if (lane != 0)
+            {
+                float halfWidth = CocacoleroVisualWidthLogical * .5f * pixel;
+                float feet = ConstructionWorkerHeightLogical * WorkerVisualPivotY * pixel;
+                float topFeet = WorkBounds.yMax - ConstructionWorkerHeightLogical * (1f - WorkerVisualPivotY) * pixel;
+                if (lane == 1)
+                    // Right run: the worker stands against the inside of the right rail, level with the fan.
+                    return new Vector2(WorkBounds.xMax - halfWidth, Mathf.Clamp(fanPosition.y, WorkBounds.yMin + feet, topFeet));
+                // Bottom run: feet right above the bottom rail, level with the fan.
+                return new Vector2(Mathf.Clamp(fanPosition.x, WorkBounds.xMin + halfWidth, WorkBounds.xMax - halfWidth), WorkBounds.yMin + feet);
+            }
             float y = routeGeometry.RightBoundary[0].y - (ConstructionWorkerHeightLogical * (1f - WorkerVisualPivotY) + 8f - lean) * pixel;
             float half = CocacoleroVisualWidthLogical * .5f * pixel;
             return new Vector2(Mathf.Clamp(fanPosition.x, WorkBounds.xMin + half, WorkBounds.xMax - half), y);
@@ -1225,7 +1289,8 @@ namespace HayChoriYPaty
             Rect worker = WorkerBounds(position, role);
             if (IsBocaKitchenLevel)
             {
-                if (!Contains(WorkBounds, worker) || Overlaps(worker, extraObstacle)) return false;
+                // La Renga's cooks and the Cocacolero stand behind their furniture with their heads over the top rail, as Luján's lean over the fence.
+                if (!Contains(IsCShapedLevel ? WorkerArea() : WorkBounds, worker) || Overlaps(worker, extraObstacle)) return false;
                 Rect feet = WorkerFeet(position);
                 foreach (var station in placedStations)
                     if (Overlaps(feet, StationSolidRect(station.Kind, station.Bounds))) return false;

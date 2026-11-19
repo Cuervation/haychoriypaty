@@ -69,7 +69,7 @@ namespace HayChoriYPaty.Tests
         public void CampaignOrderAppendsLaRengaBeforeUnchangedTraditionalIds()
         {
             Type simulation = RuntimeType("StreetSimulation");
-            Assert.AreEqual(new[] { 0, 1, 9, 2, 12, 3, 11, 10, 13, 14, 4, 5, 6, 7, 8 },
+            Assert.AreEqual(new[] { 0, 1, 9, 2, 12, 3, 10, 11, 13, 14, 4, 5, 6, 7, 8 },
                 simulation.GetField("CampaignOrder", PublicStatic).GetValue(null));
             Assert.AreEqual(15, ((string[])simulation.GetField("LevelNames", PublicStatic).GetValue(null)).Length);
             Assert.AreEqual(13, simulation.GetField("LaRengaTowerDefenseCampaignLevelId", PublicStatic).GetRawConstantValue());
@@ -169,13 +169,15 @@ namespace HayChoriYPaty.Tests
             object game = NewGame(NewCampaignSave(10));
             Assert.AreEqual(0L, ReadProperty(game, "TicketBalance"));
             WinDefenseRound(game, 10);
-            Assert.IsTrue((bool)Invoke(game, "IsLevelUnlocked", 13), "A settled ID10 victory must unlock ID13.");
+            // Current chain: Ferro -> Los Redondos -> Huracán -> (a star there) -> La Renga -> Peregrinación.
+            Assert.IsTrue((bool)Invoke(game, "IsLevelUnlocked", 11), "A settled ID10 victory must unlock Huracán ID11.");
             Assert.IsFalse((bool)Invoke(game, "TryCollectVictoryReward"));
             Assert.IsFalse((bool)Invoke(game, "ProcessRoundResult"));
             Assert.AreEqual(1L, ReadProperty(game, "TicketBalance"));
             Assert.AreEqual(1, persistedMatchCount);
             Assert.AreEqual(1L, ((long[])Field(Field(Field(game, "save"), "statistics"), "winsByLevel"))[10]);
 
+            ((bool[])Field(Field(game, "save"), "unlockedLevelIds"))[13] = true; // earned with a Huracán star, covered elsewhere
             WinDefenseRound(game, 13);
             Assert.IsTrue((bool)Invoke(game, "IsLevelUnlocked", 14), "A settled ID13 victory must unlock Peregrinación ID14.");
             Assert.IsFalse((bool)Invoke(game, "TryCollectVictoryReward"));
@@ -285,9 +287,10 @@ namespace HayChoriYPaty.Tests
             var config = Resources.Load(path, configType);
             Assert.NotNull(config);
             Assert.AreEqual(13, configType.GetProperty("SourceCampaignLevelId").GetValue(config, null));
-            Assert.AreEqual(60, configType.GetProperty("TotalFanCount").GetValue(config, null));
-            Assert.AreEqual(0.1575f, configType.GetProperty("FanSpeed").GetValue(config, null));
-            Assert.AreEqual(96f, configType.GetProperty("MinimumEntrySpacingLogical").GetValue(config, null));
+            // C-shaped, Camioneros-style kitchen version (2026-11-18): 120 fans, faster and denser than the former serpentine 60 / 0.1575 / 96.
+            Assert.AreEqual(120, configType.GetProperty("TotalFanCount").GetValue(config, null));
+            Assert.AreEqual(0.375f, (float)configType.GetProperty("FanSpeed").GetValue(config, null), 0.00001f);
+            Assert.AreEqual(58f, configType.GetProperty("MinimumEntrySpacingLogical").GetValue(config, null));
             CollectionAssert.AreEqual(new[] { 0, 4 }, (int[])configType.GetProperty("AvailableProducts").GetValue(config, null));
         }
     }

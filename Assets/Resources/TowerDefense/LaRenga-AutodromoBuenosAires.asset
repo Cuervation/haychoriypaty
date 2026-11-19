@@ -17,31 +17,68 @@ MonoBehaviour:
   displayName: La Renga – Autódromo Bs. As.
   sourceCampaignLevelId: 13
   backgroundResource: street-background-larenga-autodromo-v1
+  routeKind: 2
+  freeConstruction: 1
+  equipmentPlacementAllowed: 0
   route:
-    RowCount: 3
+    RowCount: 1
+    RouteKind: 2
     SegmentLengths:
-    - 3.8
-    - 3.8
-    - 3.8
+    - 4
     CorridorWidth: 0.9
-    RowSpacing: 1.8
+    HorizontalCorridorWidth: 0.9
+    RowSpacing: 3
+    TurnRadius: 0.68
     PlayableBounds:
       serializedVersion: 2
       x: -3.3
       y: -4.7
       width: 6.6
       height: 9.4
+    WorkBounds:
+      serializedVersion: 2
+      x: -2
+      y: -0.9
+      width: 3.4
+      height: 1.8
     TurnSegments: 16
+    FanEntryExtensionWorldUnits: 0
   straightFencePrefab: {fileID: 2371312016393039640, guid: 26ca722ab4b564168b77a248a37ddd55, type: 3}
   turnFencePrefab: {fileID: 5325544064044861468, guid: 68a6d7eb36cdf4e8aa4b233a89f11119, type: 3}
   terminalFencePrefab: {fileID: 3412343263549730106, guid: fdf92aa37b642494095a6916e80a192f, type: 3}
   directionSignPrefab: {fileID: 1359721814499061152, guid: 9cf7a7df68e2841c88fe696034ad64a0, type: 3}
   directionArrowSprite: {fileID: 21300000, guid: ef3873967f16248bd8b9a67207f11688, type: 3}
   availableProducts: 0000000004000000
-  totalFanCount: 60
-  fanSpeed: 0.1575
-  minimumEntrySpacingLogical: 96
+  totalFanCount: 120
+  fanSpeed: 0.375
+  minimumEntrySpacingLogical: 58
   serviceRange: 0.8
   firstWorkZoneOffset: {x: 0, y: 0}
   secondWorkZoneOffset: {x: 0, y: 0}
-  startingWorkersByRole: 0000000000000000000000000000000000000000
+  fanSpawnIntervalSeconds: 0.1
+  maximumWorkersPerRole: 3
+  startingStations:
+  - Kind: 0
+    PositionFromWorkBoundsMin: {x: 0, y: 0}
+    HasAccessPosition: 0
+    AccessPositionFromWorkBoundsMin: {x: 0, y: 0}
+  - Kind: 5
+    PositionFromWorkBoundsMin: {x: 0, y: 0}
+    HasAccessPosition: 0
+    AccessPositionFromWorkBoundsMin: {x: 0, y: 0}
+  - Kind: 2
+    PositionFromWorkBoundsMin: {x: 0, y: 0}
+    HasAccessPosition: 0
+    AccessPositionFromWorkBoundsMin: {x: 0, y: 0}
+  hireCostsByRole:
+  - 60
+  - 60
+  - 70
+  - 65
+  - 65
+  startingWorkersByRole:
+  - 0
+  - 0
+  - 0
+  - 0
+  - 0

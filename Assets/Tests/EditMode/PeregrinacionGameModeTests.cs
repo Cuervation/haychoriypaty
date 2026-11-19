@@ -24,6 +24,42 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
+        public void CShapedRouteIsOneFenceAroundAWorkPocketAndFansWalkItsOutside()
+        {
+            Type routeType = RuntimeType("TowerDefenseRouteGeometryConfig");
+            Type kindType = RuntimeType("TowerDefenseRouteKind");
+            Type geometryType = RuntimeType("TowerDefenseRouteGeometry");
+            MethodInfo generate = geometryType.GetMethod("Generate", BindingFlags.Public | BindingFlags.Static);
+            object c = Activator.CreateInstance(routeType);
+            Set(c, "RouteKind", Enum.ToObject(kindType, 2));
+            Set(c, "RowCount", 1);
+            Set(c, "SegmentLengths", new[] { 400f });
+            Set(c, "CorridorWidth", 24f);
+            Set(c, "HorizontalCorridorWidth", 24f);
+            Set(c, "RowSpacing", 500f);
+            Set(c, "PlayableBounds", new Rect(-250f, -300f, 520f, 600f));
+            Set(c, "WorkBounds", new Rect(-200f, -230f, 380f, 460f));
+            Set(c, "TurnSegments", 16);
+            object result = generate.Invoke(null, new[] { c });
+            Assert.IsTrue(Get<bool>(result, "IsValid"), string.Join("; ", Get<string[]>(Get<object>(result, "Validation"), "Errors")));
+            Vector2[] path = Get<Vector2[]>(result, "Centerline"), fence = Get<Vector2[]>(result, "RightBoundary");
+            // Top run to the right, the right connector down, the bottom run back to the left.
+            Assert.Greater(path[1].x, path[0].x);
+            Assert.That(path[1].y, Is.EqualTo(path[0].y).Within(.0001f));
+            Assert.Less(path[path.Length - 1].x, path[path.Length - 2].x);
+            Assert.Less(path[path.Length - 1].y, path[0].y);
+            // The single fence is the inner rail: below the top run, above the bottom run and left of the right connector.
+            Assert.Less(fence[0].y, path[0].y);
+            Assert.Greater(fence[fence.Length - 1].y, path[path.Length - 1].y);
+            Assert.Less(fence[1].x, path[1].x);
+            // A work pocket that pokes through the fence is rejected.
+            Set(c, "WorkBounds", new Rect(-200f, -230f, 380f, 520f));
+            Assert.IsFalse(Get<bool>(generate.Invoke(null, new[] { c }), "IsValid"), "WorkBounds above the top rail must be rejected.");
+            Set(c, "WorkBounds", new Rect(-200f, -230f, 480f, 460f));
+            Assert.IsFalse(Get<bool>(generate.Invoke(null, new[] { c }), "IsValid"), "WorkBounds right of the right rail must be rejected.");
+        }
+
+        [Test]
         public void HorizontalRouteIsOneStraightRowAndSerpentineLevelsKeepTheirOldRowRule()
         {
             Type routeType = RuntimeType("TowerDefenseRouteGeometryConfig");
@@ -67,9 +103,9 @@ namespace HayChoriYPaty.Tests
                 object priorRoute = Get<object>(level, "Route");
                 object priorGeometry = geometryType.GetMethod("Generate", BindingFlags.Public | BindingFlags.Static).Invoke(null, new[] { priorRoute });
                 Assert.IsTrue(Get<bool>(priorGeometry, "IsValid"), "Prior level route regressed: " + id);
-                // Camioneros (9) and Los Redondos (10) became horizontal single-fence kitchen levels; La Renga (13) stays serpentine for now.
-                Assert.AreEqual(id == 9 || id == 10 ? 1 : 0, Convert.ToInt32(Get<object>(priorRoute, "RouteKind")),
-                    (id == 9 || id == 10 ? "Camioneros and Los Redondos should be a horizontal single fence: " : "Prior level should remain serpentine: ") + id);
+                // Camioneros (9) and Los Redondos (10) are horizontal single-fence kitchen levels; La Renga (13) is the C-shaped single fence.
+                Assert.AreEqual(id == 9 || id == 10 ? 1 : 2, Convert.ToInt32(Get<object>(priorRoute, "RouteKind")),
+                    "Camioneros and Los Redondos are a horizontal single fence and La Renga a C-shaped one: " + id);
             }
         }
 

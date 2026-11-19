@@ -1124,6 +1124,7 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
+        [Ignore("La Renga (ID13) is now a C-shaped single-fence level with Huracán's kitchen and crew; this test covered its former two-area serpentine design.")]
         public IEnumerator LaRengaAutomaticSixtyFansCanWinWithNormalMovementAndCoinHires()
         {
             Assert.IsFalse((bool)Get(view, "towerDefenseTutorialActive"));
@@ -1131,12 +1132,14 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
+        [Ignore("La Renga (ID13) is now a C-shaped single-fence level with Huracán's kitchen and crew; this test covered its former two-area serpentine design.")]
         public IEnumerator LaRengaMixedOrderUsesPhysicalProductsAndCommonCampaignProjection()
         {
             yield return CaseCMixedOrderUsesRealProductionCorrectRolesReceiptsAndCampaignProjection();
         }
 
         [UnityTest]
+        [Ignore("La Renga (ID13) is now a C-shaped single-fence level with Huracán's kitchen and crew; this test covered its former two-area serpentine design.")]
         public IEnumerator LaRengaWithoutWorkersLosesAtTheFirstPendingEscape()
         {
             yield return AutomaticWaveWithoutWorkersLosesWithNoGhostDeliveries();
@@ -1854,6 +1857,151 @@ namespace HayChoriYPaty.Tests
             Assert.Greater(written, 100);
         }
 
+        [UnityTest]
+        [Explicit("Captures the empty stage (La Renga mural, sidewalk, Chicago footer; no fences, workers, tables or fans) to Logs/Acceptance/RengaEmptyStage-20261118")]
+        public IEnumerator CamionerosFooterWithRengaMuralEmptyStageCapture()
+        {
+            // Level 9 supplies the Chicago footer; the La Renga mural replaces the backdrop, framed exactly as La Renga's (0,0,1,1) source.
+            Texture2D renga = Resources.Load<Texture2D>("street-background-larenga-autodromo-v1");
+            Assert.NotNull(renga);
+            const int width = 2172, height = 1724, bandTop = 172;
+            RenderTexture target = RenderTexture.GetTemporary(width, height, 0, RenderTextureFormat.ARGB32);
+            RenderTexture previousActive = RenderTexture.active;
+            Texture2D composite = new Texture2D(width, height, TextureFormat.RGBA32, false);
+            try
+            {
+                RenderTexture.active = target;
+                GL.Clear(true, true, Color.black);
+                GL.PushMatrix(); GL.LoadPixelMatrix(0, width, height, 0);
+                Graphics.DrawTexture(new Rect(0, bandTop, width, renga.height), renga);
+                GL.PopMatrix();
+                composite.ReadPixels(new Rect(0, 0, width, height), 0, 0); composite.Apply();
+            }
+            finally { RenderTexture.active = previousActive; RenderTexture.ReleaseTemporary(target); }
+            Set(view, "towerDefenseBackdrop", composite);
+            Set(view, "towerDefensePresentation", null);
+            yield return CaptureAtResolution("renga-empty-stage-610x1356", 610, 1356);
+            Debug.Log("RENGA EMPTY STAGE captured in " + Path.Combine(CaptureDirectory, "Level09"));
+        }
+
+        [UnityTest]
+        public IEnumerator LaRengaCShapedLayoutCopiesHuracanKitchenAndCamionerosFooter()
+        {
+            yield return CaptureAtResolution("larenga-c-layout-610x1356", 610, 1356);
+            Type game = T("TowerDefenseGameMode");
+            Assert.AreEqual("CShapedSingleFence", Get(mode, "RouteKind").ToString());
+            Assert.IsTrue((bool)Get(mode, "FreeConstruction"));
+            Rect work = (Rect)Get(mode, "WorkBounds");
+            float pixel = (float)Get(mode, "WorldUnitsPerLogicalPixel");
+            Type layoutType = T("StreetKitchenLayout");
+            object huracan = Activator.CreateInstance(layoutType, new object[] { new[] { 0, 1, 4 }, true });
+            Rect sourceGrill = (Rect)Get(huracan, "NormalGrillBounds"), sourceTable = (Rect)Get(huracan, "NormalTableBounds"),
+                sourceCoca = (Rect)Get(huracan, "CocaBarrelBounds");
+            float vs = (float)Get(mode, "KitchenVerticalScale");
+            Rect grill = default, table = default, coca = default;
+            foreach (object station in (IEnumerable)Get(mode, "PlacedStations"))
+            {
+                string kind = Get(station, "Kind").ToString();
+                Rect bounds = (Rect)Get(station, "Bounds");
+                if (kind == "NormalGrill") grill = bounds; else if (kind == "NormalTable") table = bounds; else if (kind == "CocaBarrel") coca = bounds;
+            }
+            // Huracán's sizes: widths as in its layout, heights stretched by the screen's vertical scale.
+            Assert.AreEqual(sourceGrill.width, grill.width / pixel, .6f, "grill width");
+            Assert.AreEqual(sourceTable.width, table.width / pixel, 1.5f, "table width (its 1.2 px overlap padding is not part of the footprint)");
+            Assert.AreEqual(sourceCoca.width, coca.width / pixel, 1.5f, "barrel width");
+            Assert.AreEqual(sourceGrill.height * vs, grill.height / pixel, .6f, "grill height");
+            // ...and Huracán's distances between the pieces.
+            Assert.AreEqual(sourceGrill.xMin - sourceTable.xMin, (grill.xMin - table.xMin) / pixel, 1.5f, "grill-table x distance");
+            Assert.AreEqual(sourceCoca.xMin - sourceTable.xMin, (coca.xMin - table.xMin) / pixel, 1.5f, "barrel-table x distance");
+            Assert.AreEqual((sourceGrill.yMin - sourceTable.yMin) * vs, (table.yMax - grill.yMax) / pixel, .6f, "grill-table y distance");
+            float kitchenLeft = Mathf.Min(table.xMin, grill.xMin), kitchenRight = Mathf.Max(grill.xMax, coca.xMax);
+            Assert.AreEqual(work.center.x, (kitchenLeft + kitchenRight) * .5f, 1.5f * pixel, "the kitchen is centered across the pocket");
+            Assert.GreaterOrEqual(table.yMax, work.yMin); Assert.LessOrEqual(table.yMax, work.yMax + 56f * pixel);
+            // Like Camioneros: nobody starts on the crew, the kitchen is passive and the footer hires a Parrillero and a Cocacolero.
+            Assert.AreEqual(0, ((ICollection)Get(mode, "Workers")).Count);
+            Assert.IsTrue((bool)Get(mode, "IsPassiveKitchenLevel"), "La Renga plays like the other horizontal kitchen levels.");
+            // The footer is Camioneros' (Nueva Chicago's): the same top as ID9 on the same screen.
+            Type layoutHelper = T("TowerDefenseResponsiveLayout");
+            float canvas = (float)Get(view, "logicalCanvasHeight");
+            Assert.AreEqual((float)layoutHelper.GetMethod("PilgrimFooterTop").Invoke(null, new object[] { canvas, 9 }),
+                (float)layoutHelper.GetMethod("PilgrimFooterTop").Invoke(null, new object[] { canvas, 13 }), .001f);
+        }
+
+        [UnityTest]
+        [Explicit("Captures La Renga's C stage without workers: with its kitchen and without it, for layout mock-ups")]
+        public IEnumerator LaRengaKitchenOnlyAndBaseCaptures()
+        {
+            object presentation = Get(view, "towerDefensePresentation");
+            ((IList)mode.GetType().GetField("workers", I).GetValue(mode)).Clear();
+            Call(presentation, "Sync", mode);
+            yield return CaptureAtResolution("larenga-kitchen-only-610x1356", 610, 1356, false);
+            ((IList)mode.GetType().GetField("placedStations", I).GetValue(mode)).Clear();
+            Call(presentation, "Sync", mode);
+            yield return CaptureAtResolution("larenga-base-610x1356", 610, 1356, false);
+        }
+
+        [UnityTest]
+        [Explicit("Records the first 75 s of a La Renga run to Logs/Acceptance/RengaCShape-20261118/frames")]
+        public IEnumerator LaRengaGameplayVideoFrames()
+        {
+            string directory = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/RengaCShape-20261118/frames"));
+            if (Directory.Exists(directory)) Directory.Delete(directory, true);
+            Directory.CreateDirectory(directory);
+            yield return CaptureAtResolution("larenga-video-setup-610x1356", 610, 1356, false);
+            Time.captureDeltaTime = 1f / 20f;
+            object presentation = Get(view, "towerDefensePresentation");
+            Type roleKind = T("StreetWorkerRole");
+            var hires = new System.Collections.Generic.Dictionary<int, int> { { 5, 0 }, { 25, 1 }, { 45, 0 }, { 65, 1 }, { 85, 0 }, { 105, 1 } };
+            int written = 0;
+            try
+            {
+                for (int frame = 0; frame < 1500 && Get(mode, "Phase").ToString() == "Playing"; frame++)
+                {
+                    if (hires.TryGetValue(frame, out int role)) Call(game, "TryHireTowerDefenseAtPost", mode, Enum.ToObject(roleKind, role));
+                    Call(mode, "Step", .05f);
+                    Call(presentation, "Sync", mode);
+                    yield return new WaitForEndOfFrame();
+                    Texture2D image = ScreenCapture.CaptureScreenshotAsTexture();
+                    File.WriteAllBytes(Path.Combine(directory, "f" + written.ToString("00000") + ".jpg"), image.EncodeToJPG(88));
+                    UnityEngine.Object.Destroy(image);
+                    written++;
+                }
+            }
+            finally { Time.captureDeltaTime = 0f; }
+            Assert.Greater(written, 100);
+        }
+
+        [UnityTest]
+        [Explicit("Captures La Renga's C-shaped layout to Logs/Acceptance/RengaCShape-20261118")]
+        public IEnumerator LaRengaCShapedLayoutCaptures()
+        {
+            string directory = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/RengaCShape-20261118"));
+            Directory.CreateDirectory(directory);
+            yield return CaptureAtResolution("larenga-c-setup-610x1356", 610, 1356, false);
+            object presentation = Get(view, "towerDefensePresentation");
+            Type roleKind = T("StreetWorkerRole");
+            Time.captureDeltaTime = 1f / 20f;
+            int shot = 0;
+            try
+            {
+                for (int frame = 0; frame < 1200 && Get(mode, "Phase").ToString() == "Playing"; frame++)
+                {
+                    if (frame == 5) Call(game, "TryHireTowerDefenseAtPost", mode, Enum.ToObject(roleKind, 0));
+                    Call(mode, "Step", .05f);
+                    Call(presentation, "Sync", mode);
+                    if (frame == 100 || frame == 300 || frame == 600)
+                    {
+                        yield return new WaitForEndOfFrame();
+                        Texture2D image = ScreenCapture.CaptureScreenshotAsTexture();
+                        File.WriteAllBytes(Path.Combine(directory, "larenga-c-play-" + shot++ + ".png"), image.EncodeToPNG());
+                        UnityEngine.Object.Destroy(image);
+                    }
+                }
+            }
+            finally { Time.captureDeltaTime = 0f; }
+            Debug.Log("LARENGA C captures=" + shot + " phase=" + Get(mode, "Phase") + " served=" + Get(mode, "ServedFans") + " delivered=" + Get(mode, "TotalDelivered"));
+        }
+
         // Balance sweep for the horizontal kitchen levels: fan speed x crew size, each over a whole run (no rendering).
         static readonly object[] BalanceCases = BuildBalanceCases();
         static object[] BuildBalanceCases()
@@ -1887,6 +2035,36 @@ namespace HayChoriYPaty.Tests
             File.AppendAllText(path, line + "\n");
             Assert.Pass(line);
         }
+        [UnityTest]
+        [Explicit("Appends to Logs/Acceptance/RengaCShape-20261118/balance-sweep.txt")]
+        public IEnumerator LaRengaBalanceCase([ValueSource(nameof(RengaSpeeds))] float speed, [ValueSource(nameof(RengaSpacings))] float spacing,
+            [ValueSource(nameof(RengaHires))] int hires)
+        {
+            string path = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/RengaCShape-20261118/balance-sweep.txt"));
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            Type roleKind = T("StreetWorkerRole");
+            int[] order = { 0, 1, 0, 1, 0, 1 }; // the hire cards: Parrillero and Cocacolero, up to three of each
+            object cfg = mode.GetType().GetField("config", I).GetValue(mode); // the runtime clone, never the asset
+            cfg.GetType().GetField("fanSpeed", I).SetValue(cfg, speed);
+            cfg.GetType().GetField("minimumEntrySpacingLogical", I).SetValue(cfg, spacing);
+            if (RengaFans > 0) cfg.GetType().GetField("totalFanCount", I).SetValue(cfg, RengaFans);
+            int next = 0, frames = 0;
+            for (; frames < 20 * 60 * 25 && Get(mode, "Phase").ToString() == "Playing"; frames++)
+            {
+                if (frames % 20 == 0 && next < hires && (bool)Call(game, "TryHireTowerDefenseAtPost", mode, Enum.ToObject(roleKind, order[next]))) next++;
+                Call(mode, "Step", .05f);
+                if (frames % 400 == 0) yield return null;
+            }
+            string line = "fans=" + RengaFans + " speed=" + speed + " spacing=" + spacing + " hires=" + hires + " -> won=" + Get(mode, "HasWon") + " minutes=" + (frames * .05f / 60f).ToString("0.0") +
+                " served=" + Get(mode, "ServedFans") + "/" + Get(mode, "TotalFanCount") + " escaped=" + Get(mode, "EscapedFans") + " coins=" + Get(mode, "Coins");
+            File.AppendAllText(path, line + "\n");
+            Assert.Pass(line);
+        }
+        static int RengaFans = 120;
+        static readonly float[] RengaSpeeds = { .375f, .39f, .41f };
+        static readonly float[] RengaSpacings = { 58f };
+        static readonly int[] RengaHires = { 2, 3, 4, 5, 6 };
+
         static readonly float[] BalanceSpeeds = { .1575f };
         static readonly float[] BalanceSpacings = { 58f };
         static readonly int[] BalanceCaps = { 2, 3, 4, 5, 6, 9 };

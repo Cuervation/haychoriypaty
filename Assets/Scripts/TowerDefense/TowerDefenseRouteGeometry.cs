@@ -113,6 +113,8 @@ namespace HayChoriYPaty
 
             if (config.RouteKind == TowerDefenseRouteKind.HorizontalSingleFence)
                 return GenerateHorizontalSingleFence(config);
+            if (config.RouteKind == TowerDefenseRouteKind.CShapedSingleFence)
+                return GenerateCShapedSingleFence(config);
 
             var centerline = new List<Vector2>();
             float firstY = config.PlayableBounds.center.y + (config.RowCount - 1) * config.RowSpacing * 0.5f;
@@ -192,6 +194,51 @@ namespace HayChoriYPaty
             return new TowerDefenseRouteGeometryResult(new TowerDefenseRouteValidationResult(errors), centerline, left, right);
         }
 
+        /// <summary>
+        /// A "C" open to the left: fans enter at the left of the top run, walk right, down the right connector and back left
+        /// along the bottom run. SegmentLengths[0] is the length of each horizontal run and RowSpacing the distance between the
+        /// two run centerlines. The single fence is the right-hand rail of the travel direction, i.e. the inner one, so the
+        /// work pocket (WorkBounds) sits inside the C and the fans walk around the outside.
+        /// </summary>
+        private static TowerDefenseRouteGeometryResult GenerateCShapedSingleFence(TowerDefenseRouteGeometryConfig config)
+        {
+            var errors = new List<string>();
+            if (config.SegmentLengths == null || config.SegmentLengths.Length != 1 ||
+                !IsFinite(config.SegmentLengths[0]) || config.SegmentLengths[0] <= 0f)
+                errors.Add("CShapedSingleFence requires exactly one finite positive run length.");
+            if (!IsFinite(config.CorridorWidth) || config.CorridorWidth <= 0f)
+                errors.Add("CShapedSingleFence corridor width must be finite and positive.");
+            if (!IsFinite(config.RowSpacing) || config.RowSpacing <= config.CorridorWidth)
+                errors.Add("CShapedSingleFence RowSpacing (distance between the two runs) must exceed the corridor width.");
+            if (errors.Count > 0) return EmptyResult(errors);
+
+            float halfLength = config.SegmentLengths[0] * .5f;
+            float topY = config.PlayableBounds.center.y + config.RowSpacing * .5f;
+            float bottomY = topY - config.RowSpacing;
+            float leftX = config.PlayableBounds.center.x - halfLength, rightX = config.PlayableBounds.center.x + halfLength;
+            var centerline = new List<Vector2> { new Vector2(leftX, topY), new Vector2(rightX, topY) };
+            Vector2 start = new Vector2(rightX, topY), end = new Vector2(rightX, bottomY);
+            for (int sample = 1; sample <= config.TurnSegments; sample++)
+                centerline.Add(sample == config.TurnSegments ? end : Vector2.Lerp(start, end, sample / (float)config.TurnSegments));
+            centerline.Add(new Vector2(leftX, bottomY));
+
+            Vector2[] points = centerline.ToArray();
+            float horizontalWidth = config.HorizontalCorridorWidth > 0f ? config.HorizontalCorridorWidth : config.CorridorWidth;
+            Vector2[] left = OffsetPolyline(points, config.CorridorWidth * .5f, horizontalWidth * .5f);
+            Vector2[] right = OffsetPolyline(points, -config.CorridorWidth * .5f, -horizontalWidth * .5f);
+            AddBoundsErrorIfNeeded(config.PlayableBounds, points, left, right, errors);
+            if (config.WorkBounds.width <= 0f || config.WorkBounds.height <= 0f)
+                errors.Add("CShapedSingleFence requires positive WorkBounds inside the C.");
+            else
+            {
+                float innerTop = right[0].y, innerBottom = right[right.Length - 1].y, innerRight = right[1].x;
+                if (config.WorkBounds.yMax > innerTop + BoundsTolerance || config.WorkBounds.yMin < innerBottom - BoundsTolerance ||
+                    config.WorkBounds.xMax > innerRight + BoundsTolerance)
+                    errors.Add("CShapedSingleFence WorkBounds must remain inside the fence (below the top rail, above the bottom rail, left of the right rail).");
+            }
+            return new TowerDefenseRouteGeometryResult(new TowerDefenseRouteValidationResult(errors), points, left, right);
+        }
+
         private static TowerDefenseRouteGeometryResult EmptyResult(List<string> errors)
         {
             return new TowerDefenseRouteGeometryResult(
@@ -207,9 +254,9 @@ namespace HayChoriYPaty
                 return errors;
             }
 
-            if (config.RouteKind == TowerDefenseRouteKind.HorizontalSingleFence)
+            if (config.RouteKind == TowerDefenseRouteKind.HorizontalSingleFence || config.RouteKind == TowerDefenseRouteKind.CShapedSingleFence)
             {
-                if (config.RowCount != 1) errors.Add("HorizontalSingleFence must contain exactly one route row.");
+                if (config.RowCount != 1) errors.Add("A single-fence route must contain exactly one route row.");
             }
             else if (config.RowCount < 3 || config.RowCount > 9 || config.RowCount % 2 == 0)
                 errors.Add("Serpentine RowCount must be an odd number from 3 through 9.");
@@ -224,7 +271,7 @@ namespace HayChoriYPaty
 
             if (!IsFinite(config.RowSpacing) || config.RowSpacing <= 0f)
                 errors.Add("RowSpacing must be a finite value greater than zero.");
-            else if (config.RouteKind != TowerDefenseRouteKind.HorizontalSingleFence && IsFinite(config.CorridorWidth) && config.CorridorWidth > 0f && config.RowSpacing <= config.CorridorWidth)
+            else if (config.RouteKind == TowerDefenseRouteKind.Serpentine && IsFinite(config.CorridorWidth) && config.CorridorWidth > 0f && config.RowSpacing <= config.CorridorWidth)
                 errors.Add("RowSpacing must be greater than CorridorWidth so adjacent fence rails do not overlap at U-turns.");
 
             if (config.SegmentLengths == null || config.SegmentLengths.Length != config.RowCount)

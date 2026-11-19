@@ -134,7 +134,7 @@ namespace HayChoriYPaty
             }
             SetLayerRecursively(generatedRoot.gameObject, presentationLayer);
             ClearGeneratedChildren();
-            bool singleFence = levelConfig.RouteKind == TowerDefenseRouteKind.HorizontalSingleFence;
+            bool singleFence = levelConfig.RouteKind != TowerDefenseRouteKind.Serpentine;
             bool mergeRowTongues = HasSideWorkColumn(levelConfig.Route);
             if (!singleFence) BuildRail(FitVisualRailToHorizontalBounds(latestGeometry.LeftBoundary), 0, mergeRowTongues);
             BuildRail(FitVisualRailToHorizontalBounds(latestGeometry.RightBoundary), 1, mergeRowTongues);
@@ -395,7 +395,10 @@ namespace HayChoriYPaty
             // A serpentine with a side work column (Los Redondos) keeps its arrows on the
             // connector axis: the default outer offset would land inside the worker strip.
             bool sideWorkColumn = HasSideWorkColumn(route);
-            for (int turn = 0; turn < route.RowCount - 1; turn++)
+            // The C-shaped fence has one connector (its right side); the arrow rides on the fan lane.
+            bool cShaped = route.RouteKind == TowerDefenseRouteKind.CShapedSingleFence;
+            if (cShaped) sideWorkColumn = true;
+            for (int turn = 0; turn < (cShaped ? 1 : route.RowCount - 1); turn++)
             {
                 int arcMiddle = turn * stride + 1 + route.TurnSegments / 2;
                 if (arcMiddle < 0 || arcMiddle >= geometry.Centerline.Length) continue;

@@ -951,7 +951,7 @@ namespace HayChoriYPaty
 
         private bool IsAdjacentToRoleArea(TowerDefenseFanState fan, StreetWorkerRole role, int zone)
         {
-            if (config.FreeConstruction) return zone == 0 && !fan.RouteFollower.HasExited;
+            if (config.FreeConstruction) return zone == 0 && !fan.RouteFollower.HasExited && FanIsServiceable(fan);
             if (zone < 0 || zone >= serviceZones.Length || fan.RouteFollower.HasExited) return false;
             // Los Redondos has four right-side sectors; sector k serves runs k and k+1 and
             // their connector, exactly as a Camioneros area serves its two bordering runs.
