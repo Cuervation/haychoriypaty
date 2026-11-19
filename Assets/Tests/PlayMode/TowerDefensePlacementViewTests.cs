@@ -2137,6 +2137,10 @@ namespace HayChoriYPaty.Tests
         [UnityTest]
         public IEnumerator PeregrinacionHireCardsHireAtTheRolePostWithOneTap()
         {
+                // The run keeps saving its progress as it delivers every product of its five-product menu; a menu the saving simulation
+                // does not know makes the save fail and freezes the match ("No se pudo guardar. La partida quedó en pausa").
+                if (frame % 10 == 9 && Get(mode, "Phase").ToString() == "Playing")
+                    Assert.IsTrue((bool)Call(game, "PersistTowerDefenseProgress", mode), "saving the La Renga run at frame " + frame);
             float pixel = (float)Get(mode, "worldUnitsPerLogicalPixel");
             IList workers = (IList)Get(mode, "Workers");
             Assert.AreEqual(2, workers.Count);

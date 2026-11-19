@@ -604,6 +604,18 @@ namespace HayChoriYPaty
             var result = new int[LevelNames.Length][];
             for (int level = 0; level < result.Length; level++)
             {
+                if (level == TowerDefenseLevelConfig.LaRengaCampaignLevelId)
+                {
+                    // La Renga serves its authored five-product Defense menu, not the legacy Chori/Coca pair: a delivery outside the
+                    // menu made the progress save fail and froze the match ("No se pudo guardar. La partida quedó en pausa").
+                    string path = TowerDefenseLevelConfig.ResourcesPathForCampaignLevel(level);
+                    int[] menu = Resources.Load<TowerDefenseLevelConfig>(path)?.AvailableProducts;
+                    if (menu != null && menu.Length > 0)
+                    {
+                        result[level] = menu;
+                        continue;
+                    }
+                }
                 int[] parsed = ParseProductIds(value.levelProductIds != null && level < value.levelProductIds.Length
                     ? value.levelProductIds[level] : null);
                 if (parsed == null) parsed = (int[])DefaultLevelProducts[level].Clone();
