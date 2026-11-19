@@ -17,7 +17,7 @@ namespace HayChoriYPaty
 
         /// <summary>The campaign level whose footer a Tower Defense level copies. La Renga keeps Camioneros' (Nueva Chicago's) footer.</summary>
         public static int FooterSourceLevelId(int sourceCampaignLevelId) =>
-            sourceCampaignLevelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId ? TowerDefenseLevelConfig.CamionerosCampaignLevelId : sourceCampaignLevelId;
+            sourceCampaignLevelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId ? TowerDefenseLevelConfig.LosRedondosCampaignLevelId : sourceCampaignLevelId;
         // Shared visual frame width used to anchor follower entry to the viewport edge.
         public const float FanFrameWidthLogical = 78f;
         // The 96px corridor leaves a visible margin around the fan frame.

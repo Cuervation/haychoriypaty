@@ -471,7 +471,7 @@ namespace HayChoriYPaty
             coins = startingCoins >= 0 ? startingCoins : TowerDefenseEconomyProfile.StartingCoins;
             // Nueva Chicago's kitchen is the traditional one: nobody cooks, the table is always full of sandwiches and the
             // Parrillero only serves them. Every other Tower Defense level (and Luján) keeps active cooks.
-            Kitchen = new StreetKitchenProduction(sourceBalance.kitchen, availableProducts, null, !IsPassiveKitchenLevel, IsPassiveKitchenLevel, !config.FreeConstruction);
+            Kitchen = new StreetKitchenProduction(sourceBalance.kitchen, availableProducts, null, !IsPassiveKitchenLevel, IsPassiveKitchenLevel, !config.FreeConstruction, false, NarrowGrills);
             random = new System.Random(sourceBalance.randomSeed + sourceLevel * 97 + config.LevelId.GetHashCode());
             InitializeStartingStations();
             BuildWorkers();

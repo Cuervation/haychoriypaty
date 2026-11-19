@@ -1885,46 +1885,88 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
-        public IEnumerator LaRengaCShapedLayoutCopiesHuracanKitchenAndCamionerosFooter()
+        public IEnumerator LaRengaCShapedLayoutCopiesFerroKitchenAndFooter()
         {
             yield return CaptureAtResolution("larenga-c-layout-610x1356", 610, 1356);
-            Type game = T("TowerDefenseGameMode");
             Assert.AreEqual("CShapedSingleFence", Get(mode, "RouteKind").ToString());
             Assert.IsTrue((bool)Get(mode, "FreeConstruction"));
             Rect work = (Rect)Get(mode, "WorkBounds");
             float pixel = (float)Get(mode, "WorldUnitsPerLogicalPixel");
             Type layoutType = T("StreetKitchenLayout");
-            object huracan = Activator.CreateInstance(layoutType, new object[] { new[] { 0, 1, 4 }, true });
-            Rect sourceGrill = (Rect)Get(huracan, "NormalGrillBounds"), sourceTable = (Rect)Get(huracan, "NormalTableBounds"),
-                sourceCoca = (Rect)Get(huracan, "CocaBarrelBounds");
-            float vs = (float)Get(mode, "KitchenVerticalScale");
-            Rect grill = default, table = default, coca = default;
-            foreach (object station in (IEnumerable)Get(mode, "PlacedStations"))
+            // Ferro's kitchen with La Renga's narrow grills (two columns less of food, grills shrunk to hold it).
+            object ferro = Activator.CreateInstance(layoutType, new object[] { new[] { 0, 1, 2, 4, 6 }, false, true });
+            var source = new System.Collections.Generic.Dictionary<string, Rect>
             {
-                string kind = Get(station, "Kind").ToString();
-                Rect bounds = (Rect)Get(station, "Bounds");
-                if (kind == "NormalGrill") grill = bounds; else if (kind == "NormalTable") table = bounds; else if (kind == "CocaBarrel") coca = bounds;
-            }
-            // Huracán's sizes: widths as in its layout, heights stretched by the screen's vertical scale.
-            Assert.AreEqual(sourceGrill.width, grill.width / pixel, .6f, "grill width");
-            Assert.AreEqual(sourceTable.width, table.width / pixel, 1.5f, "table width (its 1.2 px overlap padding is not part of the footprint)");
-            Assert.AreEqual(sourceCoca.width, coca.width / pixel, 1.5f, "barrel width");
-            Assert.AreEqual(sourceGrill.height * vs, grill.height / pixel, .6f, "grill height");
-            // ...and Huracán's distances between the pieces.
-            Assert.AreEqual(sourceGrill.xMin - sourceTable.xMin, (grill.xMin - table.xMin) / pixel, 1.5f, "grill-table x distance");
-            Assert.AreEqual(sourceCoca.xMin - sourceTable.xMin, (coca.xMin - table.xMin) / pixel, 1.5f, "barrel-table x distance");
-            Assert.AreEqual((sourceGrill.yMin - sourceTable.yMin) * vs, (table.yMax - grill.yMax) / pixel, .6f, "grill-table y distance");
-            float kitchenLeft = Mathf.Min(table.xMin, grill.xMin), kitchenRight = Mathf.Max(grill.xMax, coca.xMax);
-            Assert.AreEqual(work.center.x, (kitchenLeft + kitchenRight) * .5f, 1.5f * pixel, "the kitchen is centered across the pocket");
-            Assert.GreaterOrEqual(table.yMax, work.yMin); Assert.LessOrEqual(table.yMax, work.yMax + 56f * pixel);
-            // Like Camioneros: nobody starts on the crew, the kitchen is passive and the footer hires a Parrillero and a Cocacolero.
+                { "NormalGrill", (Rect)Get(ferro, "NormalGrillBounds") }, { "PremiumGrill", (Rect)Get(ferro, "PremiumGrillBounds") },
+                { "NormalTable", (Rect)Get(ferro, "NormalTableBounds") }, { "PremiumTable", (Rect)Get(ferro, "PremiumTableBounds") },
+                { "CocaBarrel", (Rect)Get(ferro, "CocaBarrelBounds") }, { "BeerBarrel", (Rect)Get(ferro, "BeerBarrelBounds") }
+            };
+            var placed = new System.Collections.Generic.Dictionary<string, Rect>();
+            foreach (object station in (IEnumerable)Get(mode, "PlacedStations"))
+                placed[Get(station, "Kind").ToString()] = (Rect)Get(station, "Bounds");
+            CollectionAssert.AreEquivalent(source.Keys, placed.Keys, "La Renga installs exactly Ferro's six pieces.");
+            // The C's pocket is narrower than Ferro's 520 px counter, so the whole kitchen shrinks uniformly to fit:
+            // Ferro's sizes and x distances times that single factor.
+            float fit = (float)Call(mode, "BocaKitchenFitScale");
+            Assert.LessOrEqual(fit, 1f); Assert.Greater(fit, .8f, "the kitchen is at most slightly smaller than Ferro's (full size once the tables are halved)");
+            foreach (var pair in source)
+                Assert.AreEqual(pair.Value.width * fit, placed[pair.Key].width / pixel, 1.5f, pair.Key + " width");
+            Rect srcTable = source["NormalTable"], table = placed["NormalTable"];
+            foreach (var pair in source)
+                Assert.AreEqual((pair.Value.xMin - srcTable.xMin) * fit, (placed[pair.Key].xMin - table.xMin) / pixel, 1.5f, pair.Key + " x distance to the table");
+            Assert.Greater(table.yMin, placed["NormalGrill"].yMin, "Ferro's grills are the front row, under the tables and barrels.");
+            float left = float.MaxValue, right = float.MinValue;
+            foreach (Rect r in placed.Values) { left = Mathf.Min(left, r.xMin); right = Mathf.Max(right, r.xMax); }
+            Assert.AreEqual(work.xMin + 12f * pixel, left, 1.5f * pixel, "the kitchen starts 12 logical px from the pocket's left edge");
+            // The halved tables pull the barrels in: a worker can walk along the right fence past the last barrel. (The premium
+            // grill still reaches further right than the barrels, so the strip beside the grills is the narrower one.)
+            Debug.Log("LARENGA vertical: pocket top - Coca top = " + ((work.yMax - placed["CocaBarrel"].yMax) / pixel) + " px; barrel height = " + (placed["CocaBarrel"].height / pixel) + " px; pocket height = " + (work.height / pixel) + " px; kitchen bottom - pocket bottom = " + ((placed["NormalGrill"].yMin - work.yMin) / pixel) + " px");
+            Debug.Log("LARENGA left margin (logical px from the pocket left edge): normalTable=" + ((placed["NormalTable"].xMin - work.xMin) / pixel)+ " premiumTable=" + ((placed["PremiumTable"].xMin - work.xMin) / pixel) + " normalGrill=" + ((placed["NormalGrill"].xMin - work.xMin) / pixel)+ " | table width=" + (placed["NormalTable"].width / pixel) + " | pocket left=" + work.xMin + " pixel=" + pixel);
+            float barrelsRight = Mathf.Max(placed["CocaBarrel"].xMax, placed["BeerBarrel"].xMax);
+            float stripBesideBarrels = (work.xMax - barrelsRight) / pixel, stripBesideGrills = (work.xMax - right) / pixel;
+            Debug.Log("LARENGA strip right of the barrels = " + stripBesideBarrels + " / right of the grills = " + stripBesideGrills + " (logical px)");
+            Assert.GreaterOrEqual(stripBesideBarrels, 28f, "a free strip along the right fence beside the barrels");
+            // Like the other horizontal kitchen levels: nobody starts on the crew and the kitchen is passive.
             Assert.AreEqual(0, ((ICollection)Get(mode, "Workers")).Count);
             Assert.IsTrue((bool)Get(mode, "IsPassiveKitchenLevel"), "La Renga plays like the other horizontal kitchen levels.");
-            // The footer is Camioneros' (Nueva Chicago's): the same top as ID9 on the same screen.
+            // The footer is Ferro's / Los Redondos': the same top as ID10 on the same screen.
             Type layoutHelper = T("TowerDefenseResponsiveLayout");
             float canvas = (float)Get(view, "logicalCanvasHeight");
-            Assert.AreEqual((float)layoutHelper.GetMethod("PilgrimFooterTop").Invoke(null, new object[] { canvas, 9 }),
+            Assert.AreEqual((float)layoutHelper.GetMethod("PilgrimFooterTop").Invoke(null, new object[] { canvas, 10 }),
                 (float)layoutHelper.GetMethod("PilgrimFooterTop").Invoke(null, new object[] { canvas, 13 }), .001f);
+        }
+
+        [UnityTest]
+        public IEnumerator LaRengaWorkersNeverStepOnAnyKitchenPiece()
+        {
+            yield return null;
+            Type roleKind = T("StreetWorkerRole");
+            object[] hires = { 0, 1, 0, 1, 0, 1 };
+            int[] hireFrames = { 1, 2, 3, 4, 5, 6 }; // the whole crew from the start, so the run lasts
+            int violations = 0, checks = 0, hired = 0;
+            string first = "";
+            for (int frame = 0; frame < 1800 && Get(mode, "Phase").ToString() == "Playing"; frame++)
+            {
+                if (hired < hireFrames.Length && frame == hireFrames[hired])
+                    Call(game, "TryHireTowerDefenseAtPost", mode, Enum.ToObject(roleKind, hires[hired++]));
+                Call(mode, "Step", .05f);
+                foreach (object worker in (IEnumerable)Get(mode, "Workers"))
+                {
+                    Vector2 position = (Vector2)Get(worker, "Position");
+                    Rect feet = (Rect)Call(mode, "WorkerFeet", position);
+                    foreach (object station in (IEnumerable)Get(mode, "PlacedStations"))
+                    {
+                        checks++;
+                        if (!feet.Overlaps((Rect)Get(station, "Bounds"))) continue;
+                        violations++;
+                        if (first.Length == 0)
+                            first = Get(worker, "Role") + " feet " + feet + " over " + Get(station, "Kind") + " " + Get(station, "Bounds") + " at frame " + frame;
+                    }
+                }
+            }
+            Debug.Log("LARENGA solid kitchen: checks=" + checks + " violations=" + violations + " phase=" + Get(mode, "Phase") + " served=" + Get(mode, "ServedFans") + " " + first);
+            Assert.AreEqual(0, violations, "No worker may walk over a table, grill or barrel. First: " + first);
+            Assert.Greater((int)Get(mode, "ServedFans"), 0, "the crew still serves fans");
         }
 
         [UnityTest]
@@ -1936,6 +1978,7 @@ namespace HayChoriYPaty.Tests
             Call(presentation, "Sync", mode);
             yield return CaptureAtResolution("larenga-kitchen-only-610x1356", 610, 1356, false);
             ((IList)mode.GetType().GetField("placedStations", I).GetValue(mode)).Clear();
+            Call(presentation, "ClearPilgrimStations"); // Sync only adds station views; the base capture needs them gone.
             Call(presentation, "Sync", mode);
             yield return CaptureAtResolution("larenga-base-610x1356", 610, 1356, false);
         }
@@ -1986,10 +2029,10 @@ namespace HayChoriYPaty.Tests
             {
                 for (int frame = 0; frame < 1200 && Get(mode, "Phase").ToString() == "Playing"; frame++)
                 {
-                    if (frame == 5) Call(game, "TryHireTowerDefenseAtPost", mode, Enum.ToObject(roleKind, 0));
+                    if (frame >= 1 && frame <= 6) Call(game, "TryHireTowerDefenseAtPost", mode, Enum.ToObject(roleKind, (frame + 1) % 2));
                     Call(mode, "Step", .05f);
                     Call(presentation, "Sync", mode);
-                    if (frame == 100 || frame == 300 || frame == 600)
+                    if (frame == 30 || frame == 80 || frame == 130 || frame == 200)
                     {
                         yield return new WaitForEndOfFrame();
                         Texture2D image = ScreenCapture.CaptureScreenshotAsTexture();

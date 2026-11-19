@@ -43,8 +43,8 @@ namespace HayChoriYPaty
         private static int pilgrimFooterCacheLevel = -1;
         // Campaign level index whose own footer the level copies: Nueva Chicago (1) for Camioneros and La Renga, Ferro (3) for Los Redondos, Boca (8) for Luján.
         private static int PilgrimFooterReferenceLevel(int sourceLevelId) =>
-            sourceLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId || sourceLevelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId ? 1
-            : sourceLevelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId ? 3 : 8;
+            sourceLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId ? 1
+            : sourceLevelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId || sourceLevelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId ? 3 : 8;
         private ResponsiveFooterLayout PilgrimFooter(float canvasHeight)
         {
             int level = PilgrimFooterReferenceLevel(PilgrimSourceLevelId);

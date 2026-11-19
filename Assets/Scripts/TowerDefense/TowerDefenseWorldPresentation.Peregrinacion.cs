@@ -104,7 +104,9 @@ namespace HayChoriYPaty
 
             if (kind == TowerDefenseStationKind.NormalTable || kind == TowerDefenseStationKind.PremiumTable)
             {
-                FitPilgrimSandwichTable(obj, depth);
+                // La Renga's tables are narrower: draw the table at the width its layout gives it.
+                float layoutWidth = mode.BocaKitchenSourceBounds(kind).width;
+                FitPilgrimSandwichTable(obj, depth, layoutWidth > 0f ? layoutWidth : StreetKitchenLayout.TableWidth);
             }
             else
             {
@@ -149,7 +151,7 @@ namespace HayChoriYPaty
             }
         }
 
-        private void FitPilgrimSandwichTable(GameObject station, int depth)
+        private void FitPilgrimSandwichTable(GameObject station, int depth, float tableWidth)
         {
             Transform tabletop = station.transform.Find("Tabletop");
             Transform leftTrestle = station.transform.Find("Trestle_Left");
@@ -162,8 +164,8 @@ namespace HayChoriYPaty
 
             // Match StreetKitchenRenderer's exact Boca table composition. The source layout is
             // scaled as a whole; only its transparent authored overlap may extend past collision bounds.
-            Rect bounds = new Rect(-StreetKitchenLayout.TableWidth * .5f, -40f,
-                StreetKitchenLayout.TableWidth, StreetKitchenLayout.SandwichTableHeight);
+            Rect bounds = new Rect(-tableWidth * .5f, -40f,
+                tableWidth, StreetKitchenLayout.SandwichTableHeight);
             Rect visual = StreetKitchenLayout.FoodTableVisualBounds(bounds);
             float topDepth = visual.height * StreetKitchenLayout.SandwichTableTopDepthRatio;
             float supportHeight = visual.height - topDepth + StreetKitchenLayout.SandwichTableSupportOverlap;
@@ -242,7 +244,7 @@ namespace HayChoriYPaty
                     logicalPosition = layout.TableSlotPosition(unit.Product, unit.Slot, companionAvailable,
                         mode.Kitchen.TableCapacity(unit.Product));
                     iconSize = StreetKitchenLayout.TableServingSize(unit.Product);
-                    rotation = StreetKitchenLayout.TableSlotRotation(unit.Product, unit.Slot, companionAvailable);
+                    rotation = StreetKitchenLayout.TableSlotRotation(unit.Product, unit.Slot, companionAvailable, layout.NarrowGrills);
                 }
                 if (unit.Location == StreetFoodLocation.Carried)
                 {

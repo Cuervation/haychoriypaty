@@ -35,6 +35,7 @@ namespace HayChoriYPaty
         // Workers lean on the fence while serving: feet stay below the rail, the head rises above it, so the
         // order is handed over from close by instead of across the whole yard.
         private const float ServiceLeanLogical = 56f;
+        private const float CShapedKitchenSideMarginLogical = 12f;
         // Visible body width of a worker in Boca's own pixels (StreetKitchenLayout.GrillWorkPosition reserves 30 px per side).
         private const float BocaBodyWidthPx = 60f;
         // Boca's counter row pieces overlap by this many of its own pixels (tables/barrels are 1.2 px wider than their step).
@@ -50,16 +51,17 @@ namespace HayChoriYPaty
         // Ferro's kitchen: normal and premium grill and table, Coca and beer barrels (products 0, 1, 2, 4 and 6).
         private static readonly StreetKitchenLayout FerroKitchenLayoutStatic =
             new StreetKitchenLayout(new[] { 0, 1, 2, 4, 6 }, false);
-        // Huracán's kitchen (normal grill, table and Coca barrel with active cooks): La Renga's work area, exactly as Huracán lays it out.
-        private static readonly StreetKitchenLayout HuracanKitchenLayoutStatic =
-            new StreetKitchenLayout(new[] { 0, 1, 4 }, true);
+                // La Renga's kitchen is Ferro's with two columns less of food on its grills (2 per product instead of 3).
+        private static readonly StreetKitchenLayout RengaKitchenLayoutStatic =
+            new StreetKitchenLayout(new[] { 0, 1, 2, 4, 6 }, false, true);
+        internal bool NarrowGrills => config.SourceCampaignLevelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId;
         internal static StreetKitchenLayout LujanBocaKitchenVisualLayout => BocaKitchenLayoutStatic;
 
         /// <summary>The campaign kitchen a kitchen-derived level copies: Chicago's for Camioneros, Boca's for Luján.</summary>
         internal static StreetKitchenLayout KitchenLayoutForLevel(int sourceCampaignLevelId) =>
             sourceCampaignLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId ? ChicagoKitchenLayoutStatic
             : sourceCampaignLevelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId ? FerroKitchenLayoutStatic
-            : sourceCampaignLevelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId ? HuracanKitchenLayoutStatic
+            : sourceCampaignLevelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId ? RengaKitchenLayoutStatic
             : BocaKitchenLayoutStatic;
         private StreetKitchenLayout BocaKitchenLayout => KitchenLayoutForLevel(config.SourceCampaignLevelId);
         internal StreetKitchenLayout SourceKitchenLayout => BocaKitchenLayout;
@@ -315,7 +317,8 @@ namespace HayChoriYPaty
         // The campaign kitchens span the work area from side to side, centered on it. La Renga's pocket is wider and taller than
         // Huracán's kitchen: the kitchen keeps its exact size and distances and sits in the middle of the pocket.
         private float KitchenWorldX(float bocaX, float scale) => IsCShapedLevel
-            ? WorkBounds.center.x + (bocaX - BocaKitchenSourceBounds().center.x) * scale
+            // La Renga's kitchen is anchored to the left of the pocket, CShapedKitchenSideMarginLogical from its edge.
+            ? WorkBounds.xMin + CShapedKitchenSideMarginLogical * worldUnitsPerLogicalPixel + (bocaX - BocaKitchenSourceBounds().xMin) * scale
             : WorkBounds.center.x + (bocaX - StreetSceneLayout.Width * .5f) * scale;
         private float KitchenWorldBottomY(float scale, float bottomLogical)
         {
@@ -366,6 +369,13 @@ namespace HayChoriYPaty
             index = Mathf.Clamp(index, 0, BocaPostSlots - 1);
             int column = index % 2, row = index / 2;
             var boca = new Vector2(source.center.x + (column == 0 ? -24f : 24f) * bodyScale, source.yMax + 14f + row * 30f * bodyScale);
+            if (IsCShapedLevel)
+            {
+                // The apron below the table is the grill itself here, so the cooks hand over from the strip between the rows:
+                // two beside each other and a third in the middle.
+                float stripY = BocaKitchenLayout.GrillWorkPosition(table.Kind == TowerDefenseStationKind.PremiumTable ? 2 : 0, 0, 1).y;
+                boca = new Vector2(source.center.x + (index == 0 ? -24f : index == 1 ? 24f : 0f) * bodyScale, stripY);
+            }
             // A table at the screen edge would push the outer slot out of the work area, where no path reaches it.
             return ClampPostInsideWork(BocaPointToWorld(boca), StreetWorkerRole.Parrillero);
         }
@@ -418,7 +428,10 @@ namespace HayChoriYPaty
         }
 
         // Nueva Chicago stacks its grill 4 px under its table, so a cook stands on that thin strip: its feet are shallower there.
-        private float FootDepthLogical => IsPassiveKitchenLevel ? ChicagoFootDepthLogical : BocaFootDepthLogical;
+        // When the C-shaped pocket shrinks the kitchen to fit (Ferro is wider than the pocket), that strip shrinks with it,
+        // so the feet depth shrinks at least as fast to keep the cook's feet off the barrel base above it.
+        private float FootDepthLogical => IsPassiveKitchenLevel
+            ? ChicagoFootDepthLogical * (IsCShapedLevel ? BocaKitchenFitScale() * BocaKitchenFitScale() : 1f) : BocaFootDepthLogical;
         private const float ChicagoFootDepthLogical = 2f, ChicagoGrillOpenBackLogical = 30f;
 
         // Boca collision: only the feet touch the solid base (table front strip, barrel, grill).
@@ -431,6 +444,9 @@ namespace HayChoriYPaty
 
         private Rect StationSolidRect(TowerDefenseStationKind kind, Rect bounds)
         {
+            // La Renga: nobody walks over anything in the kitchen. Grills, tables and barrels are solid for the feet over their whole
+            // footprint; the cooks work from the thin strip between the table row and the grill row.
+            if (IsCShapedLevel) return bounds;
             if (IsPassiveKitchenLevel && (kind == TowerDefenseStationKind.NormalGrill || kind == TowerDefenseStationKind.PremiumGrill))
             {
                 // Chicago's cooks hand over and stand over the back of the grill: only its front is solid.
@@ -462,6 +478,8 @@ namespace HayChoriYPaty
                 xMax = Mathf.Max(xMax, piece.xMax);
                 yMax = Mathf.Max(yMax, piece.yMax);
             }
+            // La Renga's narrow layout keeps the span it had before the beer barrel went on top of the Coca barrel.
+            if (BocaKitchenLayout.KitchenSpanTop > 0f) yMin = Mathf.Max(yMin, BocaKitchenLayout.KitchenSpanTop);
             return Rect.MinMaxRect(xMin, yMin, xMax, yMax);
         }
 
@@ -485,6 +503,8 @@ namespace HayChoriYPaty
             Rect source = BocaKitchenSourceBounds();
             float pixel = Mathf.Max(.0001f, worldUnitsPerLogicalPixel);
             float availableWidth = WorkBounds.width / pixel;
+            // La Renga's counter would otherwise touch the screen edge and the right fence: keep a small margin on each side.
+            if (IsCShapedLevel) availableWidth -= CShapedKitchenSideMarginLogical * 2f;
             // Preserve one worker-height service lane behind the furniture before fitting
             // the same Boca station proportions into the smaller TD workfield.
             float availableHeight = WorkBounds.height / pixel - BocaKitchenWorkerLaneLogical;

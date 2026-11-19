@@ -727,6 +727,9 @@ namespace HayChoriYPaty
                     : worker.ServeAnimationSeconds > 0f && worker.LastServiceTarget.x < worker.Position.x;
                 if (gameMode.FreeConstruction && worker.IsMoving && worker.TransferRoute != null && worker.TransferIndex < worker.TransferRoute.Length)
                     workerView.Renderer.flipX = worker.TransferRoute[worker.TransferIndex].x < worker.Position.x;
+                // La Renga's barrels are taken from the right: a Cocacolero waiting at its post stands beside the barrel and faces it.
+                if (gameMode.NarrowGrills && worker.Role == StreetWorkerRole.Cocacolero && !worker.IsMoving && worker.ServeAnimationSeconds <= 0f)
+                    workerView.Renderer.flipX = true;
                 workerView.Renderer.sortingOrder = 28 + Mathf.RoundToInt(-worker.Position.y * 12f);
                 int stationMinimumOrder;
                 if (visualLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId &&

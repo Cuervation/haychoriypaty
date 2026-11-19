@@ -310,7 +310,7 @@ namespace HayChoriYPaty
         public static readonly string[] ProductNames = { "Chori", "Paty", "Bondiola", "Vacío", "Coca 600 ml", "Fernet con Coca 1 L", "Cerveza en lata" };
         public const int HuracanBonusLevelId = 11;
         public const int ArgentinosJuniorsLevelId = 12;
-        public static readonly int[] CampaignOrder = { 0, 1, TowerDefenseCampaignLevelId, 2, ArgentinosJuniorsLevelId, 3, LosRedondosTowerDefenseCampaignLevelId, HuracanBonusLevelId, LaRengaTowerDefenseCampaignLevelId, PeregrinacionTowerDefenseCampaignLevelId, 4, 5, 6, 7, 8 };
+        public static readonly int[] CampaignOrder = { 0, 1, TowerDefenseCampaignLevelId, 2, ArgentinosJuniorsLevelId, 3, LaRengaTowerDefenseCampaignLevelId, HuracanBonusLevelId, 4, 5, LosRedondosTowerDefenseCampaignLevelId, 6, 7, 8, PeregrinacionTowerDefenseCampaignLevelId };
         public static readonly string[] LevelNames = { "Floresta / All Boys", "Nueva Chicago", "Liniers - Velez Sarsfield", "Ferro Carril Oeste", "Independiente de Avellaneda", "Racing Club / Avellaneda", "San Lorenzo / Boedo", "River Plate / Núñez", "Boca Juniors / La Boca", "Sindicato de Camioneros / Plaza de Mayo", "Los Redondos / Tandil", "Huracán / Parque Patricios", "Argentinos Juniors / La Paternal", "La Renga – Autódromo Bs. As.", "Peregrinación a Luján — Moreno" };
         // Player-facing captions consistently show the club/team first and its neighborhood second.
         // LevelNames remain stable theme keys consumed by ClubVisualTheme.
@@ -319,7 +319,7 @@ namespace HayChoriYPaty
             "Ferro / Caballito", "Independiente / Avellaneda", "Racing Club / Avellaneda",
             "San Lorenzo / Boedo", "River Plate / Núñez", "Boca Juniors / La Boca",
             "Sindicato de Camioneros / Plaza de Mayo", "Los Redondos / Tandil", "Huracán / Parque Patricios",
-            "Argentinos Juniors / La Paternal", "La Renga – Autódromo Bs. As.", "Peregrinación - Luján / Moreno"
+            "Argentinos Juniors / La Paternal", "La Renga – Autódromo Bs. As.", "Peregrinación - Luján"
         };
         private static readonly int[] DefaultProductCounts = { 1, 2, 3, 5, 7, 7, 7, 7, 7, 7, 7, 3, 7, 2, 7 };
         private static readonly int[][] DefaultLevelProducts = {

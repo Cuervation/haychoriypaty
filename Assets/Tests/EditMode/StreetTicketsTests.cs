@@ -337,7 +337,7 @@ namespace HayChoriYPaty.Tests
             Type simulationType = Runtime("StreetSimulation");
             int[] order = (int[])simulationType.GetField("CampaignOrder", PublicStatic).GetValue(null);
             Assert.AreEqual(15, order.Length);
-            CollectionAssert.AreEqual(new[] { 0, 1, 9, 2, 12, 3, 10, 11, 13, 14, 4, 5, 6, 7, 8 }, order);
+            CollectionAssert.AreEqual(new[] { 0, 1, 9, 2, 12, 3, 13, 11, 4, 5, 10, 6, 7, 8, 14 }, order);
 
             long[] reservedForOtherLevels = { 1, 1, 0, 0, 0 };
             object game = NewGame(Json(NewLegacySave(9, null, Tickets(4, 0, reservedForOtherLevels))));

@@ -437,7 +437,7 @@ namespace HayChoriYPaty
                 MarketText(new Rect(badge.x + 6, badge.y + 20, badge.width - 12, 36), MarketClubInitials(level), 22, Color.white);
             }
             string[] club = StreetSimulation.LevelDisplayNames[level].Split(new[] {'/', '–', '—'});
-            if (level == StreetSimulation.PeregrinacionTowerDefenseCampaignLevelId) club = new[] {"Peregrinación", "a Luján · Moreno"};
+            if (level == StreetSimulation.PeregrinacionTowerDefenseCampaignLevelId) club = new[] {"Peregrinación - Luján"};
             float captionX = Mathf.Max(120f, badge.xMax + 16f);
             float captionWidth = 506f - captionX;
             MarketText(new Rect(captionX, 77, captionWidth, 24), "NIVEL " + (StreetSimulation.CampaignPositionOf(level) + 1), 19, MarketCyan, TextAnchor.MiddleLeft);

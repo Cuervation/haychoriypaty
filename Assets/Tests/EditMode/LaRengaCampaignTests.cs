@@ -69,7 +69,7 @@ namespace HayChoriYPaty.Tests
         public void CampaignOrderAppendsLaRengaBeforeUnchangedTraditionalIds()
         {
             Type simulation = RuntimeType("StreetSimulation");
-            Assert.AreEqual(new[] { 0, 1, 9, 2, 12, 3, 10, 11, 13, 14, 4, 5, 6, 7, 8 },
+            Assert.AreEqual(new[] { 0, 1, 9, 2, 12, 3, 13, 11, 4, 5, 10, 6, 7, 8, 14 },
                 simulation.GetField("CampaignOrder", PublicStatic).GetValue(null));
             Assert.AreEqual(15, ((string[])simulation.GetField("LevelNames", PublicStatic).GetValue(null)).Length);
             Assert.AreEqual(13, simulation.GetField("LaRengaTowerDefenseCampaignLevelId", PublicStatic).GetRawConstantValue());
@@ -169,17 +169,17 @@ namespace HayChoriYPaty.Tests
             object game = NewGame(NewCampaignSave(10));
             Assert.AreEqual(0L, ReadProperty(game, "TicketBalance"));
             WinDefenseRound(game, 10);
-            // Current chain: Ferro -> Los Redondos -> Huracán -> (a star there) -> La Renga -> Peregrinación.
-            Assert.IsTrue((bool)Invoke(game, "IsLevelUnlocked", 11), "A settled ID10 victory must unlock Huracán ID11.");
+            // Current chain: Ferro -> La Renga -> Huracán -> (a star there) -> Independiente -> Racing -> Los Redondos -> San Lorenzo ... Boca -> Peregrinación.
+            Assert.IsTrue((bool)Invoke(game, "IsLevelUnlocked", 6), "A settled ID10 victory must unlock San Lorenzo ID6.");
             Assert.IsFalse((bool)Invoke(game, "TryCollectVictoryReward"));
             Assert.IsFalse((bool)Invoke(game, "ProcessRoundResult"));
             Assert.AreEqual(1L, ReadProperty(game, "TicketBalance"));
             Assert.AreEqual(1, persistedMatchCount);
             Assert.AreEqual(1L, ((long[])Field(Field(Field(game, "save"), "statistics"), "winsByLevel"))[10]);
 
-            ((bool[])Field(Field(game, "save"), "unlockedLevelIds"))[13] = true; // earned with a Huracán star, covered elsewhere
+            ((bool[])Field(Field(game, "save"), "unlockedLevelIds"))[13] = true; // the real route reaches it from Ferro, covered elsewhere
             WinDefenseRound(game, 13);
-            Assert.IsTrue((bool)Invoke(game, "IsLevelUnlocked", 14), "A settled ID13 victory must unlock Peregrinación ID14.");
+            Assert.IsTrue((bool)Invoke(game, "IsLevelUnlocked", 11), "A settled ID13 victory must unlock Huracán ID11.");
             Assert.IsFalse((bool)Invoke(game, "TryCollectVictoryReward"));
             Assert.IsFalse((bool)Invoke(game, "ProcessRoundResult"));
             Assert.AreEqual(2L, ReadProperty(game, "TicketBalance"));
@@ -278,7 +278,7 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void LaRengaConfigUsesSharedTwoProductTowerDefenseDefaults()
+        public void LaRengaConfigUsesFerroMenuOnTheCShapedFence()
         {
             string path = RuntimeType("TowerDefenseLevelConfig").GetMethod("ResourcesPathForCampaignLevel", PublicStatic)
                 .Invoke(null, new object[] { 13 }) as string;
@@ -287,11 +287,11 @@ namespace HayChoriYPaty.Tests
             var config = Resources.Load(path, configType);
             Assert.NotNull(config);
             Assert.AreEqual(13, configType.GetProperty("SourceCampaignLevelId").GetValue(config, null));
-            // C-shaped, Camioneros-style kitchen version (2026-11-18): 120 fans, faster and denser than the former serpentine 60 / 0.1575 / 96.
+            // C-shaped, Ferro-kitchen version (2026-11-19; Ferro's five products): 120 fans, faster and denser than the former serpentine 60 / 0.1575 / 96.
             Assert.AreEqual(120, configType.GetProperty("TotalFanCount").GetValue(config, null));
             Assert.AreEqual(0.375f, (float)configType.GetProperty("FanSpeed").GetValue(config, null), 0.00001f);
             Assert.AreEqual(58f, configType.GetProperty("MinimumEntrySpacingLogical").GetValue(config, null));
-            CollectionAssert.AreEqual(new[] { 0, 4 }, (int[])configType.GetProperty("AvailableProducts").GetValue(config, null));
+            CollectionAssert.AreEqual(new[] { 0, 1, 2, 4, 6 }, (int[])configType.GetProperty("AvailableProducts").GetValue(config, null));
         }
     }
 }

@@ -23,11 +23,11 @@ namespace HayChoriYPaty.Tests
             return s;
         }
         [Test]
-        public void CampaignHasFifteenStableIdsAndThirteenFourteenFourSuccessors()
+        public void CampaignHasFifteenStableIdsAndPeregrinacionClosesTheCampaignAfterBoca()
         {
-            CollectionAssert.AreEqual(new[] {0,1,9,2,12,3,10,11,13,14,4,5,6,7,8},
+            CollectionAssert.AreEqual(new[] {0,1,9,2,12,3,13,11,4,5,10,6,7,8,14},
                 (int[])T("StreetSimulation").GetField("CampaignOrder", S).GetValue(null));
-            foreach (var pair in new[] {new[] {13,14}, new[] {14,4}})
+            foreach (var pair in new[] {new[] {3,13}, new[] {13,11}, new[] {11,4}, new[] {5,10}, new[] {10,6}, new[] {8,14}})
                 Assert.AreEqual(pair[1], T("StreetSimulation").GetMethod("NextCampaignLevelId", S).Invoke(null, new object[] {pair[0]}));
             string[] names = (string[])T("StreetSimulation").GetField("LevelNames", S).GetValue(null);
             Assert.AreEqual(15, names.Length); Assert.AreEqual("Peregrinación a Luján — Moreno", names[14]);
