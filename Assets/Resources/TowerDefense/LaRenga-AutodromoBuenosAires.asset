@@ -51,7 +51,7 @@ MonoBehaviour:
   availableProducts: 0000000001000000020000000400000006000000
   totalFanCount: 120
   fanSpeed: 0.375
-  minimumEntrySpacingLogical: 58
+  minimumEntrySpacingLogical: 66
   serviceRange: 0.8
   firstWorkZoneOffset: {x: 0, y: 0}
   secondWorkZoneOffset: {x: 0, y: 0}

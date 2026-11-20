@@ -394,6 +394,8 @@ namespace HayChoriYPaty
             float left = Mathf.Clamp(grill.xMin + visibleHalfWidth, 54f, StreetSceneLayout.Width - 54f);
             float right = Mathf.Clamp(grill.xMax - visibleHalfWidth, 54f, StreetSceneLayout.Width - 54f);
             float x = count == 1 ? grill.center.x : Mathf.Lerp(left, right, safeIndex / (float)(count - 1));
+            // La Renga: the Premium grill lies under the barrels, which its cooks must not stand beneath: their post is at the grill's left end.
+            if (NarrowGrills && product >= 2) x = grill.xMin + 14f + safeIndex * 6f;
             float y = GrillWorkY(grill);
             return new Vector2(x, y);
         }

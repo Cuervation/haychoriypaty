@@ -1994,7 +1994,7 @@ namespace HayChoriYPaty.Tests
             Time.captureDeltaTime = 1f / 20f;
             object presentation = Get(view, "towerDefensePresentation");
             Type roleKind = T("StreetWorkerRole");
-            var hires = new System.Collections.Generic.Dictionary<int, int> { { 5, 0 }, { 25, 1 }, { 45, 0 }, { 65, 1 }, { 85, 0 }, { 105, 1 } };
+            var hires = new System.Collections.Generic.Dictionary<int, int> { { 1, 0 }, { 2, 1 }, { 3, 0 }, { 4, 1 }, { 5, 0 }, { 6, 1 } }; // the whole crew from the start
             int written = 0;
             try
             {
@@ -2133,14 +2133,21 @@ namespace HayChoriYPaty.Tests
             Assert.GreaterOrEqual((int)Get(mode, "TotalDelivered"), 2, "Natural pilgrims must be served. " + diagnostic +
                 " phase=" + Get(mode, "Phase") + " lost=" + Get(mode, "HasLost") + " elapsed=" + Get(mode, "Elapsed"));
         }
-
-        [UnityTest]
-        public IEnumerator PeregrinacionHireCardsHireAtTheRolePostWithOneTap()
-        {
                 // The run keeps saving its progress as it delivers every product of its five-product menu; a menu the saving simulation
                 // does not know makes the save fail and freezes the match ("No se pudo guardar. La partida quedó en pausa").
                 if (frame % 10 == 9 && Get(mode, "Phase").ToString() == "Playing")
                     Assert.IsTrue((bool)Call(game, "PersistTowerDefenseProgress", mode), "saving the La Renga run at frame " + frame);
+
+        [UnityTest]
+        public IEnumerator PeregrinacionHireCardsHireAtTheRolePostWithOneTap()
+        {
+                    // Nobody walks the strip under the barrels (between the grills and the barrels), cooks and drink workers alike.
+                    string workerRole = Get(worker, "Role").ToString();
+                    if (workerRole != "Mozo" && ((Rect)Call(mode, "CookKeepOut")).Contains(position))
+                    {
+                        violations++;
+                        if (first.Length == 0) first = workerRole + " in the strip under the barrels at " + position + " frame " + frame;
+                    }
             float pixel = (float)Get(mode, "worldUnitsPerLogicalPixel");
             IList workers = (IList)Get(mode, "Workers");
             Assert.AreEqual(2, workers.Count);

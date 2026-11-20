@@ -325,7 +325,12 @@ namespace HayChoriYPaty
         // inside the screen edge and the bottom run sits 46.8 logical px above the footer (stage lift included); the work pocket is the rectangle the fence encloses, and the fans
         // walk around the outside. Everything is in the same logical coordinates as the horizontal route (stage lift included).
         private const float CShapedTopFenceOffset = 42.5f, CShapedRightFenceInset = 65.7f, CShapedBottomFenceAboveFooter = 38.83f,
-            CShapedCorridor = 24f, CShapedPocketClearance = 8f;
+            CShapedCorridor = 24f, CShapedPocketClearance = 8f,
+            // The downward run of the line walks this much further right than the corridor's own centre (the fence stays put),
+            // so the fans no longer stand on the right rail.
+            CShapedRightLaneShift = 31f,
+            // The bottom run walks this much further below the bottom fence (the fence stays put): the fans pass under it, not on it.
+            CShapedBottomLaneExtra = 38f;
 
         private static bool TryCreateCShaped(TowerDefenseLevelConfig source, Camera camera, Rect viewport,
             float logicalWidth, float logicalHeight, float canvasScale, float pixel,
@@ -345,10 +350,11 @@ namespace HayChoriYPaty
                 return false;
             }
             float half = CShapedCorridor * .5f;
-            float topCenter = topFence - half, bottomCenter = bottomFence + half, rightCenter = rightFence + half;
+            float verticalCorridor = CShapedCorridor + 2f * CShapedRightLaneShift, verticalHalf = verticalCorridor * .5f;
+            float topCenter = topFence - half, bottomCenter = bottomFence + half + CShapedBottomLaneExtra, rightCenter = rightFence + verticalHalf;
             float entryX = -FanFrameWidthLogical * .5f;
-            Vector2 a = LogicalToWorld(camera, viewport, logicalWidth, canvasScale, new Vector2(entryX - half, topCenter - half)); // symmetric about the run, so its left end lands exactly on entryX
-            Vector2 b = LogicalToWorld(camera, viewport, logicalWidth, canvasScale, new Vector2(rightCenter + half, bottomCenter + half));
+            Vector2 a = LogicalToWorld(camera, viewport, logicalWidth, canvasScale, new Vector2(entryX - verticalHalf, topCenter - half)); // symmetric about the run (same half width as the right end), so its left end lands exactly on entryX
+            Vector2 b = LogicalToWorld(camera, viewport, logicalWidth, canvasScale, new Vector2(rightCenter + verticalHalf, bottomCenter + half));
             Rect playable = Rect.MinMaxRect(Mathf.Min(a.x, b.x), Mathf.Min(a.y, b.y), Mathf.Max(a.x, b.x), Mathf.Max(a.y, b.y));
             // The work pocket: from the screen's left edge to just inside the right rail, between the top and bottom rails.
             Vector2 workA = LogicalToWorld(camera, viewport, logicalWidth, canvasScale,
@@ -362,8 +368,9 @@ namespace HayChoriYPaty
                 RouteKind = TowerDefenseRouteKind.CShapedSingleFence,
                 RowCount = 1,
                 SegmentLengths = new[] { (rightCenter - entryX) * pixel },
-                CorridorWidth = CShapedCorridor * pixel,
+                CorridorWidth = verticalCorridor * pixel,
                 HorizontalCorridorWidth = CShapedCorridor * pixel,
+                BottomLaneExtra = CShapedBottomLaneExtra * pixel,
                 RowSpacing = (bottomCenter - topCenter) * pixel,
                 TurnRadius = source.Route.TurnRadius,
                 PlayableBounds = playable,

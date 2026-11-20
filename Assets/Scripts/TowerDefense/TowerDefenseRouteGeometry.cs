@@ -32,6 +32,9 @@ namespace HayChoriYPaty
         [Tooltip("Number of samples along each straight vertical connector; retained to preserve route-row indexing.")]
         [Range(4, 128)] public int TurnSegments = 12;
         [NonSerialized] public float FanEntryExtensionWorldUnits;
+        // C-shaped route only: the bottom run's centerline sits this much further below its rails (the rails keep their place), so the
+        // fans walk below the bottom fence instead of on it.
+        [NonSerialized] public float BottomLaneExtra;
         // Boca-style kitchens stretch their layout's y positions by this screen-height factor (1 = the 540x960 reference).
         [NonSerialized] public float KitchenVerticalScale = 1f;
     }
@@ -226,6 +229,11 @@ namespace HayChoriYPaty
             float horizontalWidth = config.HorizontalCorridorWidth > 0f ? config.HorizontalCorridorWidth : config.CorridorWidth;
             Vector2[] left = OffsetPolyline(points, config.CorridorWidth * .5f, horizontalWidth * .5f);
             Vector2[] right = OffsetPolyline(points, -config.CorridorWidth * .5f, -horizontalWidth * .5f);
+            if (config.BottomLaneExtra > 0f)
+            {
+                // The last two vertices belong to the bottom run (its right end and its left end): put its rails back where they were.
+                for (int i = points.Length - 2; i < points.Length; i++) { left[i].y += config.BottomLaneExtra; right[i].y += config.BottomLaneExtra; }
+            }
             AddBoundsErrorIfNeeded(config.PlayableBounds, points, left, right, errors);
             if (config.WorkBounds.width <= 0f || config.WorkBounds.height <= 0f)
                 errors.Add("CShapedSingleFence requires positive WorkBounds inside the C.");

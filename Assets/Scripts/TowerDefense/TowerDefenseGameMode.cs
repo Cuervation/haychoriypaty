@@ -1304,6 +1304,7 @@ namespace HayChoriYPaty
                 WorkBounds = source.WorkBounds,
                 TurnSegments = source.TurnSegments,
                 FanEntryExtensionWorldUnits = source.FanEntryExtensionWorldUnits,
+                BottomLaneExtra = source.BottomLaneExtra,
                 KitchenVerticalScale = source.KitchenVerticalScale
             };
         }

@@ -174,7 +174,8 @@ namespace HayChoriYPaty
                 PlayableBounds = runtimeRoute.PlayableBounds,
                 WorkBounds = runtimeRoute.WorkBounds,
                 TurnSegments = runtimeRoute.TurnSegments,
-                FanEntryExtensionWorldUnits = runtimeRoute.FanEntryExtensionWorldUnits
+                FanEntryExtensionWorldUnits = runtimeRoute.FanEntryExtensionWorldUnits,
+                BottomLaneExtra = runtimeRoute.BottomLaneExtra
             };
         }
 

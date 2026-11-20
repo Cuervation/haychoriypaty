@@ -30,12 +30,16 @@ namespace HayChoriYPaty
     {
         public const float ConstructionGridLogical = 32f;
         public const float ConstructionFurnitureClearanceLogical = 12f;
+        // La Renga's cooks climb the 23 px corridor between the premium table and the barrels, so their collision feet are narrower there.
+        private float FootHalfWidthLogical => IsCShapedLevel ? CShapedFootHalfWidthLogical : BocaFootHalfWidthLogical;
+        private const float CShapedFootHalfWidthLogical = 9f;
         private const float BocaFootHalfWidthLogical = 18f, BocaFootDepthLogical = 12f, BocaTableBaseDepthLogical = 20f;
         private const int BocaPostSlots = 4;
         // Workers lean on the fence while serving: feet stay below the rail, the head rises above it, so the
         // order is handed over from close by instead of across the whole yard.
         private const float ServiceLeanLogical = 56f;
-        private const float CShapedKitchenSideMarginLogical = 12f, CShapedKitchenDropLogical = 40f;
+        // The kitchen starts this far from the pocket's left edge.
+        private const float CShapedKitchenSideMarginLogical = 12f, CShapedKitchenLeftLogical = 12f, CShapedKitchenDropLogical = 40f;
         // Visible body width of a worker in Boca's own pixels (StreetKitchenLayout.GrillWorkPosition reserves 30 px per side).
         private const float BocaBodyWidthPx = 60f;
         // Boca's counter row pieces overlap by this many of its own pixels (tables/barrels are 1.2 px wider than their step).
@@ -318,7 +322,7 @@ namespace HayChoriYPaty
         // Huracán's kitchen: the kitchen keeps its exact size and distances and sits in the middle of the pocket.
         private float KitchenWorldX(float bocaX, float scale) => IsCShapedLevel
             // La Renga's kitchen is anchored to the left of the pocket, CShapedKitchenSideMarginLogical from its edge.
-            ? WorkBounds.xMin + CShapedKitchenSideMarginLogical * worldUnitsPerLogicalPixel + (bocaX - BocaKitchenSourceBounds().xMin) * scale
+            ? WorkBounds.xMin + CShapedKitchenLeftLogical * worldUnitsPerLogicalPixel + (bocaX - BocaKitchenSourceBounds().xMin) * scale
             : WorkBounds.center.x + (bocaX - StreetSceneLayout.Width * .5f) * scale;
         private float KitchenWorldBottomY(float scale, float bottomLogical)
         {
@@ -440,8 +444,9 @@ namespace HayChoriYPaty
         private Rect WorkerFeet(Vector2 position)
         {
             float pixel = worldUnitsPerLogicalPixel, epsilon = .05f * pixel;
-            return new Rect(position.x - BocaFootHalfWidthLogical * pixel + epsilon, position.y + epsilon,
-                BocaFootHalfWidthLogical * 2f * pixel - epsilon * 2f, FootDepthLogical * pixel - epsilon * 2f);
+            float half = FootHalfWidthLogical;
+            return new Rect(position.x - half * pixel + epsilon, position.y + epsilon,
+                half * 2f * pixel - epsilon * 2f, FootDepthLogical * pixel - epsilon * 2f);
         }
 
         private Rect StationSolidRect(TowerDefenseStationKind kind, Rect bounds)
@@ -506,7 +511,7 @@ namespace HayChoriYPaty
             float pixel = Mathf.Max(.0001f, worldUnitsPerLogicalPixel);
             float availableWidth = WorkBounds.width / pixel;
             // La Renga's counter would otherwise touch the screen edge and the right fence: keep a small margin on each side.
-            if (IsCShapedLevel) availableWidth -= CShapedKitchenSideMarginLogical * 2f;
+            if (IsCShapedLevel) availableWidth -= CShapedKitchenLeftLogical + CShapedKitchenSideMarginLogical;
             // Preserve one worker-height service lane behind the furniture before fitting
             // the same Boca station proportions into the smaller TD workfield.
             float availableHeight = WorkBounds.height / pixel - BocaKitchenWorkerLaneLogical;
@@ -1370,12 +1375,44 @@ namespace HayChoriYPaty
         // Resting/placement spots never overlap a co-worker. Walking follows Boca's active-cook rule:
         // routes avoid furniture only, so co-workers may cross briefly instead of walling off the
         // single service lane under the fence (a parked Parrillero used to strand the Mozo).
+        // La Renga: a cook never walks the strip between the grills and the barrels. To get past the barrels it climbs the corridor between the
+        // table and the barrels and goes behind (above) the beer barrel. The area is the strip right under the barrels (a few px wider than them on each side).
+        // Cooks and drink workers alike: nobody walks the strip under the barrels (drinks are taken from the barrels' right side).
+        private static bool UsesBarrelKeepOut(StreetWorkerRole role) =>
+            IsCookRole(role) || role == StreetWorkerRole.Cocacolero || role == StreetWorkerRole.Fernetero;
+
+        private Rect CookKeepOut()
+        {
+            if (!IsCShapedLevel) return Rect.zero;
+            bool any = false; Rect union = Rect.zero;
+            foreach (var station in placedStations)
+            {
+                if (station.Kind != TowerDefenseStationKind.CocaBarrel && station.Kind != TowerDefenseStationKind.BeerBarrel) continue;
+                union = any ? Rect.MinMaxRect(Mathf.Min(union.xMin, station.Bounds.xMin), Mathf.Min(union.yMin, station.Bounds.yMin),
+                    Mathf.Max(union.xMax, station.Bounds.xMax), Mathf.Max(union.yMax, station.Bounds.yMax)) : station.Bounds;
+                any = true;
+            }
+            TowerDefensePlacedStation grill = FindPlacedStation(TowerDefenseStationKind.NormalGrill);
+            if (!any || grill == null) return Rect.zero;
+            float pixel = worldUnitsPerLogicalPixel;
+            return Rect.MinMaxRect(union.xMin - 4f * pixel, grill.Bounds.yMax - pixel, union.xMax + 4f * pixel, union.yMin + pixel);
+        }
+
+        private static bool SegmentCrosses(Rect area, Vector2 from, Vector2 to)
+        {
+            if (area.width <= 0f || area.height <= 0f) return false;
+            int samples = Mathf.Max(2, Mathf.CeilToInt(Vector2.Distance(from, to) / Mathf.Max(.01f, Mathf.Min(area.width, area.height) * .25f)));
+            for (int i = 0; i <= samples; i++) if (area.Contains(Vector2.Lerp(from, to, i / (float)samples))) return true;
+            return false;
+        }
+
         private bool FreePositionClear(Vector2 position, StreetWorkerRole role, TowerDefenseWorkerState ignore, Rect extra,
             bool avoidWorkers = true)
         {
             if (!IsFinite(position.x) || !IsFinite(position.y)) return false;
             Rect body = WorkerBounds(position, role);
             if (!Contains(WorkerArea(), body) || Overlaps(body, extra)) return false;
+            if (UsesBarrelKeepOut(role) && CookKeepOut().Contains(position)) return false;
             foreach (var station in placedStations) if (WorkerHitsStation(position, body, station)) return false;
             if (avoidWorkers)
                 foreach (var worker in workers) if (worker != ignore && Overlaps(body, WorkerBounds(worker.Position, worker.Role))) return false;
@@ -1385,6 +1422,7 @@ namespace HayChoriYPaty
             bool avoidWorkers = true)
         {
             if (!FreePositionClear(from, role, ignore, extra, avoidWorkers) || !FreePositionClear(to, role, ignore, extra, avoidWorkers)) return false;
+            if (UsesBarrelKeepOut(role) && SegmentCrosses(CookKeepOut(), from, to)) return false;
             Rect a = WorkerBounds(from, role), b = WorkerBounds(to, role);
             Rect swept = Rect.MinMaxRect(Mathf.Min(a.xMin,b.xMin), Mathf.Min(a.yMin,b.yMin), Mathf.Max(a.xMax,b.xMax), Mathf.Max(a.yMax,b.yMax));
             if (Overlaps(swept, extra)) return false;
@@ -1440,7 +1478,15 @@ namespace HayChoriYPaty
                 TowerDefensePlacedStation grill = FindPlacedStation(TowerDefenseStationKind.NormalGrill);
                 if (grill != null && IsFinite(grill.WorkPosition.y)) originY = WorkBounds.yMin + Mathf.Repeat(grill.WorkPosition.y - WorkBounds.yMin, step);
             }
-            int columns = Mathf.Max(1, Mathf.FloorToInt(WorkBounds.width / step) + 1);
+            // Same for the corridor between the premium table and the barrels: a column of waypoints runs along its centre line.
+            float originX = WorkBounds.xMin;
+            if (IsCShapedLevel)
+            {
+                TowerDefensePlacedStation table = FindPlacedStation(TowerDefenseStationKind.PremiumTable), barrel = FindPlacedStation(TowerDefenseStationKind.CocaBarrel);
+                if (table != null && barrel != null)
+                    originX = WorkBounds.xMin + Mathf.Repeat((table.Bounds.xMax + barrel.Bounds.xMin) * .5f - WorkBounds.xMin, step);
+            }
+            int columns = Mathf.Max(1, Mathf.FloorToInt((WorkBounds.xMax - originX) / step) + 1);
             int rows = Mathf.Max(1, Mathf.FloorToInt((WorkBounds.yMax - originY) / step) + 1), total = columns * rows;
             var lattice = new PathLattice
             {
@@ -1449,7 +1495,7 @@ namespace HayChoriYPaty
             for (int y = 0; y < rows; y++) for (int x = 0; x < columns; x++)
             {
                 int id = y * columns + x;
-                lattice.Points[id] = new Vector2(WorkBounds.xMin + x * step, originY + y * step);
+                lattice.Points[id] = new Vector2(originX + x * step, originY + y * step);
                 lattice.Open[id] = FreePositionClear(lattice.Points[id], role, movingWorker, Rect.zero, false);
             }
             pathLattices[role] = lattice;

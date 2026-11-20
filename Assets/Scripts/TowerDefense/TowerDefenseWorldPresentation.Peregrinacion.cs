@@ -56,6 +56,9 @@ namespace HayChoriYPaty
                 pilgrimStations.Add(station.Id, root);
                 Rect b = station.Bounds;
                 int depth = 32 + Mathf.RoundToInt(-b.yMin * 12f);
+                // La Renga: the cooks walk the strip right under the barrels; they are drawn in front of them (still behind the tables).
+                if (visualLevelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId &&
+                    (station.Kind == TowerDefenseStationKind.CocaBarrel || station.Kind == TowerDefenseStationKind.BeerBarrel)) depth -= 6;
                 string resource = station.Kind == TowerDefenseStationKind.NormalGrill ? "Station_NormalGrill"
                     : station.Kind == TowerDefenseStationKind.PremiumGrill ? "Station_PremiumGrill"
                     : station.Kind == TowerDefenseStationKind.NormalTable ? "Station_NormalTable"
@@ -104,7 +107,7 @@ namespace HayChoriYPaty
 
             if (kind == TowerDefenseStationKind.NormalTable || kind == TowerDefenseStationKind.PremiumTable)
             {
-                // La Renga's tables are narrower: draw the table at the width its layout gives it.
+                // La Renga's tables are half as wide: draw the table at the width its layout gives it.
                 float layoutWidth = mode.BocaKitchenSourceBounds(kind).width;
                 FitPilgrimSandwichTable(obj, depth, layoutWidth > 0f ? layoutWidth : StreetKitchenLayout.TableWidth);
             }
@@ -275,7 +278,13 @@ namespace HayChoriYPaty
                         int stationDepth = 32 + Mathf.RoundToInt(-station.Bounds.yMin * 12f);
                         renderer.sortingOrder = stationDepth + 10 + unit.Slot;
                     }
-                    else renderer.sortingOrder = 40 + Mathf.RoundToInt(-logicalPosition.y * 12f) + displayLayer;
+                    else
+                    {
+                        int productDepth = 40 + Mathf.RoundToInt(-logicalPosition.y * 12f) + displayLayer;
+                        // The drinks in La Renga's barrels follow their barrel behind the cooks that pass in front of it.
+                        if (visualLevelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId && !carried && (unit.Product == 4 || unit.Product == 6)) productDepth -= 14;
+                        renderer.sortingOrder = productDepth;
+                    }
                     string prefab = inGrill ? GrillFoodPrefabs[unit.Product] : ProductPrefabs[unit.Product];
                     var source = Resources.Load<GameObject>("ModularKitchen/Prefabs/" + prefab);
                     if (source != null) renderer.sprite = source.GetComponent<SpriteRenderer>().sprite;
