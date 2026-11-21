@@ -164,7 +164,7 @@ namespace HayChoriYPaty
                 new Vector3(cameraPixels.xMax, cameraPixels.center.y, depth));
             // ID10's exit ends inside the screen, next to the worker strip: stop the exit rails
             // so that even the centered exit terminal panel ends at the fenced route's edge.
-            if (visualLevelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId)
+            if (visualLevelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId && !mode.FreeConstruction)
                 rightEdge.x = Mathf.Min(rightEdge.x,
                     mode.RouteConfig.PlayableBounds.xMax - fenceGenerator.TerminalPanelHalfLength);
             if (!fenceGenerator.SetVisualHorizontalBounds(
@@ -496,7 +496,7 @@ namespace HayChoriYPaty
             for (int i = deliveryCues.Count - 1; i >= 0; i--)
             {
                 DeliveryCue cue = deliveryCues[i];
-                float t = Mathf.Clamp01((elapsed - cue.Receipt.Elapsed) / TowerDefenseGameMode.DeliveryCueDurationSeconds);
+                float t = Mathf.Clamp01((elapsed - cue.Receipt.Elapsed) / mode.DeliveryCueSeconds);
                 if (t >= 1f)
                 {
                     cue.GameObject.SetActive(false);
@@ -505,9 +505,12 @@ namespace HayChoriYPaty
                     continue;
                 }
                 float pixel = mode.WorldUnitsPerLogicalPixel;
-                Vector2 from = cue.HasSourcePosition ? cue.SourcePosition : cue.Receipt.Source + Vector2.up * 14f * pixel;
-                Vector2 to = cue.Receipt.Target + Vector2.up * 28f * pixel;
                 Vector2 hand = WorkerHandPosition(cue, pixel);
+                // Free-construction levels hand the order over, like Boca and River: the product is already in the
+                // worker's hand and crosses straight into the pilgrim's hand instead of being thrown.
+                bool handOver = mode.FreeConstruction;
+                Vector2 from = handOver ? hand : cue.HasSourcePosition ? cue.SourcePosition : cue.Receipt.Source + Vector2.up * 14f * pixel;
+                Vector2 to = handOver ? PilgrimHandPosition(cue, pixel) : cue.Receipt.Target + Vector2.up * 28f * pixel;
                 Vector2 throwOrigin = hand;
                 WorkerView worker;
                 if (workerViews.TryGetValue(cue.Receipt.WorkerId, out worker) && worker.GameObject != null)
@@ -517,7 +520,7 @@ namespace HayChoriYPaty
                 }
 
                 Vector2 point;
-                float throwT = 0f;
+                float throwT = 0f, handOverT = 0f;
                 if (t < HandoffPickupEnd)
                 {
                     point = Vector2.Lerp(from, hand, Mathf.SmoothStep(0f, 1f, t / HandoffPickupEnd));
@@ -527,6 +530,11 @@ namespace HayChoriYPaty
                     float windup = Mathf.SmoothStep(0f, 1f,
                         (t - HandoffPickupEnd) / Mathf.Max(.001f, HandoffThrowStart - HandoffPickupEnd));
                     point = Vector2.Lerp(hand, throwOrigin, windup);
+                }
+                else if (handOver)
+                {
+                    handOverT = Mathf.Clamp01((t - HandoffThrowStart) / Mathf.Max(.001f, 1f - HandoffThrowStart));
+                    point = HandOverPoint(throwOrigin, to, Mathf.SmoothStep(0f, 1f, handOverT));
                 }
                 else
                 {
@@ -544,9 +552,23 @@ namespace HayChoriYPaty
                 cue.GameObject.transform.localRotation = Quaternion.Euler(0f, 0f, throwT * 360f);
                 bool cocaStillInHandPose = cue.Receipt.Product == 4 && t < HandoffThrowStart;
                 cue.Renderer.enabled = !cocaStillInHandPose;
-                float throwFade = throwT <= .88f ? 1f : 1f - Mathf.SmoothStep(.88f, 1f, throwT);
+                float arrival = handOver ? handOverT : throwT;
+                float throwFade = arrival <= .88f ? 1f : 1f - Mathf.SmoothStep(.88f, 1f, arrival);
                 cue.Renderer.color = new Color(1f, 1f, 1f, throwFade);
             }
+        }
+
+        internal static Vector2 HandOverPoint(Vector2 from, Vector2 to, float progress) =>
+            Vector2.Lerp(from, to, Mathf.Clamp01(progress));
+
+        // The pilgrim keeps walking while the product crosses over, so aim at where it is now.
+        private Vector2 PilgrimHandPosition(DeliveryCue cue, float pixel)
+        {
+            Vector2 pilgrim = cue.Receipt.Target;
+            IReadOnlyList<TowerDefenseFanState> fans = mode.Fans;
+            for (int i = 0; i < fans.Count; i++)
+                if (fans[i].Id == cue.Receipt.FanId) { pilgrim = fans[i].RouteFollower.Position; break; }
+            return pilgrim + Vector2.up * 28f * pixel;
         }
 
         private Vector2 WorkerHandPosition(DeliveryCue cue, float pixel)
@@ -656,7 +678,7 @@ namespace HayChoriYPaty
                 // Station staff breathe/serve, never cycle cooking poses at an invisible grill.
                 if (!worker.IsMoving) frame = 0;
                 float actionProgress = Mathf.Clamp01(1f - worker.ServeAnimationSeconds /
-                    TowerDefenseGameMode.DeliveryCueDurationSeconds);
+                    mode.DeliveryCueSeconds);
                 workerView.Renderer.sprite = workerView.Frames[frame];
                 if (gameMode.FreeConstruction && worker.IsCooking)
                 {
@@ -686,7 +708,10 @@ namespace HayChoriYPaty
                     ? Mathf.Sin(Mathf.InverseLerp(HandoffPickupEnd, HandoffThrowStart, actionProgress) * Mathf.PI) : 0f;
                 float followThrough = actionProgress >= HandoffThrowStart
                     ? Mathf.Sin(Mathf.InverseLerp(HandoffThrowStart, 1f, actionProgress) * Mathf.PI) : 0f;
-                float gesture = -facing * windup * 8f + facing * followThrough * 11f;
+                // Free-construction levels hand the order over: no wind-up or throwing lunge, only a small lean.
+                float gesture = gameMode.FreeConstruction
+                    ? facing * followThrough * 2f
+                    : -facing * windup * 8f + facing * followThrough * 11f;
                 workerView.GameObject.transform.localRotation = Quaternion.Euler(0f, 0f, gesture - facing * serve * 2f);
                 Sprite activeSprite = workerView.Renderer.sprite;
                 if (activeSprite != null)
@@ -702,7 +727,14 @@ namespace HayChoriYPaty
                     : worker.ServeAnimationSeconds > 0f && worker.LastServiceTarget.x < worker.Position.x;
                 if (gameMode.FreeConstruction && worker.IsMoving && worker.TransferRoute != null && worker.TransferIndex < worker.TransferRoute.Length)
                     workerView.Renderer.flipX = worker.TransferRoute[worker.TransferIndex].x < worker.Position.x;
-                workerView.Renderer.sortingOrder = 28 + Mathf.RoundToInt(-worker.Position.y * 12f);
+                // La Renga's barrels are taken from the right: a Cocacolero waiting at its post stands beside the barrel and faces it.
+                if (gameMode.NarrowGrills && worker.Role == StreetWorkerRole.Cocacolero && !worker.IsMoving && worker.ServeAnimationSeconds <= 0f)
+                    workerView.Renderer.flipX = true;
+                // The sprite pivot is at its feet. Use the same ground key as the grouped
+                // furniture; a tie belongs to the worker at the front edge.
+                workerView.Renderer.sortingOrder = UsesKitchenGroundDepth
+                    ? KitchenGroundSortingOrder(worker.Position.y) + 1
+                    : 28 + Mathf.RoundToInt(-worker.Position.y * 12f);
                 int stationMinimumOrder;
                 if (visualLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId &&
                     stationMinimumSortingOrderByRoleAndZone.TryGetValue(StationSortKey(worker.Role, worker.ServiceZone), out stationMinimumOrder))

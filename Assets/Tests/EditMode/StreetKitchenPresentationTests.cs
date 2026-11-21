@@ -575,7 +575,8 @@ namespace HayChoriYPaty.Tests
             Type t = Runtime("StreetKitchenLayout");
             MethodInfo order = t.GetMethod("TableSlotDepthOrder", BindingFlags.Public | BindingFlags.Static,
                 null, new[] { typeof(int), typeof(bool) }, null);
-            MethodInfo rotation = t.GetMethod("TableSlotRotation", BindingFlags.Public | BindingFlags.Static);
+            MethodInfo rotation = t.GetMethod("TableSlotRotation", BindingFlags.Public | BindingFlags.Static,
+                null, new[] { typeof(int), typeof(int), typeof(bool) }, null);
             foreach (int product in new[] { 0, 1, 2, 3 })
             foreach (bool companion in new[] { false, true })
             {

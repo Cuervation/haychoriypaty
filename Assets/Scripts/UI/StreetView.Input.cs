@@ -190,13 +190,16 @@ namespace HayChoriYPaty
             if (pressedAction != 0 && pressedAction == HitAction(p)) DispatchAction(pressedAction);
             pressedAction = 0;
         }
+        // Returning from the bonus keeps Huracán selected in Ready, but the visible selector/hub owns input then.
+        private bool BonusTrackInputActive => game != null && game.IsBonusTrack && game.Sim.Phase != RoundPhase.Ready;
+
         private int HitAction(Vector2 p)
         {
             if (VictoryTransitionActive || victorySkipHeld) return 0;
             if (IsTowerDefenseNavigationActive) return HitTowerDefenseAction(p);
             // Huracán has its own result panel and actions. A previous club's Chulengo receipt
             // may still be present in Mercado.LastResult; it must never capture Bonus Track taps.
-            if (game.IsBonusTrack) return HitBonusTrackAction(p);
+            if (BonusTrackInputActive) return HitBonusTrackAction(p);
             if (game.ShowChulengoResult)
             {
                 Vector2 resultPoint = new Vector2(p.x, p.y * layoutVerticalScale);
@@ -281,6 +284,138 @@ namespace HayChoriYPaty
                     : ResultLevelsBounds().Contains(new Vector2(p.x, p.y * layoutVerticalScale)) ? ResultLevelsAction : 0)
                 : 0;
         }
+        // What tapping an unlocked level does: select it and go to its Market, tutorial or round (runs once the shutter has closed).
+        private void EnterSelectedLevel(int a, int level)
+        {
+            if (game == null) return;
+            levelSelectorStartError = null;
+            bool selectionSucceeded = game.SelectLevel(level);
+            if (selectionSucceeded)
+            {
+                levelSelectActive = false;
+                if (StreetSimulation.IsTowerDefenseLevel(level))
+                {
+                    marketFromSelector = true;
+                    if (game.CanStartRound)
+                    {
+                        if (StartTowerDefenseRun()) marketFromSelector = false;
+                        else
+                        {
+                            levelSelectorStartError = string.IsNullOrEmpty(towerDefenseError)
+                                ? "No se pudo iniciar el partido." : towerDefenseError;
+                            levelSelectActive = true;
+                        }
+                    }
+                    else
+                    {
+                        marketActive = true; marketTab = 0; marketMessage = "Prepará Mercado para iniciar Tower Defense.";
+                        marketScroll = 0; marketOtherExpanded = false; marketExpandedIngredient = -1;
+                    }
+                }
+                else if (level == 0)
+                {
+                    if (game.CanStartRound)
+                    {
+                        marketMessage = "";
+                        if (RepeatLevelOneTutorialForTesting ||
+                            PlayerPrefs.GetInt(LevelOneTutorialCompletedKey, 0) == 0)
+                        {
+                            levelOneTutorialActive = true;
+                            levelOneTutorialStep = 0;
+                        }
+                        else game.TryStartRound();
+                    }
+                    else { marketMessage="Falta stock para iniciar. Revisá Mercado."; levelSelectActive=true; }
+                }
+                else if (level == StreetSimulation.HuracanBonusLevelId)
+                {
+                    if (!game.TryStartRound()) levelSelectActive = true;
+                }
+                else { marketFromSelector = true; marketActive = true; marketTab = 0; marketMessage = ""; marketScroll = 0; marketOtherExpanded = false; marketExpandedIngredient = -1; }
+            }
+            lastAction = a; feedbackUntil = Time.unscaledTime + 0.22f; feedbackScale = selectionSucceeded ? 1.04f : 0.97f;
+        }
+
+        // The Market's JUGAR PARTIDO: Tower Defense run, a level's first-time tutorial or the round itself.
+        private void HandleMarketPlay()
+        {
+            if (game?.Sim == null) return;
+            if (StreetSimulation.IsTowerDefenseLevel(game.Sim.LevelIndex))
+            {
+                if (StartTowerDefenseRun())
+                {
+                    marketActive = false; marketFromSelector = false; hubActive = false; levelSelectActive = false;
+                }
+                else marketMessage = string.IsNullOrEmpty(towerDefenseError) ? "Falta stock para iniciar." : towerDefenseError;
+                return;
+            }
+            if (game.CanStartRound && game.Sim.LevelIndex == 2 &&
+                PlayerPrefs.GetInt(LevelThreePatyTutorialCompletedKey, 0) == 0)
+            {
+                marketMessage = "";
+                marketActive = false;
+                hubActive = false;
+                levelSelectActive = false;
+                levelThreePatyTutorialActive = true;
+                return;
+            }
+            if (game.CanStartRound && game.Sim.LevelIndex == 3 &&
+                PlayerPrefs.GetInt(LevelFourSpecialistsTutorialCompletedKey, 0) == 0)
+            {
+                marketMessage = "";
+                marketActive = false;
+                hubActive = false;
+                levelSelectActive = false;
+                levelFourSpecialistsTutorialActive = true;
+                levelFourSpecialistsTutorialStep = 0;
+                return;
+            }
+            if (game.CanStartRound && game.Sim.LevelIndex == 4 &&
+                PlayerPrefs.GetInt(LevelFiveSpecialistsTutorialCompletedKey, 0) == 0)
+            {
+                marketMessage = "";
+                marketActive = false;
+                hubActive = false;
+                levelSelectActive = false;
+                levelFiveSpecialistsTutorialActive = true;
+                levelFiveSpecialistsTutorialStep = 0;
+                return;
+            }
+            if (game.CanStartRound && game.Sim.LevelIndex == 5 &&
+                PlayerPrefs.GetInt(LevelSixRacingTutorialCompletedKey, 0) == 0)
+            {
+                marketMessage = "";
+                marketActive = false;
+                hubActive = false;
+                levelSelectActive = false;
+                levelSixRacingTutorialActive = true;
+                levelSixRacingTutorialStep = 0;
+                return;
+            }
+            if (game.CanStartRound && game.Sim.LevelIndex == 1 &&
+                PlayerPrefs.GetInt(LevelTwoCocacoleroTutorialCompletedKey, 0) == 0)
+            {
+                marketMessage = "";
+                marketActive = false;
+                hubActive = false;
+                levelSelectActive = false;
+                levelTwoCocacoleroTutorialActive = true;
+                levelTwoCocacoleroTutorialStep = 0;
+                return;
+            }
+            if (game.TryStartRoundWithSaveFeedback(out bool initialSaveRejected))
+                marketMessage = "";
+            else if (initialSaveRejected)
+                marketMessage = "No se pudo guardar el inicio. Volvé a intentar.";
+            else if (!game.Sim.IsBonusTrack && game.Market != null &&
+                !game.Market.CanMeetRequiredStockWithLevelOneFloor(game.Sim))
+                marketMessage = "Falta stock para iniciar";
+            else
+                marketMessage = "No se pudo iniciar el partido.";
+            if (game.Sim.Phase == RoundPhase.Playing) { marketActive = false; hubActive = false; levelSelectActive = false; }
+            return;
+        }
+
         private void DispatchAction(int a)
         {
             if (RewardShutterActive || VictoryTransitionActive || victorySkipHeld || game == null) return;
@@ -297,7 +432,7 @@ namespace HayChoriYPaty
             }
             if (HandleTowerDefenseAction(a)) return;
             // Route by the currently rendered mode before inspecting any stale normal-level receipt.
-            if (game.IsBonusTrack)
+            if (BonusTrackInputActive)
             {
                 bool bonusActionSucceeded = false;
                 if (a >= BonusCardFirstAction && a < BonusCardFirstAction + 3) game.ChooseBonusCard(a - BonusCardFirstAction);
@@ -500,6 +635,7 @@ namespace HayChoriYPaty
             {
                 if (a == LevelSelectorBackAction)
                 {
+                    levelSelectorStartError = null;
                     levelSelectActive = false;
                     hubActive = true;
                     marketFromSelector = false;
@@ -509,51 +645,14 @@ namespace HayChoriYPaty
                 {
                     int campaignPosition = a - LevelSelectFirstAction;
                     int level = StreetSimulation.CampaignLevelAt(campaignPosition);
-                    bool selectionSucceeded = game.IsLevelUnlocked(level) && game.SelectLevel(level);
-                    if (selectionSucceeded)
+                    if (game.IsLevelUnlocked(level))
                     {
-                        levelSelectActive = false;
-                        if (StreetSimulation.IsTowerDefenseLevel(level))
-                        {
-                            marketFromSelector = true;
-                            if (game.CanStartRound)
-                            {
-                                if (StartTowerDefenseRun()) marketFromSelector = false;
-                                else
-                                {
-                                    marketMessage = string.IsNullOrEmpty(towerDefenseError)
-                                        ? "No se pudo iniciar Tower Defense." : towerDefenseError;
-                                    levelSelectActive = true;
-                                }
-                            }
-                            else
-                            {
-                                marketActive = true; marketTab = 0; marketMessage = "Prepará Mercado para iniciar Tower Defense.";
-                                marketScroll = 0; marketOtherExpanded = false; marketExpandedIngredient = -1;
-                            }
-                        }
-                        else if (level == 0)
-                        {
-                            if (game.CanStartRound)
-                            {
-                                marketMessage = "";
-                                if (RepeatLevelOneTutorialForTesting ||
-                                    PlayerPrefs.GetInt(LevelOneTutorialCompletedKey, 0) == 0)
-                                {
-                                    levelOneTutorialActive = true;
-                                    levelOneTutorialStep = 0;
-                                }
-                                else game.TryStartRound();
-                            }
-                            else { marketMessage="Falta stock para iniciar. Revisá Mercado."; levelSelectActive=true; }
-                        }
-                        else if (level == StreetSimulation.HuracanBonusLevelId)
-                        {
-                            if (!game.TryStartRound()) levelSelectActive = true;
-                        }
-                        else { marketFromSelector = true; marketActive = true; marketTab = 0; marketMessage = ""; marketScroll = 0; marketOtherExpanded = false; marketExpandedIngredient = -1; }
+                        // The shutter closes over the selector, the level is entered behind it and the shutter opens on the result.
+                        int tappedAction = a;
+                        StartRewardShutter(() => EnterSelectedLevel(tappedAction, level));
+                        return;
                     }
-                    lastAction = a; feedbackUntil = Time.unscaledTime + 0.22f; feedbackScale = selectionSucceeded ? 1.04f : 0.97f;
+                    lastAction = a; feedbackUntil = Time.unscaledTime + 0.22f; feedbackScale = 0.97f;
                     return;
                 }
                 return;
@@ -585,7 +684,7 @@ namespace HayChoriYPaty
                     bool success = game.TryRedeemTicketWorker(role, game.TicketRedemptionOperationId(role));
                     marketMessage = success ? "¡CANJE REALIZADO! Tu trabajador está reservado para el próximo partido."
                         : game.TicketBalance < 3 ? "Te faltan " + System.Math.Max(0L, 3L - game.TicketBalance) + " tickets para canjear."
-                        : game.Sim.LevelIndex < 5 || !game.TicketExtrasUnlocked ? "Desbloqueá Racing y elegí un nivel 6 o superior."
+                        : game.Sim.LevelIndex < 5 || !game.TicketExtrasUnlocked ? "Desbloqueá Racing y elegí una cancha compatible."
                         : "No se pudo guardar el canje; el saldo no cambió.";
                     return;
                 }
@@ -623,79 +722,17 @@ namespace HayChoriYPaty
                 {
                     if(Time.unscaledTime-marketLastPurchaseTime<.25f)return;
                     marketLastPurchaseTime=Time.unscaledTime;
+                    if(!MarketHasMissing()){marketMessage="No hay faltantes pendientes.";return;}
                     long cost=game.Market.MinimumPurchaseCostCents(game.Sim);
                     if(cost>game.Market.BalanceCents){marketMessage=MarketInsufficientFundsMessage(cost);return;}
-                    bool bought=false;
-                    for(int id=0;id<StreetIngredientCatalog.Names.Length;id++)if(game.Market.MissingPacks(game.Sim,id)>0)bought|=game.BuyMissingIngredient(id);
-                    marketMessage=bought?"Compras mínimas realizadas":"No hay faltantes pendientes";return;
+                    marketMessage=game.TryBuyMissingIngredients() ? "Compra realizada. Stock completo."
+                        : "No se completó la compra. Tu saldo y stock no cambiaron.";
+                    return;
                 }
                 if (a == MarketPlayAction)
                 {
-                    if (StreetSimulation.IsTowerDefenseLevel(game.Sim.LevelIndex))
-                    {
-                        if (StartTowerDefenseRun())
-                        {
-                            marketActive = false; marketFromSelector = false; hubActive = false; levelSelectActive = false;
-                        }
-                        else marketMessage = string.IsNullOrEmpty(towerDefenseError) ? "Falta stock para iniciar." : towerDefenseError;
-                        return;
-                    }
-                    if (game.CanStartRound && game.Sim.LevelIndex == 2 &&
-                        PlayerPrefs.GetInt(LevelThreePatyTutorialCompletedKey, 0) == 0)
-                    {
-                        marketMessage = "";
-                        marketActive = false;
-                        hubActive = false;
-                        levelSelectActive = false;
-                        levelThreePatyTutorialActive = true;
-                        return;
-                    }
-                    if (game.CanStartRound && game.Sim.LevelIndex == 3 &&
-                        PlayerPrefs.GetInt(LevelFourSpecialistsTutorialCompletedKey, 0) == 0)
-                    {
-                        marketMessage = "";
-                        marketActive = false;
-                        hubActive = false;
-                        levelSelectActive = false;
-                        levelFourSpecialistsTutorialActive = true;
-                        levelFourSpecialistsTutorialStep = 0;
-                        return;
-                    }
-                    if (game.CanStartRound && game.Sim.LevelIndex == 4 &&
-                        PlayerPrefs.GetInt(LevelFiveSpecialistsTutorialCompletedKey, 0) == 0)
-                    {
-                        marketMessage = "";
-                        marketActive = false;
-                        hubActive = false;
-                        levelSelectActive = false;
-                        levelFiveSpecialistsTutorialActive = true;
-                        levelFiveSpecialistsTutorialStep = 0;
-                        return;
-                    }
-                    if (game.CanStartRound && game.Sim.LevelIndex == 5 &&
-                        PlayerPrefs.GetInt(LevelSixRacingTutorialCompletedKey, 0) == 0)
-                    {
-                        marketMessage = "";
-                        marketActive = false;
-                        hubActive = false;
-                        levelSelectActive = false;
-                        levelSixRacingTutorialActive = true;
-                        levelSixRacingTutorialStep = 0;
-                        return;
-                    }
-                    if (game.CanStartRound && game.Sim.LevelIndex == 1 &&
-                        PlayerPrefs.GetInt(LevelTwoCocacoleroTutorialCompletedKey, 0) == 0)
-                    {
-                        marketMessage = "";
-                        marketActive = false;
-                        hubActive = false;
-                        levelSelectActive = false;
-                        levelTwoCocacoleroTutorialActive = true;
-                        levelTwoCocacoleroTutorialStep = 0;
-                        return;
-                    }
-                    marketMessage = game.TryStartRound() ? "" : "Falta stock para iniciar";
-                    if (game.Sim.Phase == RoundPhase.Playing) { marketActive = false; hubActive = false; levelSelectActive = false; }
+                    // Going from the Market to play closes the shutter too, unless there is nothing to start (the message shows at once).
+                    if (game.CanStartRound) StartRewardShutter(HandleMarketPlay); else HandleMarketPlay();
                     return;
                 }
             }

@@ -3,7 +3,12 @@ using UnityEngine;
 
 namespace HayChoriYPaty
 {
-    public enum TowerDefenseRouteKind { Serpentine = 0, HorizontalSingleFence = 1 }
+    /// <summary>
+    /// Serpentine = the original two-rail serpentine; HorizontalSingleFence = one straight fence with the work area below;
+    /// CShapedSingleFence = one fence shaped like a "C" open to the left (top run to the right, a right connector down and a
+    /// bottom run back to the left) with the work area in the pocket the fence encloses and the fans walking outside it.
+    /// </summary>
+    public enum TowerDefenseRouteKind { Serpentine = 0, HorizontalSingleFence = 1, CShapedSingleFence = 2 }
 
     public enum TowerDefenseStationKind
     {
@@ -169,7 +174,8 @@ namespace HayChoriYPaty
                 PlayableBounds = runtimeRoute.PlayableBounds,
                 WorkBounds = runtimeRoute.WorkBounds,
                 TurnSegments = runtimeRoute.TurnSegments,
-                FanEntryExtensionWorldUnits = runtimeRoute.FanEntryExtensionWorldUnits
+                FanEntryExtensionWorldUnits = runtimeRoute.FanEntryExtensionWorldUnits,
+                BottomLaneExtra = runtimeRoute.BottomLaneExtra
             };
         }
 

@@ -57,7 +57,7 @@ namespace HayChoriYPaty
                 {
                     GUI.matrix = Matrix4x4.Scale(new Vector3(Screen.width / W, Screen.width / W, 1f));
                     GUI.color = Color.white;
-                    DrawTowerDefenseStatusHud(sim.Coins, 0f);
+                    DrawTowerDefenseStatusHud(sim.Coins, sim.Elapsed);
                     return;
                 }
                 EnsureHudBarTexture(cutoutGap);
@@ -66,21 +66,28 @@ namespace HayChoriYPaty
                     hudQuotaProductIds[slot] = sim.GetAvailableProduct(slot);
                 GUI.matrix = Matrix4x4.Scale(new Vector3(Screen.width / W, Screen.width / W, 1f));
                 GUI.color = Color.white;
-                Texture2D bar = cutoutGap.width > 0f ? cutoutHudBarTexture : hudBarTexture;
-                Rect barBounds = new Rect(0f, 0f, W, HudBarHeightFor(cutoutGap));
-                if (bar != null) GUI.DrawTexture(barBounds, bar, ScaleMode.StretchToFill, true);
-                Rect coinCell = HudStatusCellBounds(0, cutoutGap);
-                float statusScale = HudStatusScale(cutoutGap);
-                float coinIcon = Mathf.Min(HudStatusIconSize * statusScale, coinCell.height - HudChipInset * 2f);
-                float coinInset = HudStatusCardPadding * statusScale;
-                DrawHudIcon(new Rect(coinCell.x + coinInset, coinCell.center.y - coinIcon * .5f, coinIcon, coinIcon), 10);
-                DrawHudNumber(HudStatusTextBounds(0, cutoutGap), sim.Coins.ToString(),
-                    Mathf.RoundToInt(HudStatusValueFontSize * statusScale));
-                DrawHudNumber(HudStatusTextBounds(1, cutoutGap), FormatRemainingTime(sim.TimeRemaining),
-                    Mathf.RoundToInt(HudClockFontSize * statusScale));
-                int quotaFontSize = HudQuotaCounterFontSizeFor(sim, cutoutGap);
+                Rect compactStatus = Rect.zero;
+                Rect compactQuotaBand = (sim.Phase == RoundPhase.Playing || VictoryTransitionActive)
+                    ? CompactHudQuotaBand(cutoutGap, hudQuotaProductIds, hudQuotaProductCount, out compactStatus) : Rect.zero;
+                if (compactStatus.width > 0f) DrawCompactHudStatus(sim, compactStatus);
+                else
+                {
+                    Texture2D bar = cutoutGap.width > 0f ? cutoutHudBarTexture : hudBarTexture;
+                    Rect barBounds = new Rect(0f, 0f, W, HudBarHeightFor(cutoutGap));
+                    if (bar != null) GUI.DrawTexture(barBounds, bar, ScaleMode.StretchToFill, true);
+                    Rect coinCell = HudStatusCellBounds(0, cutoutGap);
+                    float statusScale = HudStatusScale(cutoutGap);
+                    float coinIcon = Mathf.Min(HudStatusIconSize * statusScale, coinCell.height - HudChipInset * 2f);
+                    float coinInset = HudStatusCardPadding * statusScale;
+                    DrawHudIcon(new Rect(coinCell.x + coinInset, coinCell.center.y - coinIcon * .5f, coinIcon, coinIcon), 10);
+                    DrawHudNumber(HudStatusTextBounds(0, cutoutGap), sim.Coins.ToString(),
+                        Mathf.RoundToInt(HudStatusValueFontSize * statusScale));
+                    DrawHudNumber(HudStatusTextBounds(1, cutoutGap), FormatRemainingTime(sim.TimeRemaining),
+                        Mathf.RoundToInt(HudClockFontSize * statusScale));
+                }
+                int quotaFontSize = HudQuotaCounterFontSizeFor(sim, cutoutGap, compactQuotaBand);
                 for (int slot = 0; slot < hudQuotaProductCount; slot++)
-                    DrawQuotaChip(sim, slot, HudQuotaCellBounds(slot, hudQuotaProductIds, hudQuotaProductCount, cutoutGap), quotaFontSize);
+                    DrawQuotaChip(sim, slot, HudQuotaDisplayBounds(slot, hudQuotaProductIds, hudQuotaProductCount, cutoutGap, compactQuotaBand), quotaFontSize);
             }
             finally { GUI.matrix = previous; GUI.color = color; layoutVerticalScale = previousVertical; }
         }
@@ -204,23 +211,98 @@ namespace HayChoriYPaty
         private static Rect HudQuotaCellBounds(int slot, int productCount, Rect cutoutGap) =>
             HudQuotaCellBounds(slot, DefaultHudProductIds, Mathf.Clamp(productCount, 0, DefaultHudProductIds.Length), cutoutGap);
 
+        private static Rect CompactHudQuotaBand(Rect cutoutGap, int[] products, int count)
+            => CompactHudQuotaBand(cutoutGap, products, count, out _);
+
+        private static Rect CompactHudQuotaBand(Rect cutoutGap, int[] products, int count, out Rect status)
+        {
+            status = Rect.zero;
+            Vector2 size = new Vector2(Screen.width, Screen.height);
+            Rect safe = CanvasViewport(size, Screen.safeArea);
+            float height = CanvasLogicalHeight(safe);
+            if (count <= 0 || size.x <= 0f || height >= 958f) return Rect.zero;
+            float safeScale = safe.width / W, screenScale = size.x / W;
+            float queueScale = height / H;
+            float counter = StreetSceneLayout.CounterTopInViewport(size.x, size.y, safe);
+            // DrawWaitingCrowd rounds to the nearest visual row. Reserve the tallest
+            // bubble even at the rear edge of the second row while a customer advances.
+            float clientY = StreetSimulation.FrontQueueY - 1.5f * StreetSimulation.QueueRowSpacing
+                + StreetSceneLayout.CustomerOffset(counter, queueScale);
+            Rect backBubble = OrderBubbleLayoutBounds(OrderBubbleBounds(new Vector2(0f, clientY),
+                StreetCustomer.MaxVisibleOrderProducts + 1), queueScale);
+            float firstBubbleTop = (safe.y + backBubble.yMin * safeScale) / screenScale;
+            const float clearance = 2f, bandHeight = 28f;
+            if (HudQuotaGridBounds(cutoutGap, products, count).yMax + clearance <= firstBubbleTop) return Rect.zero;
+            float top = HudBarHeightFor(cutoutGap) + HudObjectiveGap;
+            // Prefer the existing HUD edge. If even one row would enter the queue, use
+            // the counter face immediately below the crowd clip, not the customer lane.
+            if (top + bandHeight + clearance > firstBubbleTop)
+                top = (safe.y + counter * safeScale) / screenScale + clearance;
+            Rect band = new Rect(safe.xMin / screenScale + HudQuotaColumnInset, top,
+                safe.width / screenScale - HudQuotaColumnInset * 2f, bandHeight);
+            // In the square/very short case the old full-width status bar also covered
+            // rear orders. Keep both readings at the left of the same counter strip.
+            if (firstBubbleTop < HudBarHeightFor(cutoutGap))
+            {
+                status = new Rect(band.x, band.y, Mathf.Min(100f, band.width * .21f), band.height);
+                band.xMin = status.xMax + 4f;
+            }
+            return band;
+        }
+
+        private static Rect CompactHudCoinSlot(Rect status) => new Rect(status.x + 3f, status.center.y - 6f, 12f, 12f);
+
+        private Rect HudDisplayedCoinBounds(Rect cutoutGap)
+        {
+            if (game.Sim.Phase != RoundPhase.Playing) return HudCoinIconBounds(cutoutGap);
+            CompactHudQuotaBand(cutoutGap, hudQuotaProductIds, hudQuotaProductCount, out Rect status);
+            return status.width > 0f ? CompactHudCoinSlot(status) : HudCoinIconBounds(cutoutGap);
+        }
+
+        private void DrawCompactHudStatus(StreetSimulation sim, Rect status)
+        {
+            FillRect(status, HudQuotaCardColor(false));
+            DrawHudIcon(CompactHudCoinSlot(status), 10);
+            float half = status.width * .5f;
+            DrawHudNumber(new Rect(status.x + 16f, status.y, half - 16f, status.height), sim.Coins.ToString(),
+                14, TextAnchor.MiddleCenter, 8);
+            FillRect(new Rect(status.x + half, status.y + 4f, 1f, status.height - 8f), new Color(.45f, .88f, 1f, .65f));
+            DrawHudNumber(new Rect(status.x + half + 1f, status.y, half - 1f, status.height),
+                FormatRemainingTime(sim.TimeRemaining), 14, TextAnchor.MiddleCenter, 8);
+        }
+
+        private Rect HudQuotaDisplayBounds(int slot, int[] products, int count, Rect cutoutGap) =>
+            HudQuotaDisplayBounds(slot, products, count, cutoutGap,
+                game.Sim.Phase == RoundPhase.Playing ? CompactHudQuotaBand(cutoutGap, products, count) : Rect.zero);
+
+        private static Rect HudQuotaDisplayBounds(int slot, int[] products, int count, Rect cutoutGap, Rect compactBand)
+        {
+            if (compactBand.width <= 0f) return HudQuotaCellBounds(slot, products, count, cutoutGap);
+            if (slot < 0 || slot >= count) return Rect.zero;
+            const float gap = 4f;
+            float width = Mathf.Min(HudQuotaCardWidth, (compactBand.width - gap * (count - 1)) / count);
+            float left = compactBand.center.x - (width * count + gap * (count - 1)) * .5f;
+            return new Rect(left + slot * (width + gap), compactBand.y, width, compactBand.height);
+        }
+
         private static Color HudQuotaCardColor(bool complete) =>
             complete ? new Color(.025f, .34f, .40f, .65f) : new Color(.025f, .09f, .24f, .65f);
 
-        private int HudQuotaCounterFontSizeFor(StreetSimulation sim, Rect cutoutGap)
+        private int HudQuotaCounterFontSizeFor(StreetSimulation sim, Rect cutoutGap, Rect compactQuotaBand)
         {
             int sharedFontSize = HudQuotaCounterFontSize;
             for (int slot = 0; slot < hudQuotaProductCount; slot++)
             {
-                Rect card = HudQuotaCellBounds(slot, hudQuotaProductIds, hudQuotaProductCount, cutoutGap);
+                Rect card = HudQuotaDisplayBounds(slot, hudQuotaProductIds, hudQuotaProductCount, cutoutGap, compactQuotaBand);
                 if (card.width <= 0f || card.height <= 0f) continue;
                 int product = sim.GetAvailableProduct(slot);
-                float iconSize = Mathf.Min(HudQuotaIconMaxSize, card.height - HudQuotaCardInset * 2f);
+                float iconSize = QuotaIconSize(card);
                 Rect icon = new Rect(card.x + HudQuotaCardInset, card.center.y - iconSize * .5f, iconSize, iconSize);
                 Rect counter = HudQuotaCounterBounds(card, icon);
                 string value = sim.GetProductDelivered(product) + "/" + sim.GetProductGoal(product);
                 sharedFontSize = Mathf.Min(sharedFontSize,
-                    HudNumberFitFontSize(hudNumber, counter, value, HudQuotaCounterFontSize));
+                    HudNumberFitFontSizeWithMinimum(hudNumber, counter, value, HudQuotaCounterFontSize,
+                        card.width < 72f ? 8 : 12));
             }
             return sharedFontSize;
         }
@@ -245,11 +327,17 @@ namespace HayChoriYPaty
             }
             else FillRect(bounds, HudQuotaCardColor(complete));
             GUI.color = previous;
-            float iconSize = Mathf.Min(HudQuotaIconMaxSize, bounds.height - HudQuotaCardInset * 2f);
+            float iconSize = QuotaIconSize(bounds);
             Rect icon = new Rect(bounds.x + HudQuotaCardInset, bounds.center.y - iconSize * .5f, iconSize, iconSize);
             DrawHudIcon(icon, product);
             Rect counter = HudQuotaCounterBounds(bounds, icon);
-            DrawHudNumber(counter, delivered + "/" + goal, sharedFontSize, HudQuotaCounterTextAlignment);
+            DrawHudNumber(counter, delivered + "/" + goal, sharedFontSize, HudQuotaCounterTextAlignment,
+                bounds.width < 72f ? 8 : 12);
+        }
+        private static float QuotaIconSize(Rect card)
+        {
+            float height = Mathf.Min(HudQuotaIconMaxSize, card.height - HudQuotaCardInset * 2f);
+            return card.width < 72f ? Mathf.Min(height, card.width * .25f) : height;
         }
         private static Rect HudQuotaCounterBounds(Rect card, Rect icon)
         {
@@ -283,32 +371,35 @@ namespace HayChoriYPaty
             int seconds = Mathf.Max(0, Mathf.CeilToInt(remaining));
             return (seconds / 60) + ":" + (seconds % 60).ToString("00");
         }
-        private static int HudNumberFitFontSize(GUIStyle style, Rect bounds, string value, int preferredFontSize)
+        private static int HudNumberFitFontSize(GUIStyle style, Rect bounds, string value, int preferredFontSize) =>
+            HudNumberFitFontSizeWithMinimum(style, bounds, value, preferredFontSize, 12);
+
+        private static int HudNumberFitFontSizeWithMinimum(GUIStyle style, Rect bounds, string value, int preferredFontSize, int minimum)
         {
             int originalSize = style.fontSize;
             try
             {
-                int baseFontSize = Mathf.Max(12, preferredFontSize);
+                int baseFontSize = Mathf.Max(minimum, preferredFontSize);
                 style.fontSize = baseFontSize;
                 Vector2 needed = CachedCalcSize(style, value);
                 float fitWidth = (bounds.width - 4f) / Mathf.Max(1f, needed.x);
                 float fitHeight = (bounds.height - 2f) / Mathf.Max(1f, needed.y);
                 float fitScale = Mathf.Min(1f, fitWidth, fitHeight);
                 return fitScale < 1f
-                    ? Mathf.Max(12, Mathf.FloorToInt(baseFontSize * fitScale))
+                    ? Mathf.Max(minimum, Mathf.FloorToInt(baseFontSize * fitScale))
                     : baseFontSize;
             }
             finally { style.fontSize = originalSize; }
         }
 
         private void DrawHudNumber(Rect bounds, string value, int preferredFontSize = 40,
-            TextAnchor alignment = TextAnchor.MiddleCenter)
+            TextAnchor alignment = TextAnchor.MiddleCenter, int minimum = 12)
         {
             int originalSize = hudNumber.fontSize;
             TextAnchor originalAlignment = hudNumber.alignment;
             Color originalTextColor = hudNumber.normal.textColor;
             hudNumber.alignment = alignment;
-            hudNumber.fontSize = HudNumberFitFontSize(hudNumber, bounds, value, preferredFontSize);
+            hudNumber.fontSize = HudNumberFitFontSizeWithMinimum(hudNumber, bounds, value, preferredFontSize, minimum);
             hudNumber.normal.textColor = new Color(.005f, .025f, .11f);
             for (int y = -1; y <= 1; y++)
             for (int x = -1; x <= 1; x++)

@@ -98,7 +98,8 @@ namespace HayChoriYPaty
                 new StreetLevelBalance(new[] {310,220,135,125,255,110,145}, new[] {60,60,80,70,70}, 17.00f, 500),
                 new StreetLevelBalance(new[] {345,245,150,140,285,120,165}, new[] {70,70,90,80,80}, 21.00f, 500),
                 new StreetLevelBalance(new[] {0,0,0,0,0,0,0}, new[] {0,0,0,0,0}, 1f),
-                new StreetLevelBalance(new[] {345,245,150,140,285,120,165}, new[] {70,70,90,80,80}, 21.00f, 500),
+                // Argentinos is the fifth venue, not the old late-campaign Los Redondos shift.
+                new StreetLevelBalance(new[] {118,105,85,80,115,76,90}, new[] {70,70,90,80,80}, 21.00f, 500),
                 new StreetLevelBalance(new[] {0,0,0,0,0,0,0}, new[] {0,0,0,0,0}, 1f),
                 new StreetLevelBalance(new[] {0,0,0,0,0,0,0}, new[] {60,60,60,60,60}, 1f, 1200)
             };
@@ -310,7 +311,7 @@ namespace HayChoriYPaty
         public static readonly string[] ProductNames = { "Chori", "Paty", "Bondiola", "Vacío", "Coca 600 ml", "Fernet con Coca 1 L", "Cerveza en lata" };
         public const int HuracanBonusLevelId = 11;
         public const int ArgentinosJuniorsLevelId = 12;
-        public static readonly int[] CampaignOrder = { 0, 1, TowerDefenseCampaignLevelId, 2, ArgentinosJuniorsLevelId, 3, HuracanBonusLevelId, LosRedondosTowerDefenseCampaignLevelId, LaRengaTowerDefenseCampaignLevelId, PeregrinacionTowerDefenseCampaignLevelId, 4, 5, 6, 7, 8 };
+        public static readonly int[] CampaignOrder = { 0, 1, TowerDefenseCampaignLevelId, 2, ArgentinosJuniorsLevelId, 3, LaRengaTowerDefenseCampaignLevelId, HuracanBonusLevelId, 4, 5, LosRedondosTowerDefenseCampaignLevelId, 6, 7, 8, PeregrinacionTowerDefenseCampaignLevelId };
         public static readonly string[] LevelNames = { "Floresta / All Boys", "Nueva Chicago", "Liniers - Velez Sarsfield", "Ferro Carril Oeste", "Independiente de Avellaneda", "Racing Club / Avellaneda", "San Lorenzo / Boedo", "River Plate / Núñez", "Boca Juniors / La Boca", "Sindicato de Camioneros / Plaza de Mayo", "Los Redondos / Tandil", "Huracán / Parque Patricios", "Argentinos Juniors / La Paternal", "La Renga – Autódromo Bs. As.", "Peregrinación a Luján — Moreno" };
         // Player-facing captions consistently show the club/team first and its neighborhood second.
         // LevelNames remain stable theme keys consumed by ClubVisualTheme.
@@ -319,7 +320,7 @@ namespace HayChoriYPaty
             "Ferro / Caballito", "Independiente / Avellaneda", "Racing Club / Avellaneda",
             "San Lorenzo / Boedo", "River Plate / Núñez", "Boca Juniors / La Boca",
             "Sindicato de Camioneros / Plaza de Mayo", "Los Redondos / Tandil", "Huracán / Parque Patricios",
-            "Argentinos Juniors / La Paternal", "La Renga – Autódromo Bs. As.", "Peregrinación a Luján — Moreno"
+            "Argentinos Juniors / La Paternal", "La Renga – Autódromo Bs. As.", "Peregrinación - Luján"
         };
         private static readonly int[] DefaultProductCounts = { 1, 2, 3, 5, 7, 7, 7, 7, 7, 7, 7, 3, 7, 2, 7 };
         private static readonly int[][] DefaultLevelProducts = {
@@ -604,6 +605,18 @@ namespace HayChoriYPaty
             var result = new int[LevelNames.Length][];
             for (int level = 0; level < result.Length; level++)
             {
+                if (level == TowerDefenseLevelConfig.LosRedondosCampaignLevelId || level == TowerDefenseLevelConfig.LaRengaCampaignLevelId)
+                {
+                    // The round serves its authored Defense menu, not the legacy Chori/Coca pair (a delivery outside the menu makes the
+                    // progress save fail and freezes the match).
+                    string path = TowerDefenseLevelConfig.ResourcesPathForCampaignLevel(level);
+                    int[] menu = Resources.Load<TowerDefenseLevelConfig>(path)?.AvailableProducts;
+                    if (menu != null && menu.Length > 0)
+                    {
+                        result[level] = menu;
+                        continue;
+                    }
+                }
                 int[] parsed = ParseProductIds(value.levelProductIds != null && level < value.levelProductIds.Length
                     ? value.levelProductIds[level] : null);
                 if (parsed == null) parsed = (int[])DefaultLevelProducts[level].Clone();

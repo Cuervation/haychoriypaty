@@ -118,6 +118,14 @@ namespace HayChoriYPaty
         internal int PendingFanId;
         internal int PendingProduct = -1;
         internal int ServiceStage;
+        // Nueva Chicago's grab and hand-over dwell (StreetSimulation Pickup/Handoff states).
+        internal bool ServiceDwelling;
+        // Nueva Chicago's idle crew waits at a random spot of the middle band, re-rolled after each delivery.
+        internal bool HasWaitSpot;
+        internal Vector2 WaitSpotPosition;
+        internal float ServiceDwellSeconds;
+        internal Vector2 PostPosition;
+        internal bool ReturningToPost;
 
         internal TowerDefenseWorkerState(int id, StreetWorkerRole role, int zone, Vector2 position)
         {
@@ -126,6 +134,7 @@ namespace HayChoriYPaty
             ServiceZone = zone;
             TargetZone = zone;
             Position = position;
+            PostPosition = position;
             TransferRoute = Array.Empty<Vector2>();
         }
     }
@@ -328,7 +337,8 @@ namespace HayChoriYPaty
             return new Vector2(x, y);
         }
 
-        private bool IsLosRedondos => config.SourceCampaignLevelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId;
+        // The five-run serpentine with right-hand bays; the horizontal kitchen version of the level has none of it.
+        private bool IsLosRedondos => config.SourceCampaignLevelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId && !config.FreeConstruction;
 
         /// <summary>
         /// Los Redondos sector for a role/zone (P0, C0, P1, C1 from top to bottom), taken from
@@ -459,7 +469,9 @@ namespace HayChoriYPaty
                 ticketWorkersByRole[role] = 0L;
             }
             coins = startingCoins >= 0 ? startingCoins : TowerDefenseEconomyProfile.StartingCoins;
-            Kitchen = new StreetKitchenProduction(sourceBalance.kitchen, availableProducts, null, true, false, !config.FreeConstruction);
+            // Nueva Chicago's kitchen is the traditional one: nobody cooks, the table is always full of sandwiches and the
+            // Parrillero only serves them. Every other Tower Defense level (and Luján) keeps active cooks.
+            Kitchen = new StreetKitchenProduction(sourceBalance.kitchen, availableProducts, null, !IsPassiveKitchenLevel, IsPassiveKitchenLevel, !config.FreeConstruction, false, NarrowGrills);
             random = new System.Random(sourceBalance.randomSeed + sourceLevel * 97 + config.LevelId.GetHashCode());
             InitializeStartingStations();
             BuildWorkers();
@@ -608,13 +620,14 @@ namespace HayChoriYPaty
             TowerDefenseRouteGeometryResult nextGeometry = TowerDefenseRouteGeometry.Generate(runtimeRoute);
             if (nextGeometry == null || !nextGeometry.IsValid) return;
             LastReflowSucceeded = false;
-            if (config.FreeConstruction && !FreeLayoutFitsReflow(runtimeRoute.WorkBounds, logicalPixelScale))
+            if (config.FreeConstruction && !IsBocaKitchenLevel && !FreeLayoutFitsReflow(runtimeRoute.WorkBounds, logicalPixelScale))
             { Pause(); return; }
             Rect previousWorkBounds = route.WorkBounds;
             float previousPixelScale = worldUnitsPerLogicalPixel;
             var oldStations = config.FreeConstruction ? new List<TowerDefensePlacedStation>(placedStations) : null;
             var oldWorkerPositions = new Vector2[workers.Count];
-            for (int i = 0; i < workers.Count; i++) oldWorkerPositions[i] = workers[i].Position;
+            var oldWorkerPosts = new Vector2[workers.Count];
+            for (int i = 0; i < workers.Count; i++) { oldWorkerPositions[i] = workers[i].Position; oldWorkerPosts[i] = workers[i].PostPosition; }
             float[] normalized = new float[fans.Count];
             for (int i = 0; i < fans.Count; i++) normalized[i] = fans[i].RouteFollower.TotalDistance <= 0f ? 0f :
                 fans[i].RouteFollower.Progress / fans[i].RouteFollower.TotalDistance;
@@ -643,15 +656,20 @@ namespace HayChoriYPaty
                     Vector2 pickup = new Vector2(center.x, bounds.yMin);
                     placedStations.Add(new TowerDefensePlacedStation(old.Id, old.Kind, bounds, work, pickup));
                 }
+                if (IsBocaKitchenLevel) ReflowBocaKitchen();
                 for (int i = 0; i < workers.Count; i++)
                 {
                     TowerDefenseWorkerState worker = workers[i];
                     Vector2 old = oldWorkerPositions[i];
-                    worker.Position = route.WorkBounds.min + (old - previousWorkBounds.min) * (logicalPixelScale / Mathf.Max(.001f,previousPixelScale));
+                    float workerRatio = logicalPixelScale / Mathf.Max(.001f, previousPixelScale);
+                    worker.Position = route.WorkBounds.min + (old - previousWorkBounds.min) * workerRatio;
+                    worker.PostPosition = route.WorkBounds.min + (oldWorkerPosts[i] - previousWorkBounds.min) * workerRatio;
+                    worker.ReturningToPost = false;
                     worker.TransferRoute = Array.Empty<Vector2>(); worker.TransferIndex = 0; worker.IsMoving = false;
                     worker.IsCooking = false;
                     // Existing carried/cooking units and service claims survive a purely visual resize.
                 }
+                if (IsBocaKitchenLevel) AssignAllRolePosts();
             }
             for (int i = 0; i < fans.Count; i++)
             {
@@ -688,7 +706,7 @@ namespace HayChoriYPaty
             bool premiumCook = workerCounts[(int)StreetWorkerRole.ParrilleroPremium] > 0 && (!freeBuild || HasStation(TowerDefenseStationKind.PremiumGrill));
             bool cocaWorker = workerCounts[(int)StreetWorkerRole.Cocacolero] > 0;
             bool fernetero = workerCounts[(int)StreetWorkerRole.Fernetero] > 0 && (!freeBuild || HasStation(TowerDefenseStationKind.FernetTable));
-            if (freeBuild) cocaWorker &= HasStation(TowerDefenseStationKind.CocaBarrel) && HasStation(TowerDefenseStationKind.BeerBarrel);
+            if (freeBuild) cocaWorker &= HasStation(TowerDefenseStationKind.CocaBarrel) && (HasStation(TowerDefenseStationKind.BeerBarrel) || !ContainsProduct(6));
             Kitchen.Advance(deltaTime, cookRate, beverageRate, normalCook, premiumCook, cocaWorker, fernetero);
             if (freeBuild) AdvanceFreeConstructionCooks(deltaTime, cookRate);
             else AdvanceActiveCooks(deltaTime, cookRate);
@@ -734,6 +752,23 @@ namespace HayChoriYPaty
         {
             if (stopSpawning || spawnedFans >= TotalFanCount || fans.Count >= TotalFanCount) return;
             if (UsesCamionerosProfiles) { SpawnCamionerosOrder(); return; }
+            if (config.FreeConstruction && availableProducts.Length < 7)
+            {
+                // A smaller menu (Camioneros: sandwich and Coca): single-unit orders drawn only from what the level sells.
+                int index = spawnedFans;
+                int[] pool = availableProducts;
+                int product = index < 6 ? pool[index % 2 == 0 ? 0 : pool.Length - 1]
+                    : index < 18 ? pool[(index - 6) % pool.Length] : pool[random.Next(pool.Length)];
+                if (index >= 18 && pool.Length > 1 && random.Next(4) == 0)
+                {
+                    int second = product;
+                    while (second == product) second = pool[random.Next(pool.Length)];
+                    CreateFan(new[] { product, second }, new[] { 1, 1 });
+                }
+                else CreateFan(new[] { product }, new[] { 1 });
+                nextFanSpawnAt = elapsed + config.FanSpawnIntervalSeconds;
+                return;
+            }
             if (config.FreeConstruction)
             {
                 int index = spawnedFans;
@@ -916,7 +951,7 @@ namespace HayChoriYPaty
 
         private bool IsAdjacentToRoleArea(TowerDefenseFanState fan, StreetWorkerRole role, int zone)
         {
-            if (config.FreeConstruction) return zone == 0 && !fan.RouteFollower.HasExited;
+            if (config.FreeConstruction) return zone == 0 && !fan.RouteFollower.HasExited && FanIsServiceable(fan);
             if (zone < 0 || zone >= serviceZones.Length || fan.RouteFollower.HasExited) return false;
             // Los Redondos has four right-side sectors; sector k serves runs k and k+1 and
             // their connector, exactly as a Camioneros area serves its two bordering runs.
@@ -958,19 +993,21 @@ namespace HayChoriYPaty
                 worker.AnimationTime += deltaTime;
                 worker.ServeAnimationSeconds = Mathf.Max(0f, worker.ServeAnimationSeconds - deltaTime);
                 worker.DeliveryCooldownSeconds = Mathf.Max(0f, worker.DeliveryCooldownSeconds - deltaTime);
+                worker.ServiceDwellSeconds = Mathf.Max(0f, worker.ServiceDwellSeconds - deltaTime);
                 if (!worker.IsMoving)
                 {
                     if (config.FreeConstruction && worker.ServiceStage > 0) AdvanceFreeConstructionServiceStage(worker);
+                    else if (config.FreeConstruction && worker.ServiceStage == 0 && worker.ServeAnimationSeconds <= 0f) QueueWorkerToPost(worker);
                     continue;
                 }
-                float movement = Mathf.Max(0f, sourceBalance.workerSpeed) * worldUnitsPerLogicalPixel * deltaTime;
+                float movement = (config.FreeConstruction ? FreeWorkerSpeed(worker.Role) : Mathf.Max(0f, sourceBalance.workerSpeed) * worldUnitsPerLogicalPixel) * deltaTime;
                 while (movement > 0f && worker.TransferIndex < worker.TransferRoute.Length)
                 {
                     Vector2 target = worker.TransferRoute[worker.TransferIndex];
                     float distance = Vector2.Distance(worker.Position, target);
                     if (distance <= movement || distance <= 0.0001f)
                     {
-                        if (config.FreeConstruction && !FreeSegmentClear(worker.Position, target, worker.Role, worker, Rect.zero)) { movement = 0f; break; }
+                        if (config.FreeConstruction && !FreeSegmentClear(worker.Position, target, worker.Role, worker, Rect.zero, false)) { movement = 0f; break; }
                         worker.Position = target;
                         worker.TravelDistance += distance;
                         movement -= distance;
@@ -980,7 +1017,7 @@ namespace HayChoriYPaty
                     {
                         Vector2 direction = (target - worker.Position).normalized;
                         Vector2 nextPosition = worker.Position + direction * movement;
-                        if (config.FreeConstruction && !FreeSegmentClear(worker.Position, nextPosition, worker.Role, worker, Rect.zero)) { movement = 0f; break; }
+                        if (config.FreeConstruction && !FreeSegmentClear(worker.Position, nextPosition, worker.Role, worker, Rect.zero, false)) { movement = 0f; break; }
                         worker.Position = nextPosition;
                         worker.TravelDistance += movement;
                         movement = 0f;
@@ -990,6 +1027,7 @@ namespace HayChoriYPaty
                 {
                     worker.ServiceZone = worker.TargetZone;
                     worker.IsMoving = false;
+                    worker.ReturningToPost = false;
                     worker.TransferRoute = Array.Empty<Vector2>();
                     if (config.FreeConstruction && worker.ServiceStage > 0) AdvanceFreeConstructionServiceStage(worker);
                 }
@@ -1089,6 +1127,8 @@ namespace HayChoriYPaty
             workers.Clear();
             for (int roleIndex = 0; roleIndex < workerCounts.Length; roleIndex++)
                 for (int i = 0; i < workerCounts[roleIndex]; i++) AddWorker((StreetWorkerRole)roleIndex, ChooseInitialZone((StreetWorkerRole)roleIndex));
+            if (config.FreeConstruction && IsBocaKitchenLevel)
+                for (int roleIndex = 0; roleIndex < workerCounts.Length; roleIndex++) AssignRolePosts((StreetWorkerRole)roleIndex, true);
         }
 
         private int ChooseInitialZone(StreetWorkerRole role) =>
@@ -1141,8 +1181,11 @@ namespace HayChoriYPaty
             return count;
         }
 
+        // Traditional (passive) kitchens have no Mozo: the cook of each specialty serves its own products.
         private StreetWorkerRole GetDeliveryRole(int product) =>
-            product >= 0 && product <= 3 ? (config.FreeConstruction ? StreetWorkerRole.Mozo : StreetWorkerRole.Parrillero)
+            product >= 0 && product <= 3
+                ? (IsPassiveKitchenLevel ? StreetSpecialties.GetRequiredWorkerRole(product)
+                    : config.FreeConstruction ? StreetWorkerRole.Mozo : StreetWorkerRole.Parrillero)
                 : StreetSpecialties.GetRequiredWorkerRole(product);
 
         private int CountPriorWorkers(StreetWorkerRole role)
@@ -1158,9 +1201,9 @@ namespace HayChoriYPaty
             {
                 if (placedStations.Count > 0)
                 {
-                    Vector2 stationAccess = RoleStationAccess(role);
+                    Vector2 stationAccess = IsBocaKitchenLevel ? RolePost(role, roleIndex, crewCount) : RoleStationAccess(role);
                     if (IsFinite(stationAccess.x) && IsFinite(stationAccess.y) &&
-                        FreePositionClear(stationAccess, role, null, Rect.zero)) return stationAccess;
+                        (IsBocaKitchenLevel || FreePositionClear(stationAccess, role, null, Rect.zero))) return stationAccess;
                 }
                 int startingCrewSize = 0;
                 for (int i = 0; i < workerCounts.Length; i++) startingCrewSize += workerCounts[i];
@@ -1260,7 +1303,9 @@ namespace HayChoriYPaty
                 PlayableBounds = source.PlayableBounds,
                 WorkBounds = source.WorkBounds,
                 TurnSegments = source.TurnSegments,
-                FanEntryExtensionWorldUnits = source.FanEntryExtensionWorldUnits
+                FanEntryExtensionWorldUnits = source.FanEntryExtensionWorldUnits,
+                BottomLaneExtra = source.BottomLaneExtra,
+                KitchenVerticalScale = source.KitchenVerticalScale
             };
         }
 

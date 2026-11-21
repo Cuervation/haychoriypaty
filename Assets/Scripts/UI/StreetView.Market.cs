@@ -18,9 +18,30 @@ namespace HayChoriYPaty
         private static readonly Color MarketGold = new Color(1f, .80f, .24f);
         private static readonly Color MarketGreen = new Color(.04f, .40f, .19f);
         private static readonly Color MarketRed = new Color(.73f, .12f, .10f);
+        private static float MarketLayoutHeight(int productCount, float safeHeight)
+        {
+            float minimum = MarketBodyTop(productCount) + 184f + MarketCompactRowHeight + MarketPurchaseHeight;
+            // Preserve the original layout whenever a full expanded ingredient row already fits.
+            // In the fitted view reserve extra scroll room so a small drag does not hide every row.
+            return safeHeight >= minimum ? safeHeight : minimum + 46f;
+        }
+        private float MarketContentCanvasHeight => MarketLayoutHeight(game.Sim.ProductCount, logicalCanvasHeight);
+        private float MarketFitScale => logicalCanvasHeight / MarketContentCanvasHeight;
+        private float MarketFitLeft => (W - W * MarketFitScale) * .5f;
+        private float MarketLocalScroll => marketScroll / MarketFitScale;
+        private static Rect MarketLocalBodyBounds(int productCount, float canvasHeight) =>
+            new Rect(12, MarketBodyTop(productCount), W - 24, canvasHeight - 184f - MarketBodyTop(productCount));
+        private Rect MarketLocalBodyBounds() => MarketLocalBodyBounds(game.Sim.ProductCount, MarketContentCanvasHeight);
+        // Pointer drags in StreetView.Input are in the original safe-canvas units.
         private Rect MarketBodyBounds() => MarketBodyBounds(game.Sim.ProductCount, logicalCanvasHeight);
-        private static Rect MarketBodyBounds(int productCount, float canvasHeight) =>
-            new Rect(12, MarketBodyTop(productCount), W - 24, Mathf.Max(140f, canvasHeight - 184f - MarketBodyTop(productCount)));
+        private static Rect MarketBodyBounds(int productCount, float safeHeight)
+        {
+            float layoutHeight = MarketLayoutHeight(productCount, safeHeight);
+            Rect body = MarketLocalBodyBounds(productCount, layoutHeight);
+            float scale = safeHeight / layoutHeight;
+            return new Rect((W - W * scale) * .5f + body.x * scale, body.y * scale,
+                body.width * scale, body.height * scale);
+        }
         private static Rect MarketEconomyFooterBounds(float canvasHeight) => new Rect(12, canvasHeight - 154f, W - 24, 66f);
         private static Rect MarketBuyMissingBounds(float canvasHeight)
         {
@@ -111,19 +132,19 @@ namespace HayChoriYPaty
             if (marketTab == 2) return 40f + 2f * MarketPermitCardHeight + MarketPermitCardGap;
             if (marketTab == 1)
                 return game.TicketExtrasUnlocked ? MarketExtrasNoticeHeight + 8f +
-                    5f * MarketTicketCardHeight + 4f * MarketTicketCardGap : MarketBodyBounds().height;
+                    5f * MarketTicketCardHeight + 4f * MarketTicketCardGap : MarketLocalBodyBounds().height;
             float height = 0f;
             foreach (int id in MarketVisibleIngredients()) height += MarketRowHeight(id);
             if (MarketIngredientIds(false).Length > 0) height += MarketOthersHeight;
             return height;
         }
         private Rect MarketExtrasNoticeBounds() =>
-            new Rect(16f, MarketBodyBounds().y - marketScroll, W - 32f, MarketExtrasNoticeHeight);
+            new Rect(16f, MarketLocalBodyBounds().y - MarketLocalScroll, W - 32f, MarketExtrasNoticeHeight);
         private Rect MarketTicketCardBounds(int slot)
         {
-            Rect body = MarketBodyBounds();
+            Rect body = MarketLocalBodyBounds();
             if (slot < 0 || slot >= 5) return Rect.zero;
-            return new Rect(body.x, body.y + MarketExtrasNoticeHeight + 8f + slot * (MarketTicketCardHeight + MarketTicketCardGap) - marketScroll,
+            return new Rect(body.x, body.y + MarketExtrasNoticeHeight + 8f + slot * (MarketTicketCardHeight + MarketTicketCardGap) - MarketLocalScroll,
                 body.width, MarketTicketCardHeight);
         }
         private static Rect MarketTicketRedeemButtonBounds(Rect card) =>
@@ -131,25 +152,25 @@ namespace HayChoriYPaty
         private Rect MarketTicketRedeemButtonBounds(int slot) => MarketTicketRedeemButtonBounds(MarketTicketCardBounds(slot));
         private Rect MarketPermitCardBounds(int slot)
         {
-            Rect body = MarketBodyBounds();
+            Rect body = MarketLocalBodyBounds();
             if (slot < 0 || slot >= StreetMarketPreparationCatalog.ItemCount) return Rect.zero;
-            return new Rect(body.x, body.y + 40f + slot * (MarketPermitCardHeight + MarketPermitCardGap) - marketScroll,
+            return new Rect(body.x, body.y + 40f + slot * (MarketPermitCardHeight + MarketPermitCardGap) - MarketLocalScroll,
                 body.width, MarketPermitCardHeight);
         }
         private static Rect MarketPermitBuyButtonBounds(Rect card) =>
             new Rect(card.xMax - 154f, card.y + 34f, 142f, 48f);
-        private float MarketMaxScroll() => Mathf.Max(0, MarketContentHeight() - MarketBodyBounds().height);
+        private float MarketMaxScroll() => Mathf.Max(0, MarketContentHeight() - MarketLocalBodyBounds().height) * MarketFitScale;
         private Rect MarketRowBounds(int slot)
         {
             int[] visible = MarketVisibleIngredients();
             if (slot < 0 || slot >= visible.Length) return Rect.zero;
-            Rect body = MarketBodyBounds();
-            float y = body.y - marketScroll;
+            Rect body = MarketLocalBodyBounds();
+            float y = body.y - MarketLocalScroll;
             for (int i = 0; i < slot; i++) y += MarketRowHeight(visible[i]);
             if (slot >= MarketIngredientIds(true).Length) y += MarketOthersHeight;
             return new Rect(body.x, y, body.width, MarketRowHeight(visible[slot]));
         }
-        private Rect MarketOthersBounds() => new Rect(12, MarketBodyBounds().y + MarketRequiredContentHeight() - marketScroll, W - 24, MarketOthersHeight);
+        private Rect MarketOthersBounds() => new Rect(12, MarketLocalBodyBounds().y + MarketRequiredContentHeight() - MarketLocalScroll, W - 24, MarketOthersHeight);
         // These same rectangles drive native pointer input and IMGUI rendering.
         private static Rect MarketPurchaseControlBounds(Rect row, int action)
         {
@@ -167,13 +188,15 @@ namespace HayChoriYPaty
             row.yMax <= viewport.yMax && row.yMax - MarketPurchaseHeight >= viewport.y;
         private int HitMarketAction(Vector2 p)
         {
+            float scale = MarketFitScale;
+            if (scale < 1f) p = new Vector2((p.x - MarketFitLeft) / scale, p.y / scale);
             if (MarketBackBounds().Contains(p)) return MarketBackAction;
             if (MarketTabBounds(0).Contains(p)) return MarketIngredientsTabAction;
             if (MarketTabBounds(1).Contains(p)) return MarketExtrasTabAction;
             if (MarketTabBounds(2).Contains(p)) return MarketPermitsTabAction;
             if (MarketPlayBounds().Contains(p)) return MarketPlayAction;
-            if (marketTab == 0 && MarketBuyMissingBounds(logicalCanvasHeight).Contains(p)) return MarketCanBuyMissing() ? MarketMissingAction : 0;
-            Rect body = MarketBodyBounds();
+            if (marketTab == 0 && MarketBuyMissingBounds(MarketContentCanvasHeight).Contains(p)) return MarketCanBuyMissing() ? MarketMissingAction : 0;
+            Rect body = MarketLocalBodyBounds();
             if (!body.Contains(p)) return 0;
             if (marketTab == 2)
             {
@@ -213,15 +236,15 @@ namespace HayChoriYPaty
         }
         private static bool MarketFullyVisibleInViewport(Rect content, Rect viewport) =>
             content.yMin >= viewport.yMin && content.yMax <= viewport.yMax;
-        private Rect MarketPlayBounds() => new Rect(22, logicalCanvasHeight - 80, W - 44, 66);
+        private Rect MarketPlayBounds() => new Rect(22, MarketContentCanvasHeight - 80, W - 44, 66);
         private void MarketRevealIngredient(int id)
         {
             int[] ids = MarketVisibleIngredients();
             int slot = System.Array.IndexOf(ids, id);
             if (slot < 0) { marketScroll = Mathf.Clamp(marketScroll, 0, MarketMaxScroll()); return; }
-            Rect row = MarketRowBounds(slot), body = MarketBodyBounds();
-            if (row.y < body.y) marketScroll -= body.y - row.y;
-            else if (row.yMax > body.yMax) marketScroll += row.yMax - body.yMax;
+            Rect row = MarketRowBounds(slot), body = MarketLocalBodyBounds();
+            if (row.y < body.y) marketScroll -= (body.y - row.y) * MarketFitScale;
+            else if (row.yMax > body.yMax) marketScroll += (row.yMax - body.yMax) * MarketFitScale;
             marketScroll = Mathf.Clamp(marketScroll, 0, MarketMaxScroll());
         }
         private void DrawMarketScreen()
@@ -229,6 +252,26 @@ namespace HayChoriYPaty
             Texture2D scene = MarketSceneArt();
             if (scene != null) DrawRawCover(new Rect(0, 0, W, logicalCanvasHeight), scene, new Rect(0, 0, scene.width, scene.height * .58f));
             FillRect(new Rect(0, 0, W, logicalCanvasHeight), new Color(.015f, .045f, .14f, .38f));
+            Event evt = Event.current;
+            if (evt.type == EventType.ScrollWheel)
+            {
+                Vector2 point = ScreenToLayoutPoint(evt.mousePosition, new Vector2(Screen.width, Screen.height), CanvasViewport(new Vector2(Screen.width, Screen.height), Screen.safeArea));
+                point.y *= logicalCanvasHeight / H;
+                if (MarketBodyBounds().Contains(point)) { marketScroll = Mathf.Clamp(marketScroll + evt.delta.y * 24f, 0, MarketMaxScroll()); evt.Use(); }
+            }
+            Matrix4x4 previous = GUI.matrix;
+            float scale = MarketFitScale;
+            try
+            {
+                if (scale < 1f)
+                    GUI.matrix = previous * Matrix4x4.TRS(new Vector3(MarketFitLeft, 0f, 0f),
+                        Quaternion.identity, new Vector3(scale, scale, 1f));
+                DrawMarketContents();
+            }
+            finally { GUI.matrix = previous; }
+        }
+        private void DrawMarketContents()
+        {
             DrawStandardButton(MarketBackBounds(), MarketBackAction, marketFromSelector ? "NIVELES" : "BARRIO");
             DrawMarketBluePanel(new Rect(150, 8, 240, 56), MarketRoyalBlue);
             MarketText(new Rect(164, 10, 212, 50), "MERCADO", 34, Color.white);
@@ -249,14 +292,7 @@ namespace HayChoriYPaty
                 MarketText(new Rect(economy.x + 250, economy.y + 7, economy.width - 264, 44), game.TicketBalance.ToString(), 40, MarketGold, TextAnchor.MiddleRight);
             }
             DrawMarketTabs();
-            Rect body = MarketBodyBounds();
-            Event evt = Event.current;
-            if (evt.type == EventType.ScrollWheel)
-            {
-                Vector2 point = ScreenToLayoutPoint(evt.mousePosition, new Vector2(Screen.width, Screen.height), CanvasViewport(new Vector2(Screen.width, Screen.height), Screen.safeArea));
-                point.y *= logicalCanvasHeight / H;
-                if (body.Contains(point)) { marketScroll = Mathf.Clamp(marketScroll + evt.delta.y * 24f, 0, MarketMaxScroll()); evt.Use(); }
-            }
+            Rect body = MarketLocalBodyBounds();
             marketScroll = Mathf.Clamp(marketScroll, 0, MarketMaxScroll());
             GUI.BeginGroup(body);
             try
@@ -288,16 +324,36 @@ namespace HayChoriYPaty
             }
             finally { GUI.EndGroup(); }
             DrawMarketScrollBar(body);
-            if (!string.IsNullOrEmpty(marketMessage))
+            string shortage = MarketShortageMessage();
+            string feedback = string.IsNullOrEmpty(marketMessage) ? shortage : marketMessage;
+            if (!string.IsNullOrEmpty(feedback))
             {
-                Rect messageBounds = new Rect(20, logicalCanvasHeight - 180, W - 40, 22);
+                Rect messageBounds = new Rect(20, MarketContentCanvasHeight - 180, W - 40, 22);
                 DrawMarketBluePanel(messageBounds, new Color(.015f, .12f, .38f, .96f));
-                MarketText(new Rect(messageBounds.x + 6, messageBounds.y, messageBounds.width - 12, messageBounds.height), marketMessage, 14, Color.white);
+                MarketText(new Rect(messageBounds.x + 6, messageBounds.y, messageBounds.width - 12, messageBounds.height),
+                    feedback, 14, string.IsNullOrEmpty(marketMessage) ? MarketGold : Color.white);
             }
             if (marketTab == 0) DrawMarketEconomyFooter();
             else if (marketTab == 1) DrawMarketExtrasFooter();
             else DrawMarketPermitsFooter();
-            DrawMarketPlayButton(MarketPlayBounds(), "JUGAR PARTIDO", game.CanStartRound);
+            DrawMarketPlayButton(MarketPlayBounds(), MarketPlayCaption(shortage), game.CanStartRound);
+        }
+        private static string MarketPlayCaption(string shortage) =>
+            string.IsNullOrEmpty(shortage) ? "JUGAR PARTIDO" : "JUGAR · FALTA STOCK";
+
+        private string MarketShortageMessage()
+        {
+            if (game.CanStartRound) return "";
+            int first = -1, count = 0;
+            for (int id = 0; id < StreetIngredientCatalog.Names.Length; id++)
+            {
+                if (game.Market.MissingPacks(game.Sim, id) <= 0) continue;
+                if (first < 0) first = id;
+                count++;
+            }
+            if (first < 0) return "";
+            return "FALTA: " + StreetIngredientCatalog.Names[first].ToUpperInvariant()
+                + (count > 1 ? " · +" + (count - 1) + " MÁS" : "");
         }
         private void DrawMarketTabs()
         {
@@ -332,19 +388,21 @@ namespace HayChoriYPaty
         }
         private void DrawMarketPermitsFooter()
         {
-            Rect footer = MarketEconomyFooterBounds(logicalCanvasHeight);
+            Rect footer = MarketEconomyFooterBounds(MarketContentCanvasHeight);
             DrawMarketBluePanel(footer, new Color(.012f, .075f, .25f));
-            MarketText(new Rect(footer.x + 12f, footer.y + 7f, footer.width - 24f, 23f), "HABILITACIONES DE PREPARACIÓN", 14, Color.white);
-            MarketText(new Rect(footer.x + 12f, footer.y + 31f, footer.width - 24f, 24f), "No modifican la jugabilidad por ahora.", 17, MarketGold);
+            MarketText(new Rect(footer.x + 12f, footer.y + 7f, footer.width - 24f, 23f), "No modifican la jugabilidad por ahora.", 14, Color.white);
+            MarketText(new Rect(footer.x + 12f, footer.y + 31f, footer.width - 24f, 24f),
+                "Si cambiás de cancha, perdés los permisos sin reembolso.", 17, MarketGold);
         }
         private void DrawMarketExtrasBody(Rect body)
         {
             if (!game.TicketExtrasUnlocked)
             {
-                Rect panel = new Rect(14f, body.y + Mathf.Max(12f, (body.height - 116f) * .5f), W - 28f, 116f);
+                // This body is drawn inside GUI.BeginGroup(body), so its notice uses local coordinates.
+                Rect panel = new Rect(8f, Mathf.Max(12f, (body.height - 116f) * .5f), body.width - 16f, 116f);
                 DrawMarketBluePanel(panel, new Color(.012f, .075f, .25f, .98f));
                 MarketText(new Rect(panel.x + 10f, panel.y + 12f, panel.width - 20f, 38f), "EXTRAS SE DESBLOQUEA EN RACING", 21, MarketGold);
-                MarketText(new Rect(panel.x + 16f, panel.y + 54f, panel.width - 32f, 46f), "Juntá tickets con cada victoria.\nCanjeá desde Racing (nivel 10).", 17, Color.white);
+                MarketText(new Rect(panel.x + 16f, panel.y + 54f, panel.width - 32f, 46f), MarketExtrasUnlockMessage(), 17, Color.white);
                 return;
             }
             Rect notice = MarketExtrasNoticeBounds();
@@ -375,6 +433,10 @@ namespace HayChoriYPaty
                 DrawStandardButton(MarketTicketRedeemButtonBounds(local), MarketTicketRedeemAction + index, caption, canRedeem);
             }
         }
+        private static string MarketExtrasUnlockMessage() =>
+            "Juntá tickets con cada victoria.\nCanjeá desde Racing (nivel "
+            + (StreetSimulation.CampaignPositionOf(5) + 1) + ").";
+
         private void DrawMarketTicketWorker(Rect card, StreetWorkerRole role)
         {
             Texture2D texture = null;
@@ -403,7 +465,7 @@ namespace HayChoriYPaty
             : role == StreetWorkerRole.Fernetero ? "FERNETERO" : "MOZO";
         private void DrawMarketExtrasFooter()
         {
-            Rect footer = MarketEconomyFooterBounds(logicalCanvasHeight);
+            Rect footer = MarketEconomyFooterBounds(MarketContentCanvasHeight);
             DrawMarketBluePanel(footer, new Color(.012f, .075f, .25f));
             long reserved = 0;
             for (int role = 0; role < 5; role++) reserved += game.PendingTicketWorkers((StreetWorkerRole)role);
@@ -437,7 +499,7 @@ namespace HayChoriYPaty
                 MarketText(new Rect(badge.x + 6, badge.y + 20, badge.width - 12, 36), MarketClubInitials(level), 22, Color.white);
             }
             string[] club = StreetSimulation.LevelDisplayNames[level].Split(new[] {'/', '–', '—'});
-            if (level == StreetSimulation.PeregrinacionTowerDefenseCampaignLevelId) club = new[] {"Peregrinación", "a Luján · Moreno"};
+            if (level == StreetSimulation.PeregrinacionTowerDefenseCampaignLevelId) club = new[] {"Peregrinación - Luján"};
             float captionX = Mathf.Max(120f, badge.xMax + 16f);
             float captionWidth = 506f - captionX;
             MarketText(new Rect(captionX, 77, captionWidth, 24), "NIVEL " + (StreetSimulation.CampaignPositionOf(level) + 1), 19, MarketCyan, TextAnchor.MiddleLeft);
@@ -592,7 +654,7 @@ namespace HayChoriYPaty
             float max = MarketMaxScroll(); if (max <= 0) return;
             Rect track = new Rect(W - 9, body.y, 4, body.height);
             FillRect(track, new Color(.008f, .035f, .14f, .88f));
-            float height = Mathf.Max(28, body.height * body.height / (body.height + max));
+            float height = Mathf.Max(28, body.height * body.height / (body.height + max / MarketFitScale));
             FillRect(new Rect(track.x, track.y + (track.height - height) * marketScroll / max, 4, height), MarketCyan);
         }
         private void DrawMarketOthers(Rect bounds)
@@ -606,14 +668,14 @@ namespace HayChoriYPaty
         }
         private void DrawMarketEconomyFooter()
         {
-            Rect footer = MarketEconomyFooterBounds(logicalCanvasHeight);
+            Rect footer = MarketEconomyFooterBounds(MarketContentCanvasHeight);
             DrawMarketBluePanel(footer, new Color(.012f, .075f, .25f));
             long cost = game.Market.MinimumPurchaseCostCents(game.Sim);
             MarketText(new Rect(footer.x + 12, footer.y + 7, 230, 23), "COSTO PARA COMPLETAR", 14, Color.white);
             MarketText(new Rect(footer.x + 12, footer.y + 30, 230, 30), FormatMarketMoney(cost), 36, MarketGold);
             bool canBuyMissing = MarketCanBuyMissing();
             string caption = !MarketHasMissing() ? "STOCK COMPLETO" : canBuyMissing ? "COMPRAR FALTANTES" : "SALDO INSUFICIENTE";
-            DrawStandardButton(MarketBuyMissingBounds(logicalCanvasHeight), MarketMissingAction, caption, canBuyMissing);
+            DrawStandardButton(MarketBuyMissingBounds(MarketContentCanvasHeight), MarketMissingAction, caption, canBuyMissing);
         }
         private void DrawMarketPlayButton(Rect bounds, string caption, bool enabled)
         {

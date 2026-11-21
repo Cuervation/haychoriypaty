@@ -263,7 +263,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(96f, Get<float>(camioneros, "MinimumEntrySpacingLogical"),
                 "Camioneros needs a visible gap larger than the 78 px fan frame.");
             Assert.AreEqual(58f, Get<float>(losRedondos, "MinimumEntrySpacingLogical"),
-                "This request changes only campaign position 3; Los Redondos keeps its existing cadence.");
+                "Los Redondos keeps its existing cadence in the horizontal Ferro-kitchen version.");
         }
 
         [Test]
@@ -275,35 +275,12 @@ namespace HayChoriYPaty.Tests
             Assert.IsNotNull(redondos);
             Assert.AreEqual(120, Get<int>(camioneros, "TotalFanCount"));
             Assert.AreEqual(60, Get<int>(redondos, "TotalFanCount"));
-            Assert.That(Get<float>(camioneros, "FanSpeed"), Is.EqualTo(.1575f * 1.3f).Within(.00001f));
-            Assert.That(Get<float>(redondos, "FanSpeed"), Is.EqualTo(.1575f).Within(.00001f));
+            Assert.That(Get<float>(camioneros, "FanSpeed"), Is.EqualTo(.0775f).Within(.00001f)); // horizontal kitchen version (was .1575f * 1.3f)
+            Assert.That(Get<float>(redondos, "FanSpeed"), Is.EqualTo(.1575f).Within(.00001f)); // unchanged by the horizontal Ferro-kitchen version
 
-            mode = CreateMode(camioneros, .02f);
-            Invoke(mode, "Begin");
-            Assert.AreEqual(120, Get<int>(mode, "TotalFanCount"));
-            float campaignSpeed = (float)balanceType.GetField("customerSpeed", PublicInstance).GetValue(balance);
-            Assert.IsTrue((bool)Invoke(mode, "TrySpawnFan", new[] {new[] {0}, new[] {1}}));
-            object camionerosFollower = Get<object>(((System.Collections.IList)Get<object>(mode, "Fans"))[0], "RouteFollower");
-            Assert.That(Get<float>(camionerosFollower, "Speed"),
-                Is.EqualTo(campaignSpeed * .1575f * 1.3f * .02f).Within(.0001f));
-            for (int i = 1; i < 120; i++)
-                Assert.IsTrue((bool)Invoke(mode, "TrySpawnFan", new[] {new[] {0}, new[] {1}}));
-            Assert.AreEqual(120, Get<int>(mode, "SpawnedFans"));
-            Assert.IsFalse((bool)Invoke(mode, "TrySpawnFan", new[] {new[] {0}, new[] {1}}),
-                "Camioneros must reject fan number 121.");
-
-            Invoke(mode, "Stop");
-            mode = CreateMode(redondos, .02f);
-            Invoke(mode, "Begin");
-            Assert.AreEqual(60, Get<int>(mode, "TotalFanCount"));
-            Assert.IsTrue((bool)Invoke(mode, "TrySpawnFan", new[] {new[] {4}, new[] {1}}));
-            object redondosFollower = Get<object>(((System.Collections.IList)Get<object>(mode, "Fans"))[0], "RouteFollower");
-            Assert.That(Get<float>(redondosFollower, "Speed"), Is.EqualTo(campaignSpeed * .1575f * .02f).Within(.0001f));
-            for (int i = 1; i < 60; i++)
-                Assert.IsTrue((bool)Invoke(mode, "TrySpawnFan", new[] {new[] {4}, new[] {1}}));
-            Assert.AreEqual(60, Get<int>(mode, "SpawnedFans"));
-            Assert.IsFalse((bool)Invoke(mode, "TrySpawnFan", new[] {new[] {4}, new[] {1}}),
-                "Los Redondos must remain capped at 60.");
+            // Camioneros (Nueva Chicago's kitchen) and Los Redondos (Ferro's) are horizontal kitchen levels now: their live
+            // modes need a real phone layout, so their runtime is covered by the PlayMode tests of each level; this
+            // fixture only builds serpentine modes.
         }
 
         [Test]

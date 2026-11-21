@@ -69,7 +69,7 @@ namespace HayChoriYPaty.Tests
         public void CampaignOrderAppendsLaRengaBeforeUnchangedTraditionalIds()
         {
             Type simulation = RuntimeType("StreetSimulation");
-            Assert.AreEqual(new[] { 0, 1, 9, 2, 12, 3, 11, 10, 13, 14, 4, 5, 6, 7, 8 },
+            Assert.AreEqual(new[] { 0, 1, 9, 2, 12, 3, 13, 11, 4, 5, 10, 6, 7, 8, 14 },
                 simulation.GetField("CampaignOrder", PublicStatic).GetValue(null));
             Assert.AreEqual(15, ((string[])simulation.GetField("LevelNames", PublicStatic).GetValue(null)).Length);
             Assert.AreEqual(13, simulation.GetField("LaRengaTowerDefenseCampaignLevelId", PublicStatic).GetRawConstantValue());
@@ -155,10 +155,18 @@ namespace HayChoriYPaty.Tests
             Assert.IsTrue((bool)Invoke(game, "SelectLevel", levelId));
             Assert.IsTrue((bool)Invoke(game, "TryStartTowerDefenseRound"));
             object sim = ReadProperty(game, "Sim");
-            int[] deliveries = new int[7]; deliveries[0] = 1;
+            int[] deliveries = levelId == 10 ? new[] { 18, 15, 13, 0, 11, 0, 17 } : new[] { 1, 0, 0, 0, 0, 0, 0 };
             int[] workers = (int[])ReadProperty(sim, "WorkerCountsByRole");
+            if (levelId == 10)
+            {
+                Assert.IsFalse((bool)Invoke(game, "IsLevelUnlocked", 11));
+                var outsideMenu = (int[])deliveries.Clone(); outsideMenu[5] = 1;
+                Assert.IsFalse((bool)InvokeAny(sim, "ImportTowerDefenseState", 240f, 600, 250, 1, workers,
+                    outsideMenu, 60, 60, true, true), "Fernet isn't on the authored Redondos menu.");
+                Assert.AreEqual("Playing", ReadProperty(sim, "Phase").ToString());
+            }
             Assert.IsTrue((bool)InvokeAny(sim, "ImportTowerDefenseState", 240f, 600, 250, 1, workers,
-                deliveries, 8, 7, true, true));
+                deliveries, levelId == 10 ? 60 : 8, levelId == 10 ? 60 : 7, true, true));
             Assert.IsTrue((bool)Invoke(game, "ProcessRoundResult"));
             Assert.IsTrue((bool)Invoke(game, "TryCollectVictoryReward"));
         }
@@ -169,15 +177,17 @@ namespace HayChoriYPaty.Tests
             object game = NewGame(NewCampaignSave(10));
             Assert.AreEqual(0L, ReadProperty(game, "TicketBalance"));
             WinDefenseRound(game, 10);
-            Assert.IsTrue((bool)Invoke(game, "IsLevelUnlocked", 13), "A settled ID10 victory must unlock ID13.");
+            // Current chain: Ferro -> La Renga -> Huracán -> (a star there) -> Independiente -> Racing -> Los Redondos -> San Lorenzo ... Boca -> Peregrinación.
+            Assert.IsTrue((bool)Invoke(game, "IsLevelUnlocked", 6), "A settled ID10 victory must unlock San Lorenzo ID6.");
             Assert.IsFalse((bool)Invoke(game, "TryCollectVictoryReward"));
             Assert.IsFalse((bool)Invoke(game, "ProcessRoundResult"));
             Assert.AreEqual(1L, ReadProperty(game, "TicketBalance"));
             Assert.AreEqual(1, persistedMatchCount);
             Assert.AreEqual(1L, ((long[])Field(Field(Field(game, "save"), "statistics"), "winsByLevel"))[10]);
 
+            ((bool[])Field(Field(game, "save"), "unlockedLevelIds"))[13] = true; // the real route reaches it from Ferro, covered elsewhere
             WinDefenseRound(game, 13);
-            Assert.IsTrue((bool)Invoke(game, "IsLevelUnlocked", 14), "A settled ID13 victory must unlock Peregrinación ID14.");
+            Assert.IsTrue((bool)Invoke(game, "IsLevelUnlocked", 11), "A settled ID13 victory must unlock Huracán ID11.");
             Assert.IsFalse((bool)Invoke(game, "TryCollectVictoryReward"));
             Assert.IsFalse((bool)Invoke(game, "ProcessRoundResult"));
             Assert.AreEqual(2L, ReadProperty(game, "TicketBalance"));
@@ -276,7 +286,7 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void LaRengaConfigUsesSharedTwoProductTowerDefenseDefaults()
+        public void LaRengaConfigUsesFerroMenuOnTheCShapedFence()
         {
             string path = RuntimeType("TowerDefenseLevelConfig").GetMethod("ResourcesPathForCampaignLevel", PublicStatic)
                 .Invoke(null, new object[] { 13 }) as string;
@@ -285,10 +295,11 @@ namespace HayChoriYPaty.Tests
             var config = Resources.Load(path, configType);
             Assert.NotNull(config);
             Assert.AreEqual(13, configType.GetProperty("SourceCampaignLevelId").GetValue(config, null));
-            Assert.AreEqual(60, configType.GetProperty("TotalFanCount").GetValue(config, null));
-            Assert.AreEqual(0.1575f, configType.GetProperty("FanSpeed").GetValue(config, null));
-            Assert.AreEqual(96f, configType.GetProperty("MinimumEntrySpacingLogical").GetValue(config, null));
-            CollectionAssert.AreEqual(new[] { 0, 4 }, (int[])configType.GetProperty("AvailableProducts").GetValue(config, null));
+            // C-shaped, Ferro-kitchen version (2026-11-19; Ferro's five products): 120 fans, faster and denser than the former serpentine 60 / 0.1575 / 96.
+            Assert.AreEqual(120, configType.GetProperty("TotalFanCount").GetValue(config, null));
+            Assert.AreEqual(0.375f, (float)configType.GetProperty("FanSpeed").GetValue(config, null), 0.00001f);
+            Assert.AreEqual(66f, configType.GetProperty("MinimumEntrySpacingLogical").GetValue(config, null));
+            CollectionAssert.AreEqual(new[] { 0, 1, 2, 4, 6 }, (int[])configType.GetProperty("AvailableProducts").GetValue(config, null));
         }
     }
 }

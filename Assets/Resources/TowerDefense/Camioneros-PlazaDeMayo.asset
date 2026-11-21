@@ -17,21 +17,32 @@ MonoBehaviour:
   displayName: Camioneros / Plaza de Mayo
   sourceCampaignLevelId: 9
   backgroundResource: street-background-camioneros-v1
+  routeKind: 1
+  freeConstruction: 1
+  equipmentPlacementAllowed: 0
   route:
-    RowCount: 3
+    RowCount: 1
+    RouteKind: 1
     SegmentLengths:
-    - 3.8
-    - 3.8
-    - 3.8
+    - 1
     CorridorWidth: 0.9
+    HorizontalCorridorWidth: 0.9
     RowSpacing: 1.8
+    TurnRadius: 0.68
     PlayableBounds:
       serializedVersion: 2
       x: -3.3
       y: -4.7
       width: 6.6
       height: 9.4
+    WorkBounds:
+      serializedVersion: 2
+      x: -3.3
+      y: -5.7
+      width: 6.6
+      height: 4.8
     TurnSegments: 16
+    FanEntryExtensionWorldUnits: 0
   straightFencePrefab: {fileID: 2371312016393039640, guid: 26ca722ab4b564168b77a248a37ddd55, type: 3}
   turnFencePrefab: {fileID: 5325544064044861468, guid: 68a6d7eb36cdf4e8aa4b233a89f11119, type: 3}
   terminalFencePrefab: {fileID: 3412343263549730106, guid: fdf92aa37b642494095a6916e80a192f, type: 3}
@@ -39,9 +50,24 @@ MonoBehaviour:
   directionArrowSprite: {fileID: 21300000, guid: ef3873967f16248bd8b9a67207f11688, type: 3}
   availableProducts: 0000000004000000
   totalFanCount: 120
-  fanSpeed: 0.20475
+  fanSpeed: 0.0775
   minimumEntrySpacingLogical: 96
   serviceRange: 0.8
   firstWorkZoneOffset: {x: 0, y: 0}
   secondWorkZoneOffset: {x: 0, y: 0}
+  fanSpawnIntervalSeconds: 0.1
+  maximumWorkersPerRole: 3
+  startingStations:
+  - Kind: 0
+    PositionFromWorkBoundsMin: {x: 0, y: 0}
+    HasAccessPosition: 0
+    AccessPositionFromWorkBoundsMin: {x: 0, y: 0}
+  - Kind: 5
+    PositionFromWorkBoundsMin: {x: 0, y: 0}
+    HasAccessPosition: 0
+    AccessPositionFromWorkBoundsMin: {x: 0, y: 0}
+  - Kind: 2
+    PositionFromWorkBoundsMin: {x: 0, y: 0}
+    HasAccessPosition: 0
+    AccessPositionFromWorkBoundsMin: {x: 0, y: 0}
   startingWorkersByRole: 0000000000000000000000000000000000000000

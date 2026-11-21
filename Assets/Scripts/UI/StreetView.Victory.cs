@@ -38,6 +38,10 @@ namespace HayChoriYPaty
                 : 72f;
             float resultButtonGap = chulengo ? ChulengoPendingButtonBottomInset : 8f;
             // Chulengo reserves the shared horizontal action row below the popup and keeps the status HUD above the crest.
+            // In the square stress view the usual top padding leaves the portrait popup too small for the prize text.
+            if (chulengo && canvasHeight < 600f)
+                topHudReserve = HudQuotaGridBounds(TopHudCutoutBounds(new Vector2(Screen.width, Screen.height),
+                    Screen.cutouts)).yMax + 10f;
             float availableHeight = Mathf.Max(1f, canvasHeight - topHudReserve - screenInset - resultActionReserve - resultButtonGap);
             float horizontalInset = chulengo ? 32f : 24f;
             float scale = Mathf.Min((W - horizontalInset) / VictoryPopupArtSize.x, availableHeight / VictoryPopupArtSize.y);
@@ -450,23 +454,26 @@ namespace HayChoriYPaty
             int seconds = Mathf.Max(0, Mathf.CeilToInt(remaining));
             return (seconds / 60).ToString("00") + ":" + (seconds % 60).ToString("00");
         }
-        private static int FitVictoryFont(GUIStyle style, string value, int preferred, Rect bounds)
+        private static int FitVictoryFont(GUIStyle style, string value, int preferred, Rect bounds) =>
+            FitVictoryFontWithMinimum(style, value, preferred, bounds, 12);
+
+        private static int FitVictoryFontWithMinimum(GUIStyle style, string value, int preferred, Rect bounds, int minimum)
         {
             int original = style.fontSize;
-            style.fontSize = preferred;
+            style.fontSize = Mathf.Max(1, preferred);
             Vector2 needed = style.CalcSize(new GUIContent(value));
             style.fontSize = original;
-            float scale = Mathf.Min(1f, Mathf.Max(1f, bounds.width - 8f) / Mathf.Max(1f, needed.x),
-                Mathf.Max(1f, bounds.height - 6f) / Mathf.Max(1f, needed.y));
-            return Mathf.Max(12, Mathf.FloorToInt(preferred * scale));
+            float scale = Mathf.Min(1f, Mathf.Max(1f, bounds.width - (minimum < 12 ? 4f : 8f)) / Mathf.Max(1f, needed.x),
+                Mathf.Max(1f, bounds.height - (minimum < 12 ? 2f : 6f)) / Mathf.Max(1f, needed.y));
+            return Mathf.Max(minimum, Mathf.FloorToInt(preferred * scale));
         }
         private void VictoryText(Rect bounds, string value, int preferred, Color fill, TextAnchor alignment) =>
             VictoryText(bounds, value, preferred, fill, alignment, new Color(.08f, .035f, .018f, .98f));
 
-        private void VictoryText(Rect bounds, string value, int preferred, Color fill, TextAnchor alignment, Color outline)
+        private void VictoryText(Rect bounds, string value, int preferred, Color fill, TextAnchor alignment, Color outline, int minimum = 12)
         {
             // Keep popup/cover styles isolated and avoid inherited white hover on static summary labels.
-            int fontSize = FitVictoryFont(menuTitle, value, preferred, bounds);
+            int fontSize = FitVictoryFontWithMinimum(menuTitle, value, preferred, bounds, minimum);
             var captionStyle = CreateStandardButtonLabelStyle(menuTitle, fontSize, fill);
             captionStyle.alignment = alignment;
             var borderStyle = CreateStandardButtonLabelStyle(captionStyle, fontSize, outline);
@@ -491,6 +498,9 @@ namespace HayChoriYPaty
             VictorySlot(frame, secondLine ? ChulengoTitleSecondLineSlot : ChulengoTitleFirstLineSlot);
 
         private static Rect ChulengoPrizeAmountBoundsForFrame(Rect frame) => VictorySlot(frame, ChulengoPrizeAmountSlot);
+        private static Rect ChulengoPrizeCaptionBounds(Rect frame, bool compact) => VictorySlot(frame,
+            // The compact caption is above the coin illustration, not under its top-left edge.
+            compact ? new Rect(.385f, .381f, .435f, .061f) : ChulengoPrizeLabelSlot);
         private static Rect ChulengoTicketCardBoundsForFrame(Rect frame) => VictorySlot(frame, ChulengoTicketCardSlot);
         private static Rect ChulengoTicketCaptionBoundsForFrame(Rect frame) => VictorySlot(frame, ChulengoTicketCaptionSlot);
 
@@ -570,7 +580,7 @@ namespace HayChoriYPaty
         {
             // Keep the original bolt plates visible while expanding the authored parchment into the reference's reward-card hierarchy.
             // The legacy popup has a baked green CTA at the bottom; extend the paper behind the live replacement action to hide its exposed edge.
-            Rect paper = VictorySlot(frame, new Rect(.07f, .31f, .86f, .64f));
+            Rect paper = VictorySlot(frame, new Rect(.07f, .31f, .86f, .674f));
             if (chulengoParchment != null) GUI.DrawTexture(paper, chulengoParchment, ScaleMode.StretchToFill, true);
             else FillRect(paper, new Color(.98f, .89f, .68f));
         }
@@ -615,8 +625,11 @@ namespace HayChoriYPaty
 
             Color resultColor = sector == 0 || sector == 6 ? new Color(.75f, .075f, .035f) : cream;
             if (pending || lockedRetry && sector < 0) resultColor = cream;
-            VictoryText(VictorySlot(frame, ChulengoPrizeLabelSlot), label,
-                Mathf.RoundToInt(20f * fontScale), resultColor, TextAnchor.MiddleCenter);
+            int preferredLabelSize = Mathf.RoundToInt(20f * fontScale);
+            bool compactLabel = logicalCanvasHeight < 958f && preferredLabelSize < 12;
+            VictoryText(ChulengoPrizeCaptionBounds(frame, compactLabel), label,
+                preferredLabelSize, resultColor, TextAnchor.MiddleCenter,
+                new Color(.08f, .035f, .018f, .98f), compactLabel ? 1 : 12);
             if (gameCoin != null)
             {
                 GUI.DrawTexture(VictorySlot(frame, new Rect(.385f, .435f, .075f, .075f)), gameCoin, ScaleMode.ScaleToFit, true);

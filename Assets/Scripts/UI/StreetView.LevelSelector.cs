@@ -81,24 +81,42 @@ namespace HayChoriYPaty
             MarketText(new Rect(panel.x + 22, panel.y + 164, panel.width - 44, 58), "EL RANKING GLOBAL LLEGA PRONTO", 23, Color.white);
             MarketText(new Rect(panel.x + 28, panel.y + 218, panel.width - 56, 52), "Todavía no publicamos posiciones de otros hinchas.", 16, new Color(.95f, .87f, .72f));
             MarketText(new Rect(panel.x + 26, panel.y + 295, panel.width - 52, 30), "TU PROGRESO", 19, new Color(1f, .84f, .38f));
-            int unlockedCount = 0, nextLevel = -1;
+            string objective = RankingObjectiveText(out int unlockedCount);
+            MarketText(new Rect(panel.x + 26, panel.y + 331, panel.width - 52, 38), "CANCHAS DESBLOQUEADAS: " + unlockedCount + " / " + StreetSimulation.CampaignOrder.Length, 19, Color.white);
+            MarketText(new Rect(panel.x + 26, panel.y + 373, panel.width - 52, 48), objective, 16, new Color(.52f, 1f, .47f));
+            DrawStandardButton(RankingBackBounds(height), RankingBackAction, "VOLVER AL BARRIO");
+        }
+
+        private string RankingObjectiveText(out int unlockedCount)
+        {
+            unlockedCount = 0;
+            int firstLocked = -1, firstWithoutWin = -1;
             for (int i = 0; i < StreetSimulation.CampaignOrder.Length; i++)
             {
                 int levelId = StreetSimulation.CampaignLevelAt(i);
                 if (game.IsLevelUnlocked(levelId)) unlockedCount++;
-                else if (nextLevel < 0) nextLevel = levelId;
+                else if (firstLocked < 0) firstLocked = levelId;
+                if (firstWithoutWin < 0 && !game.HasWonLevel(levelId)) firstWithoutWin = levelId;
             }
-            MarketText(new Rect(panel.x + 26, panel.y + 331, panel.width - 52, 38), "CANCHAS DESBLOQUEADAS: " + unlockedCount + " / " + StreetSimulation.CampaignOrder.Length, 19, Color.white);
-            string next = nextLevel < 0 ? "TODAS LAS CANCHAS SUPERADAS"
-                : StreetSimulation.LevelDisplayNames[nextLevel].Split('/')[0].Trim().ToUpperInvariant();
-            MarketText(new Rect(panel.x + 26, panel.y + 373, panel.width - 52, 48), "PRÓXIMO OBJETIVO: " + next, 16, new Color(.52f, 1f, .47f));
-            DrawStandardButton(RankingBackBounds(height), RankingBackAction, "VOLVER AL BARRIO");
+            int nextLevel = firstLocked >= 0 ? firstLocked : firstWithoutWin;
+            return nextLevel < 0 ? "TODAS LAS CANCHAS SUPERADAS"
+                : "PRÓXIMO OBJETIVO: " + StreetSimulation.LevelDisplayNames[nextLevel].Split('/')[0].Trim().ToUpperInvariant();
         }
+        private string levelSelectorStartError;
+
         private void DrawLevelSelector()
         {
             Rect viewport = LevelSelectorViewportBounds(logicalCanvasHeight);
             DrawLevelSelectorBackdrop();
             DrawLevelSelectorHeading();
+            if (!string.IsNullOrEmpty(levelSelectorStartError))
+            {
+                // The mural strip above the title is outside the scroll area and all tap targets.
+                Rect notice = new Rect(22f, 23f, W - 44f, 46f);
+                DrawMarketWoodPanel(notice, new Color(.25f, .09f, .045f, .97f));
+                MarketText(new Rect(notice.x + 12f, notice.y, notice.width - 24f, notice.height),
+                    levelSelectorStartError, 19, Color.white);
+            }
             Event evt = Event.current;
             if (evt.type == EventType.ScrollWheel)
             {

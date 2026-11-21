@@ -125,6 +125,34 @@ namespace HayChoriYPaty.Tests
                 "Startup should not draw the separate generic PREPARANDO EL BARRIO screen.");
         }
 
+        [UnityTest]
+        public IEnumerator RankingNeedsAnActualBocaWinBeforeShowingTheCampaignComplete()
+        {
+            for (int frame = 0; frame < 1200 && !(bool)Field("viewResourcesReady"); frame++) yield return null;
+            Assert.IsTrue((bool)Field("viewResourcesReady"));
+            vt.GetField("introActive", P).SetValue(view, false);
+            vt.GetField("hubActive", P).SetValue(view, true);
+            object save = gt.GetField("save", P).GetValue(game);
+            var unlocks = (bool[])save.GetType().GetField("unlockedLevelIds").GetValue(save);
+            var stats = save.GetType().GetField("statistics").GetValue(save);
+            var wins = (long[])stats.GetType().GetField("winsByLevel").GetValue(stats);
+            for (int id = 0; id < unlocks.Length; id++) { unlocks[id] = true; wins[id] = id == 8 ? 0L : 1L; }
+
+            ClickAction(203); // Ranking sign in the real hub.
+            Assert.IsTrue((bool)Field("rankingActive"));
+            var objective = vt.GetMethod("RankingObjectiveText", P);
+            var unlockedCounter = new object[] { 0 };
+            StringAssert.Contains("PRÓXIMO OBJETIVO: BOCA JUNIORS", (string)objective.Invoke(view, unlockedCounter));
+            Assert.AreEqual(15, unlockedCounter[0]);
+            if (!Application.isBatchMode) yield return Capture("qa03-ranking-boca-pending-1080x1920");
+
+            wins[8] = 1L;
+            Assert.AreEqual("TODAS LAS CANCHAS SUPERADAS", objective.Invoke(view, unlockedCounter));
+            if (!Application.isBatchMode) yield return Capture("qa03-ranking-campaign-completed-1080x1920");
+            wins[6] = 0L; // A legacy profile can know only part of its victory history.
+            StringAssert.Contains("SAN LORENZO", (string)objective.Invoke(view, unlockedCounter));
+        }
+
         [UnityTest] public IEnumerator PermanentFirebaseSyncFailureReturnsToHubAndOpensAccountPanel()
         {
             float deadline = Time.realtimeSinceStartup + 20f;

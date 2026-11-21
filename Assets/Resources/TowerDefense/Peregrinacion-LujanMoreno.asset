@@ -59,13 +59,13 @@ MonoBehaviour:
   - 5
   - 6
   totalFanCount: 60
-  fanSpeed: 0.0525
-  minimumEntrySpacingLogical: 96
+  fanSpeed: 0.102375
+  minimumEntrySpacingLogical: 58
   serviceRange: 0.8
   firstWorkZoneOffset: {x: 0, y: 0}
   secondWorkZoneOffset: {x: 0, y: 0}
   startingCoins: 1200
-  fanSpawnIntervalSeconds: 9
+  fanSpawnIntervalSeconds: 0.1
   stationCost: 80
   maximumWorkersPerRole: 3
   freeStationCounts:
@@ -116,4 +116,4 @@ MonoBehaviour:
   - 0
   - 0
   - 0
-  - 0
+  - 1

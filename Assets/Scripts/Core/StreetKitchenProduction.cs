@@ -51,6 +51,7 @@ namespace HayChoriYPaty
         private readonly List<StreetFoodUnit> advanceOrder = new List<StreetFoodUnit>();
         private readonly int[] tableCapacity = new int[7];
         private readonly int[] grillCapacity = new int[7];
+        private readonly bool narrowGrills;
         private readonly float[] drinkProgress = new float[7];
         private int nextId = 1;
         private long nextTableDepositSequence;
@@ -85,7 +86,15 @@ namespace HayChoriYPaty
         public StreetKitchenProduction(StreetKitchenBalance balance, int[] availableProducts,
             IStreetKitchenStock ingredientStock, bool activeCooks, bool unlimitedSandwiches,
             bool activeCookSelfDelivery, bool premiumTableStartsLikeNormalTable)
+            : this(balance, availableProducts, ingredientStock, activeCooks, unlimitedSandwiches,
+                activeCookSelfDelivery, premiumTableStartsLikeNormalTable, false) { }
+
+        /// <param name="narrowGrills">Two columns less of food on the grills (see <see cref="StreetKitchenLayout"/>).</param>
+        public StreetKitchenProduction(StreetKitchenBalance balance, int[] availableProducts,
+            IStreetKitchenStock ingredientStock, bool activeCooks, bool unlimitedSandwiches,
+            bool activeCookSelfDelivery, bool premiumTableStartsLikeNormalTable, bool narrowGrills)
         {
+            this.narrowGrills = narrowGrills;
             this.balance = balance ?? new StreetKitchenBalance();
             this.ingredientStock = ingredientStock;
             this.unlimitedSandwiches = unlimitedSandwiches && !activeCooks;
@@ -132,7 +141,7 @@ namespace HayChoriYPaty
             // occupied layer first, then move rear-to-front within that layer, so empty
             // lower layers are never left holding visibly suspended sandwiches.
             int legacyBaseSlotCount = !ActiveCooks && product < 4
-                ? (tableCapacity[product ^ 1] > 0 ? 6 : 12)
+                ? (narrowGrills ? (tableCapacity[product ^ 1] > 0 ? 3 : 6) : (tableCapacity[product ^ 1] > 0 ? 6 : 12))
                 : 0;
             StreetFoodUnit selected = null;
             for (int i = 0; i < units.Count; i++)
@@ -516,9 +525,11 @@ namespace HayChoriYPaty
             tableCapacity[5] = available[5] ? Mathf.Max(1, balance.fernetTableCapacity) : 0;
             tableCapacity[4] = available[4] ? Mathf.Max(1, balance.barrelCapacity) : 0;
             tableCapacity[6] = available[6] ? Mathf.Max(1, balance.barrelCapacity) : 0;
-            SetGrillCapacities(available, 0, 1, 18, 12);
+            if (narrowGrills && available[0] && available[1]) SetGrillCapacities(available, 0, 1, 12, 8); // 2 columns x 4 rows + 2 x 2
+            else SetGrillCapacities(available, 0, 1, 18, 12);
             SetGrillCapacities(available, 2, 3, 7, 4);
             if (available[2]) grillCapacity[2] = 6; // User-selected whole Bondiola cooking grid:3 columns x 2 rows.
+            if (narrowGrills && available[2]) grillCapacity[2] = 4; // 2 x 2 beside the Vacío, or one row of 4 alone
             if (available[2] && available[3]) grillCapacity[3] = 4; // Fill the right half with four whole Vacíos in a compact 2x2 grid.
             for (int product = 0; product < 7; product++)
             {

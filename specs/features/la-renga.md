@@ -2,6 +2,8 @@
 
 **Contrato nuevo — 2026-11-10. Estado: implementación incorporada; aceptación Unity pendiente por bloqueo MCP.** Este delta se aplica únicamente a La Renga y a la ampliación aditiva de campaña/persistencia. Reutiliza [Tower Defense](tower-defense.md), [Mercado](market-fridge.md), [Firebase](firebase-player.md) y el límite de [siete productos](../product.md); no reemplaza sus reglas compartidas ni sus pendientes históricos.
 
+> **Delta 2026-11-18 (vigente para ruta, cocina, footer y equipo inicial):** La Renga es un nivel de **valla en C** con la cocina de Huracán y el footer de Camioneros, ver [tower-defense.md](tower-defense.md#la-renga-id13-valla-en-c-con-la-cocina-de-huracán-y-el-footer-de-camioneros--2026-11-18-vigente). Lo que dice este registro sobre "tres tramos S", "dos áreas" y "trabajadores iniciales 0" quedó superado.
+
 > Delta posterior del mismo día: [Peregrinación ID14](peregrinacion-lujan.md) se inserta entre13 y4; campaña vigente15 y sucesión13→14→4. El resto de este registro conserva el alcance original de la incorporación de La Renga. No cambia su balance ni sus assets.
 
 ## Identidad y campaña
@@ -35,6 +37,11 @@ Reutilizar ruta/follower, generador de doble valla modular, flechas, colisiones,
 - Familia exclusiva de **al menos 12 identidades**: ropa rock negra, jean/bermudas, variedad de pelo, género, edades y accesorios. Nunca fallback silencioso a hinchas Ferro/Camioneros/Los Redondos en ID13.
 - Atlas transparentes compatibles con grilla/tamaño/pivote y convenciones existentes: caminata lateral ambas direcciones, dos poses reales de caminata frontal descendente en atlas pareado, recepción y salida. Mantener coherencia de las doce identidades entre poses.
 - Globos unos píxeles sobre la cabeza sin cubrirla; separación de entrada impide superposición de hinchas. Mural legible y HUD/controles completos, sin vallas/estaciones/trabajadores invadiendo pasillos ni controles.
+
+## Área de juego con poco alto — 2026-11-20
+El arranque compartido Defense prueba primero el área segura habitual. Si falla la ruta o la cocina en un formato más bajo que los tamaños de teléfono aprobados, se valida de nuevo con una cancha retrato 540×960 centrada horizontalmente dentro del área útil. HUD, mundo y toque coinciden con el mismo recorte. No se modifica el recorrido, el balance ni el diseño que ya encaja. Si tampoco encaja el formato alternativo, no se abre un intento y el selector sigue operativo.
+
+**QA #2 (PASS):** Unity PlayMode 4/4, 16 fallos de arranque recuperados con contrataciones y entregas reales; cuatro combinaciones cortas ya válidas sin encuadre alternativo; 36 combinaciones Defense en los nueve tamaños protegidos con las mismas entregas. Reflow en una partida y rechazo sin intento también comprobados. Evidencia de Game View en `Logs/Acceptance/QA-Responsive-2/`; teléfono físico y APK no ejecutados.
 
 ## Persistencia: migración mínima compatible
 

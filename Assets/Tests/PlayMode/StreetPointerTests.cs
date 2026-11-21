@@ -12,6 +12,19 @@ namespace HayChoriYPaty.Tests
     // Exercise the actual StreetView pointer path while keeping runtime in Assembly-CSharp.
     public sealed class StreetPointerTests
     {
+        // The level tap and the Market's JUGAR PARTIDO now run behind the reward shutter: let it close, run its action and open.
+        private static void SettleShutter(object view)
+        {
+            Type t = view.GetType();
+            FieldInfo started = t.GetField("rewardShutterStarted", BindingFlags.NonPublic | BindingFlags.Instance);
+            MethodInfo update = t.GetMethod("UpdateRewardShutter", BindingFlags.NonPublic | BindingFlags.Instance);
+            for (int i = 0; i < 3 && (float)started.GetValue(view) >= 0f; i++)
+            {
+                started.SetValue(view, Time.unscaledTime - 5f);
+                update.Invoke(view, null);
+            }
+        }
+
         private const BindingFlags PublicInstance = BindingFlags.Public | BindingFlags.Instance;
         private const BindingFlags PrivateInstance = BindingFlags.NonPublic | BindingFlags.Instance;
         private const BindingFlags StaticPrivate = BindingFlags.NonPublic | BindingFlags.Static;
@@ -223,6 +236,86 @@ namespace HayChoriYPaty.Tests
             return new Vector2(viewport.x + x * scale, Screen.height - (viewport.y + y * verticalScale * scale));
         }
 
+        private void TapFullCanvasPoint(Vector2 point)
+        {
+            Type type = view.GetType();
+            // Full-canvas bounds (selector, Market and result) are already in the current safe logical height.
+            Rect viewport = (Rect)type.GetMethod("CanvasViewport", StaticPrivate)
+                .Invoke(null, new object[] { new Vector2(Screen.width, Screen.height), Screen.safeArea });
+            float scale = viewport.width / 540f;
+            var pixel = new Vector2(viewport.x + point.x * scale, Screen.height - viewport.y - point.y * scale);
+            var pointer = type.GetMethod("HandlePointer", PrivateInstance);
+            pointer.Invoke(view, new object[] { pixel, true, false });
+            pointer.Invoke(view, new object[] { pixel, false, true });
+        }
+
+        [UnityTest]
+        public IEnumerator HuracanWinReturnsToSelectorAndCanOpenAnotherLevel() => HuracanReturnKeepsNavigation(true);
+
+        [UnityTest]
+        public IEnumerator HuracanZeroStarsReturnsToHubAndCanReplayBonus() => HuracanReturnKeepsNavigation(false);
+
+        private IEnumerator HuracanReturnKeepsNavigation(bool won)
+        {
+            Time.timeScale = 0f;
+            Type type = view.GetType();
+            FieldInfo selector = type.GetField("levelSelectActive", PrivateInstance);
+            FieldInfo market = type.GetField("marketActive", PrivateInstance);
+            FieldInfo hub = type.GetField("hubActive", PrivateInstance);
+            PropertyInfo shutter = type.GetProperty("RewardShutterActive", PrivateInstance);
+            object save = gameType.GetField("save", PrivateInstance).GetValue(game);
+            bool[] unlocks = (bool[])save.GetType().GetField("unlockedLevelIds").GetValue(save);
+            unlocks[1] = true; unlocks[11] = true;
+            Assert.IsTrue((bool)CallGame("SelectLevel", 11));
+            Assert.IsTrue((bool)CallGame("TryStartRound"));
+            yield return null;
+            object bonus = Sim.GetType().GetProperty("BonusTrack").GetValue(Sim);
+            bonus.GetType().GetField("score", PrivateInstance).SetValue(bonus, won ? 3000 : 0);
+            // Both results finish the timed run; a zero-star result isn't the traditional Lost phase.
+            bonus.GetType().GetField("choiceCount", PrivateInstance).SetValue(bonus, 5);
+            SetSim("Elapsed", 119.99f);
+            Invoke(Sim, "Step", .1f);
+            Assert.AreEqual("Won", Phase, "The domain finishes the timed round regardless of stars.");
+            yield return null;
+            yield return new WaitForSecondsRealtime(3.2f);
+
+            float height = (float)type.GetField("logicalCanvasHeight", PrivateInstance).GetValue(view);
+            Rect levels = (Rect)type.GetMethod("BonusResultLevelsBounds", PrivateInstance).Invoke(view, new object[] { height });
+            TapFullCanvasPoint(levels.center);
+            Assert.IsTrue((bool)selector.GetValue(view));
+            Assert.AreEqual("Ready", Phase);
+
+            if (won)
+            {
+                Rect chicago = (Rect)type.GetMethod("LevelSelectCardBounds", StaticPrivate).Invoke(null, new object[] { 1 });
+                TapFullCanvasPoint(chicago.center);
+                Assert.IsTrue((bool)shutter.GetValue(view), "A tap on another unlocked cancha must start the shutter.");
+                yield return new WaitForSecondsRealtime(2.1f);
+                Assert.IsTrue((bool)market.GetValue(view));
+                Assert.AreEqual(1, Sim.GetType().GetProperty("LevelIndex").GetValue(Sim));
+            }
+            else
+            {
+                Rect back = (Rect)type.GetMethod("LevelSelectorBackBounds", StaticPrivate).Invoke(null, new object[] { height });
+                TapFullCanvasPoint(back.center);
+                Assert.IsFalse((bool)selector.GetValue(view));
+                Assert.IsTrue((bool)hub.GetValue(view));
+                int play = (int)type.GetField("HubPlayAction", StaticPrivate).GetRawConstantValue();
+                type.GetMethod("DispatchAction", PrivateInstance).Invoke(view, new object[] { play });
+                Assert.IsTrue((bool)selector.GetValue(view));
+                Rect bonusCard = (Rect)type.GetMethod("LevelSelectCardBounds", StaticPrivate).Invoke(null, new object[] { 7 });
+                Rect viewport = (Rect)type.GetMethod("LevelSelectorViewportBounds", StaticPrivate).Invoke(null, new object[] { height });
+                float max = (float)type.GetMethod("LevelSelectorMaxScroll", StaticPrivate).Invoke(null, new object[] { height });
+                float scroll = Mathf.Clamp(bonusCard.center.y - viewport.center.y, 0f, max);
+                type.GetField("levelSelectScroll", PrivateInstance).SetValue(view, scroll);
+                TapFullCanvasPoint(bonusCard.center - new Vector2(0f, scroll));
+                Assert.IsTrue((bool)shutter.GetValue(view));
+                yield return new WaitForSecondsRealtime(2.1f);
+                Assert.AreEqual(11, Sim.GetType().GetProperty("LevelIndex").GetValue(Sim));
+                Assert.AreEqual("Playing", Phase);
+            }
+        }
+
         private IEnumerator Click(float x, float y)
         {
             Vector2 p = Pixel(x, y);
@@ -405,6 +498,7 @@ namespace HayChoriYPaty.Tests
             viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, true);
             MethodInfo dispatch = viewType.GetMethod("DispatchAction", PrivateInstance);
             dispatch.Invoke(view, new object[] { 30 }); // Select Floresta from the unlocked level selector.
+            SettleShutter(view);
 
             Assert.IsTrue((bool)viewType.GetField("levelOneTutorialActive", PrivateInstance).GetValue(view));
             Assert.AreEqual(0, viewType.GetField("levelOneTutorialStep", PrivateInstance).GetValue(view));
@@ -995,6 +1089,7 @@ namespace HayChoriYPaty.Tests
             viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, true);
             MethodInfo dispatch = viewType.GetMethod("DispatchAction", PrivateInstance);
             dispatch.Invoke(view, new object[] { 30 });
+            SettleShutter(view);
             Assert.IsTrue((bool)viewType.GetField("levelOneTutorialActive", PrivateInstance).GetValue(view));
             Rect skipBounds = (Rect)viewType.GetMethod("LevelOneTutorialSkipBounds", PrivateInstance).Invoke(view, null);
             yield return Click(skipBounds.center.x, skipBounds.center.y);
@@ -1011,6 +1106,7 @@ namespace HayChoriYPaty.Tests
             Type viewType = view.GetType();
             viewType.GetField("levelSelectActive", PrivateInstance).SetValue(view, true);
             viewType.GetMethod("DispatchAction", PrivateInstance).Invoke(view, new object[] { 30 });
+            SettleShutter(view);
             Assert.IsTrue((bool)viewType.GetField("levelOneTutorialActive", PrivateInstance).GetValue(view),
                 "The temporary QA override must show the tutorial even if an old completion marker exists.");
             Assert.AreEqual(0, viewType.GetField("levelOneTutorialStep", PrivateInstance).GetValue(view));
@@ -1183,6 +1279,7 @@ namespace HayChoriYPaty.Tests
             Assert.IsTrue((bool)gameType.GetProperty("CanStartRound", PublicInstance).GetValue(game, null),
                 "Prepare the selected level's real stock before choosing it.");
             viewType.GetMethod("DispatchAction", PrivateInstance).Invoke(view, new object[] { 30 });
+            SettleShutter(view);
             Assert.IsFalse((bool)viewType.GetField("levelSelectActive", PrivateInstance).GetValue(view));
             Assert.IsTrue((bool)viewType.GetField("levelOneTutorialActive", PrivateInstance).GetValue(view),
                 "A first-time player sees the required Level 1 tutorial before the round.");
@@ -1418,6 +1515,20 @@ namespace HayChoriYPaty.Tests
                 "hay-chori-chulengo-pending-" + Screen.width + "x" + Screen.height + ".png");
             try
             {
+                Rect frame = (Rect)viewType.GetMethod("VictoryPopupBounds", StaticPrivate)
+                    .Invoke(null, new object[] { canvasHeight, true });
+                float scale = viewport.width / 540f;
+                int greenSamples = 0;
+                for (int row = 0; row <= 14; row++)
+                for (int col = 0; col <= 40; col++)
+                {
+                    int x = Mathf.RoundToInt(viewport.x + (frame.x + frame.width * (.27f + col * .0115f)) * scale);
+                    int y = Mathf.RoundToInt(Screen.height - viewport.y
+                        - (frame.y + frame.height * (.952f + row * .002f)) * scale);
+                    Color pixel = chulengoCapture.GetPixel(x, y);
+                    if (pixel.g > .36f && pixel.g > pixel.r + .16f && pixel.g > pixel.b + .08f) greenSamples++;
+                }
+                Assert.LessOrEqual(greenSamples, 2, "The underlying frame must not expose the obsolete green button.");
                 System.IO.File.WriteAllBytes(chulengoCapturePath, chulengoCapture.EncodeToPNG());
                 Debug.Log("Chulengo Game View capture saved to " + chulengoCapturePath + " (" + chulengoCapture.width + "x" + chulengoCapture.height + ")");
             }

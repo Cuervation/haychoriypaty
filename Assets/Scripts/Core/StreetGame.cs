@@ -662,21 +662,29 @@ namespace HayChoriYPaty
         }
         public void SetProductPrice(int product,float value) { if(playerActive && sim!=null && sim.Phase==RoundPhase.Ready)sim.SetProductPrice(product,value); }
         public void StartRound() { TryStartRound(); }
-        public bool TryStartRound()
+        public bool TryStartRound() => TryStartRoundWithSaveFeedback(out _);
+
+        // This reports only a rejected initial write, whose existing rollback makes a retry safe.
+        internal bool TryStartRoundWithSaveFeedback(out bool initialSaveRejected)
         {
+            initialSaveRejected = false;
             // Both stable TD IDs are owned by the external mode, never the traditional simulation.
             if (sim == null || StreetSimulation.IsTowerDefenseLevel(sim.LevelIndex)) return false;
-            return TryStartRoundCore(false);
+            return TryStartRoundCore(false, out initialSaveRejected);
         }
 
-        public bool TryStartTowerDefenseRound()
+        public bool TryStartTowerDefenseRound() => TryStartTowerDefenseRoundWithSaveFeedback(out _);
+
+        internal bool TryStartTowerDefenseRoundWithSaveFeedback(out bool initialSaveRejected)
         {
+            initialSaveRejected = false;
             return sim != null && StreetSimulation.IsTowerDefenseLevel(sim.LevelIndex) &&
-                IsLevelUnlocked(sim.LevelIndex) && TryStartRoundCore(true);
+                IsLevelUnlocked(sim.LevelIndex) && TryStartRoundCore(true, out initialSaveRejected);
         }
 
-        private bool TryStartRoundCore(bool externalTowerDefense)
+        private bool TryStartRoundCore(bool externalTowerDefense, out bool initialSaveRejected)
         {
+            initialSaveRejected = false;
             if (!playerActive || !CanStartRound) return false;
             if (sim.IsBonusTrack) return TryStartBonusRound();
             long[] ticketGrants = new long[5];
@@ -702,6 +710,7 @@ namespace HayChoriYPaty
             // The same durable snapshot confirms the attempt and consumes eligible reservations.
             if (!Save())
             {
+                initialSaveRejected = true;
                 save.statistics.attemptsStarted--;
                 save.activeAttemptId = null; activeAttemptId = null;
                 save.tickets = JsonUtility.FromJson<StreetTicketData>(previousTickets);
@@ -824,6 +833,20 @@ namespace HayChoriYPaty
             return PersistTowerDefenseProgress(mode);
         }
 
+        public bool TryHireTowerDefenseAtPost(TowerDefenseGameMode mode, StreetWorkerRole role)
+        {
+            int index = (int)role;
+            if (!playerActive || sim == null || mode == null || !sim.IsExternalCampaignRuntime ||
+                mode != towerDefenseMode || index < 0 || index >= 5 || !mode.CanHireAtPost(role)) return false;
+            int cost = mode.HireCost(role);
+            if (cost <= 0 || !mode.TryHireAtPost(role)) return false;
+            long cents = (long)cost * 100L;
+            save.statistics.paidHiresByRole[index]++;
+            save.statistics.hireSpendCentsByRole[index] += cents;
+            save.statistics.hireSpendTotalCents += cents;
+            return PersistTowerDefenseProgress(mode);
+        }
+
         public bool TryPlaceTowerDefenseStation(TowerDefenseGameMode mode, TowerDefenseStationKind kind, Vector2 position)
         {
             if (!playerActive || sim == null || mode == null || mode != towerDefenseMode || !sim.IsExternalCampaignRuntime ||
@@ -937,22 +960,57 @@ namespace HayChoriYPaty
             market = new StreetMarket(JsonUtility.FromJson<StreetMarketData>(serializedMarket), balance);
             save.market = market.Data;
         }
-        public bool TryBuyIngredient(int ingredient, int packs, long operationId = 0)
+        private bool CanPurchaseIngredients() => playerActive && !HasPendingChulengo && !resumedChulengoResult &&
+            market != null && sim != null && sim.Phase == RoundPhase.Ready && UnlockedLevel > 0;
+
+        private void TrackIngredientPurchase(int ingredient, int packs)
         {
-            if (!playerActive || HasPendingChulengo || resumedChulengoResult || market == null || sim == null || sim.Phase != RoundPhase.Ready || UnlockedLevel == 0) return false;
-            string before = JsonUtility.ToJson(market.Data);
-            if (!market.TryBuy(sim, ingredient, packs, UnlockedLevel,
-                operationId == 0 ? market.NextPurchaseId : operationId)) return false;
             save.statistics.purchasedUnitsByIngredient[ingredient] += (long)packs * StreetIngredientCatalog.PackUnits[ingredient];
             long purchaseCost = (long)packs * market.PackPriceCents(ingredient);
             save.statistics.purchaseSpendCentsByIngredient[ingredient] += purchaseCost;
             save.statistics.ingredientSpendTotalCents += purchaseCost;
+        }
+
+        public bool TryBuyIngredient(int ingredient, int packs, long operationId = 0)
+        {
+            if (!CanPurchaseIngredients()) return false;
+            string before = JsonUtility.ToJson(market.Data);
+            if (!market.TryBuy(sim, ingredient, packs, UnlockedLevel,
+                operationId == 0 ? market.NextPurchaseId : operationId)) return false;
+            TrackIngredientPurchase(ingredient, packs);
             if (Save()) return true;
-            save.statistics.purchasedUnitsByIngredient[ingredient] -= (long)packs * StreetIngredientCatalog.PackUnits[ingredient];
-            save.statistics.purchaseSpendCentsByIngredient[ingredient] -= purchaseCost;
-            save.statistics.ingredientSpendTotalCents -= purchaseCost;
-            market = new StreetMarket(JsonUtility.FromJson<StreetMarketData>(before), balance);
-            save.market = market.Data;
+            TrackIngredientPurchase(ingredient, -packs);
+            RestoreMarketAfterFailedStart(before);
+            return false;
+        }
+
+        public bool TryBuyMissingIngredients()
+        {
+            if (!CanPurchaseIngredients() || market.Data.attemptActive ||
+                market.MinimumPurchaseCostCents(sim) > market.BalanceCents) return false;
+            var nextMarket = new StreetMarket(JsonUtility.FromJson<StreetMarketData>(JsonUtility.ToJson(market.Data)), balance);
+            var boughtPacks = new int[StreetIngredientCatalog.Names.Length];
+            bool hasPurchase = false;
+            for (int ingredient = 0; ingredient < boughtPacks.Length; ingredient++)
+            {
+                int packs = nextMarket.MissingPacks(sim, ingredient);
+                if (packs <= 0) continue;
+                if (!nextMarket.TryBuy(sim, ingredient, packs, UnlockedLevel, nextMarket.NextPurchaseId)) return false;
+                boughtPacks[ingredient] = packs;
+                hasPurchase = true;
+            }
+            if (!hasPurchase) return false;
+
+            // Preserve per-ingredient counters, but never persist a prefix of the batch.
+            StreetMarket previousMarket = market;
+            market = nextMarket;
+            for (int ingredient = 0; ingredient < boughtPacks.Length; ingredient++)
+                if (boughtPacks[ingredient] > 0) TrackIngredientPurchase(ingredient, boughtPacks[ingredient]);
+            if (Save()) return true;
+            for (int ingredient = 0; ingredient < boughtPacks.Length; ingredient++)
+                if (boughtPacks[ingredient] > 0) TrackIngredientPurchase(ingredient, -boughtPacks[ingredient]);
+            market = previousMarket;
+            save.market = previousMarket.Data;
             return false;
         }
         public bool IsPreparationPermitPurchased(int itemId) => playerActive && market != null && sim != null &&
