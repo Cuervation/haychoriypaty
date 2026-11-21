@@ -18,6 +18,7 @@ namespace HayChoriYPaty
         private const float TowerDefenseMinimumFanRevealBeforeOrderBubbleLogical =
             TowerDefenseResponsiveLayout.FanFrameWidthLogical * .5f;
         private const float TowerDefenseOrderBubbleHeadClearanceLogical = 6f;
+        private readonly List<Rect> laRengaOrderBubbles = new List<Rect>();
         private const string CamionerosTutorialCompletedKey = "HayChoriYPaty.TowerDefense.Camioneros.Tutorial.Completed.v2";
         private static readonly string[] CamionerosTutorialHeadlines =
         {
@@ -54,6 +55,7 @@ namespace HayChoriYPaty
         private GUIStyle towerDefenseLabel, towerDefenseSmallLabel, towerDefenseTitle;
         private Vector2 towerDefenseScreenSize;
         private Rect towerDefenseSafeArea;
+        private Rect? towerDefenseCompactViewport;
 
         private bool IsTowerDefenseNavigationActive => towerDefenseActive;
 
@@ -76,6 +78,7 @@ namespace HayChoriYPaty
             towerDefenseLabel = towerDefenseSmallLabel = towerDefenseTitle = null;
             towerDefenseScreenSize = Vector2.zero;
             towerDefenseSafeArea = Rect.zero;
+            towerDefenseCompactViewport = null;
             TowerDefenseGameMode.SetCampaignStepSuspended(false);
         }
 
@@ -187,6 +190,17 @@ namespace HayChoriYPaty
 
         private int HitTowerDefenseAction(Vector2 point)
         {
+            // The common pointer path supplies the unmodified safe-canvas point.
+            // Map it into the same compact rectangle used by the Defense GUI and camera projection.
+            if (towerDefenseCompactViewport.HasValue)
+            {
+                Rect safe = CanvasViewport(TowerDefenseRenderSize(Camera.main), Screen.safeArea);
+                Rect compact = towerDefenseCompactViewport.Value;
+                point.x = (safe.x + point.x * safe.width / W - compact.x) * W / compact.width;
+                logicalCanvasHeight = CanvasLogicalHeight(compact);
+                layoutVerticalScale = logicalCanvasHeight / H;
+                if (point.x < 0f || point.x >= W || point.y < 0f || point.y >= H) return 0;
+            }
             point.y *= layoutVerticalScale;
             if (IsPilgrimConstruction) return HitPilgrimAction(point);
             if (towerDefenseTutorialActive)
@@ -202,12 +216,58 @@ namespace HayChoriYPaty
             if (towerDefenseSelectedRole >= 0)
             {
                 Camera camera = Camera.main;
-                Rect viewport = CanvasViewport(TowerDefenseRenderSize(camera), Screen.safeArea);
+                Rect viewport = towerDefenseCompactViewport ?? CanvasViewport(TowerDefenseRenderSize(camera), Screen.safeArea);
                 Rect[] areas = TowerDefensePlacementAreaBounds(viewport);
                 for (int i = 0; i < areas.Length; i++)
                     if (areas[i].Contains(point)) return TowerDefensePlaceFirstAction + i;
             }
             return 0;
+        }
+
+        private struct TowerDefenseLayoutDraft
+        {
+            public Rect Viewport;
+            public bool Compact;
+            public TowerDefenseLevelConfig Config;
+            public TowerDefenseRouteGeometryConfig Route;
+            public float WorldPixel;
+            public Vector2 FirstZone, SecondZone;
+            public TowerDefenseGameMode Mode;
+        }
+
+        private bool TryDraftTowerDefenseLayout(Camera camera, Rect viewport, bool validateStations,
+            out TowerDefenseLayoutDraft draft, out string error)
+        {
+            draft = new TowerDefenseLayoutDraft { Viewport = viewport };
+            if (!TowerDefenseResponsiveLayout.TryCreate(towerDefenseSourceConfig, camera, viewport, W,
+                    CanvasLogicalHeight(viewport), out draft.Config, out draft.Route, out draft.WorldPixel,
+                    out draft.FirstZone, out draft.SecondZone, out error))
+                return false;
+            if (!validateStations) return true;
+            try
+            {
+                int startingCoins = StreetSimulation.GetStartingCoinsForLevel(game.Balance, towerDefenseSourceConfig.SourceCampaignLevelId);
+                draft.Mode = new TowerDefenseGameMode(draft.Config, game.Balance, draft.Route, draft.WorldPixel,
+                    draft.FirstZone, draft.SecondZone, null, null, startingCoins);
+                return true;
+            }
+            catch (ArgumentException exception) when (exception.ParamName == "config" || exception.ParamName == "runtimeRoute")
+            {
+                Destroy(draft.Config);
+                draft.Config = null;
+                error = exception.Message;
+                return false;
+            }
+        }
+
+        private bool TryFitTowerDefenseLayout(Camera camera, Rect safe, bool starting,
+            out TowerDefenseLayoutDraft draft, out string error)
+        {
+            bool canCompact = TowerDefenseResponsiveLayout.TryCompactViewport(safe, out Rect compact);
+            if (TryDraftTowerDefenseLayout(camera, safe, starting || canCompact, out draft, out error)) return true;
+            if (!canCompact || !TryDraftTowerDefenseLayout(camera, compact, true, out draft, out error)) return false;
+            draft.Compact = true;
+            return true;
         }
 
         private bool StartTowerDefenseRun()
@@ -248,32 +308,25 @@ namespace HayChoriYPaty
             }
 
             Vector2 screenSize = TowerDefenseRenderSize(camera);
-            Rect viewport = CanvasViewport(screenSize, Screen.safeArea);
-            float logicalHeight = CanvasLogicalHeight(viewport);
-            TowerDefenseRouteGeometryConfig route;
-            float worldPerLogicalPixel;
-            Vector2 firstZone, secondZone;
-            string error = null;
-            if (!TowerDefenseResponsiveLayout.TryCreate(towerDefenseSourceConfig, camera, viewport, W, logicalHeight,
-                    out towerDefenseRuntimeConfig, out route, out worldPerLogicalPixel, out firstZone, out secondZone, out error))
-            {
-                towerDefenseError = error;
-                return false;
-            }
-
             try
             {
-                if (!game.TryStartTowerDefenseRound())
+                // Validate the normal layout, and its compact fallback if needed, before committing an attempt.
+                if (!TryFitTowerDefenseLayout(camera, CanvasViewport(screenSize, Screen.safeArea), true,
+                        out TowerDefenseLayoutDraft draft, out string error))
                 {
-                    towerDefenseError = "No se pudo iniciar el intento de campaña.";
+                    towerDefenseError = error;
+                    return false;
+                }
+                towerDefenseRuntimeConfig = draft.Config;
+                if (!game.TryStartTowerDefenseRoundWithSaveFeedback(out bool initialSaveRejected))
+                {
+                    towerDefenseError = initialSaveRejected ? "No se pudo guardar el inicio. Volvé a intentar."
+                        : "No se pudo iniciar el intento de campaña.";
                     if (towerDefenseRuntimeConfig != null) Destroy(towerDefenseRuntimeConfig);
                     towerDefenseRuntimeConfig = null;
                     return false;
                 }
-                StreetSimulation campaign = game.Sim;
-                towerDefenseMode = new TowerDefenseGameMode(towerDefenseRuntimeConfig, game.Balance, route,
-                    worldPerLogicalPixel, firstZone, secondZone, campaign.WorkerCountsByRole,
-                    campaign.TicketWorkerCountsByRole, campaign.Coins);
+                towerDefenseMode = draft.Mode;
                 towerDefenseMode.Begin();
                 if (towerDefensePresentation == null)
                     towerDefensePresentation = GetComponent<TowerDefenseWorldPresentation>() ?? gameObject.AddComponent<TowerDefenseWorldPresentation>();
@@ -288,8 +341,9 @@ namespace HayChoriYPaty
                 levelSelectActive = false;
                 towerDefenseScreenSize = screenSize;
                 towerDefenseSafeArea = Screen.safeArea;
-                logicalCanvasHeight = logicalHeight;
-                layoutVerticalScale = logicalHeight / H;
+                towerDefenseCompactViewport = draft.Compact ? draft.Viewport : (Rect?)null;
+                logicalCanvasHeight = CanvasLogicalHeight(draft.Viewport);
+                layoutVerticalScale = logicalCanvasHeight / H;
                 TowerDefenseGameMode.SetCampaignStepSuspended(true);
                 // The old tutorial explains choosing one of two shared areas; the horizontal kitchen version hires with one tap.
                 if (campaignLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId && !towerDefenseMode.FreeConstruction &&
@@ -325,6 +379,7 @@ namespace HayChoriYPaty
             }
             towerDefenseMode = null;
             towerDefenseActive = false;
+            towerDefenseCompactViewport = null;
             if (towerDefenseRuntimeConfig != null)
             {
                 Destroy(towerDefenseRuntimeConfig);
@@ -337,7 +392,7 @@ namespace HayChoriYPaty
         {
             Camera camera = Camera.main;
             Vector2 screenSize = TowerDefenseRenderSize(camera);
-            Rect activeViewport = CanvasViewport(screenSize, Screen.safeArea);
+            Rect activeViewport = towerDefenseCompactViewport ?? CanvasViewport(screenSize, Screen.safeArea);
             logicalCanvasHeight = CanvasLogicalHeight(activeViewport);
             layoutVerticalScale = logicalCanvasHeight / H;
             if (!viewResourcesReady || game == null) return;
@@ -368,45 +423,41 @@ namespace HayChoriYPaty
         private void ReflowTowerDefense(Vector2 screenSize)
         {
             Camera camera = Camera.main;
-            Rect viewport = CanvasViewport(screenSize, Screen.safeArea);
             string error = null;
-            TowerDefenseLevelConfig nextConfig;
-            TowerDefenseRouteGeometryConfig route;
-            float worldPerLogicalPixel;
-            Vector2 firstZone, secondZone;
-            if (camera == null || !TowerDefenseResponsiveLayout.TryCreate(towerDefenseSourceConfig, camera, viewport,
-                    W, CanvasLogicalHeight(viewport), out nextConfig, out route, out worldPerLogicalPixel,
-                    out firstZone, out secondZone, out error))
+            if (camera == null || !TryFitTowerDefenseLayout(camera, CanvasViewport(screenSize, Screen.safeArea), false,
+                    out TowerDefenseLayoutDraft draft, out error))
             {
                 towerDefenseError = camera == null ? "No se pudo recalcular la cámara." : error;
                 towerDefenseMode.Pause();
                 return;
             }
 
-            towerDefenseMode.Reflow(route, worldPerLogicalPixel, firstZone, secondZone);
+            towerDefenseMode.Reflow(draft.Route, draft.WorldPixel, draft.FirstZone, draft.SecondZone);
             if (!towerDefenseMode.LastReflowSucceeded)
             {
-                Destroy(nextConfig);
+                Destroy(draft.Config);
                 towerDefenseError = "El área quedó demasiado pequeña para esta distribución. Restaurá el formato anterior.";
                 return;
             }
             TowerDefenseLevelConfig previous = towerDefenseRuntimeConfig;
-            towerDefenseRuntimeConfig = nextConfig;
+            towerDefenseRuntimeConfig = draft.Config;
             if (towerDefensePresentation != null)
             {
                 towerDefensePresentation.ResizeTarget(screenSize);
-                towerDefensePresentation.RebuildRoute(nextConfig, screenSize);
+                towerDefensePresentation.RebuildRoute(draft.Config, screenSize);
             }
             if (previous != null) Destroy(previous);
             towerDefenseScreenSize = screenSize;
             towerDefenseSafeArea = Screen.safeArea;
-            logicalCanvasHeight = CanvasLogicalHeight(viewport);
+            towerDefenseCompactViewport = draft.Compact ? draft.Viewport : (Rect?)null;
+            logicalCanvasHeight = CanvasLogicalHeight(draft.Viewport);
             layoutVerticalScale = logicalCanvasHeight / H;
             towerDefenseError = null;
         }
 
         private void DrawTowerDefenseUi(Rect viewport)
         {
+            viewport = towerDefenseCompactViewport ?? viewport;
             float logicalHeight = CanvasLogicalHeight(viewport);
             logicalCanvasHeight = logicalHeight;
             layoutVerticalScale = logicalHeight / H;
@@ -444,6 +495,7 @@ namespace HayChoriYPaty
                     DrawTowerDefenseOrderBubbles(viewport);
                 DrawTowerDefenseHud(logicalHeight);
                 if (towerDefenseTutorialActive) DrawCamionerosTutorial();
+                if (towerDefenseCompactViewport.HasValue) MaskTowerDefenseViewport(viewport, screenSize);
             }
             finally
             {
@@ -451,6 +503,19 @@ namespace HayChoriYPaty
                 GUI.matrix = previous;
                 GUI.color = oldColor;
             }
+        }
+
+        private static void MaskTowerDefenseViewport(Rect viewport, Vector2 size)
+        {
+            // The source and overlay cameras still project to the full display. Mask the areas
+            // outside the playable safe rectangle, including fans waiting off the route edge.
+            GUI.matrix = Matrix4x4.identity;
+            GUI.color = new Color(.024f, .034f, .05f, 1f);
+            Texture2D fill = Texture2D.whiteTexture;
+            GUI.DrawTexture(new Rect(0f, 0f, viewport.xMin, size.y), fill);
+            GUI.DrawTexture(new Rect(viewport.xMax, 0f, size.x - viewport.xMax, size.y), fill);
+            GUI.DrawTexture(new Rect(viewport.xMin, 0f, viewport.width, viewport.yMin), fill);
+            GUI.DrawTexture(new Rect(viewport.xMin, viewport.yMax, viewport.width, size.y - viewport.yMax), fill);
         }
 
         private void DrawTowerDefenseHud(float height)
@@ -585,9 +650,13 @@ namespace HayChoriYPaty
         }
 
         private void DrawTowerDefenseCampaignHud() =>
-            DrawTowerDefenseStatusHud(towerDefenseMode.Coins, towerDefenseMode.Elapsed);
+            DrawTowerDefenseStatusHud(towerDefenseMode.Coins, towerDefenseMode.Elapsed,
+                TowerDefenseWaveCaption(towerDefenseMode));
 
-        private void DrawTowerDefenseStatusHud(int coins, float elapsed)
+        private static string TowerDefenseWaveCaption(TowerDefenseGameMode mode) =>
+            "PEDIDOS " + mode.OrdersCompleted + "/" + mode.TotalFanCount;
+
+        private void DrawTowerDefenseStatusHud(int coins, float elapsed, string waveCaption = null)
         {
             Matrix4x4 previous = GUI.matrix;
             Color previousColor = GUI.color;
@@ -596,9 +665,13 @@ namespace HayChoriYPaty
             {
                 // Read-only HUD matches campaign: physical top, independent of the safe-area viewport.
                 layoutVerticalScale = 1f;
-                GUI.matrix = Matrix4x4.Scale(new Vector3(Screen.width / W, Screen.width / W, 1f));
+                bool compact = !string.IsNullOrEmpty(waveCaption) && towerDefenseCompactViewport.HasValue;
+                Rect view = towerDefenseCompactViewport.GetValueOrDefault();
+                GUI.matrix = compact
+                    ? Matrix4x4.TRS(view.position, Quaternion.identity, new Vector3(view.width / W, view.width / W, 1f))
+                    : Matrix4x4.Scale(new Vector3(Screen.width / W, Screen.width / W, 1f));
                 GUI.color = Color.white;
-                Rect cutout = TopHudCutoutBounds(new Vector2(Screen.width, Screen.height), Screen.cutouts);
+                Rect cutout = compact ? Rect.zero : TopHudCutoutBounds(new Vector2(Screen.width, Screen.height), Screen.cutouts);
                 EnsureHudBarTexture(cutout);
                 Texture2D bar = cutout.width > 0f ? cutoutHudBarTexture : hudBarTexture;
                 GUI.DrawTexture(new Rect(0f, 0f, W, HudBarHeightFor(cutout)), bar, ScaleMode.StretchToFill, true);
@@ -608,6 +681,12 @@ namespace HayChoriYPaty
                     Mathf.RoundToInt(HudStatusValueFontSize * statusScale));
                 DrawHudNumber(HudStatusTextBounds(1, cutout), FormatElapsedTime(elapsed),
                     Mathf.RoundToInt(HudClockFontSize * statusScale));
+                if (!string.IsNullOrEmpty(waveCaption))
+                {
+                    Rect wave = new Rect((W - 176f) * .5f, HudBarHeightFor(cutout) + 4f, 176f, 30f);
+                    DrawMarketBluePanel(wave, new Color(.015f, .12f, .38f, .94f));
+                    DrawHudNumber(wave, waveCaption, 19);
+                }
                 hudQuotaProductCount = 0; // Defense has no traditional product quotas or deadline.
             }
             finally
@@ -627,6 +706,10 @@ namespace HayChoriYPaty
             float canvasScale = viewport.width / W;
             float feetOffset = towerDefenseMode.WorldUnitsPerLogicalPixel * 38f;
             IReadOnlyList<TowerDefenseFanState> fans = towerDefenseMode.Fans;
+            int levelId = towerDefenseSourceConfig != null
+                ? towerDefenseSourceConfig.SourceCampaignLevelId : -1;
+            bool avoidOverlap = levelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId;
+            laRengaOrderBubbles.Clear();
             // Camioneros and Peregrinación bubbles share the viewport edge with the
             // world-space fan during progressive entry. Clamping either bubble into view
             // makes it pop at the margin before the supporter has walked onto the screen.
@@ -650,9 +733,8 @@ namespace HayChoriYPaty
                     float visibleFanFrameLogical = Mathf.Clamp(fanFeet.x +
                         TowerDefenseResponsiveLayout.FanFrameWidthLogical * .5f, 0f,
                         TowerDefenseResponsiveLayout.FanFrameWidthLogical);
-                    int levelId = towerDefenseSourceConfig != null
-                        ? towerDefenseSourceConfig.SourceCampaignLevelId : -1;
                     if (!ShouldDrawTowerDefenseBubbleForFanEntry(levelId, visibleFanFrameLogical)) continue;
+                    if (avoidOverlap && (fanFeet.x < 0f || fanFeet.x > W)) continue;
                     // TD lanes have far more vertical separation than the campaign queue;
                     // keep the existing full-size product icons instead of shrinking each
                     // two-item order bubble to fit a regular queue row.
@@ -671,7 +753,9 @@ namespace HayChoriYPaty
                     }
                     if (!UsesProgressiveTowerDefenseFanEntry(levelId))
                         bubble.x = Mathf.Clamp(bubble.x, 6f, W - bubble.width - 6f);
+                    if (avoidOverlap) bubble = PlaceLaRengaOrderBubble(bubble, laRengaOrderBubbles);
                     if (bubble.yMax <= 0f || bubble.yMin >= logicalCanvasHeight) continue;
+                    if (avoidOverlap) laRengaOrderBubbles.Add(bubble);
 
                     DrawOrderBubble(bubble, 1f);
                     int shown = 0;
@@ -691,6 +775,21 @@ namespace HayChoriYPaty
                 }
             }
             finally { GUI.EndGroup(); }
+        }
+
+        private static Rect PlaceLaRengaOrderBubble(Rect bubble, IReadOnlyList<Rect> alreadyPlaced)
+        {
+            const float gap = 3f;
+            // Preserve horizontal alignment to the fan. Only lift when another full-size order is in the way.
+            for (int i = 0; i < alreadyPlaced.Count;)
+            {
+                Rect other = alreadyPlaced[i++];
+                if (bubble.xMax + gap <= other.xMin || other.xMax + gap <= bubble.xMin ||
+                    bubble.yMax + gap <= other.yMin || other.yMax + gap <= bubble.yMin) continue;
+                bubble.y = other.yMin - gap - .05f - bubble.height;
+                i = 0; // A newly raised rectangle may now intersect a bubble checked before this one.
+            }
+            return bubble;
         }
 
         private static Rect TowerDefenseOrderBubbleBounds(Vector2 fanFeet, int visibleLines, int campaignLevelId)

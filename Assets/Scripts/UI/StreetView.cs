@@ -763,11 +763,16 @@ namespace HayChoriYPaty
         private void DrawLevelCrest(Rect slot, Texture2D crest)
         {
             if (crest == null) return;
-            Rect uv, body;
+            Rect drawn = LevelCrestVisibleBounds(slot, crest, out Rect uv);
+            GUI.DrawTextureWithTexCoords(drawn, crest, uv, true);
+        }
+
+        private Rect LevelCrestVisibleBounds(Rect slot, Texture2D crest, out Rect uv)
+        {
             if (!crestVisibleUvs.TryGetValue(crest, out uv)) uv = new Rect(0, 0, 1, 1);
-            if (!crestBodyUvs.TryGetValue(crest, out body)) body = uv;
+            if (!crestBodyUvs.TryGetValue(crest, out Rect body)) body = uv;
             slot = LevelCrestSizedSlot(slot, crest);
-            GUI.DrawTextureWithTexCoords(FitLevelCrest(slot, new Vector2(crest.width, crest.height), uv, body), crest, uv, true);
+            return FitLevelCrest(slot, new Vector2(crest.width, crest.height), uv, body);
         }
 
         private static Texture2D CreateLevelCrestCutout(Texture2D source)
@@ -1388,11 +1393,17 @@ namespace HayChoriYPaty
             if (kitchenRenderer.CarriedTexture != null)
                 GUI.DrawTexture(kitchenCanvas, kitchenRenderer.CarriedTexture, ScaleMode.StretchToFill, true);
             if (sim.UsesActiveCooks) DrawCookingProgress(sim);
-            for(int i=0;i<sim.Sales.Count;i++)
+            float saleFeedbackTop = sim.Sales.Count > 0 ? SaleFeedbackTop(v) : 0f;
+            for (int i = 0; i < sim.Sales.Count; i++)
             {
-                var s=sim.Sales[i];float a=Mathf.Clamp01(2.2f-s.Age);GUI.color=new Color(1,1,1,a);
-                Item(new Rect(s.Position.x-27,s.Position.y-86-s.Age*33,23,23),10);
-                Label(new Rect(s.Position.x-3,s.Position.y-86-s.Age*33,48,25),"+"+s.Amount,text);GUI.color=Color.white;
+                var sale = sim.Sales[i];
+                float alpha = Mathf.Clamp01(SaleFeedbackDuration - sale.Age);
+                if (alpha <= 0f) continue;
+                Rect bounds = SaleFeedbackBounds(sale.Position, sale.Age, saleFeedbackTop, layoutVerticalScale);
+                GUI.color = new Color(1f, 1f, 1f, alpha);
+                Item(new Rect(bounds.x, bounds.y / layoutVerticalScale, 23f, 23f), 10);
+                GUI.Label(new Rect(bounds.x + 24f, bounds.y, 48f, bounds.height), "+" + sale.Amount, text);
+                GUI.color = Color.white;
             }
             if (sim.IsBonusTrack) DrawBonusTrackHud(sim);
             else DrawCounters(sim);
@@ -1510,7 +1521,7 @@ namespace HayChoriYPaty
             if (measured + 8f > available)
                 levelTitle.fontSize = Mathf.Max(12, Mathf.FloorToInt(originalSize * (available - 8f) / measured));
             Rect[] layout = LevelBadgeLayoutForWidth(bounds, levelTitle.CalcSize(new GUIContent(caption)).x + 8f, crestWidth);
-            if (showCrest) DrawLevelCrest(LayoutRect(layout[0]), crest);
+            if (showCrest) DrawLevelCrest(LevelBadgeCrestDisplaySlot(levelIndex, LayoutRect(layout[0]), crest), crest);
             levelTitle.normal.textColor = new Color(.005f, .035f, .16f);
             for (int y = -1; y <= 1; y++)
             for (int x = -1; x <= 1; x++)
@@ -1519,6 +1530,25 @@ namespace HayChoriYPaty
             levelTitle.normal.textColor = Color.white;
             Label(layout[1], caption, levelTitle);
             levelTitle.fontSize = originalSize;
+        }
+
+        private Rect LevelBadgeCrestDisplaySlot(int levelIndex, Rect slot, Texture2D crest)
+        {
+            if (logicalCanvasHeight >= 958f) return slot;
+            StreetSimulation sim = game?.Sim;
+            if (sim == null || sim.LevelIndex != levelIndex || sim.IsBonusTrack || StreetSimulation.IsTowerDefenseLevel(levelIndex)) return slot;
+            Rect drawn = LevelCrestVisibleBounds(slot, crest, out _);
+            // Keep the badge's width, artwork and the card hitboxes. Shift only the shield
+            // by its visible overlap with the real compact cards (rather than its texture padding).
+            foreach (Rect bounds in CurrentResponsiveFooter(sim, logicalCanvasHeight).UpgradeBounds)
+            {
+                Rect card = LayoutRect(ScaleCardBounds(bounds, layoutVerticalScale));
+                if (drawn.xMin >= card.xMax || drawn.xMax <= card.xMin || drawn.yMin >= card.yMax) continue;
+                float overlap = Mathf.Max(0f, drawn.yMax - card.yMin + 2f);
+                drawn.y -= overlap;
+                slot.y -= overlap;
+            }
+            return slot;
         }
         private static Rect[] LevelBadgeLayout(Rect bounds, float preferredTextWidth, bool includeCrest)
         {
@@ -1731,6 +1761,29 @@ namespace HayChoriYPaty
             levelOneTutorialSkipStyle.normal.textColor = new Color(.045f, .14f, .29f);
         }
         private static GUIStyle Style(int size){var s=new GUIStyle(GUI.skin.label){fontSize=size,fontStyle=FontStyle.Bold,alignment=TextAnchor.MiddleCenter,wordWrap=true};s.normal.textColor=new Color(.16f,.10f,.08f);return s;}
+        private const float SaleFeedbackDuration = 2.2f;
+        private float SaleFeedbackTop(Rect viewport)
+        {
+            float top = CustomerCounterTopY();
+            // Short screens may place the compact quota/status band on the counter face.
+            if (logicalCanvasHeight < H - 2f)
+            {
+                float fullCanvasHeight = Screen.height * W / Screen.width;
+                top += StreetSceneLayout.CounterBounds(fullCanvasHeight).height * Screen.width / viewport.width;
+            }
+            return top;
+        }
+
+        private static Rect SaleFeedbackBounds(Vector2 handoff, float age, float clearTop, float verticalScale)
+        {
+            const float width = 72f, risePerSecond = 33f, gap = 6f;
+            float rise = risePerSecond * verticalScale;
+            // Orders are clipped at this same projected counter edge. Keep the whole
+            // ascending coin and amount on the other side, including their last visible frame.
+            float startY = Mathf.Max((handoff.y - 86f) * verticalScale, clearTop + gap + SaleFeedbackDuration * rise);
+            float y = startY - Mathf.Clamp(age, 0f, SaleFeedbackDuration) * rise;
+            return new Rect(Mathf.Clamp(handoff.x - 27f, gap, W - width - gap), y, width, 25f);
+        }
         private void Label(Rect r,string value,GUIStyle style){GUI.Label(LayoutRect(r),value,style);}
         private void Item(Rect r,int id,bool stretch=false)
         {

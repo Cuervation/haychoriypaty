@@ -59,7 +59,7 @@ namespace HayChoriYPaty
             hudQuotaProductCount = count;
             for (int slot = 0; slot < count; slot++)
                 if (hudQuotaProductIds[slot] == 4)
-                    return HudScreenRectToSafeCanvas(HudQuotaCellBounds(slot, hudQuotaProductIds, count, gap));
+                    return HudScreenRectToSafeCanvas(HudQuotaDisplayBounds(slot, hudQuotaProductIds, count, gap));
             return Rect.zero;
         }
         private void DrawLevelTwoCocacoleroTutorial()
@@ -114,7 +114,7 @@ namespace HayChoriYPaty
             hudQuotaProductCount = count;
             for (int slot = 0; slot < count; slot++)
                 if (hudQuotaProductIds[slot] == 1)
-                    return HudScreenRectToSafeCanvas(HudQuotaCellBounds(slot, hudQuotaProductIds, count, gap));
+                    return HudScreenRectToSafeCanvas(HudQuotaDisplayBounds(slot, hudQuotaProductIds, count, gap));
             return Rect.zero;
         }
         private Rect LevelThreePatyTutorialPanelBounds()
@@ -356,10 +356,10 @@ namespace HayChoriYPaty
                 for (int slot = 0; slot < count; slot++)
                     hudQuotaProductIds[slot] = game.Sim.GetAvailableProduct(slot);
                 hudQuotaProductCount = count;
-                return HudScreenRectToSafeCanvas(HudQuotaCellBounds(0, hudQuotaProductIds, count, gap));
+                return HudScreenRectToSafeCanvas(HudQuotaDisplayBounds(0, hudQuotaProductIds, count, gap));
             }
             if (levelOneTutorialStep == 1)
-                return HudScreenRectToSafeCanvas(HudCoinIconBounds(gap));
+                return HudScreenRectToSafeCanvas(HudDisplayedCoinBounds(gap));
             return ResponsiveUpgradeCardBounds(game.Sim, levelOneTutorialStep == 2 ? 2 : 3);
         }
         private Rect HudScreenRectToSafeCanvas(Rect screenLogicalBounds)

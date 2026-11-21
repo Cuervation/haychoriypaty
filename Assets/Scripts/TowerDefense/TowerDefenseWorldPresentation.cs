@@ -730,7 +730,11 @@ namespace HayChoriYPaty
                 // La Renga's barrels are taken from the right: a Cocacolero waiting at its post stands beside the barrel and faces it.
                 if (gameMode.NarrowGrills && worker.Role == StreetWorkerRole.Cocacolero && !worker.IsMoving && worker.ServeAnimationSeconds <= 0f)
                     workerView.Renderer.flipX = true;
-                workerView.Renderer.sortingOrder = 28 + Mathf.RoundToInt(-worker.Position.y * 12f);
+                // The sprite pivot is at its feet. Use the same ground key as the grouped
+                // furniture; a tie belongs to the worker at the front edge.
+                workerView.Renderer.sortingOrder = UsesKitchenGroundDepth
+                    ? KitchenGroundSortingOrder(worker.Position.y) + 1
+                    : 28 + Mathf.RoundToInt(-worker.Position.y * 12f);
                 int stationMinimumOrder;
                 if (visualLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId &&
                     stationMinimumSortingOrderByRoleAndZone.TryGetValue(StationSortKey(worker.Role, worker.ServiceZone), out stationMinimumOrder))

@@ -38,6 +38,11 @@ Reutilizar ruta/follower, generador de doble valla modular, flechas, colisiones,
 - Atlas transparentes compatibles con grilla/tamaño/pivote y convenciones existentes: caminata lateral ambas direcciones, dos poses reales de caminata frontal descendente en atlas pareado, recepción y salida. Mantener coherencia de las doce identidades entre poses.
 - Globos unos píxeles sobre la cabeza sin cubrirla; separación de entrada impide superposición de hinchas. Mural legible y HUD/controles completos, sin vallas/estaciones/trabajadores invadiendo pasillos ni controles.
 
+## Área de juego con poco alto — 2026-11-20
+El arranque compartido Defense prueba primero el área segura habitual. Si falla la ruta o la cocina en un formato más bajo que los tamaños de teléfono aprobados, se valida de nuevo con una cancha retrato 540×960 centrada horizontalmente dentro del área útil. HUD, mundo y toque coinciden con el mismo recorte. No se modifica el recorrido, el balance ni el diseño que ya encaja. Si tampoco encaja el formato alternativo, no se abre un intento y el selector sigue operativo.
+
+**QA #2 (PASS):** Unity PlayMode 4/4, 16 fallos de arranque recuperados con contrataciones y entregas reales; cuatro combinaciones cortas ya válidas sin encuadre alternativo; 36 combinaciones Defense en los nueve tamaños protegidos con las mismas entregas. Reflow en una partida y rechazo sin intento también comprobados. Evidencia de Game View en `Logs/Acceptance/QA-Responsive-2/`; teléfono físico y APK no ejecutados.
+
 ## Persistencia: migración mínima compatible
 
 - Elevar **SaveData 7→8**, no el envelope local/remoto `schemaVersion=1`. Conservar lectura v1–v7 y sus reparaciones/archivado legacy previos; luego aplicar migración v7→v8 una sola vez.

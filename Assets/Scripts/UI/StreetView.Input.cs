@@ -190,13 +190,16 @@ namespace HayChoriYPaty
             if (pressedAction != 0 && pressedAction == HitAction(p)) DispatchAction(pressedAction);
             pressedAction = 0;
         }
+        // Returning from the bonus keeps Huracán selected in Ready, but the visible selector/hub owns input then.
+        private bool BonusTrackInputActive => game != null && game.IsBonusTrack && game.Sim.Phase != RoundPhase.Ready;
+
         private int HitAction(Vector2 p)
         {
             if (VictoryTransitionActive || victorySkipHeld) return 0;
             if (IsTowerDefenseNavigationActive) return HitTowerDefenseAction(p);
             // Huracán has its own result panel and actions. A previous club's Chulengo receipt
             // may still be present in Mercado.LastResult; it must never capture Bonus Track taps.
-            if (game.IsBonusTrack) return HitBonusTrackAction(p);
+            if (BonusTrackInputActive) return HitBonusTrackAction(p);
             if (game.ShowChulengoResult)
             {
                 Vector2 resultPoint = new Vector2(p.x, p.y * layoutVerticalScale);
@@ -285,6 +288,7 @@ namespace HayChoriYPaty
         private void EnterSelectedLevel(int a, int level)
         {
             if (game == null) return;
+            levelSelectorStartError = null;
             bool selectionSucceeded = game.SelectLevel(level);
             if (selectionSucceeded)
             {
@@ -297,8 +301,8 @@ namespace HayChoriYPaty
                         if (StartTowerDefenseRun()) marketFromSelector = false;
                         else
                         {
-                            marketMessage = string.IsNullOrEmpty(towerDefenseError)
-                                ? "No se pudo iniciar Tower Defense." : towerDefenseError;
+                            levelSelectorStartError = string.IsNullOrEmpty(towerDefenseError)
+                                ? "No se pudo iniciar el partido." : towerDefenseError;
                             levelSelectActive = true;
                         }
                     }
@@ -335,7 +339,7 @@ namespace HayChoriYPaty
         // The Market's JUGAR PARTIDO: Tower Defense run, a level's first-time tutorial or the round itself.
         private void HandleMarketPlay()
         {
-            if (game == null) return;
+            if (game?.Sim == null) return;
             if (StreetSimulation.IsTowerDefenseLevel(game.Sim.LevelIndex))
             {
                 if (StartTowerDefenseRun())
@@ -399,7 +403,15 @@ namespace HayChoriYPaty
                 levelTwoCocacoleroTutorialStep = 0;
                 return;
             }
-            marketMessage = game.TryStartRound() ? "" : "Falta stock para iniciar";
+            if (game.TryStartRoundWithSaveFeedback(out bool initialSaveRejected))
+                marketMessage = "";
+            else if (initialSaveRejected)
+                marketMessage = "No se pudo guardar el inicio. Volvé a intentar.";
+            else if (!game.Sim.IsBonusTrack && game.Market != null &&
+                !game.Market.CanMeetRequiredStockWithLevelOneFloor(game.Sim))
+                marketMessage = "Falta stock para iniciar";
+            else
+                marketMessage = "No se pudo iniciar el partido.";
             if (game.Sim.Phase == RoundPhase.Playing) { marketActive = false; hubActive = false; levelSelectActive = false; }
             return;
         }
@@ -420,7 +432,7 @@ namespace HayChoriYPaty
             }
             if (HandleTowerDefenseAction(a)) return;
             // Route by the currently rendered mode before inspecting any stale normal-level receipt.
-            if (game.IsBonusTrack)
+            if (BonusTrackInputActive)
             {
                 bool bonusActionSucceeded = false;
                 if (a >= BonusCardFirstAction && a < BonusCardFirstAction + 3) game.ChooseBonusCard(a - BonusCardFirstAction);
@@ -623,6 +635,7 @@ namespace HayChoriYPaty
             {
                 if (a == LevelSelectorBackAction)
                 {
+                    levelSelectorStartError = null;
                     levelSelectActive = false;
                     hubActive = true;
                     marketFromSelector = false;
@@ -671,7 +684,7 @@ namespace HayChoriYPaty
                     bool success = game.TryRedeemTicketWorker(role, game.TicketRedemptionOperationId(role));
                     marketMessage = success ? "¡CANJE REALIZADO! Tu trabajador está reservado para el próximo partido."
                         : game.TicketBalance < 3 ? "Te faltan " + System.Math.Max(0L, 3L - game.TicketBalance) + " tickets para canjear."
-                        : game.Sim.LevelIndex < 5 || !game.TicketExtrasUnlocked ? "Desbloqueá Racing y elegí un nivel 6 o superior."
+                        : game.Sim.LevelIndex < 5 || !game.TicketExtrasUnlocked ? "Desbloqueá Racing y elegí una cancha compatible."
                         : "No se pudo guardar el canje; el saldo no cambió.";
                     return;
                 }
@@ -709,11 +722,12 @@ namespace HayChoriYPaty
                 {
                     if(Time.unscaledTime-marketLastPurchaseTime<.25f)return;
                     marketLastPurchaseTime=Time.unscaledTime;
+                    if(!MarketHasMissing()){marketMessage="No hay faltantes pendientes.";return;}
                     long cost=game.Market.MinimumPurchaseCostCents(game.Sim);
                     if(cost>game.Market.BalanceCents){marketMessage=MarketInsufficientFundsMessage(cost);return;}
-                    bool bought=false;
-                    for(int id=0;id<StreetIngredientCatalog.Names.Length;id++)if(game.Market.MissingPacks(game.Sim,id)>0)bought|=game.BuyMissingIngredient(id);
-                    marketMessage=bought?"Compras mínimas realizadas":"No hay faltantes pendientes";return;
+                    marketMessage=game.TryBuyMissingIngredients() ? "Compra realizada. Stock completo."
+                        : "No se completó la compra. Tu saldo y stock no cambiaron.";
+                    return;
                 }
                 if (a == MarketPlayAction)
                 {

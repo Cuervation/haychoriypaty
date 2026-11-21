@@ -27,6 +27,19 @@ namespace HayChoriYPaty
         // Full fan body height shared by Camioneros and Los Redondos.
         public const float LosRedondosFanBodyLogical = 76f;
 
+        /// <summary>Only offer a narrower view below the shortest validated phone (320×568).</summary>
+        public static bool TryCompactViewport(Rect safeViewport, out Rect viewport)
+        {
+            viewport = safeViewport;
+            const float shortestProtectedHeight = 958f; // 320×568 is 958.5 logical pixels high.
+            if (safeViewport.width <= 0f || safeViewport.height <= 0f ||
+                safeViewport.height * StreetSceneLayout.Width >= safeViewport.width * shortestProtectedHeight)
+                return false;
+            float width = safeViewport.height * StreetSceneLayout.Width / StreetSceneLayout.Height;
+            viewport = new Rect(safeViewport.center.x - width * .5f, safeViewport.y, width, safeViewport.height);
+            return true;
+        }
+
         public static bool TryCreate(TowerDefenseLevelConfig source, Camera camera, Rect viewport,
             float logicalWidth, float logicalHeight, out TowerDefenseLevelConfig runtimeConfig,
             out TowerDefenseRouteGeometryConfig route, out float worldUnitsPerLogicalPixel,

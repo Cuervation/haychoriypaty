@@ -286,9 +286,17 @@ namespace HayChoriYPaty
             finally { layoutVerticalScale = previousVertical; }
         }
 
+        private static string RiotResultMessage(StreetSimulation sim)
+        {
+            if (sim != null && StreetSimulation.IsTowerDefenseLevel(sim.LevelIndex))
+                return "Un hincha llegó a la salida\nPedidos completos: " + sim.OrdersCompleted + "/" +
+                    TowerDefenseLevelConfig.TotalFanCountForCampaignLevel(sim.LevelIndex) + "\nIntentalo nuevamente";
+            return "Los hinchas se cansaron\nde esperar,\nintentalo nuevamente";
+        }
+
         private void DrawRiotWaitMessage(Rect bounds)
         {
-            const string message = "Los hinchas se cansaron\nde esperar,\nintentalo nuevamente";
+            string message = RiotResultMessage(game?.Sim);
             const int fontSize = 30;
             GUIStyle caption = CachedStandardButtonLabelStyle(menuTitle, fontSize, Color.white);
             GUIStyle outline = CachedStandardButtonLabelStyle(menuTitle, fontSize, new Color(.035f, .075f, .16f));

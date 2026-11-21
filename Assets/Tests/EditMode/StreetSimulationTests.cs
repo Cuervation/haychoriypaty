@@ -2185,7 +2185,7 @@ string[] names = (string[])simType.GetField("LevelNames", BindingFlags.Public | 
         {
             string[] expectedNames = { "Racing Club / Avellaneda", "San Lorenzo / Boedo", "River Plate / Núñez", "Boca Juniors / La Boca", "Argentinos Juniors / La Paternal" };
             // Camioneros (9) and Los Redondos (10) are Tower Defense levels and have no traditional goal/duration.
-            int[] expectedGoals = { 850, 1020, 1050, 1150, 1450 };
+            int[] expectedGoals = { 850, 1020, 1050, 1150, 669 };
             float[] expectedDurations = { 260f, 300f, 340f, 340f, 315f };
             float[] expectedDemand = { 1.65f, 1.815f, 1.9965f, 2.19615f, 2.6573415f };
             int[] levelIds = { 5, 6, 7, 8, 12 };
@@ -2199,6 +2199,16 @@ string[] names = (string[])simType.GetField("LevelNames", BindingFlags.Public | 
                 Assert.AreEqual(expectedDurations[i], Get(sim, "TimeRemaining")); Assert.AreEqual(7, Get(sim, "ProductCount"));
                 CollectionAssert.AreEqual(new[] { 0, 1, 2, 3, 4, 6, 5 }, AvailableProducts(sim));
                 Assert.AreEqual(expectedDemand[i], demand[level], 0.00001f);
+                if (level == 12)
+                {
+                    var quotas = new int[7];
+                    for (int product = 0; product < quotas.Length; product++)
+                        quotas[product] = (int)Call(sim, "GetProductGoal", product);
+                    CollectionAssert.AreEqual(new[] { 118, 105, 85, 80, 115, 76, 90 }, quotas);
+                    Assert.AreEqual(105, Get(sim, "SpeedCost"), "Only Argentinos' targets changed, not speed prices.");
+                    Start(sim);
+                    Assert.AreEqual(500, Get(sim, "Coins"), "Argentinos retains the original attempt budget.");
+                }
             }
         }
 

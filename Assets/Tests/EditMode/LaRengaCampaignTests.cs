@@ -155,10 +155,18 @@ namespace HayChoriYPaty.Tests
             Assert.IsTrue((bool)Invoke(game, "SelectLevel", levelId));
             Assert.IsTrue((bool)Invoke(game, "TryStartTowerDefenseRound"));
             object sim = ReadProperty(game, "Sim");
-            int[] deliveries = new int[7]; deliveries[0] = 1;
+            int[] deliveries = levelId == 10 ? new[] { 18, 15, 13, 0, 11, 0, 17 } : new[] { 1, 0, 0, 0, 0, 0, 0 };
             int[] workers = (int[])ReadProperty(sim, "WorkerCountsByRole");
+            if (levelId == 10)
+            {
+                Assert.IsFalse((bool)Invoke(game, "IsLevelUnlocked", 11));
+                var outsideMenu = (int[])deliveries.Clone(); outsideMenu[5] = 1;
+                Assert.IsFalse((bool)InvokeAny(sim, "ImportTowerDefenseState", 240f, 600, 250, 1, workers,
+                    outsideMenu, 60, 60, true, true), "Fernet isn't on the authored Redondos menu.");
+                Assert.AreEqual("Playing", ReadProperty(sim, "Phase").ToString());
+            }
             Assert.IsTrue((bool)InvokeAny(sim, "ImportTowerDefenseState", 240f, 600, 250, 1, workers,
-                deliveries, 8, 7, true, true));
+                deliveries, levelId == 10 ? 60 : 8, levelId == 10 ? 60 : 7, true, true));
             Assert.IsTrue((bool)Invoke(game, "ProcessRoundResult"));
             Assert.IsTrue((bool)Invoke(game, "TryCollectVictoryReward"));
         }

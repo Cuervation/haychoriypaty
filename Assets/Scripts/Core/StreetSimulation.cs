@@ -98,7 +98,8 @@ namespace HayChoriYPaty
                 new StreetLevelBalance(new[] {310,220,135,125,255,110,145}, new[] {60,60,80,70,70}, 17.00f, 500),
                 new StreetLevelBalance(new[] {345,245,150,140,285,120,165}, new[] {70,70,90,80,80}, 21.00f, 500),
                 new StreetLevelBalance(new[] {0,0,0,0,0,0,0}, new[] {0,0,0,0,0}, 1f),
-                new StreetLevelBalance(new[] {345,245,150,140,285,120,165}, new[] {70,70,90,80,80}, 21.00f, 500),
+                // Argentinos is the fifth venue, not the old late-campaign Los Redondos shift.
+                new StreetLevelBalance(new[] {118,105,85,80,115,76,90}, new[] {70,70,90,80,80}, 21.00f, 500),
                 new StreetLevelBalance(new[] {0,0,0,0,0,0,0}, new[] {0,0,0,0,0}, 1f),
                 new StreetLevelBalance(new[] {0,0,0,0,0,0,0}, new[] {60,60,60,60,60}, 1f, 1200)
             };
@@ -604,10 +605,10 @@ namespace HayChoriYPaty
             var result = new int[LevelNames.Length][];
             for (int level = 0; level < result.Length; level++)
             {
-                if (level == TowerDefenseLevelConfig.LaRengaCampaignLevelId)
+                if (level == TowerDefenseLevelConfig.LosRedondosCampaignLevelId || level == TowerDefenseLevelConfig.LaRengaCampaignLevelId)
                 {
-                    // La Renga serves its authored five-product Defense menu, not the legacy Chori/Coca pair: a delivery outside the
-                    // menu made the progress save fail and froze the match ("No se pudo guardar. La partida quedó en pausa").
+                    // The round serves its authored Defense menu, not the legacy Chori/Coca pair (a delivery outside the menu makes the
+                    // progress save fail and freezes the match).
                     string path = TowerDefenseLevelConfig.ResourcesPathForCampaignLevel(level);
                     int[] menu = Resources.Load<TowerDefenseLevelConfig>(path)?.AvailableProducts;
                     if (menu != null && menu.Length > 0)

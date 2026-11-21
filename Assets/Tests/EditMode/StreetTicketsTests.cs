@@ -222,7 +222,7 @@ namespace HayChoriYPaty.Tests
             Assert.IsTrue((bool)Invoke(game, "TryStartTowerDefenseRound"));
             object sim = Read(game, "Sim");
             Assert.AreEqual(500, Read(sim, "Coins"), "Both defense campaign identities use the isolated common opening grant.");
-            Assert.AreEqual(2, Read(sim, "ProductCount"));
+            Assert.AreEqual(5, Read(sim, "ProductCount"), "Los Redondos serves its authored five-product Defense menu.");
         }
 
         [Test]

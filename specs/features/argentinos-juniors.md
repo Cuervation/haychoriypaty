@@ -8,7 +8,7 @@ Agregar Argentinos Juniors como nivel normal de campaña, con las fotos aportada
 
 - ID estable **12**, posición visible **5**, entre Vélez y Ferro. Orden visible: `0,1,9,2,12,3,11,10,4,5,6,7,8`. No se renumera ningún ID.
 - El selector existente lo lista como **Argentinos Juniors / La Paternal**, quinta tarjeta y inicialmente bloqueada.
-- Su balance tradicional conserva los valores históricos de Los Redondos antes de su conversión a Tower Defense. Los valores vigentes están en [la tabla maestra](../../docs/BALANCE_ACTUAL_NIVELES.md); no duplicar aquí cifras de metas/caja/tiers. No copiar la modalidad Tower Defense de Camioneros ni el Bonus Track de Huracán.
+- Su balance tradicional se originó en el antiguo Los Redondos. Desde 2026-11-19 se calibra solo su vector de metas para la quinta posición: siguen siendo siete cuotas obligatorias, con el mismo reloj, caja, equipo inicial, costos y cocina. Los valores vigentes están en [la tabla maestra](../../docs/BALANCE_ACTUAL_NIVELES.md); no duplicar aquí cifras de metas/caja/tiers. No copiar la modalidad Tower Defense de Camioneros ni el Bonus Track de Huracán.
 - Ganar Vélez ID2 habilita ID12; ganar ID12 habilita Ferro ID3. SaveData v7 conserva desbloqueos por ID y migra los flags antiguos sin otorgar accesos nuevos por posición.
 - Migración SaveData v5→v6 solo concede el flag si hay evidencia de una victoria ID10 en estadísticas o un match terminal pendiente; `unlockedLevel == 10` por sí solo solo acredita acceso a Los Redondos. Preservar prefijos existentes de estadísticas y watermarks de Mercado.
 - Partidos/estadísticas de ID12 se guardan en su slot independiente. Firestore local permite resultado `level == 12` y rechaza `level > 12`; `unlockedLevel` remoto sigue limitado a10.
@@ -20,7 +20,7 @@ Agregar Argentinos Juniors como nivel normal de campaña, con las fotos aportada
 | Criterio | Evidencia | Estado |
 |---|---|---|
 | Orden de campaña, nombre/ID y siguiente nivel ID10→ID12; ID12 terminal | EditMode `StreetBonusTrackTests` y `StreetTicketsTests` | PASS — job `9f35be2dd95e4a2ba473fb19a6699a2e` |
-| Configuración ID12 coincide campo por campo con ID10, incluidas cuotas, duración, caja y plantel de inicio | EditMode `StreetSimulationTests` | PASS — job `9f35be2dd95e4a2ba473fb19a6699a2e` |
+| Copia original de configuración ID10 antes del cambio a Defense | EditMode `StreetSimulationTests` | PASS histórico — job `9f35be2dd95e4a2ba473fb19a6699a2e`; las metas actuales de ID12 lo sustituyen |
 | Migración v5 preserva el frontier y solo desbloquea ID12 ante evidencia de victoria ID10 | EditMode `StreetBonusTrackTests` | PASS — job `9f35be2dd95e4a2ba473fb19a6699a2e` |
 | Guardado de stats y watermarks de Mercado no colisiona con ID11; local repo acepta v6 | EditMode de estadísticas, Mercado, tickets y snapshots | PASS — job `9f35be2dd95e4a2ba473fb19a6699a2e` |
 | Tema, mural y nuevos atlases v2 se cargan desde recursos propios; selector muestra la última tarjeta | EditMode de arte, tema, atlas y selector | BLOCKED — Unity importó las dos texturas, pero el bridge se desconectó antes de ejecutar el job EditMode |
@@ -32,5 +32,7 @@ Agregar Argentinos Juniors como nivel normal de campaña, con las fotos aportada
 **Validación Unity 2026-11-06 (integración original):** la compilación de scripts terminó sin errores (un warning UAC0005 no relacionado). El job EditMode `9f35be2dd95e4a2ba473fb19a6699a2e` terminó con **33/33 PASS**, 0 fallas y 0 omitidas. La compilación/test inicial había fallado antes de iniciar pruebas por una llave omitida en el test de manifiesto; la llave se corrigió antes de este job exitoso. La suite local Firestore y una captura Game View no se ejecutaron.
 
 **Actualización de camisetas 2026-11-06:** se generaron atlases versionados v2 con cinco diseños basados en las fotos del usuario y asignación idéntica por identidad en poses de caminata/celebración y trifulca; ambos PNG miden 1536×1024, conservan canal alpha y Unity registró su importación en `Logs/Editor.log`. El primer `refresh_unity` agotó 60 s esperando readiness; un refresh posterior recuperó el Editor, pero `run_tests` terminó con `Unity plugin session ... disconnected while awaiting command_result`. Por eso compile/test de esta actualización y captura Game View siguen **BLOCKED/NOT_RUN**, no aprobados.
+
+**Balance y progresión, 2026-11-19 (B-02):** en Main real con perfil nuevo sin saldo ni accesos inyectados, Argentinos ganó con las siete cuotas a 284,85 s y cobró una vez, habilitando Ferro; Ferro también ganó y habilitó Los Redondos. La corrida llegó a 12/15 antes de perder en San Lorenzo. Evidencia y capturas en `Logs/Acceptance/Argentinos-Balance-20261119/INFORME.md`. No certifica juego humano completo, otros tamaños ni Android.
 
 La edición de `firebase/firestore.rules` no publica reglas en el proyecto remoto. No se declara aceptación Android ni APK hasta que se solicite y se ejecute por separado.

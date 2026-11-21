@@ -23,6 +23,8 @@ namespace HayChoriYPaty.Tests
         object mode;
         bool failSaves, previousGate;
         int savedCalls;
+        int persistedMatches;
+        object lastPersistedMatch;
         bool hadCamionerosTutorialCompletion;
         int previousCamionerosTutorialCompletion;
         string camionerosTutorialCompletedKey;
@@ -63,6 +65,11 @@ namespace HayChoriYPaty.Tests
         bool Persist<TMatch>(string json, TMatch match)
         {
             savedCalls++;
+            if (!failSaves && (object)match != null)
+            {
+                persistedMatches++;
+                lastPersistedMatch = match;
+            }
             return !failSaves;
         }
         void SetPortrait()
@@ -86,6 +93,8 @@ namespace HayChoriYPaty.Tests
         [UnitySetUp]
         public IEnumerator SetUp()
         {
+            persistedMatches = 0;
+            lastPersistedMatch = null;
             requestedLevelId = TestContext.CurrentContext.Test.Name.IndexOf("Peregrinacion", StringComparison.OrdinalIgnoreCase) >= 0 ? 14
                 : TestContext.CurrentContext.Test.Name.IndexOf("LaRenga", StringComparison.OrdinalIgnoreCase) >= 0 ? 13
                 : TestContext.CurrentContext.Test.Name.IndexOf("LosRedondos", StringComparison.OrdinalIgnoreCase) >= 0 ? 10 : 9;
@@ -1662,7 +1671,57 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(Rect.zero, (Rect)Call(view, "PilgrimCardBounds", 3), "Chicago's footer has only three cards.");
         }
 
-        // The Parrillero cooks and also hands the sandwich to the pilgrim at the fence; the Cocacolero brings the Coca.
+        [UnityTest]
+        public IEnumerator CamionerosKitchenKeepsWorkersOnTheCorrectSideOfCounters()
+        {
+            yield return CheckHorizontalKitchenDepth("camioneros", new[] { "Parrillero", "Cocacolero" },
+                new[] { "NormalTable", "CocaBarrel" });
+        }
+
+        [UnityTest]
+        public IEnumerator LosRedondosKitchenKeepsWorkersOnTheCorrectSideOfCounters()
+        {
+            yield return CheckHorizontalKitchenDepth("redondos", new[] { "Parrillero", "Parrillero", "Cocacolero", "Cocacolero" },
+                new[] { "NormalTable", "PremiumTable", "CocaBarrel", "BeerBarrel" });
+        }
+
+        IEnumerator CheckHorizontalKitchenDepth(string level, string[] roles, string[] stationKinds)
+        {
+            foreach (string role in roles)
+                Assert.IsTrue((bool)Call(game, "TryHireTowerDefenseAtPost", mode, Role(role)));
+            object presentation = Get(view, "towerDefensePresentation");
+            IDictionary stationViews = (IDictionary)Get(presentation, "pilgrimStations");
+            IDictionary workerViews = (IDictionary)Get(presentation, "workerViews");
+            IList workers = (IList)Get(mode, "Workers");
+            float pixel = (float)Get(mode, "WorldUnitsPerLogicalPixel");
+            var stations = ((IEnumerable)Get(mode, "PlacedStations")).Cast<object>().ToArray();
+            foreach (bool isFront in new[] { false, true })
+            {
+                for (int i = 0; i < stationKinds.Length; i++)
+                {
+                    object station = stations.Single(s => Get(s, "Kind").ToString() == stationKinds[i]);
+                    var stationView = (GameObject)stationViews[Get(station, "Id")];
+                    var group = stationView.GetComponent<UnityEngine.Rendering.SortingGroup>();
+                    Assert.IsNotNull(group, "Counter and stocked products must have one external depth: " + stationKinds[i]);
+                    var fixedParts = stationView.transform.GetChild(0).GetComponentsInChildren<SpriteRenderer>();
+                    float floor = fixedParts.Min(r => r.bounds.min.y);
+                    SpriteRenderer[] stock = stationView.GetComponentsInChildren<SpriteRenderer>()
+                        .Where(r => r.gameObject.name.StartsWith("Physical kitchen unit", StringComparison.Ordinal)).ToArray();
+                    Assert.IsNotEmpty(stock, stationKinds[i] + " stock participates in the same depth group.");
+                    Assert.Greater(stock.Min(r => r.sortingOrder), fixedParts.Max(r => r.sortingOrder));
+                    float x = ((Rect)Get(station, "Bounds")).center.x;
+                    workers[i].GetType().GetProperty("Position", I).SetValue(workers[i],
+                        new Vector2(x, floor + (isFront ? -3f : 20f) * pixel));
+                    Call(presentation, "Sync", mode);
+                    var renderedWorker = (SpriteRenderer)Get(workerViews[Get(workers[i], "Id")], "Renderer");
+                    if (isFront) Assert.Greater(renderedWorker.sortingOrder, group.sortingOrder, stationKinds[i]);
+                    else Assert.Less(renderedWorker.sortingOrder, group.sortingOrder, stationKinds[i]);
+                }
+                if (!Application.isBatchMode) yield return Capture("qa10-" + level + (isFront ? "-worker-in-front" : "-worker-behind"));
+            }
+        }
+
+        // The Parrillero also hands the sandwich to the pilgrim at the fence; the Cocacolero brings the Coca.
         [UnityTest]
         public IEnumerator CamionerosParrilleroAndCocacoleroDeliverOnlyWhatTheKitchenSells()
         {
@@ -1827,6 +1886,63 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
+        public IEnumerator LosRedondosFullWaveWithFiveProductsPaysOnceAndUnlocksHuracan()
+        {
+            // The generic fixture grants multiple levels; only this test needs a locked successor.
+            ((bool[])Get(Get(game, "save"), "unlockedLevelIds"))[11] = false;
+            Assert.IsFalse((bool)Call(game, "IsLevelUnlocked", 11));
+            ((bool[])Get(Get(game, "save"), "unlockedLevelIds"))[6] = false;
+            Assert.IsFalse((bool)Call(game, "IsLevelUnlocked", 6));
+            int[] hires = { 0, 1, 2, 0, 1, 2 };
+            int nextHire = 0;
+            for (int tick = 0; tick < 3600 && Get(mode, "Phase").ToString() == "Playing"; tick++)
+            {
+                if (tick % 20 == 0 && nextHire < hires.Length &&
+                    (bool)Call(game, "TryHireTowerDefenseAtPost", mode, Enum.ToObject(T("StreetWorkerRole"), hires[nextHire])))
+                    nextHire++;
+                Call(mode, "Step", .05f);
+                if (tick % 100 == 0) yield return null;
+            }
+            Assert.IsTrue((bool)Get(mode, "HasWon"), "Natural Redondos wave must win with legal hires.");
+            Assert.AreEqual(60, Get(mode, "ServedFans"));
+            Assert.AreEqual(0, Get(mode, "EscapedFans"));
+            int[] deliveries = (int[])Get(mode, "DeliveredByProduct");
+            foreach (int product in new[] { 0, 1, 2, 4, 6 }) Assert.Greater(deliveries[product], 0, "Product " + product);
+            Assert.AreEqual(0, deliveries[3]); Assert.AreEqual(0, deliveries[5]);
+            Call(view, "UpdateTowerDefenseFrame");
+            Assert.AreEqual("Won", Get(Get(game, "Sim"), "Phase").ToString(), (string)Get(view, "towerDefenseError"));
+            Assert.IsTrue((bool)Get(game, "HasPendingChulengo"));
+            Assert.AreEqual(0, persistedMatches);
+
+            // Let the real unscaled victory reveal reach its claim controls.
+            yield return null;
+            yield return new WaitForSecondsRealtime(3.2f);
+            if (!Application.isBatchMode) yield return Capture("qa00-redondos-victory-before-claim");
+            long balanceBefore = (long)Get(Get(game, "Market"), "BalanceCents");
+            long reward = (long)Get(game, "ChulengoBaseRewardCents");
+            long ticketsBefore = (long)Get(game, "TicketBalance");
+            Assert.Greater(reward, 0);
+            Vector2 collect = ((Rect)Call(view, "ChulengoCollectBounds")).center;
+            yield return Tap(collect);
+            yield return Tap(collect); // repeated tap during the same shutter
+            float deadline = Time.realtimeSinceStartup + 5f;
+            while (!(bool)Get(view, "levelSelectActive") && Time.realtimeSinceStartup < deadline) yield return null;
+            Assert.IsTrue((bool)Get(view, "levelSelectActive"));
+            // Campaign order 2026-11-19: Los Redondos now follows Racing and its successor is San Lorenzo (ID6), not Huracán.
+            Assert.IsTrue((bool)Call(game, "IsLevelUnlocked", 6));
+            Assert.IsFalse((bool)Call(game, "TryCollectVictoryReward"));
+            Assert.AreEqual(balanceBefore + reward, Get(Get(game, "Market"), "BalanceCents"));
+            Assert.AreEqual(ticketsBefore + 1, Get(game, "TicketBalance"));
+            Assert.AreEqual(1, persistedMatches);
+            CollectionAssert.AreEqual(Array.ConvertAll(deliveries, value => (long)value),
+                (long[])Get(lastPersistedMatch, "salesByProduct"));
+            TestContext.WriteLine("Redondos 60/60, products=" + string.Join(",", deliveries) + ", reward cents=" + reward);
+            while ((bool)Get(view, "RewardShutterActive") && Time.realtimeSinceStartup < deadline) yield return null;
+            Assert.IsFalse((bool)Get(view, "RewardShutterActive"));
+            if (!Application.isBatchMode) yield return Capture("qa00-redondos-selector-after-claim");
+        }
+
+        [UnityTest]
         [Explicit("Records a real Los Redondos run to Logs/Acceptance/RedondosVideo-20261118")]
         public IEnumerator LosRedondosGameplayVideoFrames()
         {
@@ -1882,6 +1998,73 @@ namespace HayChoriYPaty.Tests
             Set(view, "towerDefensePresentation", null);
             yield return CaptureAtResolution("renga-empty-stage-610x1356", 610, 1356);
             Debug.Log("RENGA EMPTY STAGE captured in " + Path.Combine(CaptureDirectory, "Level09"));
+        }
+
+        [UnityTest]
+        public IEnumerator LaRengaOverlappingOrdersStayReadableInAPackedEntry()
+        {
+            Rect lead = new Rect(39f, 120f, 62f, 54f);
+            Rect trailing = new Rect(6f, 118f, 62f, 42f);
+            Rect unaffected = new Rect(105f, 120f, 62f, 54f);
+            Rect raised = (Rect)CallStatic(vt, "PlaceLaRengaOrderBubble", trailing, new[] { lead });
+            Assert.AreEqual(trailing.x, raised.x);
+            Assert.AreEqual(trailing.size, raised.size);
+            Assert.LessOrEqual(raised.yMax + 3f, lead.yMin);
+            Assert.AreEqual(unaffected, CallStatic(vt, "PlaceLaRengaOrderBubble", unaffected, new[] { lead }));
+
+            foreach (string role in new[] { "Parrillero", "Cocacolero" })
+                Assert.IsTrue((bool)Call(game, "TryHireTowerDefenseAtPost", mode, Role(role)));
+            for (int tick = 0; tick < 500 && (int)Get(mode, "OrdersCompleted") < 10; tick++)
+            {
+                Call(mode, "Step", .05f);
+                if (tick % 50 == 0) yield return null;
+            }
+            Assert.AreEqual("Playing", Get(mode, "Phase").ToString());
+            if (Application.isBatchMode) yield break;
+            yield return Capture("qa08-la-renga-order-bubbles");
+            IList rects = (IList)Get(view, "laRengaOrderBubbles");
+            Assert.GreaterOrEqual(rects.Count, 2, "Show multiple actual pending orders at once.");
+            for (int i = 0; i < rects.Count; i++)
+            for (int j = i + 1; j < rects.Count; j++)
+                Assert.IsFalse(((Rect)rects[i]).Overlaps((Rect)rects[j]), "Do not draw one order over another.");
+            yield return CaptureAtResolution("qa08-la-renga-order-bubbles-610x1356", 610, 1356);
+        }
+
+        [UnityTest]
+        public IEnumerator LaRengaEscapeResultKeepsElapsedAndExplainsTheLoss()
+        {
+            Assert.AreEqual("PEDIDOS 0/120", CallStatic(vt, "TowerDefenseWaveCaption", mode));
+            foreach (string role in new[] { "Parrillero", "Cocacolero" })
+                Assert.IsTrue((bool)Call(game, "TryHireTowerDefenseAtPost", mode, Role(role)));
+            bool observedLiveProgress = false;
+            for (int tick = 0; tick < 4000 && Get(mode, "Phase").ToString() == "Playing"; tick++)
+            {
+                Call(mode, "Step", .05f);
+                int current = (int)Get(mode, "OrdersCompleted");
+                if (!observedLiveProgress && current >= 10 && Get(mode, "Phase").ToString() == "Playing")
+                {
+                    Assert.AreEqual("PEDIDOS " + current + "/120", CallStatic(vt, "TowerDefenseWaveCaption", mode));
+                    observedLiveProgress = true;
+                    if (!Application.isBatchMode) yield return Capture("qa06-la-renga-wave-progress");
+                }
+                if (tick % 100 == 0) yield return null;
+            }
+            Assert.IsTrue(observedLiveProgress, "A live Defense wave should visibly progress before the result.");
+            Assert.IsTrue((bool)Get(mode, "HasLost"));
+            Assert.AreEqual(1, Get(mode, "EscapedFans"));
+            float elapsed = (float)Get(mode, "Elapsed");
+            Assert.Greater(elapsed, 1f);
+            Call(view, "UpdateTowerDefenseFrame");
+            object sim = Get(game, "Sim");
+            Assert.AreEqual("Lost", Get(sim, "Phase").ToString());
+            Assert.AreEqual(elapsed, Get(sim, "Elapsed"));
+            int completed = (int)Get(mode, "OrdersCompleted");
+            Assert.Greater(completed, 0);
+            StringAssert.Contains("Un hincha llegó a la salida\nPedidos completos: " + completed + "/120",
+                (string)CallStatic(vt, "RiotResultMessage", sim));
+            TestContext.WriteLine("La Renga lost at " + elapsed + " seconds; completed=" + completed + "/120.");
+            yield return new WaitForSecondsRealtime(1.6f);
+            if (!Application.isBatchMode) yield return Capture("qa04-la-renga-defense-loss");
         }
 
         [UnityTest]
@@ -1941,6 +2124,10 @@ namespace HayChoriYPaty.Tests
         {
             yield return null;
             Type roleKind = T("StreetWorkerRole");
+            // Every spot a worker can stand on must be reachable from the grill post: a pocket cut in two (for instance by the stacked
+            // barrels leaving no room to walk over them) left the cooks unable to leave their strip and retrying every frame.
+            foreach (int role in new[] { 0, 1 })
+                Assert.AreEqual(0, (int)Call(mode, "UnreachableWorkerNodes", Enum.ToObject(roleKind, role)), "role " + role + " reaches the whole pocket");
             object[] hires = { 0, 1, 0, 1, 0, 1 };
             int[] hireFrames = { 1, 2, 3, 4, 5, 6 }; // the whole crew from the start, so the run lasts
             int violations = 0, checks = 0, hired = 0;
@@ -1950,10 +2137,21 @@ namespace HayChoriYPaty.Tests
                 if (hired < hireFrames.Length && frame == hireFrames[hired])
                     Call(game, "TryHireTowerDefenseAtPost", mode, Enum.ToObject(roleKind, hires[hired++]));
                 Call(mode, "Step", .05f);
+                // The run keeps saving its progress as it delivers every product of its five-product menu; a menu the saving simulation
+                // does not know makes the save fail and freezes the match ("No se pudo guardar. La partida quedó en pausa").
+                if (frame % 10 == 9 && Get(mode, "Phase").ToString() == "Playing")
+                    Assert.IsTrue((bool)Call(game, "PersistTowerDefenseProgress", mode), "saving the La Renga run at frame " + frame);
                 foreach (object worker in (IEnumerable)Get(mode, "Workers"))
                 {
                     Vector2 position = (Vector2)Get(worker, "Position");
                     Rect feet = (Rect)Call(mode, "WorkerFeet", position);
+                    // Nobody walks the strip under the barrels (between the grills and the barrels), cooks and drink workers alike.
+                    string workerRole = Get(worker, "Role").ToString();
+                    if (workerRole != "Mozo" && ((Rect)Call(mode, "CookKeepOut")).Contains(position))
+                    {
+                        violations++;
+                        if (first.Length == 0) first = workerRole + " in the strip under the barrels at " + position + " frame " + frame;
+                    }
                     foreach (object station in (IEnumerable)Get(mode, "PlacedStations"))
                     {
                         checks++;
@@ -2124,30 +2322,15 @@ namespace HayChoriYPaty.Tests
             {
                 Call(mode, "Step", .05f);
                 if (tick % 100 == 0) diagnostic = DescribeLujanService(mode, mozo);
-            // Every spot a worker can stand on must be reachable from the grill post: a pocket cut in two (for instance by the stacked
-            // barrels leaving no room to walk over them) left the cooks unable to leave their strip and retrying every frame.
-            foreach (int role in new[] { 0, 1 })
-                Assert.AreEqual(0, (int)Call(mode, "UnreachableWorkerNodes", Enum.ToObject(roleKind, role)), "role " + role + " reaches the whole pocket");
                 if (tick % 40 == 0) yield return null;
             }
             Assert.GreaterOrEqual((int)Get(mode, "TotalDelivered"), 2, "Natural pilgrims must be served. " + diagnostic +
                 " phase=" + Get(mode, "Phase") + " lost=" + Get(mode, "HasLost") + " elapsed=" + Get(mode, "Elapsed"));
         }
-                // The run keeps saving its progress as it delivers every product of its five-product menu; a menu the saving simulation
-                // does not know makes the save fail and freezes the match ("No se pudo guardar. La partida quedó en pausa").
-                if (frame % 10 == 9 && Get(mode, "Phase").ToString() == "Playing")
-                    Assert.IsTrue((bool)Call(game, "PersistTowerDefenseProgress", mode), "saving the La Renga run at frame " + frame);
 
         [UnityTest]
         public IEnumerator PeregrinacionHireCardsHireAtTheRolePostWithOneTap()
         {
-                    // Nobody walks the strip under the barrels (between the grills and the barrels), cooks and drink workers alike.
-                    string workerRole = Get(worker, "Role").ToString();
-                    if (workerRole != "Mozo" && ((Rect)Call(mode, "CookKeepOut")).Contains(position))
-                    {
-                        violations++;
-                        if (first.Length == 0) first = workerRole + " in the strip under the barrels at " + position + " frame " + frame;
-                    }
             float pixel = (float)Get(mode, "worldUnitsPerLogicalPixel");
             IList workers = (IList)Get(mode, "Workers");
             Assert.AreEqual(2, workers.Count);
@@ -2867,3 +3050,5 @@ namespace HayChoriYPaty.Tests
 }
 
 #endif
+
+
