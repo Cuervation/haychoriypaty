@@ -1,4 +1,12 @@
-# Android — 2026-11-13: humo Chulengo, APK del commit `dab10dd` (**BUILD/ARTEFACT PASS; DEVICE NOT_RUN**)
+# Android — 2026-11-23: cuadrilla de campaña en Defense, APK del commit `7c30b2a` (**BUILD/ARTEFACT PASS; INSTALACIÓN PASS; SMOKE NOT_RUN**)
+
+Unity 6000.6.3f1 BuildPipeline por MCP, job `build-6f88b2c58f`, `clean_build` + `detailed_report`; Android no-Development, IL2CPP/ARM64, escenas `Assets/Scenes/Main.unity` y `Assets/Scenes/SampleScene.unity`: **Succeeded en 464,7 s, 0 errores / 5 advertencias**. Se compiló después de publicar `7c30b2a` en `origin/docs/post-cleanup-state`, sin cambios locales en `ProjectSettings`; el log no contiene `uncompiled code changes`. Console sin errores.
+
+APK local ignorada por Git: `Builds/Android/Archive/HayChoriYPaty-0.2.83-code85-7c30b2a-campaign-crew-20261123.apk`, **219.548.353 bytes**, SHA-256 `d675f650a6a58e4328e35ec81909219473432aa18254faec9e2e99a0205029f2`. **PASS:** ZIP íntegro, `zipalign -c 4`, `apksigner` (APK Signature Scheme v2) y `aapt`: `com.haychoriypaty.game`, `0.2.83`/code`85`, min API26/target API36, ABI `arm64-v8a`, sin `debuggable`. Firma Android Debug; no es firma Play Store.
+
+Instalación en Motorola Edge 60 Fusion (`ZY22MBNWRB`) con `adb install -r`: **PASS**; `firstInstallTime=2026-10-03 18:49:24` preservado, `lastUpdateTime=2026-11-23 12:36:10`, y el SHA-256 del `base.apk` instalado coincide con el archivo local. No se limpiaron datos ni progreso. **NOT_RUN:** apertura/smoke en el dispositivo y partidas de La Renga, Camioneros y Los Redondos en el teléfono.
+
+## Android — 2026-11-13: humo Chulengo, APK del commit `dab10dd` (**BUILD/ARTEFACT PASS; DEVICE NOT_RUN**)
 
 Unity 6000.6.3f1, Build Profiles → Android; `Development Build` desactivado, IL2CPP/ARM64, escenas `Assets/Scenes/Main.unity` y `Assets/Scenes/SampleScene.unity`. El Editor reportó **Succeeded en 509 s**; Console al terminar: **0 errores / 5 warnings** (diagnóstico que recomienda símbolos y cuatro advertencias existentes `UAC0009` por `DEVELOPMENT_BUILD`). No apareció la advertencia `uncompiled code changes`. Se creó un perfil Android temporal para usar Build Profiles; se eliminó al acabar. `ProjectSettings.asset`, `GvhProjectSettings.xml` y `EditorBuildSettings.asset` conservaron sus hashes del inicio de la compilación.
 
