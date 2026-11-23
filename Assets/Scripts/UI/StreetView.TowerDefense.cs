@@ -1092,6 +1092,18 @@ namespace HayChoriYPaty
             return frames;
         }
 
+        /// <summary>Campaign kitchen crew bodies (eight directions, carry, pickup) for a Tower Defense presentation.</summary>
+        internal StreetWorkerProjection CreateTowerDefenseCrewProjection(int levelId)
+        {
+            var projection = new StreetWorkerProjection(null, null);
+            bool matched = UsesMatchedCocacoleroArt(levelId);
+            projection.SetArt(parrillero, parrilleroDiagonal, premiumWorker, premiumDiagonal,
+                CocacoleroArtForLevel(levelId), matched ? fernetWorkerLater : fernetWorker, matched);
+            if (projection.Ready) return projection;
+            projection.Dispose();
+            return null;
+        }
+
         /// <summary>
         /// Creates short delivery gestures from already-authored campaign poses. Coca's reach
         /// pose contains a bottle, so the delivery cue must stay hidden until the release.

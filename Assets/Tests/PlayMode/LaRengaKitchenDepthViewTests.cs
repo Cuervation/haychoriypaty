@@ -178,7 +178,9 @@ namespace HayChoriYPaty.Tests
                     for (int index = 0; index < stations.Length; index++)
                     {
                         var group = ((GameObject)stationViews[Get(stations[index], "Id")]).GetComponent<SortingGroup>();
-                        var rider = (SpriteRenderer)Get(workerViews[Get(workers[index], "Id")], "Renderer");
+                        // The campaign crew body sorts as one SortingGroup at the feet depth.
+                        var rider = (SortingGroup)Get(workerViews[Get(workers[index], "Id")], "Group");
+                        Assert.IsNotNull(rider);
                         string kind = Get(stations[index], "Kind").ToString();
                         if (front) Assert.Greater(rider.sortingOrder, group.sortingOrder, kind);
                         else Assert.Less(rider.sortingOrder, group.sortingOrder, kind);
@@ -194,7 +196,8 @@ namespace HayChoriYPaty.Tests
         public IEnumerator LaRengaRealWaveKeepsTheAuditedOutcomeAndDeliveryCount()
         {
             foreach (var (width, height, expectedWins, expectedFans, expectedUnits) in new[]
-                     { (540, 960, true, 120, 145), (610, 1356, false, 66, 77) })
+                     // Fans at half speed (fanSpeed 0.1875) sandwiches taken from behind the table and campaign waiting spots (2026-11-21); the previous audit at 0.375 gave 145 and a 66/77 loss.
+                     { (540, 960, true, 120, 141), (610, 1356, true, 120, 141) })
             {
                 yield return SetSize(width, height);
                 object mode = OpenLaRenga();
@@ -222,6 +225,8 @@ namespace HayChoriYPaty.Tests
                 }
                 Assert.Greater(checks, 0);
                 Assert.AreEqual("Finished", Get(mode, "Phase").ToString());
+                Debug.Log("Renga real wave observed: " + width + "x" + height + "; won=" + Get(mode, "HasWon") + "; served=" +
+                    Get(mode, "ServedFans") + "; deliveries=" + Get(mode, "TotalDelivered"));
                 Assert.AreEqual(expectedWins, Get(mode, "HasWon"), width + "x" + height);
                 Assert.AreEqual(expectedFans, Get(mode, "ServedFans"), width + "x" + height);
                 Assert.AreEqual(expectedUnits, Get(mode, "TotalDelivered"), width + "x" + height);

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace HayChoriYPaty
 {
@@ -32,6 +33,12 @@ namespace HayChoriYPaty
             public SpriteRenderer Renderer;
             public Sprite[] Frames;
             public Sprite[] HandoffFrames;
+            // La Renga's campaign crew body (see TowerDefenseWorldPresentation.CampaignCrew.cs).
+            public SortingGroup Group;
+            public SpriteRenderer Torso, LeftLeg, RightLeg;
+            public StreetFacing Facing;
+            public Vector2 LastPosition, PalmWorld;
+            public bool Rear, WasMoving;
         }
 
         private sealed class DeliveryCue
@@ -232,6 +239,7 @@ namespace HayChoriYPaty
             fanSpriteCache.Clear();
             for (int i = 0; i < generatedWorkerSprites.Count; i++) DestroyPresentationObject(generatedWorkerSprites[i]);
             generatedWorkerSprites.Clear();
+            DisposeCampaignCrewProjection();
             if (overlayTexture != null)
             {
                 overlayTexture.Release();
@@ -576,7 +584,10 @@ namespace HayChoriYPaty
             Vector2 workerPosition = cue.Receipt.Source;
             WorkerView worker;
             if (workerViews.TryGetValue(cue.Receipt.WorkerId, out worker) && worker.GameObject != null)
+            {
+                if (worker.Group != null) return worker.PalmWorld;
                 workerPosition = worker.GameObject.transform.position;
+            }
             float facing = cue.Receipt.Target.x < workerPosition.x ? -1f : 1f;
             // Coca's approved reach pose extends the bottle beyond the worker's elbow;
             // the Parrillero's tongs stay closer to the apron.
@@ -673,6 +684,11 @@ namespace HayChoriYPaty
                     workerViews.Add(worker.Id, workerView);
                 }
                 staleIds.Remove(worker.Id);
+                if (workerView.Group != null)
+                {
+                    SyncCampaignCrewBody(gameMode, worker, workerView);
+                    continue;
+                }
                 int frame = worker.IsMoving ? Mathf.FloorToInt(worker.TravelDistance / Mathf.Max(.01f, gameMode.WorldUnitsPerLogicalPixel * 16f)) % workerView.Frames.Length
                     : Mathf.FloorToInt(worker.AnimationTime * 2f) % workerView.Frames.Length;
                 // Station staff breathe/serve, never cycle cooking poses at an invisible grill.
@@ -763,6 +779,11 @@ namespace HayChoriYPaty
 
         private WorkerView CreateWorkerView(TowerDefenseWorkerState worker)
         {
+            if (UsesCampaignCrewBodies)
+            {
+                WorkerView campaignCrew = CreateCampaignCrewView(worker);
+                if (campaignCrew != null) return campaignCrew;
+            }
             Sprite[] frames = view != null ? view.CreateTowerDefenseWorkerFrames(worker.Role) : null;
             if (frames == null || frames.Length == 0) return CreateFallbackWorker(worker);
             generatedWorkerSprites.AddRange(frames);

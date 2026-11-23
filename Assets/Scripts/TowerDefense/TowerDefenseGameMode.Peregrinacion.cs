@@ -34,6 +34,8 @@ namespace HayChoriYPaty
         private float FootHalfWidthLogical => IsCShapedLevel ? CShapedFootHalfWidthLogical : BocaFootHalfWidthLogical;
         private const float CShapedFootHalfWidthLogical = 9f;
         private const float BocaFootHalfWidthLogical = 18f, BocaFootDepthLogical = 12f, BocaTableBaseDepthLogical = 20f;
+        // La Renga: gap between the far edge of a solid table and the feet of the worker taking a sandwich from behind it.
+        private const float TableBackPickupClearanceLogical = 2f;
         private const int BocaPostSlots = 4;
         // Workers lean on the fence while serving: feet stay below the rail, the head rises above it, so the
         // order is handed over from close by instead of across the whole yard.
@@ -254,6 +256,13 @@ namespace HayChoriYPaty
 
         private Vector2 BocaStationAccess(TowerDefensePlacedStation station)
         {
+            if (IsCShapedLevel && (station.Kind == TowerDefenseStationKind.NormalTable || station.Kind == TowerDefenseStationKind.PremiumTable))
+            {
+                // As in the campaign kitchens, sandwiches are taken from the far side of the table (the grill is on the near
+                // side): the worker stands just behind the solid table, which hides the legs, and reaches over it.
+                var behind = new Vector2(station.Bounds.center.x, station.Bounds.yMax + TableBackPickupClearanceLogical * worldUnitsPerLogicalPixel);
+                return ClampPostInsideWork(behind, StreetWorkerRole.Parrillero);
+            }
             StreetKitchenLayout layout = BocaKitchenLayout;
             Vector2 boca;
             switch (station.Kind)
@@ -304,7 +313,7 @@ namespace HayChoriYPaty
                 ? 1f + speedLevel * .06f : 1f + speedLevel * Mathf.Max(.01f, sourceBalance.speedIncrease);
         private float FreeWorkerSpeed(StreetWorkerRole role) =>
             Mathf.Max(0f, sourceBalance.workerSpeed) * worldUnitsPerLogicalPixel * (IsPassiveKitchenLevel ? ChicagoWorkRate(role) : 1f);
-        private float ChicagoDwellSeconds(StreetWorkerRole role) =>
+        internal float ChicagoDwellSeconds(StreetWorkerRole role) =>
             sourceBalance.pickupSeconds / Mathf.Max(.01f, ChicagoWorkRate(role));
         /// <summary>How long a delivered product takes to reach the customer (the hand-over cue).</summary>
         public float DeliveryCueSeconds => IsPassiveKitchenLevel ? ChicagoReceiveSeconds : DeliveryCueDurationSeconds;
@@ -652,38 +661,49 @@ namespace HayChoriYPaty
             ChargeHire(roleIndex, cost);
             AddWorker(role, 0);
             if (IsBocaKitchenLevel) AssignRolePosts(role, false);
+            if (IsPassiveKitchenLevel)
+            {
+                // As in the campaign, a new hire appears at its own waiting spot.
+                TowerDefenseWorkerState hired = workers[workers.Count - 1];
+                Vector2 home = CampaignWaitSpot(hired);
+                if (FreePositionClear(home, hired.Role, hired, Rect.zero, true))
+                {
+                    hired.Position = home;
+                    hired.IsMoving = false; hired.ReturningToPost = false;
+                    hired.TransferRoute = Array.Empty<Vector2>(); hired.TransferIndex = 0;
+                }
+            }
             return true;
         }
 
-        // Where an idle worker waits. Nueva Chicago's delivery crew (Parrillero and Cocacolero) waits somewhere in the middle
-        // band between the kitchen and the fence, each at its own random spot (re-rolled after every delivery), so the next
-        // order is a short walk and nobody stands in line; every other level waits at the post.
-        private Vector2 WaitSpot(TowerDefenseWorkerState worker)
+        // Where an idle worker waits: the passive campaign-kitchen levels (Camioneros, Los Redondos, La Renga) wait like the
+        // campaign (CampaignWaitSpot); every other level waits at the post.
+        private Vector2 WaitSpot(TowerDefenseWorkerState worker) =>
+            IsPassiveKitchenLevel ? CampaignWaitSpot(worker) : worker.PostPosition;
+
+        // The passive Defense kitchens wait like the traditional passive kitchens (StreetSimulation.WorkerWaitPosition): each worker owns a fixed
+        // spot by hire order, in rows along the service line next to the fence (the top run here, the counter there), each
+        // row shifted half a column, and stands there until its next order. Columns and rows are one body apart so the
+        // waiting crew never blocks itself; a spot on furniture is skipped (behind a table, the stacks hide the body, as in the campaign).
+        internal Vector2 CampaignWaitSpot(TowerDefenseWorkerState worker)
         {
-            if (!IsPassiveKitchenLevel) return worker.PostPosition;
-            if (worker.HasWaitSpot && FreePositionClear(worker.WaitSpotPosition, worker.Role, worker, Rect.zero, true))
-                return worker.WaitSpotPosition;
-            float laneY = GetFanServiceAnchor(worker.PostPosition).y;
-            float bandBottom = Mathf.Lerp(worker.PostPosition.y, laneY, .25f), bandTop = Mathf.Lerp(worker.PostPosition.y, laneY, .85f);
-            // Keep the waiting crew above the stacks of sandwiches that rise over the tables, not standing in front of them.
-            foreach (var station in placedStations)
-                if (station.Kind == TowerDefenseStationKind.NormalTable || station.Kind == TowerDefenseStationKind.PremiumTable)
-                    bandBottom = Mathf.Max(bandBottom, station.Bounds.yMax + 100f * worldUnitsPerLogicalPixel * BocaVerticalScale);
-            bandBottom = Mathf.Min(bandBottom, bandTop - ConstructionWorkerHeightLogical * .5f * worldUnitsPerLogicalPixel);
-            for (int attempt = 0; attempt < 24; attempt++)
+            int order = workers.IndexOf(worker);
+            if (order < 0 || routeGeometry.Centerline == null || routeGeometry.Centerline.Length == 0) return worker.PostPosition;
+            float pixel = worldUnitsPerLogicalPixel;
+            float column = CocacoleroVisualWidthLogical * pixel, row = ConstructionWorkerHeightLogical * pixel;
+            float serviceY = GetFanServiceAnchor(routeGeometry.Centerline[0]).y;
+            int found = 0;
+            for (int line = 0; line < 4; line++)
             {
-                var spot = ClampPostInsideWork(new Vector2(
-                    Mathf.Lerp(WorkBounds.xMin, WorkBounds.xMax, (float)random.NextDouble()),
-                    Mathf.Lerp(bandBottom, bandTop, (float)random.NextDouble())), worker.Role);
-                // Every worker keeps its own spot: stay clear of the others' bodies and of where they are heading.
-                if (!FreePositionClear(spot, worker.Role, worker, Rect.zero, true)) continue;
-                bool taken = false;
-                foreach (TowerDefenseWorkerState other in workers)
-                    if (other != worker && other.HasWaitSpot && Vector2.Distance(other.WaitSpotPosition, spot) < ConstructionWorkerWidthLogical * worldUnitsPerLogicalPixel)
-                    { taken = true; break; }
-                if (taken || !TryBuildWorkerPath(worker, worker.Position, spot, Rect.zero, out _)) continue;
-                worker.HasWaitSpot = true; worker.WaitSpotPosition = spot;
-                return spot;
+                float y = serviceY - line * row;
+                for (int slot = 0; ; slot++)
+                {
+                    float x = WorkBounds.xMin + column * (.5f + slot + ((line & 1) == 1 ? .5f : 0f));
+                    if (x > WorkBounds.xMax - column * .5f) break;
+                    var spot = new Vector2(x, y);
+                    if (!FreePositionClear(spot, StreetWorkerRole.Cocacolero, worker, Rect.zero, false)) continue;
+                    if (found++ == order) return spot;
+                }
             }
             return worker.PostPosition;
         }
@@ -884,6 +904,9 @@ namespace HayChoriYPaty
                     continue;
                 }
 
+                // Passive kitchen levels: once in place beside the fan the worker stands still and hands the order over, as at a
+                // campaign counter, instead of hopping a few pixels after the walking fan (it looked like a shake).
+                if (IsPassiveKitchenLevel && !worker.IsMoving && WorkerInHandOverRange(worker, fan)) continue;
                 float eta = RemainingWorkerPathDistance(worker) / workerSpeed;
                 if (eta + .12f >= timeToExit)
                 {
@@ -1029,14 +1052,7 @@ namespace HayChoriYPaty
             int product = worker.PendingProduct, unitId = worker.ServiceUnitId;
             if (fan == null || fan.RouteFollower.HasExited)
             { ReleaseFreeService(worker, fan); return; }
-            Vector2 serviceAnchor = GetFanServiceAnchor(fan);
-            bool rightRun = ServiceLane(fan.RouteFollower.Position) == 1;
-            float acrossLane = rightRun ? Mathf.Abs(worker.Position.x - serviceAnchor.x) : Mathf.Abs(worker.Position.y - serviceAnchor.y);
-            float alongLane = rightRun ? Mathf.Abs(worker.Position.y - fan.RouteFollower.Position.y)
-                : Mathf.Abs(worker.Position.x - fan.RouteFollower.Position.x);
-            if (acrossLane > 2f * worldUnitsPerLogicalPixel)
-            { TryQueueFreeConstructionIntercept(worker, fan); return; }
-            if (fan != null && !fan.RouteFollower.HasExited && alongLane > 64f * worldUnitsPerLogicalPixel)
+            if (!WorkerInHandOverRange(worker, fan))
             {
                 TryQueueFreeConstructionIntercept(worker, fan);
                 return;
@@ -1070,6 +1086,17 @@ namespace HayChoriYPaty
             ReleaseFreeService(worker, fan);
         }
 
+        // The worker stands on the fan's side of the lane and the fan is beside it: the order can be handed over.
+        private bool WorkerInHandOverRange(TowerDefenseWorkerState worker, TowerDefenseFanState fan)
+        {
+            Vector2 serviceAnchor = GetFanServiceAnchor(fan);
+            bool rightRun = ServiceLane(fan.RouteFollower.Position) == 1;
+            float acrossLane = rightRun ? Mathf.Abs(worker.Position.x - serviceAnchor.x) : Mathf.Abs(worker.Position.y - serviceAnchor.y);
+            float alongLane = rightRun ? Mathf.Abs(worker.Position.y - fan.RouteFollower.Position.y)
+                : Mathf.Abs(worker.Position.x - fan.RouteFollower.Position.x);
+            return acrossLane <= 2f * worldUnitsPerLogicalPixel && alongLane <= 64f * worldUnitsPerLogicalPixel;
+        }
+
         private void ReleaseFreeService(TowerDefenseWorkerState worker, TowerDefenseFanState fan)
         {
             if (fan != null && fan.ReservedByWorker == worker.Id) fan.ReservedByWorker = 0;
@@ -1077,7 +1104,6 @@ namespace HayChoriYPaty
             Kitchen.ReleaseTableReservation(worker.Id);
             worker.PendingFanId = 0; worker.PendingProduct = -1; worker.ServiceStage = 0; worker.ServiceUnitId = 0;
             worker.ServiceDwelling = false; worker.ServiceDwellSeconds = 0f;
-            worker.HasWaitSpot = false;
             worker.TransferRoute = Array.Empty<Vector2>(); worker.TransferIndex = 0; worker.IsMoving = false;
             worker.ReturningToPost = false;
             // After a hand-over the worker stays put until the product reaches the pilgrim's hand.
@@ -1177,7 +1203,7 @@ namespace HayChoriYPaty
             return true;
         }
 
-        private static TowerDefenseStationKind StationForProduct(int product)
+        internal static TowerDefenseStationKind StationForProduct(int product)
         {
             if (product < 2) return TowerDefenseStationKind.NormalTable;
             if (product < 4) return TowerDefenseStationKind.PremiumTable;

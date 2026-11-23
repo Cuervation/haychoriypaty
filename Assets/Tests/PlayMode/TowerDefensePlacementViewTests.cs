@@ -1713,7 +1713,9 @@ namespace HayChoriYPaty.Tests
                     workers[i].GetType().GetProperty("Position", I).SetValue(workers[i],
                         new Vector2(x, floor + (isFront ? -3f : 20f) * pixel));
                     Call(presentation, "Sync", mode);
-                    var renderedWorker = (SpriteRenderer)Get(workerViews[Get(workers[i], "Id")], "Renderer");
+                    // The campaign crew body sorts as one SortingGroup at the feet depth.
+                    var renderedWorker = (UnityEngine.Rendering.SortingGroup)Get(workerViews[Get(workers[i], "Id")], "Group");
+                    Assert.IsNotNull(renderedWorker, "The crew uses the campaign body.");
                     if (isFront) Assert.Greater(renderedWorker.sortingOrder, group.sortingOrder, stationKinds[i]);
                     else Assert.Less(renderedWorker.sortingOrder, group.sortingOrder, stationKinds[i]);
                 }
@@ -1775,9 +1777,10 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(0f, (float)Get(coca, "DeliveryCooldownSeconds"), .001f, "Chicago has no wait between deliveries.");
         }
 
-        // Camioneros' idle delivery crew waits in the middle band between its post and the fence, each at its own spot.
+        // Camioneros' idle crew waits like the campaign's passive kitchens (2026-11-21, superseding the random middle-band spot):
+        // each worker at its own fixed spot on the service line by the fence.
         [UnityTest]
-        public IEnumerator CamionerosIdleWorkersWaitHalfWayBetweenPostAndFence()
+        public IEnumerator CamionerosIdleWorkersWaitAtTheirOwnCampaignSpotByTheFence()
         {
             Type roleKind = T("StreetWorkerRole");
             Assert.IsTrue((bool)Call(game, "TryHireTowerDefenseAtPost", mode, Enum.ToObject(roleKind, 0)));
@@ -1795,12 +1798,15 @@ namespace HayChoriYPaty.Tests
             }
             Assert.IsTrue(bothResting, "At some point both workers must be idle and resting.");
             var xs = new System.Collections.Generic.List<float>();
+            float pixel = (float)Get(mode, "WorldUnitsPerLogicalPixel");
             foreach (object worker in workers)
             {
                 float postY = ((Vector2)worker.GetType().GetField("PostPosition", I).GetValue(worker)).y;
                 Vector2 position = (Vector2)Get(worker, "Position");
+                Vector2 spot = (Vector2)Call(mode, "CampaignWaitSpot", worker);
+                Assert.Less(Vector2.Distance(position, spot), 2f * pixel, Get(worker, "Role") + " waits at its own campaign spot.");
                 Assert.Greater(position.y, postY + .1f, Get(worker, "Role") + " must have left its post toward the fence.");
-                Assert.Less(position.y, laneY - .1f, Get(worker, "Role") + " must wait before the fence line.");
+                Assert.AreEqual(laneY, position.y, 2f * pixel, Get(worker, "Role") + " waits on the service line by the fence.");
                 xs.Add(position.x);
             }
             Assert.Greater(Mathf.Abs(xs[0] - xs[1]), .3f, "Each idle worker waits at its own spot.");
@@ -2211,6 +2217,175 @@ namespace HayChoriYPaty.Tests
             finally { Time.captureDeltaTime = 0f; }
             Assert.Greater(written, 100);
         }
+
+        // La Renga's crew uses the campaign bodies: walking towards the fence shows the back, never a front pose sliding up.
+        // The passive campaign-kitchen Defense levels (Camioneros, Los Redondos, La Renga) share La Renga's crew logic.
+        IEnumerator RunCampaignCrew(int frames, string directory, bool laRenga)
+        {
+            object presentation = Get(view, "towerDefensePresentation");
+            Type roleKind = T("StreetWorkerRole");
+            var hires = new System.Collections.Generic.Dictionary<int, int> { { 1, 0 }, { 2, 1 }, { 3, 0 }, { 4, 1 }, { 5, 2 }, { 6, 0 } };
+            IDictionary workerViews = (IDictionary)Get(presentation, "workerViews");
+            int movingUp = 0, movingDown = 0, carried = 0, backPickups = 0, leftBarrelPickups = 0, waitingAtSpot = 0, written = 0;
+            var waitSpots = new System.Collections.Generic.Dictionary<int, Vector2>();
+            var previous = new System.Collections.Generic.Dictionary<int, (bool moving, int stage, string facing, bool handing)>();
+            int handOverFrames = 0;
+            float pixel = (float)Get(mode, "WorldUnitsPerLogicalPixel");
+            for (int frame = 0; frame < frames && Get(mode, "Phase").ToString() == "Playing"; frame++)
+            {
+                if (hires.TryGetValue(frame, out int role)) Call(game, "TryHireTowerDefenseAtPost", mode, Enum.ToObject(roleKind, role));
+                Call(mode, "Step", .05f);
+                Call(presentation, "Sync", mode);
+                foreach (object worker in (IEnumerable)Get(mode, "Workers"))
+                {
+                    object workerView = workerViews[(int)Get(worker, "Id")];
+                    Assert.IsNotNull(Get(workerView, "Group"), "The crew is drawn with the campaign torso-over-legs body.");
+                    var torso = (SpriteRenderer)Get(workerView, "Torso");
+                    var leftLeg = (SpriteRenderer)Get(workerView, "LeftLeg");
+                    Assert.IsTrue(torso.enabled && torso.sprite != null && torso.sprite.name.EndsWith("_cutout", StringComparison.Ordinal),
+                        "Campaign cutout torso, not a Tower Defense-only frame.");
+                    Assert.IsTrue(leftLeg.enabled && leftLeg.sprite != null, "Campaign legs are drawn under the torso.");
+                    // Handing over: no hopping after the walking fan and no turning once in place (it looked like a shake).
+                    {
+                        int stageNow = (int)worker.GetType().GetField("ServiceStage", I).GetValue(worker);
+                        bool movingNow = (bool)Get(worker, "IsMoving");
+                        bool handing = !movingNow && (stageNow == 2 || (float)Get(worker, "ServeAnimationSeconds") > 0f);
+                        string facingNow = Get(workerView, "Facing").ToString();
+                        if (previous.TryGetValue((int)Get(worker, "Id"), out var before))
+                        {
+                            Assert.IsFalse(before.stage == 2 && stageNow == 2 && !before.moving && movingNow,
+                                "A worker in place to hand over does not set off again after the fan.");
+                            if (before.handing && handing)
+                            {
+                                Assert.AreEqual(before.facing, facingNow, "The facing holds while handing over.");
+                                handOverFrames++;
+                            }
+                        }
+                        previous[(int)Get(worker, "Id")] = (movingNow, stageNow, facingNow, handing);
+                    }
+                    // Like the campaign's passive kitchens: each worker owns one fixed waiting spot and waits there.
+                    int workerId = (int)Get(worker, "Id");
+                    Vector2 waitSpot = (Vector2)Call(mode, "CampaignWaitSpot", worker);
+                    if (waitSpots.TryGetValue(workerId, out Vector2 firstSpot))
+                        Assert.Less(Vector2.Distance(firstSpot, waitSpot), .0001f, "A worker's waiting spot never changes: worker " + workerId +
+                            " frame " + frame + " first " + firstSpot.ToString("F3") + " now " + waitSpot.ToString("F3") + " work " + ((Rect)Get(mode, "WorkBounds")).ToString("F3") +
+                            " workers " + ((IList)Get(mode, "Workers")).Count);
+                    else
+                    {
+                        waitSpots.Add(workerId, waitSpot);
+                        Assert.Greater(Vector2.Distance(waitSpot, (Vector2)worker.GetType().GetField("PostPosition", I).GetValue(worker)), 2f * pixel,
+                            "The waiting spot is on the service line by the fence, not the kitchen post.");
+                    }
+                    if (!(bool)Get(worker, "IsMoving") && (int)worker.GetType().GetField("ServiceStage", I).GetValue(worker) == 0 &&
+                        (float)Get(worker, "ServeAnimationSeconds") <= 0f && Vector2.Distance((Vector2)Get(worker, "Position"), waitSpot) <= 2f * pixel)
+                        waitingAtSpot++;
+                    int pending = (int)worker.GetType().GetField("PendingProduct", I).GetValue(worker);
+                    int stage = (int)worker.GetType().GetField("ServiceStage", I).GetValue(worker);
+                    if (!(bool)Get(worker, "IsMoving") && (bool)worker.GetType().GetField("ServiceDwelling", I).GetValue(worker) &&
+                        (stage == 1 || stage == 3) && (pending == 4 || pending == 6))
+                    {
+                        // La Renga's only difference from the campaign: drinks are taken from the barrel's right side, facing left.
+                        // Elsewhere the campaign's front reach into the barrel.
+                        Assert.AreEqual(laRenga ? "Left" : "Down", Get(workerView, "Facing").ToString(), "Barrel grab facing. role=" + Get(worker, "Role") +
+                            " stage=" + stage + " pending=" + pending + " narrow=" + Get(mode, "NarrowGrills") + " frame=" + frame +
+                            " stations=" + string.Join(",", ((IEnumerable)Get(mode, "PlacedStations")).Cast<object>().Select(st => Get(st, "Kind").ToString())));
+                        leftBarrelPickups++;
+                    }
+                    if (!(bool)Get(worker, "IsMoving") && (bool)worker.GetType().GetField("ServiceDwelling", I).GetValue(worker) &&
+                        (stage == 1 || stage == 3) && pending >= 0 && pending < 4 && laRenga)
+                    {
+                        // Like the campaign kitchens: the sandwich is taken from the far side of the table, not from the grill side.
+                        string tableKind = pending < 2 ? "NormalTable" : "PremiumTable";
+                        object table = ((IEnumerable)Get(mode, "PlacedStations")).Cast<object>().First(station => Get(station, "Kind").ToString() == tableKind);
+                        Assert.GreaterOrEqual(((Vector2)Get(worker, "Position")).y, ((Rect)Get(table, "Bounds")).yMax,
+                            "Sandwiches are picked up from behind the table.");
+                        backPickups++;
+                    }
+                    if (!(bool)Get(worker, "IsMoving")) continue;
+                    var route = (Vector2[])worker.GetType().GetField("TransferRoute", I).GetValue(worker);
+                    int index = (int)worker.GetType().GetField("TransferIndex", I).GetValue(worker);
+                    if (route == null || index >= route.Length) continue;
+                    Vector2 step = route[index] - (Vector2)Get(worker, "Position");
+                    string facing = Get(workerView, "Facing").ToString();
+                    if (step.y > Mathf.Abs(step.x) * 2.5f && step.sqrMagnitude > 1e-8f)
+                    {
+                        Assert.IsTrue(facing.StartsWith("Up", StringComparison.Ordinal), "Walking towards the back must show the back: " + facing);
+                        movingUp++;
+                    }
+                    else if (-step.y > Mathf.Abs(step.x) * 2.5f && step.sqrMagnitude > 1e-8f)
+                    {
+                        Assert.IsTrue(facing.StartsWith("Down", StringComparison.Ordinal), "Walking towards the camera must show the front: " + facing);
+                        movingDown++;
+                    }
+                    if ((int)worker.GetType().GetField("ServiceUnitId", I).GetValue(worker) > 0) carried++;
+                }
+                if (directory == null) continue;
+                yield return new WaitForEndOfFrame();
+                Texture2D image = ScreenCapture.CaptureScreenshotAsTexture();
+                File.WriteAllBytes(Path.Combine(directory, "f" + written.ToString("00000") + ".jpg"), image.EncodeToJPG(88));
+                UnityEngine.Object.Destroy(image);
+                written++;
+            }
+            Assert.Greater(movingUp, 0, "Some walk towards the back was observed.");
+            Assert.Greater(movingDown, 0, "Some walk towards the camera was observed.");
+            Assert.Greater(carried, 0, "Some product was carried to a fan.");
+            if (laRenga) Assert.Greater(backPickups, 0, "Some sandwich was picked up from behind its table.");
+            Assert.Greater(waitingAtSpot, 0, "Idle workers wait at their own fixed spot.");
+            Assert.Greater(leftBarrelPickups, 0, "Some drink was grabbed from a barrel.");
+            Assert.Greater(handOverFrames, 0, "Some hand-over was observed standing still.");
+            Assert.AreEqual(waitSpots.Count, waitSpots.Values.Distinct().Count(), "Every worker has a waiting spot of its own.");
+            Debug.Log("Campaign crew " + Get(mode, "LevelId") + ": up=" + movingUp + " down=" + movingDown + " carried=" + carried + " backPickups=" + backPickups + " leftBarrelPickups=" + leftBarrelPickups + " waitingAtSpot=" + waitingAtSpot + " frames=" + written);
+        }
+
+        [UnityTest]
+        public IEnumerator LaRengaCrewUsesCampaignBodiesAndFacesTheWalkingDirection()
+        {
+            yield return RunCampaignCrew(900, null, true);
+        }
+
+        [UnityTest]
+        [Explicit("Records La Renga's campaign-crew bodies and half-speed fans to Logs/Acceptance/RengaCampaignCrew-20261121/frames-handover")]
+        public IEnumerator LaRengaCampaignCrewVideoFrames()
+        {
+            string directory = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/RengaCampaignCrew-20261121/frames-handover"));
+            if (Directory.Exists(directory)) Directory.Delete(directory, true);
+            Directory.CreateDirectory(directory);
+            yield return CaptureAtResolution("larenga-campaign-crew-setup-610x1356", 610, 1356, false);
+            Time.captureDeltaTime = 1f / 20f;
+            try { yield return RunCampaignCrew(420, directory, true); }
+            finally { Time.captureDeltaTime = 0f; }
+        }
+
+        [UnityTest]
+        public IEnumerator CamionerosCrewSharesTheCampaignCrewLogic()
+        {
+            yield return RunCampaignCrew(900, null, false);
+        }
+
+        [UnityTest]
+        public IEnumerator LosRedondosCrewSharesTheCampaignCrewLogic()
+        {
+            yield return RunCampaignCrew(900, null, false);
+        }
+
+        IEnumerator RecordCampaignCrew(string folder)
+        {
+            string directory = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/RengaCampaignCrew-20261121/" + folder));
+            if (Directory.Exists(directory)) Directory.Delete(directory, true);
+            Directory.CreateDirectory(directory);
+            yield return CaptureAtResolution(folder + "-setup-610x1356", 610, 1356, false);
+            Time.captureDeltaTime = 1f / 20f;
+            try { yield return RunCampaignCrew(420, directory, false); }
+            finally { Time.captureDeltaTime = 0f; }
+        }
+
+        [UnityTest]
+        [Explicit("Records Camioneros with La Renga's crew logic to Logs/Acceptance/RengaCampaignCrew-20261121/frames-camioneros")]
+        public IEnumerator CamionerosCampaignCrewVideoFrames() { yield return RecordCampaignCrew("frames-camioneros"); }
+
+        [UnityTest]
+        [Explicit("Records Los Redondos with La Renga's crew logic to Logs/Acceptance/RengaCampaignCrew-20261121/frames-losredondos")]
+        public IEnumerator LosRedondosCampaignCrewVideoFrames() { yield return RecordCampaignCrew("frames-losredondos"); }
 
         [UnityTest]
         [Explicit("Captures La Renga's C-shaped layout to Logs/Acceptance/RengaCShape-20261118")]

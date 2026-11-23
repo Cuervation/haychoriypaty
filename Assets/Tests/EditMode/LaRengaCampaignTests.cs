@@ -297,7 +297,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(13, configType.GetProperty("SourceCampaignLevelId").GetValue(config, null));
             // C-shaped, Ferro-kitchen version (2026-11-19; Ferro's five products): 120 fans, faster and denser than the former serpentine 60 / 0.1575 / 96.
             Assert.AreEqual(120, configType.GetProperty("TotalFanCount").GetValue(config, null));
-            Assert.AreEqual(0.375f, (float)configType.GetProperty("FanSpeed").GetValue(config, null), 0.00001f);
+            Assert.AreEqual(0.1875f, (float)configType.GetProperty("FanSpeed").GetValue(config, null), 0.00001f);
             Assert.AreEqual(66f, configType.GetProperty("MinimumEntrySpacingLogical").GetValue(config, null));
             CollectionAssert.AreEqual(new[] { 0, 1, 2, 4, 6 }, (int[])configType.GetProperty("AvailableProducts").GetValue(config, null));
         }

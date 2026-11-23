@@ -120,9 +120,6 @@ namespace HayChoriYPaty
         internal int ServiceStage;
         // Nueva Chicago's grab and hand-over dwell (StreetSimulation Pickup/Handoff states).
         internal bool ServiceDwelling;
-        // Nueva Chicago's idle crew waits at a random spot of the middle band, re-rolled after each delivery.
-        internal bool HasWaitSpot;
-        internal Vector2 WaitSpotPosition;
         internal float ServiceDwellSeconds;
         internal Vector2 PostPosition;
         internal bool ReturningToPost;

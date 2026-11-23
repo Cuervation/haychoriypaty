@@ -290,6 +290,13 @@ namespace HayChoriYPaty
                     // Carried objects follow their worker in world units rather than table-space.
                     logicalPosition = carrier.Position + new Vector2(18f, 40f) * pixel;
                     if (UsesKitchenGroundDepth) carrierDepth = KitchenGroundSortingOrder(carrier.Position.y) + 2;
+                    // The campaign crew body holds the unit in its palm, behind the body when walking away.
+                    WorkerView carrierView;
+                    if (workerViews.TryGetValue(carrier.Id, out carrierView) && carrierView.Group != null)
+                    {
+                        logicalPosition = carrierView.PalmWorld;
+                        if (carrierView.Rear) carrierDepth = KitchenGroundSortingOrder(carrier.Position.y);
+                    }
                     sourceBounds = Rect.zero;
                 }
                 else logicalPosition = MapBocaKitchenPointToStation(logicalPosition, sourceBounds, station, kitchenScale, pixel);

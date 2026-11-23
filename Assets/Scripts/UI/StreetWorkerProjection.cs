@@ -108,7 +108,8 @@ namespace HayChoriYPaty
             if (mozoExtension != null) UnityEngine.Object.Destroy(mozoExtension);
             mozo = mozoDiagonal = mozoExtension = null;
         }
-        private static bool Beverage(StreetWorker w) => w.Role == StreetWorkerRole.Cocacolero || w.Role == StreetWorkerRole.Fernetero;
+        private static bool Beverage(StreetWorker w) => Beverage(w.Role);
+        private static bool Beverage(StreetWorkerRole role) => role == StreetWorkerRole.Cocacolero || role == StreetWorkerRole.Fernetero;
         internal static bool IsObscuredIdleWorker(IReadOnlyList<StreetWorker> allWorkers, StreetWorker candidate, float verticalScale, bool activeCooks = false)
         {
             if (candidate == null || candidate.State != StreetWorkerState.Idle || candidate.Role == StreetWorkerRole.Mozo) return false;
@@ -314,13 +315,14 @@ namespace HayChoriYPaty
             }
             return count <= 1 ? 0 : Mathf.RoundToInt(Mathf.Lerp(-4f, 4f, index / (float)(count - 1)));
         }
-        private Texture2D BaseTexture(StreetWorker w) => w.Role == StreetWorkerRole.Mozo && mozo != null ? mozo : Beverage(w) ? (w.Role == StreetWorkerRole.Fernetero ? fernet : drink)
-            : w.Role == StreetWorkerRole.ParrilleroPremium ? premium : normal;
-        private Texture2D Extension(StreetWorker w) => w.Role == StreetWorkerRole.Mozo && mozoExtension != null ? mozoExtension : w.Role == StreetWorkerRole.ParrilleroPremium ? premiumExtension
-            : w.Role == StreetWorkerRole.Fernetero ? fernetExtension : extension;
+        private Texture2D BaseTexture(StreetWorkerRole role) => role == StreetWorkerRole.Mozo && mozo != null ? mozo : Beverage(role) ? (role == StreetWorkerRole.Fernetero ? fernet : drink)
+            : role == StreetWorkerRole.ParrilleroPremium ? premium : normal;
+        private Texture2D Extension(StreetWorkerRole role) => role == StreetWorkerRole.Mozo && mozoExtension != null ? mozoExtension : role == StreetWorkerRole.ParrilleroPremium ? premiumExtension
+            : role == StreetWorkerRole.Fernetero ? fernetExtension : extension;
         private static bool Diagonal(StreetFacing f) => ((int)f & 1) == 1;
         private static int Quarter(StreetFacing f) => f == StreetFacing.DownLeft ? 0 : f == StreetFacing.DownRight ? 1 : f == StreetFacing.UpLeft ? 2 : 3;
-        private Art Original(StreetWorker w, int frame, bool flip)
+        private Art Original(StreetWorker w, int frame, bool flip) => Original(w.Role, frame, flip);
+        private Art Original(StreetWorkerRole w, int frame, bool flip)
         {
             Texture2D texture = BaseTexture(w);
             Rect source = Beverage(w) ? StreetView.WorkerDrinkPoseBounds(matched)[frame] : StreetView.WorkerFoodPoseBounds[frame];
@@ -329,7 +331,7 @@ namespace HayChoriYPaty
                 source.width * texture.width / authored.x, source.height * texture.height / authored.y);
             return new Art { Texture = texture, Bounds = source, Flip = flip, Palm = new Vector2(.5f,.58f) };
         }
-        private Art Supplemental(StreetWorker w, int index, bool flip, Vector2 palm)
+        private Art Supplemental(StreetWorkerRole w, int index, bool flip, Vector2 palm)
             => new Art { Texture = Extension(w), Bounds = ExtensionBounds[index], Flip = flip, Palm = palm };
         private Art CookPoseArt(StreetWorker worker, int frame)
         {
@@ -340,20 +342,22 @@ namespace HayChoriYPaty
             Rect bounds = new Rect(source.x * scale.x, source.y * scale.y, source.width * scale.x, source.height * scale.y);
             return new Art { Texture = texture, Bounds = bounds, Palm = new Vector2(.5f, 1f) };
         }
-        private Art Walk(StreetWorker w, StreetFacing facing, int contact, bool moving)
+        private Art Walk(StreetWorker w, StreetFacing facing, int contact, bool moving) => Walk(w.Role, facing, contact, moving);
+        private Art Walk(StreetWorkerRole w, StreetFacing facing, int contact, bool moving)
         {
             if (Diagonal(facing))
             {
                 int quarter = Quarter(facing);
                 if (Beverage(w)) return Supplemental(w, 4 + quarter * 2 + contact, false, Vector2.zero);
-                Texture2D texture = w.Role == StreetWorkerRole.Mozo && mozoDiagonal != null ? mozoDiagonal : w.Role == StreetWorkerRole.ParrilleroPremium ? premiumDiagonal : diagonal;
+                Texture2D texture = w == StreetWorkerRole.Mozo && mozoDiagonal != null ? mozoDiagonal : w == StreetWorkerRole.ParrilleroPremium ? premiumDiagonal : diagonal;
                 return new Art { Texture = texture, Bounds = StreetView.WorkerDiagonalPoseBounds[quarter * 2 + contact] };
             }
             int first = facing == StreetFacing.Down ? 0 : facing == StreetFacing.Up ? 4 : 8;
             bool flip = first == 8 && (Beverage(w) ? facing == StreetFacing.Left : facing == StreetFacing.Right);
             return Original(w, first + (moving ? 1 + contact : 0), flip);
         }
-        private Art Carry(StreetWorker w, StreetFacing facing)
+        private Art Carry(StreetWorker w, StreetFacing facing) => Carry(w.Role, facing, w.State == StreetWorkerState.ToTable);
+        private Art Carry(StreetWorkerRole w, StreetFacing facing, bool toTable)
         {
             if (!Beverage(w))
             {
@@ -362,7 +366,7 @@ namespace HayChoriYPaty
                     Art a = Original(w, facing == StreetFacing.Down ? 12 : facing == StreetFacing.Up ? 13 : 7, facing == StreetFacing.Right);
                     a.Palm = facing == StreetFacing.Down ? new Vector2(.5f,.68f) : facing == StreetFacing.Up ? new Vector2(.68f,.65f) : new Vector2(.23f,.67f);
                     // Keep the real unit beside the hand/forearm at waist height, not near the face.
-                    if (facing == StreetFacing.Up && (w.Role == StreetWorkerRole.Mozo || w.State == StreetWorkerState.ToTable))
+                    if (facing == StreetFacing.Up && (w == StreetWorkerRole.Mozo || toTable))
                         a.Palm = new Vector2(.98f, .65f);
                     return a;
                 }
@@ -378,6 +382,61 @@ namespace HayChoriYPaty
             int cell = facing == StreetFacing.Down ? 12 : facing == StreetFacing.Up ? 13 : facing == StreetFacing.Left ? 14 : 15;
             return Supplemental(w, cell, facing == StreetFacing.Left,
                 new Vector2(facing == StreetFacing.Down ? .25f : facing == StreetFacing.Up ? .83f : .80f, facing == StreetFacing.Up ? .65f : .68f));
+        }
+        /// <summary>One cutout of the campaign's split crew body, in logical pixels with Y up from the feet.</summary>
+        internal struct BodyPart
+        {
+            public Sprite Sprite;
+            public bool Flip;
+            public Vector2 Offset;
+            public float Scale;
+        }
+
+        /// <summary>
+        /// Samples the same torso-over-legs cutouts that <see cref="Sync"/> draws for the campaign crew
+        /// (eight gait directions, carry, pickup reach) for presentations that are not driven by
+        /// <see cref="StreetSimulation"/>. Offsets/scales are in campaign logical pixels; the palm is
+        /// relative to the feet. Presentation only.
+        /// </summary>
+        internal bool TrySampleBody(StreetWorkerRole role, StreetFacing facing, bool moving, int frame, bool carrying,
+            bool pickingUp, bool pickupFlip, bool barrelPickup, float pickupProgress, float bob,
+            out BodyPart torso, out BodyPart leftLeg, out BodyPart rightLeg, out Vector2 palm, out bool rear)
+        {
+            torso = leftLeg = rightLeg = default(BodyPart);
+            palm = Vector2.zero;
+            rear = facing == StreetFacing.Up || facing == StreetFacing.UpLeft || facing == StreetFacing.UpRight;
+            if (!Ready) return false;
+            int contact = frame >= 2 ? 1 : 0;
+            Art upper = carrying ? Carry(role, facing, false) : Walk(role, facing, contact, moving);
+            if (pickingUp)
+                // A barrel reached from its side (La Renga) uses the side carry pose; otherwise the campaign's front reach.
+                upper = barrelPickup ? Carry(role, facing == StreetFacing.Left || facing == StreetFacing.Right ? facing : StreetFacing.Down, false)
+                    : Beverage(role) ? Carry(role, facing, false) : Original(role, 11, pickupFlip);
+            if (upper.Texture == null) return false;
+            bool passing = !moving || (frame & 1) == 1;
+            StreetFacing legFacing = Diagonal(facing) ? (rear ? StreetFacing.Up : StreetFacing.Down) : facing;
+            Art legs = passing ? Walk(role, legFacing, 0, false) : Walk(role, facing, contact, true);
+            if (legs.Texture == null) return false;
+            float upperScale = Scale(upper), legScale = Scale(legs);
+            float splitRatio = Waist + WaistOverlap;
+            float split = upper.Bounds.height * splitRatio;
+            float reach = pickingUp ? Mathf.Sin(Mathf.Clamp01(pickupProgress) * Mathf.PI) * Height * (barrelPickup ? -.08f : .20f) : 0f;
+            float upperBottom = upper.Bounds.height * (1f - splitRatio) * upperScale - bob - reach;
+            torso = new BodyPart { Sprite = Slice(upper.Texture, new Rect(upper.Bounds.x, upper.Bounds.y, upper.Bounds.width, split)),
+                Flip = upper.Flip, Offset = new Vector2(0f, upperBottom), Scale = upperScale };
+            float legHeight = legs.Bounds.height * (1f - Waist + WaistOverlap), half = legs.Bounds.width * .5f;
+            float leftLift = moving && frame == 1 ? 2f : 0f;
+            float rightLift = moving && frame == 3 ? 2f : 0f;
+            float quarterWidth = legs.Bounds.width * legScale * .25f;
+            if (legs.Flip) { float t = leftLift; leftLift = rightLift; rightLift = t; }
+            leftLeg = new BodyPart { Sprite = Slice(legs.Texture, new Rect(legs.Bounds.x, legs.Bounds.yMax - legHeight, half, legHeight)),
+                Flip = legs.Flip, Offset = new Vector2(legs.Flip ? quarterWidth : -quarterWidth, leftLift), Scale = legScale };
+            rightLeg = new BodyPart { Sprite = Slice(legs.Texture, new Rect(legs.Bounds.x + half, legs.Bounds.yMax - legHeight, half, legHeight)),
+                Flip = legs.Flip, Offset = new Vector2(legs.Flip ? -quarterWidth : quarterWidth, rightLift), Scale = legScale };
+            float handX = (upper.Palm.x - .5f) * upper.Bounds.width * upperScale;
+            if (upper.Flip) handX = -handX;
+            palm = new Vector2(handX, (1f - upper.Palm.y) * upper.Bounds.height * upperScale - bob + reach);
+            return true;
         }
         private Sprite Slice(Texture2D texture, Rect bounds)
         {
