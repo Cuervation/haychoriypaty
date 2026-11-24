@@ -90,5 +90,35 @@ namespace HayChoriYPaty.Tests
             }
             finally { UnityEngine.Object.DestroyImmediate(root); }
         }
+
+        // 2026-11-23: the "TECH SEGURIDAD" guard that patrols La Renga's top sidewalk (decorative; TowerDefenseWorldPresentation.SecurityGuard).
+        [Test]
+        public void SecurityGuardAtlasHasTheFourSupporterBasedFramesAndTransparentCorners()
+        {
+            Texture2D atlas = Resources.Load<Texture2D>("street-security-guard-v1");
+            Assert.NotNull(atlas);
+            Assert.AreEqual(1024, atlas.width); Assert.AreEqual(256, atlas.height); // 1 x 4 cells of 256 px: walk A, walk B, front A, front B (the bald supporter in uniform)
+            var importer = (TextureImporter)AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(atlas));
+            Assert.IsTrue(importer.alphaIsTransparency);
+            Assert.IsFalse(importer.mipmapEnabled);
+            // Reading pixels needs a readable copy: render through a temporary RenderTexture.
+            var target = RenderTexture.GetTemporary(atlas.width, atlas.height, 0, RenderTextureFormat.ARGB32);
+            var previous = RenderTexture.active;
+            var readable = new Texture2D(atlas.width, atlas.height, TextureFormat.RGBA32, false);
+            try
+            {
+                Graphics.Blit(atlas, target); RenderTexture.active = target;
+                readable.ReadPixels(new Rect(0, 0, atlas.width, atlas.height), 0, 0); readable.Apply();
+                for (int cell = 0; cell < 4; cell++)
+                {
+                    int x = cell * 256, y = 0;
+                    Assert.AreEqual(0f, readable.GetPixel(x + 2, y + 2).a, .01f, "cell " + cell + " must keep a transparent corner");
+                    int opaque = 0;
+                    for (int px = 0; px < 256; px += 8) for (int py = 0; py < 256; py += 8) if (readable.GetPixel(x + px, y + py).a > .9f) opaque++;
+                    Assert.Greater(opaque, 150, "cell " + cell + " must contain the guard");
+                }
+            }
+            finally { RenderTexture.active = previous; RenderTexture.ReleaseTemporary(target); UnityEngine.Object.DestroyImmediate(readable); }
+        }
     }
 }

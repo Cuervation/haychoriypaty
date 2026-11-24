@@ -355,7 +355,9 @@ namespace HayChoriYPaty
             SetLayerRecursively(pieceObject, presentationLayer);
             pieceObject.transform.position = new Vector3(position.x, position.y, 0f);
             pieceObject.transform.localScale = new Vector3(uniformScale, uniformScale, 1f);
-            pieceObject.transform.rotation = GetFencePanelRotation(tangent);
+            // La Renga's C-shaped fence (2026-11-23, a pedido): its right side is turned the other way so the support feet face the pocket.
+            bool mirrorVertical = levelConfig != null && levelConfig.RouteKind == TowerDefenseRouteKind.CShapedSingleFence;
+            pieceObject.transform.rotation = GetFencePanelRotation(tangent, mirrorVertical);
 
             var renderer = pieceObject.GetComponent<SpriteRenderer>();
             if (renderer == null) renderer = pieceObject.AddComponent<SpriteRenderer>();
@@ -380,10 +382,10 @@ namespace HayChoriYPaty
         /// otherwise flip the support feet above the rail, while alternating
         /// vertical runs swap them between sides.
         /// </summary>
-        private static Quaternion GetFencePanelRotation(Vector2 tangent)
+        private static Quaternion GetFencePanelRotation(Vector2 tangent, bool mirrorVertical = false)
         {
             if (tangent.sqrMagnitude <= 0.000001f) return Quaternion.identity;
-            float angle = Mathf.Abs(tangent.x) >= Mathf.Abs(tangent.y) ? 0f : 90f;
+            float angle = Mathf.Abs(tangent.x) >= Mathf.Abs(tangent.y) ? 0f : mirrorVertical ? -90f : 90f;
             return Quaternion.AngleAxis(angle, Vector3.forward);
         }
 

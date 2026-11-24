@@ -85,6 +85,12 @@ namespace HayChoriYPaty
         public bool HasCocaBarrel { get { return hasCoca; } }
         public bool HasBeerBarrel { get { return hasBeer; } }
         public bool NarrowGrills { get; private set; }
+        /// <summary>
+        /// Tower Defense on La Renga's C-shaped fence (2026-11-23): drinks are taken from the barrel's right side, with the workers
+        /// spread upward along it, exactly as in the narrow (La Renga) layout, without changing any size or the food capacity.
+        /// </summary>
+        public bool SideBarrelPickup { get; set; }
+        public bool BarrelsFromTheSide { get { return NarrowGrills || SideBarrelPickup; } }
         /// <summary>Top edge of the span the kitchen is fitted with (narrow layout only; 0 = use the pieces).</summary>
         public float KitchenSpanTop { get; private set; }
         public Rect NormalGrillBounds { get { return normalGrill; } }
@@ -276,7 +282,7 @@ namespace HayChoriYPaty
         {
             Rect barrel = product == 4 ? cocaBarrel : product == 6 ? beerBarrel : Rect.zero;
             if (barrel.width <= 0f) return Vector2.zero;
-            if (NarrowGrills) return NarrowBarrelSidePickup(barrel, 0, 1);
+            if (BarrelsFromTheSide) return NarrowBarrelSidePickup(barrel, 0, 1);
             float safeX = Mathf.Clamp(barrel.center.x, StreetWorkstationLayout.WorkerHalfWidth,
                 StreetSceneLayout.Width - StreetWorkstationLayout.WorkerHalfWidth);
             return new Vector2(safeX, barrel.yMin - (BarrelY - BarrelPickupY));
@@ -299,7 +305,7 @@ namespace HayChoriYPaty
             if (barrel.width <= 0f) return Vector2.zero;
             int count = Mathf.Clamp(accessCount, 1, 3);
             int index = Mathf.Clamp(accessIndex, 0, count - 1);
-            if (NarrowGrills) return NarrowBarrelSidePickup(barrel, index, count);
+            if (BarrelsFromTheSide) return NarrowBarrelSidePickup(barrel, index, count);
             float inset = Mathf.Min(15f, barrel.width * .2f);
             float left = Mathf.Clamp(barrel.xMin + inset, StreetWorkstationLayout.WorkerHalfWidth,
                 StreetSceneLayout.Width - StreetWorkstationLayout.WorkerHalfWidth);

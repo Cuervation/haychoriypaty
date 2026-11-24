@@ -52,6 +52,8 @@ namespace HayChoriYPaty
         public TowerDefenseFanRouteFollower RouteFollower { get; internal set; }
         public int AppearanceId { get; internal set; }
         public CamionerosFanProfile Profile { get; internal set; }
+        /// <summary>Difficulty-ramp speed multiplier fixed when the fan is born (1 when the level has no ramp).</summary>
+        public float SpeedMultiplier { get; internal set; } = 1f;
         public IReadOnlyList<TowerDefenseOrderLine> Order => order;
         public float AnimationTime { get; internal set; }
         public bool IsReceiving { get; internal set; }
@@ -122,6 +124,7 @@ namespace HayChoriYPaty
         internal bool ServiceDwelling;
         internal float ServiceDwellSeconds;
         internal Vector2 PostPosition;
+        internal float WaitJitter = float.NaN; // C levels: where in the waiting band this stop falls (-1..1), re-rolled after every job
         internal bool ReturningToPost;
 
         internal TowerDefenseWorkerState(int id, StreetWorkerRole role, int zone, Vector2 position)
@@ -192,6 +195,7 @@ namespace HayChoriYPaty
         private readonly int[] deliveredByProduct = new int[7];
         private readonly int[] availableProducts;
         private readonly int[] workerCounts = new int[5];
+        private int[] startingCrewCounts = new int[5];
         private readonly long[] ticketWorkersByRole = new long[5];
         private readonly long[] hiresByRole = new long[5];
         private readonly Vector2[] serviceZones = new Vector2[2];
@@ -465,6 +469,7 @@ namespace HayChoriYPaty
                     ? Mathf.Clamp(configuredStartingCrew[role], 0, config.MaximumWorkersPerRole) : 0;
                 ticketWorkersByRole[role] = 0L;
             }
+            startingCrewCounts = (int[])workerCounts.Clone();
             coins = startingCoins >= 0 ? startingCoins : TowerDefenseEconomyProfile.StartingCoins;
             // Nueva Chicago's kitchen is the traditional one: nobody cooks, the table is always full of sandwiches and the
             // Parrillero only serves them. Every other Tower Defense level (and Luján) keeps active cooks.
@@ -519,6 +524,14 @@ namespace HayChoriYPaty
                 if (config.UseCampaignEconomyPricing)
                     return StreetSimulation.CalculateHireCost(sourceBalance, config.EconomicBalanceCampaignLevelId,
                         role, workerCounts[(int)role], 0L);
+                if (config.HirePricingCampaignLevelId >= 0)
+                {
+                    // La Renga copies Ferro's worker prices and their growth (x1, x2.5, x5, ...): the crew it starts with is free and only
+                    // the workers bought count, plus the one Parrillero that Ferro itself starts with.
+                    int bought = Math.Max(0, workerCounts[(int)role] - startingCrewCounts[(int)role]);
+                    int ferroStartingCrew = role == StreetWorkerRole.Parrillero ? 1 : 0;
+                    return StreetSimulation.CalculateHireCost(sourceBalance, config.HirePricingCampaignLevelId, role, bought + ferroStartingCrew, 0L);
+                }
                 return config.HireCostForRole(role);
             }
             if (!IsPlaceableRole(role) || !IsRoleAvailable(role)) return 0;
@@ -567,7 +580,9 @@ namespace HayChoriYPaty
         public int SpeedUpgradeCost => speedLevel >= MaximumSpeedLevel ? 0
             : config.FreeConstruction && config.UseCampaignEconomyPricing
                 ? StreetSimulation.CalculateSpeedCost(sourceBalance, config.EconomicBalanceCampaignLevelId, speedLevel)
-                : TowerDefenseEconomyProfile.CalculateSpeedCost(speedLevel);
+                : config.FreeConstruction && config.HirePricingCampaignLevelId >= 0
+                    ? StreetSimulation.CalculateSpeedCost(sourceBalance, config.HirePricingCampaignLevelId, speedLevel) // La Renga: Ferro's speed prices
+                    : TowerDefenseEconomyProfile.CalculateSpeedCost(speedLevel);
 
         public bool TryUpgradeSpeed()
         {
@@ -672,7 +687,7 @@ namespace HayChoriYPaty
             {
                 TowerDefenseFanState fan = fans[i];
                 var follower = new TowerDefenseFanRouteFollower(fan.Id, fanRouteWaypoints,
-                    FanSpeedForProfile(fan.Profile, logicalPixelScale));
+                    FanSpeedForProfile(fan.Profile, logicalPixelScale) * fan.SpeedMultiplier);
                 float progress = profileProgress == null ? normalized[i] * follower.TotalDistance : profileProgress[i];
                 if (follower.Speed > 0f && progress > 0f)
                     follower.Advance(progress / follower.Speed);
@@ -749,6 +764,25 @@ namespace HayChoriYPaty
         {
             if (stopSpawning || spawnedFans >= TotalFanCount || fans.Count >= TotalFanCount) return;
             if (UsesCamionerosProfiles) { SpawnCamionerosOrder(); return; }
+            if (config.FreeConstruction && availableProducts.Length < 7 && config.HasDifficultyRamp)
+            {
+                // Difficulty ramp (La Renga): the same product rotation as the smaller menu below, but each fan's quantities and its
+                // chance of a second product come from the tier of its spawn index (its speed is applied in CreateFan).
+                int index = spawnedFans;
+                TowerDefenseDifficultyTier tier = config.DifficultyTierForFan(index);
+                int[] pool = availableProducts;
+                int product = index < 6 ? pool[index % 2 == 0 ? 0 : pool.Length - 1]
+                    : index < 18 ? pool[(index - 6) % pool.Length] : pool[random.Next(pool.Length)];
+                if (tier.SecondProductPercent > 0 && pool.Length > 1 && random.Next(100) < tier.SecondProductPercent)
+                {
+                    int second = product;
+                    while (second == product) second = pool[random.Next(pool.Length)];
+                    CreateFan(new[] { product, second }, new[] { RollTierQuantity(tier), RollTierQuantity(tier) });
+                }
+                else CreateFan(new[] { product }, new[] { RollTierQuantity(tier) });
+                nextFanSpawnAt = elapsed + config.FanSpawnIntervalSeconds;
+                return;
+            }
             if (config.FreeConstruction && availableProducts.Length < 7)
             {
                 // A smaller menu (Camioneros: sandwich and Coca): single-unit orders drawn only from what the level sells.
@@ -793,6 +827,13 @@ namespace HayChoriYPaty
                 CreateFan(new[] { random.Next(2) == 0 ? 0 : 4 }, new[] { random.Next(1, 5) });
         }
 
+        private int RollTierQuantity(TowerDefenseDifficultyTier tier)
+        {
+            int roll = random.Next(100);
+            if (roll < tier.Quantity3Percent) return 3;
+            return roll < tier.Quantity3Percent + tier.Quantity2Percent ? 2 : 1;
+        }
+
         private bool CreateFan(int[] products, int[] quantities)
         {
             if (stopSpawning || spawnedFans >= TotalFanCount || fans.Count >= TotalFanCount ||
@@ -800,9 +841,11 @@ namespace HayChoriYPaty
             int id = nextFanId++;
             int appearance = UsesCamionerosProfiles ? CamionerosFanProfile.AppearanceForSpawn(spawnedFans) : id;
             CamionerosFanProfile profile = UsesCamionerosProfiles ? CamionerosFanProfile.ForAppearance(appearance) : null;
+            float rampSpeed = config.HasDifficultyRamp ? config.DifficultyTierForFan(spawnedFans).SpeedMultiplier : 1f;
             var follower = new TowerDefenseFanRouteFollower(id, fanRouteWaypoints,
-                FanSpeedForProfile(profile, worldUnitsPerLogicalPixel));
-            fans.Add(new TowerDefenseFanState(id, follower, products, quantities) { AppearanceId = appearance, Profile = profile });
+                FanSpeedForProfile(profile, worldUnitsPerLogicalPixel) * rampSpeed);
+            fans.Add(new TowerDefenseFanState(id, follower, products, quantities)
+                { AppearanceId = appearance, Profile = profile, SpeedMultiplier = rampSpeed });
             spawnedFans++;
             if (spawnedFans >= TotalFanCount) stopSpawning = true;
             return true;

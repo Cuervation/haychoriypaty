@@ -17,17 +17,17 @@ MonoBehaviour:
   displayName: Camioneros / Plaza de Mayo
   sourceCampaignLevelId: 9
   backgroundResource: street-background-camioneros-v1
-  routeKind: 1
+  routeKind: 2
   freeConstruction: 1
   equipmentPlacementAllowed: 0
   route:
     RowCount: 1
-    RouteKind: 1
+    RouteKind: 2
     SegmentLengths:
-    - 1
+    - 4
     CorridorWidth: 0.9
     HorizontalCorridorWidth: 0.9
-    RowSpacing: 1.8
+    RowSpacing: 3
     TurnRadius: 0.68
     PlayableBounds:
       serializedVersion: 2
@@ -37,10 +37,10 @@ MonoBehaviour:
       height: 9.4
     WorkBounds:
       serializedVersion: 2
-      x: -3.3
-      y: -5.7
-      width: 6.6
-      height: 4.8
+      x: -2
+      y: -0.9
+      width: 3.4
+      height: 1.8
     TurnSegments: 16
     FanEntryExtensionWorldUnits: 0
   straightFencePrefab: {fileID: 2371312016393039640, guid: 26ca722ab4b564168b77a248a37ddd55, type: 3}
@@ -57,6 +57,68 @@ MonoBehaviour:
   secondWorkZoneOffset: {x: 0, y: 0}
   fanSpawnIntervalSeconds: 0.1
   maximumWorkersPerRole: 3
+  hirePricingCampaignLevelId: 1
+  difficultyTiers:
+  - FromFan: 0
+    SpeedMultiplier: 1.0
+    Quantity2Percent: 0
+    Quantity3Percent: 0
+    SecondProductPercent: 0
+  - FromFan: 10
+    SpeedMultiplier: 1.06
+    Quantity2Percent: 0
+    Quantity3Percent: 0
+    SecondProductPercent: 20
+  - FromFan: 20
+    SpeedMultiplier: 1.12
+    Quantity2Percent: 20
+    Quantity3Percent: 0
+    SecondProductPercent: 25
+  - FromFan: 30
+    SpeedMultiplier: 1.18
+    Quantity2Percent: 35
+    Quantity3Percent: 0
+    SecondProductPercent: 30
+  - FromFan: 40
+    SpeedMultiplier: 1.24
+    Quantity2Percent: 40
+    Quantity3Percent: 10
+    SecondProductPercent: 35
+  - FromFan: 50
+    SpeedMultiplier: 1.3
+    Quantity2Percent: 40
+    Quantity3Percent: 20
+    SecondProductPercent: 40
+  - FromFan: 60
+    SpeedMultiplier: 1.36
+    Quantity2Percent: 40
+    Quantity3Percent: 30
+    SecondProductPercent: 45
+  - FromFan: 70
+    SpeedMultiplier: 1.42
+    Quantity2Percent: 35
+    Quantity3Percent: 40
+    SecondProductPercent: 50
+  - FromFan: 80
+    SpeedMultiplier: 1.48
+    Quantity2Percent: 35
+    Quantity3Percent: 50
+    SecondProductPercent: 55
+  - FromFan: 90
+    SpeedMultiplier: 1.54
+    Quantity2Percent: 30
+    Quantity3Percent: 60
+    SecondProductPercent: 60
+  - FromFan: 100
+    SpeedMultiplier: 1.6
+    Quantity2Percent: 30
+    Quantity3Percent: 65
+    SecondProductPercent: 65
+  - FromFan: 110
+    SpeedMultiplier: 1.66
+    Quantity2Percent: 25
+    Quantity3Percent: 70
+    SecondProductPercent: 70
   startingStations:
   - Kind: 0
     PositionFromWorkBoundsMin: {x: 0, y: 0}

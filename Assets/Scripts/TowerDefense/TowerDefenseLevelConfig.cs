@@ -28,6 +28,25 @@ namespace HayChoriYPaty
         public Vector2 AccessPositionFromWorkBoundsMin;
     }
 
+    /// <summary>
+    /// One step of a level's difficulty ramp. It applies to every fan whose spawn index is at least <see cref="FromFan"/> and
+    /// below the next tier's FromFan. Orders roll their quantity per product line and their chance of a second product here.
+    /// </summary>
+    [Serializable]
+    public struct TowerDefenseDifficultyTier
+    {
+        [Tooltip("Index (0-based) of the first fan of the wave that uses this tier.")]
+        [Min(0)] public int FromFan;
+        [Tooltip("Multiplier on the level's fan speed for fans born in this tier (already-born fans keep theirs).")]
+        [Min(0.1f)] public float SpeedMultiplier;
+        [Tooltip("Percent chance that a product line asks for 2 units.")]
+        [Range(0, 100)] public int Quantity2Percent;
+        [Tooltip("Percent chance that a product line asks for 3 units (rolled before the 2-unit chance; the rest ask for 1).")]
+        [Range(0, 100)] public int Quantity3Percent;
+        [Tooltip("Percent chance that the order has a second product.")]
+        [Range(0, 100)] public int SecondProductPercent;
+    }
+
     /// <summary>Serializable configuration for the Tower Defense runtime attached to a campaign level.</summary>
     [CreateAssetMenu(menuName = "Hay Chori y Paty/Tower Defense/Level Config", fileName = "TD-Camioneros-PlazaDeMayo")]
     public sealed class TowerDefenseLevelConfig : ScriptableObject
@@ -76,6 +95,8 @@ namespace HayChoriYPaty
         [Tooltip("Optional campaign balance row used only for Tower Defense prices. Campaign identity/progression still uses SourceCampaignLevelId.")]
         [SerializeField, Min(0)] private int economicBalanceCampaignLevelId = CommonEconomicBalanceLevelId;
         [SerializeField] private bool useCampaignEconomyPricing;
+        [Tooltip("Optional: price the workers hired in this level with the hire prices and growth of a regular campaign level (e.g. 3 = Ferro). -1 = off. Speed upgrades keep their own price.")]
+        [SerializeField] private int hirePricingCampaignLevelId = -1;
         [SerializeField] private string backgroundResource = "street-background-camioneros-v1";
         [SerializeField] private TowerDefenseRouteKind routeKind = TowerDefenseRouteKind.Serpentine;
         [SerializeField] private bool freeConstruction;
@@ -107,7 +128,10 @@ namespace HayChoriYPaty
         [SerializeField, Min(0)] private int startingCoins = 500;
         [SerializeField, Min(0.1f)] private float fanSpawnIntervalSeconds = 1f;
         [SerializeField, Min(0)] private int stationCost = 80;
-        [SerializeField, Min(1)] private int maximumWorkersPerRole = 3;
+        [Tooltip("Most workers of each role the player may hire in a free-construction level. 0 = no limit (only coins limit it).")]
+        [SerializeField, Min(0)] private int maximumWorkersPerRole = 3;
+        [Tooltip("Optional difficulty ramp by spawn index (ascending FromFan). Empty = the level's fixed difficulty.")]
+        [SerializeField] private TowerDefenseDifficultyTier[] difficultyTiers = Array.Empty<TowerDefenseDifficultyTier>();
         [SerializeField] private int[] freeStationCounts = { 1, 1, 1, 1, 1, 1, 1 };
         [Tooltip("Optional physical stations placed at level start. Positions are logical pixels from the lower-left of WorkBounds.")]
         [SerializeField] private TowerDefenseStartingStation[] startingStations = Array.Empty<TowerDefenseStartingStation>();
@@ -122,6 +146,8 @@ namespace HayChoriYPaty
         public int SourceCampaignLevelId => sourceCampaignLevelId;
         public int EconomicBalanceCampaignLevelId => Mathf.Clamp(economicBalanceCampaignLevelId, 0, StreetSimulation.LevelNames.Length - 1);
         public bool UseCampaignEconomyPricing => useCampaignEconomyPricing;
+        /// <summary>Regular campaign level whose worker prices this level copies, or -1.</summary>
+        public int HirePricingCampaignLevelId => hirePricingCampaignLevelId < 0 ? -1 : Mathf.Min(hirePricingCampaignLevelId, StreetSimulation.LevelNames.Length - 1);
         public string BackgroundResource => backgroundResource;
         public TowerDefenseRouteKind RouteKind => routeKind;
         public bool FreeConstruction => freeConstruction;
@@ -129,7 +155,21 @@ namespace HayChoriYPaty
         public int StartingCoins => Mathf.Max(0, startingCoins);
         public float FanSpawnIntervalSeconds => Mathf.Max(0.1f, fanSpawnIntervalSeconds);
         public int StationCost => Mathf.Max(0, stationCost);
-        public int MaximumWorkersPerRole => Mathf.Max(1, maximumWorkersPerRole);
+        public int MaximumWorkersPerRole => maximumWorkersPerRole <= 0 ? int.MaxValue : maximumWorkersPerRole;
+        public bool HasDifficultyRamp => difficultyTiers != null && difficultyTiers.Length > 0;
+        /// <summary>The tier that governs the fan with this 0-based spawn index (the last one whose FromFan is not above it).</summary>
+        public TowerDefenseDifficultyTier DifficultyTierForFan(int spawnIndex)
+        {
+            if (!HasDifficultyRamp) return new TowerDefenseDifficultyTier { SpeedMultiplier = 1f };
+            TowerDefenseDifficultyTier tier = difficultyTiers[0];
+            for (int i = 1; i < difficultyTiers.Length; i++)
+            {
+                if (difficultyTiers[i].FromFan > spawnIndex) break;
+                tier = difficultyTiers[i];
+            }
+            if (tier.SpeedMultiplier <= 0f) tier.SpeedMultiplier = 1f;
+            return tier;
+        }
         public int HireCostForRole(StreetWorkerRole role)
         {
             int index = (int)role;

@@ -142,8 +142,13 @@ namespace HayChoriYPaty.Tests
             Delegate handler = GetType().GetMethod("RecordReceipt", I).MakeGenericMethod(receiptType)
                 .CreateDelegate(deliveryEvent.EventHandlerType, this);
             deliveryEvent.AddEventHandler(mode, handler);
-            Assert.AreEqual(requestedLevelId == 14 ? 2 : 0, ((ICollection)Get(mode, "Workers")).Count,
-                "Only Peregrinación has an explicitly configured Boca-like crew (Parrillero + Mozo) at start.");
+            Assert.AreEqual(requestedLevelId == 14 || requestedLevelId == 13 ? 2 : 0, ((ICollection)Get(mode, "Workers")).Count,
+                "Only Peregrinación (Parrillero + Mozo) and La Renga (Parrillero + Cocacolero, 2026-11-23) have an explicitly configured crew at start.");
+            if (requestedLevelId == 13)
+            {
+                CollectionAssert.AreEqual(new[] { 1, 1, 0, 0, 0 }, (int[])Get(mode, "WorkerCountsByRole"));
+                Assert.AreEqual(110, (int)Get(mode, "Coins"), "La Renga starts with 110 coins.");
+            }
             if (requestedLevelId == 14)
             {
                 CollectionAssert.AreEqual(new[] { 1, 0, 0, 0, 1 }, (int[])Get(mode, "WorkerCountsByRole"));
@@ -1653,14 +1658,20 @@ namespace HayChoriYPaty.Tests
             var pieces = new System.Collections.Generic.Dictionary<string, string>
                 { { "NormalGrill", "NormalGrillBounds" }, { "NormalTable", "NormalTableBounds" }, { "CocaBarrel", "CocaBarrelBounds" } };
             MethodInfo toLogical = view.GetType().GetMethod("PilgrimWorldToLogical", I);
+            // 2026-11-23: Camioneros plays on La Renga's C-shaped fence. Its kitchen keeps Nueva Chicago's exact sizes and distances
+            // (scale 1) but is anchored in the C's pocket like La Renga's, so it no longer sits on Chicago's absolute screen columns.
+            Assert.AreEqual(1f, (float)Call(mode, "BocaKitchenFitScale"), .0001f, "Camioneros' kitchen is not shrunk.");
+            Rect chicagoTable = (Rect)layout.GetType().GetProperty("NormalTableBounds").GetValue(layout);
+            Rect tableOnScreen = (Rect)toLogical.Invoke(view, new object[] { (Rect)Get(Call(mode, "FindPlacedStation", Enum.Parse(kindType, "NormalTable")), "Bounds") });
             foreach (var piece in pieces)
             {
                 Rect chicago = (Rect)layout.GetType().GetProperty(piece.Value).GetValue(layout);
                 Rect world = (Rect)Get(Call(mode, "FindPlacedStation", Enum.Parse(kindType, piece.Key)), "Bounds");
                 Rect onScreen = (Rect)toLogical.Invoke(view, new object[] { world });
-                Assert.AreEqual(chicago.center.x, onScreen.center.x, 1.5f, piece.Key + " column on screen");
-                Assert.AreEqual((chicago.y + chicago.height * .5f) * stretch, onScreen.center.y, 1.5f, piece.Key + " row on screen");
+                Assert.AreEqual(chicago.width, onScreen.width, 1.5f, piece.Key + " width on screen");
                 Assert.AreEqual(chicago.height * stretch, onScreen.height, 1.5f, piece.Key + " height on screen");
+                Assert.AreEqual(chicago.center.x - chicagoTable.center.x, onScreen.center.x - tableOnScreen.center.x, 1.5f, piece.Key + " column distance to the table");
+                Assert.AreEqual((chicago.center.y - chicagoTable.center.y) * stretch, onScreen.center.y - tableOnScreen.center.y, 1.5f, piece.Key + " row distance to the table");
             }
             float chicagoFooterTop = (float)layout.GetType().GetProperty("PlayfieldBottom").GetValue(layout) * stretch;
             Assert.AreEqual(665f * stretch, chicagoFooterTop, .01f, "Chicago's playfield bottom is row 665.");
@@ -1675,7 +1686,7 @@ namespace HayChoriYPaty.Tests
         public IEnumerator CamionerosKitchenKeepsWorkersOnTheCorrectSideOfCounters()
         {
             yield return CheckHorizontalKitchenDepth("camioneros", new[] { "Parrillero", "Cocacolero" },
-                new[] { "NormalTable", "CocaBarrel" });
+                new[] { "NormalTable", "CocaBarrel" }, true);
         }
 
         [UnityTest]
@@ -1685,7 +1696,8 @@ namespace HayChoriYPaty.Tests
                 new[] { "NormalTable", "PremiumTable", "CocaBarrel", "BeerBarrel" });
         }
 
-        IEnumerator CheckHorizontalKitchenDepth(string level, string[] roles, string[] stationKinds)
+        // footprintFloor: the C-shaped levels (La Renga's depth model, now also Camioneros) sort the furniture by its footprint, not by its art.
+        IEnumerator CheckHorizontalKitchenDepth(string level, string[] roles, string[] stationKinds, bool footprintFloor = false)
         {
             foreach (string role in roles)
                 Assert.IsTrue((bool)Call(game, "TryHireTowerDefenseAtPost", mode, Role(role)));
@@ -1704,14 +1716,14 @@ namespace HayChoriYPaty.Tests
                     var group = stationView.GetComponent<UnityEngine.Rendering.SortingGroup>();
                     Assert.IsNotNull(group, "Counter and stocked products must have one external depth: " + stationKinds[i]);
                     var fixedParts = stationView.transform.GetChild(0).GetComponentsInChildren<SpriteRenderer>();
-                    float floor = fixedParts.Min(r => r.bounds.min.y);
+                    float floor = footprintFloor ? ((Rect)Get(station, "Bounds")).yMin : fixedParts.Min(r => r.bounds.min.y);
                     SpriteRenderer[] stock = stationView.GetComponentsInChildren<SpriteRenderer>()
                         .Where(r => r.gameObject.name.StartsWith("Physical kitchen unit", StringComparison.Ordinal)).ToArray();
                     Assert.IsNotEmpty(stock, stationKinds[i] + " stock participates in the same depth group.");
                     Assert.Greater(stock.Min(r => r.sortingOrder), fixedParts.Max(r => r.sortingOrder));
                     float x = ((Rect)Get(station, "Bounds")).center.x;
                     workers[i].GetType().GetProperty("Position", I).SetValue(workers[i],
-                        new Vector2(x, floor + (isFront ? -3f : 20f) * pixel));
+                        new Vector2(x, floor + (isFront ? (footprintFloor ? -4f : -3f) : (footprintFloor ? 18f : 20f)) * pixel));
                     Call(presentation, "Sync", mode);
                     // The campaign crew body sorts as one SortingGroup at the feet depth.
                     var renderedWorker = (UnityEngine.Rendering.SortingGroup)Get(workerViews[Get(workers[i], "Id")], "Group");
@@ -1806,7 +1818,9 @@ namespace HayChoriYPaty.Tests
                 Vector2 spot = (Vector2)Call(mode, "CampaignWaitSpot", worker);
                 Assert.Less(Vector2.Distance(position, spot), 2f * pixel, Get(worker, "Role") + " waits at its own campaign spot.");
                 Assert.Greater(position.y, postY + .1f, Get(worker, "Role") + " must have left its post toward the fence.");
-                Assert.AreEqual(laneY, position.y, 2f * pixel, Get(worker, "Role") + " waits on the service line by the fence.");
+                // The horizontal fence's service line only exists on Los Redondos' route; on the C-shaped fence the campaign wait spot above is the check.
+                if (!(bool)Get(mode, "IsCShapedLevel"))
+                    Assert.AreEqual(laneY, position.y, 2f * pixel, Get(worker, "Role") + " waits on the service line by the fence.");
                 xs.Add(position.x);
             }
             Assert.Greater(Mathf.Abs(xs[0] - xs[1]), .3f, "Each idle worker waits at its own spot.");
@@ -2018,8 +2032,7 @@ namespace HayChoriYPaty.Tests
             Assert.LessOrEqual(raised.yMax + 3f, lead.yMin);
             Assert.AreEqual(unaffected, CallStatic(vt, "PlaceLaRengaOrderBubble", unaffected, new[] { lead }));
 
-            foreach (string role in new[] { "Parrillero", "Cocacolero" })
-                Assert.IsTrue((bool)Call(game, "TryHireTowerDefenseAtPost", mode, Role(role)));
+            // 2026-11-23: La Renga already starts with one Parrillero and one Cocacolero (and 0 coins), so nobody needs hiring here.
             for (int tick = 0; tick < 500 && (int)Get(mode, "OrdersCompleted") < 10; tick++)
             {
                 Call(mode, "Step", .05f);
@@ -2039,9 +2052,8 @@ namespace HayChoriYPaty.Tests
         [UnityTest]
         public IEnumerator LaRengaEscapeResultKeepsElapsedAndExplainsTheLoss()
         {
-            Assert.AreEqual("PEDIDOS 0/120", CallStatic(vt, "TowerDefenseWaveCaption", mode));
-            foreach (string role in new[] { "Parrillero", "Cocacolero" })
-                Assert.IsTrue((bool)Call(game, "TryHireTowerDefenseAtPost", mode, Role(role)));
+            Assert.AreEqual("PEDIDOS 0/200", CallStatic(vt, "TowerDefenseWaveCaption", mode));
+            // 2026-11-23: La Renga already starts with one Parrillero and one Cocacolero (and 0 coins), so nobody needs hiring here.
             bool observedLiveProgress = false;
             for (int tick = 0; tick < 4000 && Get(mode, "Phase").ToString() == "Playing"; tick++)
             {
@@ -2049,7 +2061,7 @@ namespace HayChoriYPaty.Tests
                 int current = (int)Get(mode, "OrdersCompleted");
                 if (!observedLiveProgress && current >= 10 && Get(mode, "Phase").ToString() == "Playing")
                 {
-                    Assert.AreEqual("PEDIDOS " + current + "/120", CallStatic(vt, "TowerDefenseWaveCaption", mode));
+                    Assert.AreEqual("PEDIDOS " + current + "/200", CallStatic(vt, "TowerDefenseWaveCaption", mode));
                     observedLiveProgress = true;
                     if (!Application.isBatchMode) yield return Capture("qa06-la-renga-wave-progress");
                 }
@@ -2066,9 +2078,9 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(elapsed, Get(sim, "Elapsed"));
             int completed = (int)Get(mode, "OrdersCompleted");
             Assert.Greater(completed, 0);
-            StringAssert.Contains("Un hincha llegó a la salida\nPedidos completos: " + completed + "/120",
+            StringAssert.Contains("Un hincha llegó a la salida\nPedidos completos: " + completed + "/200",
                 (string)CallStatic(vt, "RiotResultMessage", sim));
-            TestContext.WriteLine("La Renga lost at " + elapsed + " seconds; completed=" + completed + "/120.");
+            TestContext.WriteLine("La Renga lost at " + elapsed + " seconds; completed=" + completed + "/200.");
             yield return new WaitForSecondsRealtime(1.6f);
             if (!Application.isBatchMode) yield return Capture("qa04-la-renga-defense-loss");
         }
@@ -2116,7 +2128,7 @@ namespace HayChoriYPaty.Tests
             Debug.Log("LARENGA strip right of the barrels = " + stripBesideBarrels + " / right of the grills = " + stripBesideGrills + " (logical px)");
             Assert.GreaterOrEqual(stripBesideBarrels, 28f, "a free strip along the right fence beside the barrels");
             // Like the other horizontal kitchen levels: nobody starts on the crew and the kitchen is passive.
-            Assert.AreEqual(0, ((ICollection)Get(mode, "Workers")).Count);
+            Assert.AreEqual(2, ((ICollection)Get(mode, "Workers")).Count, "La Renga starts with a Parrillero and a Cocacolero.");
             Assert.IsTrue((bool)Get(mode, "IsPassiveKitchenLevel"), "La Renga plays like the other horizontal kitchen levels.");
             // The footer is Ferro's / Los Redondos': the same top as ID10 on the same screen.
             Type layoutHelper = T("TowerDefenseResponsiveLayout");
@@ -2220,7 +2232,7 @@ namespace HayChoriYPaty.Tests
 
         // La Renga's crew uses the campaign bodies: walking towards the fence shows the back, never a front pose sliding up.
         // The passive campaign-kitchen Defense levels (Camioneros, Los Redondos, La Renga) share La Renga's crew logic.
-        IEnumerator RunCampaignCrew(int frames, string directory, bool laRenga)
+        IEnumerator RunCampaignCrew(int frames, string directory, bool laRenga, bool requireWalkDown = true)
         {
             object presentation = Get(view, "towerDefensePresentation");
             Type roleKind = T("StreetWorkerRole");
@@ -2267,7 +2279,8 @@ namespace HayChoriYPaty.Tests
                     int workerId = (int)Get(worker, "Id");
                     Vector2 waitSpot = (Vector2)Call(mode, "CampaignWaitSpot", worker);
                     if (waitSpots.TryGetValue(workerId, out Vector2 firstSpot))
-                        Assert.Less(Vector2.Distance(firstSpot, waitSpot), .0001f, "A worker's waiting spot never changes: worker " + workerId +
+                        // C levels re-roll the height of the spot at every stop (2026-11-23, a pedido); the column never changes.
+                        Assert.Less(Mathf.Abs(firstSpot.x - waitSpot.x) + (Get(mode, "IsCShapedLevel") is true ? 0f : Mathf.Abs(firstSpot.y - waitSpot.y)), .0001f, "A worker's waiting column never changes: worker " + workerId +
                             " frame " + frame + " first " + firstSpot.ToString("F3") + " now " + waitSpot.ToString("F3") + " work " + ((Rect)Get(mode, "WorkBounds")).ToString("F3") +
                             " workers " + ((IList)Get(mode, "Workers")).Count);
                     else
@@ -2286,7 +2299,7 @@ namespace HayChoriYPaty.Tests
                     {
                         // La Renga's only difference from the campaign: drinks are taken from the barrel's right side, facing left.
                         // Elsewhere the campaign's front reach into the barrel.
-                        Assert.AreEqual(laRenga ? "Left" : "Down", Get(workerView, "Facing").ToString(), "Barrel grab facing. role=" + Get(worker, "Role") +
+                        Assert.AreEqual((bool)Get(mode, "BarrelsFromTheSide") ? "Left" : "Down", Get(workerView, "Facing").ToString(), "Barrel grab facing. role=" + Get(worker, "Role") +
                             " stage=" + stage + " pending=" + pending + " narrow=" + Get(mode, "NarrowGrills") + " frame=" + frame +
                             " stations=" + string.Join(",", ((IEnumerable)Get(mode, "PlacedStations")).Cast<object>().Select(st => Get(st, "Kind").ToString())));
                         leftBarrelPickups++;
@@ -2327,7 +2340,7 @@ namespace HayChoriYPaty.Tests
                 written++;
             }
             Assert.Greater(movingUp, 0, "Some walk towards the back was observed.");
-            Assert.Greater(movingDown, 0, "Some walk towards the camera was observed.");
+            if (requireWalkDown) Assert.Greater(movingDown, 0, "Some walk towards the camera was observed.");
             Assert.Greater(carried, 0, "Some product was carried to a fan.");
             if (laRenga) Assert.Greater(backPickups, 0, "Some sandwich was picked up from behind its table.");
             Assert.Greater(waitingAtSpot, 0, "Idle workers wait at their own fixed spot.");
@@ -2359,7 +2372,9 @@ namespace HayChoriYPaty.Tests
         [UnityTest]
         public IEnumerator CamionerosCrewSharesTheCampaignCrewLogic()
         {
-            yield return RunCampaignCrew(900, null, false);
+            // Camioneros plays on La Renga's C-shaped fence (2026-11-23): sandwiches come from behind the table and drinks from the barrel's
+            // right side, exactly like La Renga; Chicago's compact kitchen never needs a straight walk towards the camera.
+            yield return RunCampaignCrew(900, null, true, false);
         }
 
         [UnityTest]

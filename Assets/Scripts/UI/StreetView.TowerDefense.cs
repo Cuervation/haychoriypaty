@@ -492,7 +492,10 @@ namespace HayChoriYPaty
                 EnsureTowerDefenseStyles();
                 DrawTowerDefensePlacementOverlay(viewport);
                 if (towerDefenseActive && towerDefenseMode != null)
+                {
                     DrawTowerDefenseOrderBubbles(viewport);
+                    DrawTowerDefenseCrewChants(viewport);
+                }
                 DrawTowerDefenseHud(logicalHeight);
                 if (towerDefenseTutorialActive) DrawCamionerosTutorial();
                 if (towerDefenseCompactViewport.HasValue) MaskTowerDefenseViewport(viewport, screenSize);
@@ -681,7 +684,10 @@ namespace HayChoriYPaty
                     Mathf.RoundToInt(HudStatusValueFontSize * statusScale));
                 DrawHudNumber(HudStatusTextBounds(1, cutout), FormatElapsedTime(elapsed),
                     Mathf.RoundToInt(HudClockFontSize * statusScale));
-                if (!string.IsNullOrEmpty(waveCaption))
+                // La Renga (2026-11-23, a pedido): no "PEDIDOS n/120" under the top bar. The caption still selects the compact HUD above.
+                bool hideOrderCounter = towerDefenseSourceConfig != null &&
+                    towerDefenseSourceConfig.SourceCampaignLevelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId;
+                if (!string.IsNullOrEmpty(waveCaption) && !hideOrderCounter)
                 {
                     Rect wave = new Rect((W - 176f) * .5f, HudBarHeightFor(cutout) + 4f, 176f, 30f);
                     DrawMarketBluePanel(wave, new Color(.015f, .12f, .38f, .94f));
@@ -739,6 +745,9 @@ namespace HayChoriYPaty
                     // keep the existing full-size product icons instead of shrinking each
                     // two-item order bubble to fit a regular queue row.
                     Rect bubble = TowerDefenseOrderBubbleBounds(fanFeet, visibleLines, levelId);
+                    // La Renga: a fan still entering would have its bubble squeezed against the left margin by the clamp below,
+                    // sliding it onto the previous fan's bubble and lifting it. Wait until the bubble fits beside its own fan.
+                    if (avoidOverlap && bubble.x < 6f) continue;
                     // The new directional atlas uses a foot pivot, not a centered frame.
                     // Anchor ID13 to the actual rendered head, including its gait bob.
                     Bounds visualBounds;
@@ -775,6 +784,92 @@ namespace HayChoriYPaty
                 }
             }
             finally { GUI.EndGroup(); }
+        }
+
+        // La Renga's C (2026-11-23, a pedido): when a crew member has finished settling into its waiting spot (nothing to deliver, standing still on
+        // the spot and looking ahead) it calls out its line in a speech bubble: Parrillero "Hay chori y Paty", Parrillero Premium "Hay Bondio!",
+        // Cocacolero "Hay coca y birra!". The bubble lasts one second and fades away; it does not come back until the next time the worker has been
+        // away working and settles again. Hires and the run's first frame do not call out (their first observation is taken as already settled).
+        private const float CrewChantSeconds = 1f, CrewChantFadeSeconds = .4f;
+        // The speech art's tail sits at the bottom right; its tip is this far in from the right edge (mirrored: from the left edge).
+        private const float CrewChantTailTipInsetLogical = 22f, CrewChantSidePaddingLogical = 12f, CrewChantLineHeightLogical = 15f, CrewChantBaseHeightLogical = 22f;
+        private readonly Dictionary<int, bool> crewWasSettled = new Dictionary<int, bool>();
+        private readonly Dictionary<int, float> crewChantStart = new Dictionary<int, float>();
+        private TowerDefenseGameMode crewChantMode;
+        private GUIStyle crewChantStyle;
+
+        private static string CrewChantTextFor(StreetWorkerRole role)
+        {
+            switch (role)
+            {
+                case StreetWorkerRole.Parrillero: return "¡Hay\nchori y Paty!";
+                case StreetWorkerRole.ParrilleroPremium: return "¡Hay Bondio!";
+                case StreetWorkerRole.Cocacolero: return "¡Hay coca\ny birra!";
+                default: return null;
+            }
+        }
+
+        private static bool CrewHasNothingToDeliver(TowerDefenseWorkerState worker) =>
+            worker.PendingProduct < 0 && worker.ServiceStage == 0 && worker.ServiceUnitId <= 0 && !worker.ServiceDwelling && worker.ServeAnimationSeconds <= 0f;
+
+        private void DrawTowerDefenseCrewChants(Rect viewport)
+        {
+            if (towerDefenseMode == null || !towerDefenseMode.IsCShapedLevel || items == null || viewport.width <= 0f || text == null) return;
+            Camera camera = Camera.main;
+            if (camera == null) return;
+            if (!ReferenceEquals(crewChantMode, towerDefenseMode)) { crewChantMode = towerDefenseMode; crewWasSettled.Clear(); crewChantStart.Clear(); }
+            float now = towerDefenseMode.Elapsed, canvasScale = viewport.width / W;
+            float pixel = towerDefenseMode.WorldUnitsPerLogicalPixel;
+            float headWorld = pixel * TowerDefenseGameMode.WorkerVisualHeightLogical;
+            if (crewChantStyle == null) crewChantStyle = new GUIStyle(text) { alignment = TextAnchor.MiddleCenter, wordWrap = false };
+            crewChantStyle.fontSize = 11;
+            Color previousColor = GUI.color;
+            GUI.BeginGroup(new Rect(0f, 0f, W, logicalCanvasHeight));
+            try
+            {
+                IReadOnlyList<TowerDefenseWorkerState> crew = towerDefenseMode.Workers;
+                for (int i = 0; i < crew.Count; i++)
+                {
+                    TowerDefenseWorkerState worker = crew[i];
+                    string chant = CrewChantTextFor(worker.Role);
+                    if (chant == null) continue;
+                    bool settled = !worker.IsMoving && CrewHasNothingToDeliver(worker) &&
+                        Vector2.Distance(worker.Position, towerDefenseMode.CampaignWaitSpot(worker)) <= 2f * pixel, wasSettled;
+                    if (!crewWasSettled.TryGetValue(worker.Id, out wasSettled)) wasSettled = true;
+                    if (settled && !wasSettled) crewChantStart[worker.Id] = now;
+                    crewWasSettled[worker.Id] = settled;
+                    float started;
+                    if (!crewChantStart.TryGetValue(worker.Id, out started)) continue;
+                    float age = now - started;
+                    if (age < 0f || age >= CrewChantSeconds) continue;
+                    float alpha = age < CrewChantSeconds - CrewChantFadeSeconds ? 1f : (CrewChantSeconds - age) / CrewChantFadeSeconds;
+                    Vector3 head = camera.WorldToScreenPoint(new Vector3(worker.Position.x, worker.Position.y + headWorld, 0f));
+                    if (head.z <= 0f) continue;
+                    // As narrow as its longest line allows (same font size): the bubble hugs the text on both sides.
+                    string[] lines = chant.Split('\n');
+                    float chantWidth = 0f;
+                    foreach (string line in lines) chantWidth = Mathf.Max(chantWidth, crewChantStyle.CalcSize(new GUIContent(line)).x);
+                    chantWidth = Mathf.Max(56f, Mathf.Ceil(chantWidth) + 2f * CrewChantSidePaddingLogical);
+                    float chantHeight = CrewChantBaseHeightLogical + lines.Length * CrewChantLineHeightLogical;
+                    float headX = (head.x - viewport.x) / canvasScale;
+                    float headY = (Screen.height - head.y - viewport.y) / canvasScale - TowerDefenseResponsiveLayout.VisualStageLift;
+                    float rise = (1f - alpha) * 6f; // it drifts up a little while it dissolves
+                    // The tail must point at its worker: bubbles of workers in the left half mirror the art (tail on the left, bubble to the right).
+                    bool tailLeft = headX < W * .5f;
+                    float bubbleX = tailLeft ? headX - CrewChantTailTipInsetLogical : headX - (chantWidth - CrewChantTailTipInsetLogical);
+                    var bubble = new Rect(Mathf.Clamp(bubbleX, 4f, W - chantWidth - 4f), headY - chantHeight - 3f - rise, chantWidth, chantHeight);
+                    GUI.color = new Color(1f, 1f, 1f, alpha);
+                    Matrix4x4 previousMatrix = GUI.matrix;
+                    if (tailLeft)
+                        GUI.matrix = previousMatrix * Matrix4x4.TRS(new Vector3(bubble.center.x, 0f, 0f), Quaternion.identity, new Vector3(-1f, 1f, 1f))
+                            * Matrix4x4.TRS(new Vector3(-bubble.center.x, 0f, 0f), Quaternion.identity, Vector3.one);
+                    DrawOrderBubble(bubble, 1f);
+                    GUI.matrix = previousMatrix;
+                    var label = new Rect(bubble.x, bubble.y + 3f, bubble.width, bubble.height - 3f - 16f);
+                    GUI.Label(label, chant, crewChantStyle);
+                }
+            }
+            finally { GUI.EndGroup(); GUI.color = previousColor; }
         }
 
         private static Rect PlaceLaRengaOrderBubble(Rect bubble, IReadOnlyList<Rect> alreadyPlaced)

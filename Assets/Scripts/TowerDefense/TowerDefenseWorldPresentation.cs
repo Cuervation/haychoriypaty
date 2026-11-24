@@ -188,6 +188,7 @@ namespace HayChoriYPaty
             SyncFans(gameMode);
             SyncWorkers(gameMode);
             SyncDeliveryCues(gameMode.Elapsed);
+            SyncSecurityGuard(gameMode);
         }
 
         public void ResizeTarget(Vector2 screenSize)
@@ -240,6 +241,7 @@ namespace HayChoriYPaty
             for (int i = 0; i < generatedWorkerSprites.Count; i++) DestroyPresentationObject(generatedWorkerSprites[i]);
             generatedWorkerSprites.Clear();
             DisposeCampaignCrewProjection();
+            DisposeSecurityGuard();
             if (overlayTexture != null)
             {
                 overlayTexture.Release();
@@ -447,6 +449,10 @@ namespace HayChoriYPaty
         private void OnDeliveryCompleted(TowerDefenseDelivery receipt)
         {
             if (!configured || receipt.Product < 0 || receipt.Product > 6 || (!mode.FreeConstruction && receipt.Product != 0 && receipt.Product != 4)) return;
+            // La Renga (2026-11-23, a pedido): the delivery looks exactly like the regular levels, where the carried product stays in the
+            // worker's hand and disappears when it is consumed; no extra sprite crosses over to the fan. Camioneros plays on the same
+            // C-shaped fence and delivers the same way.
+            if (mode.RouteConfig.RouteKind == TowerDefenseRouteKind.CShapedSingleFence) return;
             DeliveryCue cue = pooledDeliveryCues.Count > 0 ? pooledDeliveryCues.Pop() : new DeliveryCue();
             if (cue.GameObject == null)
             {
@@ -744,7 +750,7 @@ namespace HayChoriYPaty
                 if (gameMode.FreeConstruction && worker.IsMoving && worker.TransferRoute != null && worker.TransferIndex < worker.TransferRoute.Length)
                     workerView.Renderer.flipX = worker.TransferRoute[worker.TransferIndex].x < worker.Position.x;
                 // La Renga's barrels are taken from the right: a Cocacolero waiting at its post stands beside the barrel and faces it.
-                if (gameMode.NarrowGrills && worker.Role == StreetWorkerRole.Cocacolero && !worker.IsMoving && worker.ServeAnimationSeconds <= 0f)
+                if (gameMode.BarrelsFromTheSide && worker.Role == StreetWorkerRole.Cocacolero && !worker.IsMoving && worker.ServeAnimationSeconds <= 0f)
                     workerView.Renderer.flipX = true;
                 // The sprite pivot is at its feet. Use the same ground key as the grouped
                 // furniture; a tie belongs to the worker at the front edge.

@@ -2186,7 +2186,7 @@ string[] names = (string[])simType.GetField("LevelNames", BindingFlags.Public | 
             string[] expectedNames = { "Racing Club / Avellaneda", "San Lorenzo / Boedo", "River Plate / Núñez", "Boca Juniors / La Boca", "Argentinos Juniors / La Paternal" };
             // Camioneros (9) and Los Redondos (10) are Tower Defense levels and have no traditional goal/duration.
             int[] expectedGoals = { 850, 1020, 1050, 1150, 669 };
-            float[] expectedDurations = { 260f, 300f, 340f, 340f, 315f };
+            float[] expectedDurations = { 260f, 300f, 340f, 310f, 315f };
             float[] expectedDemand = { 1.65f, 1.815f, 1.9965f, 2.19615f, 2.6573415f };
             int[] levelIds = { 5, 6, 7, 8, 12 };
             string[] names = (string[])simType.GetField("LevelNames", BindingFlags.Public | BindingFlags.Static).GetValue(null);
@@ -2223,7 +2223,7 @@ string[] names = (string[])simType.GetField("LevelNames", BindingFlags.Public | 
             Tune(balance, "levelProductIds", new[] { "0", "0,4", "0,1,4", "0,1,2,4,6", "0,1,2,3,4,6,5" });
             object sim = Make(level: level, balance: balance);
             Assert.AreEqual(goal, Get(sim, "Goal"));
-            Assert.AreEqual(level == 5 ? 260f : level == 6 ? 300f : (level == 7 || level == 8) ? 340f : level == 9 ? 380f : level == 10 ? 315f : 300f, Get(sim, "TimeRemaining"));
+            Assert.AreEqual(level == 5 ? 260f : level == 6 ? 300f : level == 7 ? 340f : level == 8 ? 310f : level == 9 ? 380f : level == 10 ? 315f : 300f, Get(sim, "TimeRemaining"));
             Assert.AreEqual(7, Get(sim, "ProductCount"));
             Start(sim); Assert.DoesNotThrow(() => Step(sim, 1f));
         }
@@ -2252,7 +2252,7 @@ object sim = Make(level: level);
                 new[] {210,145,80,75,175,75,90}, new[] {230,175,110,95,205,90,115},
                 new[] {250,180,110,95,210,90,115}, new[] {275,195,120,110,225,100,125},
                 new[] {310,220,135,125,255,110,145}, new[] {345,245,150,140,285,120,165} };
-            float[] durations = {120f,150f,180f,210f,240f,260f,300f,340f,340f,380f,315f};
+            float[] durations = {120f,150f,180f,210f,240f,260f,300f,340f,310f,380f,315f};
             int[] openingCoins = {0,10,0,0,20,250,250,800,800,500,500};
             for (int level = 0; level < 11; level++)
             {
@@ -2283,7 +2283,7 @@ object sim = Make(level: level);
             Start(sim);
 
             Assert.AreEqual(800, Get(sim, "Coins"));
-            Assert.AreEqual(340f, Get(sim, "TimeRemaining"));
+            Assert.AreEqual(level == 8 ? 310f : 340f, Get(sim, "TimeRemaining"));
             Assert.AreEqual(1, Get(sim, "ParrilleroCount"));
             Assert.AreEqual(0, Get(sim, "CocacoleroCount"));
             Assert.AreEqual(0, Get(sim, "ParrilleroPremiumCount"));
@@ -2307,7 +2307,7 @@ object sim = Make(level: level);
             Restart(sim);
 
             Assert.AreEqual(800, Get(sim, "Coins"));
-            Assert.AreEqual(340f, Get(sim, "TimeRemaining"));
+            Assert.AreEqual(level == 8 ? 310f : 340f, Get(sim, "TimeRemaining"));
             Assert.AreEqual(1 + expectedMozoCount, Get(sim, "StaffCount"));
             Assert.AreEqual(1, Get(sim, "ParrilleroCount"));
             Assert.AreEqual(expectedMozoCount, Get(sim, "MozoCount"), "Retry restores only Boca's free Mozo and discards paid hires.");
@@ -2352,7 +2352,7 @@ object sim = Make(level: level);
                     new[] {210,145,80,75,175,75,90}, new[] {230,175,110,95,205,90,115},
                     new[] {250,180,110,95,210,90,115}, new[] {275,195,120,110,225,100,125},
                     new[] {310,220,135,125,255,110,145}, new[] {345,245,150,140,285,120,165} };
-                float[] expectedDurations = {120f,150f,180f,210f,240f,260f,300f,340f,340f,380f,315f};
+                float[] expectedDurations = {120f,150f,180f,210f,240f,260f,300f,340f,310f,380f,315f};
                 int[] expectedOpeningCoins = {0,10,0,0,20,250,250,800,800,500,500};
                 object sanLorenzo = null;
                 for (int level = 0; level < 11; level++)

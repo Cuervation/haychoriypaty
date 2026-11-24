@@ -1,6 +1,7 @@
 #if UNITY_EDITOR
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -138,7 +139,9 @@ namespace HayChoriYPaty.Tests
             {
                 yield return SetSize(width, height);
                 object mode = OpenLaRenga();
-                foreach (int role in new[] { 0, 1, 2, 0, 1, 2 })
+                // 2026-11-23: La Renga starts with a Parrillero and a Cocacolero and no coins; fund the rest of the six-person crew.
+                Set(mode, "coins", 100000);
+                foreach (int role in new[] { 2, 0, 1, 2 })
                     Assert.IsTrue((bool)Call(game, "TryHireTowerDefenseAtPost", mode, Role(role)));
                 object presentation = Get(view, "towerDefensePresentation");
                 var stationViews = (IDictionary)Get(presentation, "pilgrimStations");
@@ -192,21 +195,90 @@ namespace HayChoriYPaty.Tests
             }
         }
 
+        [UnityTest, Timeout(120000)]
+        public IEnumerator LaRengaIdleCrewWaitsBetweenFenceAndTablesFacingTheFenceAndChantsWhenItRunsOutOfWork()
+        {
+            yield return SetSize(610, 1356);
+            object mode = OpenLaRenga();
+            Set(mode, "coins", 100000);
+            foreach (int role in new[] { 0, 0, 2, 1 })
+                Assert.IsTrue((bool)Call(game, "TryHireTowerDefenseAtPost", mode, Role(role)));
+            float tablesTop = ((IEnumerable)Get(mode, "PlacedStations")).Cast<object>()
+                .Where(station => Get(station, "Kind").ToString().EndsWith("Table")).Max(station => ((Rect)Get(station, "Bounds")).yMax);
+            for (int tick = 0; tick < 24; tick++) Call(mode, "Step", .25f);
+            yield return null; yield return null;
+            var workerViews = (IDictionary)Get(Get(view, "towerDefensePresentation"), "workerViews");
+            int waiting = 0;
+            foreach (object worker in (IEnumerable)Get(mode, "Workers"))
+            {
+                if (Get(worker, "Role").ToString().StartsWith("Parrillero") == false || (bool)Get(worker, "IsMoving")) continue;
+                Assert.Greater(((Vector2)Get(worker, "Position")).y, tablesTop, "A waiting cook stays above the tables, between them and the fence.");
+                Assert.AreEqual("Up", Get(workerViews[Get(worker, "Id")], "Facing").ToString(), "A waiting cook looks at the first fence.");
+                waiting++;
+            }
+            Assert.GreaterOrEqual(waiting, 3);
+
+            // Run until each kind of worker has been away working and settled again: the chant starts once and lasts about a second.
+            var starts = (IDictionary)Get(view, "crewChantStart");
+            var roleOf = new Dictionary<int, string>();
+            foreach (object worker in (IEnumerable)Get(mode, "Workers")) roleOf[(int)Get(worker, "Id")] = Get(worker, "Role").ToString();
+            var chanted = new HashSet<string>();
+            for (int tick = 0; tick < 4000 && chanted.Count < 3; tick++)
+            {
+                Call(mode, "Step", .1f);
+                if (tick % 2 == 0) yield return null;
+                foreach (DictionaryEntry entry in starts)
+                {
+                    string role = roleOf[(int)entry.Key];
+                    if (chanted.Contains(role) || (float)Get(mode, "Elapsed") - (float)entry.Value > .35f) continue;
+                    chanted.Add(role);
+                    yield return Capture("dialogo-" + role);
+                }
+            }
+            CollectionAssert.AreEquivalent(new[] { "Parrillero", "ParrilleroPremium", "Cocacolero" }, chanted, "Each kind of worker calls out its line once it has settled.");
+            Return(mode);
+        }
+
+        [UnityTest, Timeout(120000)]
+        public IEnumerator CamionerosWorkersCostWhatNuevaChicagoChargesAndGrowTheSameWay()
+        {
+            yield return SetSize(610, 1356);
+            EnterFromSelector(9);
+            object mode = Get(view, "towerDefenseMode");
+            Set(mode, "coins", 100000);
+            // 2026-11-23 (a pedido): the previous normal level's prices (Nueva Chicago base 20/20) and its growth (x1, x2.5, x5, ...).
+            int[] expectedPrice = { 20, 20, 50, 50, 100, 100 };
+            int[] roles = { 0, 1, 0, 1, 0, 1 };
+            for (int i = 0; i < roles.Length; i++)
+            {
+                Assert.AreEqual(expectedPrice[i], (int)Call(mode, "HireCost", Role(roles[i])), "hire " + i + " role " + roles[i]);
+                Assert.IsTrue((bool)Call(game, "TryHireTowerDefenseAtPost", mode, Role(roles[i])), "hire " + i + " role " + roles[i] + " coins " + Get(mode, "Coins"));
+                for (int tick = 0; tick < 80; tick++) Call(mode, "Step", .25f); // one at a time: the strip jams if several cooks are hired in the same instant
+            }
+            Return(mode);
+        }
+
         [UnityTest, Timeout(220000)]
         public IEnumerator LaRengaRealWaveKeepsTheAuditedOutcomeAndDeliveryCount()
         {
             foreach (var (width, height, expectedWins, expectedFans, expectedUnits) in new[]
                      // Fans at half speed (fanSpeed 0.1875) sandwiches taken from behind the table and campaign waiting spots (2026-11-21); the previous audit at 0.375 gave 145 and a 66/77 loss.
-                     { (540, 960, true, 120, 141), (610, 1356, true, 120, 141) })
+                     // 2026-11-23: with the difficulty ramp (speed x1.00..x1.40, bigger and double orders) the same scripted crew still wins 120/120 but delivers 220 units.
+                     // 2026-11-23 (a pedido): 200 fans and the ramp up to x1.72. The old eight-hire crew now loses at 150/200 (334 units); the crew below hires up to 24
+                     // staff as coins allow (the per-role cap is gone), wins 200/200 and delivers 514 units.
+                     // 2026-11-23 (a pedido): La Renga starts with 0 coins, one Parrillero and one Cocacolero and prices workers like Ferro (30/30/35, x2.5, x5, ...).
+                     // The same scripted crew now loses at 178/200 (444 units) in 540x960 but still wins 200/200 (514 units) in the taller 610x1356; no scripted strategy of the 540x960 sweep won (best 180/200).
+                     // 2026-11-23 (a pedido): La Renga starts with 110 coins and also pays Ferro's prices for the speed upgrade (20, 35, 50, ...). The same crew now wins 200/200 (514 units) in both sizes.
+                     { (540, 960, true, 200, 514), (610, 1356, true, 200, 514) })
             {
                 yield return SetSize(width, height);
                 object mode = OpenLaRenga();
-                int[] hires = { 0, 1, 2, 0, 1, 2, 0, 1 };
+                int[] hires = { 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2 };
                 int hired = 0;
                 int checks = 0;
                 var stations = ((IEnumerable)Get(mode, "PlacedStations")).Cast<object>()
                     .Select(station => (Rect)Get(station, "Bounds")).ToArray();
-                for (int tick = 0; tick < 2400 && Get(mode, "Phase").ToString() == "Playing"; tick++)
+                for (int tick = 0; tick < 6000 && Get(mode, "Phase").ToString() == "Playing"; tick++)
                 {
                     if (hired < hires.Length && (bool)Call(game, "TryHireTowerDefenseAtPost", mode, Role(hires[hired]))) hired++;
                     if (tick > 80 && tick % 32 == 0) Call(game, "TryUpgradeTowerDefenseSpeed", mode);

@@ -72,14 +72,20 @@ namespace HayChoriYPaty.Tests
             CollectionAssert.AreEqual((int[])Read(camioneros, "StartingWorkersByRole"), (int[])Read(redondos, "StartingWorkersByRole"));
             object camionerosRoute = Read(camioneros, "Route");
             object redondosRoute = Read(redondos, "Route");
-            Assert.AreEqual(1, Read(camionerosRoute, "RowCount"), "Camioneros is now one horizontal fence with Nueva Chicago's kitchen.");
+            // 2026-11-23 (a pedido): Camioneros plays on La Renga's C-shaped fence (same route, Nueva Chicago's kitchen); Los Redondos stays horizontal.
+            object renga = Resources.Load("TowerDefense/LaRenga-AutodromoBuenosAires");
+            Assert.IsNotNull(renga);
+            object rengaRoute = Read(renga, "Route");
+            Assert.AreEqual(2, Convert.ToInt32(Read(camionerosRoute, "RouteKind")), "Camioneros is now the C-shaped single fence of La Renga.");
+            Assert.AreEqual(1, Read(camionerosRoute, "RowCount"));
             Assert.AreEqual(1, Read(redondosRoute, "RowCount"), "Los Redondos is now one horizontal fence with Ferro's kitchen.");
-            CollectionAssert.AreEqual(new[] { 1f }, (float[])Read(camionerosRoute, "SegmentLengths"));
+            CollectionAssert.AreEqual((float[])Read(rengaRoute, "SegmentLengths"), (float[])Read(camionerosRoute, "SegmentLengths"));
             CollectionAssert.AreEqual(new[] { 1f }, (float[])Read(redondosRoute, "SegmentLengths"));
-            Assert.AreEqual(Read(camionerosRoute, "CorridorWidth"), Read(redondosRoute, "CorridorWidth"));
-            Assert.AreEqual(Read(camionerosRoute, "RowSpacing"), Read(redondosRoute, "RowSpacing"));
+            Assert.AreEqual(Read(rengaRoute, "CorridorWidth"), Read(camionerosRoute, "CorridorWidth"));
+            Assert.AreEqual(Read(rengaRoute, "RowSpacing"), Read(camionerosRoute, "RowSpacing"));
             Rect camionerosBounds = (Rect)Read(camionerosRoute, "PlayableBounds");
             Rect redondosBounds = (Rect)Read(redondosRoute, "PlayableBounds");
+            Assert.AreEqual(Read(rengaRoute, "PlayableBounds"), camionerosBounds, "Camioneros shares La Renga's authored route bounds.");
             Assert.AreEqual(9.4f, camionerosBounds.height, .001f, "Camioneros retains its original authored route bounds.");
             Assert.AreEqual(camionerosBounds, redondosBounds,
                 "Five authored 1.8-unit rows plus the 0.9-unit corridor fit the original route bounds.");

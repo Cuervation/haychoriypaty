@@ -14,10 +14,12 @@ namespace HayChoriYPaty
         private readonly Dictionary<int, Sprite[]> pilgrimGrillMeatSprites = new Dictionary<int, Sprite[]>();
         private Sprite pilgrimFernetCupSprite, pilgrimFernetBottleSprite, pilgrimCocaTableBottleSprite, pilgrimFernetContactShadowSprite;
         private bool UsesHorizontalKitchenDepth => mode.FreeConstruction &&
+            mode.RouteConfig.RouteKind != TowerDefenseRouteKind.CShapedSingleFence &&
             (visualLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId ||
              visualLevelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId);
+        // La Renga's depth model also drives Camioneros since it plays on the same C-shaped fence (2026-11-23, a pedido).
         private bool UsesLaRengaKitchenDepth => mode.FreeConstruction &&
-            visualLevelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId &&
+            (visualLevelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId || visualLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId) &&
             mode.RouteConfig.RouteKind == TowerDefenseRouteKind.CShapedSingleFence;
         private bool UsesKitchenGroundDepth => UsesHorizontalKitchenDepth || UsesLaRengaKitchenDepth;
 

@@ -53,7 +53,7 @@ namespace HayChoriYPaty
             new StreetKitchenLayout(new[] { 0, 1, 2, 3, 4, 5, 6 }, true);
         // Nueva Chicago's kitchen: one grill, one sandwich table and the Coca barrel (traditional layout, products 0 and 4).
         private static readonly StreetKitchenLayout ChicagoKitchenLayoutStatic =
-            new StreetKitchenLayout(new[] { 0, 4 }, false);
+            new StreetKitchenLayout(new[] { 0, 4 }, false) { SideBarrelPickup = true }; // drinks from the barrel's side, like La Renga (the C-shaped fence)
         // Ferro's kitchen: normal and premium grill and table, Coca and beer barrels (products 0, 1, 2, 4 and 6).
         private static readonly StreetKitchenLayout FerroKitchenLayoutStatic =
             new StreetKitchenLayout(new[] { 0, 1, 2, 4, 6 }, false);
@@ -61,6 +61,8 @@ namespace HayChoriYPaty
         private static readonly StreetKitchenLayout RengaKitchenLayoutStatic =
             new StreetKitchenLayout(new[] { 0, 1, 2, 4, 6 }, false, true);
         internal bool NarrowGrills => config.SourceCampaignLevelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId;
+        /// <summary>Drinks are taken from the barrel's right side, facing it (La Renga and, on the same C-shaped fence, Camioneros).</summary>
+        internal bool BarrelsFromTheSide => BocaKitchenLayout.BarrelsFromTheSide;
         internal static StreetKitchenLayout LujanBocaKitchenVisualLayout => BocaKitchenLayoutStatic;
 
         /// <summary>The campaign kitchen a kitchen-derived level copies: Chicago's for Camioneros, Boca's for Luján.</summary>
@@ -685,6 +687,10 @@ namespace HayChoriYPaty
         // spot by hire order, in rows along the service line next to the fence (the top run here, the counter there), each
         // row shifted half a column, and stands there until its next order. Columns and rows are one body apart so the
         // waiting crew never blocks itself; a spot on furniture is skipped (behind a table, the stacks hide the body, as in the campaign).
+        private const float WaitingBandStackHeightLogical = 130f;
+        private const float WaitingBandMarginFraction = .3f, WaitingBandColumnSpacing = .75f;
+        private readonly System.Random waitRandom = new System.Random(1311);
+
         internal Vector2 CampaignWaitSpot(TowerDefenseWorkerState worker)
         {
             int order = workers.IndexOf(worker);
@@ -692,6 +698,47 @@ namespace HayChoriYPaty
             float pixel = worldUnitsPerLogicalPixel;
             float column = CocacoleroVisualWidthLogical * pixel, row = ConstructionWorkerHeightLogical * pixel;
             float serviceY = GetFanServiceAnchor(routeGeometry.Centerline[0]).y;
+            // La Renga's C (2026-11-23, a pedido): the crew waits in the open band between the fence and the sandwich tables, never beside
+            // the tables or behind their stacks, so the band above each table (stack height) and everything below the tables' top edge is off limits.
+            bool band = IsCShapedLevel;
+            float tablesTop = float.NegativeInfinity;
+            var stackZones = new List<Rect>();
+            if (band)
+                for (int i = 0; i < placedStations.Count; i++)
+                {
+                    TowerDefensePlacedStation station = placedStations[i];
+                    if (station.Kind != TowerDefenseStationKind.NormalTable && station.Kind != TowerDefenseStationKind.PremiumTable) continue;
+                    Rect b = station.Bounds;
+                    tablesTop = Mathf.Max(tablesTop, b.yMax);
+                    stackZones.Add(new Rect(b.xMin - column * .5f, b.yMin, b.width + column, b.height + WaitingBandStackHeightLogical * pixel));
+                }
+            if (band && serviceY - tablesTop > row * .5f)
+            {
+                // The crew waits halfway between the fence and the tables (a pedido), one column each so nobody overlaps; every stop lands
+                // up to WaitingBandMarginFraction of that distance above or below the middle, at random. Columns are 3/4 of a body apart (shoulder to shoulder).
+                float middle = (serviceY + tablesTop) * .5f, span = serviceY - tablesTop;
+                if (float.IsNaN(worker.WaitJitter)) worker.WaitJitter = (float)(waitRandom.NextDouble() * 2.0 - 1.0);
+                var openColumns = new List<Vector2>();
+                var stackedColumns = new List<Vector2>();
+                float step = column * WaitingBandColumnSpacing;
+                for (int slot = 0; ; slot++)
+                {
+                    float x = WorkBounds.xMin + column * .5f + step * slot;
+                    if (x > WorkBounds.xMax - column * .5f) break;
+                    var spot = new Vector2(x, middle);
+                    if (!FreePositionClear(spot, StreetWorkerRole.Cocacolero, worker, Rect.zero, false)) continue;
+                    // Columns in front of a table's stack come last: there the body is partly hidden behind the sandwiches.
+                    (stackZones.Exists(zone => zone.Contains(spot)) ? stackedColumns : openColumns).Add(spot);
+                }
+                openColumns.AddRange(stackedColumns);
+                if (order < openColumns.Count)
+                {
+                    Vector2 chosen = openColumns[order];
+                    var jittered = new Vector2(chosen.x, middle + worker.WaitJitter * WaitingBandMarginFraction * span);
+                    return FreePositionClear(jittered, StreetWorkerRole.Cocacolero, worker, Rect.zero, false) ? jittered : chosen;
+                }
+                order -= openColumns.Count; // the rest wait in the old rows
+            }
             int found = 0;
             for (int line = 0; line < 4; line++)
             {
@@ -1103,6 +1150,7 @@ namespace HayChoriYPaty
             if (worker.ServiceUnitId > 0) Kitchen.ReturnCarried(worker.ServiceUnitId, worker.Id);
             Kitchen.ReleaseTableReservation(worker.Id);
             worker.PendingFanId = 0; worker.PendingProduct = -1; worker.ServiceStage = 0; worker.ServiceUnitId = 0;
+            worker.WaitJitter = float.NaN; // a new stop: a new random spot in the waiting band
             worker.ServiceDwelling = false; worker.ServiceDwellSeconds = 0f;
             worker.TransferRoute = Array.Empty<Vector2>(); worker.TransferIndex = 0; worker.IsMoving = false;
             worker.ReturningToPost = false;
