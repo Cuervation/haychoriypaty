@@ -65,28 +65,6 @@ namespace HayChoriYPaty
             MarketText(new Rect(28, height - 109, W - 56, 22), coverage, 13, Color.white);
             DrawStandardButton(BadgeBackBounds(height), BadgeBackAction, "VOLVER AL BARRIO");
         }
-        private void DrawRankingScreen()
-        {
-            DrawIntroScreen(hubBackdrop, new Color(.42f, .42f, .42f, 1f), ScaleMode.ScaleAndCrop);
-            DrawIntroScreen(Texture2D.whiteTexture, new Color(.025f, .018f, .012f, .72f), ScaleMode.StretchToFill);
-            float height = logicalCanvasHeight;
-            float panelHeight = Mathf.Min(520f, height - 150f);
-            Rect panel = new Rect(22, (height - panelHeight) * .5f, W - 44, panelHeight);
-            DrawMarketWoodPanel(panel, new Color(.11f, .065f, .036f, .97f));
-            MarketText(new Rect(panel.x + 18, panel.y + 20, panel.width - 36, 48), "RANKING DE LA HINCHADA", 30, new Color(1f, .84f, .38f));
-            Rect trophy = new Rect(W * .5f - 32, panel.y + 84, 64, 64);
-            FillRect(new Rect(trophy.x - 5, trophy.y - 5, trophy.width + 10, trophy.height + 10), new Color(.70f, .42f, .08f));
-            FillRect(trophy, new Color(.98f, .76f, .19f));
-            MarketText(trophy, "★", 44, new Color(.24f, .11f, .025f));
-            MarketText(new Rect(panel.x + 22, panel.y + 164, panel.width - 44, 58), "EL RANKING GLOBAL LLEGA PRONTO", 23, Color.white);
-            MarketText(new Rect(panel.x + 28, panel.y + 218, panel.width - 56, 52), "Todavía no publicamos posiciones de otros hinchas.", 16, new Color(.95f, .87f, .72f));
-            MarketText(new Rect(panel.x + 26, panel.y + 295, panel.width - 52, 30), "TU PROGRESO", 19, new Color(1f, .84f, .38f));
-            string objective = RankingObjectiveText(out int unlockedCount);
-            MarketText(new Rect(panel.x + 26, panel.y + 331, panel.width - 52, 38), "CANCHAS DESBLOQUEADAS: " + unlockedCount + " / " + StreetSimulation.CampaignOrder.Length, 19, Color.white);
-            MarketText(new Rect(panel.x + 26, panel.y + 373, panel.width - 52, 48), objective, 16, new Color(.52f, 1f, .47f));
-            DrawStandardButton(RankingBackBounds(height), RankingBackAction, "VOLVER AL BARRIO");
-        }
-
         private string RankingObjectiveText(out int unlockedCount)
         {
             unlockedCount = 0;

@@ -241,7 +241,7 @@ namespace HayChoriYPaty
                 return LevelSixRacingTutorialPrimaryBounds().Contains(p) ? LevelOneTutorialPrimaryAction : 0;
             }
             if (badgesActive) { p.y *= layoutVerticalScale; return BadgeBackBounds(logicalCanvasHeight).Contains(p) ? BadgeBackAction : 0; }
-            if (rankingActive) { p.y *= layoutVerticalScale; return RankingBackBounds(logicalCanvasHeight).Contains(p) ? RankingBackAction : 0; }
+            if (rankingActive) { p.y *= layoutVerticalScale; return HitRankingAction(p); }
             if (hubActive && !marketActive)
             {
                 if (settingsActive)
@@ -617,7 +617,7 @@ namespace HayChoriYPaty
                     marketScroll = 0; marketOtherExpanded = false; marketExpandedIngredient = -1;
                 }
                 else if (a == HubBadgesAction) { hubActive = false; badgesActive = true; }
-                else if (a == HubRankingAction) { hubActive = false; rankingActive = true; }
+                else if (a == HubRankingAction) OpenRanking();
                 else if (a == HubAccountAction) Cloud.FirebasePlayerSession.Instance?.OpenAccountMenu();
                 return;
             }
@@ -628,7 +628,7 @@ namespace HayChoriYPaty
             }
             if (rankingActive)
             {
-                if (a == RankingBackAction) { rankingActive = false; hubActive = true; }
+                DispatchRankingAction(a);
                 return;
             }
             if (levelSelectActive)

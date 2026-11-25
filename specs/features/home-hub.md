@@ -35,7 +35,7 @@ El hub es una escena ilustrada vertical, vista elevada de una calle de partido: 
 | Puesto de choripán | JUGAR | Selector de clubes existente; el jugador sigue el flujo de nivel y Mercado actual. No salta la selección ni inicia una partida sin la preparación vigente. |
 | Almacén/supermercado | MERCADO | Pantalla Mercado existente; comprar sigue sujeto a saldo/stock/gates actuales. |
 | Vendedor ambulante de camisetas | INSIGNIAS | Colección de21insignias por ventas acumuladas:500/2500/5000 para cada uno de los7productos, derivadas de estadísticas del perfil Firebase (ver delta vigente abajo). Sin premios nuevos. |
-| Tablero del estadio | RANKING | Muestra canchas desbloqueadas y canchas ya ganadas en el perfil propio, y aclara que el ranking global está pendiente. No consulta ni expone una lista pública de otros jugadores: el contrato Firebase actual no autoriza ese acceso. |
+| Tablero del estadio | RANKING | **Desde 2026-11-25: ranking global de la hinchada** (contrato en [firebase-player.md](firebase-player.md#ranking-de-la-hinchada--2026-11-25)): podio con los tres primeros, Top 10 y la fila propia fija abajo, con apodo y Puntos de Liga leídos del servidor. Sin sesión Google o sin conexión muestra el progreso propio y REINTENTAR. |
 
 **QA-03 (2026-11-19):** contar desbloqueos no equivale a ganar. Con las 15 canchas disponibles y Boca aún sin victoria, el objetivo sigue siendo Boca; mostrar «Todas las canchas superadas» solo si el perfil registra una victoria por cada cancha. No se modifica ningún desbloqueo ni se completa historial faltante.
 Unity 6000.6.3f1: PlayMode PASS 1/1 y Game View 720×1280 revisada con Boca pendiente y campaña ganada; evidencias en `Logs/Acceptance/QA-Fixes-20261119/`.

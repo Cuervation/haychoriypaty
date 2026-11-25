@@ -127,6 +127,8 @@ namespace HayChoriYPaty
         }
         public bool IsIngredientUnlocked(int ingredientId) => playerActive && market != null && save != null &&
             market.IsIngredientUnlocked(ingredientId, save.unlockedLevelIds, save.unlockedLevel);
+        /// <summary>Statistics of the active profile (read-only use: Liga points for the ranking); null without a player.</summary>
+        public StreetPlayerStatistics PlayerStatistics => playerActive ? save?.statistics : null;
         public bool HasWonLevel(int levelIndex)
         {
             if (save == null || save.statistics == null || levelIndex < 0 || levelIndex >= StreetSimulation.LevelNames.Length ||

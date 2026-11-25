@@ -127,6 +127,38 @@ namespace HayChoriYPaty.Tests
                 }
             }
         }
+        // 2026-11-25: the ranking screen with a made-up server answer (podium, list, own row outside the Top 10, apodo form, no connection).
+        [UnityTest, Explicit("Captures the ranking screen states to Logs/Acceptance/Ranking-20261125")]
+        public IEnumerator RankingScreenStatesCapture()
+        {
+            if (Application.isBatchMode) Assert.Ignore("Requires interactive Game View.");
+            Portrait(575, 1280); yield return null; yield return null;
+            Type snapshotType = Type.GetType("HayChoriYPaty.Cloud.LeaderboardSnapshot, Assembly-CSharp", true);
+            Type entryType = Type.GetType("HayChoriYPaty.Cloud.LeaderboardEntry, Assembly-CSharp", true);
+            Type stateType = vt.GetNestedType("RankingState", BindingFlags.NonPublic);
+            Func<string, string, long, long, object> entry = (uid, nick, points, won) =>
+            {
+                object e = Activator.CreateInstance(entryType);
+                Set(e, "uid", uid); Set(e, "nickname", nick); Set(e, "points", points); Set(e, "wonLevels", won); return e;
+            };
+            string[] nicks = { "Xiangxiu", "Chori_Rey", "La Bondiola", "Ñandú FC", "Paty Doble", "El Negro", "Hincha 10", "Fernet&Co", "Doña Coca", "Vacío Total" };
+            object snapshot = Activator.CreateInstance(snapshotType);
+            IList top = (IList)Get(snapshot, "top");
+            for (int i = 0; i < nicks.Length; i++) top.Add(entry("u" + i, nicks[i], 2030 - i * 140, 14 - i / 2));
+            Set(snapshot, "me", entry("me", "Cuervation", 393, 4)); Set(snapshot, "myRank", 1779L);
+            Set(view, "rankingSnapshot", snapshot);
+            string folder = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/Ranking-20261125"));
+            Directory.CreateDirectory(folder);
+            foreach (var shot in new[] { ("ready", 2), ("nickname", 3), ("offline", 4) })
+            {
+                foreach (string flag in new[] { "introActive", "settingsActive", "marketActive", "badgesActive", "levelSelectActive", "hubActive" }) Set(view, flag, false);
+                Set(view, "rankingActive", true); Set(view, "rankingState", Enum.ToObject(stateType, shot.Item2));
+                yield return null; yield return new WaitForEndOfFrame();
+                Texture2D capture = ScreenCapture.CaptureScreenshotAsTexture();
+                File.WriteAllBytes(Path.Combine(folder, "ranking-" + shot.Item1 + ".png"), capture.EncodeToPNG());
+                UnityEngine.Object.Destroy(capture);
+            }
+        }
         [UnityTearDown] public IEnumerator TearDown()
         {
             if (root != null) UnityEngine.Object.Destroy(root); if (cameraRoot != null) UnityEngine.Object.Destroy(cameraRoot);

@@ -129,7 +129,30 @@ service cloud.firestore {
       allow create: if owner(uid) && validMatch(uid, matchId);
       allow update, delete: if false;
     }
-    // No public profile, other-player state, deletes, or unscoped writes.
+    // Ranking de la hinchada (2026-11-25): the only public data. One document per player with an apodo and Liga points;
+    // never the Google name, mail or any game state. Readable by any signed-in Google player; each one writes only its own.
+    function signedIn() {
+      return request.auth != null && request.auth.token.firebase.sign_in_provider == 'google.com';
+    }
+    function leaderboardShape(uid, d) {
+      return d.keys().hasOnly(['schemaVersion','uid','nickname','points','wonLevels','updatedAt'])
+        && d.schemaVersion == 1 && d.uid == uid
+        && d.nickname is string
+        && d.nickname.matches('^[A-Za-z0-9ÁÉÍÓÚÜÑáéíóúüñ_.-][A-Za-z0-9ÁÉÍÓÚÜÑáéíóúüñ _.-]{1,14}[A-Za-z0-9ÁÉÍÓÚÜÑáéíóúüñ_.-]$')
+        && d.points is int && d.points >= 0 && d.points <= 3000
+        && d.wonLevels is int && d.wonLevels >= 0 && d.wonLevels <= 14
+        && d.updatedAt == request.time;
+    }
+    match /leaderboard/{uid} {
+      allow read: if signedIn();
+      allow create: if owner(uid) && leaderboardShape(uid, request.resource.data);
+      // Liga points and won canchas only ever grow; the apodo may change.
+      allow update: if owner(uid) && leaderboardShape(uid, request.resource.data)
+        && request.resource.data.points >= resource.data.points
+        && request.resource.data.wonLevels >= resource.data.wonLevels;
+      allow delete: if false;
+    }
+    // No other public profile, other-player state, deletes, or unscoped writes.
     match /{document=**} { allow read, write: if false; }
   }
 }
