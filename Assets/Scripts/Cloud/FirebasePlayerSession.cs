@@ -373,13 +373,9 @@ namespace HayChoriYPaty.Cloud
             if (StreetGame.AllowEditorTestInitialization) return;
 #endif
             var view = FindAnyObjectByType<StreetView>();
-            if (State == PlayerSessionState.Ready && !accountOpen)
-            {
-                if (view != null && view.AccountMenuVisible && !view.HubAccountActionRendered)
-                    AccountButton(HayChoriYPaty.StreetView.HubAccountButtonScreenBounds(
-                        new Vector2(Screen.width, Screen.height)), "CUENTA", OpenAccountMenu);
-                return;
-            }
+            // 2026-11-24 (a pedido): the top-right "CUENTA" button is no longer drawn on the hub, badges, ranking or market.
+            // The account panel still opens when a game destination is pressed without a session (StreetView.Input).
+            if (State == PlayerSessionState.Ready && !accountOpen) return;
 
             // Never put a second full-screen Firebase cover in front of the three-phrase
             // startup presentation or the hub. The account panel is opened from the hub hotspot.

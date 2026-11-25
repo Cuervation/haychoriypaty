@@ -1180,7 +1180,9 @@ namespace HayChoriYPaty
             int crewCount = index + 1;
             workers.Add(new TowerDefenseWorkerState(nextWorkerId++, role, zone,
                 ZoneWorkerPosition(role, zone, index, crewCount)));
-            if (IsCamionerosCrew(role, zone)) RepositionCamionerosCrew(role, zone);
+            // 2026-11-24: the C-shaped free-construction Camioneros waits at campaign spots. Teleporting the whole role to zone slots on every hire moved
+            // a worker that was mid-job without clearing its route, which then crossed the table and stayed stuck with a fan reserved forever.
+            if (IsCamionerosCrew(role, zone) && !IsPassiveKitchenLevel) RepositionCamionerosCrew(role, zone);
             else if (IsLosRedondos)
                 RepositionLosRedondosCrew(role, zone);
         }

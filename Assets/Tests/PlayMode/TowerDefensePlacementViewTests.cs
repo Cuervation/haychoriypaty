@@ -142,12 +142,12 @@ namespace HayChoriYPaty.Tests
             Delegate handler = GetType().GetMethod("RecordReceipt", I).MakeGenericMethod(receiptType)
                 .CreateDelegate(deliveryEvent.EventHandlerType, this);
             deliveryEvent.AddEventHandler(mode, handler);
-            Assert.AreEqual(requestedLevelId == 14 || requestedLevelId == 13 ? 2 : 0, ((ICollection)Get(mode, "Workers")).Count,
-                "Only Peregrinación (Parrillero + Mozo) and La Renga (Parrillero + Cocacolero, 2026-11-23) have an explicitly configured crew at start.");
+            Assert.AreEqual(requestedLevelId == 14 ? 2 : requestedLevelId == 13 || requestedLevelId == 10 ? 1 : 0, ((ICollection)Get(mode, "Workers")).Count,
+                "Only Peregrinación (Parrillero + Mozo), La Renga and Los Redondos (one Parrillero, 2026-11-24) have an explicitly configured crew at start.");
             if (requestedLevelId == 13)
             {
-                CollectionAssert.AreEqual(new[] { 1, 1, 0, 0, 0 }, (int[])Get(mode, "WorkerCountsByRole"));
-                Assert.AreEqual(110, (int)Get(mode, "Coins"), "La Renga starts with 110 coins.");
+                CollectionAssert.AreEqual(new[] { 1, 0, 0, 0, 0 }, (int[])Get(mode, "WorkerCountsByRole"));
+                Assert.AreEqual(40, (int)Get(mode, "Coins"), "La Renga starts with 40 coins.");
             }
             if (requestedLevelId == 14)
             {
@@ -1690,6 +1690,7 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
+        [Ignore("Los Redondos (ID10) now plays La Renga's inverted C-shaped single fence (2026-11-24); this test covered its former horizontal Ferro-kitchen layout.")]
         public IEnumerator LosRedondosKitchenKeepsWorkersOnTheCorrectSideOfCounters()
         {
             yield return CheckHorizontalKitchenDepth("redondos", new[] { "Parrillero", "Parrillero", "Cocacolero", "Cocacolero" },
@@ -1740,6 +1741,7 @@ namespace HayChoriYPaty.Tests
         public IEnumerator CamionerosParrilleroAndCocacoleroDeliverOnlyWhatTheKitchenSells()
         {
             Type roleKind = T("StreetWorkerRole");
+            Set(mode, "coins", 500); // 2026-11-24: Camioneros now starts with 50 coins; fund the three hires (20 + 20 + 50).
             Assert.IsTrue((bool)Call(game, "TryHireTowerDefenseAtPost", mode, Enum.ToObject(roleKind, 0)));
             Assert.IsTrue((bool)Call(game, "TryHireTowerDefenseAtPost", mode, Enum.ToObject(roleKind, 1)));
             Assert.IsTrue((bool)Call(game, "TryHireTowerDefenseAtPost", mode, Enum.ToObject(roleKind, 0)));
@@ -1828,6 +1830,7 @@ namespace HayChoriYPaty.Tests
 
         // Los Redondos is a horizontal-fence kitchen level that copies Ferro's kitchen and footer.
         [UnityTest]
+        [Ignore("Los Redondos (ID10) now plays La Renga's inverted C-shaped single fence (2026-11-24); this test covered its former horizontal Ferro-kitchen layout.")]
         public IEnumerator LosRedondosFerroKitchenStartsWithSixStationsAndTheFerroFooter()
         {
             Assert.AreEqual(10, requestedLevelId);
@@ -1847,6 +1850,7 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
+        [Ignore("Los Redondos (ID10) now plays La Renga's inverted C-shaped single fence (2026-11-24); this test covered its former horizontal Ferro-kitchen layout.")]
         public IEnumerator LosRedondosKitchenAndFooterSitAtFerroScreenRows()
         {
             yield return CaptureAtResolution("losredondos-ferro-screen-rows-610x1356", 610, 1356, false);
@@ -1877,6 +1881,7 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
+        [Ignore("Los Redondos (ID10) now plays La Renga's inverted C-shaped single fence (2026-11-24); this test covered its former horizontal Ferro-kitchen layout.")]
         public IEnumerator LosRedondosCrewDeliversEachProductWithItsOwnRole()
         {
             Type roleKind = T("StreetWorkerRole");
@@ -1906,6 +1911,7 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
+        [Ignore("Los Redondos (ID10) now plays La Renga's inverted C-shaped single fence (2026-11-24); this test covered its former horizontal Ferro-kitchen layout.")]
         public IEnumerator LosRedondosFullWaveWithFiveProductsPaysOnceAndUnlocksHuracan()
         {
             // The generic fixture grants multiple levels; only this test needs a locked successor.
@@ -1964,6 +1970,7 @@ namespace HayChoriYPaty.Tests
 
         [UnityTest]
         [Explicit("Records a real Los Redondos run to Logs/Acceptance/RedondosVideo-20261118")]
+        [Ignore("Los Redondos (ID10) now plays La Renga's inverted C-shaped single fence (2026-11-24); this test covered its former horizontal Ferro-kitchen layout.")]
         public IEnumerator LosRedondosGameplayVideoFrames()
         {
             string directory = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/RedondosVideo-20261118/frames"));
@@ -2032,7 +2039,8 @@ namespace HayChoriYPaty.Tests
             Assert.LessOrEqual(raised.yMax + 3f, lead.yMin);
             Assert.AreEqual(unaffected, CallStatic(vt, "PlaceLaRengaOrderBubble", unaffected, new[] { lead }));
 
-            // 2026-11-23: La Renga already starts with one Parrillero and one Cocacolero (and 0 coins), so nobody needs hiring here.
+            // 2026-11-24: La Renga starts with one Parrillero and 40 coins; hire the Cocacolero so drinks can be served.
+            Assert.IsTrue((bool)Call(game, "TryHireTowerDefenseAtPost", mode, Enum.ToObject(T("StreetWorkerRole"), 1)));
             for (int tick = 0; tick < 500 && (int)Get(mode, "OrdersCompleted") < 10; tick++)
             {
                 Call(mode, "Step", .05f);
@@ -2052,8 +2060,9 @@ namespace HayChoriYPaty.Tests
         [UnityTest]
         public IEnumerator LaRengaEscapeResultKeepsElapsedAndExplainsTheLoss()
         {
-            Assert.AreEqual("PEDIDOS 0/200", CallStatic(vt, "TowerDefenseWaveCaption", mode));
-            // 2026-11-23: La Renga already starts with one Parrillero and one Cocacolero (and 0 coins), so nobody needs hiring here.
+            Assert.AreEqual("PEDIDOS 0/240", CallStatic(vt, "TowerDefenseWaveCaption", mode));
+            // 2026-11-24: La Renga starts with one Parrillero and 40 coins; hire the Cocacolero so drinks can be served.
+            Assert.IsTrue((bool)Call(game, "TryHireTowerDefenseAtPost", mode, Enum.ToObject(T("StreetWorkerRole"), 1)));
             bool observedLiveProgress = false;
             for (int tick = 0; tick < 4000 && Get(mode, "Phase").ToString() == "Playing"; tick++)
             {
@@ -2061,7 +2070,7 @@ namespace HayChoriYPaty.Tests
                 int current = (int)Get(mode, "OrdersCompleted");
                 if (!observedLiveProgress && current >= 10 && Get(mode, "Phase").ToString() == "Playing")
                 {
-                    Assert.AreEqual("PEDIDOS " + current + "/200", CallStatic(vt, "TowerDefenseWaveCaption", mode));
+                    Assert.AreEqual("PEDIDOS " + current + "/240", CallStatic(vt, "TowerDefenseWaveCaption", mode));
                     observedLiveProgress = true;
                     if (!Application.isBatchMode) yield return Capture("qa06-la-renga-wave-progress");
                 }
@@ -2078,9 +2087,9 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(elapsed, Get(sim, "Elapsed"));
             int completed = (int)Get(mode, "OrdersCompleted");
             Assert.Greater(completed, 0);
-            StringAssert.Contains("Un hincha llegó a la salida\nPedidos completos: " + completed + "/200",
+            StringAssert.Contains("Un hincha llegó a la salida\nPedidos completos: " + completed + "/240",
                 (string)CallStatic(vt, "RiotResultMessage", sim));
-            TestContext.WriteLine("La Renga lost at " + elapsed + " seconds; completed=" + completed + "/200.");
+            TestContext.WriteLine("La Renga lost at " + elapsed + " seconds; completed=" + completed + "/240.");
             yield return new WaitForSecondsRealtime(1.6f);
             if (!Application.isBatchMode) yield return Capture("qa04-la-renga-defense-loss");
         }
@@ -2128,7 +2137,7 @@ namespace HayChoriYPaty.Tests
             Debug.Log("LARENGA strip right of the barrels = " + stripBesideBarrels + " / right of the grills = " + stripBesideGrills + " (logical px)");
             Assert.GreaterOrEqual(stripBesideBarrels, 28f, "a free strip along the right fence beside the barrels");
             // Like the other horizontal kitchen levels: nobody starts on the crew and the kitchen is passive.
-            Assert.AreEqual(2, ((ICollection)Get(mode, "Workers")).Count, "La Renga starts with a Parrillero and a Cocacolero.");
+            Assert.AreEqual(1, ((ICollection)Get(mode, "Workers")).Count, "La Renga starts with a single Parrillero (2026-11-24).");
             Assert.IsTrue((bool)Get(mode, "IsPassiveKitchenLevel"), "La Renga plays like the other horizontal kitchen levels.");
             // The footer is Ferro's / Los Redondos': the same top as ID10 on the same screen.
             Type layoutHelper = T("TowerDefenseResponsiveLayout");
@@ -2237,6 +2246,8 @@ namespace HayChoriYPaty.Tests
             object presentation = Get(view, "towerDefensePresentation");
             Type roleKind = T("StreetWorkerRole");
             var hires = new System.Collections.Generic.Dictionary<int, int> { { 1, 0 }, { 2, 1 }, { 3, 0 }, { 4, 1 }, { 5, 2 }, { 6, 0 } };
+            // 2026-11-24: La Renga now opens with 40 coins and no Cocacolero; fund the scripted hires below.
+            if (laRenga) Set(mode, "coins", 100000);
             IDictionary workerViews = (IDictionary)Get(presentation, "workerViews");
             int movingUp = 0, movingDown = 0, carried = 0, backPickups = 0, leftBarrelPickups = 0, waitingAtSpot = 0, written = 0;
             var waitSpots = new System.Collections.Generic.Dictionary<int, Vector2>();
@@ -2378,6 +2389,7 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
+        [Ignore("Los Redondos (ID10) now plays La Renga's inverted C-shaped single fence (2026-11-24); this test covered its former horizontal Ferro-kitchen layout.")]
         public IEnumerator LosRedondosCrewSharesTheCampaignCrewLogic()
         {
             yield return RunCampaignCrew(900, null, false);
@@ -2400,6 +2412,7 @@ namespace HayChoriYPaty.Tests
 
         [UnityTest]
         [Explicit("Records Los Redondos with La Renga's crew logic to Logs/Acceptance/RengaCampaignCrew-20261121/frames-losredondos")]
+        [Ignore("Los Redondos (ID10) now plays La Renga's inverted C-shaped single fence (2026-11-24); this test covered its former horizontal Ferro-kitchen layout.")]
         public IEnumerator LosRedondosCampaignCrewVideoFrames() { yield return RecordCampaignCrew("frames-losredondos"); }
 
         [UnityTest]
@@ -2445,6 +2458,7 @@ namespace HayChoriYPaty.Tests
 
         [UnityTest]
         [Explicit("Appends to Logs/Acceptance/RedondosVideo-20261118/balance-sweep.txt")]
+        [Ignore("Los Redondos (ID10) now plays La Renga's inverted C-shaped single fence (2026-11-24); this test covered its former horizontal Ferro-kitchen layout.")]
         public IEnumerator LosRedondosBalanceCase([ValueSource(nameof(BalanceSpeeds))] float speed, [ValueSource(nameof(BalanceSpacings))] float spacing, [ValueSource(nameof(BalanceCaps))] int cap)
         {
             string path = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/RedondosVideo-20261118/balance-sweep.txt"));

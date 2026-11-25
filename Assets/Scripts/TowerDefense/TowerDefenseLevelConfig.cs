@@ -138,6 +138,8 @@ namespace HayChoriYPaty
         [SerializeField] private int[] hireCostsByRole = { 60, 60, 60, 60, 60 };
         [Tooltip("Explicit role-local starting crew for free-construction levels. This is level config, never imported from a saved campaign roster.")]
         [SerializeField] private int[] startingWorkersByRole = new int[5];
+        [Tooltip("Draws the Defense world mirrored left-right on screen (a C that opens to the right). The game logic and geometry are unchanged.")]
+        [SerializeField] private bool mirrorHorizontally;
 
         public string ModeId => string.IsNullOrWhiteSpace(modeId) ? "tower-defense" : modeId;
         public string LevelId => string.IsNullOrWhiteSpace(levelId) ? CamionerosLevelId : levelId;
@@ -195,6 +197,14 @@ namespace HayChoriYPaty
         public float ServiceRange => Mathf.Max(0.01f, serviceRange);
         public Vector2 FirstWorkZoneOffset => firstWorkZoneOffset;
         public Vector2 SecondWorkZoneOffset => secondWorkZoneOffset;
+        /// <summary>The world is drawn mirrored left-right on screen (2026-11-24: Los Redondos plays La Renga's C inverted).</summary>
+        public bool MirrorHorizontally => mirrorHorizontally;
+        /// <summary>
+        /// La Renga's dynamics: its C-shaped fence, kitchen (Ferro's with narrow grills), crew behavior and difficulty ramp.
+        /// Los Redondos copies them on the C-shaped fence (2026-11-24, a pedido).
+        /// </summary>
+        public bool UsesLaRengaDynamics => sourceCampaignLevelId == LaRengaCampaignLevelId ||
+            (sourceCampaignLevelId == LosRedondosCampaignLevelId && routeKind == TowerDefenseRouteKind.CShapedSingleFence);
         public int[] StartingWorkersByRole => startingWorkersByRole == null
             ? new int[5] : (int[])startingWorkersByRole.Clone();
 

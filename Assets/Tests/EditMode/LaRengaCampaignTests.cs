@@ -286,13 +286,14 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void CamionerosGetsHarderEveryTenFansUpToTimesOnePointSixSix()
+        public void CamionerosGetsHarderEveryTenFansUpToTimesOnePointEightyEight()
         {
             Type configType = RuntimeType("TowerDefenseLevelConfig");
             string path = configType.GetMethod("ResourcesPathForCampaignLevel", PublicStatic).Invoke(null, new object[] { 9 }) as string;
             var config = Resources.Load(path, configType);
             Assert.NotNull(config);
-            // 2026-11-23 (a pedido): a steeper ramp than La Renga's first tiers: twelve tiers, one every 10 of its 120 fans (x1.00 .. x1.66).
+            // 2026-11-24 (a pedido): La Renga's "E" table over Camioneros' 120 fans: twelve tiers, one every 10 fans (x1.00 .. x1.88, +0.08), orders of 3 units from fan 70 and
+            // 50 starting coins (it was x1.00 .. x1.66 and 500 coins).
             Assert.AreEqual(120, configType.GetProperty("TotalFanCount").GetValue(config, null));
             Assert.AreEqual(true, configType.GetProperty("HasDifficultyRamp").GetValue(config, null));
             var tierFor = configType.GetMethod("DifficultyTierForFan");
@@ -303,13 +304,15 @@ namespace HayChoriYPaty.Tests
                 Assert.AreEqual(tier.GetType().GetField("FromFan").GetValue(tier), tierIndex * 10, "tier " + tierIndex + " starts at fan " + tierIndex * 10);
                 float speed = (float)tier.GetType().GetField("SpeedMultiplier").GetValue(tier);
                 int three = (int)tier.GetType().GetField("Quantity3Percent").GetValue(tier), second = (int)tier.GetType().GetField("SecondProductPercent").GetValue(tier);
-                Assert.AreEqual(1f + .06f * tierIndex, speed, 0.0001f, "speed of tier " + tierIndex);
+                Assert.AreEqual(1f + .08f * tierIndex, speed, 0.0001f, "speed of tier " + tierIndex);
                 Assert.Greater(speed, previousSpeed); Assert.GreaterOrEqual(three, previousThree); Assert.GreaterOrEqual(second, previousSecond);
                 previousSpeed = speed; previousThree = three; previousSecond = second;
             }
             object last = tierFor.Invoke(config, new object[] { 119 });
-            Assert.AreEqual(1.66f, (float)last.GetType().GetField("SpeedMultiplier").GetValue(last), 0.0001f);
-            Assert.AreEqual(70, (int)last.GetType().GetField("Quantity3Percent").GetValue(last));
+            Assert.AreEqual(1.88f, (float)last.GetType().GetField("SpeedMultiplier").GetValue(last), 0.0001f);
+            Assert.AreEqual(100, (int)last.GetType().GetField("Quantity3Percent").GetValue(last));
+            Assert.AreEqual(100, (int)last.GetType().GetField("SecondProductPercent").GetValue(last));
+            Assert.AreEqual(50, configType.GetProperty("StartingCoins").GetValue(config, null), "Camioneros starts with 50 coins.");
         }
 
         [Test]
@@ -324,7 +327,8 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(13, configType.GetProperty("SourceCampaignLevelId").GetValue(config, null));
             // C-shaped, Ferro-kitchen version (2026-11-19; Ferro's five products): 120 fans, faster and denser than the former serpentine 60 / 0.1575 / 96.
             // 2026-11-23 (a pedido): 200 fans (was 120); the difficulty ramp is extended to ten tiers (x1.00..x1.72).
-            Assert.AreEqual(200, configType.GetProperty("TotalFanCount").GetValue(config, null));
+            // 2026-11-24 (a pedido): 240 fans, two more tiers of 20 (x1.80, x1.88) and orders of 3 units / second products from fan 140 on.
+            Assert.AreEqual(240, configType.GetProperty("TotalFanCount").GetValue(config, null));
             Assert.AreEqual(0.1875f, (float)configType.GetProperty("FanSpeed").GetValue(config, null), 0.00001f);
             // 2026-11-23: 70 px (was 66) so the order bubbles of fans entering side by side keep the same height.
             Assert.AreEqual(70f, configType.GetProperty("MinimumEntrySpacingLogical").GetValue(config, null));
@@ -332,7 +336,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(int.MaxValue, configType.GetProperty("MaximumWorkersPerRole").GetValue(config, null));
             Assert.AreEqual(true, configType.GetProperty("HasDifficultyRamp").GetValue(config, null));
             var tierFor = configType.GetMethod("DifficultyTierForFan");
-            foreach (var (fan, speed) in new[] { (0, 1f), (19, 1f), (20, 1.08f), (100, 1.4f), (119, 1.4f), (120, 1.48f), (160, 1.64f), (180, 1.72f), (199, 1.72f) })
+            foreach (var (fan, speed) in new[] { (0, 1f), (19, 1f), (20, 1.08f), (100, 1.4f), (119, 1.4f), (120, 1.48f), (160, 1.64f), (180, 1.72f), (199, 1.72f), (200, 1.8f), (219, 1.8f), (220, 1.88f), (239, 1.88f) })
             {
                 object tier = tierFor.Invoke(config, new object[] { fan });
                 Assert.AreEqual(speed, (float)tier.GetType().GetField("SpeedMultiplier").GetValue(tier), 0.0001f, "tier of fan " + fan);

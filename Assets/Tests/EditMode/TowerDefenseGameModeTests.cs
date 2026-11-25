@@ -262,8 +262,8 @@ namespace HayChoriYPaty.Tests
             Assert.IsNotNull(losRedondos);
             Assert.AreEqual(96f, Get<float>(camioneros, "MinimumEntrySpacingLogical"),
                 "Camioneros needs a visible gap larger than the 78 px fan frame.");
-            Assert.AreEqual(58f, Get<float>(losRedondos, "MinimumEntrySpacingLogical"),
-                "Los Redondos keeps its existing cadence in the horizontal Ferro-kitchen version.");
+            Assert.AreEqual(70f, Get<float>(losRedondos, "MinimumEntrySpacingLogical"),
+                "Los Redondos copies La Renga's cadence on its inverted C (2026-11-24).");
         }
 
         [Test]
@@ -274,9 +274,9 @@ namespace HayChoriYPaty.Tests
             Assert.IsNotNull(camioneros);
             Assert.IsNotNull(redondos);
             Assert.AreEqual(120, Get<int>(camioneros, "TotalFanCount"));
-            Assert.AreEqual(60, Get<int>(redondos, "TotalFanCount"));
+            Assert.AreEqual(240, Get<int>(redondos, "TotalFanCount")); // 2026-11-24: La Renga's 240 fans
             Assert.That(Get<float>(camioneros, "FanSpeed"), Is.EqualTo(.0775f).Within(.00001f)); // horizontal kitchen version (was .1575f * 1.3f)
-            Assert.That(Get<float>(redondos, "FanSpeed"), Is.EqualTo(.1575f).Within(.00001f)); // unchanged by the horizontal Ferro-kitchen version
+            Assert.That(Get<float>(redondos, "FanSpeed"), Is.EqualTo(.1875f).Within(.00001f)); // La Renga's speed (2026-11-24)
 
             // Camioneros (Nueva Chicago's kitchen) and Los Redondos (Ferro's) are horizontal kitchen levels now: their live
             // modes need a real phone layout, so their runtime is covered by the PlayMode tests of each level; this

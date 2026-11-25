@@ -195,7 +195,8 @@ namespace HayChoriYPaty.Tests
                 Assert.AreEqual(0f, Get(defense, "TimeRemaining"));
                 // Los Redondos serves its authored five-product Defense menu; Camioneros keeps the Chori/Coca pair.
                 Assert.AreEqual(level == 10 ? 5 : 2, Get(defense, "ProductCount"));
-                Assert.AreEqual(500, CallStatic(simType, "GetStartingCoinsForLevel", Activator.CreateInstance(balanceType), level));
+                // 2026-11-24 (a pedido): Camioneros opens with 50 coins and Los Redondos (La Renga's C) with 40.
+                Assert.AreEqual(level == 10 ? 40 : 50, CallStatic(simType, "GetStartingCoinsForLevel", Activator.CreateInstance(balanceType), level));
             }
             object ordinaryMarket = Market(), ordinary = Sim(8);
             Assert.IsFalse((bool)Call(ordinaryMarket, "HasRequiredStock", ordinary));

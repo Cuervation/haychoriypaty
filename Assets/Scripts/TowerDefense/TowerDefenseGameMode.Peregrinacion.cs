@@ -60,7 +60,7 @@ namespace HayChoriYPaty
                 // La Renga's kitchen is Ferro's with two columns less of food on its grills (2 per product instead of 3).
         private static readonly StreetKitchenLayout RengaKitchenLayoutStatic =
             new StreetKitchenLayout(new[] { 0, 1, 2, 4, 6 }, false, true);
-        internal bool NarrowGrills => config.SourceCampaignLevelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId;
+        internal bool NarrowGrills => config.UsesLaRengaDynamics;
         /// <summary>Drinks are taken from the barrel's right side, facing it (La Renga and, on the same C-shaped fence, Camioneros).</summary>
         internal bool BarrelsFromTheSide => BocaKitchenLayout.BarrelsFromTheSide;
         internal static StreetKitchenLayout LujanBocaKitchenVisualLayout => BocaKitchenLayoutStatic;
@@ -71,7 +71,9 @@ namespace HayChoriYPaty
             : sourceCampaignLevelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId ? FerroKitchenLayoutStatic
             : sourceCampaignLevelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId ? RengaKitchenLayoutStatic
             : BocaKitchenLayoutStatic;
-        private StreetKitchenLayout BocaKitchenLayout => KitchenLayoutForLevel(config.SourceCampaignLevelId);
+        // Los Redondos on La Renga's C-shaped fence (2026-11-24) cooks in La Renga's kitchen; the footer still copies Ferro's (FooterSourceLevelId).
+        private StreetKitchenLayout BocaKitchenLayout => KitchenLayoutForLevel(config.UsesLaRengaDynamics
+            ? TowerDefenseLevelConfig.LaRengaCampaignLevelId : config.SourceCampaignLevelId);
         internal StreetKitchenLayout SourceKitchenLayout => BocaKitchenLayout;
         private readonly List<TowerDefensePlacedStation> placedStations = new List<TowerDefensePlacedStation>();
         private long equipmentSpendCents;
@@ -668,7 +670,9 @@ namespace HayChoriYPaty
                 // As in the campaign, a new hire appears at its own waiting spot.
                 TowerDefenseWorkerState hired = workers[workers.Count - 1];
                 Vector2 home = CampaignWaitSpot(hired);
-                if (FreePositionClear(home, hired.Role, hired, Rect.zero, true))
+                // 2026-11-24: ignore co-workers here (routes and walking do too): a spot briefly occupied by someone passing used to leave the hire at the
+                // slot AddWorker gave it, inside the keep-out strip under the barrels, from where no route can be planned and it never received an order.
+                if (FreePositionClear(home, hired.Role, hired, Rect.zero, false))
                 {
                     hired.Position = home;
                     hired.IsMoving = false; hired.ReturningToPost = false;
@@ -761,6 +765,9 @@ namespace HayChoriYPaty
                 !IsFinite(worker.PostPosition.x) || !IsFinite(worker.PostPosition.y)) return;
             Vector2 spot = WaitSpot(worker);
             if (WorkerAt(worker, spot)) return;
+            // 2026-11-24: an idle worker standing where no route can start (furniture or the barrel keep-out strip) would never get an order: put it on its spot.
+            if (IsPassiveKitchenLevel && !worker.IsMoving && !FreePositionClear(worker.Position, worker.Role, worker, Rect.zero, false) &&
+                FreePositionClear(spot, worker.Role, worker, Rect.zero, false)) { worker.Position = spot; return; }
             if (QueueFreeWorkerPath(worker, spot)) worker.ReturningToPost = worker.IsMoving;
         }
 

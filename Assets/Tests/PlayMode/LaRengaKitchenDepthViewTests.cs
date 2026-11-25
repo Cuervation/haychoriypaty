@@ -139,9 +139,9 @@ namespace HayChoriYPaty.Tests
             {
                 yield return SetSize(width, height);
                 object mode = OpenLaRenga();
-                // 2026-11-23: La Renga starts with a Parrillero and a Cocacolero and no coins; fund the rest of the six-person crew.
+                // 2026-11-24: La Renga starts with one Parrillero and 40 coins; fund the rest of the six-person crew.
                 Set(mode, "coins", 100000);
-                foreach (int role in new[] { 2, 0, 1, 2 })
+                foreach (int role in new[] { 2, 0, 1, 2, 1 })
                     Assert.IsTrue((bool)Call(game, "TryHireTowerDefenseAtPost", mode, Role(role)));
                 object presentation = Get(view, "towerDefensePresentation");
                 var stationViews = (IDictionary)Get(presentation, "pilgrimStations");
@@ -195,13 +195,71 @@ namespace HayChoriYPaty.Tests
             }
         }
 
+        // 2026-11-24 (a pedido, from a phone capture): hiring the Camioneros crew in quick succession used to teleport a worker that was mid-job (its route then
+        // crossed the table and it stood still with a fan reserved) and left new hires inside the barrels' keep-out strip, where no route can start.
+        [UnityTest, Timeout(300000)]
+        public IEnumerator CamionerosCrewHiredInQuickSuccessionNeverGetsStuckAndServesEveryFan()
+        {
+            yield return SetSize(575, 1280);
+            EnterFromSelector(9);
+            object mode = Get(view, "towerDefenseMode");
+            Set(mode, "coins", 100000);
+            int[] roles = { 0, 1, 0, 1, 0, 1 };
+            int hired = 0;
+            var lastKey = new Dictionary<int, string>(); var since = new Dictionary<int, float>();
+            float t = 0f, longestStuck = 0f;
+            for (int tick = 0; tick < 9000 && Get(mode, "Phase").ToString() == "Playing"; tick++)
+            {
+                t += .05f;
+                if (hired < roles.Length && Call(game, "TryHireTowerDefenseAtPost", mode, Role(roles[hired])) is bool ok && ok) hired++;
+                if (tick > 400 && tick % 160 == 0) Call(game, "TryUpgradeTowerDefenseSpeed", mode);
+                Call(mode, "Step", .05f);
+                foreach (object worker in (IEnumerable)Get(mode, "Workers"))
+                {
+                    int id = (int)Get(worker, "Id");
+                    string key = Get(worker, "Position") + "|" + Get(worker, "ServiceStage") + "|" + Get(worker, "PendingFanId") + "|" + Get(worker, "IsMoving") + "|" + Get(worker, "ServiceDwelling");
+                    if (!lastKey.TryGetValue(id, out string previous) || previous != key) { lastKey[id] = key; since[id] = t; continue; }
+                    if ((int)Get(worker, "ServiceStage") != 0) longestStuck = Mathf.Max(longestStuck, t - since[id]);
+                }
+                if (tick % 20 == 0) yield return null;
+            }
+            Assert.AreEqual(roles.Length, hired);
+            Assert.Less(longestStuck, 8f, "A worker with a job never stands still for long.");
+            Assert.AreEqual("Finished", Get(mode, "Phase").ToString());
+            Assert.IsTrue((bool)Get(mode, "HasWon"), "Every fan is served.");
+            Assert.AreEqual(120, Get(mode, "ServedFans"));
+            Return(mode);
+        }
+
+        // 2026-11-24 (a pedido): Los Redondos plays La Renga's C-shaped fence inverted, with La Renga's kitchen, crew and difficulty.
+        [UnityTest, Timeout(120000)]
+        public IEnumerator LosRedondosOpensOnTheInvertedCWithLaRengasKitchenCrewAndEconomy()
+        {
+            yield return SetSize(575, 1280);
+            EnterFromSelector(10);
+            Assert.AreEqual(true, Get(view, "towerDefenseActive"), Get(view, "towerDefenseError")?.ToString());
+            object mode = Get(view, "towerDefenseMode");
+            object config = Get(view, "towerDefenseSourceConfig");
+            Assert.IsTrue((bool)Get(mode, "IsCShapedLevel"), "La Renga's C-shaped single fence.");
+            Assert.IsTrue((bool)Get(config, "MirrorHorizontally"), "Drawn inverted.");
+            Assert.IsTrue((bool)Get(config, "UsesLaRengaDynamics"));
+            Assert.IsTrue((bool)Get(mode, "NarrowGrills"), "La Renga's kitchen.");
+            Assert.AreEqual(40, (int)Get(mode, "Coins"));
+            Assert.AreEqual(240, (int)Get(mode, "TotalFanCount"));
+            CollectionAssert.AreEqual(new[] { 1, 0, 0, 0, 0 }, (int[])Get(mode, "WorkerCountsByRole"));
+            Assert.AreEqual(6, ((ICollection)Get(mode, "PlacedStations")).Count);
+            Assert.IsTrue((bool)Get(config, "HasDifficultyRamp"));
+            yield return Capture("redondos-invertida-apertura");
+            Return(mode);
+        }
+
         [UnityTest, Timeout(120000)]
         public IEnumerator LaRengaIdleCrewWaitsBetweenFenceAndTablesFacingTheFenceAndChantsWhenItRunsOutOfWork()
         {
             yield return SetSize(610, 1356);
             object mode = OpenLaRenga();
             Set(mode, "coins", 100000);
-            foreach (int role in new[] { 0, 0, 2, 1 })
+            foreach (int role in new[] { 0, 0, 2, 1, 1, 1 })
                 Assert.IsTrue((bool)Call(game, "TryHireTowerDefenseAtPost", mode, Role(role)));
             float tablesTop = ((IEnumerable)Get(mode, "PlacedStations")).Cast<object>()
                 .Where(station => Get(station, "Kind").ToString().EndsWith("Table")).Max(station => ((Rect)Get(station, "Bounds")).yMax);
@@ -268,8 +326,10 @@ namespace HayChoriYPaty.Tests
                      // staff as coins allow (the per-role cap is gone), wins 200/200 and delivers 514 units.
                      // 2026-11-23 (a pedido): La Renga starts with 0 coins, one Parrillero and one Cocacolero and prices workers like Ferro (30/30/35, x2.5, x5, ...).
                      // The same scripted crew now loses at 178/200 (444 units) in 540x960 but still wins 200/200 (514 units) in the taller 610x1356; no scripted strategy of the 540x960 sweep won (best 180/200).
-                     // 2026-11-23 (a pedido): La Renga starts with 110 coins and also pays Ferro's prices for the speed upgrade (20, 35, 50, ...). The same crew now wins 200/200 (514 units) in both sizes.
-                     { (540, 960, true, 200, 514), (610, 1356, true, 200, 514) })
+                     // 2026-11-24 (a pedido): ramp 'E' (orders of 3 units and second products from early on) plus two extra tiers of 20 -> 240 fans, x1.80 and x1.88. With 40 coins and no starting Cocacolero the same scripted crew
+                     // now LOSES: 212/240 (900 units) in 540x960 and 120/240 (366 units) in 610x1356 (the Parrillero strip jams; one scripted strategy only, not a balance certificate).
+                     // 2026-11-23 (a pedido): La Renga pays Ferro's prices for the speed upgrade (20, 35, 50, ...). 2026-11-24 (a pedido): it starts with 0 coins again; the same crew still wins 200/200 (514 units) in both sizes.
+                     { (540, 960, false, 211, 897), (610, 1356, false, 120, 366) })
             {
                 yield return SetSize(width, height);
                 object mode = OpenLaRenga();

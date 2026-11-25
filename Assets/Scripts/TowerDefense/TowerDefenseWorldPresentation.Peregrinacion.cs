@@ -19,7 +19,8 @@ namespace HayChoriYPaty
              visualLevelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId);
         // La Renga's depth model also drives Camioneros since it plays on the same C-shaped fence (2026-11-23, a pedido).
         private bool UsesLaRengaKitchenDepth => mode.FreeConstruction &&
-            (visualLevelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId || visualLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId) &&
+            (visualLevelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId || visualLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId ||
+             visualLevelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId) &&
             mode.RouteConfig.RouteKind == TowerDefenseRouteKind.CShapedSingleFence;
         private bool UsesKitchenGroundDepth => UsesHorizontalKitchenDepth || UsesLaRengaKitchenDepth;
 

@@ -260,3 +260,5 @@ Este delta **supersede** las composiciones parciales de recortes, telas y placas
 - [ ] EditMode `StreetHubSignageTests`: **NOT_RUN** en el reintento (0 tests iniciados; runner no inicializó en 120 s).
 - [ ] PlayMode `CompleteReferenceArtworkIsNotCoveredByLegacyLayerCutouts` y captura full Game View 1080×2400: **BLOCKED / NOT_RUN**; el runner no inició ningún test en 120 s y luego el WebSocket MCP Unity se cerró. La captura anterior es previa a quitar la capa y no sirve como evidencia de aceptación de este delta. No declarar aceptación visual hasta capturar y revisar el Game View nuevo.
 - [ ] Android/APK y dispositivo: **NOT_RUN** (no solicitados).
+
+**Botón CUENTA retirado (2026-11-24, a pedido):** el botón superior derecho "CUENTA" ya no se dibuja en hub, insignias, ranking ni mercado (`FirebasePlayerSession.OnGUI`). El panel de cuenta sigue abriéndose al pulsar un destino de juego sin sesión; con sesión iniciada ya no hay acceso visible a "CAMBIAR CUENTA GOOGLE". `HubAccountButtonScreenBounds` se conserva (geometría del altavoz/pruebas). No se probó en pantalla: NOT_RUN.

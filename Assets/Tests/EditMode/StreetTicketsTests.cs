@@ -221,7 +221,7 @@ namespace HayChoriYPaty.Tests
             Assert.IsFalse((bool)Invoke(game, "TryStartRound"), "Legacy ID10 must not be reinterpreted as a traditional round.");
             Assert.IsTrue((bool)Invoke(game, "TryStartTowerDefenseRound"));
             object sim = Read(game, "Sim");
-            Assert.AreEqual(500, Read(sim, "Coins"), "Both defense campaign identities use the isolated common opening grant.");
+            Assert.AreEqual(40, Read(sim, "Coins"), "Los Redondos opens with La Renga's 40 coins (2026-11-24).");
             Assert.AreEqual(5, Read(sim, "ProductCount"), "Los Redondos serves its authored five-product Defense menu.");
         }
 
@@ -428,6 +428,7 @@ namespace HayChoriYPaty.Tests
                 Read(campaign, "WorkerCountsByRole"), Read(campaign, "TicketWorkerCountsByRole"), Read(campaign, "Coins")
             });
             Invoke(mode, "Begin");
+            Put(mode, "coins", 500); // 2026-11-24: Camioneros opens with 50 coins; this test is about the settlement, not the opening purse.
             Assert.IsTrue((bool)Invoke(game, "TryHireTowerDefense", mode, Role(roleType, "Cocacolero"), 0));
             for (int n = 0; n < 10; n++)
                 Assert.IsTrue((bool)Invoke(mode, "TrySpawnFan", new[] {4}, new[] {1}));

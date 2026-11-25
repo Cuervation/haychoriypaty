@@ -49,7 +49,7 @@ MonoBehaviour:
   directionSignPrefab: {fileID: 1359721814499061152, guid: 9cf7a7df68e2841c88fe696034ad64a0, type: 3}
   directionArrowSprite: {fileID: 21300000, guid: ef3873967f16248bd8b9a67207f11688, type: 3}
   availableProducts: 0000000001000000020000000400000006000000
-  totalFanCount: 200
+  totalFanCount: 240
   fanSpeed: 0.1875
   minimumEntrySpacingLogical: 70
   serviceRange: 0.8
@@ -57,59 +57,69 @@ MonoBehaviour:
   secondWorkZoneOffset: {x: 0, y: 0}
   fanSpawnIntervalSeconds: 0.1
   maximumWorkersPerRole: 0
-  startingCoins: 110
+  startingCoins: 40
   hirePricingCampaignLevelId: 3
   difficultyTiers:
   - FromFan: 0
     SpeedMultiplier: 1
     Quantity2Percent: 0
     Quantity3Percent: 0
-    SecondProductPercent: 0
+    SecondProductPercent: 20
   - FromFan: 20
     SpeedMultiplier: 1.08
-    Quantity2Percent: 0
-    Quantity3Percent: 0
-    SecondProductPercent: 25
-  - FromFan: 40
-    SpeedMultiplier: 1.16
     Quantity2Percent: 30
     Quantity3Percent: 0
-    SecondProductPercent: 25
-  - FromFan: 60
-    SpeedMultiplier: 1.24
-    Quantity2Percent: 50
-    Quantity3Percent: 0
-    SecondProductPercent: 30
-  - FromFan: 80
-    SpeedMultiplier: 1.32
+    SecondProductPercent: 45
+  - FromFan: 40
+    SpeedMultiplier: 1.16
     Quantity2Percent: 40
     Quantity3Percent: 20
-    SecondProductPercent: 35
+    SecondProductPercent: 55
+  - FromFan: 60
+    SpeedMultiplier: 1.24
+    Quantity2Percent: 30
+    Quantity3Percent: 40
+    SecondProductPercent: 60
+  - FromFan: 80
+    SpeedMultiplier: 1.32
+    Quantity2Percent: 20
+    Quantity3Percent: 60
+    SecondProductPercent: 65
   - FromFan: 100
     SpeedMultiplier: 1.4
-    Quantity2Percent: 50
-    Quantity3Percent: 30
-    SecondProductPercent: 40
+    Quantity2Percent: 10
+    Quantity3Percent: 80
+    SecondProductPercent: 70
   - FromFan: 120
     SpeedMultiplier: 1.48
-    Quantity2Percent: 45
-    Quantity3Percent: 40
-    SecondProductPercent: 45
+    Quantity2Percent: 10
+    Quantity3Percent: 90
+    SecondProductPercent: 75
   - FromFan: 140
     SpeedMultiplier: 1.56
-    Quantity2Percent: 40
-    Quantity3Percent: 50
-    SecondProductPercent: 50
+    Quantity2Percent: 0
+    Quantity3Percent: 100
+    SecondProductPercent: 80
   - FromFan: 160
     SpeedMultiplier: 1.64
-    Quantity2Percent: 40
-    Quantity3Percent: 55
-    SecondProductPercent: 55
+    Quantity2Percent: 0
+    Quantity3Percent: 100
+    SecondProductPercent: 85
   - FromFan: 180
     SpeedMultiplier: 1.72
-    Quantity2Percent: 35
-    Quantity3Percent: 65
-    SecondProductPercent: 60
+    Quantity2Percent: 0
+    Quantity3Percent: 100
+    SecondProductPercent: 90
+  - FromFan: 200
+    SpeedMultiplier: 1.8
+    Quantity2Percent: 0
+    Quantity3Percent: 100
+    SecondProductPercent: 95
+  - FromFan: 220
+    SpeedMultiplier: 1.88
+    Quantity2Percent: 0
+    Quantity3Percent: 100
+    SecondProductPercent: 100
   startingStations:
   - Kind: 0
     PositionFromWorkBoundsMin: {x: 0, y: 0}
@@ -143,7 +153,7 @@ MonoBehaviour:
   - 65
   startingWorkersByRole:
   - 1
-  - 1
+  - 0
   - 0
   - 0
   - 0

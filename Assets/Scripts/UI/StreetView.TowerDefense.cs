@@ -483,9 +483,16 @@ namespace HayChoriYPaty
                 DrawTowerDefenseSceneLayers(logicalHeight);
                 GUI.matrix = previous;
                 if (towerDefenseActive && towerDefensePresentation != null && towerDefensePresentation.OverlayTexture != null)
-                    GUI.DrawTexture(new Rect(0f, -TowerDefenseResponsiveLayout.VisualStageLift * viewport.width / W,
-                        screenSize.x, screenSize.y), towerDefensePresentation.OverlayTexture,
-                        ScaleMode.StretchToFill, true);
+                {
+                    Rect overlay = new Rect(0f, -TowerDefenseResponsiveLayout.VisualStageLift * viewport.width / W, screenSize.x, screenSize.y);
+                    if (TowerDefenseMirrored)
+                    {
+                        // Mirrored about the playable viewport's centre, the same axis the bubbles and dialogues use.
+                        overlay.x = 2f * (viewport.x + viewport.width * .5f) - screenSize.x;
+                        GUI.DrawTextureWithTexCoords(overlay, towerDefensePresentation.OverlayTexture, new Rect(1f, 0f, -1f, 1f), true);
+                    }
+                    else GUI.DrawTexture(overlay, towerDefensePresentation.OverlayTexture, ScaleMode.StretchToFill, true);
+                }
                 GUI.matrix = Matrix4x4.TRS(new Vector3(viewport.x, viewport.y), Quaternion.identity,
                     new Vector3(viewport.width / W, viewport.width / W, 1f));
                 GUI.color = Color.white;
@@ -684,15 +691,8 @@ namespace HayChoriYPaty
                     Mathf.RoundToInt(HudStatusValueFontSize * statusScale));
                 DrawHudNumber(HudStatusTextBounds(1, cutout), FormatElapsedTime(elapsed),
                     Mathf.RoundToInt(HudClockFontSize * statusScale));
-                // La Renga (2026-11-23, a pedido): no "PEDIDOS n/120" under the top bar. The caption still selects the compact HUD above.
-                bool hideOrderCounter = towerDefenseSourceConfig != null &&
-                    towerDefenseSourceConfig.SourceCampaignLevelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId;
-                if (!string.IsNullOrEmpty(waveCaption) && !hideOrderCounter)
-                {
-                    Rect wave = new Rect((W - 176f) * .5f, HudBarHeightFor(cutout) + 4f, 176f, 30f);
-                    DrawMarketBluePanel(wave, new Color(.015f, .12f, .38f, .94f));
-                    DrawHudNumber(wave, waveCaption, 19);
-                }
+                // 2026-11-24 (a pedido): no "PEDIDOS n/total" panel under the top bar in any Defense level, so the player does not know how many
+                // orders are left (La Renga lost it on 2026-11-23). The caption still selects the compact HUD above.
                 hudQuotaProductCount = 0; // Defense has no traditional product quotas or deadline.
             }
             finally
@@ -714,7 +714,8 @@ namespace HayChoriYPaty
             IReadOnlyList<TowerDefenseFanState> fans = towerDefenseMode.Fans;
             int levelId = towerDefenseSourceConfig != null
                 ? towerDefenseSourceConfig.SourceCampaignLevelId : -1;
-            bool avoidOverlap = levelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId;
+            bool avoidOverlap = towerDefenseSourceConfig != null && towerDefenseSourceConfig.UsesLaRengaDynamics;
+            bool mirrored = TowerDefenseMirrored;
             laRengaOrderBubbles.Clear();
             // Camioneros and Peregrinación bubbles share the viewport edge with the
             // world-space fan during progressive entry. Clamping either bubble into view
@@ -766,7 +767,9 @@ namespace HayChoriYPaty
                     if (bubble.yMax <= 0f || bubble.yMin >= logicalCanvasHeight) continue;
                     if (avoidOverlap) laRengaOrderBubbles.Add(bubble);
 
-                    DrawOrderBubble(bubble, 1f);
+                    // Mirrored world (2026-11-24): the bubbles were laid out as if the fans entered from the left; reflect the final rectangle and its art.
+                    if (mirrored) bubble.x = W - bubble.xMax;
+                    DrawTowerDefenseOrderBubbleArt(bubble, mirrored);
                     int shown = 0;
                     for (int lineIndex = 0; lineIndex < fan.Order.Count; lineIndex++)
                     {
@@ -845,6 +848,7 @@ namespace HayChoriYPaty
                     float alpha = age < CrewChantSeconds - CrewChantFadeSeconds ? 1f : (CrewChantSeconds - age) / CrewChantFadeSeconds;
                     Vector3 head = camera.WorldToScreenPoint(new Vector3(worker.Position.x, worker.Position.y + headWorld, 0f));
                     if (head.z <= 0f) continue;
+                    if (TowerDefenseMirrored) head.x = 2f * (viewport.x + viewport.width * .5f) - head.x;
                     // As narrow as its longest line allows (same font size): the bubble hugs the text on both sides.
                     string[] lines = chant.Split('\n');
                     float chantWidth = 0f;
@@ -898,6 +902,20 @@ namespace HayChoriYPaty
                 - TowerDefenseOrderBubbleHeadClearanceLogical;
             bubble.y += desiredBottom - bubble.yMax;
             return bubble;
+        }
+
+        /// <summary>Los Redondos plays La Renga's C inverted: the whole Defense world is drawn mirrored left-right (2026-11-24, a pedido).</summary>
+        private bool TowerDefenseMirrored => towerDefenseSourceConfig != null && towerDefenseSourceConfig.MirrorHorizontally;
+
+        // The order bubble's tail sits at the bottom right; mirrored it sits at the bottom left. Only the art flips, never the icons or numbers.
+        private void DrawTowerDefenseOrderBubbleArt(Rect bubble, bool mirrored)
+        {
+            Matrix4x4 previousMatrix = GUI.matrix;
+            if (mirrored)
+                GUI.matrix = previousMatrix * Matrix4x4.TRS(new Vector3(bubble.center.x, 0f, 0f), Quaternion.identity, new Vector3(-1f, 1f, 1f))
+                    * Matrix4x4.TRS(new Vector3(-bubble.center.x, 0f, 0f), Quaternion.identity, Vector3.one);
+            DrawOrderBubble(bubble, 1f);
+            GUI.matrix = previousMatrix;
         }
 
         private static bool ShouldDrawTowerDefenseBubbleForFanEntry(int campaignLevelId, float visibleFrameWidthLogical) =>

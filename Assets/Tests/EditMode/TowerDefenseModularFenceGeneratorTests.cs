@@ -265,6 +265,7 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
+        [Ignore("Los Redondos (ID10) now plays La Renga's inverted C-shaped single fence (2026-11-24); this test covered its former five-run fence.")]
         public void LosRedondosDrawsBothRailsAlongTheWholeFiveRunRoute()
         {
             Type generatorType = Type.GetType("HayChoriYPaty.TowerDefenseModularFenceGenerator, Assembly-CSharp", true);
