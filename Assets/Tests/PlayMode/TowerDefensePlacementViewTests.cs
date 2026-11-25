@@ -142,8 +142,8 @@ namespace HayChoriYPaty.Tests
             Delegate handler = GetType().GetMethod("RecordReceipt", I).MakeGenericMethod(receiptType)
                 .CreateDelegate(deliveryEvent.EventHandlerType, this);
             deliveryEvent.AddEventHandler(mode, handler);
-            Assert.AreEqual(requestedLevelId == 14 ? 2 : requestedLevelId == 13 || requestedLevelId == 10 ? 1 : 0, ((ICollection)Get(mode, "Workers")).Count,
-                "Only Peregrinación (Parrillero + Mozo), La Renga and Los Redondos (one Parrillero, 2026-11-24) have an explicitly configured crew at start.");
+            Assert.AreEqual(requestedLevelId == 14 ? 2 : requestedLevelId == 10 ? 3 : requestedLevelId == 13 ? 1 : 0, ((ICollection)Get(mode, "Workers")).Count,
+                "Only Peregrinación (Parrillero + Mozo), La Renga (one Parrillero) and Los Redondos (Parrillero, Parrillero Premium and Mozo, 2026-11-24) have an explicitly configured crew at start.");
             if (requestedLevelId == 13)
             {
                 CollectionAssert.AreEqual(new[] { 1, 0, 0, 0, 0 }, (int[])Get(mode, "WorkerCountsByRole"));
@@ -2001,6 +2001,59 @@ namespace HayChoriYPaty.Tests
             }
             finally { Time.captureDeltaTime = 0f; }
             Assert.Greater(written, 100);
+        }
+
+        [UnityTest]
+        [Explicit("Records Los Redondos' active kitchen with La Renga's narrow tables and stacked barrels to Logs/Acceptance/RedondosNarrowTables-20261125")]
+        public IEnumerator LosRedondosNarrowTablesVideoFrames()
+        {
+            string root = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/RedondosNarrowTables-20261125"));
+            string directory = Path.Combine(root, "frames");
+            if (Directory.Exists(directory)) Directory.Delete(directory, true);
+            Directory.CreateDirectory(directory);
+            yield return CaptureAtResolution("losredondos-narrow-tables-575x1280", 575, 1280, false);
+            File.Copy(Path.Combine(CaptureDirectory, "Level" + requestedLevelId.ToString("00"), "losredondos-narrow-tables-575x1280.png"),
+                Path.Combine(root, "still-575x1280.png"), true);
+            Time.captureDeltaTime = 1f / 20f;
+            object presentation = Get(view, "towerDefensePresentation");
+            Type roleKind = T("StreetWorkerRole");
+            // Video demo only: extra coins so the Cocacolero and the Fernetero are on screen too.
+            Set(mode, "coins", 600);
+            var hires = new System.Collections.Generic.Dictionary<int, int> { { 5, 1 }, { 25, 3 }, { 45, 0 }, { 65, 4 } };
+            int written = 0;
+            try
+            {
+                for (int frame = 0; frame < 1000 && Get(mode, "Phase").ToString() == "Playing"; frame++)
+                {
+                    if (hires.TryGetValue(frame, out int role)) Call(game, "TryHireTowerDefenseAtPost", mode, Enum.ToObject(roleKind, role));
+                    Call(mode, "Step", .05f);
+                    Call(presentation, "Sync", mode);
+                    yield return new WaitForEndOfFrame();
+                    Texture2D image = ScreenCapture.CaptureScreenshotAsTexture();
+                    File.WriteAllBytes(Path.Combine(directory, "f" + written.ToString("00000") + ".jpg"), image.EncodeToJPG(88));
+                    UnityEngine.Object.Destroy(image);
+                    written++;
+                }
+            }
+            finally { Time.captureDeltaTime = 0f; }
+            Assert.Greater(written, 100);
+        }
+
+        [UnityTest]
+        public IEnumerator LosRedondosFerneteroLeavesTheFernetTableAndServesFernet()
+        {
+            // 2026-11-25: its Boca post is the middle of the Fernet table, solid on the C, so the Fernetero used to stand there for ever.
+            Set(mode, "coins", 600);
+            Assert.IsTrue((bool)Call(game, "TryHireTowerDefenseAtPost", mode, Enum.ToObject(T("StreetWorkerRole"), 3)));
+            bool served = false;
+            for (int tick = 0; tick < 1600 && !served && Get(mode, "Phase").ToString() == "Playing"; tick++)
+            {
+                Call(mode, "Step", .05f);
+                foreach (object w in (IList)Get(mode, "Workers"))
+                    if (Get(w, "Role").ToString() == "Fernetero" && ((bool)Get(w, "IsMoving") || (int)Get(w, "ServiceStage") > 0)) served = true;
+                if (tick % 100 == 0) yield return null;
+            }
+            Assert.IsTrue(served, "The Fernetero never walked to the Fernet table for an order.");
         }
 
         [UnityTest]

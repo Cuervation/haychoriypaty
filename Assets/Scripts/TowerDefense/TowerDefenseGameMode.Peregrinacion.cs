@@ -60,7 +60,10 @@ namespace HayChoriYPaty
                 // La Renga's kitchen is Ferro's with two columns less of food on its grills (2 per product instead of 3).
         private static readonly StreetKitchenLayout RengaKitchenLayoutStatic =
             new StreetKitchenLayout(new[] { 0, 1, 2, 4, 6 }, false, true);
-        internal bool NarrowGrills => config.UsesLaRengaDynamics && !config.ActiveKitchen;
+        // Los Redondos' active kitchen is Racing's seven stations with La Renga's narrow grills and tables and its barrel stack (2026-11-25).
+        private static readonly StreetKitchenLayout RedondosKitchenLayoutStatic =
+            new StreetKitchenLayout(new[] { 0, 1, 2, 3, 4, 5, 6 }, true, true);
+        internal bool NarrowGrills => config.UsesLaRengaDynamics;
         /// <summary>Drinks are taken from the barrel's right side, facing it (La Renga and, on the same C-shaped fence, Camioneros).</summary>
         internal bool BarrelsFromTheSide => BocaKitchenLayout.BarrelsFromTheSide;
         internal static StreetKitchenLayout LujanBocaKitchenVisualLayout => BocaKitchenLayoutStatic;
@@ -73,7 +76,7 @@ namespace HayChoriYPaty
             : BocaKitchenLayoutStatic;
         // Los Redondos on La Renga's C-shaped fence (2026-11-24) cooks in La Renga's kitchen; the footer still copies Ferro's (FooterSourceLevelId).
         // 2026-11-24: with the active kitchen it is Racing's (the same seven-station layout as Luján's).
-        private StreetKitchenLayout BocaKitchenLayout => config.ActiveKitchen ? BocaKitchenLayoutStatic : KitchenLayoutForLevel(config.UsesLaRengaDynamics
+        private StreetKitchenLayout BocaKitchenLayout => config.ActiveKitchen ? (IsCShapedLevel ? RedondosKitchenLayoutStatic : BocaKitchenLayoutStatic) : KitchenLayoutForLevel(config.UsesLaRengaDynamics
             ? TowerDefenseLevelConfig.LaRengaCampaignLevelId : config.SourceCampaignLevelId);
         internal StreetKitchenLayout SourceKitchenLayout => BocaKitchenLayout;
         private readonly List<TowerDefensePlacedStation> placedStations = new List<TowerDefensePlacedStation>();
@@ -706,8 +709,9 @@ namespace HayChoriYPaty
 
         // The passive crews wait in the open band between the fence and the tables. On the C-shaped fence the active kitchen's Mozos do too (2026-11-24):
         // their Boca post, in front of the tables, is inside the solid furniture of the C, from where no route can start.
+        // 2026-11-25: the Fernetero too: its Boca post is the middle of the Fernet table, which is solid on the C, so it never left it (no route can start there).
         private bool UsesWaitingBand(TowerDefenseWorkerState worker) =>
-            IsPassiveKitchenLevel || (IsCShapedLevel && worker.Role == StreetWorkerRole.Mozo);
+            IsPassiveKitchenLevel || (IsCShapedLevel && (worker.Role == StreetWorkerRole.Mozo || worker.Role == StreetWorkerRole.Fernetero));
 
         // The passive Defense kitchens wait like the traditional passive kitchens (StreetSimulation.WorkerWaitPosition): each worker owns a fixed
         // spot by hire order, in rows along the service line next to the fence (the top run here, the counter there), each

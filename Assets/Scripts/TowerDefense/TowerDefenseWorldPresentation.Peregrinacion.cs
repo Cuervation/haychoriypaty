@@ -283,7 +283,7 @@ namespace HayChoriYPaty
                     logicalPosition = layout.TableSlotPosition(unit.Product, unit.Slot, companionAvailable,
                         mode.Kitchen.TableCapacity(unit.Product));
                     iconSize = StreetKitchenLayout.TableServingSize(unit.Product);
-                    rotation = StreetKitchenLayout.TableSlotRotation(unit.Product, unit.Slot, companionAvailable, layout.NarrowGrills);
+                    rotation = StreetKitchenLayout.TableSlotRotation(unit.Product, unit.Slot, companionAvailable, layout.NarrowTables);
                 }
                 if (unit.Location == StreetFoodLocation.Carried)
                 {

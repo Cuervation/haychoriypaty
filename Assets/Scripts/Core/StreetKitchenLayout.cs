@@ -85,12 +85,14 @@ namespace HayChoriYPaty
         public bool HasCocaBarrel { get { return hasCoca; } }
         public bool HasBeerBarrel { get { return hasBeer; } }
         public bool NarrowGrills { get; private set; }
+        /// <summary>Sandwich tables three quarters as wide (one column of sandwiches per product): they come with the narrow grills (La Renga, and Los Redondos' active kitchen).</summary>
+        public bool NarrowTables { get; private set; }
         /// <summary>
         /// Tower Defense on La Renga's C-shaped fence (2026-11-23): drinks are taken from the barrel's right side, with the workers
         /// spread upward along it, exactly as in the narrow (La Renga) layout, without changing any size or the food capacity.
         /// </summary>
         public bool SideBarrelPickup { get; set; }
-        public bool BarrelsFromTheSide { get { return NarrowGrills || SideBarrelPickup; } }
+        public bool BarrelsFromTheSide { get { return NarrowGrills || NarrowTables || SideBarrelPickup; } }
         /// <summary>Top edge of the span the kitchen is fitted with (narrow layout only; 0 = use the pieces).</summary>
         public float KitchenSpanTop { get; private set; }
         public Rect NormalGrillBounds { get { return normalGrill; } }
@@ -110,6 +112,7 @@ namespace HayChoriYPaty
         {
             this.activeCooks = activeCooks;
             NarrowGrills = narrowGrills;
+            NarrowTables = narrowGrills;
             bool[] available = new bool[7];
             if (availableProducts != null)
                 for (int i = 0; i < availableProducts.Length; i++)
@@ -125,14 +128,16 @@ namespace HayChoriYPaty
             // La Renga: the sandwich tables are three quarters as wide (one column of sandwiches per product instead of two). They keep
             // Ferro's separation (26.4), the barrels sit NarrowTableBarrelGap from the right table and next to each other
             // with Ferro's own separation, as in the original row.
-            if (narrowGrills && hasNormal && hasPremium)
+            if (NarrowTables && hasNormal && hasPremium)
             {
                 float tableGap = premium.xMin - normal.xMax;
                 float barrelGap = hasCoca && hasBeer ? beer.xMin - coca.xMax : tableGap;
                 normal.width *= NarrowTableWidthFraction;
                 premium.width *= NarrowTableWidthFraction;
                 premium.x = normal.xMax + tableGap;
-                if (hasCoca) coca.x = premium.xMax + NarrowTableBarrelGap;
+                // The Fernet table is narrowed like the sandwich tables: with it the row (and the barrels' side pickup lane) would not fit the pocket.
+                if (hasFernet) { fernet.width *= NarrowTableWidthFraction; fernet.x = premium.xMax + tableGap; }
+                if (hasCoca) coca.x = hasFernet ? fernet.xMax + FernetBarrelGap : premium.xMax + NarrowTableBarrelGap;
                 // The barrels are 15% smaller, standing on the same base line as before.
                 float spanTop = Mathf.Min(hasCoca ? coca.yMin : float.MaxValue, hasBeer ? beer.yMin : float.MaxValue);
                 if (hasCoca) coca = ShrinkBarrel(coca);
@@ -172,6 +177,8 @@ namespace HayChoriYPaty
             return new Rect(barrel.x, barrel.yMax - height, width, height);
         }
         public const float NarrowGrillGap = 3f;
+        /// <summary>Los Redondos (with a Fernet table): the barrels stand almost against it (3 px), 2026-11-25.</summary>
+        public const float FernetBarrelGap = 3f;
         public const float NarrowTableBarrelGap = 23.4f, NarrowTableWidthFraction = .75f, NarrowBarrelStackGap = 1f, NarrowBarrelSideStandoff = 24f;
         private static Rect ShrinkToFitFood(Rect grill)
         {
@@ -361,8 +368,8 @@ namespace HayChoriYPaty
         }
 
         // Narrow tables hold one column of sandwiches per product instead of two (half the base slots per product).
-        private int TableBaseCount(bool companionAvailable) => NarrowGrills ? (companionAvailable ? 3 : 6) : (companionAvailable ? 6 : 12);
-        private int TableColumnCount(bool companionAvailable) => NarrowGrills ? (companionAvailable ? 1 : 2) : (companionAvailable ? 2 : 4);
+        private int TableBaseCount(bool companionAvailable) => NarrowTables ? (companionAvailable ? 3 : 6) : (companionAvailable ? 6 : 12);
+        private int TableColumnCount(bool companionAvailable) => NarrowTables ? (companionAvailable ? 1 : 2) : (companionAvailable ? 2 : 4);
 
         /// <summary>Front-side pickup point aligned to the exact reserved sandwich slot.</summary>
         public Vector2 TableSlotPickupPosition(int product, int slot, bool companionAvailable, int capacity)
