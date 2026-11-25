@@ -422,9 +422,13 @@ namespace HayChoriYPaty
             float split = upper.Bounds.height * splitRatio;
             float reach = pickingUp ? Mathf.Sin(Mathf.Clamp01(pickupProgress) * Mathf.PI) * Height * (barrelPickup ? -.08f : .20f) : 0f;
             float upperBottom = upper.Bounds.height * (1f - splitRatio) * upperScale - bob - reach;
+            float legHeight = legs.Bounds.height * (1f - Waist + WaistOverlap), half = legs.Bounds.width * .5f;
+            // 2026-11-25: a barrel taken from its side shows the side carry pose over the walking legs. Its art is not exactly as tall as the legs' (and the
+            // old -8 % "reach" lifted the torso on purpose), so the two cutouts parted at the waist and a clear line crossed the apron. The torso now never
+            // rides higher than the legs' top minus the designed waist overlap. Other poses are untouched (they already sit exactly there).
+            if (barrelPickup) upperBottom = Mathf.Min(upperBottom, legHeight * legScale - WaistOverlap * upper.Bounds.height * upperScale);
             torso = new BodyPart { Sprite = Slice(upper.Texture, new Rect(upper.Bounds.x, upper.Bounds.y, upper.Bounds.width, split)),
                 Flip = upper.Flip, Offset = new Vector2(0f, upperBottom), Scale = upperScale };
-            float legHeight = legs.Bounds.height * (1f - Waist + WaistOverlap), half = legs.Bounds.width * .5f;
             float leftLift = moving && frame == 1 ? 2f : 0f;
             float rightLift = moving && frame == 3 ? 2f : 0f;
             float quarterWidth = legs.Bounds.width * legScale * .25f;
