@@ -12,7 +12,7 @@ namespace HayChoriYPaty
         {
             get
             {
-                int level = PilgrimFooterReferenceLevel(PilgrimSourceLevelId);
+                int level = PilgrimFooterReferenceLevel(PilgrimFooterSourceLevelId);
                 if (pilgrimCardRolesLevel != level || pilgrimCardRoles == null)
                 {
                     var sim = new StreetSimulation(new StreetBalance(), level, 5f, 0, 1, 0);
@@ -29,6 +29,9 @@ namespace HayChoriYPaty
         // The campaign level whose kitchen, footer and caption this level copies (Boca for Luján, Nueva Chicago for Camioneros).
         private int PilgrimSourceLevelId => towerDefenseSourceConfig != null
             ? towerDefenseSourceConfig.SourceCampaignLevelId : TowerDefenseLevelConfig.PeregrinacionLujanCampaignLevelId;
+        // The level whose footer (cards, height) is copied: Racing's active kitchen uses Boca's, the same as Luján (2026-11-24, Los Redondos).
+        private int PilgrimFooterSourceLevelId => towerDefenseSourceConfig != null && towerDefenseSourceConfig.ActiveKitchen
+            ? TowerDefenseLevelConfig.PeregrinacionLujanCampaignLevelId : PilgrimSourceLevelId;
         // Index zero is the immediate speed upgrade; the remaining cards hire real staff.
         // Like Boca's footer, Luján has no category switcher or equipment catalogue.
         private bool IsPilgrimConstruction => towerDefenseMode != null && towerDefenseMode.FreeConstruction;
@@ -47,7 +50,7 @@ namespace HayChoriYPaty
             : sourceLevelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId || sourceLevelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId ? 3 : 8;
         private ResponsiveFooterLayout PilgrimFooter(float canvasHeight)
         {
-            int level = PilgrimFooterReferenceLevel(PilgrimSourceLevelId);
+            int level = PilgrimFooterReferenceLevel(PilgrimFooterSourceLevelId);
             if (Mathf.Abs(canvasHeight - pilgrimFooterCacheHeight) > .001f || pilgrimFooterCache.UpgradeBounds == null ||
                 pilgrimFooterCacheLevel != level)
             {
@@ -137,7 +140,7 @@ namespace HayChoriYPaty
         private void DrawPilgrimHud(float height)
         {
             DrawTowerDefenseCampaignHud();
-            float top = TowerDefenseResponsiveLayout.PilgrimFooterTop(height, PilgrimSourceLevelId);
+            float top = TowerDefenseResponsiveLayout.PilgrimFooterTop(height, PilgrimFooterSourceLevelId);
             DrawFooterBluePanel(LayoutRect(new Rect(0, top, W, height - top)), layoutVerticalScale);
             // Same caption as the source level's footer: club first, neighborhood second, with the level's crest.
             ResponsiveFooterLayout pilgrimFooterLayout = PilgrimFooter(height);

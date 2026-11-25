@@ -477,6 +477,7 @@ namespace HayChoriYPaty
             random = new System.Random(sourceBalance.randomSeed + sourceLevel * 97 + config.LevelId.GetHashCode());
             InitializeStartingStations();
             BuildWorkers();
+            WarmPathLattices();
         }
 
         public void Begin()
@@ -484,6 +485,7 @@ namespace HayChoriYPaty
             if (Phase != TowerDefenseRunPhase.Ready) return;
             activeInstance = this;
             campaignStepSuspended = true;
+            WarmPathLattices(); // a no-op when the screen layout did not change since construction
             Phase = TowerDefenseRunPhase.Playing;
         }
 

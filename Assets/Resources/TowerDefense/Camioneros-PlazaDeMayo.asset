@@ -57,66 +57,66 @@ MonoBehaviour:
   secondWorkZoneOffset: {x: 0, y: 0}
   fanSpawnIntervalSeconds: 0.1
   maximumWorkersPerRole: 3
-  startingCoins: 50
+  startingCoins: 20
   hirePricingCampaignLevelId: 1
   difficultyTiers:
   - FromFan: 0
-    SpeedMultiplier: 1
+    SpeedMultiplier: 1.16
     Quantity2Percent: 0
     Quantity3Percent: 0
     SecondProductPercent: 20
   - FromFan: 10
-    SpeedMultiplier: 1.08
+    SpeedMultiplier: 1.24
     Quantity2Percent: 30
     Quantity3Percent: 0
     SecondProductPercent: 45
   - FromFan: 20
-    SpeedMultiplier: 1.16
+    SpeedMultiplier: 1.32
     Quantity2Percent: 40
     Quantity3Percent: 20
     SecondProductPercent: 55
   - FromFan: 30
-    SpeedMultiplier: 1.24
+    SpeedMultiplier: 1.4
     Quantity2Percent: 30
     Quantity3Percent: 40
     SecondProductPercent: 60
   - FromFan: 40
-    SpeedMultiplier: 1.32
+    SpeedMultiplier: 1.48
     Quantity2Percent: 20
     Quantity3Percent: 60
     SecondProductPercent: 65
   - FromFan: 50
-    SpeedMultiplier: 1.4
+    SpeedMultiplier: 1.56
     Quantity2Percent: 10
     Quantity3Percent: 80
     SecondProductPercent: 70
   - FromFan: 60
-    SpeedMultiplier: 1.48
+    SpeedMultiplier: 1.64
     Quantity2Percent: 10
     Quantity3Percent: 90
     SecondProductPercent: 75
   - FromFan: 70
-    SpeedMultiplier: 1.56
+    SpeedMultiplier: 1.72
     Quantity2Percent: 0
     Quantity3Percent: 100
     SecondProductPercent: 80
   - FromFan: 80
-    SpeedMultiplier: 1.64
+    SpeedMultiplier: 1.8
     Quantity2Percent: 0
     Quantity3Percent: 100
     SecondProductPercent: 85
   - FromFan: 90
-    SpeedMultiplier: 1.72
+    SpeedMultiplier: 1.88
     Quantity2Percent: 0
     Quantity3Percent: 100
     SecondProductPercent: 90
   - FromFan: 100
-    SpeedMultiplier: 1.8
+    SpeedMultiplier: 1.96
     Quantity2Percent: 0
     Quantity3Percent: 100
     SecondProductPercent: 95
   - FromFan: 110
-    SpeedMultiplier: 1.88
+    SpeedMultiplier: 2.04
     Quantity2Percent: 0
     Quantity3Percent: 100
     SecondProductPercent: 100

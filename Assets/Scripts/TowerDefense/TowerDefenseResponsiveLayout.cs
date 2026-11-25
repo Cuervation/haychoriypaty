@@ -355,7 +355,8 @@ namespace HayChoriYPaty
             firstServiceZone = secondServiceZone = Vector2.zero;
             error = null;
             float topFence = RouteTopReserve + CShapedTopFenceOffset;
-            float bottomFence = PilgrimFooterTop(logicalHeight, source.SourceCampaignLevelId) - CShapedBottomFenceAboveFooter;
+            // Los Redondos' active kitchen (2026-11-24) copies Racing's/Boca's footer, which is taller than Ferro's.
+            float bottomFence = PilgrimFooterTop(logicalHeight, source.ActiveKitchen ? TowerDefenseLevelConfig.PeregrinacionLujanCampaignLevelId : source.SourceCampaignLevelId) - CShapedBottomFenceAboveFooter;
             float rightFence = logicalWidth - CShapedRightFenceInset;
             if (bottomFence - topFence < 300f || rightFence < logicalWidth * .5f)
             {

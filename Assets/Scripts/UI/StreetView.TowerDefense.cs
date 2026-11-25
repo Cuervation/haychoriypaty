@@ -817,7 +817,8 @@ namespace HayChoriYPaty
 
         private void DrawTowerDefenseCrewChants(Rect viewport)
         {
-            if (towerDefenseMode == null || !towerDefenseMode.IsCShapedLevel || items == null || viewport.width <= 0f || text == null) return;
+            // The calls are for the passive waiting crew; Los Redondos' active kitchen (cooks at their grills, Mozos delivering) does not wait in the band.
+            if (towerDefenseMode == null || !towerDefenseMode.IsCShapedLevel || !towerDefenseMode.IsPassiveKitchenLevel || items == null || viewport.width <= 0f || text == null) return;
             Camera camera = Camera.main;
             if (camera == null) return;
             if (!ReferenceEquals(crewChantMode, towerDefenseMode)) { crewChantMode = towerDefenseMode; crewWasSettled.Clear(); crewChantStart.Clear(); }
@@ -958,7 +959,7 @@ namespace HayChoriYPaty
             float sidewalkTop = mural.yMax;
             const float farSidewalkHeight = 24f, nearSidewalkHeight = 30f, stallSpaceHeight = 90f;
             float footerTop = IsPilgrimConstruction
-                ? TowerDefenseResponsiveLayout.PilgrimFooterTop(canvasHeight, visualLevelId)
+                ? TowerDefenseResponsiveLayout.PilgrimFooterTop(canvasHeight, PilgrimFooterSourceLevelId)
                 : canvasHeight - TowerDefenseResponsiveLayout.FooterReserve;
             float roadBottom = footerTop - nearSidewalkHeight - stallSpaceHeight;
             Rect cleanRoad = new Rect(0f, sidewalkTop + farSidewalkHeight, W,

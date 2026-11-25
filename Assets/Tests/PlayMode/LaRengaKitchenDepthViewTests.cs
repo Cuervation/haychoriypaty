@@ -243,11 +243,13 @@ namespace HayChoriYPaty.Tests
             Assert.IsTrue((bool)Get(mode, "IsCShapedLevel"), "La Renga's C-shaped single fence.");
             Assert.IsTrue((bool)Get(config, "MirrorHorizontally"), "Drawn inverted.");
             Assert.IsTrue((bool)Get(config, "UsesLaRengaDynamics"));
-            Assert.IsTrue((bool)Get(mode, "NarrowGrills"), "La Renga's kitchen.");
+            Assert.IsTrue((bool)Get(config, "ActiveKitchen"), "Racing's active kitchen (2026-11-24).");
+            Assert.IsFalse((bool)Get(mode, "IsPassiveKitchenLevel"), "Parrilleros cook and Mozos deliver.");
             Assert.AreEqual(40, (int)Get(mode, "Coins"));
             Assert.AreEqual(240, (int)Get(mode, "TotalFanCount"));
-            CollectionAssert.AreEqual(new[] { 1, 0, 0, 0, 0 }, (int[])Get(mode, "WorkerCountsByRole"));
-            Assert.AreEqual(6, ((ICollection)Get(mode, "PlacedStations")).Count);
+            CollectionAssert.AreEqual(new[] { 0, 1, 2, 3, 4, 5, 6 }, (int[])Get(config, "AvailableProducts"), "Racing's seven products.");
+            CollectionAssert.AreEqual(new[] { 1, 0, 1, 0, 1 }, (int[])Get(mode, "WorkerCountsByRole"), "Racing's crew: a Parrillero, a Premium and a Mozo.");
+            Assert.AreEqual(7, ((ICollection)Get(mode, "PlacedStations")).Count, "Racing's seven stations.");
             Assert.IsTrue((bool)Get(config, "HasDifficultyRamp"));
             yield return Capture("redondos-invertida-apertura");
             Return(mode);

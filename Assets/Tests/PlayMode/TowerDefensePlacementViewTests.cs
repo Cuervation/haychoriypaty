@@ -1628,6 +1628,7 @@ namespace HayChoriYPaty.Tests
         [UnityTest]
         public IEnumerator CamionerosChicagoKitchenStartsWithThreeStationsAndTheChicagoFooter()
         {
+            Set(mode, "coins", 500); // 2026-11-24: Camioneros opens with 20 coins; fund the hires of this test
             Assert.AreEqual(9, requestedLevelId);
             Assert.IsTrue((bool)Get(mode, "FreeConstruction"), "Camioneros must be a free-construction (kitchen) level.");
             Assert.IsTrue((bool)Get(mode, "IsPassiveKitchenLevel"), "Camioneros must use Nueva Chicago's kitchen.");
@@ -1685,6 +1686,7 @@ namespace HayChoriYPaty.Tests
         [UnityTest]
         public IEnumerator CamionerosKitchenKeepsWorkersOnTheCorrectSideOfCounters()
         {
+            Set(mode, "coins", 500); // 2026-11-24: Camioneros opens with 20 coins; fund the hires of this test
             yield return CheckHorizontalKitchenDepth("camioneros", new[] { "Parrillero", "Cocacolero" },
                 new[] { "NormalTable", "CocaBarrel" }, true);
         }
@@ -1796,6 +1798,7 @@ namespace HayChoriYPaty.Tests
         [UnityTest]
         public IEnumerator CamionerosIdleWorkersWaitAtTheirOwnCampaignSpotByTheFence()
         {
+            Set(mode, "coins", 500); // 2026-11-24: Camioneros opens with 20 coins; fund the hires of this test
             Type roleKind = T("StreetWorkerRole");
             Assert.IsTrue((bool)Call(game, "TryHireTowerDefenseAtPost", mode, Enum.ToObject(roleKind, 0)));
             Assert.IsTrue((bool)Call(game, "TryHireTowerDefenseAtPost", mode, Enum.ToObject(roleKind, 1)));
@@ -2247,7 +2250,7 @@ namespace HayChoriYPaty.Tests
             Type roleKind = T("StreetWorkerRole");
             var hires = new System.Collections.Generic.Dictionary<int, int> { { 1, 0 }, { 2, 1 }, { 3, 0 }, { 4, 1 }, { 5, 2 }, { 6, 0 } };
             // 2026-11-24: La Renga now opens with 40 coins and no Cocacolero; fund the scripted hires below.
-            if (laRenga) Set(mode, "coins", 100000);
+            Set(mode, "coins", 100000); // Camioneros opens with 20 coins (2026-11-24) and these runs hire a full crew
             IDictionary workerViews = (IDictionary)Get(presentation, "workerViews");
             int movingUp = 0, movingDown = 0, carried = 0, backPickups = 0, leftBarrelPickups = 0, waitingAtSpot = 0, written = 0;
             var waitSpots = new System.Collections.Generic.Dictionary<int, Vector2>();

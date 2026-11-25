@@ -160,10 +160,7 @@ namespace HayChoriYPaty.Tests
             if (levelId == 10)
             {
                 Assert.IsFalse((bool)Invoke(game, "IsLevelUnlocked", 11));
-                var outsideMenu = (int[])deliveries.Clone(); outsideMenu[5] = 1;
-                Assert.IsFalse((bool)InvokeAny(sim, "ImportTowerDefenseState", 240f, 600, 250, 1, workers,
-                    outsideMenu, 60, 60, true, true), "Fernet isn't on the authored Redondos menu.");
-                Assert.AreEqual("Playing", ReadProperty(sim, "Phase").ToString());
+                // 2026-11-24: Los Redondos sells Racing's seven products (Fernet included), so no product is outside its menu any more.
             }
             Assert.IsTrue((bool)InvokeAny(sim, "ImportTowerDefenseState", 240f, 600, 250, 1, workers,
                 deliveries, levelId == 10 ? 60 : 8, levelId == 10 ? 60 : 7, true, true));
@@ -293,7 +290,7 @@ namespace HayChoriYPaty.Tests
             var config = Resources.Load(path, configType);
             Assert.NotNull(config);
             // 2026-11-24 (a pedido): La Renga's "E" table over Camioneros' 120 fans: twelve tiers, one every 10 fans (x1.00 .. x1.88, +0.08), orders of 3 units from fan 70 and
-            // 50 starting coins (it was x1.00 .. x1.66 and 500 coins).
+            // 20 starting coins (it was x1.00 .. x1.66 and 500 coins; 50 coins on 2026-11-24 before this change).
             Assert.AreEqual(120, configType.GetProperty("TotalFanCount").GetValue(config, null));
             Assert.AreEqual(true, configType.GetProperty("HasDifficultyRamp").GetValue(config, null));
             var tierFor = configType.GetMethod("DifficultyTierForFan");
@@ -304,15 +301,15 @@ namespace HayChoriYPaty.Tests
                 Assert.AreEqual(tier.GetType().GetField("FromFan").GetValue(tier), tierIndex * 10, "tier " + tierIndex + " starts at fan " + tierIndex * 10);
                 float speed = (float)tier.GetType().GetField("SpeedMultiplier").GetValue(tier);
                 int three = (int)tier.GetType().GetField("Quantity3Percent").GetValue(tier), second = (int)tier.GetType().GetField("SecondProductPercent").GetValue(tier);
-                Assert.AreEqual(1f + .08f * tierIndex, speed, 0.0001f, "speed of tier " + tierIndex);
+                Assert.AreEqual(1.16f + .08f * tierIndex, speed, 0.0001f, "speed of tier " + tierIndex); // starts at x1.16 (2026-11-24, a pedido)
                 Assert.Greater(speed, previousSpeed); Assert.GreaterOrEqual(three, previousThree); Assert.GreaterOrEqual(second, previousSecond);
                 previousSpeed = speed; previousThree = three; previousSecond = second;
             }
             object last = tierFor.Invoke(config, new object[] { 119 });
-            Assert.AreEqual(1.88f, (float)last.GetType().GetField("SpeedMultiplier").GetValue(last), 0.0001f);
+            Assert.AreEqual(2.04f, (float)last.GetType().GetField("SpeedMultiplier").GetValue(last), 0.0001f);
             Assert.AreEqual(100, (int)last.GetType().GetField("Quantity3Percent").GetValue(last));
             Assert.AreEqual(100, (int)last.GetType().GetField("SecondProductPercent").GetValue(last));
-            Assert.AreEqual(50, configType.GetProperty("StartingCoins").GetValue(config, null), "Camioneros starts with 50 coins.");
+            Assert.AreEqual(20, configType.GetProperty("StartingCoins").GetValue(config, null), "Camioneros starts with 20 coins.");
         }
 
         [Test]

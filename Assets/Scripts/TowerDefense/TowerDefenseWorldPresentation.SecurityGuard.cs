@@ -3,7 +3,7 @@ using UnityEngine;
 namespace HayChoriYPaty
 {
     /// <summary>
-    /// La Renga (2026-11-23, a pedido): four "TECH SEGURIDAD" guards patrol the top sidewalk, above the lane the fans walk, and stop
+    /// La Renga (2026-11-23, a pedido; and Los Redondos on the same C-shaped fence, 2026-11-24): four "TECH SEGURIDAD" guards patrol the top sidewalk, above the lane the fans walk, and stop
     /// from time to time to look at the street. Purely decorative: no collision, order or economy; positions are derived from the
     /// run clock, so they stand still while the match is paused. Art: street-security-guard-v1, the bald bearded supporter of the
     /// supporters' sheets dressed in the uniform (1x4 atlas of 256 px cells: walk A, walk B facing right, front A, front B).
@@ -38,7 +38,9 @@ namespace HayChoriYPaty
         private GameObject[] securityGuardObjects;
         private SpriteRenderer[] securityGuardRenderers;
 
-        private bool HasSecurityGuard => visualLevelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId;
+        // Los Redondos plays La Renga's C-shaped fence (2026-11-24, a pedido), so it has the same guards; mirrored with the rest of the world.
+        private bool HasSecurityGuard => visualLevelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId ||
+            (visualLevelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId && mode != null && mode.RouteConfig.RouteKind == TowerDefenseRouteKind.CShapedSingleFence);
 
         private void SyncSecurityGuard(TowerDefenseGameMode gameMode)
         {

@@ -222,7 +222,7 @@ namespace HayChoriYPaty.Tests
             Assert.IsTrue((bool)Invoke(game, "TryStartTowerDefenseRound"));
             object sim = Read(game, "Sim");
             Assert.AreEqual(40, Read(sim, "Coins"), "Los Redondos opens with La Renga's 40 coins (2026-11-24).");
-            Assert.AreEqual(5, Read(sim, "ProductCount"), "Los Redondos serves its authored five-product Defense menu.");
+            Assert.AreEqual(7, Read(sim, "ProductCount"), "Los Redondos serves Racing's seven products (2026-11-24).");
         }
 
         [Test]

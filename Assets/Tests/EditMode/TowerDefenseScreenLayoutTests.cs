@@ -66,10 +66,10 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(240, Read(redondos, "TotalFanCount"));
             // Camioneros' horizontal kitchen version slows its fans to keep the old on-screen time over a single fence.
             Assert.That((float)Read(camioneros, "FanSpeed"), Is.EqualTo(.0775f).Within(0.00001f));
-            Assert.That((float)Read(redondos, "FanSpeed"), Is.EqualTo(.1875f).Within(0.00001f), "Los Redondos has La Renga's fan speed.");
+            Assert.That((float)Read(redondos, "FanSpeed"), Is.EqualTo(.102375f).Within(0.00001f), "Los Redondos has Luján's fan speed (active kitchen).");
             CollectionAssert.AreEqual(new[] { 0, 4 }, (int[])Read(camioneros, "AvailableProducts"));
-            CollectionAssert.AreEqual(new[] { 0, 1, 2, 4, 6 }, (int[])Read(redondos, "AvailableProducts"), "Los Redondos sells Ferro's menu.");
-            CollectionAssert.AreEqual(new[] { 1, 0, 0, 0, 0 }, (int[])Read(redondos, "StartingWorkersByRole"), "Los Redondos opens like La Renga: one Parrillero.");
+            CollectionAssert.AreEqual(new[] { 0, 1, 2, 3, 4, 5, 6 }, (int[])Read(redondos, "AvailableProducts"), "Los Redondos sells Racing's seven products.");
+            CollectionAssert.AreEqual(new[] { 1, 0, 1, 0, 1 }, (int[])Read(redondos, "StartingWorkersByRole"), "Los Redondos opens like Racing: a Parrillero, a Premium and a Mozo.");
             Assert.AreEqual(true, Read(redondos, "MirrorHorizontally"), "Los Redondos draws La Renga's C inverted.");
             object camionerosRoute = Read(camioneros, "Route");
             object redondosRoute = Read(redondos, "Route");

@@ -140,6 +140,8 @@ namespace HayChoriYPaty
         [SerializeField] private int[] startingWorkersByRole = new int[5];
         [Tooltip("Draws the Defense world mirrored left-right on screen (a C that opens to the right). The game logic and geometry are unchanged.")]
         [SerializeField] private bool mirrorHorizontally;
+        [Tooltip("Racing's active kitchen (2026-11-24): the Parrilleros cook on the grill and the Mozos hand the sandwiches over, with all seven products, like the previous campaign level.")]
+        [SerializeField] private bool activeKitchen;
 
         public string ModeId => string.IsNullOrWhiteSpace(modeId) ? "tower-defense" : modeId;
         public string LevelId => string.IsNullOrWhiteSpace(levelId) ? CamionerosLevelId : levelId;
@@ -199,6 +201,8 @@ namespace HayChoriYPaty
         public Vector2 SecondWorkZoneOffset => secondWorkZoneOffset;
         /// <summary>The world is drawn mirrored left-right on screen (2026-11-24: Los Redondos plays La Renga's C inverted).</summary>
         public bool MirrorHorizontally => mirrorHorizontally;
+        /// <summary>Racing's active kitchen: cooks cook on the grill and Mozos deliver (Boca's seven-station layout); not a passive Defense kitchen.</summary>
+        public bool ActiveKitchen => activeKitchen;
         /// <summary>
         /// La Renga's dynamics: its C-shaped fence, kitchen (Ferro's with narrow grills), crew behavior and difficulty ramp.
         /// Los Redondos copies them on the C-shaped fence (2026-11-24, a pedido).

@@ -50,6 +50,11 @@ namespace HayChoriYPaty
         // Reused per-step order keeps legacy grill transfer rear/top-first without allocating.
         private readonly List<StreetFoodUnit> advanceOrder = new List<StreetFoodUnit>();
         private readonly int[] tableCapacity = new int[7];
+        // 2026-11-24 (a pedido): in the passive Defense kitchens (unlimited sandwiches) the grills stop topping the sandwich table up once it holds what it opened with,
+        // so the piles stay at their starting height instead of growing to the physical capacity. Everywhere else the limit is the capacity.
+        private readonly int[] tableFillLimit = new int[7];
+        private bool TableIsAtFillLimit(int product) =>
+            product >= 0 && product < 4 && unlimitedSandwiches && TableCount(product) >= tableFillLimit[product];
         private readonly int[] grillCapacity = new int[7];
         private readonly bool narrowGrills;
         private readonly float[] drinkProgress = new float[7];
@@ -448,7 +453,7 @@ namespace HayChoriYPaty
                     {
                         unit.Progress = 1f;
                         unit.State = StreetFoodState.Cooked;
-                        int slot = FirstFreeTableSlot(unit.Product);
+                        int slot = TableIsAtFillLimit(unit.Product) ? -1 : FirstFreeTableSlot(unit.Product);
                         if (slot >= 0)
                         {
                             int grillSlot = unit.Slot;
@@ -462,7 +467,7 @@ namespace HayChoriYPaty
                 }
                 if (unit.State == StreetFoodState.Cooked)
                 {
-                    int slot = FirstFreeTableSlot(unit.Product);
+                    int slot = TableIsAtFillLimit(unit.Product) ? -1 : FirstFreeTableSlot(unit.Product);
                     if (slot >= 0)
                     {
                         int grillSlot = unit.Slot;
@@ -537,6 +542,7 @@ namespace HayChoriYPaty
                 if (capacity <= 0 || (ActiveCooks && product < 4)) continue;
                 if (product == 4 || product == 6) capacity = Mathf.Min(capacity, Mathf.Max(1, balance.barrelCapacity));
                 int initialStock = product < 4 ? Mathf.Min(initialSandwichStock[product], capacity) : capacity;
+                tableFillLimit[product] = initialStock;
                 for (int slot = 0; slot < initialStock; slot++) Add(product, StreetFoodState.Cooked, StreetFoodLocation.Table, slot);
             }
             if (!ActiveCooks)

@@ -2437,7 +2437,7 @@ object sim = Make(level: level);
             }
         }
 
-        [TestCase(1, 10)] [TestCase(4, 20)] [TestCase(8, 800)] [TestCase(9, 50)] [TestCase(10, 40)]
+        [TestCase(1, 10)] [TestCase(4, 20)] [TestCase(8, 800)] [TestCase(9, 20)] [TestCase(10, 40)]
         public void AdjustedOpeningBalanceAppliesOnSelectionAdvanceStartAndRetry(int level, int expectedCoins)
         {
             object balance = NewBalance();

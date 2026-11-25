@@ -60,7 +60,7 @@ namespace HayChoriYPaty
                 // La Renga's kitchen is Ferro's with two columns less of food on its grills (2 per product instead of 3).
         private static readonly StreetKitchenLayout RengaKitchenLayoutStatic =
             new StreetKitchenLayout(new[] { 0, 1, 2, 4, 6 }, false, true);
-        internal bool NarrowGrills => config.UsesLaRengaDynamics;
+        internal bool NarrowGrills => config.UsesLaRengaDynamics && !config.ActiveKitchen;
         /// <summary>Drinks are taken from the barrel's right side, facing it (La Renga and, on the same C-shaped fence, Camioneros).</summary>
         internal bool BarrelsFromTheSide => BocaKitchenLayout.BarrelsFromTheSide;
         internal static StreetKitchenLayout LujanBocaKitchenVisualLayout => BocaKitchenLayoutStatic;
@@ -72,7 +72,8 @@ namespace HayChoriYPaty
             : sourceCampaignLevelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId ? RengaKitchenLayoutStatic
             : BocaKitchenLayoutStatic;
         // Los Redondos on La Renga's C-shaped fence (2026-11-24) cooks in La Renga's kitchen; the footer still copies Ferro's (FooterSourceLevelId).
-        private StreetKitchenLayout BocaKitchenLayout => KitchenLayoutForLevel(config.UsesLaRengaDynamics
+        // 2026-11-24: with the active kitchen it is Racing's (the same seven-station layout as Luján's).
+        private StreetKitchenLayout BocaKitchenLayout => config.ActiveKitchen ? BocaKitchenLayoutStatic : KitchenLayoutForLevel(config.UsesLaRengaDynamics
             ? TowerDefenseLevelConfig.LaRengaCampaignLevelId : config.SourceCampaignLevelId);
         internal StreetKitchenLayout SourceKitchenLayout => BocaKitchenLayout;
         private readonly List<TowerDefensePlacedStation> placedStations = new List<TowerDefensePlacedStation>();
@@ -256,11 +257,12 @@ namespace HayChoriYPaty
         internal bool IsPassiveKitchenLevel => (config.SourceCampaignLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId ||
             config.SourceCampaignLevelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId ||
             config.SourceCampaignLevelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId)
-            && config.FreeConstruction && (config.RouteKind == TowerDefenseRouteKind.HorizontalSingleFence || IsCShapedLevel);
+            && config.FreeConstruction && !config.ActiveKitchen && (config.RouteKind == TowerDefenseRouteKind.HorizontalSingleFence || IsCShapedLevel);
 
         private Vector2 BocaStationAccess(TowerDefensePlacedStation station)
         {
-            if (IsCShapedLevel && (station.Kind == TowerDefenseStationKind.NormalTable || station.Kind == TowerDefenseStationKind.PremiumTable))
+            if (IsCShapedLevel && (station.Kind == TowerDefenseStationKind.NormalTable || station.Kind == TowerDefenseStationKind.PremiumTable ||
+                                   station.Kind == TowerDefenseStationKind.FernetTable))
             {
                 // As in the campaign kitchens, sandwiches are taken from the far side of the table (the grill is on the near
                 // side): the worker stands just behind the solid table, which hides the legs, and reaches over it.
@@ -449,8 +451,23 @@ namespace HayChoriYPaty
         // Nueva Chicago stacks its grill 4 px under its table, so a cook stands on that thin strip: its feet are shallower there.
         // When the C-shaped pocket shrinks the kitchen to fit (Ferro is wider than the pocket), that strip shrinks with it,
         // so the feet depth shrinks at least as fast to keep the cook's feet off the barrel base above it.
-        private float FootDepthLogical => IsPassiveKitchenLevel
-            ? ChicagoFootDepthLogical * (IsCShapedLevel ? BocaKitchenFitScale() * BocaKitchenFitScale() : 1f) : BocaFootDepthLogical;
+        // 2026-11-24: this was recomputed (rebuilding the whole kitchen's pieces twice) on every WorkerFeet call, and a single path-clearance test calls it ~26 times
+        // while a path search makes hundreds of such tests: the late-match stutter. It only depends on the screen scale and the work area, so it is kept.
+        private float footDepthCache = float.NaN, footDepthPixel;
+        private Rect footDepthBounds;
+        private float FootDepthLogical
+        {
+            get
+            {
+                if (!IsPassiveKitchenLevel) return BocaFootDepthLogical;
+                if (!IsCShapedLevel) return ChicagoFootDepthLogical;
+                if (!float.IsNaN(footDepthCache) && footDepthPixel == worldUnitsPerLogicalPixel && footDepthBounds == WorkBounds) return footDepthCache;
+                float fit = BocaKitchenFitScale();
+                footDepthCache = ChicagoFootDepthLogical * fit * fit;
+                footDepthPixel = worldUnitsPerLogicalPixel; footDepthBounds = WorkBounds;
+                return footDepthCache;
+            }
+        }
         private const float ChicagoFootDepthLogical = 2f, ChicagoGrillOpenBackLogical = 30f;
 
         // Boca collision: only the feet touch the solid base (table front strip, barrel, grill).
@@ -665,7 +682,7 @@ namespace HayChoriYPaty
             ChargeHire(roleIndex, cost);
             AddWorker(role, 0);
             if (IsBocaKitchenLevel) AssignRolePosts(role, false);
-            if (IsPassiveKitchenLevel)
+            if (UsesWaitingBand(workers[workers.Count - 1]))
             {
                 // As in the campaign, a new hire appears at its own waiting spot.
                 TowerDefenseWorkerState hired = workers[workers.Count - 1];
@@ -685,7 +702,12 @@ namespace HayChoriYPaty
         // Where an idle worker waits: the passive campaign-kitchen levels (Camioneros, Los Redondos, La Renga) wait like the
         // campaign (CampaignWaitSpot); every other level waits at the post.
         private Vector2 WaitSpot(TowerDefenseWorkerState worker) =>
-            IsPassiveKitchenLevel ? CampaignWaitSpot(worker) : worker.PostPosition;
+            UsesWaitingBand(worker) ? CampaignWaitSpot(worker) : worker.PostPosition;
+
+        // The passive crews wait in the open band between the fence and the tables. On the C-shaped fence the active kitchen's Mozos do too (2026-11-24):
+        // their Boca post, in front of the tables, is inside the solid furniture of the C, from where no route can start.
+        private bool UsesWaitingBand(TowerDefenseWorkerState worker) =>
+            IsPassiveKitchenLevel || (IsCShapedLevel && worker.Role == StreetWorkerRole.Mozo);
 
         // The passive Defense kitchens wait like the traditional passive kitchens (StreetSimulation.WorkerWaitPosition): each worker owns a fixed
         // spot by hire order, in rows along the service line next to the fence (the top run here, the counter there), each
@@ -695,9 +717,28 @@ namespace HayChoriYPaty
         private const float WaitingBandMarginFraction = .3f, WaitingBandColumnSpacing = .75f;
         private readonly System.Random waitRandom = new System.Random(1311);
 
+        // 2026-11-24: a worker's waiting spot only depends on its place in the crew, the furniture, the screen scale and its random offset, so it is kept
+        // instead of rebuilt (three lists and a scan of every column) for every idle worker on every simulation step and every frame of the dialogues.
+        private readonly struct WaitSpotEntry
+        {
+            public readonly Vector2 Spot; public readonly int Order; public readonly long Signature; public readonly float Pixel, Jitter;
+            public WaitSpotEntry(Vector2 spot, int order, long signature, float pixel, float jitter) { Spot = spot; Order = order; Signature = signature; Pixel = pixel; Jitter = jitter; }
+        }
+        private readonly Dictionary<int, WaitSpotEntry> waitSpotCache = new Dictionary<int, WaitSpotEntry>();
+
         internal Vector2 CampaignWaitSpot(TowerDefenseWorkerState worker)
         {
             int order = workers.IndexOf(worker);
+            long signature = PathLatticeSignature();
+            if (!float.IsNaN(worker.WaitJitter) && waitSpotCache.TryGetValue(worker.Id, out WaitSpotEntry cached) && cached.Order == order &&
+                cached.Signature == signature && cached.Pixel == worldUnitsPerLogicalPixel && cached.Jitter == worker.WaitJitter) return cached.Spot;
+            Vector2 spot = CampaignWaitSpotUncached(worker, order);
+            waitSpotCache[worker.Id] = new WaitSpotEntry(spot, order, signature, worldUnitsPerLogicalPixel, worker.WaitJitter);
+            return spot;
+        }
+
+        private Vector2 CampaignWaitSpotUncached(TowerDefenseWorkerState worker, int order)
+        {
             if (order < 0 || routeGeometry.Centerline == null || routeGeometry.Centerline.Length == 0) return worker.PostPosition;
             float pixel = worldUnitsPerLogicalPixel;
             float column = CocacoleroVisualWidthLogical * pixel, row = ConstructionWorkerHeightLogical * pixel;
@@ -766,7 +807,7 @@ namespace HayChoriYPaty
             Vector2 spot = WaitSpot(worker);
             if (WorkerAt(worker, spot)) return;
             // 2026-11-24: an idle worker standing where no route can start (furniture or the barrel keep-out strip) would never get an order: put it on its spot.
-            if (IsPassiveKitchenLevel && !worker.IsMoving && !FreePositionClear(worker.Position, worker.Role, worker, Rect.zero, false) &&
+            if (UsesWaitingBand(worker) && !worker.IsMoving && !FreePositionClear(worker.Position, worker.Role, worker, Rect.zero, false) &&
                 FreePositionClear(spot, worker.Role, worker, Rect.zero, false)) { worker.Position = spot; return; }
             if (QueueFreeWorkerPath(worker, spot)) worker.ReturningToPost = worker.IsMoving;
         }
@@ -1029,12 +1070,30 @@ namespace HayChoriYPaty
             return best;
         }
 
+        // The walk to a station only depends on where the worker stands and on the furniture, so it is kept while an idle worker stays on its spot.
+        private readonly Dictionary<(int, int, int, int, int, int, long), float> pickupDistanceCache = new Dictionary<(int, int, int, int, int, int, long), float>();
+
+        private bool TryGetPickupDistance(TowerDefenseWorkerState worker, TowerDefensePlacedStation station, out float distance)
+        {
+            var key = (worker.Id, station.Id, Mathf.RoundToInt(worker.Position.x * 1000f), Mathf.RoundToInt(worker.Position.y * 1000f),
+                Mathf.RoundToInt(station.WorkPosition.x * 1000f), Mathf.RoundToInt(station.WorkPosition.y * 1000f), PathLatticeSignature());
+            if (pickupDistanceCache.TryGetValue(key, out float cached)) { distance = cached; return cached >= 0f; }
+            bool ok = TryBuildWorkerPath(worker, worker.Position, station.WorkPosition, Rect.zero, out Vector2[] pickupPath);
+            distance = ok ? PathDistance(worker.Position, pickupPath) : -1f;
+            if (pickupDistanceCache.Count > 4096) pickupDistanceCache.Clear();
+            pickupDistanceCache[key] = distance;
+            return ok;
+        }
+
         private bool TryEstimateFreeServiceEta(TowerDefenseWorkerState worker, TowerDefensePlacedStation station,
             TowerDefenseFanState fan, float workerSpeed, float timeToExit, out float eta)
         {
             eta = float.PositiveInfinity;
-            if (!TryBuildWorkerPath(worker, worker.Position, station.WorkPosition, Rect.zero, out Vector2[] pickupPath)) return false;
-            float pickupEta = PathDistance(worker.Position, pickupPath) / workerSpeed;
+            // 2026-11-24: the walk to the station cannot be shorter than the straight line, so a fan that leaves before even that is covered is out of reach
+            // without searching a single path (late fans near the exit used to cost ~5 path searches per worker, every step).
+            if (Vector2.Distance(worker.Position, station.WorkPosition) / workerSpeed + .12f >= timeToExit) return false;
+            if (!TryGetPickupDistance(worker, station, out float pickupDistance)) return false;
+            float pickupEta = pickupDistance / workerSpeed;
             Vector2 target = GetFanServiceAnchor(fan);
             float deliveryEta = 0f;
             for (int attempt = 0; attempt < 3; attempt++)
@@ -1479,12 +1538,23 @@ namespace HayChoriYPaty
             return Rect.MinMaxRect(union.xMin - 4f * pixel, grill.Bounds.yMax - pixel, union.xMax + 4f * pixel, union.yMin + pixel);
         }
 
+        // 2026-11-24: exact segment/rectangle test (Liang-Barsky). It used to walk the segment in steps of a quarter of the thinnest side; the barrels' keep-out
+        // strip is ~0.06 units thick, so a 3-unit segment cost ~200 point tests, and every path search runs hundreds of these checks (the late-match stutter).
         private static bool SegmentCrosses(Rect area, Vector2 from, Vector2 to)
         {
             if (area.width <= 0f || area.height <= 0f) return false;
-            int samples = Mathf.Max(2, Mathf.CeilToInt(Vector2.Distance(from, to) / Mathf.Max(.01f, Mathf.Min(area.width, area.height) * .25f)));
-            for (int i = 0; i <= samples; i++) if (area.Contains(Vector2.Lerp(from, to, i / (float)samples))) return true;
-            return false;
+            float t0 = 0f, t1 = 1f, dx = to.x - from.x, dy = to.y - from.y;
+            return ClipSegment(-dx, from.x - area.xMin, ref t0, ref t1) && ClipSegment(dx, area.xMax - from.x, ref t0, ref t1) &&
+                ClipSegment(-dy, from.y - area.yMin, ref t0, ref t1) && ClipSegment(dy, area.yMax - from.y, ref t0, ref t1);
+        }
+
+        private static bool ClipSegment(float p, float q, ref float t0, ref float t1)
+        {
+            if (Mathf.Abs(p) < 1e-9f) return q >= 0f;
+            float r = q / p;
+            if (p < 0f) { if (r > t1) return false; if (r > t0) t0 = r; }
+            else { if (r < t0) return false; if (r < t1) t1 = r; }
+            return true;
         }
 
         private bool FreePositionClear(Vector2 position, StreetWorkerRole role, TowerDefenseWorkerState ignore, Rect extra,
@@ -1581,6 +1651,15 @@ namespace HayChoriYPaty
             }
             pathLattices[role] = lattice;
             return lattice;
+        }
+
+        // 2026-11-24: build each role's waypoint lattice, and every edge it can walk, before the run starts. They used to be built on the first
+        // job, costing a 50-115 ms hitch at the start of the match (the BFS below visits and caches the whole connected pocket).
+        private void WarmPathLattices()
+        {
+            if (!config.FreeConstruction) return;
+            foreach (StreetWorkerRole role in new[] { StreetWorkerRole.Parrillero, StreetWorkerRole.ParrilleroPremium, StreetWorkerRole.Cocacolero })
+                UnreachableWorkerNodes(role);
         }
 
         /// <summary>Waypoints a worker of this role could stand on but never reach from the grill post: 0 when the pocket is connected.</summary>
