@@ -340,8 +340,15 @@ namespace HayChoriYPaty
         // Huracán's kitchen: the kitchen keeps its exact size and distances and sits in the middle of the pocket.
         private float KitchenWorldX(float bocaX, float scale) => IsCShapedLevel
             // La Renga's kitchen is anchored to the left of the pocket, CShapedKitchenSideMarginLogical from its edge.
-            ? WorkBounds.xMin + CShapedKitchenLeftLogical * worldUnitsPerLogicalPixel + (bocaX - BocaKitchenSourceBounds().xMin) * scale
+            // 2026-11-25 (a pedido): Los Redondos' world is drawn mirrored, so its kitchen is laid out reflected and anchored to the other side of the
+            // pocket: on screen every piece then stands where it does in La Renga (normal left, premium right, barrels right).
+            ? ReflectKitchen
+                ? WorkBounds.xMax - CShapedKitchenSideMarginLogical * worldUnitsPerLogicalPixel - (bocaX - BocaKitchenSourceBounds().xMin) * scale
+                : WorkBounds.xMin + CShapedKitchenLeftLogical * worldUnitsPerLogicalPixel + (bocaX - BocaKitchenSourceBounds().xMin) * scale
             : WorkBounds.center.x + (bocaX - StreetSceneLayout.Width * .5f) * scale;
+
+        /// <summary>The kitchen's left-right order is reversed in world space (the mirrored world flips it back on screen).</summary>
+        internal bool ReflectKitchen => config.MirrorHorizontally && IsCShapedLevel;
         private float KitchenWorldBottomY(float scale, float bottomLogical)
         {
             if (!IsCShapedLevel) return WorkBounds.yMin;
@@ -361,7 +368,7 @@ namespace HayChoriYPaty
         {
             float scale = BocaKitchenFitScale() * worldUnitsPerLogicalPixel;
             float bottom = BocaStationsBottomLogical(BocaKitchenLayout, BocaVerticalScale);
-            float x = KitchenWorldX(boca.xMin, scale);
+            float x = KitchenWorldX(ReflectKitchen ? boca.xMax : boca.xMin, scale);
             float y = KitchenWorldBottomY(scale, bottom) + (bottom - boca.yMax * BocaVerticalScale) * scale;
             return new Rect(x, y, boca.width * scale, boca.height * BocaVerticalScale * scale);
         }

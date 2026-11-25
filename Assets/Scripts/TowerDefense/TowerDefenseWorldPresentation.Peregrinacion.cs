@@ -370,7 +370,8 @@ namespace HayChoriYPaty
         {
             // Boca's item positions are stretched vertically with the screen height, like its stations.
             Vector2 offset = point - sourceBounds.center;
-            return station.Bounds.center + new Vector2(offset.x, -offset.y * mode.KitchenVerticalScale) * (fitScale * pixelScale);
+            // The kitchen is reflected in world space (Los Redondos): a piece's contents mirror about its own centre too.
+            return station.Bounds.center + new Vector2(mode.ReflectKitchen ? -offset.x : offset.x, -offset.y * mode.KitchenVerticalScale) * (fitScale * pixelScale);
         }
 
         private void SyncPilgrimAmbientGrillMeat(StreetKitchenLayout layout, float kitchenScale)

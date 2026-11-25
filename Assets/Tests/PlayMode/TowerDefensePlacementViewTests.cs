@@ -2057,6 +2057,104 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
+        [Explicit("Captures Los Redondos' stage at 575x1280 to Logs/Acceptance/RedondosGrills-20261125/still.png")]
+        public IEnumerator LosRedondosGrillsStill()
+        {
+            string root = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/RedondosGrills-20261125"));
+            Directory.CreateDirectory(root);
+            yield return CaptureAtResolution("losredondos-grills-575x1280", 575, 1280, false);
+            File.Copy(Path.Combine(CaptureDirectory, "Level" + requestedLevelId.ToString("00"), "losredondos-grills-575x1280.png"),
+                Path.Combine(root, "still.png"), true);
+        }
+
+        [UnityTest]
+        [Explicit("Captures the Cocacolero grabbing a drink from the barrel (LaRengaCocacoleroCrouchFrames) to Logs/Acceptance/CocacoleroCrouch-20261125/LaRengaCocacoleroCrouchFrames")]
+        public IEnumerator LaRengaCocacoleroCrouchFrames()
+        {
+            string directory = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/CocacoleroCrouch-20261125/LaRengaCocacoleroCrouchFrames"));
+            if (Directory.Exists(directory)) Directory.Delete(directory, true);
+            Directory.CreateDirectory(directory);
+            yield return CaptureAtResolution("cocacolero-crouch-setup", 575, 1280, false);
+            object presentation = Get(view, "towerDefensePresentation");
+            Set(mode, "coins", 900);
+            Call(game, "TryHireTowerDefenseAtPost", mode, Enum.ToObject(T("StreetWorkerRole"), 1)); // a level that already starts with one refuses: fine
+            int written = 0;
+            for (int tick = 0; tick < 6000 && written < 24 && Get(mode, "Phase").ToString() == "Playing"; tick++)
+            {
+                Call(mode, "Step", .05f);
+                Call(presentation, "Sync", mode);
+                bool grabbing = false;
+                foreach (object w in (IList)Get(mode, "Workers"))
+                    if (Get(w, "Role").ToString() == "Cocacolero" && ((bool)Get(w, "ServiceDwelling") || (float)Get(w, "ServiceDwellSeconds") > 0f)) grabbing = true;
+                if (!grabbing) { if (tick % 100 == 0) yield return null; continue; }
+                yield return new WaitForEndOfFrame();
+                Texture2D image = ScreenCapture.CaptureScreenshotAsTexture();
+                File.WriteAllBytes(Path.Combine(directory, "g" + written.ToString("000") + ".png"), image.EncodeToPNG());
+                UnityEngine.Object.Destroy(image);
+                written++;
+            }
+            Assert.Greater(written, 0, "The Cocacolero never grabbed a drink.");
+        }
+
+        [UnityTest]
+        [Explicit("Captures the Cocacolero grabbing a drink from the barrel (PeregrinacionCocacoleroCrouchFrames) to Logs/Acceptance/CocacoleroCrouch-20261125/PeregrinacionCocacoleroCrouchFrames")]
+        public IEnumerator PeregrinacionCocacoleroCrouchFrames()
+        {
+            string directory = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/CocacoleroCrouch-20261125/PeregrinacionCocacoleroCrouchFrames"));
+            if (Directory.Exists(directory)) Directory.Delete(directory, true);
+            Directory.CreateDirectory(directory);
+            yield return CaptureAtResolution("cocacolero-crouch-setup", 575, 1280, false);
+            object presentation = Get(view, "towerDefensePresentation");
+            Set(mode, "coins", 900);
+            Call(game, "TryHireTowerDefenseAtPost", mode, Enum.ToObject(T("StreetWorkerRole"), 1)); // a level that already starts with one refuses: fine
+            int written = 0;
+            for (int tick = 0; tick < 6000 && written < 24 && Get(mode, "Phase").ToString() == "Playing"; tick++)
+            {
+                Call(mode, "Step", .05f);
+                Call(presentation, "Sync", mode);
+                bool grabbing = false;
+                foreach (object w in (IList)Get(mode, "Workers"))
+                    if (Get(w, "Role").ToString() == "Cocacolero" && ((bool)Get(w, "ServiceDwelling") || (float)Get(w, "ServiceDwellSeconds") > 0f)) grabbing = true;
+                if (!grabbing) { if (tick % 100 == 0) yield return null; continue; }
+                yield return new WaitForEndOfFrame();
+                Texture2D image = ScreenCapture.CaptureScreenshotAsTexture();
+                File.WriteAllBytes(Path.Combine(directory, "g" + written.ToString("000") + ".png"), image.EncodeToPNG());
+                UnityEngine.Object.Destroy(image);
+                written++;
+            }
+            Assert.Greater(written, 0, "The Cocacolero never grabbed a drink.");
+        }
+
+        [UnityTest]
+        [Explicit("Captures the Cocacolero grabbing a drink from the barrel (LosRedondosCocacoleroCrouchFrames) to Logs/Acceptance/CocacoleroCrouch-20261125/LosRedondosCocacoleroCrouchFrames")]
+        public IEnumerator LosRedondosCocacoleroCrouchFrames()
+        {
+            string directory = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/CocacoleroCrouch-20261125/LosRedondosCocacoleroCrouchFrames"));
+            if (Directory.Exists(directory)) Directory.Delete(directory, true);
+            Directory.CreateDirectory(directory);
+            yield return CaptureAtResolution("cocacolero-crouch-setup", 575, 1280, false);
+            object presentation = Get(view, "towerDefensePresentation");
+            Set(mode, "coins", 900);
+            Call(game, "TryHireTowerDefenseAtPost", mode, Enum.ToObject(T("StreetWorkerRole"), 1)); // a level that already starts with one refuses: fine
+            int written = 0;
+            for (int tick = 0; tick < 6000 && written < 24 && Get(mode, "Phase").ToString() == "Playing"; tick++)
+            {
+                Call(mode, "Step", .05f);
+                Call(presentation, "Sync", mode);
+                bool grabbing = false;
+                foreach (object w in (IList)Get(mode, "Workers"))
+                    if (Get(w, "Role").ToString() == "Cocacolero" && ((bool)Get(w, "ServiceDwelling") || (float)Get(w, "ServiceDwellSeconds") > 0f)) grabbing = true;
+                if (!grabbing) { if (tick % 100 == 0) yield return null; continue; }
+                yield return new WaitForEndOfFrame();
+                Texture2D image = ScreenCapture.CaptureScreenshotAsTexture();
+                File.WriteAllBytes(Path.Combine(directory, "g" + written.ToString("000") + ".png"), image.EncodeToPNG());
+                UnityEngine.Object.Destroy(image);
+                written++;
+            }
+            Assert.Greater(written, 0, "The Cocacolero never grabbed a drink.");
+        }
+
+        [UnityTest]
         [Explicit("Captures the empty stage (La Renga mural, sidewalk, Chicago footer; no fences, workers, tables or fans) to Logs/Acceptance/RengaEmptyStage-20261118")]
         public IEnumerator CamionerosFooterWithRengaMuralEmptyStageCapture()
         {

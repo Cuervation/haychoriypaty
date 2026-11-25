@@ -530,11 +530,11 @@ namespace HayChoriYPaty
             tableCapacity[5] = available[5] ? Mathf.Max(1, balance.fernetTableCapacity) : 0;
             tableCapacity[4] = available[4] ? Mathf.Max(1, balance.barrelCapacity) : 0;
             tableCapacity[6] = available[6] ? Mathf.Max(1, balance.barrelCapacity) : 0;
-            if (narrowGrills && available[0] && available[1]) SetGrillCapacities(available, 0, 1, 12, 8); // 2 columns x 4 rows + 2 x 2
+            if (narrowGrills && available[0] && available[1]) SetGrillCapacities(available, 0, 1, 14, 8); // 2 columns x 4 rows + 2 columns x 3 rows
             else SetGrillCapacities(available, 0, 1, 18, 12);
             SetGrillCapacities(available, 2, 3, 7, 4);
             if (available[2]) grillCapacity[2] = 6; // User-selected whole Bondiola cooking grid:3 columns x 2 rows.
-            if (narrowGrills && available[2]) grillCapacity[2] = 4; // 2 x 2 beside the Vacío, or one row of 4 alone
+            if (narrowGrills && available[2]) grillCapacity[2] = available[3] ? 4 : 8; // 2 x 2 beside the Vacío, or two rows of 4 alone
             if (available[2] && available[3]) grillCapacity[3] = 4; // Fill the right half with four whole Vacíos in a compact 2x2 grid.
             for (int product = 0; product < 7; product++)
             {

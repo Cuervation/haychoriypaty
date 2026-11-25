@@ -803,8 +803,67 @@ namespace HayChoriYPaty
         public Vector2 GrillSlotPosition(int product, int slot) => GrillSlotPosition(product, slot, true, product < 2 ? 12 : 4);
 
         /// <summary>Visual meat footprint adapted to the actual surface of the scaled grill.</summary>
+
+        // 2026-11-25 (a pedido): on the narrow grills (La Renga, Los Redondos) the cuts form one filled, symmetric grid: every column the same width,
+        // every row evenly spread over the grate, and nothing past the grate's REAR edges (the narrowest ones), so no cut hangs over a side at any depth.
+        // Chori 2x4 and Paty 3x2 share the grill (left and right half); a lone Bondiola grill is 4x2. Rows overlap (perspective) so each cut is as big as its column allows.
+        // NarrowMeatGap is the seam between cuts; the grate bars run a little further front than GrillSurfaceBottom, so the filled grid uses all of them.
+        private const float NarrowMeatGap = 1f, NarrowGridSurfaceBottom = .50f;
+
+        // Chori|Paty and Bondiola|Vacío each split the grill in half; a lone Bondiola takes all of it. (A lone Chori/Vacío keeps the old layout.)
+        private bool UsesFilledNarrowGrid(int product, bool companionAvailable) =>
+            NarrowGrills && (product == 2 || (companionAvailable && product < 4));
+
+        // pitch = how much of a cut's height the next row advances (the rest overlaps it).
+        private static void NarrowGridShape(int product, bool companionAvailable, out int columns, out int rows, out float aspect, out float pitch)
+        {
+            pitch = .5f;
+            switch (product)
+            {
+                case 0: columns = 2; rows = 4; aspect = 36.4f / 14f; pitch = .28f; break;
+                case 1: columns = 3; rows = 2; aspect = 1.2f; break; // the patty art is round: its box is nearly square
+                case 2: columns = companionAvailable ? 2 : 4; rows = 2; aspect = 2.1f; break;
+                default: columns = 2; rows = 2; aspect = 2001f / 786f; break; // Vacío art box (the old 3.4 left it two thirds of its cell)
+            }
+        }
+
+        private void NarrowGridZone(int product, bool companionAvailable, out float left, out float right, out float top, out float bottom)
+        {
+            Rect r = GrillBoundsForProduct(product);
+            left = r.x + r.width * Mathf.Max(LeftEdgeAt(0f), LeftEdgeAt(1f));
+            right = r.x + r.width * Mathf.Min(RightEdgeAt(0f), RightEdgeAt(1f));
+            float middle = (left + right) * .5f;
+            if (companionAvailable && (product == 0 || product == 2)) right = middle - NarrowMeatGap * .5f;
+            else if (companionAvailable && (product == 1 || product == 3)) left = middle + NarrowMeatGap * .5f;
+            top = r.y + r.height * GrillSurfaceTop;
+            bottom = r.y + r.height * NarrowGridSurfaceBottom;
+        }
+
+        private Vector2 NarrowGridMeatSize(int product, bool companionAvailable)
+        {
+            NarrowGridShape(product, companionAvailable, out int columns, out int rows, out float aspect, out float pitch);
+            NarrowGridZone(product, companionAvailable, out float left, out float right, out float top, out float bottom);
+            float cellWidth = (right - left) / columns;
+            float tallest = (bottom - top) / (1f + (rows - 1) * pitch);
+            float height = Mathf.Max(1f, Mathf.Min(tallest, (cellWidth - NarrowMeatGap) / aspect));
+            return new Vector2(height * aspect, height);
+        }
+
+        private Vector2 NarrowGridSlotPosition(int product, int slot, bool companionAvailable)
+        {
+            NarrowGridShape(product, companionAvailable, out int columns, out int rows, out _, out _);
+            NarrowGridZone(product, companionAvailable, out float left, out float right, out float top, out float bottom);
+            Vector2 size = NarrowGridMeatSize(product, companionAvailable);
+            int index = Mathf.Max(0, slot);
+            int column = index % columns, row = (index / columns) % rows;
+            float x = left + (right - left) / columns * (column + .5f);
+            float y = rows <= 1 ? (top + bottom) * .5f : Mathf.Lerp(top + size.y * .5f, bottom - size.y * .5f, row / (float)(rows - 1));
+            return new Vector2(x, y);
+        }
+
         public Vector2 GrillMeatSize(int product, bool companionAvailable)
         {
+            if (UsesFilledNarrowGrid(product, companionAvailable)) return NarrowGridMeatSize(product, companionAvailable);
             Rect grill = GrillBoundsForProduct(product);
             if (product == 0 && !companionAvailable)
             {
@@ -842,6 +901,7 @@ namespace HayChoriYPaty
 
         public Vector2 GrillSlotPosition(int product, int slot, bool companionAvailable, int capacity)
         {
+            if (UsesFilledNarrowGrid(product, companionAvailable)) return NarrowGridSlotPosition(product, slot, companionAvailable);
             Rect r = GrillBoundsForProduct(product);
             int index = Mathf.Max(0, slot);
             Vector2 meatSize = GrillMeatSize(product, companionAvailable);
