@@ -61,64 +61,88 @@ MonoBehaviour:
   hirePricingCampaignLevelId: 1
   difficultyTiers:
   - FromFan: 0
-    SpeedMultiplier: 1.16
+    SpeedMultiplier: 1.2
     Quantity2Percent: 0
     Quantity3Percent: 0
+    Quantity4Percent: 0
+    Quantity5Percent: 0
     SecondProductPercent: 20
   - FromFan: 10
-    SpeedMultiplier: 1.24
-    Quantity2Percent: 30
-    Quantity3Percent: 0
-    SecondProductPercent: 45
-  - FromFan: 20
-    SpeedMultiplier: 1.32
-    Quantity2Percent: 40
-    Quantity3Percent: 20
-    SecondProductPercent: 55
-  - FromFan: 30
-    SpeedMultiplier: 1.4
-    Quantity2Percent: 30
-    Quantity3Percent: 40
+    SpeedMultiplier: 1.3
+    Quantity2Percent: 45
+    Quantity3Percent: 15
+    Quantity4Percent: 0
+    Quantity5Percent: 0
     SecondProductPercent: 60
-  - FromFan: 40
-    SpeedMultiplier: 1.48
-    Quantity2Percent: 20
-    Quantity3Percent: 60
-    SecondProductPercent: 65
-  - FromFan: 50
-    SpeedMultiplier: 1.56
-    Quantity2Percent: 10
-    Quantity3Percent: 80
+  - FromFan: 20
+    SpeedMultiplier: 1.4
+    Quantity2Percent: 45
+    Quantity3Percent: 35
+    Quantity4Percent: 5
+    Quantity5Percent: 0
     SecondProductPercent: 70
-  - FromFan: 60
-    SpeedMultiplier: 1.64
-    Quantity2Percent: 10
-    Quantity3Percent: 90
+  - FromFan: 30
+    SpeedMultiplier: 1.5
+    Quantity2Percent: 35
+    Quantity3Percent: 45
+    Quantity4Percent: 15
+    Quantity5Percent: 0
     SecondProductPercent: 75
-  - FromFan: 70
-    SpeedMultiplier: 1.72
-    Quantity2Percent: 0
-    Quantity3Percent: 100
+  - FromFan: 40
+    SpeedMultiplier: 1.6
+    Quantity2Percent: 25
+    Quantity3Percent: 50
+    Quantity4Percent: 20
+    Quantity5Percent: 5
     SecondProductPercent: 80
-  - FromFan: 80
-    SpeedMultiplier: 1.8
-    Quantity2Percent: 0
-    Quantity3Percent: 100
+  - FromFan: 50
+    SpeedMultiplier: 1.7
+    Quantity2Percent: 15
+    Quantity3Percent: 50
+    Quantity4Percent: 25
+    Quantity5Percent: 10
     SecondProductPercent: 85
-  - FromFan: 90
-    SpeedMultiplier: 1.88
-    Quantity2Percent: 0
-    Quantity3Percent: 100
+  - FromFan: 60
+    SpeedMultiplier: 1.8
+    Quantity2Percent: 10
+    Quantity3Percent: 45
+    Quantity4Percent: 30
+    Quantity5Percent: 15
     SecondProductPercent: 90
-  - FromFan: 100
-    SpeedMultiplier: 1.96
-    Quantity2Percent: 0
-    Quantity3Percent: 100
+  - FromFan: 70
+    SpeedMultiplier: 1.9
+    Quantity2Percent: 5
+    Quantity3Percent: 40
+    Quantity4Percent: 35
+    Quantity5Percent: 20
     SecondProductPercent: 95
-  - FromFan: 110
-    SpeedMultiplier: 2.04
+  - FromFan: 80
+    SpeedMultiplier: 2.0
     Quantity2Percent: 0
-    Quantity3Percent: 100
+    Quantity3Percent: 35
+    Quantity4Percent: 40
+    Quantity5Percent: 25
+    SecondProductPercent: 100
+  - FromFan: 90
+    SpeedMultiplier: 2.1
+    Quantity2Percent: 0
+    Quantity3Percent: 25
+    Quantity4Percent: 45
+    Quantity5Percent: 30
+    SecondProductPercent: 100
+  - FromFan: 100
+    SpeedMultiplier: 2.2
+    Quantity2Percent: 0
+    Quantity3Percent: 15
+    Quantity4Percent: 45
+    Quantity5Percent: 40
+    SecondProductPercent: 100
+  - FromFan: 110
+    SpeedMultiplier: 2.3
+    Quantity2Percent: 0
+    Quantity3Percent: 0
+    Quantity4Percent: 50
+    Quantity5Percent: 50
     SecondProductPercent: 100
   startingStations:
   - Kind: 0

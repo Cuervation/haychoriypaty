@@ -59,6 +59,7 @@ MonoBehaviour:
   maximumWorkersPerRole: 0
   startingCoins: 40
   hirePricingCampaignLevelId: 5
+  hireBaseCostOverridesByRole: 0000000000000000000000007800000000000000
   difficultyTiers:
   - FromFan: 0
     SpeedMultiplier: 1

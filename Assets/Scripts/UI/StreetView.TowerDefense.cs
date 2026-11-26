@@ -408,6 +408,9 @@ namespace HayChoriYPaty
                 ReflowTowerDefense(screenSize);
             if (towerDefenseMode.Phase == TowerDefenseRunPhase.Playing)
                 towerDefenseMode.Step(Time.deltaTime);
+            // Back from the background (2026-11-26): up to 10 s of the time away per frame, in the mode's own 1 s calls.
+            for (int i = 0; i < 10 && game.PendingBackgroundCatchUpSeconds > 0f && towerDefenseMode.Phase == TowerDefenseRunPhase.Playing; i++)
+                towerDefenseMode.Step(game.TakeBackgroundCatchUp(1f));
             if (towerDefensePresentation != null) towerDefensePresentation.Sync(towerDefenseMode);
             if (towerDefenseMode.Phase == TowerDefenseRunPhase.Finished)
             {
@@ -1227,14 +1230,24 @@ namespace HayChoriYPaty
         /// Creates short delivery gestures from already-authored campaign poses. Coca's reach
         /// pose contains a bottle, so the delivery cue must stay hidden until the release.
         /// </summary>
+        private Texture2D towerDefensePremiumCookingPoses;
+
         internal Sprite[] CreateTowerDefenseHandoffFrames(StreetWorkerRole role)
         {
             Texture2D texture;
             Rect[] poses;
-            if (role == StreetWorkerRole.Parrillero)
+            if (role == StreetWorkerRole.Parrillero || role == StreetWorkerRole.ParrilleroPremium)
             {
                 texture = Resources.Load<Texture2D>("street-parrillero-cooking-arms-v1");
                 poses = StreetWorkerProjection.CookingPoseBounds;
+                // The Premium cooks in its own outfit, not the Parrillero's white apron (2026-11-26, a pedido): the same recolor
+                // the campaign kitchen uses for its cooking poses, made once per view.
+                if (role == StreetWorkerRole.ParrilleroPremium && texture != null)
+                {
+                    if (towerDefensePremiumCookingPoses == null)
+                        towerDefensePremiumCookingPoses = StreetWorkerAppearance.CreateVariant(texture, role, poses, StreetWorkerProjection.CookingPoseAtlasSize);
+                    if (towerDefensePremiumCookingPoses != null) texture = towerDefensePremiumCookingPoses;
+                }
             }
             else if (role == StreetWorkerRole.Cocacolero)
             {

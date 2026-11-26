@@ -41,8 +41,12 @@ namespace HayChoriYPaty
         [Min(0.1f)] public float SpeedMultiplier;
         [Tooltip("Percent chance that a product line asks for 2 units.")]
         [Range(0, 100)] public int Quantity2Percent;
-        [Tooltip("Percent chance that a product line asks for 3 units (rolled before the 2-unit chance; the rest ask for 1).")]
+        [Tooltip("Percent chance that a product line asks for 3 units (rolled after 5 and 4, before 2; the rest ask for 1).")]
         [Range(0, 100)] public int Quantity3Percent;
+        [Tooltip("Percent chance that a product line asks for 4 units (2026-11-26; 0 in levels that never ask for more than 3).")]
+        [Range(0, 100)] public int Quantity4Percent;
+        [Tooltip("Percent chance that a product line asks for 5 units (rolled first; the five quantity chances add up to at most 100).")]
+        [Range(0, 100)] public int Quantity5Percent;
         [Tooltip("Percent chance that the order has a second product.")]
         [Range(0, 100)] public int SecondProductPercent;
     }
@@ -97,6 +101,8 @@ namespace HayChoriYPaty
         [SerializeField] private bool useCampaignEconomyPricing;
         [Tooltip("Optional: price the workers hired in this level with the hire prices and growth of a regular campaign level (e.g. 3 = Ferro). -1 = off. Speed upgrades keep their own price.")]
         [SerializeField] private int hirePricingCampaignLevelId = -1;
+        [Tooltip("Per-role first price that replaces the campaign one (0 = keep it); it grows with each purchase like the campaign prices.")]
+        [SerializeField] private int[] hireBaseCostOverridesByRole = new int[0];
         [SerializeField] private string backgroundResource = "street-background-camioneros-v1";
         [SerializeField] private TowerDefenseRouteKind routeKind = TowerDefenseRouteKind.Serpentine;
         [SerializeField] private bool freeConstruction;
@@ -151,6 +157,12 @@ namespace HayChoriYPaty
         public int EconomicBalanceCampaignLevelId => Mathf.Clamp(economicBalanceCampaignLevelId, 0, StreetSimulation.LevelNames.Length - 1);
         public bool UseCampaignEconomyPricing => useCampaignEconomyPricing;
         /// <summary>Regular campaign level whose worker prices this level copies, or -1.</summary>
+        /// <summary>Own first price for this role (Los Redondos' Fernetero: 120, 2026-11-26), or 0 to keep the campaign price.</summary>
+        public int HireBaseCostOverride(StreetWorkerRole role)
+        {
+            int index = (int)role;
+            return hireBaseCostOverridesByRole != null && index >= 0 && index < hireBaseCostOverridesByRole.Length ? Mathf.Max(0, hireBaseCostOverridesByRole[index]) : 0;
+        }
         public int HirePricingCampaignLevelId => hirePricingCampaignLevelId < 0 ? -1 : Mathf.Min(hirePricingCampaignLevelId, StreetSimulation.LevelNames.Length - 1);
         public string BackgroundResource => backgroundResource;
         public TowerDefenseRouteKind RouteKind => routeKind;

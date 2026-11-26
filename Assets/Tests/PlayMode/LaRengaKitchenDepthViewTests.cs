@@ -198,7 +198,7 @@ namespace HayChoriYPaty.Tests
         // 2026-11-24 (a pedido, from a phone capture): hiring the Camioneros crew in quick succession used to teleport a worker that was mid-job (its route then
         // crossed the table and it stood still with a fan reserved) and left new hires inside the barrels' keep-out strip, where no route can start.
         [UnityTest, Timeout(300000)]
-        public IEnumerator CamionerosCrewHiredInQuickSuccessionNeverGetsStuckAndServesEveryFan()
+        public IEnumerator CamionerosCrewHiredInQuickSuccessionNeverGetsStuck()
         {
             yield return SetSize(575, 1280);
             EnterFromSelector(9);
@@ -225,9 +225,36 @@ namespace HayChoriYPaty.Tests
             }
             Assert.AreEqual(roles.Length, hired);
             Assert.Less(longestStuck, 8f, "A worker with a job never stands still for long.");
-            Assert.AreEqual("Finished", Get(mode, "Phase").ToString());
-            Assert.IsTrue((bool)Get(mode, "HasWon"), "Every fan is served.");
-            Assert.AreEqual(120, Get(mode, "ServedFans"));
+            // 2026-11-26: the user kept Camioneros' harder orders (4 and 5 units) even though this maximum crew no longer wins
+            // (it served 79-87/120); the test keeps checking that nobody gets stuck and that the round ends, not the result.
+            Assert.AreEqual("Finished", Get(mode, "Phase").ToString(), "served " + Get(mode, "ServedFans") + "/120 in " + t.ToString("0.0") + " s");
+            Assert.Greater((int)Get(mode, "ServedFans"), 0);
+            Return(mode);
+        }
+
+        // 2026-11-26 (a pedido): the time the app spent in the background is played on return, a few seconds per frame.
+        [UnityTest, Timeout(120000)]
+        public IEnumerator TimeAwayInTheBackgroundIsPlayedWhenTheAppReturns()
+        {
+            yield return SetSize(575, 1280);
+            EnterFromSelector(9);
+            object mode = Get(view, "towerDefenseMode");
+            Assert.AreEqual("Playing", Get(mode, "Phase").ToString());
+            float before = (float)Get(mode, "Elapsed");
+            // As OnApplicationPause(true) then (false) after 25 s away, without the save the real pause makes.
+            Set(game, "backgroundSinceUtc", (DateTime?)DateTime.UtcNow.AddSeconds(-25));
+            Call(game, "RecordBackgroundTime", false);
+            Assert.AreEqual(25f, (float)Get(game, "PendingBackgroundCatchUpSeconds"), .5f, "the time away is owed to the running round");
+            for (int frame = 0; frame < 6; frame++) yield return null;
+            Assert.AreEqual(0f, (float)Get(game, "PendingBackgroundCatchUpSeconds"), "played within a few frames (10 s per frame)");
+            Assert.GreaterOrEqual((float)Get(mode, "Elapsed") - before, 24.5f, "the clock and the fans advanced by the time away");
+            Assert.Greater((int)Get(mode, "SpawnedFans"), 0, "fans kept arriving while away");
+
+            // A paused round owes nothing.
+            Call(mode, "Pause");
+            Set(game, "backgroundSinceUtc", (DateTime?)DateTime.UtcNow.AddSeconds(-25));
+            Call(game, "RecordBackgroundTime", false);
+            Assert.AreEqual(0f, (float)Get(game, "PendingBackgroundCatchUpSeconds"));
             Return(mode);
         }
 
@@ -251,6 +278,14 @@ namespace HayChoriYPaty.Tests
             CollectionAssert.AreEqual(new[] { 1, 0, 1, 0, 1 }, (int[])Get(mode, "WorkerCountsByRole"), "Racing's crew: a Parrillero, a Premium and a Mozo.");
             Assert.AreEqual(7, ((ICollection)Get(mode, "PlacedStations")).Count, "Racing's seven stations.");
             Assert.IsTrue((bool)Get(config, "HasDifficultyRamp"));
+            // 2026-11-26 (a pedido): the first Fernetero costs 120 (it was Racing's 200) and the next ones grow from there.
+            Assert.AreEqual(120, (int)Call(mode, "HireCost", Role(3)), "first Fernetero");
+            // 2026-11-26 (a pedido): the Premium cooks in its own outfit, not with the Parrillero's white-apron poses.
+            var cookPoses = (UnityEngine.Sprite[])Call(view, "CreateTowerDefenseHandoffFrames", Role(0));
+            var premiumPoses = (UnityEngine.Sprite[])Call(view, "CreateTowerDefenseHandoffFrames", Role(2));
+            Assert.AreEqual(cookPoses.Length, premiumPoses.Length, "the Premium has the same cooking poses");
+            Assert.Greater(premiumPoses.Length, 0);
+            Assert.AreNotSame(cookPoses[0].texture, premiumPoses[0].texture, "recolored, not the Parrillero's apron");
             yield return Capture("redondos-invertida-apertura");
             Return(mode);
         }

@@ -48,7 +48,7 @@ namespace HayChoriYPaty
             };
             view.Renderer = view.Torso;
             Sprite[] handoffFrames = this.view != null && (worker.Role == StreetWorkerRole.Parrillero || worker.Role == StreetWorkerRole.ParrilleroPremium)
-                ? this.view.CreateTowerDefenseHandoffFrames(StreetWorkerRole.Parrillero) : null;
+                ? this.view.CreateTowerDefenseHandoffFrames(worker.Role) : null; // the Premium keeps its own outfit while cooking (2026-11-26)
             if (handoffFrames != null) generatedWorkerSprites.AddRange(handoffFrames);
             view.HandoffFrames = handoffFrames;
             view.Frames = System.Array.Empty<Sprite>();

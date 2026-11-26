@@ -504,7 +504,8 @@ namespace HayChoriYPaty
             long paidNumber = Math.Max(1L, (long)roleWorkerCount - freeBaseline - Math.Max(0L, ticketWorkers) + 1);
             return ComputeHireCost(sourceBalance.GetHireBaseCost(levelIndex, role), paidNumber);
         }
-        private static int ComputeHireCost(int baseCost, long paidNumber)
+        /// <summary>Price of the paidNumber-th paid worker from a base price: x1, x2.5, x5, then n(n+1)/2 - 1 (capped).</summary>
+        public static int ComputeHireCost(int baseCost, long paidNumber)
         {
             if (baseCost <= 0 || paidNumber <= 0) return 0;
             long factorNumerator;

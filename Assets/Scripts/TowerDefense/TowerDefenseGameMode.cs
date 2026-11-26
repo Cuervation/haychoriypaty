@@ -536,6 +536,9 @@ namespace HayChoriYPaty
                     // La Renga copies Ferro's worker prices and their growth (x1, x2.5, x5, ...): the crew it starts with is free and only
                     // the workers bought count, plus the one Parrillero that Ferro itself starts with.
                     int bought = Math.Max(0, workerCounts[(int)role] - startingCrewCounts[(int)role]);
+                    // A role with its own first price (Los Redondos' Fernetero: 120, 2026-11-26) keeps the same growth from that price.
+                    int ownBase = config.HireBaseCostOverride(role);
+                    if (ownBase > 0) return StreetSimulation.ComputeHireCost(ownBase, bought + 1);
                     int ferroStartingCrew = role == StreetWorkerRole.Parrillero ? 1 : 0;
                     return StreetSimulation.CalculateHireCost(sourceBalance, config.HirePricingCampaignLevelId, role, bought + ferroStartingCrew, 0L);
                 }
@@ -623,7 +626,7 @@ namespace HayChoriYPaty
             int[] safeQuantities = new int[products.Length];
             for (int i = 0; i < products.Length; i++)
             {
-                if (!ContainsProduct(products[i]) || quantities[i] < 1 || quantities[i] > 4) return false;
+                if (!ContainsProduct(products[i]) || quantities[i] < 1 || quantities[i] > 5) return false;
                 for (int prior = 0; prior < i; prior++) if (products[prior] == products[i]) return false;
                 safeProducts[i] = products[i];
                 safeQuantities[i] = quantities[i];
@@ -836,9 +839,12 @@ namespace HayChoriYPaty
 
         private int RollTierQuantity(TowerDefenseDifficultyTier tier)
         {
-            int roll = random.Next(100);
-            if (roll < tier.Quantity3Percent) return 3;
-            return roll < tier.Quantity3Percent + tier.Quantity2Percent ? 2 : 1;
+            // One roll over 5, 4, 3 and 2 units in that order (4 and 5 since 2026-11-26, Camioneros); the rest ask for 1.
+            int roll = random.Next(100), threshold = tier.Quantity5Percent;
+            if (roll < threshold) return 5;
+            if (roll < (threshold += tier.Quantity4Percent)) return 4;
+            if (roll < (threshold += tier.Quantity3Percent)) return 3;
+            return roll < threshold + tier.Quantity2Percent ? 2 : 1;
         }
 
         private bool CreateFan(int[] products, int[] quantities)

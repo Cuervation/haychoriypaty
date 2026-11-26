@@ -294,20 +294,30 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(120, configType.GetProperty("TotalFanCount").GetValue(config, null));
             Assert.AreEqual(true, configType.GetProperty("HasDifficultyRamp").GetValue(config, null));
             var tierFor = configType.GetMethod("DifficultyTierForFan");
-            float previousSpeed = 0f; int previousThree = -1, previousSecond = -1;
+            // 2026-11-26 (a pedido): from tier 2 more 2- and 3-unit lines and more two-product orders, plus 4 and 5 units by difficulty.
+            float previousSpeed = 0f, previousUnits = 0f; int previousSecond = -1;
             for (int tierIndex = 0; tierIndex < 12; tierIndex++)
             {
                 object tier = tierFor.Invoke(config, new object[] { tierIndex * 10 });
                 Assert.AreEqual(tier.GetType().GetField("FromFan").GetValue(tier), tierIndex * 10, "tier " + tierIndex + " starts at fan " + tierIndex * 10);
                 float speed = (float)tier.GetType().GetField("SpeedMultiplier").GetValue(tier);
-                int three = (int)tier.GetType().GetField("Quantity3Percent").GetValue(tier), second = (int)tier.GetType().GetField("SecondProductPercent").GetValue(tier);
-                Assert.AreEqual(1.16f + .08f * tierIndex, speed, 0.0001f, "speed of tier " + tierIndex); // starts at x1.16 (2026-11-24, a pedido)
-                Assert.Greater(speed, previousSpeed); Assert.GreaterOrEqual(three, previousThree); Assert.GreaterOrEqual(second, previousSecond);
-                previousSpeed = speed; previousThree = three; previousSecond = second;
+                int Percent(object t, string field) => (int)t.GetType().GetField(field).GetValue(t);
+                int two = Percent(tier, "Quantity2Percent"), three = Percent(tier, "Quantity3Percent"), four = Percent(tier, "Quantity4Percent"),
+                    five = Percent(tier, "Quantity5Percent"), second = Percent(tier, "SecondProductPercent");
+                Assert.LessOrEqual(two + three + four + five, 100, "quantity chances of tier " + tierIndex);
+                float units = (100 - two - three - four - five + 2 * two + 3 * three + 4 * four + 5 * five) / 100f;
+                Assert.AreEqual(1.20f + .10f * tierIndex, speed, 0.0001f, "speed of tier " + tierIndex); // x1.20 +0.10 per tier (2026-11-26, a pedido; was x1.16 +0.08)
+                Assert.Greater(speed, previousSpeed); Assert.GreaterOrEqual(second, previousSecond);
+                if (tierIndex > 0) Assert.Greater(units, previousUnits, "average units per line grow from tier " + tierIndex);
+                previousSpeed = speed; previousUnits = units; previousSecond = second;
             }
+            object first = tierFor.Invoke(config, new object[] { 0 });
+            Assert.AreEqual(0, (int)first.GetType().GetField("Quantity2Percent").GetValue(first), "the first ten fans still ask for one unit");
+            Assert.AreEqual(20, (int)first.GetType().GetField("SecondProductPercent").GetValue(first));
             object last = tierFor.Invoke(config, new object[] { 119 });
-            Assert.AreEqual(2.04f, (float)last.GetType().GetField("SpeedMultiplier").GetValue(last), 0.0001f);
-            Assert.AreEqual(100, (int)last.GetType().GetField("Quantity3Percent").GetValue(last));
+            Assert.AreEqual(2.30f, (float)last.GetType().GetField("SpeedMultiplier").GetValue(last), 0.0001f);
+            Assert.AreEqual(50, (int)last.GetType().GetField("Quantity4Percent").GetValue(last));
+            Assert.AreEqual(50, (int)last.GetType().GetField("Quantity5Percent").GetValue(last));
             Assert.AreEqual(100, (int)last.GetType().GetField("SecondProductPercent").GetValue(last));
             Assert.AreEqual(20, configType.GetProperty("StartingCoins").GetValue(config, null), "Camioneros starts with 20 coins.");
         }

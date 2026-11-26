@@ -324,14 +324,52 @@ namespace HayChoriYPaty
             temporaryStartupTicketGrantAppliedThisProcess = false;
         }
 
+        // ---- Time away in the background (2026-11-26, a pedido: "que cuando la app esté en segundo plano continúe andando") ----
+        // Android freezes the player while the app is in the background, so nothing can run there. Instead, the round that was being
+        // played when the app left catches up on return: the clock, fans and workers advance by the time it was away, a few seconds
+        // of simulation per frame (normal levels in StreetGame, Defense levels in StreetView). A player pause or the hub drops it.
+        public const float MaxBackgroundCatchUpSeconds = 3600f;
+        private DateTime? backgroundSinceUtc;
+        private float backgroundCatchUpSeconds;
+        public float PendingBackgroundCatchUpSeconds => backgroundCatchUpSeconds;
+
+        /// <summary>Takes up to maxSeconds of the time still owed to the round after coming back from the background.</summary>
+        public float TakeBackgroundCatchUp(float maxSeconds)
+        {
+            float taken = Mathf.Clamp(backgroundCatchUpSeconds, 0f, Mathf.Max(0f, maxSeconds));
+            backgroundCatchUpSeconds -= taken;
+            return taken;
+        }
+
+        private bool RoundIsRunning => playerActive && sim != null && (sim.IsExternalCampaignRuntime
+            ? towerDefenseMode != null && towerDefenseMode.Phase == TowerDefenseRunPhase.Playing
+            : sim.Phase == RoundPhase.Playing);
+
+        private void RecordBackgroundTime(bool paused)
+        {
+            if (paused) { backgroundSinceUtc = DateTime.UtcNow; return; }
+            if (!backgroundSinceUtc.HasValue) return;
+            double away = (DateTime.UtcNow - backgroundSinceUtc.Value).TotalSeconds;
+            backgroundSinceUtc = null;
+            // A clock moved backwards gives nothing; a very long absence is capped.
+            if (away > 0d && RoundIsRunning)
+                backgroundCatchUpSeconds = Mathf.Min(MaxBackgroundCatchUpSeconds, backgroundCatchUpSeconds + (float)Math.Min(away, MaxBackgroundCatchUpSeconds));
+        }
+
         private void Update()
         {
+            // Owed time only belongs to the round that was running; paused, finished or left rounds drop it.
+            if (backgroundCatchUpSeconds > 0f && !RoundIsRunning) backgroundCatchUpSeconds = 0f;
             if (!playerActive || sim == null || TowerDefenseGameMode.CampaignStepSuspended) return;
             sim.Step(Time.deltaTime);
+            // Normal levels: up to 30 s of the time away per frame, in the simulation's own 10 s calls.
+            for (int i = 0; i < 3 && backgroundCatchUpSeconds > 0f && !sim.IsExternalCampaignRuntime && sim.Phase == RoundPhase.Playing; i++)
+                sim.Step(TakeBackgroundCatchUp(10f));
             ProcessRoundResult();
         }
         private void OnApplicationPause(bool paused)
         {
+            RecordBackgroundTime(paused);
             if (!paused || (!playerActive && !suspensionRequested)) return;
             if (playerActive && sim != null && sim.IsExternalCampaignRuntime)
             {

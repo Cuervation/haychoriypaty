@@ -1104,6 +1104,7 @@ namespace HayChoriYPaty
                     if (texture != null) Destroy(texture);
             marketPanelTextures.Clear();
             if (clubPennantTexture != null) Destroy(clubPennantTexture);
+            if (towerDefensePremiumCookingPoses != null) Destroy(towerDefensePremiumCookingPoses);
             clubPennantTexture = null;
             clubPennantThemeName = null;
             foreach (Texture2D variant in new[] { premiumWorker, premiumDiagonal, fernetWorker, fernetWorkerLater, mozoWorker })
