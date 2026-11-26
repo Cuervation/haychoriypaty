@@ -357,6 +357,14 @@ namespace HayChoriYPaty.Cloud
 
         /// <summary>The ranking needs a live Google session and a connection; it never blocks or changes the game.</summary>
         public bool LeaderboardReady => State == PlayerSessionState.Ready && !offline && firestore != null && IsGoogleUser(auth?.CurrentUser);
+        // ---- Perfil del barrio (2026-11-26, a pedido): datos de la cuenta que el propio jugador ve en su perfil. ----
+        /// <summary>True while a Google player is signed in and their progress is loaded.</summary>
+        public bool ProfileSignedIn => State == PlayerSessionState.Ready && IsGoogleUser(auth?.CurrentUser);
+        /// <summary>The signed-in Google account's mail, shown only to its owner in the profile (never published or logged).</summary>
+        public string AccountEmail => ProfileSignedIn ? auth.CurrentUser.Email : null;
+        /// <summary>Stable id used only to colour the player's own avatar the same way the ranking does.</summary>
+        public string AccountUid => ProfileSignedIn ? auth.CurrentUser.UserId : null;
+
         public string LeaderboardNickname
         {
             get

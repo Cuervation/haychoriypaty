@@ -1183,6 +1183,7 @@ namespace HayChoriYPaty
             UpdatePostProcessingPolicy();
             UpdateRewardShutter();
             if (badgesActive && viewResourcesReady) EnsureBadgeShapes(); // trophy art is sampled outside OnGUI
+            UpdateProfileKeyboard();
             UpdateHubMusic();
             // The branded presentation belongs to startup, not to the authenticated game session.
             // Let it complete while Firebase resolves; game actions remain gated separately.
@@ -1264,7 +1265,7 @@ namespace HayChoriYPaty
 #endif
         }
 
-        public bool AccountMenuVisible => !introActive && (hubActive || badgesActive || rankingActive || marketActive);
+        public bool AccountMenuVisible => !introActive && (hubActive || badgesActive || rankingActive || marketActive || profileActive);
         public bool HubAccountActionRendered => false;
 
         private void OnGUI()
@@ -1335,6 +1336,13 @@ namespace HayChoriYPaty
             if (hubActive && !marketActive && !chulengoResult)
             {
                 DrawHubScreen();
+                GUI.color=old; GUI.matrix=m;
+                return;
+            }
+            if (profileActive && !chulengoResult)
+            {
+                float pageScale = layoutVerticalScale; layoutVerticalScale = 1f;
+                DrawProfileScreen(); layoutVerticalScale = pageScale;
                 GUI.color=old; GUI.matrix=m;
                 return;
             }
@@ -1681,6 +1689,7 @@ namespace HayChoriYPaty
             levelFourSpecialistsTutorialActive = false; levelFourSpecialistsTutorialStep = 0;
             levelFiveSpecialistsTutorialActive = false; levelFiveSpecialistsTutorialStep = 0;
             marketActive = false; badgesActive = false; rankingActive = false; hubActive = true;
+            CloseProfile();
             marketFromSelector = false; pressedAction = 0;
         }
 
@@ -1700,7 +1709,7 @@ namespace HayChoriYPaty
             ClearLevelOneTutorialMarkerForTesting();
 #endif
             introActive = false; levelSelectActive = false; marketActive = false;
-            badgesActive = false; rankingActive = false; settingsActive = false;
+            badgesActive = false; rankingActive = false; settingsActive = false; CloseProfile();
             hubActive = true; marketFromSelector = false;
             pressedAction = 0;
         }

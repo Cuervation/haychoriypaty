@@ -262,3 +262,15 @@ Este delta **supersede** las composiciones parciales de recortes, telas y placas
 - [ ] Android/APK y dispositivo: **NOT_RUN** (no solicitados).
 
 **Botón CUENTA retirado (2026-11-24, a pedido):** el botón superior derecho "CUENTA" ya no se dibuja en hub, insignias, ranking ni mercado (`FirebasePlayerSession.OnGUI`). El panel de cuenta sigue abriéndose al pulsar un destino de juego sin sesión; con sesión iniciada ya no hay acceso visible a "CAMBIAR CUENTA GOOGLE". `HubAccountButtonScreenBounds` se conserva (geometría del altavoz/pruebas). No se probó en pantalla: NOT_RUN.
+
+## Perfil del hincha — 2026-11-26
+
+Pedido del usuario (referencia: la tarjeta de jugador arriba del menú y la ficha de perfil de un juego móvil, "siempre con el estilo del juego"):
+
+- **Tarjeta en el barrio:** arriba a la izquierda, sobre la ilustración, una fila crema con borde de madera (como las filas del Ranking): medallón con la inicial del apodo (color estable por cuenta), el **apodo** y debajo `★ puntos · canchas/14`. Sin apodo dice ELEGÍ TU APODO; sin sesión, MI PERFIL. Se corre a la derecha del engranaje de ajustes y se acorta antes del botón de música cuando caen en la misma fila (16:9). Tocarla abre la ficha.
+- **Ficha MI PERFIL DE HINCHA** (marco de madera y título dorado como Ranking e Insignias): tarjeta celeste con medallón con laureles, el apodo grande, `★ Puntos de Liga` y **EDITAR** (o ELEGIR); seis recuadros crema con **partidas jugadas, partidas ganadas, canchas ganadas, insignias, productos vendidos y clientes atendidos**; una fila verde con el **próximo objetivo**; al pie **TU CUENTA DE GOOGLE** con el **mail** y **CERRAR SESIÓN** (rojo), o INICIAR SESIÓN si no hay sesión; VOLVER AL BARRIO.
+- **Editar el apodo:** tocar el apodo o EDITAR. En Android se abre el teclado nativo con su línea de texto (como la referencia) y "Aceptar" guarda; en el Editor, un campo de texto. GUARDAR / CANCELAR debajo. Es **el mismo apodo del Ranking** (`SaveLeaderboardNicknameAsync`, mismas reglas: 3 a 16 letras, números, espacio, punto o guion) y necesita conexión y sesión de Google; si falla, se muestra el motivo y no cambia nada.
+- **Cerrar sesión:** pide confirmación (¿CERRAR SESIÓN? · SÍ, CERRAR / CANCELAR) y usa `FirebasePlayerSession.SignOut()` de siempre, que guarda, vuelve al barrio y muestra el inicio de sesión.
+- El mail se ve solo en esta ficha y solo del propio jugador; no se publica ni se registra. No cambian datos, reglas, economía ni el Ranking.
+
+Evidencia: prueba explícita PlayMode `ProfileScreensCapture` (tarjeta del barrio, ficha, edición, confirmación y sin sesión, a 575×1280 y 1080×1920) en `Logs/Acceptance/Profile-20261126/`, con datos de vista previa porque en el Editor no hay sesión de Firebase; comprueba además que tocar la tarjeta abre la ficha y que EDITAR, CERRAR SESIÓN, CANCELAR y VOLVER cambian de estado. **NOT_RUN:** guardar un apodo real, el teclado nativo y cerrar sesión en el celular.

@@ -30,6 +30,7 @@ namespace HayChoriYPaty
             DrawHubHotspot(HubPlayAction);
             DrawHubSettingsButton();
             DrawHubTopMusicButton();
+            DrawHubProfileCard();
         }
 
         private void DrawHubSettingsButton()

@@ -33,7 +33,7 @@ namespace HayChoriYPaty.Tests
         bool Persist<TMatch>(string json, TMatch match) => true; // Never PlayerPrefs/cloud.
         void Hub()
         {
-            foreach (string flag in new[] {"introActive", "settingsActive", "marketActive", "badgesActive", "rankingActive", "levelSelectActive"}) Set(view, flag, false);
+            foreach (string flag in new[] {"introActive", "settingsActive", "marketActive", "badgesActive", "rankingActive", "levelSelectActive", "profileActive"}) Set(view, flag, false);
             Set(view, "hubActive", true); Set(view, "pressedAction", 0);
         }
         void Portrait(int width, int height)
@@ -205,6 +205,49 @@ namespace HayChoriYPaty.Tests
             Texture2D shortCapture = ScreenCapture.CaptureScreenshotAsTexture();
             File.WriteAllBytes(Path.Combine(folder, "badges-top-1080x1920.png"), shortCapture.EncodeToPNG());
             UnityEngine.Object.Destroy(shortCapture);
+        }
+        // 2026-11-26: the hub profile card and the profile screen (preview data: there is no Firebase session in the editor).
+        [UnityTest, Explicit("Captures the hub profile card and profile screen to Logs/Acceptance/Profile-20261126")]
+        public IEnumerator ProfileScreensCapture()
+        {
+            if (Application.isBatchMode) Assert.Ignore("Requires interactive Game View.");
+            object save = gt.GetField("save", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(game);
+            object statistics = save.GetType().GetField("statistics").GetValue(save);
+            statistics.GetType().GetField("deliveredByProduct").SetValue(statistics, new long[] { 5400, 2600, 820, 120, 3100, 0, 510 });
+            Set(statistics, "attemptsFinished", 184L); Set(statistics, "wins", 97L); Set(statistics, "customersAttended", 9321L);
+            statistics.GetType().GetMethod("Normalize").Invoke(statistics, null);
+            Set(view, "profilePreviewNickname", "Cuervation"); Set(view, "profilePreviewEmail", "hincha.ejemplo@gmail.com"); Set(view, "profilePreviewSignedIn", true);
+            string folder = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/Profile-20261126"));
+            Directory.CreateDirectory(folder);
+            IEnumerator Shot(string name)
+            {
+                yield return null; yield return new WaitForEndOfFrame();
+                Texture2D capture = ScreenCapture.CaptureScreenshotAsTexture();
+                File.WriteAllBytes(Path.Combine(folder, name + ".png"), capture.EncodeToPNG());
+                UnityEngine.Object.Destroy(capture);
+            }
+            foreach (var size in new[] { new Vector2Int(575, 1280), new Vector2Int(1080, 1920) })
+            {
+                Portrait(size.x, size.y); yield return null; yield return null;
+                Hub(); yield return Shot("hub-card-" + size.x + "x" + size.y);
+                Call(view, "DispatchAction", 240);
+                Assert.IsTrue((bool)Get(view, "profileActive"), "tapping the card opens the profile");
+                yield return Shot("profile-" + size.x + "x" + size.y);
+                Call(view, "DispatchAction", 242);
+                Assert.IsTrue((bool)Get(view, "profileEditing"));
+                Set(view, "profileNicknameInput", "Cuervation 10");
+                yield return Shot("profile-editing-" + size.x + "x" + size.y);
+                Call(view, "DispatchAction", 244);
+                Call(view, "DispatchAction", 245);
+                Assert.IsTrue((bool)Get(view, "profileConfirmSignOut"));
+                yield return Shot("profile-signout-confirm-" + size.x + "x" + size.y);
+                Call(view, "DispatchAction", 247);
+                Call(view, "DispatchAction", 241);
+                Assert.IsTrue((bool)Get(view, "hubActive"));
+            }
+            Set(view, "profilePreviewSignedIn", false); Set(view, "profilePreviewNickname", null); Set(view, "profilePreviewEmail", null);
+            Call(view, "DispatchAction", 240);
+            yield return Shot("profile-signed-out-1080x1920");
         }
         [UnityTearDown] public IEnumerator TearDown()
         {
