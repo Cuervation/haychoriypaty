@@ -115,6 +115,8 @@ namespace HayChoriYPaty
         public bool IsCooking { get; internal set; }
         public int CurrentFoodId => ServiceUnitId > 0 ? ServiceUnitId : CookUnitId;
         internal int CookUnitId;
+        /// <summary>Seconds left standing at the table before putting the cooked sandwich down; negative while it has not started.</summary>
+        internal float CookHandoffSeconds = -1f;
         internal int NextCookProduct;
         internal int ServiceUnitId;
         internal int PendingFanId;

@@ -50,7 +50,7 @@ MonoBehaviour:
   directionArrowSprite: {fileID: 21300000, guid: ef3873967f16248bd8b9a67207f11688, type: 3}
   availableProducts: 00000000010000000200000003000000040000000500000006000000
   totalFanCount: 240
-  fanSpeed: 0.102375
+  fanSpeed: 0.1535625
   minimumEntrySpacingLogical: 70
   serviceRange: 0.8
   firstWorkZoneOffset: {x: 0, y: 0}

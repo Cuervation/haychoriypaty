@@ -93,6 +93,8 @@ namespace HayChoriYPaty
         /// </summary>
         public bool SideBarrelPickup { get; set; }
         public bool BarrelsFromTheSide { get { return NarrowGrills || NarrowTables || SideBarrelPickup; } }
+        /// <summary>The barrel stack is left of the tables and its side pickup is on the barrel's left (Los Redondos).</summary>
+        public bool BarrelsBeforeTables { get; private set; }
         /// <summary>Top edge of the span the kitchen is fitted with (narrow layout only; 0 = use the pieces).</summary>
         public float KitchenSpanTop { get; private set; }
         public Rect NormalGrillBounds { get { return normalGrill; } }
@@ -108,9 +110,16 @@ namespace HayChoriYPaty
         public StreetKitchenLayout(int[] availableProducts, bool activeCooks) : this(availableProducts, activeCooks, false) { }
 
         /// <summary>When <paramref name="narrowGrills"/> is true the grills hold two columns less of food: 2 instead of 3 per product on a shared grill, 4 instead of 6 for a solo Bondiola row.</summary>
-        public StreetKitchenLayout(int[] availableProducts, bool activeCooks, bool narrowGrills)
+        public StreetKitchenLayout(int[] availableProducts, bool activeCooks, bool narrowGrills) : this(availableProducts, activeCooks, narrowGrills, false) { }
+
+        /// <summary>
+        /// <paramref name="barrelsBeforeTables"/> (Los Redondos, 2026-11-25): the barrel stack stands to the LEFT of the tables instead of the right and is
+        /// served from its left side, so the table row can sit against the right margin of the pocket and the free lane stays on the other side.
+        /// </summary>
+        public StreetKitchenLayout(int[] availableProducts, bool activeCooks, bool narrowGrills, bool barrelsBeforeTables)
         {
             this.activeCooks = activeCooks;
+            BarrelsBeforeTables = barrelsBeforeTables;
             NarrowGrills = narrowGrills;
             NarrowTables = narrowGrills;
             bool[] available = new bool[7];
@@ -137,7 +146,14 @@ namespace HayChoriYPaty
                 premium.x = normal.xMax + tableGap;
                 // The Fernet table is narrowed like the sandwich tables: with it the row (and the barrels' side pickup lane) would not fit the pocket.
                 if (hasFernet) { fernet.width *= NarrowTableWidthFraction; fernet.x = premium.xMax + tableGap; }
-                if (hasCoca) coca.x = hasFernet ? fernet.xMax + FernetBarrelGap : premium.xMax + NarrowTableBarrelGap;
+                if (BarrelsBeforeTables && hasCoca)
+                {
+                    // The barrels take the left end of the row (where the normal table started) and the tables slide right by the barrels' width.
+                    float rowStart = normal.xMin, shift = coca.width * NarrowBarrelScale + FernetBarrelGap;
+                    normal.x += shift; premium.x += shift; if (hasFernet) fernet.x += shift;
+                    coca.x = rowStart;
+                }
+                else if (hasCoca) coca.x = hasFernet ? fernet.xMax + FernetBarrelGap : premium.xMax + NarrowTableBarrelGap;
                 // The barrels are 15% smaller, standing on the same base line as before.
                 float spanTop = Mathf.Min(hasCoca ? coca.yMin : float.MaxValue, hasBeer ? beer.yMin : float.MaxValue);
                 if (hasCoca) coca = ShrinkBarrel(coca);
@@ -163,6 +179,19 @@ namespace HayChoriYPaty
                     premiumG.x = normalG.xMax + NarrowGrillGap;
             }
             normalGrill = normalG; premiumGrill = premiumG;
+            if (BarrelsBeforeTables && hasNormal && hasPremium)
+            {
+                // The row of tables (with the barrels in front of it) ends where the grills end, so both stand against the same right margin.
+                float tablesRight = Mathf.Max(normalTable.xMax, Mathf.Max(premiumTable.xMax, hasFernet ? fernetTable.xMax : float.NegativeInfinity));
+                float slide = Mathf.Max(0f, premiumGrill.xMax - tablesRight);
+                if (slide > 0f)
+                {
+                    normalTable = SlideRight(normalTable, slide); premiumTable = SlideRight(premiumTable, slide);
+                    if (hasFernet) fernetTable = SlideRight(fernetTable, slide);
+                    if (hasCoca) cocaBarrel = SlideRight(cocaBarrel, slide);
+                    if (hasBeer) beerBarrel = SlideRight(beerBarrel, slide);
+                }
+            }
             BuildRouteGeometry(available);
         }
 
@@ -171,6 +200,7 @@ namespace HayChoriYPaty
         /// 36.4 px sausage columns edge to edge. Same centre and same top edge, so the cook strip under the tables is unchanged.
         /// </summary>
         public const float NarrowGrillScale = .73f, NarrowBarrelScale = .85f;
+        private static Rect SlideRight(Rect rect, float distance) { rect.x += distance; return rect; }
         private static Rect ShrinkBarrel(Rect barrel)
         {
             float width = barrel.width * NarrowBarrelScale, height = barrel.height * NarrowBarrelScale;
@@ -299,10 +329,11 @@ namespace HayChoriYPaty
         /// La Renga's barrels are taken from the right: the worker stands beside the barrel with the feet near its base;
         /// several workers spread upward along the barrel's right edge.
         /// </summary>
-        private static Vector2 NarrowBarrelSidePickup(Rect barrel, int index, int count)
+        private Vector2 NarrowBarrelSidePickup(Rect barrel, int index, int count)
         {
             float step = count > 1 ? Mathf.Min(24f, Mathf.Max(0f, barrel.height - 30f) / (count - 1)) : 0f;
-            return new Vector2(barrel.xMax + NarrowBarrelSideStandoff, barrel.yMax - 4f - index * step);
+            float x = BarrelsBeforeTables ? barrel.xMin - NarrowBarrelSideStandoff : barrel.xMax + NarrowBarrelSideStandoff;
+            return new Vector2(x, barrel.yMax - 4f - index * step);
         }
 
         /// <summary>One of a few front-side access points for concurrent workers at the same station.</summary>

@@ -62,7 +62,7 @@ namespace HayChoriYPaty
             new StreetKitchenLayout(new[] { 0, 1, 2, 4, 6 }, false, true);
         // Los Redondos' active kitchen is Racing's seven stations with La Renga's narrow grills and tables and its barrel stack (2026-11-25).
         private static readonly StreetKitchenLayout RedondosKitchenLayoutStatic =
-            new StreetKitchenLayout(new[] { 0, 1, 2, 3, 4, 5, 6 }, true, true);
+            new StreetKitchenLayout(new[] { 0, 1, 2, 3, 4, 5, 6 }, true, true, true);
         internal bool NarrowGrills => config.UsesLaRengaDynamics;
         /// <summary>Drinks are taken from the barrel's right side, facing it (La Renga and, on the same C-shaped fence, Camioneros).</summary>
         internal bool BarrelsFromTheSide => BocaKitchenLayout.BarrelsFromTheSide;
@@ -340,10 +340,11 @@ namespace HayChoriYPaty
         // Huracán's kitchen: the kitchen keeps its exact size and distances and sits in the middle of the pocket.
         private float KitchenWorldX(float bocaX, float scale) => IsCShapedLevel
             // La Renga's kitchen is anchored to the left of the pocket, CShapedKitchenSideMarginLogical from its edge.
-            // 2026-11-25 (a pedido): Los Redondos' world is drawn mirrored, so its kitchen is laid out reflected and anchored to the other side of the
-            // pocket: on screen every piece then stands where it does in La Renga (normal left, premium right, barrels right).
+            // 2026-11-25 (a pedido): Los Redondos' world is drawn mirrored, so its kitchen is laid out reflected: on screen the grills and tables keep
+            // La Renga's order (normal left, premium right). The three tables go against the screen's right margin and the barrels stand to their left (the layout puts the
+            // barrels first), which leaves the free lane on the fence side. The world is mirrored, so the screen's right margin is the world's left one.
             ? ReflectKitchen
-                ? WorkBounds.xMax - CShapedKitchenSideMarginLogical * worldUnitsPerLogicalPixel - (bocaX - BocaKitchenSourceBounds().xMin) * scale
+                ? WorkBounds.xMin + CShapedKitchenSideMarginLogical * worldUnitsPerLogicalPixel + (BocaKitchenSourceBounds().xMax - bocaX) * scale
                 : WorkBounds.xMin + CShapedKitchenLeftLogical * worldUnitsPerLogicalPixel + (bocaX - BocaKitchenSourceBounds().xMin) * scale
             : WorkBounds.center.x + (bocaX - StreetSceneLayout.Width * .5f) * scale;
 
@@ -400,7 +401,10 @@ namespace HayChoriYPaty
             index = Mathf.Clamp(index, 0, BocaPostSlots - 1);
             int column = index % 2, row = index / 2;
             var boca = new Vector2(source.center.x + (column == 0 ? -24f : 24f) * bodyScale, source.yMax + 14f + row * 30f * bodyScale);
-            if (IsCShapedLevel)
+            // 2026-11-25: only where the grill is stacked right under the table (La Renga's kitchen). Los Redondos' active kitchen keeps the campaign's 70 px
+            // between table and grill, so its cooks walk up to the table's front edge (Boca's apron) to hand the sandwich over instead of "delivering" it
+            // 16 px sideways from their own post, 100 px away from the table.
+            if (IsCShapedLevel && !config.ActiveKitchen)
             {
                 // The apron below the table is the grill itself here, so the cooks hand over from the strip between the rows:
                 // two beside each other and a third in the middle.
@@ -525,6 +529,9 @@ namespace HayChoriYPaty
                 xMax = Mathf.Max(xMax, piece.xMax);
                 yMax = Mathf.Max(yMax, piece.yMax);
             }
+            // Barrels first (Los Redondos): the Cocacolero's side lane is on the barrels' left, so the span includes it (otherwise the post would be pushed into the barrel).
+            if (BocaKitchenLayout.BarrelsBeforeTables && BocaKitchenLayout.HasCocaBarrel)
+                xMin = Mathf.Min(xMin, BocaKitchenLayout.CocaBarrelBounds.xMin - StreetKitchenLayout.NarrowBarrelSideStandoff - ConstructionWorkerWidthLogical * .5f);
             // La Renga's narrow layout keeps the span it had before the beer barrel went on top of the Coca barrel.
             if (BocaKitchenLayout.KitchenSpanTop > 0f) yMin = Mathf.Max(yMin, BocaKitchenLayout.KitchenSpanTop);
             return Rect.MinMaxRect(xMin, yMin, xMax, yMax);
@@ -857,7 +864,13 @@ namespace HayChoriYPaty
                     // real sandwich to its own nearby handoff point.
                     Vector2 handoff = CookTableHandoffPosition(worker, table);
                     if (!IsFinite(handoff.x) || !IsFinite(handoff.y)) continue;
-                    if (!WorkerAt(worker, handoff)) { QueueFreeWorkerPath(worker, handoff); continue; }
+                    if (!WorkerAt(worker, handoff)) { worker.CookHandoffSeconds = -1f; QueueFreeWorkerPath(worker, handoff); continue; }
+                    // The campaign cook stops at the table for pickupSeconds / work rate before putting the sandwich down (StreetWorkerState.Deposit).
+                    // Only on the C-shaped fence (Los Redondos): Luján's active kitchen keeps its own timing.
+                    if (worker.CookHandoffSeconds < 0f) worker.CookHandoffSeconds = IsCShapedLevel ? ChicagoDwellSeconds(worker.Role) : 0f;
+                    worker.CookHandoffSeconds -= deltaTime;
+                    if (worker.CookHandoffSeconds > 0f) continue;
+                    worker.CookHandoffSeconds = -1f;
                     if (Kitchen.DepositCooked(carried.Id, worker.Id)) worker.CookUnitId = 0;
                     continue;
                 }

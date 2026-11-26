@@ -2068,6 +2068,132 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
+        public IEnumerator LosRedondosCooksWalkToTheTableAndPauseBeforeLeavingTheSandwich()
+        {
+            // 2026-11-25: the cook used to "deliver" 16 px sideways from its own post, in one tick, 100 px away from the table.
+            float pixel = (float)Get(mode, "WorldUnitsPerLogicalPixel");
+            var farthest = new System.Collections.Generic.Dictionary<int, float>();
+            var longestStop = new System.Collections.Generic.Dictionary<int, float>();
+            var stopped = new System.Collections.Generic.Dictionary<int, float>();
+            for (int tick = 0; tick < 400 && Get(mode, "Phase").ToString() == "Playing"; tick++)
+            {
+                Call(mode, "Step", .05f);
+                foreach (object w in (IList)Get(mode, "Workers"))
+                {
+                    string role = Get(w, "Role").ToString();
+                    if (role != "Parrillero" && role != "ParrilleroPremium") continue;
+                    int id = (int)Get(w, "Id");
+                    UnityEngine.Vector2 p = (UnityEngine.Vector2)Get(w, "Position"), post = (UnityEngine.Vector2)Get(w, "PostPosition");
+                    float away = UnityEngine.Vector2.Distance(p, post) / pixel;
+                    farthest[id] = farthest.TryGetValue(id, out float f) ? Mathf.Max(f, away) : away;
+                    // Time spent standing still at the table (away from the post, carrying the sandwich).
+                    bool atTable = away > 30f && !(bool)Get(w, "IsMoving");
+                    stopped[id] = atTable ? (stopped.TryGetValue(id, out float s) ? s + .05f : .05f) : 0f;
+                    longestStop[id] = Mathf.Max(longestStop.TryGetValue(id, out float l) ? l : 0f, stopped[id]);
+                }
+                if (tick % 100 == 0) yield return null;
+            }
+            Assert.IsNotEmpty(farthest, "The level has no cooks.");
+            foreach (var pair in farthest)
+            {
+                Assert.GreaterOrEqual(pair.Value, 40f, "Cook " + pair.Key + " never walked up to the table (farthest from its post: " + pair.Value + " px).");
+                Assert.GreaterOrEqual(longestStop[pair.Key], .2f, "Cook " + pair.Key + " never stopped at the table before leaving the sandwich.");
+            }
+        }
+
+        [UnityTest]
+        [Explicit("Captures every tick of the first Los Redondos cook hand-over to Logs/Acceptance/RedondosCooks-20261125/frames")]
+        public IEnumerator LosRedondosCooksHandoverFrames() => CooksHandoverFrames("RedondosCooks-20261125/frames");
+
+        [UnityTest]
+        [Explicit("Captures every tick of the first Luján cook hand-over (the reference active kitchen) to Logs/Acceptance/RedondosCooks-20261125/lujan")]
+        public IEnumerator LujanCooksHandoverFrames() => CooksHandoverFrames("RedondosCooks-20261125/lujan");
+
+        IEnumerator CooksHandoverFrames(string relativeFolder)
+        {
+            string directory = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance", relativeFolder));
+            if (Directory.Exists(directory)) Directory.Delete(directory, true);
+            Directory.CreateDirectory(directory);
+            yield return CaptureAtResolution("cooks-setup", 575, 1280, false);
+            object presentation = Get(view, "towerDefensePresentation");
+            int written = 0;
+            for (int tick = 0; tick < 90 && Get(mode, "Phase").ToString() == "Playing"; tick++)
+            {
+                Call(mode, "Step", .05f);
+                Call(presentation, "Sync", mode);
+                if (tick < 20) continue;
+                yield return new WaitForEndOfFrame();
+                Texture2D image = ScreenCapture.CaptureScreenshotAsTexture();
+                File.WriteAllBytes(Path.Combine(directory, "c" + tick.ToString("000") + ".png"), image.EncodeToPNG());
+                UnityEngine.Object.Destroy(image);
+                written++;
+            }
+            Assert.Greater(written, 20);
+        }
+
+        [UnityTest]
+        [Explicit("Writes the Los Redondos fan route length and speed to Logs/Acceptance/RedondosCooks-20261125/fan-route.txt")]
+        public IEnumerator LosRedondosFanRouteInfo()
+        {
+            float pixel = (float)Get(mode, "WorldUnitsPerLogicalPixel");
+            for (int tick = 0; tick < 200 && ((IList)Get(mode, "Fans")).Count == 0; tick++) Call(mode, "Step", .05f);
+            object fan = ((IList)Get(mode, "Fans"))[0];
+            object follower = Get(fan, "RouteFollower");
+            float total = (float)Get(follower, "TotalDistance"), speed = (float)Get(follower, "Speed");
+            string root = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/RedondosCooks-20261125"));
+            Directory.CreateDirectory(root);
+            File.WriteAllText(Path.Combine(root, "fan-route.txt"), "routeLogicalPx=" + (total / pixel) + " speedLogicalPxPerSecond=" + (speed / pixel) + " seconds=" + (total / speed));
+            yield return null;
+        }
+
+        [UnityTest]
+        [Explicit("Traces the Los Redondos cooks (position, state, route) every tick to Logs/Acceptance/RedondosCooks-20261125/trace.csv")]
+        public IEnumerator LosRedondosCooksTrace()
+        {
+            string root = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/RedondosCooks-20261125"));
+            Directory.CreateDirectory(root);
+            var csv = new System.Text.StringBuilder("tick,t,id,role,x,y,moving,cooking,cookUnit,servStage,route,idx,postX,postY\n");
+            object presentation = Get(view, "towerDefensePresentation");
+            for (int tick = 0; tick < 1200 && Get(mode, "Phase").ToString() == "Playing"; tick++)
+            {
+                Call(mode, "Step", .05f);
+                Call(presentation, "Sync", mode);
+                foreach (object w in (IList)Get(mode, "Workers"))
+                {
+                    string role = Get(w, "Role").ToString();
+                    if (role != "Parrillero" && role != "ParrilleroPremium" && role != "Mozo") continue;
+                    UnityEngine.Vector2 p = (UnityEngine.Vector2)Get(w, "Position"), post = (UnityEngine.Vector2)Get(w, "PostPosition");
+                    System.Array route = (System.Array)Get(w, "TransferRoute");
+                    csv.Append(tick).Append(',').Append((tick * .05f).ToString("0.00")).Append(',').Append(Get(w, "Id")).Append(',').Append(role).Append(',')
+                        .Append(p.x.ToString("0.000")).Append(',').Append(p.y.ToString("0.000")).Append(',').Append(Get(w, "IsMoving")).Append(',')
+                        .Append(Get(w, "IsCooking")).Append(',').Append(Get(w, "CookUnitId")).Append(',').Append(Get(w, "ServiceStage")).Append(',')
+                        .Append(route == null ? 0 : route.Length).Append(',').Append(Get(w, "TransferIndex")).Append(',')
+                        .Append(post.x.ToString("0.000")).Append(',').Append(post.y.ToString("0.000")).Append('\n');
+                }
+                if (tick % 200 == 0) yield return null;
+            }
+            File.WriteAllText(Path.Combine(root, "trace.csv"), csv.ToString());
+            Assert.Greater(csv.Length, 1000);
+        }
+
+        [UnityTest]
+        [Explicit("Captures Los Redondos' stage with the Cocacolero and the Fernetero hired to Logs/Acceptance/RedondosGrills-20261125/crew.png")]
+        public IEnumerator LosRedondosBarrelLaneCrewStill()
+        {
+            // 2026-11-25: the barrels stand left of the tables and are served from their left side: the Cocacolero must stand there, not on the barrel.
+            string root = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/RedondosGrills-20261125"));
+            Directory.CreateDirectory(root);
+            Set(mode, "coins", 900);
+            Call(game, "TryHireTowerDefenseAtPost", mode, Enum.ToObject(T("StreetWorkerRole"), 1));
+            Call(game, "TryHireTowerDefenseAtPost", mode, Enum.ToObject(T("StreetWorkerRole"), 3));
+            object presentation = Get(view, "towerDefensePresentation");
+            for (int tick = 0; tick < 60; tick++) { Call(mode, "Step", .05f); Call(presentation, "Sync", mode); }
+            yield return CaptureAtResolution("losredondos-crew-575x1280", 575, 1280, false);
+            File.Copy(Path.Combine(CaptureDirectory, "Level" + requestedLevelId.ToString("00"), "losredondos-crew-575x1280.png"),
+                Path.Combine(root, "crew.png"), true);
+        }
+
+        [UnityTest]
         [Explicit("Captures the Cocacolero grabbing a drink from the barrel (LaRengaCocacoleroCrouchFrames) to Logs/Acceptance/CocacoleroCrouch-20261125/LaRengaCocacoleroCrouchFrames")]
         public IEnumerator LaRengaCocacoleroCrouchFrames()
         {
