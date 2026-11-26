@@ -27,15 +27,19 @@ namespace HayChoriYPaty
         {
             hubActive = false; rankingActive = true;
             rankingNicknameError = null;
-            LoadRanking();
+            // Prefetched at startup (2026-11-26): show the last read at once and refresh it silently behind the board.
+            LeaderboardSnapshot cached = FirebasePlayerSession.Instance?.CachedLeaderboard;
+            if (cached != null) { rankingSnapshot = cached; rankingState = cached.me == null ? RankingState.NeedNickname : RankingState.Ready; }
+            LoadRanking(cached != null);
         }
 
-        private async void LoadRanking()
+        // silent: a board is already on screen, so a failure keeps it instead of switching to Cargando/Error.
+        private async void LoadRanking(bool silent = false)
         {
             int token = ++rankingLoadToken;
             FirebasePlayerSession session = FirebasePlayerSession.Instance;
-            if (session == null || !session.LeaderboardReady) { rankingState = RankingState.Unavailable; return; }
-            rankingState = RankingState.Loading;
+            if (session == null || !session.LeaderboardReady) { if (!silent) rankingState = RankingState.Unavailable; return; }
+            if (!silent) rankingState = RankingState.Loading;
             try
             {
                 LeaderboardSnapshot snapshot = await session.LoadLeaderboardAsync();
@@ -46,7 +50,7 @@ namespace HayChoriYPaty
             catch (System.Exception)
             {
                 // The session already logs provider failures without account data; the screen only offers a retry.
-                if (this != null && token == rankingLoadToken) rankingState = RankingState.Error;
+                if (!silent && this != null && token == rankingLoadToken) rankingState = RankingState.Error;
             }
         }
 
@@ -59,7 +63,7 @@ namespace HayChoriYPaty
             }
             FirebasePlayerSession session = FirebasePlayerSession.Instance;
             if (session == null || !session.LeaderboardReady) { rankingState = RankingState.Unavailable; return; }
-            rankingNicknameError = null; rankingState = RankingState.Loading;
+            rankingNicknameError = null; rankingState = RankingState.Loading; rankingLoadToken++; // a silent refresh must not reopen the form
             bool saved = await session.SaveLeaderboardNicknameAsync(nickname);
             if (this == null) return;
             if (saved) LoadRanking();

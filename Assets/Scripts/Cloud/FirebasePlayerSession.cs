@@ -251,6 +251,8 @@ namespace HayChoriYPaty.Cloud
             if ((State == PlayerSessionState.Ready || (initialSyncWaiting && State == PlayerSessionState.Recovering)) &&
                 local != null && local.State.pending.Count > 0 && Time.unscaledTime >= retryAt)
                 SyncPending();
+            // Ranking prefetch (2026-11-26): read once per sign-in as soon as the session is ready (usually behind the splash).
+            if (prefetchedLeaderboardGeneration != generation && LeaderboardReady) PrefetchLeaderboard();
         }
         private async void SyncPending()
         {
@@ -348,6 +350,9 @@ namespace HayChoriYPaty.Cloud
         private string leaderboardNickname;
         private long publishedPoints = -1, publishedWonLevels = -1;
         private bool publishingLeaderboard;
+        private LeaderboardSnapshot cachedLeaderboard;
+        private Task<LeaderboardSnapshot> leaderboardLoad;
+        private int cachedLeaderboardGeneration = -1, leaderboardLoadGeneration = -1, prefetchedLeaderboardGeneration = -1;
         private const string LeaderboardNicknameKey = "HayChoriYPaty.Leaderboard.Nickname.";
 
         /// <summary>The ranking needs a live Google session and a connection; it never blocks or changes the game.</summary>
@@ -368,8 +373,27 @@ namespace HayChoriYPaty.Cloud
             if (auth?.CurrentUser != null) PlayerPrefs.SetString(LeaderboardNicknameKey + auth.CurrentUser.UserId, nickname ?? "");
         }
 
-        /// <summary>Reads the top and the player's own position; first brings the player's published points up to date.</summary>
-        public async Task<LeaderboardSnapshot> LoadLeaderboardAsync()
+        /// <summary>Last ranking read in this sign-in (startup prefetch or the last open), or null; the screen shows it at once and refreshes.</summary>
+        public LeaderboardSnapshot CachedLeaderboard => cachedLeaderboardGeneration == generation ? cachedLeaderboard : null;
+
+        /// <summary>Reads the top and the player's own position; a read already in flight for this sign-in is shared instead of repeated.</summary>
+        public Task<LeaderboardSnapshot> LoadLeaderboardAsync()
+        {
+            if (leaderboardLoad != null && !leaderboardLoad.IsCompleted && leaderboardLoadGeneration == generation) return leaderboardLoad;
+            leaderboardLoadGeneration = generation;
+            return leaderboardLoad = ReadLeaderboardAsync();
+        }
+
+        private async void PrefetchLeaderboard()
+        {
+            prefetchedLeaderboardGeneration = generation; // one silent attempt per sign-in; opening the ranking still loads on its own
+            try { await LoadLeaderboardAsync(); }
+            catch (OperationCanceledException) { }
+            catch (Exception error) { Debug.LogWarning("[FirebasePlayerSession] " + FormatFailureDiagnostic("leaderboard-prefetch", error)); }
+        }
+
+        // First brings the player's published points up to date, then reads the top.
+        private async Task<LeaderboardSnapshot> ReadLeaderboardAsync()
         {
             if (!LeaderboardReady) throw new InvalidOperationException("Ranking unavailable");
             int ticket = generation;
@@ -380,6 +404,7 @@ namespace HayChoriYPaty.Cloud
             if (own != null) await PublishLeaderboardAsync(repository, ticket);
             LeaderboardSnapshot snapshot = await Within(repository.ReadAsync());
             if (ticket != generation) throw new OperationCanceledException();
+            cachedLeaderboard = snapshot; cachedLeaderboardGeneration = ticket;
             return snapshot;
         }
 
