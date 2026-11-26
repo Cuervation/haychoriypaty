@@ -158,6 +158,22 @@ namespace HayChoriYPaty.Tests
                 File.WriteAllBytes(Path.Combine(folder, "ranking-" + shot.Item1 + ".png"), capture.EncodeToPNG());
                 UnityEngine.Object.Destroy(capture);
             }
+            // Few players (the real server today): the player alone at Nº 1, empty podium places and free list rows.
+            object sparse = Activator.CreateInstance(snapshotType);
+            object alone = entry("me", "cuervo", 1655, 12);
+            ((IList)Get(sparse, "top")).Add(alone); Set(sparse, "me", alone); Set(sparse, "myRank", 1L);
+            Set(view, "rankingSnapshot", sparse); Set(view, "rankingState", Enum.ToObject(stateType, 2));
+            yield return null; yield return new WaitForEndOfFrame();
+            Texture2D sparseCapture = ScreenCapture.CaptureScreenshotAsTexture();
+            File.WriteAllBytes(Path.Combine(folder, "ranking-ready-sparse.png"), sparseCapture.EncodeToPNG());
+            UnityEngine.Object.Destroy(sparseCapture);
+            // Shortest supported portrait (16:9): the board must still fit without overlaps.
+            Portrait(1080, 1920); yield return null; yield return null;
+            Set(view, "rankingSnapshot", snapshot); Set(view, "rankingState", Enum.ToObject(stateType, 2));
+            yield return null; yield return new WaitForEndOfFrame();
+            Texture2D shortCapture = ScreenCapture.CaptureScreenshotAsTexture();
+            File.WriteAllBytes(Path.Combine(folder, "ranking-ready-1080x1920.png"), shortCapture.EncodeToPNG());
+            UnityEngine.Object.Destroy(shortCapture);
         }
         [UnityTearDown] public IEnumerator TearDown()
         {
