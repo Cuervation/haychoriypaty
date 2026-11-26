@@ -19,6 +19,10 @@ namespace HayChoriYPaty
         private const string CamionerosDownReverseWalkingFansResource = "street-ferro-fans-walk-down-reverse-v1";
         private const string CamionerosDownPassingWalkingFansResource = "street-ferro-fans-walk-down-passing-v1";
         private const int CamionerosWalkingPoseCount = 3;
+        // Los Redondos ID10 (2026-11-26): pose 0 = authored stride atlas, pose 1 = passing pose derived from it
+        // (tools/art/make_walk_poses_from_stride.swift), so the legs visibly alternate while the fans advance.
+        private const string LosRedondosPassingWalkingFansResource = "street-losredondos-fans-walk-passing-v1";
+        private const int LosRedondosWalkingPoseCount = 2;
         private const float FanWalkHalfStrideLogicalPixels = 18f;
 
         private sealed class FanView
@@ -75,6 +79,7 @@ namespace HayChoriYPaty
         private Texture2D camionerosDownWalkingFans;
         private Texture2D camionerosDownReverseWalkingFans;
         private Texture2D camionerosDownPassingWalkingFans;
+        private Texture2D losRedondosPassingWalkingFans;
         private RenderTexture overlayTexture;
         private int originalSourceCameraMask;
         private int presentationLayer = 5;
@@ -103,6 +108,8 @@ namespace HayChoriYPaty
                 ? Resources.Load<Texture2D>(CamionerosDownReverseWalkingFansResource) : null;
             camionerosDownPassingWalkingFans = visualLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId
                 ? Resources.Load<Texture2D>(CamionerosDownPassingWalkingFansResource) : null;
+            losRedondosPassingWalkingFans = visualLevelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId
+                ? Resources.Load<Texture2D>(LosRedondosPassingWalkingFansResource) : null;
             sourceCamera = camera;
             presentationLayer = LayerMask.NameToLayer("UI");
             if (presentationLayer < 0) presentationLayer = 5;
@@ -836,9 +843,14 @@ namespace HayChoriYPaty
             ClubFanDefinition fans = ClubVisualTheme.ForLevel(visualLevelId).Fans;
             if (fans == null) return null;
             Texture2D texture = receiving ? fans.LoadFrontFans() : fans.LoadWalkingFans();
-            bool directionalPairedWalk = !receiving && fans.WalkingPoseCount > 1 &&
-                !string.IsNullOrEmpty(fans.DownwardWalkingFans);
-            if (directionalPairedWalk && walkingDownwards) texture = fans.LoadDownwardWalkingFans();
+            // Paired walk atlases (La Renga, Peregrinación) alternate their two authored poses; the downward atlas
+            // is optional (Peregrinación walks only sideways and has none).
+            bool directionalPairedWalk = !receiving && fans.WalkingPoseCount > 1;
+            if (directionalPairedWalk && walkingDownwards && !string.IsNullOrEmpty(fans.DownwardWalkingFans))
+                texture = fans.LoadDownwardWalkingFans();
+            if (!receiving && visualLevelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId &&
+                walkingPose % LosRedondosWalkingPoseCount == 1 && losRedondosPassingWalkingFans != null)
+                texture = losRedondosPassingWalkingFans;
             if (!receiving && visualLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId)
             {
                 int pose = walkingPose % CamionerosWalkingPoseCount;
@@ -897,8 +909,9 @@ namespace HayChoriYPaty
 
         private static int FanWalkingFrameIndex(int levelId, int fanId, float routeProgress, float worldUnitsPerLogicalPixel)
         {
-            int poseCount = levelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId
-                ? CamionerosWalkingPoseCount : ClubVisualTheme.ForLevel(levelId).Fans?.WalkingPoseCount ?? 1;
+            int poseCount = levelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId ? CamionerosWalkingPoseCount
+                : levelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId ? LosRedondosWalkingPoseCount
+                : ClubVisualTheme.ForLevel(levelId).Fans?.WalkingPoseCount ?? 1;
             if (poseCount <= 1 ||
                 float.IsNaN(routeProgress) || float.IsInfinity(routeProgress) || routeProgress < 0f ||
                 float.IsNaN(worldUnitsPerLogicalPixel) || float.IsInfinity(worldUnitsPerLogicalPixel) ||

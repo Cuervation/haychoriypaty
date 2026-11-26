@@ -525,6 +525,9 @@ namespace HayChoriYPaty
             if (config.FreeConstruction)
             {
                 if (!IsPlaceableRole(role) || !IsRoleAvailable(role)) return 0;
+                // At the per-role cap (Camioneros, Peregrinación: 3) there is nothing left to buy: cost 0 makes the card read "MAX"
+                // and stay unavailable instead of showing a price that can no longer be paid (2026-11-26, a pedido).
+                if (WorkersCount(role) >= config.MaximumWorkersPerRole) return 0;
                 if (config.UseCampaignEconomyPricing)
                     return StreetSimulation.CalculateHireCost(sourceBalance, config.EconomicBalanceCampaignLevelId,
                         role, workerCounts[(int)role], 0L);

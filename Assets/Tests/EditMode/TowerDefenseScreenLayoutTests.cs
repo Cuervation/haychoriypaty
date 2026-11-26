@@ -41,7 +41,7 @@ namespace HayChoriYPaty.Tests
             CollectionAssert.AreEqual(new[] {0, 4}, (int[])type.GetProperty("AvailableProducts").GetValue(config));
             CollectionAssert.AreEqual(new int[5], (int[])type.GetProperty("StartingWorkersByRole").GetValue(config));
             Assert.AreEqual(120, type.GetProperty("TotalFanCount").GetValue(config));
-            Assert.That((float)type.GetProperty("FanSpeed").GetValue(config), Is.EqualTo(.0775f).Within(.00001f));
+            Assert.That((float)type.GetProperty("FanSpeed").GetValue(config), Is.EqualTo(.096875f).Within(.00001f));
         }
 
         [Test]
@@ -65,8 +65,8 @@ namespace HayChoriYPaty.Tests
             // 2026-11-24 (a pedido): Los Redondos copies La Renga (240 fans, same speed, ramp, economy and kitchen) on the inverted C.
             Assert.AreEqual(240, Read(redondos, "TotalFanCount"));
             // Camioneros' horizontal kitchen version slows its fans to keep the old on-screen time over a single fence.
-            Assert.That((float)Read(camioneros, "FanSpeed"), Is.EqualTo(.0775f).Within(0.00001f));
-            Assert.That((float)Read(redondos, "FanSpeed"), Is.EqualTo(.102375f).Within(0.00001f), "Los Redondos has Luján's fan speed (active kitchen).");
+            Assert.That((float)Read(camioneros, "FanSpeed"), Is.EqualTo(.096875f).Within(0.00001f));
+            Assert.That((float)Read(redondos, "FanSpeed"), Is.EqualTo(.1535625f).Within(0.00001f), "Los Redondos: Luján's fan speed x1.5 (03cdd74, a pedido).");
             CollectionAssert.AreEqual(new[] { 0, 4 }, (int[])Read(camioneros, "AvailableProducts"));
             CollectionAssert.AreEqual(new[] { 0, 1, 2, 3, 4, 5, 6 }, (int[])Read(redondos, "AvailableProducts"), "Los Redondos sells Racing's seven products.");
             CollectionAssert.AreEqual(new[] { 1, 0, 1, 0, 1 }, (int[])Read(redondos, "StartingWorkersByRole"), "Los Redondos opens like Racing: a Parrillero, a Premium and a Mozo.");
@@ -204,7 +204,8 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(0, pose(9, 0, logicalPixel * 54f, logicalPixel));
             Assert.AreEqual(1, pose(9, 1, 0f, logicalPixel), "Adjacent fans should not all freeze in the same gait pose.");
             Assert.AreEqual(2, pose(9, 2, 0f, logicalPixel), "Three starting poses should be staggered across the crowd.");
-            Assert.AreEqual(0, pose(10, 0, logicalPixel * 180f, logicalPixel), "Los Redondos retains its current single walk pose.");
+            Assert.AreEqual(1, pose(10, 0, logicalPixel * 18f, logicalPixel), "Los Redondos alternates its stride and passing poses (2026-11-26).");
+            Assert.AreEqual(0, pose(10, 0, logicalPixel * 36f, logicalPixel));
 
             Texture2D baseAtlas = Resources.Load<Texture2D>("street-ferro-fans-walk-v2");
             Texture2D reverseAtlas = Resources.Load<Texture2D>("street-ferro-fans-walk-reverse-v1");

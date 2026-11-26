@@ -315,6 +315,12 @@ namespace HayChoriYPaty.Tests
                 Assert.IsTrue((bool)Call(game, "TryHireTowerDefenseAtPost", mode, Role(roles[i])), "hire " + i + " role " + roles[i] + " coins " + Get(mode, "Coins"));
                 for (int tick = 0; tick < 80; tick++) Call(mode, "Step", .25f); // one at a time: the strip jams if several cooks are hired in the same instant
             }
+            // 2026-11-26 (a pedido): at the cap of 3 per role the card reads "MAX" (cost 0) and nothing more can be bought.
+            foreach (int role in new[] { 0, 1 })
+            {
+                Assert.AreEqual(0, (int)Call(mode, "HireCost", Role(role)), "role " + role + " at its cap shows MAX");
+                Assert.IsFalse((bool)Call(game, "TryHireTowerDefenseAtPost", mode, Role(role)), "role " + role + " cannot be hired past 3");
+            }
             Return(mode);
         }
 

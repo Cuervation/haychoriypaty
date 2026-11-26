@@ -432,8 +432,14 @@ namespace HayChoriYPaty
                 case StreetWorkerRole.Mozo: boca = layout.PickupPosition(HasStation(TowerDefenseStationKind.NormalTable) ? 0 : 2, index, count); break;
                 default: return new Vector2(float.NaN, float.NaN);
             }
+            if (CooksAtVisibleGrillBack && IsCookRole(role)) boca.y += layout.GrillVisibleTopInset(role == StreetWorkerRole.Parrillero ? 0 : 2);
             return ClampPostInsideWork(BocaPointToWorld(boca), role);
         }
+
+        // 2026-11-26 (a pedido): Los Redondos' cooks stand right against the back of their own grill. The narrow grill art leaves a transparent band over
+        // the grate (GrillVisibleTopInset); their post goes down by that band and the band is not solid (StationSolidRect), so the feet meet the grate.
+        // The grill's access point (and the path lattice aligned to it) does not move. La Renga's passive kitchen keeps its 4 px strip.
+        private bool CooksAtVisibleGrillBack => IsCShapedLevel && config.ActiveKitchen;
 
         private void AssignRolePosts(StreetWorkerRole role, bool snap)
         {
@@ -497,6 +503,12 @@ namespace HayChoriYPaty
         {
             // La Renga: nobody walks over anything in the kitchen. Grills, tables and barrels are solid for the feet over their whole
             // footprint; the cooks work from the thin strip between the table row and the grill row.
+            if (CooksAtVisibleGrillBack && (kind == TowerDefenseStationKind.NormalGrill || kind == TowerDefenseStationKind.PremiumGrill))
+            {
+                float band = BocaKitchenLayout.GrillVisibleTopInset(kind == TowerDefenseStationKind.NormalGrill ? 0 : 2) *
+                    BocaKitchenFitScale() * BocaVerticalScale * worldUnitsPerLogicalPixel;
+                return new Rect(bounds.xMin, bounds.yMin, bounds.width, Mathf.Max(0f, bounds.height - band));
+            }
             if (IsCShapedLevel) return bounds;
             if (IsPassiveKitchenLevel && (kind == TowerDefenseStationKind.NormalGrill || kind == TowerDefenseStationKind.PremiumGrill))
             {

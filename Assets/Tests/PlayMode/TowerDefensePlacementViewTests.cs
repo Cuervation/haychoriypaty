@@ -3530,6 +3530,84 @@ namespace HayChoriYPaty.Tests
             PlayerPrefs.Save();
             if (editorGate != null) editorGate.SetValue(null, previousGate);
         }
+
+        // 2026-11-26: in every Tower Defense level the walking fans must visibly move their legs (never slide with a
+        // frozen stride). Each case lets the first fans walk in, then advances 48 ticks of 0.05 s, saves every frame
+        // (575x1280) to Logs/Acceptance/TDFanWalk-20261126/<level>/ and checks that every fan that walked at least
+        // two half-strides (36 logical px) without stopping to receive showed at least two different walk sprites.
+        [UnityTest]
+        [Explicit("Captures the walking fans' leg cycle of Camioneros ID9 to Logs/Acceptance/TDFanWalk-20261126/camioneros")]
+        public IEnumerator CamionerosFansMoveTheirLegsWhileWalking() { yield return FansMoveTheirLegsWhileWalking("camioneros"); }
+
+        [UnityTest]
+        [Explicit("Captures the walking fans' leg cycle of Los Redondos ID10 to Logs/Acceptance/TDFanWalk-20261126/losredondos")]
+        public IEnumerator LosRedondosFansMoveTheirLegsWhileWalking() { yield return FansMoveTheirLegsWhileWalking("losredondos"); }
+
+        [UnityTest]
+        [Explicit("Captures the walking fans' leg cycle of La Renga ID13 to Logs/Acceptance/TDFanWalk-20261126/larenga")]
+        public IEnumerator LaRengaFansMoveTheirLegsWhileWalking() { yield return FansMoveTheirLegsWhileWalking("larenga"); }
+
+        [UnityTest]
+        [Explicit("Captures the walking pilgrims' leg cycle of Peregrinación ID14 to Logs/Acceptance/TDFanWalk-20261126/peregrinacion")]
+        public IEnumerator PeregrinacionFansMoveTheirLegsWhileWalking() { yield return FansMoveTheirLegsWhileWalking("peregrinacion"); }
+
+        IEnumerator FansMoveTheirLegsWhileWalking(string level)
+        {
+            string directory = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/TDFanWalk-20261126", level));
+            if (Directory.Exists(directory)) Directory.Delete(directory, true);
+            Directory.CreateDirectory(directory);
+            object presentation = Get(view, "towerDefensePresentation");
+            float pixel = (float)Get(mode, "WorldUnitsPerLogicalPixel");
+            IList fans = (IList)Get(mode, "Fans");
+            // Let a few fans enter the route.
+            for (int step = 0; step < 2000 && fans.Count < 4; step++) { Call(mode, "Step", .05f); fans = (IList)Get(mode, "Fans"); }
+            for (int step = 0; step < 40; step++) Call(mode, "Step", .05f);
+            Call(presentation, "Sync", mode);
+            yield return CaptureAtResolution(level + "-walk-setup-575x1280", 575, 1280, false);
+
+            IDictionary views = (IDictionary)Get(presentation, "activeFans");
+            var sprites = new Dictionary<int, HashSet<string>>();
+            var start = new Dictionary<int, float>();
+            var end = new Dictionary<int, float>();
+            var stopped = new HashSet<int>();
+            var log = new System.Text.StringBuilder("frame;fan;progressLogicalPx;receiving;sprite\n");
+            for (int frame = 0; frame < 48; frame++)
+            {
+                Call(mode, "Step", .05f);
+                Call(presentation, "Sync", mode);
+                Call(view, "UpdateTowerDefenseFrame");
+                fans = (IList)Get(mode, "Fans");
+                foreach (object fan in fans)
+                {
+                    int id = (int)Get(fan, "Id");
+                    float progress = (float)Get(Get(fan, "RouteFollower"), "Progress") / pixel;
+                    bool receiving = (bool)Get(fan, "IsReceiving") || (bool)Get(fan, "IsDeparting");
+                    if (!views.Contains(id)) continue;
+                    Sprite sprite = ((SpriteRenderer)Get(views[id], "Renderer")).sprite;
+                    string key = sprite == null ? "none" : sprite.texture.name + "@" + sprite.rect;
+                    log.Append(frame).Append(';').Append(id).Append(';').Append(progress.ToString("0.0")).Append(';')
+                        .Append(receiving).Append(';').Append(key).Append('\n');
+                    if (receiving) { stopped.Add(id); continue; }
+                    if (!sprites.ContainsKey(id)) { sprites[id] = new HashSet<string>(); start[id] = progress; }
+                    sprites[id].Add(key);
+                    end[id] = progress;
+                }
+                yield return new WaitForEndOfFrame();
+                Texture2D image = ScreenCapture.CaptureScreenshotAsTexture();
+                File.WriteAllBytes(Path.Combine(directory, "f" + frame.ToString("00") + ".png"), image.EncodeToPNG());
+                UnityEngine.Object.Destroy(image);
+            }
+            File.WriteAllText(Path.Combine(directory, "poses.csv"), log.ToString());
+            int walkers = 0;
+            foreach (int id in sprites.Keys)
+            {
+                if (stopped.Contains(id) || end[id] - start[id] < 36f) continue;
+                walkers++;
+                Assert.GreaterOrEqual(sprites[id].Count, 2, level + ": fan " + id + " walked " + (end[id] - start[id]).ToString("0") +
+                    " logical px with a single walk sprite (legs frozen): " + string.Join(", ", sprites[id]));
+            }
+            Assert.GreaterOrEqual(walkers, 2, level + ": at least two fans must walk 36 logical px during the capture.");
+        }
     }
 }
 

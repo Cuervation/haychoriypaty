@@ -103,9 +103,9 @@ namespace HayChoriYPaty.Tests
                 object priorRoute = Get<object>(level, "Route");
                 object priorGeometry = geometryType.GetMethod("Generate", BindingFlags.Public | BindingFlags.Static).Invoke(null, new[] { priorRoute });
                 Assert.IsTrue(Get<bool>(priorGeometry, "IsValid"), "Prior level route regressed: " + id);
-                // Los Redondos (10) is a horizontal single-fence kitchen level; La Renga (13) and, since 2026-11-23, Camioneros (9) are the C-shaped single fence.
-                Assert.AreEqual(id == 10 ? 1 : 2, Convert.ToInt32(Get<object>(priorRoute, "RouteKind")),
-                    "Los Redondos is a horizontal single fence; La Renga and Camioneros are the C-shaped one: " + id);
+                // La Renga (13), Camioneros (9, since 2026-11-23) and Los Redondos (10, on La Renga's inverted C since cf5ac1f) all use the C-shaped single fence.
+                Assert.AreEqual(2, Convert.ToInt32(Get<object>(priorRoute, "RouteKind")),
+                    "La Renga, Camioneros and Los Redondos are the C-shaped single fence: " + id);
             }
         }
 

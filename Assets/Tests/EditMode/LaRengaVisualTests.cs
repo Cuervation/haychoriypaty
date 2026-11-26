@@ -86,7 +86,55 @@ namespace HayChoriYPaty.Tests
                 Assert.AreEqual(1, gait.Invoke(null, new object[] {13, 0, .361f, .02f}));
                 Assert.AreEqual(0, gait.Invoke(null, new object[] {13, 0, .721f, .02f}));
                 Assert.AreEqual(2, gait.Invoke(null, new object[] {9, 0, .721f, .02f}));
-                Assert.AreEqual(0, gait.Invoke(null, new object[] {10, 0, .721f, .02f}));
+                Assert.AreEqual(1, gait.Invoke(null, new object[] {10, 0, .361f, .02f}), "Los Redondos alternates stride and passing poses.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(root); }
+        }
+
+        // 2026-11-26: every Tower Defense level's walking fans alternate at least two leg poses while they advance.
+        // Los Redondos (ID10) switches between its stride atlas and the derived passing atlas; Peregrinación (ID14)
+        // alternates the two authored columns of its paired walk atlas although it has no downward atlas.
+        [Test]
+        public void LosRedondosAndPeregrinacionWalkingFansAlternateTwoDifferentLegPoses()
+        {
+            var root = new GameObject("TD gait atlas check");
+            try
+            {
+                Type type = T("TowerDefenseWorldPresentation");
+                MethodInfo gait = type.GetMethod("FanWalkingFrameIndex", S);
+                MethodInfo spriteMethod = type.GetMethod("FanSpriteForFacing", I);
+                Component renderer = root.AddComponent(type);
+
+                type.GetField("visualLevelId", I).SetValue(renderer, 10);
+                Texture2D stride = Resources.Load<Texture2D>("street-losredondos-fans-walk-v1");
+                Texture2D passing = Resources.Load<Texture2D>("street-losredondos-fans-walk-passing-v1");
+                Assert.NotNull(stride); Assert.NotNull(passing);
+                Assert.AreEqual(stride.width, passing.width); Assert.AreEqual(stride.height, passing.height);
+                type.GetField("losRedondosPassingWalkingFans", I).SetValue(renderer, passing);
+                Assert.AreEqual(0, gait.Invoke(null, new object[] {10, 0, 0f, .01f}));
+                Assert.AreEqual(1, gait.Invoke(null, new object[] {10, 0, .18f, .01f}));
+                Assert.AreEqual(0, gait.Invoke(null, new object[] {10, 0, .36f, .01f}));
+                Assert.AreEqual(1, gait.Invoke(null, new object[] {10, 1, 0f, .01f}), "Neighbouring fans start in opposite poses.");
+                for (int id = 0; id < 12; id++)
+                {
+                    Sprite a = (Sprite)spriteMethod.Invoke(renderer, new object[] {id, false, 0, false});
+                    Sprite b = (Sprite)spriteMethod.Invoke(renderer, new object[] {id, false, 1, true});
+                    Assert.AreEqual("street-losredondos-fans-walk-v1", a.texture.name);
+                    Assert.AreEqual("street-losredondos-fans-walk-passing-v1", b.texture.name);
+                    Assert.AreEqual(a.rect, b.rect, "Both poses use the same identity cell.");
+                }
+
+                type.GetField("visualLevelId", I).SetValue(renderer, 14);
+                Assert.AreEqual(0, gait.Invoke(null, new object[] {14, 0, 0f, .01f}));
+                Assert.AreEqual(1, gait.Invoke(null, new object[] {14, 0, .18f, .01f}));
+                for (int id = 0; id < 12; id++)
+                {
+                    Sprite a = (Sprite)spriteMethod.Invoke(renderer, new object[] {id, false, 0, false});
+                    Sprite b = (Sprite)spriteMethod.Invoke(renderer, new object[] {id, false, 1, false});
+                    Assert.AreEqual("street-peregrinacion-fans-walk-v1", a.texture.name);
+                    Assert.AreSame(a.texture, b.texture);
+                    Assert.AreNotEqual(a.rect, b.rect, "Peregrinación must alternate the two columns of its paired walk atlas.");
+                }
             }
             finally { UnityEngine.Object.DestroyImmediate(root); }
         }

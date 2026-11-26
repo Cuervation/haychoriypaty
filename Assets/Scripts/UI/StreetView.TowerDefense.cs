@@ -796,6 +796,9 @@ namespace HayChoriYPaty
         private const float CrewChantSeconds = 1f, CrewChantFadeSeconds = .4f;
         // The speech art's tail sits at the bottom right; its tip is this far in from the right edge (mirrored: from the left edge).
         private const float CrewChantTailTipInsetLogical = 22f, CrewChantSidePaddingLogical = 12f, CrewChantLineHeightLogical = 15f, CrewChantBaseHeightLogical = 22f;
+        // Body of the speech art (Items[11], 225 px tall, drawn with 15 px top/bottom slices of 65 px): opaque from source y≈10 to y≈196,
+        // the tail below. In logical pixels the body starts 10/65×15 below the top and ends (225−196)/65×15 above the bottom.
+        private const float CrewChantBodyTopInsetLogical = 2.3f, CrewChantBodyBottomInsetLogical = 6.7f;
         private readonly Dictionary<int, bool> crewWasSettled = new Dictionary<int, bool>();
         private readonly Dictionary<int, float> crewChantStart = new Dictionary<int, float>();
         private TowerDefenseGameMode crewChantMode;
@@ -870,7 +873,9 @@ namespace HayChoriYPaty
                             * Matrix4x4.TRS(new Vector3(-bubble.center.x, 0f, 0f), Quaternion.identity, Vector3.one);
                     DrawOrderBubble(bubble, 1f);
                     GUI.matrix = previousMatrix;
-                    var label = new Rect(bubble.x, bubble.y + 3f, bubble.width, bubble.height - 3f - 16f);
+                    // Centre the text on the bubble's body, not on the body plus tail (2026-11-26, a pedido: "¡Hay Bondio!" sat too high).
+                    var label = new Rect(bubble.x, bubble.y + CrewChantBodyTopInsetLogical, bubble.width,
+                        bubble.height - CrewChantBodyTopInsetLogical - CrewChantBodyBottomInsetLogical);
                     GUI.Label(label, chant, crewChantStyle);
                 }
             }

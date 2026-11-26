@@ -275,8 +275,8 @@ namespace HayChoriYPaty.Tests
             Assert.IsNotNull(redondos);
             Assert.AreEqual(120, Get<int>(camioneros, "TotalFanCount"));
             Assert.AreEqual(240, Get<int>(redondos, "TotalFanCount")); // 2026-11-24: La Renga's 240 fans
-            Assert.That(Get<float>(camioneros, "FanSpeed"), Is.EqualTo(.0775f).Within(.00001f)); // horizontal kitchen version (was .1575f * 1.3f)
-            Assert.That(Get<float>(redondos, "FanSpeed"), Is.EqualTo(.102375f).Within(.00001f)); // Luján's speed, the other active-kitchen Defense level (2026-11-24)
+            Assert.That(Get<float>(camioneros, "FanSpeed"), Is.EqualTo(.096875f).Within(.00001f)); // .0775 x 1.25 (2026-11-26, a pedido); before .1575f * 1.3f
+            Assert.That(Get<float>(redondos, "FanSpeed"), Is.EqualTo(.1535625f).Within(.00001f)); // Luján's speed x1.5 (03cdd74, 2026-11-25, a pedido)
 
             // Camioneros (Nueva Chicago's kitchen) and Los Redondos (Ferro's) are horizontal kitchen levels now: their live
             // modes need a real phone layout, so their runtime is covered by the PlayMode tests of each level; this
