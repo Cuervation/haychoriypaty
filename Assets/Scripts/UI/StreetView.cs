@@ -1182,6 +1182,7 @@ namespace HayChoriYPaty
         {
             UpdatePostProcessingPolicy();
             UpdateRewardShutter();
+            if (badgesActive && viewResourcesReady) EnsureBadgeShapes(); // trophy art is sampled outside OnGUI
             UpdateHubMusic();
             // The branded presentation belongs to startup, not to the authenticated game session.
             // Let it complete while Firebase resolves; game actions remain gated separately.
@@ -1227,6 +1228,17 @@ namespace HayChoriYPaty
                     var press = touch.primaryTouch.press;
                     if (press.isPressed || press.wasReleasedThisFrame)
                         HandleLevelSelectorTouchScroll(touch.primaryTouch.position.ReadValue(),
+                            press.wasPressedThisFrame, press.isPressed, press.wasReleasedThisFrame);
+                }
+            }
+            if (badgesActive && !game.ShowChulengoResult)
+            {
+                Touchscreen badgesTouch = Touchscreen.current;
+                if (badgesTouch != null)
+                {
+                    var press = badgesTouch.primaryTouch.press;
+                    if (press.isPressed || press.wasReleasedThisFrame)
+                        HandleBadgesTouchScroll(badgesTouch.primaryTouch.position.ReadValue(),
                             press.wasPressedThisFrame, press.isPressed, press.wasReleasedThisFrame);
                 }
             }

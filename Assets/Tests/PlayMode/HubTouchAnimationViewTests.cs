@@ -175,6 +175,37 @@ namespace HayChoriYPaty.Tests
             File.WriteAllBytes(Path.Combine(folder, "ranking-ready-1080x1920.png"), shortCapture.EncodeToPNG());
             UnityEngine.Object.Destroy(shortCapture);
         }
+        // 2026-11-26: the badges trophy vitrina with mixed progress, at the top, half-way and the end of the scroll.
+        [UnityTest, Explicit("Captures the badges vitrina to Logs/Acceptance/Badges-20261126")]
+        public IEnumerator BadgesVitrinaCapture()
+        {
+            if (Application.isBatchMode) Assert.Ignore("Requires interactive Game View.");
+            Portrait(575, 1280); yield return null; yield return null;
+            object save = gt.GetField("save", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(game);
+            object statistics = save.GetType().GetField("statistics").GetValue(save);
+            statistics.GetType().GetField("deliveredByProduct").SetValue(statistics, new long[] { 5400, 2600, 820, 120, 3100, 0, 510 });
+            statistics.GetType().GetMethod("Normalize").Invoke(statistics, null);
+            string folder = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/Badges-20261126"));
+            Directory.CreateDirectory(folder);
+            foreach (string flag in new[] { "introActive", "settingsActive", "marketActive", "rankingActive", "levelSelectActive", "hubActive" }) Set(view, flag, false);
+            Set(view, "badgesActive", true);
+            for (int frame = 0; frame < 4; frame++) yield return null; // the trophy art is sampled in Update
+            float max = (float)vt.GetMethod("BadgesMaxScroll", BindingFlags.NonPublic | BindingFlags.Static).Invoke(null, new object[] { (float)Get(view, "logicalCanvasHeight") });
+            foreach (var shot in new[] { ("top", 0f), ("middle", .5f), ("end", 1f) })
+            {
+                Set(view, "badgesScroll", max * shot.Item2);
+                yield return null; yield return new WaitForEndOfFrame();
+                Texture2D capture = ScreenCapture.CaptureScreenshotAsTexture();
+                File.WriteAllBytes(Path.Combine(folder, "badges-" + shot.Item1 + ".png"), capture.EncodeToPNG());
+                UnityEngine.Object.Destroy(capture);
+            }
+            Portrait(1080, 1920); yield return null; yield return null;
+            Set(view, "badgesScroll", 0f);
+            yield return null; yield return new WaitForEndOfFrame();
+            Texture2D shortCapture = ScreenCapture.CaptureScreenshotAsTexture();
+            File.WriteAllBytes(Path.Combine(folder, "badges-top-1080x1920.png"), shortCapture.EncodeToPNG());
+            UnityEngine.Object.Destroy(shortCapture);
+        }
         [UnityTearDown] public IEnumerator TearDown()
         {
             if (root != null) UnityEngine.Object.Destroy(root); if (cameraRoot != null) UnityEngine.Object.Destroy(cameraRoot);

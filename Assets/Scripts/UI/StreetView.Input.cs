@@ -167,6 +167,12 @@ namespace HayChoriYPaty
                 }
                 return;
             }
+            if (badgesActive && !game.ShowChulengoResult)
+            {
+                p.y *= layoutVerticalScale;
+                HandleBadgesPointer(p, down, up);
+                return;
+            }
             if (marketActive && !game.ShowChulengoResult)
             {
                 p.y *= layoutVerticalScale; // Market geometry uses the full logical safe-area height.
@@ -616,7 +622,7 @@ namespace HayChoriYPaty
                     marketActive = true; marketFromSelector = false; marketTab = 0; marketMessage = "";
                     marketScroll = 0; marketOtherExpanded = false; marketExpandedIngredient = -1;
                 }
-                else if (a == HubBadgesAction) { hubActive = false; badgesActive = true; }
+                else if (a == HubBadgesAction) OpenBadges();
                 else if (a == HubRankingAction) OpenRanking();
                 else if (a == HubAccountAction) Cloud.FirebasePlayerSession.Instance?.OpenAccountMenu();
                 return;

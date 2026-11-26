@@ -50,7 +50,7 @@ namespace HayChoriYPaty
                 }
                 GUI.Label(letters, caption, captionStyle);
                 GUI.enabled = interactive;
-                if (GUI.Button(hitBounds, buttonContent ?? GUIContent.none, invisible) && !SuppressLevelSelectorNativeTap && !SuppressMarketNativeTap)
+                if (GUI.Button(hitBounds, buttonContent ?? GUIContent.none, invisible) && !SuppressLevelSelectorNativeTap && !SuppressMarketNativeTap && !SuppressBadgesNativeTap)
                 { if (activated != null) activated(); else NativeAction(action); }
             }
             finally
