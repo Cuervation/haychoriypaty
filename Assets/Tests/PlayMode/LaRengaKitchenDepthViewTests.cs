@@ -345,6 +345,31 @@ namespace HayChoriYPaty.Tests
             yield return AllSizes("15-resultado");
         }
 
+        // 2026-11-27 (a pedido): Huracán plays as a normal level between Ferro and Independiente: Market stock, quotas, clock, passive kitchen.
+        [UnityTest, Timeout(180000)]
+        public IEnumerator HuracanPlaysAsANormalQuotaLevel()
+        {
+            yield return SetSize(610, 1356);
+            Assert.IsTrue((bool)Call(game, "SelectLevel", 11));
+            object market = Get(game, "Market");
+            Set(Get(market, "Data"), "balanceCents", 10000000L);
+            if (!(bool)Get(game, "CanStartRound")) Assert.IsTrue((bool)Call(game, "TryBuyMissingIngredients"));
+            Assert.IsTrue((bool)Call(game, "TryStartRound"), "Huracán starts with Market stock like any level");
+            object sim = Get(game, "Sim");
+            Assert.IsFalse((bool)Get(sim, "IsBonusTrack"));
+            Assert.IsFalse((bool)Get(sim, "UsesActiveCooks"), "passive kitchen like Ferro and Independiente");
+            Assert.AreEqual(6, (int)Get(sim, "ProductCount"));
+            Assert.AreEqual(225f, (float)Get(sim, "TimeRemaining"), .5f);
+            int goals = 0;
+            foreach (int product in new[] { 0, 1, 2, 3, 4, 6 }) goals += (int)sim.GetType().GetMethod("GetProductGoal", new[] { typeof(int) }).Invoke(sim, new object[] { product });
+            Assert.AreEqual(677, goals);
+            for (float t = 0f; t < 20f; t += .05f) Call(sim, "Step", .05f);
+            Assert.AreEqual("Playing", Get(sim, "Phase").ToString());
+            Assert.Greater((float)Get(sim, "Elapsed"), 19f);
+            yield return Capture("huracan-nivel-normal");
+            Call(game, "ReturnToLevels");
+        }
+
         // 2026-11-26: recheck of the two screens fixed in the full review (settings panel, Huracán's HUD bar) at the ten aspect ratios.
         [UnityTest, Timeout(600000), Explicit("Captures to Logs/Acceptance/FullGame-20261126/recheck")]
         public IEnumerator SettingsAndHuracanRecheckCapture()

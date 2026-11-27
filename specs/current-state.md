@@ -27,7 +27,7 @@
 
 ## Pendiente / no verificado
 
-- **Huracán como nivel normal (2026-11-27): compila (Editor.log), pero sus pruebas y una partida NO se corrieron** (Unity quedó desconectado con la pantalla bloqueada). Primer paso al retomar: compilar, correr EditMode completo y PlayMode `StreetPointerTests`/`StreetHubViewTests`, y jugar Huracán desde el selector (Mercado → partida → Chulengo/disturbio).
+- Huracán como nivel normal (2026-11-27): verificado con EditMode completo y PlayMode `HuracanPlaysAsANormalQuotaLevel`; falta una partida entera (victoria con Chulengo y derrota) y probarlo en el celular.
 - Balance de Camioneros, Los Redondos y Huracán sin medir; nada se jugó entero en el celular.
 - Voces del puestero: borradores con voces de macOS fuera del proyecto (`Logs/Acceptance/PuesteroVoces-20261126/`), no aptas para publicar.
 - Grant de QA de +30 tickets por inicio fuera del Editor: retirar antes de una release.
