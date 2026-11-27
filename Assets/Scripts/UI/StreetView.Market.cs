@@ -411,7 +411,7 @@ namespace HayChoriYPaty
                 Rect localNotice = new Rect(notice.x - body.x, notice.y - body.y, notice.width, notice.height);
                 DrawMarketBluePanel(localNotice, new Color(.012f, .075f, .25f, .96f));
                 string message = StreetSimulation.IsTowerDefenseLevel(game.Sim.LevelIndex) ? "TOWER DEFENSE SE JUEGA SIN TRABAJADORES DE TICKETS"
-                    : game.Sim.LevelIndex >= 5 ? "CADA TRABAJADOR CUESTA 3 TICKETS" : "SE CANJEA AL PREPARAR RACING";
+                    : StreetSimulation.IsRacingOrLaterLevel(game.Sim.LevelIndex) ? "CADA TRABAJADOR CUESTA 3 TICKETS" : "SE CANJEA AL PREPARAR RACING";
                 MarketText(new Rect(localNotice.x + 8f, localNotice.y + 2f, localNotice.width - 16f, localNotice.height - 4f), message, 17, Color.white);
             }
             for (int index = 0; index < 5; index++)
@@ -428,7 +428,7 @@ namespace HayChoriYPaty
                 MarketText(new Rect(textX, local.y + 65f, 232f, 24f), "RESERVADOS: " + game.PendingTicketWorkers(role), 15, MarketBlueInk, TextAnchor.MiddleLeft);
                 bool canRedeem = game.CanRedeemTicketWorker(role);
                 string caption = StreetSimulation.IsTowerDefenseLevel(game.Sim.LevelIndex) ? "NO DISPONIBLE"
-                    : game.Sim.LevelIndex < 5 ? "DISPONIBLE EN RACING" : game.TicketBalance < 3
+                    : !StreetSimulation.IsRacingOrLaterLevel(game.Sim.LevelIndex) ? "DISPONIBLE EN RACING" : game.TicketBalance < 3
                     ? "FALTAN " + System.Math.Max(0L, 3L - game.TicketBalance) + " TICKETS" : "CANJEAR";
                 DrawStandardButton(MarketTicketRedeemButtonBounds(local), MarketTicketRedeemAction + index, caption, canRedeem);
             }

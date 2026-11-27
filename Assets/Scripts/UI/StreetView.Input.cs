@@ -336,10 +336,6 @@ namespace HayChoriYPaty
                     }
                     else { marketMessage="Falta stock para iniciar. Revisá Mercado."; levelSelectActive=true; }
                 }
-                else if (level == StreetSimulation.HuracanBonusLevelId)
-                {
-                    if (!game.TryStartRound()) levelSelectActive = true;
-                }
                 else { marketFromSelector = true; marketActive = true; marketTab = 0; marketMessage = ""; marketScroll = 0; marketOtherExpanded = false; marketExpandedIngredient = -1; }
             }
             lastAction = a; feedbackUntil = Time.unscaledTime + 0.22f; feedbackScale = selectionSucceeded ? 1.04f : 0.97f;
@@ -699,7 +695,7 @@ namespace HayChoriYPaty
                     bool success = game.TryRedeemTicketWorker(role, game.TicketRedemptionOperationId(role));
                     marketMessage = success ? "¡CANJE REALIZADO! Tu trabajador está reservado para el próximo partido."
                         : game.TicketBalance < 3 ? "Te faltan " + System.Math.Max(0L, 3L - game.TicketBalance) + " tickets para canjear."
-                        : game.Sim.LevelIndex < 5 || !game.TicketExtrasUnlocked ? "Desbloqueá Racing y elegí una cancha compatible."
+                        : !StreetSimulation.IsRacingOrLaterLevel(game.Sim.LevelIndex) || !game.TicketExtrasUnlocked ? "Desbloqueá Racing y elegí una cancha compatible."
                         : "No se pudo guardar el canje; el saldo no cambió.";
                     return;
                 }

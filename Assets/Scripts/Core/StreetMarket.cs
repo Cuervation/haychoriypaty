@@ -378,9 +378,7 @@ namespace HayChoriYPaty
                 result.level < 0 || result.level >= Data.highestRecognizedSalesByLevel.Length ||
                 !Data.bonusPaidByLevel[result.level] || Data.highestRecognizedSalesByLevel[result.level] < result.halfSalesCents) return 0L;
 
-            int nextLevel = StreetSimulation.NextCampaignLevelId(result.level);
-            if (nextLevel == StreetSimulation.HuracanBonusLevelId)
-                nextLevel = StreetSimulation.NextCampaignLevelId(StreetSimulation.HuracanBonusLevelId);
+            int nextLevel = StreetSimulation.NextCampaignLevelId(result.level); // Huracán buys stock like any level since 2026-11-27
             if (nextLevel < 0 || nextLevel >= StreetSimulation.LevelNames.Length) return 0L;
             long missingCost = MinimumPurchaseCostCents(new StreetSimulation(Balance, nextLevel, 5f));
             if (missingCost <= 0 || missingCost == long.MaxValue) return 0L;

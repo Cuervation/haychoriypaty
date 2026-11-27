@@ -62,7 +62,7 @@ namespace HayChoriYPaty
         [Min(0.1f)] public float customerArrivalSeconds = 0.16f;
         [Min(0.1f)] public float workerSpeed = 300f;
         [Min(10f)] public float customerSpeed = 300f;
-        public float[] levelDemandMultipliers = { 1f, 1.1f, 1.2f, 1.35f, 1.5f, 1.65f, 1.815f, 1.9965f, 2.19615f, 2.415765f, 2.6573415f, 1.65f, 2.6573415f, 2.6573415f, 1f };
+        public float[] levelDemandMultipliers = { 1f, 1.1f, 1.2f, 1.35f, 1.5f, 1.65f, 1.815f, 1.9965f, 2.19615f, 2.415765f, 2.6573415f, 1.425f, 2.6573415f, 2.6573415f, 1f };
         [Min(0.01f)] public float pickupSeconds = 0.28f;
         [Min(0f)] public float minPrice = 0f;
         [Min(0f)] public float maxPrice = 60f;
@@ -77,7 +77,7 @@ namespace HayChoriYPaty
         public string[] levelProductIds = { "0", "0,4", "0,1,4", "0,1,2,4,6", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,2,3,4,6,5", "0,1,4", "0,1,2,3,4,6,5", "0,4", "0,1,2,3,4,6,5" };
         [HideInInspector, Tooltip("Legacy aggregate goals retained for serialized-scene compatibility; individual levelBalances are authoritative.")]
         public int[] levelGoals = { 200, 200, 65, 85, 110, 121, 133, 146, 161, 177, 195, 0, 195, 0, 0 };
-        public float[] levelDurations = { 120f, 150f, 180f, 210f, 240f, 260f, 300f, 340f, 315f, 380f, 315f, StreetBonusTrackState.DurationSeconds, 315f, 0f, 0f };
+        public float[] levelDurations = { 120f, 150f, 180f, 210f, 240f, 260f, 300f, 340f, 315f, 380f, 315f, 225f, 315f, 0f, 0f };
         [Tooltip("Official per-level goals, role hire base costs, speed-cost multiplier, and opening attempt balance.")]
         public StreetLevelBalance[] levelBalances = CreateOfficialLevelBalances();
 
@@ -96,7 +96,8 @@ namespace HayChoriYPaty
                 new StreetLevelBalance(new[] {275,195,120,110,225,100,125}, new[] {55,55,70,65,65}, 13.50f, 800),
                 new StreetLevelBalance(new[] {310,220,135,125,255,110,145}, new[] {60,60,80,70,70}, 17.00f, 500),
                 new StreetLevelBalance(new[] {345,245,150,140,285,120,165}, new[] {70,70,90,80,80}, 21.00f, 500),
-                new StreetLevelBalance(new[] {0,0,0,0,0,0,0}, new[] {0,0,0,0,0}, 1f),
+                // Huracán (2026-11-27, a pedido): a normal level between Ferro and Independiente; Ferro's menu plus vacío (no new role).
+                new StreetLevelBalance(new[] {188,128,65,60,158,0,78}, new[] {30,30,40,0,0}, 3.875f, 10),
                 // Argentinos is the fifth venue, not the old late-campaign Los Redondos shift.
                 new StreetLevelBalance(new[] {118,105,85,80,115,76,90}, new[] {70,70,90,80,80}, 21.00f, 500),
                 new StreetLevelBalance(new[] {0,0,0,0,0,0,0}, new[] {0,0,0,0,0}, 1f),
@@ -122,7 +123,7 @@ namespace HayChoriYPaty
         {
             int roleIndex = (int)role;
             if (roleIndex < 0 || roleIndex > 4) return 0;
-            if (role == StreetWorkerRole.Mozo && levelIndex < 5) return 0;
+            if (role == StreetWorkerRole.Mozo && !IsRacingOrLaterLevel(levelIndex)) return 0;
             StreetLevelBalance row = GetLevelBalance(levelIndex);
             return row.hireBaseCostsByRole != null && roleIndex >= 0 && roleIndex < row.hireBaseCostsByRole.Length
                 ? Mathf.Max(0, row.hireBaseCostsByRole[roleIndex])
@@ -285,6 +286,8 @@ namespace HayChoriYPaty
         private const int QueueColumns = 7, QueueSlots = QueueColumns * QueueRowCount;
         public static readonly string[] ProductNames = { "Chori", "Paty", "Bondiola", "Vacío", "Coca 600 ml", "Fernet con Coca 1 L", "Cerveza en lata" };
         public const int HuracanBonusLevelId = 11;
+        /// <summary>Racing and later: active cooks, Mozos and ticket workers. Huracán (ID 11) plays before Racing as a normal level since 2026-11-27.</summary>
+        public static bool IsRacingOrLaterLevel(int levelIndex) => levelIndex >= 5 && levelIndex != HuracanBonusLevelId;
         public const int ArgentinosJuniorsLevelId = 12;
         public static readonly int[] CampaignOrder = { 0, 1, TowerDefenseCampaignLevelId, 2, ArgentinosJuniorsLevelId, 3, LaRengaTowerDefenseCampaignLevelId, HuracanBonusLevelId, 4, 5, LosRedondosTowerDefenseCampaignLevelId, 6, 7, 8, PeregrinacionTowerDefenseCampaignLevelId };
         public static readonly string[] LevelNames = { "Floresta / All Boys", "Nueva Chicago", "Liniers - Velez Sarsfield", "Ferro Carril Oeste", "Independiente de Avellaneda", "Racing Club / Avellaneda", "San Lorenzo / Boedo", "River Plate / Núñez", "Boca Juniors / La Boca", "Sindicato de Camioneros / Plaza de Mayo", "Los Redondos / Tandil", "Huracán / Parque Patricios", "Argentinos Juniors / La Paternal", "La Renga – Autódromo Bs. As.", "Peregrinación a Luján — Moreno" };
@@ -297,16 +300,16 @@ namespace HayChoriYPaty
             "Sindicato de Camioneros / Plaza de Mayo", "Los Redondos / Tandil", "Huracán / Parque Patricios",
             "Argentinos Juniors / La Paternal", "La Renga – Autódromo Bs. As.", "Peregrinación - Luján"
         };
-        private static readonly int[] DefaultProductCounts = { 1, 2, 3, 5, 7, 7, 7, 7, 7, 7, 7, 3, 7, 2, 7 };
+        private static readonly int[] DefaultProductCounts = { 1, 2, 3, 5, 7, 7, 7, 7, 7, 7, 7, 6, 7, 2, 7 };
         private static readonly int[][] DefaultLevelProducts = {
             new[] { 0 }, new[] { 0, 4 }, new[] { 0, 1, 4 },
             new[] { 0, 1, 2, 4, 6 }, new[] { 0, 1, 2, 3, 4, 6, 5 },
             new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 },
-            new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 4 }, new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 4 }, new[] {0,1,2,3,4,6,5}
+            new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 1, 2, 3, 4, 6 }, new[] { 0, 1, 2, 3, 4, 6, 5 }, new[] { 0, 4 }, new[] {0,1,2,3,4,6,5}
         };
-        private static readonly float[] DefaultDemandMultipliers = { 1f, 1.1f, 1.2f, 1.35f, 1.5f, 1.65f, 1.815f, 1.9965f, 2.19615f, 2.415765f, 2.6573415f, 1.65f, 2.6573415f, 2.6573415f, 1f };
+        private static readonly float[] DefaultDemandMultipliers = { 1f, 1.1f, 1.2f, 1.35f, 1.5f, 1.65f, 1.815f, 1.9965f, 2.19615f, 2.415765f, 2.6573415f, 1.425f, 2.6573415f, 2.6573415f, 1f };
         private static readonly int[] DefaultSpeedCosts = { 5, 10, 15, 20, 30, 45, 65, 90, 125 };
-        private static readonly float[] DefaultDurations = { 120f, 150f, 180f, 210f, 240f, 260f, 300f, 340f, 315f, 380f, 315f, StreetBonusTrackState.DurationSeconds, 315f, 0f, 0f };
+        private static readonly float[] DefaultDurations = { 120f, 150f, 180f, 210f, 240f, 260f, 300f, 340f, 315f, 380f, 315f, 225f, 315f, 0f, 0f };
         private const int MaxHireCost = int.MaxValue - int.MaxValue % 5;
         private readonly StreetBalance balance;
         private readonly int[][] availableProductsByLevel;
@@ -353,7 +356,8 @@ namespace HayChoriYPaty
 
         public RoundPhase Phase { get; private set; } = RoundPhase.Ready;
         public int LevelIndex { get; private set; }
-        public bool IsBonusTrack => LevelIndex == HuracanBonusLevelId;
+        // Huracán stopped being a Bonus Track on 2026-11-27 (a pedido): it plays as a normal quota level. The bonus code stays dormant.
+        public bool IsBonusTrack => false;
         /// <summary>True only while campaign level 9 is being driven by its Tower Defense runtime.</summary>
         public bool IsExternalCampaignRuntime => externalCampaignRuntime;
         public StreetBonusTrackState BonusTrack => IsBonusTrack ? bonusTrack : null;
@@ -423,7 +427,7 @@ namespace HayChoriYPaty
         public bool CanHireCocacolero { get { return CanHireRole(StreetWorkerRole.Cocacolero); } }
         public bool CanHireParrilleroPremium { get { return CanHireRole(StreetWorkerRole.ParrilleroPremium); } }
         public bool CanHireFernetero { get { return CanHireRole(StreetWorkerRole.Fernetero); } }
-        public bool UsesActiveCooks => LevelIndex >= 5;
+        public bool UsesActiveCooks => IsRacingOrLaterLevel(LevelIndex);
         public int MozoCount => WorkerCount(StreetWorkerRole.Mozo);
         public int[] WorkerCountsByRole
         {
@@ -471,10 +475,10 @@ namespace HayChoriYPaty
             int roleWorkerCount, long ticketWorkers = 0)
         {
             if (sourceBalance == null || roleWorkerCount < 0) return 0;
-            long freeBaseline = role == StreetWorkerRole.Parrillero ? (levelIndex == 6 || levelIndex == HuracanBonusLevelId ? 2 : 1)
-                : role == StreetWorkerRole.Cocacolero && (levelIndex == 9 || levelIndex == 10 || levelIndex == ArgentinosJuniorsLevelId || levelIndex == HuracanBonusLevelId) ? 1
+            long freeBaseline = role == StreetWorkerRole.Parrillero ? (levelIndex == 6 ? 2 : 1)
+                : role == StreetWorkerRole.Cocacolero && (levelIndex == 9 || levelIndex == 10 || levelIndex == ArgentinosJuniorsLevelId) ? 1
                 : role == StreetWorkerRole.ParrilleroPremium && levelIndex == 5 ? 1
-                : role == StreetWorkerRole.Mozo && (levelIndex == 5 || levelIndex == 6 || levelIndex == 8 || levelIndex == 9 || levelIndex == 10 || levelIndex == ArgentinosJuniorsLevelId || levelIndex == HuracanBonusLevelId) ? 1
+                : role == StreetWorkerRole.Mozo && (levelIndex == 5 || levelIndex == 6 || levelIndex == 8 || levelIndex == 9 || levelIndex == 10 || levelIndex == ArgentinosJuniorsLevelId) ? 1
                 : 0;
             long paidNumber = Math.Max(1L, (long)roleWorkerCount - freeBaseline - Math.Max(0L, ticketWorkers) + 1);
             return ComputeHireCost(sourceBalance.GetHireBaseCost(levelIndex, role), paidNumber);

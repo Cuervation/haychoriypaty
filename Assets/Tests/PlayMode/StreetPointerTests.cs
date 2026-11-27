@@ -249,9 +249,11 @@ namespace HayChoriYPaty.Tests
             pointer.Invoke(view, new object[] { pixel, false, true });
         }
 
+        [Ignore("Huracán dejó de ser Bonus Track el 2026-11-27; estas pruebas cubrían su resultado de estrellas.")]
         [UnityTest]
         public IEnumerator HuracanWinReturnsToSelectorAndCanOpenAnotherLevel() => HuracanReturnKeepsNavigation(true);
 
+        [Ignore("Huracán dejó de ser Bonus Track el 2026-11-27; estas pruebas cubrían su resultado de estrellas.")]
         [UnityTest]
         public IEnumerator HuracanZeroStarsReturnsToHubAndCanReplayBonus() => HuracanReturnKeepsNavigation(false);
 

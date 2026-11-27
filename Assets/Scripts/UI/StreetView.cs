@@ -238,7 +238,7 @@ namespace HayChoriYPaty
                 - panelHeight - pennantClearance);
             // Levels 1–5 keep their pennants. Huracán is the explicit bonus-track exception;
             // regular Racing and later campaign levels keep the match scenery unobstructed.
-            float pennantHeight = sim.LevelIndex < 5 || sim.IsBonusTrack
+            float pennantHeight = !StreetSimulation.IsRacingOrLaterLevel(sim.LevelIndex)
                 ? Mathf.Min(desiredPennantHeight, availablePennantHeight)
                 : 0f;
             float pennantTop = decorationBottom - pennantHeight;

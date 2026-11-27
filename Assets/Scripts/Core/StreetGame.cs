@@ -443,7 +443,7 @@ namespace HayChoriYPaty
                 bool firstTimeUnlock = nextLevel >= 0 && !IsLevelUnlocked(nextLevel);
                 if (nextLevel >= 0) SetCampaignLevelUnlocked(nextLevel);
                 save.unlockedLevel = Mathf.Max(save.unlockedLevel, Mathf.Min(10, sim.LevelIndex + 1));
-                if (market != null && nextLevel >= 0 && nextLevel != StreetSimulation.HuracanBonusLevelId)
+                if (market != null && nextLevel >= 0)
                 {
                     var nextLevelSimulation = new StreetSimulation(balance, nextLevel, sim.Price);
                     market.GrantFirstUnlockStockBonus(nextLevelSimulation, firstTimeUnlock);
@@ -728,7 +728,7 @@ namespace HayChoriYPaty
             if (!playerActive || !CanStartRound) return false;
             if (sim.IsBonusTrack) return TryStartBonusRound();
             long[] ticketGrants = new long[5];
-            bool eligibleLevel = sim.LevelIndex >= 5 && !externalTowerDefense;
+            bool eligibleLevel = StreetSimulation.IsRacingOrLaterLevel(sim.LevelIndex) && !externalTowerDefense;
             if (eligibleLevel) Array.Copy(save.tickets.pendingWorkersByRole, ticketGrants, ticketGrants.Length);
             if (!sim.CanStartRoundWithTicketWorkers(ticketGrants)) return false;
 
@@ -929,7 +929,7 @@ namespace HayChoriYPaty
         {
             int index = (int)role;
             return playerActive && save?.tickets != null && market != null && sim != null &&
-                IsLevelUnlocked(sim.LevelIndex) && sim.LevelIndex >= 5 && !sim.IsBonusTrack && sim.Phase == RoundPhase.Ready &&
+                IsLevelUnlocked(sim.LevelIndex) && StreetSimulation.IsRacingOrLaterLevel(sim.LevelIndex) && !sim.IsBonusTrack && sim.Phase == RoundPhase.Ready &&
                 !HasPendingChulengo && !resumedChulengoResult && !market.Data.attemptActive &&
                 !StreetSimulation.IsTowerDefenseLevel(sim.LevelIndex) &&
                 index >= 0 && index < 5 && sim.HasRole(role) && save.tickets.balance >= 3 &&

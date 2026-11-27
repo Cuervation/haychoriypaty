@@ -8,6 +8,7 @@ using UnityEngine;
 namespace HayChoriYPaty.Tests
 {
     /// <summary>Huracán regressions use reflection to preserve the test asmdef's runtime boundary.</summary>
+    [Ignore("Huracán dejó de ser Bonus Track el 2026-11-27 (a pedido: nivel normal entre Ferro e Independiente); el modo bonus quedó inactivo.")]
     public sealed class StreetBonusTrackTests
     {
         private const BindingFlags PublicInstance = BindingFlags.Instance | BindingFlags.Public;

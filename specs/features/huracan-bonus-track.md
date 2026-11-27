@@ -1,6 +1,17 @@
-# Huracán / Parque Patricios — Bonus Track
+# Huracán / Parque Patricios
 
-**Estado:** lógica y presentación fuente integradas; aceptación total pendiente. Este contrato describe lo que hoy hace la fuente, no certifica ejecución de escena, balance final ni Game View.
+## Nivel normal desde el 2026-11-27 (vigente; reemplaza el Bonus Track)
+
+Pedido del usuario: "el nivel de Huracán debe ser un nivel normal, con la dificultad entre el nivel anterior y el que le sigue". Huracán (ID 11, posición 8 del selector, entre La Renga y Independiente) se juega como cualquier nivel tradicional: cuotas por producto, reloj, monedas, stock de Mercado, contrataciones, mejoras de velocidad, victoria con Chulengo y derrota con disturbio. Ganarlo desbloquea Independiente.
+
+- **Valores (a mitad de camino entre Ferro, el nivel normal anterior, e Independiente, el siguiente):** 225 s (210 / 240); menú de Ferro más vacío, elegido por el usuario: chori, paty, bondiola, vacío, coca y cerveza (el vacío lo hace el Parrillero Premium, así que no agrega rol; el Fernetero sigue apareciendo en Independiente); cuotas 188/128/65/60/158/78 = 677, unas 180,5 por minuto (Ferro 171,4; Independiente 190,0); 10 monedas al empezar (0 / 20); 1 Parrillero inicial; contrataciones 30/30/40 (Parrillero, Cocacolero, Premium); costo de velocidad ×3,875 (×3,25 / ×4,50); demanda ×1,425 (×1,35 / ×1,50). Cocina pasiva como Ferro e Independiente: `StreetSimulation.IsRacingOrLaterLevel` reúne las reglas "desde Racing" (cocina activa, Mozos, trabajadores por tickets, banderín) y deja afuera a Huracán.
+- `StreetSimulation.IsBonusTrack` devuelve siempre `false`: las cartas, ¡Aguante!, estrellas, puntos y tickets del bonus quedan inactivos (código y estado de guardado conservados, sin uso). Huracán entra al Mercado desde el selector y compra stock como cualquier nivel; el Mercado ya no lo saltea.
+- **Liga:** sigue sin sumar Puntos de Liga ni canchas ganadas, para respetar el tope de 14 canchas de las reglas de Firestore; cambiarlo exige publicar reglas nuevas.
+- Pruebas del bonus (`StreetBonusTrackTests` y dos PlayMode de navegación con estrellas) quedan ignoradas con motivo. **Compila (Editor.log sin errores); EditMode/PlayMode y una partida de Huracán: NOT_RUN** (Unity desconectado). **Balance NO medido**; en el celular: NOT_RUN.
+
+## Historial: Bonus Track (hasta el 2026-11-26)
+
+Lo que sigue describe el modo anterior y ya no está activo.
 
 ## Identidad y progresión
 
