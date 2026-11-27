@@ -1105,17 +1105,6 @@ namespace HayChoriYPaty
                     if (config.FreeConstruction && worker.ServiceStage > 0) AdvanceFreeConstructionServiceStage(worker);
                 }
             }
-
-        }
-
-        private TowerDefenseWorkerState FindWorkerInZone(StreetWorkerRole role, int zone)
-        {
-            for (int i = 0; i < workers.Count; i++)
-            {
-                TowerDefenseWorkerState worker = workers[i];
-                if (worker.Role == role && !worker.IsMoving && worker.ServiceZone == zone) return worker;
-            }
-            return null;
         }
 
         private Vector2 WorkAreaHorizontalBounds(int zone)

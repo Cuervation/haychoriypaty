@@ -273,14 +273,5 @@ namespace HayChoriYPaty
             if (selected) DrawTowerDefensePlacementBorder(bounds, new Color(1f, .86f, .18f, 1f));
             else if (available) DrawAffordableUpgradeBorder(bounds);
         }
-
-        private void DrawPilgrimCardLabel(Rect bounds, string value, GUIStyle style, Color color, int maximumFontSize)
-        {
-            int previous = style.fontSize;
-            style.fontSize = Mathf.Min(previous, maximumFontSize);
-            style.fontSize = FitUpgradeStatusFontSize(style, value, bounds.width);
-            UpgradeOutline(bounds, value, style, color);
-            style.fontSize = previous;
-        }
     }
 }

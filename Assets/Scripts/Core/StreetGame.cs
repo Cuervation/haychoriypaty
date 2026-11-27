@@ -859,20 +859,6 @@ namespace HayChoriYPaty
             return true;
         }
 
-        public bool TryHireTowerDefenseAt(TowerDefenseGameMode mode, StreetWorkerRole role, Vector2 position)
-        {
-            int index = (int)role;
-            if (!playerActive || sim == null || mode == null || !sim.IsExternalCampaignRuntime ||
-                mode != towerDefenseMode || index < 0 || index >= 5 || !mode.CanHireAt(role, position)) return false;
-            int cost = mode.HireCost(role);
-            if (cost <= 0 || !mode.TryHireAt(role, position)) return false;
-            long cents = (long)cost * 100L;
-            save.statistics.paidHiresByRole[index]++;
-            save.statistics.hireSpendCentsByRole[index] += cents;
-            save.statistics.hireSpendTotalCents += cents;
-            return PersistTowerDefenseProgress(mode);
-        }
-
         public bool TryHireTowerDefenseAtPost(TowerDefenseGameMode mode, StreetWorkerRole role)
         {
             int index = (int)role;
@@ -884,17 +870,6 @@ namespace HayChoriYPaty
             save.statistics.paidHiresByRole[index]++;
             save.statistics.hireSpendCentsByRole[index] += cents;
             save.statistics.hireSpendTotalCents += cents;
-            return PersistTowerDefenseProgress(mode);
-        }
-
-        public bool TryPlaceTowerDefenseStation(TowerDefenseGameMode mode, TowerDefenseStationKind kind, Vector2 position)
-        {
-            if (!playerActive || sim == null || mode == null || mode != towerDefenseMode || !sim.IsExternalCampaignRuntime ||
-                !mode.EquipmentPlacementAllowed) return false;
-            TowerDefensePlacedStation placed;
-            int cost = mode.StationCost(kind);
-            if (!mode.TryPlaceStation(kind, position, out placed)) return false;
-            save.statistics.equipmentSpendTotalCents += (long)cost * 100L;
             return PersistTowerDefenseProgress(mode);
         }
 
@@ -1334,7 +1309,6 @@ namespace HayChoriYPaty
             }
             return data;
         }
-
 
         private bool InitializeTicketData(SaveData data)
         {

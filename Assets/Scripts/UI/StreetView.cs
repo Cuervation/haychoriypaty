@@ -209,7 +209,6 @@ namespace HayChoriYPaty
                 canvasHeight + Mathf.Max(0f, bottomBleed));
         }
 
-
         private static ResponsiveFooterLayout BuildResponsiveFooterLayoutCore(
             StreetSimulation sim, float canvasHeight, bool showUpgrades, bool showReadySelector, float decorationBottom)
         {
@@ -1461,7 +1460,6 @@ namespace HayChoriYPaty
             GUI.color=old;GUI.matrix=m;
         }
 
-
         private const float CookingRingRadius = 10f;
         private const float CookingRingDotSize = 3f;
         private const float CookingRingHeadGap = 4f;
@@ -1722,13 +1720,6 @@ namespace HayChoriYPaty
 
         private static Rect GrillRect(int productCount) => StreetWorkstationLayout.GrillBounds;
         private static Rect GrillRectForLevel(int productCount, int levelIndex) => StreetWorkstationLayout.GrillBounds;
-        private Rect DrawGrillArtwork(Rect bounds, Texture2D art)
-        {
-            if (art == null) { Item(bounds,7); return LayoutRect(bounds); }
-            Rect drawn = StreetWorkstationLayout.FitArtwork(LayoutRect(bounds), new Vector2(art.width,art.height));
-            GUI.DrawTexture(drawn,art,ScaleMode.StretchToFill,true);
-            return drawn;
-        }
         private static string StationLabelForProduct(int product)
         {
             return product == 4 ? "COCA 600 ml" : product == 6 ? "CERVEZA" : product == 5 ? "FERNET 1 L" : string.Empty;

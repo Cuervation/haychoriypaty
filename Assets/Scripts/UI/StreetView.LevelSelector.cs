@@ -103,14 +103,5 @@ namespace HayChoriYPaty
         {
             DrawLevelSelectorCardPresentation(index, baseBounds);
         }
-        private static Color LevelSelectAccent(int levelIndex)
-        {
-            switch (levelIndex)
-            {
-                case 2: return new Color(.08f, .27f, .59f); // Vélez: blue/white
-                case 3: return new Color(.04f, .38f, .19f); // Ferro: green/white
-                default: return new Color(.79f, .035f, .06f); // Independiente: red/white
-            }
-        }
     }
 }

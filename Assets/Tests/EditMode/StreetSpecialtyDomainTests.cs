@@ -141,7 +141,7 @@ namespace HayChoriYPaty.Tests
         [Test]
         public void HireCostSaturatesAtTheLargestFiveDollarAmountWithoutOverflow()
         {
-            MethodInfo compute = TypeOf("StreetSimulation").GetMethod("ComputeHireCost", BindingFlags.NonPublic | BindingFlags.Static);
+            MethodInfo compute = TypeOf("StreetSimulation").GetMethod("ComputeHireCost", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static); // public since 2026-11-26 (Los Redondos' Fernetero price)
             Assert.NotNull(compute);
             int maxRoundedCost = int.MaxValue - int.MaxValue % 5;
             Assert.AreEqual(35, compute.Invoke(null, new object[] { 35, 1L }));

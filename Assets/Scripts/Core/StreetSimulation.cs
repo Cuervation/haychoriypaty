@@ -13,7 +13,6 @@ namespace HayChoriYPaty
         public int[] speedUpgradeCosts = { 5, 10, 15, 20, 30, 45, 65, 90, 125 };
     }
 
-
     [Serializable]
     public sealed class StreetLevelBalance
     {
@@ -135,30 +134,6 @@ namespace HayChoriYPaty
         }
         [Tooltip("Optional deadline-only Floresta trial. Default false: win immediately at the unit goal.")]
         public bool florestaFinishAtDeadline = false;
-        private static readonly StreetUpgradeCostProfile DefaultUpgradeCostProfile = new StreetUpgradeCostProfile();
-
-        public StreetUpgradeCostProfile GetUpgradeCostProfile(int levelIndex)
-        {
-            return GetProfile(levelUpgradeCostProfileIds != null && levelIndex >= 0 && levelIndex < levelUpgradeCostProfileIds.Length
-                ? levelUpgradeCostProfileIds[levelIndex] : 0);
-        }
-
-        public StreetUpgradeCostProfile GetHireCostProfile(int levelIndex, StreetWorkerRole role)
-        {
-            int roleIndex = (int)role;
-            int profileIndex = roleHireCostProfileIds != null && roleIndex >= 0 && roleIndex < roleHireCostProfileIds.Length
-                ? roleHireCostProfileIds[roleIndex] : -1;
-            return GetProfile(profileIndex >= 0 ? profileIndex :
-                levelUpgradeCostProfileIds != null && levelIndex >= 0 && levelIndex < levelUpgradeCostProfileIds.Length
-                    ? levelUpgradeCostProfileIds[levelIndex] : 0);
-        }
-
-        private StreetUpgradeCostProfile GetProfile(int profileIndex)
-        {
-            if (upgradeCostProfiles == null || upgradeCostProfiles.Length == 0) return DefaultUpgradeCostProfile;
-            if (profileIndex < 0 || profileIndex >= upgradeCostProfiles.Length) profileIndex = 0;
-            return upgradeCostProfiles[profileIndex] ?? DefaultUpgradeCostProfile;
-        }
     }
 
     public enum StreetCustomerState { Entering, Waiting, Receiving, Leaving, Advancing }
@@ -928,7 +903,6 @@ namespace HayChoriYPaty
         public static Vector2 StationPosition(int product) => StreetWorkstationLayout.PickupPosition(Mathf.Clamp(product, 0, 6));
         public static Vector2 StationPositionForLevel(int product, int levelIndex, int productCount) => StationPosition(product);
         public static Vector2 StationApproachPoint() => StreetWorkstationLayout.ApproachPosition(0);
-        public static Vector2 StationApproachPointForLevel(int product, int levelIndex) => StreetWorkstationLayout.ApproachPosition(product);
         public static Vector2 StationPositionForProductCount(int product, int productCount) => StationPosition(product);
         public static float CounterHandoffYForLevel(int levelIndex) => Mathf.Lerp(FrontQueueY, StreetSceneLayout.WorkerServiceY, .5f);
         private Vector2 WorkerWaitPosition(int workerId)
@@ -1145,11 +1119,6 @@ namespace HayChoriYPaty
             worker.TravelDistance += worker.StepDistance;
             if (worker.StepDistance > .0001f) worker.FacingVector = delta;
         }
-
-        private static bool IsWorkerTravelling(StreetWorker worker) => worker.ReturningToWaitPosition ||
-            worker.State == StreetWorkerState.ToStation || worker.State == StreetWorkerState.ToCounter ||
-            worker.State == StreetWorkerState.ToGrill || worker.State == StreetWorkerState.ToTable ||
-            worker.State == StreetWorkerState.ToCookQueue;
 
         private void AdvanceIdleWorker(StreetWorker worker, float dt)
         {

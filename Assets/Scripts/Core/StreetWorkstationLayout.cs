@@ -87,7 +87,6 @@ namespace HayChoriYPaty
             float weight = Mathf.Clamp01(1f - Vector2.Distance(feet, pickup) / Mathf.Max(1f, Vector2.Distance(approach, pickup)));
             return (pickup.y - BoundsForProduct(product, premium).y - WorkerHeight) * (1f - verticalScale) * weight;
         }
-        public static Rect WorkerVisualBounds(Vector2 feet) => new Rect(feet.x - WorkerHalfWidth, feet.y - WorkerHeight, WorkerHalfWidth * 2, WorkerHeight + 1.5f);
 
         // Shared occupancy check for current/future placement changes: both rendered rectangles, not centers.
         public static bool HasStationClearance(Rect a, Rect b)

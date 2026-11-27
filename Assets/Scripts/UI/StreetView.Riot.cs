@@ -195,7 +195,6 @@ namespace HayChoriYPaty
                 cellWidth, cellHeight);
         }
 
-
         private static Rect RiotFanFrameSource(Texture2D atlas, int customerId, int pose)
         {
             if (atlas == null) return Rect.zero;
@@ -267,12 +266,6 @@ namespace HayChoriYPaty
             return new Rect(150, Mathf.Min(lastSafeTop, preferredTop), 240f * responsiveScale, height);
         }
 
-        private static Rect RiotGameOverBounds(float canvasHeight)
-        {
-            float height = Mathf.Min(380f, Mathf.Max(200f, canvasHeight * .5f));
-            return new Rect(18f, (canvasHeight - height) * .5f, W - 36f, height);
-        }
-
         private void DrawRiotResult()
         {
             float previousVertical = layoutVerticalScale;
@@ -310,6 +303,5 @@ namespace HayChoriYPaty
                         letters.width, letters.height), message, outline);
             Label(letters, message, caption);
         }
-
     }
 }

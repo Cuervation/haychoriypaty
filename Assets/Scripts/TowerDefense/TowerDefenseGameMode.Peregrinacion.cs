@@ -1428,16 +1428,6 @@ namespace HayChoriYPaty
             return true;
         }
 
-        private bool CanWorkerOccupyPosition(TowerDefenseWorkerState moving, Vector2 position)
-        {
-            Rect body = WorkerBounds(position, moving.Role);
-            if (!Contains(WorkBounds, body)) return false;
-            for (int i = 0; i < placedStations.Count; i++) if (Overlaps(body, placedStations[i].Bounds)) return false;
-            for (int i = 0; i < workers.Count; i++)
-                if (workers[i] != moving && Overlaps(body, WorkerBounds(workers[i].Position, workers[i].Role))) return false;
-            return true;
-        }
-
         private Rect StationFootprint(TowerDefenseStationKind kind, Vector2 position) =>
             StationFootprint(kind, position, true);
 
