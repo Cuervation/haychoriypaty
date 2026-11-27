@@ -123,7 +123,7 @@ namespace HayChoriYPaty
         {
             int roleIndex = (int)role;
             if (roleIndex < 0 || roleIndex > 4) return 0;
-            if (role == StreetWorkerRole.Mozo && !IsRacingOrLaterLevel(levelIndex)) return 0;
+            if (role == StreetWorkerRole.Mozo && !StreetSimulation.IsRacingOrLaterLevel(levelIndex)) return 0;
             StreetLevelBalance row = GetLevelBalance(levelIndex);
             return row.hireBaseCostsByRole != null && roleIndex >= 0 && roleIndex < row.hireBaseCostsByRole.Length
                 ? Mathf.Max(0, row.hireBaseCostsByRole[roleIndex])

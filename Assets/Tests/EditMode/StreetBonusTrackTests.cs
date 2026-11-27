@@ -8,7 +8,6 @@ using UnityEngine;
 namespace HayChoriYPaty.Tests
 {
     /// <summary>Huracán regressions use reflection to preserve the test asmdef's runtime boundary.</summary>
-    [Ignore("Huracán dejó de ser Bonus Track el 2026-11-27 (a pedido: nivel normal entre Ferro e Independiente); el modo bonus quedó inactivo.")]
     public sealed class StreetBonusTrackTests
     {
         private const BindingFlags PublicInstance = BindingFlags.Instance | BindingFlags.Public;
@@ -165,6 +164,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(14, CallStatic(simType, "NextCampaignLevelId", 8));
         }
 
+        [Ignore("Huracán dejó de ser Bonus Track el 2026-11-27 (a pedido: nivel normal entre Ferro e Independiente); el modo bonus quedó inactivo.")]
         [Test]
         public void BonusStartsWithFreeTeamAndPausesAtFiveExactChoiceDeadlines()
         {
@@ -202,6 +202,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(120f, (float)Read(sim, "Elapsed"), .0001f);
         }
 
+        [Ignore("Huracán dejó de ser Bonus Track el 2026-11-27 (a pedido: nivel normal entre Ferro e Independiente); el modo bonus quedó inactivo.")]
         [Test]
         public void BonusChoiceCardsSitBelowHuracanCaptionAbovePennantsAndHitTheirWholeCard()
         {
@@ -266,6 +267,7 @@ namespace HayChoriYPaty.Tests
             }
         }
 
+        [Ignore("Huracán dejó de ser Bonus Track el 2026-11-27 (a pedido: nivel normal entre Ferro e Independiente); el modo bonus quedó inactivo.")]
         [Test]
         public void EmergencyRoleChoicesAlsoUseDirectFooterCardsAndMatchingHitActions()
         {
@@ -338,6 +340,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(0f, (float)Read(bonus, "AguanteProgress"));
         }
 
+        [Ignore("Huracán dejó de ser Bonus Track el 2026-11-27 (a pedido: nivel normal entre Ferro e Independiente); el modo bonus quedó inactivo.")]
         [Test]
         public void OnlyRealSimulationHandoffsAddBonusPointsAndNeverAddCurrency()
         {
@@ -372,6 +375,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(0, Read(sim, "CustomersLost"));
         }
 
+        [Ignore("Huracán dejó de ser Bonus Track el 2026-11-27 (a pedido: nivel normal entre Ferro e Independiente); el modo bonus quedó inactivo.")]
         [Test]
         public void BonusTicketGrantIsIdempotentAndThreeStarExtraIsOneTime()
         {
@@ -413,6 +417,7 @@ namespace HayChoriYPaty.Tests
             Assert.IsNotEmpty(latestJson);
         }
 
+        [Ignore("Huracán dejó de ser Bonus Track el 2026-11-27 (a pedido: nivel normal entre Ferro e Independiente); el modo bonus quedó inactivo.")]
         [Test]
         public void BonusMatchAndStaleOutboxUseTheCommittedSnapshotInventory()
         {
