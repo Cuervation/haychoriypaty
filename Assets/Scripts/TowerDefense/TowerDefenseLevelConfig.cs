@@ -49,6 +49,10 @@ namespace HayChoriYPaty
         [Range(0, 100)] public int Quantity5Percent;
         [Tooltip("Percent chance that the order has a second product.")]
         [Range(0, 100)] public int SecondProductPercent;
+        [Tooltip("Percent chance, once it has two, that the order adds a third different product (2026-11-26; 0 keeps orders at two).")]
+        [Range(0, 100)] public int ThirdProductPercent;
+        [Tooltip("Percent chance, once it has three, that the order adds a fourth different product.")]
+        [Range(0, 100)] public int FourthProductPercent;
     }
 
     /// <summary>Serializable configuration for the Tower Defense runtime attached to a campaign level.</summary>

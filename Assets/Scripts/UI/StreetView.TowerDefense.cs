@@ -900,9 +900,19 @@ namespace HayChoriYPaty
             return bubble;
         }
 
+        private const int TowerDefenseMaxOrderRows = 4;
         private static Rect TowerDefenseOrderBubbleBounds(Vector2 fanFeet, int visibleLines, int campaignLevelId)
         {
             Rect bubble = OrderBubbleBounds(fanFeet, visibleLines, 20f);
+            // Defense orders can list up to four products (2026-11-26): the bubble grows a row per product instead of the
+            // campaign's two rows and "more" footer, keeping its bottom (tail) where it was.
+            int rows = Mathf.Clamp(visibleLines, 1, TowerDefenseMaxOrderRows);
+            if (visibleLines > StreetCustomer.MaxVisibleOrderProducts)
+            {
+                float bottom = bubble.yMax;
+                bubble.height = OrderPaddingY * 2f + rows * OrderRowHeight + OrderTailHeight;
+                bubble.y = bottom - bubble.height;
+            }
             if (campaignLevelId != TowerDefenseLevelConfig.CamionerosCampaignLevelId) return bubble;
 
             // The shared campaign anchor lets the speech tail overlap the top of the

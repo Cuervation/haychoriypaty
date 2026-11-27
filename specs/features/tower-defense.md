@@ -747,6 +747,56 @@ Resultado con la rampa exigente: antes de las correcciones esa estrategia perdí
 
 **Tope de 3 por rol muestra MAX (2026-11-26, a pedido):** en los niveles de construcción libre con tope por rol (Camioneros y Peregrinación, `maximumWorkersPerRole: 3`), cuando un rol llega al tope `TowerDefenseGameMode.HireCost` devuelve 0: la tarjeta del footer dice **MAX**, sin moneda ni precio, y queda apagada y no se puede tocar (antes seguía mostrando el precio y se veía disponible aunque la contratación ya no se podía hacer). Las contrataciones, precios y el tope no cambian. Evidencia: PlayMode `CamionerosWorkersCostWhatNuevaChicagoChargesAndGrowTheSameWay` (20, 20, 50, 50, 100, 100 y luego costo 0 sin poder contratar) PASS; captura y celu NOT_RUN.
 
+**La Renga: análisis de "trabajadores parados y un hincha que se escapó" (2026-11-26, reporte del usuario; solo análisis, sin cambios de juego):** prueba explícita de diagnóstico `LaRengaCrewStallTrace` (el equipo de la auditoría, 24 contrataciones en ciclo P/C/Pr con mejoras de velocidad, a 540×960 y a 610×1356, la proporción del Motorola; trazas en `Logs/Acceptance/RengaStall-20261126/`).
+
+- **No hay trabajadores trabados:** en toda la partida ningún trabajador quedó quieto y libre más de 0,1 s mientras un hincha sin atender pedía algo de su rol, y ninguno quedó quieto a mitad de una entrega más de 2 s (el agarre en la mesa o el barril).
+- **Por qué se escapa el hincha:** en las dos partidas perdió un hincha que pedía 1 paty con **todos los Parrilleros ocupados**, mientras había Parrilleros Premium y Cocacoleros libres. Por la regla de especialidades de todo el juego (`StreetSpecialties`: Parrillero chori/paty, Premium bondiola/vacío, Cocacolero coca/cerveza) esos libres no pueden llevar paty. Es falta de Parrilleros para la demanda de chori y paty (pedidos de hasta 3 unidades), no una falla de entrega.
+- **La resolución no cambia la dificultad:** a 610×1356 los hinchas tardan 30 s en cruzar (27 s a 540×960), cada entrega de Parrillero dura lo mismo (2,5 s de promedio) y los atendidos a los 60/100/140 s son casi iguales (43/83/116 contra 45/83/121). El comentario de la auditoría sobre "la franja de Parrilleros se traba" en 610×1356 corresponde a una versión anterior; con esta traza no se ve ese atasco.
+
+**Los Redondos: el parrillero cocina pegado a la parrilla como en los niveles normales (2026-11-26, a pedido, con captura del celular: "mucha distancia entre el parrillero cuando cocina y la parrilla; dejar la misma distancia que en los niveles normales"):** en los niveles normales, `StreetWorkerProjection` dibuja al cocinero que está en su parrilla más abajo: la franja transparente de arriba del arte de la parrilla (`GrillVisibleTopInset`) más `GrillVisualContactOffset` (2 px + 30 % del alto visible de la parrilla), así la grilla le tapa las piernas. En Los Redondos el puesto ya bajaba la franja, pero faltaba ese segundo tramo y el cocinero quedaba unos 40 px por encima de la parrilla. Ahora `TowerDefenseGameMode.CookGrillContactDepth` da esa misma profundidad (convertida a la escala de la cocina) y `TowerDefenseWorldPresentation.CampaignCrew` dibuja al cocinero así de hundido cuando está en su puesto (se aplica gradualmente en los últimos 24 px de la caminata para que no salte). Solo cambia el dibujo: el puesto lógico, los caminos, las colisiones y el orden de dibujo (que sigue la línea de piso real, por eso la parrilla queda delante de las piernas) no cambian. Solo en la C con cocina activa (Los Redondos). Evidencia: captura PlayMode `Logs/Acceptance/QA-LaRenga-Depth/frames/redondos-pedido-4-productos.jpg` (el Parrillero cocina con las piernas detrás de la grilla) y PlayMode de Tower Defense 117/119 (fallan solo las dos capturas explícitas del Cocacolero agachándose, que fallan igual en Peregrinación); en el celular: NOT_RUN.
+
+**Los Redondos: parrillero trabado y mozos quietos (2026-11-26, reporte del usuario con captura del celular):** "quedó un parrillero trabado enfrente del barril" y "los mozos estaban parados y los hinchas con pedidos para ellos continuaban el camino; luego, de un momento para otro, se activaron". Se reprodujo con el equipo de la captura (3 Parrilleros, 1 Premium, 1 Cocacolero, 1 Fernetero, 4 Mozos) en una partida simulada (prueba explícita de diagnóstico `LosRedondosCrewStallTrace`, traza en `Logs/Acceptance/RedondosStall-20261126/trace.txt`):
+
+- **Parrillero trabado:** el primer Parrillero, cuyo puesto queda junto a los barriles, terminaba de cocinar y no tenía ningún camino caminable hasta su punto de entrega en la mesa; como lo volvía a intentar cada cuadro, quedaba toda la partida quieto con el sánguche en la mano. Ahora, si su punto no se alcanza, va al siguiente punto de entrega de la mesa al que sí llega; y si ninguno se alcanza durante 0,8 s, deja el sánguche en la mesa desde donde está y vuelve a cocinar. Vale para toda cocina activa con puntos de la mesa estilo Boca (Los Redondos y Luján); solo cambia algo cuando antes quedaba trabado.
+- **Mozos quietos:** para no saltear la fila, un rol no atendía a ningún hincha mientras uno más adelante esperaba algo de ese rol, aunque ese sánguche no estuviera cocinado. Con pedidos variados, un hincha esperando, por ejemplo, un vacío sin stock frenaba a todos los Mozos y pasaban de largo hinchas que pedían choris que ya estaban en la mesa, hasta que ese hincha quedaba fuera de alcance. En Los Redondos (C con cocina activa) la espera ahora es **por producto**: nadie se adelanta en la fila de ese producto, pero los otros productos se siguen repartiendo. La Renga (cocina pasiva, siempre con stock) y Luján mantienen la espera por rol.
+- **Resultado en la misma partida simulada:** de 30 a 40 hinchas atendidos; el Parrillero que estaba trabado cocina; los Mozos ya no pasan varios segundos quietos con stock (antes 8 s o más seguidos). Prueba permanente PlayMode `LosRedondosCooksNeverHoldASandwichAndMozosServeWhatIsOnTheTable`: ningún cocinero queda quieto más de 3 s con un sánguche cocinado en la mano, y nunca hay 3 s seguidos con dos o más Mozos quietos mientras un hincha ya dentro de la valla pide algo que está en la mesa. **Balance NO equilibrado** (la partida simulada igual pierde); en el celular: NOT_RUN.
+
+**Los Redondos: rampa ×1,10 + 0,10 cada 10 hinchas, pedidos de hasta 5 unidades y hasta 4 productos (2026-11-26, a pedido: "que la velocidad empiece en 1,1 y aumente cada 10, 0,1; agregale que puedan llevar 4 o 5 productos, con hasta 4 productos diferentes"):**
+
+- **Corrección al revisar:** hasta este cambio los pedidos de Los Redondos **no tomaban la rampa**. Con los 7 productos de Racing, `SpawnNextFan` los mandaba por la rama genérica de construcción libre: siempre 1 unidad y 25 % de segundo producto desde el hincha 19. La rampa solo aplicaba la velocidad. Ahora la rama de la rampa rige en todo nivel con `difficultyTiers` (La Renga, Camioneros y Los Redondos; Peregrinación no tiene rampa). Consecuencia: los primeros hinchas de Los Redondos alternan el primer y el último producto del menú (Chori y Cerveza) en lugar de Chori y Coca.
+- `TowerDefenseDifficultyTier` suma `ThirdProductPercent` y `FourthProductPercent` (0 por defecto: La Renga y Camioneros siguen con pedidos de hasta 2 productos y con la misma secuencia aleatoria). Cada producto extra se sortea solo si se agregó el anterior, siempre distinto de los que ya tiene el pedido; cada producto sortea su cantidad (1 a 5) por separado.
+- El globo de pedido de los Tower Defense crece un renglón por producto hasta 4 (antes, 2 renglones y el resto no se veía); la cola queda donde estaba.
+- `LosRedondos-Tandil.asset`: **24 tramos de 10 hinchas** (antes 12 de 20), velocidad **×1,10 a ×3,40** sobre `fanSpeed 0.1535625`. Porcentajes de 1 a 5 unidades por producto y probabilidad de 2º, 3º y 4º producto:
+
+| Hinchas | Velocidad | px/s | 1 u. | 2 u. | 3 u. | 4 u. | 5 u. | 2º prod. | 3º prod. | 4º prod. |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1–10 | ×1,10 | 50,7 | 100 | 0 | 0 | 0 | 0 | 20 | 0 | 0 |
+| 11–20 | ×1,20 | 55,3 | 70 | 30 | 0 | 0 | 0 | 35 | 0 | 0 |
+| 21–30 | ×1,30 | 59,9 | 50 | 40 | 10 | 0 | 0 | 45 | 10 | 0 |
+| 31–40 | ×1,40 | 64,5 | 40 | 40 | 20 | 0 | 0 | 50 | 15 | 0 |
+| 41–50 | ×1,50 | 69,1 | 30 | 35 | 30 | 5 | 0 | 55 | 20 | 5 |
+| 51–60 | ×1,60 | 73,7 | 25 | 30 | 35 | 10 | 0 | 60 | 25 | 10 |
+| 61–70 | ×1,70 | 78,3 | 20 | 25 | 35 | 15 | 5 | 65 | 30 | 15 |
+| 71–80 | ×1,80 | 82,9 | 15 | 25 | 35 | 20 | 5 | 70 | 35 | 20 |
+| 81–90 | ×1,90 | 87,5 | 10 | 20 | 35 | 25 | 10 | 75 | 40 | 25 |
+| 91–100 | ×2,00 | 92,1 | 5 | 20 | 35 | 30 | 10 | 80 | 45 | 30 |
+| 101–110 | ×2,10 | 96,7 | 5 | 15 | 30 | 35 | 15 | 85 | 50 | 35 |
+| 111–120 | ×2,20 | 101,4 | 0 | 15 | 30 | 40 | 15 | 90 | 55 | 40 |
+| 121–130 | ×2,30 | 106,0 | 0 | 10 | 30 | 40 | 20 | 95 | 60 | 45 |
+| 131–140 | ×2,40 | 110,6 | 0 | 10 | 25 | 40 | 25 | 100 | 65 | 50 |
+| 141–150 | ×2,50 | 115,2 | 0 | 5 | 25 | 40 | 30 | 100 | 70 | 55 |
+| 151–160 | ×2,60 | 119,8 | 0 | 5 | 20 | 40 | 35 | 100 | 75 | 60 |
+| 161–170 | ×2,70 | 124,4 | 0 | 0 | 20 | 40 | 40 | 100 | 80 | 65 |
+| 171–180 | ×2,80 | 129,0 | 0 | 0 | 15 | 40 | 45 | 100 | 85 | 70 |
+| 181–190 | ×2,90 | 133,6 | 0 | 0 | 10 | 40 | 50 | 100 | 90 | 75 |
+| 191–200 | ×3,00 | 138,2 | 0 | 0 | 10 | 35 | 55 | 100 | 95 | 80 |
+| 201–210 | ×3,10 | 142,8 | 0 | 0 | 5 | 35 | 60 | 100 | 100 | 85 |
+| 211–220 | ×3,20 | 147,4 | 0 | 0 | 5 | 30 | 65 | 100 | 100 | 90 |
+| 221–230 | ×3,30 | 152,0 | 0 | 0 | 0 | 30 | 70 | 100 | 100 | 95 |
+| 231–240 | ×3,40 | 156,6 | 0 | 0 | 0 | 25 | 75 | 100 | 100 | 100 |
+
+**Balance NO medido.** Es mucho más exigente que antes: en el último tramo el cruce de la valla dura unos 10 s (antes 18 s) y cada hincha pide 4 productos de 4 o 5 unidades. Evidencia: EditMode `LosRedondosRampStartsAtOnePointOneAndEndsWithFourProductOrdersOfFourOrFiveUnits` (24 tramos con su velocidad y un hincha del último tramo con 4 productos distintos de 4 o 5 unidades); partida completa y celu NOT_RUN.
+
 **Camioneros: rampa de velocidad ×1,20 + 0,10 por tramo (2026-11-26, a pedido: "1,20 y vas subiendo 0,1 en cada nivel"):** los multiplicadores de los doce tramos pasan de ×1,16…×2,04 (+0,08) a **×1,20, 1,30, 1,40 … 2,30** (+0,10), sobre `fanSpeed 0.096875`: 34,9 px/s lógicos en el primer tramo y 66,8 px/s en el último (antes 33,7 y 59,3); el intervalo mínimo entre hinchas baja a 2,75 s y 1,44 s (antes 2,85 s y 1,62 s). Las cantidades y el segundo producto quedan como en la entrada siguiente. Hace todavía más difícil una rampa que el equipo máximo ya no podía ganar. Prueba EditMode de la rampa actualizada (×1,20 + 0,10 × tramo, último ×2,30).
 
 **Los Redondos: el Parrillero Premium cocina con su ropa (2026-11-26, a pedido):** con la cocina activa los dos cocineros usaban la pose de cocinar del Parrillero (`street-parrillero-cooking-arms-v1`, delantal blanco), así que el Premium se veía igual que el Parrillero mientras cocinaba. Ahora `CreateTowerDefenseHandoffFrames(ParrilleroPremium)` usa la misma variante de colores del Premium que ya usa la cocina de la campaña (`StreetWorkerAppearance.CreateVariant`, creada una vez por vista) y `TowerDefenseWorldPresentation.CampaignCrew` pide las poses del rol de cada trabajador. Solo presentación; sin arte nuevo.

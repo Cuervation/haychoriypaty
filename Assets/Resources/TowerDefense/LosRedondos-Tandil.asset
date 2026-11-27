@@ -62,65 +62,221 @@ MonoBehaviour:
   hireBaseCostOverridesByRole: 0000000000000000000000007800000000000000
   difficultyTiers:
   - FromFan: 0
-    SpeedMultiplier: 1
+    SpeedMultiplier: 1.1
     Quantity2Percent: 0
     Quantity3Percent: 0
+    Quantity4Percent: 0
+    Quantity5Percent: 0
     SecondProductPercent: 20
-  - FromFan: 20
-    SpeedMultiplier: 1.08
+    ThirdProductPercent: 0
+    FourthProductPercent: 0
+  - FromFan: 10
+    SpeedMultiplier: 1.2
     Quantity2Percent: 30
     Quantity3Percent: 0
+    Quantity4Percent: 0
+    Quantity5Percent: 0
+    SecondProductPercent: 35
+    ThirdProductPercent: 0
+    FourthProductPercent: 0
+  - FromFan: 20
+    SpeedMultiplier: 1.3
+    Quantity2Percent: 40
+    Quantity3Percent: 10
+    Quantity4Percent: 0
+    Quantity5Percent: 0
     SecondProductPercent: 45
-  - FromFan: 40
-    SpeedMultiplier: 1.16
+    ThirdProductPercent: 10
+    FourthProductPercent: 0
+  - FromFan: 30
+    SpeedMultiplier: 1.4
     Quantity2Percent: 40
     Quantity3Percent: 20
+    Quantity4Percent: 0
+    Quantity5Percent: 0
+    SecondProductPercent: 50
+    ThirdProductPercent: 15
+    FourthProductPercent: 0
+  - FromFan: 40
+    SpeedMultiplier: 1.5
+    Quantity2Percent: 35
+    Quantity3Percent: 30
+    Quantity4Percent: 5
+    Quantity5Percent: 0
     SecondProductPercent: 55
-  - FromFan: 60
-    SpeedMultiplier: 1.24
+    ThirdProductPercent: 20
+    FourthProductPercent: 5
+  - FromFan: 50
+    SpeedMultiplier: 1.6
     Quantity2Percent: 30
-    Quantity3Percent: 40
+    Quantity3Percent: 35
+    Quantity4Percent: 10
+    Quantity5Percent: 0
     SecondProductPercent: 60
-  - FromFan: 80
-    SpeedMultiplier: 1.32
-    Quantity2Percent: 20
-    Quantity3Percent: 60
+    ThirdProductPercent: 25
+    FourthProductPercent: 10
+  - FromFan: 60
+    SpeedMultiplier: 1.7
+    Quantity2Percent: 25
+    Quantity3Percent: 35
+    Quantity4Percent: 15
+    Quantity5Percent: 5
     SecondProductPercent: 65
-  - FromFan: 100
-    SpeedMultiplier: 1.4
-    Quantity2Percent: 10
-    Quantity3Percent: 80
-    SecondProductPercent: 70
-  - FromFan: 120
-    SpeedMultiplier: 1.48
-    Quantity2Percent: 10
-    Quantity3Percent: 90
-    SecondProductPercent: 75
-  - FromFan: 140
-    SpeedMultiplier: 1.56
-    Quantity2Percent: 0
-    Quantity3Percent: 100
-    SecondProductPercent: 80
-  - FromFan: 160
-    SpeedMultiplier: 1.64
-    Quantity2Percent: 0
-    Quantity3Percent: 100
-    SecondProductPercent: 85
-  - FromFan: 180
-    SpeedMultiplier: 1.72
-    Quantity2Percent: 0
-    Quantity3Percent: 100
-    SecondProductPercent: 90
-  - FromFan: 200
+    ThirdProductPercent: 30
+    FourthProductPercent: 15
+  - FromFan: 70
     SpeedMultiplier: 1.8
-    Quantity2Percent: 0
-    Quantity3Percent: 100
+    Quantity2Percent: 25
+    Quantity3Percent: 35
+    Quantity4Percent: 20
+    Quantity5Percent: 5
+    SecondProductPercent: 70
+    ThirdProductPercent: 35
+    FourthProductPercent: 20
+  - FromFan: 80
+    SpeedMultiplier: 1.9
+    Quantity2Percent: 20
+    Quantity3Percent: 35
+    Quantity4Percent: 25
+    Quantity5Percent: 10
+    SecondProductPercent: 75
+    ThirdProductPercent: 40
+    FourthProductPercent: 25
+  - FromFan: 90
+    SpeedMultiplier: 2
+    Quantity2Percent: 20
+    Quantity3Percent: 35
+    Quantity4Percent: 30
+    Quantity5Percent: 10
+    SecondProductPercent: 80
+    ThirdProductPercent: 45
+    FourthProductPercent: 30
+  - FromFan: 100
+    SpeedMultiplier: 2.1
+    Quantity2Percent: 15
+    Quantity3Percent: 30
+    Quantity4Percent: 35
+    Quantity5Percent: 15
+    SecondProductPercent: 85
+    ThirdProductPercent: 50
+    FourthProductPercent: 35
+  - FromFan: 110
+    SpeedMultiplier: 2.2
+    Quantity2Percent: 15
+    Quantity3Percent: 30
+    Quantity4Percent: 40
+    Quantity5Percent: 15
+    SecondProductPercent: 90
+    ThirdProductPercent: 55
+    FourthProductPercent: 40
+  - FromFan: 120
+    SpeedMultiplier: 2.3
+    Quantity2Percent: 10
+    Quantity3Percent: 30
+    Quantity4Percent: 40
+    Quantity5Percent: 20
     SecondProductPercent: 95
-  - FromFan: 220
-    SpeedMultiplier: 1.88
-    Quantity2Percent: 0
-    Quantity3Percent: 100
+    ThirdProductPercent: 60
+    FourthProductPercent: 45
+  - FromFan: 130
+    SpeedMultiplier: 2.4
+    Quantity2Percent: 10
+    Quantity3Percent: 25
+    Quantity4Percent: 40
+    Quantity5Percent: 25
     SecondProductPercent: 100
+    ThirdProductPercent: 65
+    FourthProductPercent: 50
+  - FromFan: 140
+    SpeedMultiplier: 2.5
+    Quantity2Percent: 5
+    Quantity3Percent: 25
+    Quantity4Percent: 40
+    Quantity5Percent: 30
+    SecondProductPercent: 100
+    ThirdProductPercent: 70
+    FourthProductPercent: 55
+  - FromFan: 150
+    SpeedMultiplier: 2.6
+    Quantity2Percent: 5
+    Quantity3Percent: 20
+    Quantity4Percent: 40
+    Quantity5Percent: 35
+    SecondProductPercent: 100
+    ThirdProductPercent: 75
+    FourthProductPercent: 60
+  - FromFan: 160
+    SpeedMultiplier: 2.7
+    Quantity2Percent: 0
+    Quantity3Percent: 20
+    Quantity4Percent: 40
+    Quantity5Percent: 40
+    SecondProductPercent: 100
+    ThirdProductPercent: 80
+    FourthProductPercent: 65
+  - FromFan: 170
+    SpeedMultiplier: 2.8
+    Quantity2Percent: 0
+    Quantity3Percent: 15
+    Quantity4Percent: 40
+    Quantity5Percent: 45
+    SecondProductPercent: 100
+    ThirdProductPercent: 85
+    FourthProductPercent: 70
+  - FromFan: 180
+    SpeedMultiplier: 2.9
+    Quantity2Percent: 0
+    Quantity3Percent: 10
+    Quantity4Percent: 40
+    Quantity5Percent: 50
+    SecondProductPercent: 100
+    ThirdProductPercent: 90
+    FourthProductPercent: 75
+  - FromFan: 190
+    SpeedMultiplier: 3
+    Quantity2Percent: 0
+    Quantity3Percent: 10
+    Quantity4Percent: 35
+    Quantity5Percent: 55
+    SecondProductPercent: 100
+    ThirdProductPercent: 95
+    FourthProductPercent: 80
+  - FromFan: 200
+    SpeedMultiplier: 3.1
+    Quantity2Percent: 0
+    Quantity3Percent: 5
+    Quantity4Percent: 35
+    Quantity5Percent: 60
+    SecondProductPercent: 100
+    ThirdProductPercent: 100
+    FourthProductPercent: 85
+  - FromFan: 210
+    SpeedMultiplier: 3.2
+    Quantity2Percent: 0
+    Quantity3Percent: 5
+    Quantity4Percent: 30
+    Quantity5Percent: 65
+    SecondProductPercent: 100
+    ThirdProductPercent: 100
+    FourthProductPercent: 90
+  - FromFan: 220
+    SpeedMultiplier: 3.3
+    Quantity2Percent: 0
+    Quantity3Percent: 0
+    Quantity4Percent: 30
+    Quantity5Percent: 70
+    SecondProductPercent: 100
+    ThirdProductPercent: 100
+    FourthProductPercent: 95
+  - FromFan: 230
+    SpeedMultiplier: 3.4
+    Quantity2Percent: 0
+    Quantity3Percent: 0
+    Quantity4Percent: 25
+    Quantity5Percent: 75
+    SecondProductPercent: 100
+    ThirdProductPercent: 100
+    FourthProductPercent: 100
   startingStations:
   - Kind: 0
     PositionFromWorkBoundsMin: {x: 0, y: 0}

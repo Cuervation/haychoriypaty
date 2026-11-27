@@ -334,6 +334,39 @@ namespace HayChoriYPaty.Tests
             Assert.IsEmpty((string[])Invoke(mode, "AuditLosRedondosLayout"), "The ID10 audit does not apply to ID9.");
         }
 
+        // 2026-11-26 (a pedido): speed x1.10 rising 0.10 every 10 fans (24 tiers up to x3.40), orders of up to 5 units and up to 4 different products.
+        [Test]
+        public void LosRedondosRampStartsAtOnePointOneAndEndsWithFourProductOrdersOfFourOrFiveUnits()
+        {
+            object config = Resources.Load("TowerDefense/LosRedondos-Tandil");
+            MethodInfo tierFor = config.GetType().GetMethod("DifficultyTierForFan");
+            for (int tierIndex = 0; tierIndex < 24; tierIndex++)
+            {
+                object tier = tierFor.Invoke(config, new object[] { tierIndex * 10 + 9 });
+                Assert.AreEqual(tierIndex * 10, tier.GetType().GetField("FromFan").GetValue(tier), "tier " + tierIndex);
+                Assert.AreEqual(1.1f + .1f * tierIndex, (float)tier.GetType().GetField("SpeedMultiplier").GetValue(tier), .0001f, "speed of tier " + tierIndex);
+                int quantities = 0;
+                foreach (string field in new[] { "Quantity2Percent", "Quantity3Percent", "Quantity4Percent", "Quantity5Percent" })
+                    quantities += (int)tier.GetType().GetField(field).GetValue(tier);
+                Assert.LessOrEqual(quantities, 100);
+            }
+            object mode = CreateLosRedondosMode(1200f, out object route, out float px);
+            SetPrivate(mode, "spawnedFans", 230);
+            Invoke(mode, "SpawnNextFan");
+            IList fans = (IList)mode.GetType().GetProperty("Fans").GetValue(mode);
+            Assert.AreEqual(1, fans.Count);
+            IList order = (IList)fans[0].GetType().GetProperty("Order").GetValue(fans[0]);
+            Assert.AreEqual(4, order.Count, "the last tier always asks for four different products");
+            var seen = new HashSet<int>();
+            foreach (object line in order)
+            {
+                int product = (int)line.GetType().GetProperty("Product").GetValue(line);
+                int remaining = (int)line.GetType().GetProperty("Remaining").GetValue(line);
+                Assert.IsTrue(seen.Add(product), "products are different");
+                Assert.That(remaining, Is.InRange(4, 5), "the last tier asks for 4 or 5 units of each");
+            }
+        }
+
         private object CreateLosRedondosMode(float logicalHeight, out object route, out float px)
         {
             object config = Resources.Load("TowerDefense/LosRedondos-Tandil");

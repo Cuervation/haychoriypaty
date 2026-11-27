@@ -137,7 +137,9 @@ namespace HayChoriYPaty
 
             // Same visual height as the rest of the Tower Defense crew.
             float unit = pixel * TowerDefenseGameMode.WorkerVisualHeightLogical / StreetWorkerProjection.Height;
-            Vector3 root = new Vector3(worker.Position.x, worker.Position.y, 0f);
+            // A cook at its grill is drawn sunk into the grill art like in the kitchen levels (render only; sorting keeps its real ground line,
+            // so the grill covers its legs).
+            Vector3 root = new Vector3(worker.Position.x, worker.Position.y - gameMode.CookGrillContactDepth(worker), 0f);
             workerView.GameObject.transform.position = root;
             workerView.GameObject.transform.localRotation = Quaternion.identity;
             workerView.GameObject.transform.localScale = Vector3.one;

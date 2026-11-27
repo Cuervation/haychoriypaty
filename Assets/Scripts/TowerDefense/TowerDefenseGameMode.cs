@@ -117,6 +117,8 @@ namespace HayChoriYPaty
         internal int CookUnitId;
         /// <summary>Seconds left standing at the table before putting the cooked sandwich down; negative while it has not started.</summary>
         internal float CookHandoffSeconds = -1f;
+        /// <summary>Seconds a cook holding a cooked sandwich has found no walkable way to any handoff point (2026-11-26 stuck-cook fix).</summary>
+        internal float CookHandoffBlockedSeconds;
         internal int NextCookProduct;
         internal int ServiceUnitId;
         internal int PendingFanId;
@@ -774,10 +776,11 @@ namespace HayChoriYPaty
         {
             if (stopSpawning || spawnedFans >= TotalFanCount || fans.Count >= TotalFanCount) return;
             if (UsesCamionerosProfiles) { SpawnCamionerosOrder(); return; }
-            if (config.FreeConstruction && availableProducts.Length < 7 && config.HasDifficultyRamp)
+            if (config.FreeConstruction && config.HasDifficultyRamp)
             {
-                // Difficulty ramp (La Renga): the same product rotation as the smaller menu below, but each fan's quantities and its
-                // chance of a second product come from the tier of its spawn index (its speed is applied in CreateFan).
+                // Difficulty ramp (La Renga, Camioneros and, since 2026-11-26, Los Redondos with Racing's seven products, whose orders
+                // used to skip the ramp and only took its speed): the same product rotation as the smaller menu below, but each fan's
+                // quantities and its extra products come from the tier of its spawn index (its speed is applied in CreateFan).
                 int index = spawnedFans;
                 TowerDefenseDifficultyTier tier = config.DifficultyTierForFan(index);
                 int[] pool = availableProducts;
@@ -787,7 +790,17 @@ namespace HayChoriYPaty
                 {
                     int second = product;
                     while (second == product) second = pool[random.Next(pool.Length)];
-                    CreateFan(new[] { product, second }, new[] { RollTierQuantity(tier), RollTierQuantity(tier) });
+                    var products = new List<int> { product, second };
+                    // Up to four different products (Los Redondos, 2026-11-26): each extra one is rolled only once the previous one was added.
+                    if (tier.ThirdProductPercent > 0 && pool.Length > 2 && random.Next(100) < tier.ThirdProductPercent)
+                    {
+                        products.Add(RollDistinctProduct(pool, products));
+                        if (tier.FourthProductPercent > 0 && pool.Length > 3 && random.Next(100) < tier.FourthProductPercent)
+                            products.Add(RollDistinctProduct(pool, products));
+                    }
+                    var quantities = new int[products.Count];
+                    for (int i = 0; i < quantities.Length; i++) quantities[i] = RollTierQuantity(tier);
+                    CreateFan(products.ToArray(), quantities);
                 }
                 else CreateFan(new[] { product }, new[] { RollTierQuantity(tier) });
                 nextFanSpawnAt = elapsed + config.FanSpawnIntervalSeconds;
@@ -835,6 +848,13 @@ namespace HayChoriYPaty
                 CreateFan(new[] { 0, 4 }, new[] { random.Next(1, 5), random.Next(1, 5) });
             else
                 CreateFan(new[] { random.Next(2) == 0 ? 0 : 4 }, new[] { random.Next(1, 5) });
+        }
+
+        private int RollDistinctProduct(int[] pool, List<int> taken)
+        {
+            int candidate = taken[0];
+            while (taken.Contains(candidate)) candidate = pool[random.Next(pool.Length)];
+            return candidate;
         }
 
         private int RollTierQuantity(TowerDefenseDifficultyTier tier)

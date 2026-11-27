@@ -441,6 +441,22 @@ namespace HayChoriYPaty
         // The grill's access point (and the path lattice aligned to it) does not move. La Renga's passive kitchen keeps its 4 px strip.
         private bool CooksAtVisibleGrillBack => IsCShapedLevel && config.ActiveKitchen;
 
+        /// <summary>
+        /// Render-only depth (world units) that sinks a cook standing at its grill into the grill art, as the campaign kitchen draws it
+        /// (StreetWorkerProjection: visible-top inset + GrillVisualContactOffset, the inset already being in the post). 2026-11-26, a pedido:
+        /// Los Redondos' cooks stood visibly apart from their grill. It fades in over the last 24 px of the walk to the post; the logical
+        /// post, paths and collisions do not change.
+        /// </summary>
+        internal float CookGrillContactDepth(TowerDefenseWorkerState worker)
+        {
+            if (!CooksAtVisibleGrillBack || worker == null || !IsCookRole(worker.Role)) return 0f;
+            if (!IsFinite(worker.PostPosition.x) || !IsFinite(worker.PostPosition.y)) return 0f;
+            float blend = Mathf.Clamp01(1f - Vector2.Distance(worker.Position, worker.PostPosition) / (24f * worldUnitsPerLogicalPixel));
+            if (blend <= 0f) return 0f;
+            int product = worker.Role == StreetWorkerRole.Parrillero ? 0 : 2;
+            return BocaKitchenLayout.GrillVisualContactOffset(product) * BocaKitchenFitScale() * BocaVerticalScale * worldUnitsPerLogicalPixel * blend;
+        }
+
         private void AssignRolePosts(StreetWorkerRole role, bool snap)
         {
             int count = 0;
@@ -875,8 +891,19 @@ namespace HayChoriYPaty
                     // Keep the table's Mozo pickup point free while the cook carries a
                     // real sandwich to its own nearby handoff point.
                     Vector2 handoff = CookTableHandoffPosition(worker, table);
-                    if (!IsFinite(handoff.x) || !IsFinite(handoff.y)) continue;
-                    if (!WorkerAt(worker, handoff)) { worker.CookHandoffSeconds = -1f; QueueFreeWorkerPath(worker, handoff); continue; }
+                    bool reachable = IsFinite(handoff.x) && IsFinite(handoff.y) && (WorkerAt(worker, handoff) || QueueFreeWorkerPath(worker, handoff));
+                    if (!reachable)
+                    {
+                        // 2026-11-26 (Los Redondos, user report): a cook whose handoff point had no walkable way stood forever with the cooked
+                        // sandwich in hand. After a short wait it puts the sandwich on the table from where it stands and goes back to cooking.
+                        worker.CookHandoffBlockedSeconds += deltaTime;
+                        if (worker.CookHandoffBlockedSeconds < CookHandoffBlockedLimitSeconds) continue;
+                        worker.CookHandoffBlockedSeconds = 0f; worker.CookHandoffSeconds = -1f;
+                        if (Kitchen.DepositCooked(carried.Id, worker.Id)) worker.CookUnitId = 0;
+                        continue;
+                    }
+                    worker.CookHandoffBlockedSeconds = 0f;
+                    if (!WorkerAt(worker, handoff)) { worker.CookHandoffSeconds = -1f; continue; }
                     // The campaign cook stops at the table for pickupSeconds / work rate before putting the sandwich down (StreetWorkerState.Deposit).
                     // Only on the C-shaped fence (Los Redondos): Luján's active kitchen keeps its own timing.
                     if (worker.CookHandoffSeconds < 0f) worker.CookHandoffSeconds = IsCShapedLevel ? ChicagoDwellSeconds(worker.Role) : 0f;
@@ -914,6 +941,7 @@ namespace HayChoriYPaty
             }
         }
 
+        private const float CookHandoffBlockedLimitSeconds = .8f;
         private Vector2 CookTableHandoffPosition(TowerDefenseWorkerState worker, TowerDefensePlacedStation table)
         {
             if (worker == null || table == null) return new Vector2(float.NaN, float.NaN);
@@ -928,7 +956,16 @@ namespace HayChoriYPaty
                 }
                 // A slot beside a table at the screen edge could leave the work area (the cook then never delivered and
                 // stood idle holding the sandwich), so keep the whole body inside.
-                return ClampPostInsideWork(TableDepositPosition(table, index), worker.Role);
+                Vector2 preferred = ClampPostInsideWork(TableDepositPosition(table, index), worker.Role);
+                // 2026-11-26: when the cook's own slot cannot be walked to (Los Redondos' third Parrillero beside the barrels), use the
+                // next table slot it can reach.
+                if (WorkerAt(worker, preferred) || TryBuildWorkerPath(worker, worker.Position, preferred, Rect.zero, out _)) return preferred;
+                for (int offset = 1; offset < BocaPostSlots; offset++)
+                {
+                    Vector2 candidate = ClampPostInsideWork(TableDepositPosition(table, (index + offset) % BocaPostSlots), worker.Role);
+                    if (WorkerAt(worker, candidate) || TryBuildWorkerPath(worker, worker.Position, candidate, Rect.zero, out _)) return candidate;
+                }
+                return preferred;
             }
             TowerDefenseStationKind grillKind = worker.Role == StreetWorkerRole.Parrillero
                 ? TowerDefenseStationKind.NormalGrill : TowerDefenseStationKind.PremiumGrill;
@@ -975,6 +1012,12 @@ namespace HayChoriYPaty
             // (even without stock yet), so a worker does not jump the queue. Other roles keep working in parallel,
             // and a pilgrim nobody of the role can reach in time stops holding the line.
             var heldRoles = new HashSet<StreetWorkerRole>();
+            // Los Redondos (C-shaped fence with an active kitchen), 2026-11-26 user report: holding the whole role left every Mozo idle while
+            // one fan ahead waited for a sandwich nobody had cooked yet, and fans asking for choris already on the table walked past. There
+            // the hold is per product: nobody jumps the queue for that product, but other products keep being served. La Renga's passive
+            // kitchen always has stock, so it keeps the audited per-role hold.
+            bool holdPerProduct = IsCShapedLevel && Kitchen.ActiveCooks;
+            var heldProducts = new HashSet<int>();
             for (int f = 0; f < serviceOrder.Count; f++)
             {
                 TowerDefenseFanState fan = serviceOrder[f];
@@ -984,7 +1027,7 @@ namespace HayChoriYPaty
                     TowerDefenseOrderLine order = (TowerDefenseOrderLine)fan.Order[line];
                     if (order.Remaining <= 0) continue;
                     StreetWorkerRole role = GetDeliveryRole(order.Product);
-                    if (heldRoles.Contains(role)) continue;
+                    if (holdPerProduct ? heldProducts.Contains(order.Product) : heldRoles.Contains(role)) continue;
                     if (order.Product < 4 && Kitchen.AvailableTableCount(order.Product) <= 0) continue;
                     TowerDefenseWorkerState worker = FindWorkerForFreeService(role, fan, order.Product);
                     if (worker == null || !HasStationForRole(role)) continue;
@@ -1000,7 +1043,11 @@ namespace HayChoriYPaty
                     TowerDefenseOrderLine order = (TowerDefenseOrderLine)fan.Order[line];
                     if (order.Remaining <= 0) continue;
                     StreetWorkerRole role = GetDeliveryRole(order.Product);
-                    if (!heldRoles.Contains(role) && IsFanReachableForRole(fan, role, order.Product)) heldRoles.Add(role);
+                    if (holdPerProduct)
+                    {
+                        if (!heldProducts.Contains(order.Product) && IsFanReachableForRole(fan, role, order.Product)) heldProducts.Add(order.Product);
+                    }
+                    else if (!heldRoles.Contains(role) && IsFanReachableForRole(fan, role, order.Product)) heldRoles.Add(role);
                 }
             }
         }
