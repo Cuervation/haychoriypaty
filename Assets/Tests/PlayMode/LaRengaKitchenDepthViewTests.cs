@@ -258,6 +258,411 @@ namespace HayChoriYPaty.Tests
             Return(mode);
         }
 
+        // 2026-11-26 (a pedido, before publishing): every screen of the game, each one captured at the ten aspect ratios of the publishing matrix
+        // (one folder per screen), for manual review. Screens are set up once and the Game view is resized under them.
+        [UnityTest, Timeout(1800000), Explicit("Captures to Logs/Acceptance/FullGame-20261126")]
+        public IEnumerator EveryScreenAcrossTheResolutionMatrixCapture()
+        {
+            string root = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/FullGame-20261126"));
+            var sizes = new[] {
+                new Vector2Int(720, 1280), new Vector2Int(1080, 2160), new Vector2Int(1080, 2340), new Vector2Int(1080, 2400), new Vector2Int(1220, 2712),
+                new Vector2Int(1080, 2520), new Vector2Int(800, 1280), new Vector2Int(768, 1024), new Vector2Int(904, 2316), new Vector2Int(1768, 2208) };
+            string[] flags = { "introActive", "settingsActive", "marketActive", "badgesActive", "rankingActive", "levelSelectActive", "profileActive", "hubActive" };
+            void Show(params string[] on) { foreach (string f in flags) Set(view, f, false); foreach (string f in on) Set(view, f, true); Set(view, "pressedAction", 0); }
+            IEnumerator AllSizes(string screen, Action beforeEach = null)
+            {
+                string folder = Path.Combine(root, screen);
+                Directory.CreateDirectory(folder);
+                foreach (Vector2Int size in sizes)
+                {
+                    yield return SetSize(size.x, size.y);
+                    beforeEach?.Invoke();
+                    for (int frame = 0; frame < 4; frame++) yield return null;
+                    yield return new WaitForEndOfFrame();
+                    Texture2D capture = ScreenCapture.CaptureScreenshotAsTexture();
+                    File.WriteAllBytes(Path.Combine(folder, size.x + "x" + size.y + ".png"), capture.EncodeToPNG());
+                    UnityEngine.Object.Destroy(capture);
+                }
+            }
+            object Market() => Get(game, "Market");
+            bool StartLevel(int level)
+            {
+                if (!(bool)Call(game, "SelectLevel", level)) return false;
+                Set(Get(Market(), "Data"), "balanceCents", 10000000L);
+                if (!(bool)Get(game, "CanStartRound")) Call(game, "TryBuyMissingIngredients");
+                return (bool)Call(game, "TryStartRound");
+            }
+            void StepSim(float seconds) { object sim = Get(game, "Sim"); for (float t = 0f; t < seconds; t += .05f) Call(sim, "Step", .05f); }
+
+            bool onlyVictory = File.Exists(Path.Combine(root, "skip-menus")); // drop this file to recapture only the levels at the end
+            if (!onlyVictory) {
+            // Menus.
+            yield return AllSizes("01-portada", () => { Show("introActive"); Set(view, "splashClockStarted", false); });
+            Show("hubActive"); yield return AllSizes("02-barrio");
+            Show("hubActive", "settingsActive"); yield return AllSizes("03-ajustes");
+            Show("levelSelectActive"); Set(view, "levelSelectScroll", 0f); yield return AllSizes("04-selector-arriba");
+            yield return AllSizes("05-selector-abajo", () => Set(view, "levelSelectScroll", 100000f));
+            Show("hubActive"); Call(view, "DispatchAction", 201);
+            Set(view, "marketTab", 0); yield return AllSizes("06-mercado");
+            Set(view, "marketTab", 1); yield return AllSizes("07-mercado-pestana-2");
+            Show("hubActive");
+
+            // A normal level before and during play, then lost (riot).
+            Show(); Assert.IsTrue((bool)Call(game, "SelectLevel", 5)); yield return AllSizes("08-nivel-listo");
+            Assert.IsTrue(StartLevel(5), "level 5 starts"); StepSim(25f); yield return AllSizes("09-nivel-jugando");
+            object playing = Get(game, "Sim");
+            float duration = (float)Get(playing, "LevelDuration");
+            playing.GetType().GetField("<Elapsed>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(playing, duration - .1f);
+            StepSim(.3f);
+            Assert.AreEqual("Lost", Get(playing, "Phase").ToString());
+            yield return AllSizes("10-derrota-disturbio");
+            Call(view, "DispatchAction", 15);
+
+            // Huracán's bonus track.
+            Show(); if (StartLevel(11)) { StepSim(8f); yield return AllSizes("11-huracan"); }
+            }
+            Call(game, "ReturnToLevels"); // leave Huracán's bonus round so the next levels can start
+
+            // The two Defense levels not covered by the earlier capture.
+            Show("levelSelectActive"); EnterFromSelector(13);
+            object renga = Get(view, "towerDefenseMode");
+            if (renga != null) { for (int i = 0; i < 16; i++) Call(renga, "Step", .5f); yield return AllSizes("12-la-renga"); Return(renga); }
+            Show("levelSelectActive"); EnterFromSelector(14);
+            object lujan = Get(view, "towerDefenseMode");
+            if (lujan != null) { for (int i = 0; i < 16; i++) Call(lujan, "Step", .5f); yield return AllSizes("13-peregrinacion"); Return(lujan); }
+
+            // A won normal level: the victory transition, then the result.
+            Show(); Assert.IsTrue(StartLevel(5), "level 5 starts for the victory"); StepSim(5f);
+            object winning = Get(game, "Sim");
+            System.Array delivered = (System.Array)winning.GetType().GetField("deliveredByProduct", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(winning);
+            for (int product = 0; product < delivered.Length; product++)
+                delivered.SetValue(Convert.ChangeType(winning.GetType().GetMethod("GetProductGoal", new[] { typeof(int) }).Invoke(winning, new object[] { product }), delivered.GetType().GetElementType()), product);
+            StepSim(.1f);
+            for (int frame = 0; frame < 30; frame++) yield return null;
+            yield return AllSizes("14-victoria");
+            float until = Time.realtimeSinceStartup + 15f;
+            while (!(bool)Get(game, "ShowChulengoResult") && Time.realtimeSinceStartup < until) yield return null;
+            yield return AllSizes("15-resultado");
+        }
+
+        // 2026-11-26: recheck of the two screens fixed in the full review (settings panel, Huracán's HUD bar) at the ten aspect ratios.
+        [UnityTest, Timeout(600000), Explicit("Captures to Logs/Acceptance/FullGame-20261126/recheck")]
+        public IEnumerator SettingsAndHuracanRecheckCapture()
+        {
+            string root = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/FullGame-20261126/recheck"));
+            Directory.CreateDirectory(root);
+            var sizes = new[] {
+                new Vector2Int(720, 1280), new Vector2Int(1080, 2160), new Vector2Int(1080, 2340), new Vector2Int(1080, 2400), new Vector2Int(1220, 2712),
+                new Vector2Int(1080, 2520), new Vector2Int(800, 1280), new Vector2Int(768, 1024), new Vector2Int(904, 2316), new Vector2Int(1768, 2208) };
+            string[] flags = { "introActive", "settingsActive", "marketActive", "badgesActive", "rankingActive", "levelSelectActive", "profileActive", "hubActive" };
+            IEnumerator Shots(string prefix)
+            {
+                foreach (Vector2Int size in sizes)
+                {
+                    yield return SetSize(size.x, size.y);
+                    for (int frame = 0; frame < 4; frame++) yield return null;
+                    yield return new WaitForEndOfFrame();
+                    Texture2D capture = ScreenCapture.CaptureScreenshotAsTexture();
+                    File.WriteAllBytes(Path.Combine(root, prefix + "-" + size.x + "x" + size.y + ".png"), capture.EncodeToPNG());
+                    UnityEngine.Object.Destroy(capture);
+                }
+            }
+            foreach (string f in flags) Set(view, f, false);
+            Set(view, "hubActive", true); Set(view, "settingsActive", true);
+            yield return Shots("ajustes");
+            foreach (string f in flags) Set(view, f, false);
+            Assert.IsTrue((bool)Call(game, "SelectLevel", 11));
+            Assert.IsTrue((bool)Call(game, "TryStartRound"));
+            object sim = Get(game, "Sim");
+            for (float t = 0f; t < 8f; t += .05f) Call(sim, "Step", .05f);
+            yield return Shots("huracan");
+            Call(game, "ReturnToLevels");
+        }
+
+        // 2026-11-26 diagnosis (user report on La Renga: several workers stood still and a fan escaped with its order). Plays the audit's crew at
+        // 540x960 and at the Motorola's 610x1356 and writes every worker and pending fan every second, plus the moment a fan escapes.
+        [UnityTest, Timeout(600000), Explicit("Diagnostic trace to Logs/Acceptance/RengaStall-20261126")]
+        public IEnumerator LaRengaCrewStallTrace()
+        {
+            string directory = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/RengaStall-20261126"));
+            Directory.CreateDirectory(directory);
+            MethodInfo deliveryRole = RuntimeType("TowerDefenseGameMode").GetMethod("GetDeliveryRole", BindingFlags.Instance | BindingFlags.NonPublic);
+            foreach (var (width, height) in new[] { (540, 960), (610, 1356) })
+            {
+                yield return SetSize(width, height);
+                object mode = OpenLaRenga();
+                int[] hires = { 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2 };
+                int hired = 0;
+                var log = new System.Text.StringBuilder();
+                var idleWithWork = new Dictionary<string, float>(); var longest = new Dictionary<string, float>();
+                float t = 0f;
+                for (int tick = 0; tick < 24000 && Get(mode, "Phase").ToString() == "Playing"; tick++)
+                {
+                    t += .05f;
+                    if (hired < hires.Length && (bool)Call(game, "TryHireTowerDefenseAtPost", mode, Role(hires[hired]))) hired++;
+                    if (tick > 320 && tick % 128 == 0) Call(game, "TryUpgradeTowerDefenseSpeed", mode);
+                    Call(mode, "Step", .05f);
+                    // Roles with an idle worker while an unreserved fan wants one of their products.
+                    var wanted = new HashSet<string>();
+                    foreach (object fan in (IEnumerable)Get(mode, "Fans"))
+                    {
+                        if ((bool)Get(fan, "OrderComplete") || (int)Get(fan, "ReservedByWorker") != 0) continue;
+                        foreach (object line in (IEnumerable)Get(fan, "Order"))
+                            if ((int)Get(line, "Remaining") > 0) wanted.Add(deliveryRole.Invoke(mode, new object[] { (int)Get(line, "Product") }).ToString());
+                    }
+                    var idleRoles = new HashSet<string>();
+                    foreach (object worker in (IEnumerable)Get(mode, "Workers"))
+                        if (!(bool)Get(worker, "IsMoving") && (int)Get(worker, "ServiceStage") == 0) idleRoles.Add(Get(worker, "Role").ToString());
+                    foreach (string role in new[] { "Parrillero", "Cocacolero", "ParrilleroPremium" })
+                    {
+                        float streak = idleRoles.Contains(role) && wanted.Contains(role) ? (idleWithWork.TryGetValue(role, out float s0) ? s0 : 0f) + .05f : 0f;
+                        idleWithWork[role] = streak;
+                        longest[role] = Mathf.Max(longest.TryGetValue(role, out float l0) ? l0 : 0f, streak);
+                    }
+                    bool snapshot = tick % 20 == 0 || Get(mode, "Phase").ToString() != "Playing";
+                    if (!snapshot) continue;
+                    log.Append("t=").Append(t.ToString("0.0")).Append(" served=").Append(Get(mode, "ServedFans")).Append(" coins=").Append(Get(mode, "Coins")).Append('\n');
+                    foreach (object worker in (IEnumerable)Get(mode, "Workers"))
+                        log.Append("  W").Append(Get(worker, "Id")).Append(' ').Append(Get(worker, "Role")).Append(" pos=").Append(((Vector2)Get(worker, "Position")).ToString("F2"))
+                            .Append(" post=").Append(((Vector2)Get(worker, "PostPosition")).ToString("F2")).Append(" mov=").Append(Get(worker, "IsMoving"))
+                            .Append(" stage=").Append(Get(worker, "ServiceStage")).Append(" fan=").Append(Get(worker, "PendingFanId")).Append(" prod=").Append(Get(worker, "PendingProduct"))
+                            .Append(" dwell=").Append(Get(worker, "ServiceDwelling")).Append(" cd=").Append(((float)Get(worker, "DeliveryCooldownSeconds")).ToString("0.00")).Append('\n');
+                    foreach (object fan in (IEnumerable)Get(mode, "Fans"))
+                    {
+                        if ((bool)Get(fan, "OrderComplete")) continue;
+                        object follower = Get(fan, "RouteFollower");
+                        log.Append("  F").Append(Get(fan, "Id")).Append(" res=").Append(Get(fan, "ReservedByWorker")).Append(" prog=")
+                            .Append(((float)Get(follower, "Progress")).ToString("0.00")).Append('/').Append(((float)Get(follower, "TotalDistance")).ToString("0.00")).Append(" order=");
+                        foreach (object line in (IEnumerable)Get(fan, "Order")) log.Append(Get(line, "Product")).Append('x').Append(Get(line, "Remaining")).Append(' ');
+                        log.Append('\n');
+                    }
+                    if (tick % 400 == 0) yield return null;
+                }
+                log.Append("END ").Append(width).Append('x').Append(height).Append(" phase=").Append(Get(mode, "Phase")).Append(" won=").Append(Get(mode, "HasWon"))
+                    .Append(" served=").Append(Get(mode, "ServedFans")).Append(" t=").Append(t.ToString("0.0")).Append(" hired=").Append(hired);
+                foreach (var pair in longest) log.Append(" longestIdleWithWork[").Append(pair.Key).Append("]=").Append(pair.Value.ToString("0.0"));
+                File.WriteAllText(Path.Combine(directory, "trace-" + width + "x" + height + ".txt"), log.ToString());
+                Return(mode);
+            }
+        }
+
+        // 2026-11-26 (a pedido: "analizá que no tenga ningún problema visual en ninguna de las resoluciones"): every screen changed this
+        // session at 16:9, 20:9, the Motorola's 1220x2712 and a 3:4 tablet, for manual review.
+        [UnityTest, Timeout(600000), Explicit("Captures to Logs/Acceptance/Resolutions-20261126")]
+        public IEnumerator ChangedScreensAcrossResolutionsCapture()
+        {
+            string folder = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/Resolutions-20261126"));
+            Directory.CreateDirectory(folder);
+            object save = Get(game, "save");
+            object statistics = save.GetType().GetField("statistics").GetValue(save);
+            statistics.GetType().GetField("deliveredByProduct").SetValue(statistics, new long[] { 5400, 2600, 820, 120, 3100, 0, 510 });
+            Set(statistics, "attemptsFinished", 184L); Set(statistics, "wins", 97L); Set(statistics, "customersAttended", 9321L);
+            statistics.GetType().GetMethod("Normalize").Invoke(statistics, null);
+            Set(view, "profilePreviewNickname", "Cuervation"); Set(view, "profilePreviewEmail", "hincha.ejemplo@gmail.com"); Set(view, "profilePreviewSignedIn", true);
+            Type snapshotType = RuntimeType("Cloud.LeaderboardSnapshot"), entryType = RuntimeType("Cloud.LeaderboardEntry");
+            object snapshot = Activator.CreateInstance(snapshotType);
+            string[] nicks = { "Morcipan_10", "La Chimi", "Tano Parrilla", "Fernetero", "Doña Provoleta", "El Colo Asado", "Bondiolero", "Vacío_Feliz", "Mollejita", "Pancho.LP" };
+            IList top = (IList)Get(snapshot, "top");
+            for (int i = 0; i < nicks.Length; i++)
+            {
+                object e = Activator.CreateInstance(entryType);
+                Set(e, "uid", "u" + i); Set(e, "nickname", nicks[i]); Set(e, "points", 1890L - i * 120L); Set(e, "wonLevels", 14L - i);
+                top.Add(e);
+            }
+            object me = Activator.CreateInstance(entryType);
+            Set(me, "uid", "me"); Set(me, "nickname", "Cuervation"); Set(me, "points", 393L); Set(me, "wonLevels", 4L);
+            Set(snapshot, "me", me); Set(snapshot, "myRank", 27L);
+            Type rankingState = view.GetType().GetNestedType("RankingState", BindingFlags.NonPublic);
+            string[] flags = { "introActive", "settingsActive", "marketActive", "badgesActive", "rankingActive", "levelSelectActive", "profileActive", "hubActive" };
+            IEnumerator Shot(string name)
+            {
+                for (int frame = 0; frame < 4; frame++) yield return null;
+                yield return new WaitForEndOfFrame();
+                Texture2D capture = ScreenCapture.CaptureScreenshotAsTexture();
+                File.WriteAllBytes(Path.Combine(folder, name + ".png"), capture.EncodeToPNG());
+                UnityEngine.Object.Destroy(capture);
+            }
+            void Show(string flag) { foreach (string f in flags) Set(view, f, false); Set(view, flag, true); Set(view, "pressedAction", 0); }
+            // Publishing matrix (2026-11-26): 16:9, 18:9, 19.5:9, 20:9 (and the Motorola), 21:9, 16:10 and 3:4 tablets, a folded phone's tall cover
+            // screen and an unfolded phone's near-square inner screen.
+            var sizes = new[] {
+                new Vector2Int(720, 1280), new Vector2Int(1080, 2160), new Vector2Int(1080, 2340), new Vector2Int(1080, 2400), new Vector2Int(1220, 2712),
+                new Vector2Int(1080, 2520), new Vector2Int(800, 1280), new Vector2Int(768, 1024), new Vector2Int(904, 2316), new Vector2Int(1768, 2208) };
+            foreach (var size in sizes)
+            {
+                yield return SetSize(size.x, size.y);
+                string tag = size.x + "x" + size.y;
+                Show("hubActive"); yield return Shot(tag + "-01-hub");
+                Show("profileActive"); Set(view, "profileEditing", false); Set(view, "profileConfirmSignOut", false); yield return Shot(tag + "-02-perfil");
+                Set(view, "profileEditing", true); Set(view, "profileNicknameInput", "Cuervation 10"); yield return Shot(tag + "-03-perfil-editando");
+                Set(view, "profileEditing", false); Set(view, "profileConfirmSignOut", true); yield return Shot(tag + "-04-perfil-cerrar-sesion");
+                Set(view, "profileConfirmSignOut", false);
+                Show("badgesActive"); Set(view, "badgesScroll", 0f); yield return Shot(tag + "-05-insignias-arriba");
+                Set(view, "badgesScroll", 100000f); yield return Shot(tag + "-06-insignias-final");
+                Show("rankingActive"); Set(view, "rankingSnapshot", snapshot); Set(view, "rankingState", Enum.ToObject(rankingState, 2)); yield return Shot(tag + "-07-ranking");
+                Show("levelSelectActive");
+                EnterFromSelector(10);
+                object redondos = Get(view, "towerDefenseMode");
+                Assert.IsNotNull(redondos, Get(view, "towerDefenseError")?.ToString());
+                Assert.IsTrue((bool)Call(redondos, "TrySpawnFan", new[] { 0, 2, 4, 6 }, new[] { 5, 4, 5, 4 }));
+                for (int i = 0; i < 12; i++) Call(redondos, "Step", .5f);
+                yield return Shot(tag + "-08-redondos");
+                Return(redondos);
+                Show("levelSelectActive");
+                EnterFromSelector(9);
+                object camioneros = Get(view, "towerDefenseMode");
+                Assert.IsNotNull(camioneros, Get(view, "towerDefenseError")?.ToString());
+                Assert.IsTrue((bool)Call(camioneros, "TrySpawnFan", new[] { 0, 4 }, new[] { 5, 4 }));
+                for (int i = 0; i < 8; i++) Call(camioneros, "Step", .5f);
+                yield return Shot(tag + "-09-camioneros");
+                Return(camioneros);
+            }
+        }
+
+        // 2026-11-26 (user report on Los Redondos): with the user's crew a Parrillero stood forever by the barrels holding a cooked sandwich
+        // (its handoff point had no walkable way) and the Mozos stood idle while fans asking for choris on the table walked past (one fan
+        // ahead waiting for an uncooked sandwich held the whole role). Neither may last more than a moment now.
+        [UnityTest, Timeout(300000)]
+        public IEnumerator LosRedondosCooksNeverHoldASandwichAndMozosServeWhatIsOnTheTable()
+        {
+            yield return SetSize(610, 1356);
+            EnterFromSelector(10);
+            object mode = Get(view, "towerDefenseMode");
+            Set(mode, "coins", 100000);
+            int[] roles = { 0, 0, 1, 3, 4, 4, 4 };
+            int hired = 0;
+            object kitchen = Get(mode, "Kitchen");
+            MethodInfo available = kitchen.GetType().GetMethod("AvailableTableCount");
+            var holding = new Dictionary<int, float>();
+            float t = 0f, longestHold = 0f, mozoStall = 0f, longestMozoStall = 0f;
+            for (int tick = 0; tick < 6000 && Get(mode, "Phase").ToString() == "Playing"; tick++)
+            {
+                t += .05f;
+                if (hired < roles.Length && Call(game, "TryHireTowerDefenseAtPost", mode, Role(roles[hired])) is bool ok && ok) hired++;
+                Call(mode, "Step", .05f);
+                int idleMozos = 0;
+                foreach (object worker in (IEnumerable)Get(mode, "Workers"))
+                {
+                    int id = (int)Get(worker, "Id"), cookUnit = (int)Get(worker, "CookUnitId");
+                    bool carrying = false;
+                    if (cookUnit > 0 && !(bool)Get(worker, "IsMoving"))
+                        foreach (object unit in (IEnumerable)Get(kitchen, "Units"))
+                            if ((int)Get(unit, "Id") == cookUnit && Get(unit, "Location").ToString() == "Carried") carrying = true;
+                    holding[id] = carrying ? (holding.TryGetValue(id, out float held) ? held : 0f) + .05f : 0f;
+                    longestHold = Mathf.Max(longestHold, holding[id]);
+                    if (Get(worker, "Role").ToString() == "Mozo" && !(bool)Get(worker, "IsMoving") && (int)Get(worker, "ServiceStage") == 0) idleMozos++;
+                }
+                // A fan well inside the fence asks for a sandwich that is on the table and no fan ahead is waiting for that same sandwich.
+                bool servable = false;
+                var fans = new List<object>();
+                foreach (object fan in (IEnumerable)Get(mode, "Fans")) if (!(bool)Get(fan, "OrderComplete")) fans.Add(fan);
+                fans.Sort((a, b) => ((float)Get(Get(b, "RouteFollower"), "Progress")).CompareTo((float)Get(Get(a, "RouteFollower"), "Progress")));
+                var waitedAhead = new HashSet<int>();
+                foreach (object fan in fans)
+                {
+                    float progress = (float)Get(Get(fan, "RouteFollower"), "Progress");
+                    bool reserved = (int)Get(fan, "ReservedByWorker") != 0;
+                    foreach (object line in (IEnumerable)Get(fan, "Order"))
+                    {
+                        int product = (int)Get(line, "Product");
+                        if ((int)Get(line, "Remaining") <= 0 || product >= 4) continue;
+                        if (!reserved && progress > 2.5f && !waitedAhead.Contains(product) && (int)available.Invoke(kitchen, new object[] { product, 0 }) > 0) servable = true;
+                        waitedAhead.Add(product);
+                    }
+                }
+                mozoStall = idleMozos >= 2 && servable ? mozoStall + .05f : 0f;
+                longestMozoStall = Mathf.Max(longestMozoStall, mozoStall);
+                if (tick % 200 == 0) yield return null;
+            }
+            Assert.AreEqual(7, hired);
+            Assert.Less(longestHold, 3f, "a cook never stands still holding a cooked sandwich");
+            Assert.Less(longestMozoStall, 3f, "Mozos do not stand idle while a fan asks for what is on the table");
+            Return(mode);
+        }
+
+        // 2026-11-26 diagnosis (user report on Los Redondos): a Parrillero stood stuck by the barrels and the Mozos stood idle while fans
+        // with orders walked past. Plays the user's crew (3 P, 1 Pr, 1 C, 1 F, 4 M) and writes a trace of every worker.
+        [UnityTest, Timeout(300000), Explicit("Diagnostic trace to Logs/Acceptance/RedondosStall-20261126")]
+        public IEnumerator LosRedondosCrewStallTrace()
+        {
+            yield return SetSize(610, 1356);
+            EnterFromSelector(10);
+            object mode = Get(view, "towerDefenseMode");
+            Set(mode, "coins", 100000);
+            int[] roles = { 0, 0, 1, 3, 4, 4, 4 };
+            int hired = 0;
+            object kitchen = Get(mode, "Kitchen");
+            var log = new System.Text.StringBuilder();
+            float t = 0f;
+            for (int tick = 0; tick < 6000 && Get(mode, "Phase").ToString() == "Playing"; tick++)
+            {
+                t += .05f;
+                if (hired < roles.Length && Call(game, "TryHireTowerDefenseAtPost", mode, Role(roles[hired])) is bool ok && ok) hired++;
+                Call(mode, "Step", .05f);
+                if (tick % 40 != 0) continue;
+                log.Append("t=").Append(t.ToString("0.0")).Append(" served=").Append(Get(mode, "ServedFans")).Append(" table=");
+                for (int product = 0; product < 7; product++)
+                    log.Append((int)kitchen.GetType().GetMethod("AvailableTableCount").Invoke(kitchen, new object[] { product, 0 })).Append(product < 6 ? "," : "");
+                log.Append('\n');
+                foreach (object worker in (IEnumerable)Get(mode, "Workers"))
+                {
+                    log.Append("  W").Append(Get(worker, "Id")).Append(' ').Append(Get(worker, "Role")).Append(" pos=").Append(((Vector2)Get(worker, "Position")).ToString("F2"))
+                        .Append(" post=").Append(((Vector2)Get(worker, "PostPosition")).ToString("F2"))
+                        .Append(" mov=").Append(Get(worker, "IsMoving")).Append(" cook=").Append(Get(worker, "IsCooking")).Append(" stage=").Append(Get(worker, "ServiceStage"))
+                        .Append(" fan=").Append(Get(worker, "PendingFanId")).Append(" prod=").Append(Get(worker, "PendingProduct")).Append(" cookUnit=").Append(Get(worker, "CookUnitId"))
+                        .Append(" handoff=").Append(Get(worker, "CookHandoffSeconds"));
+                int cookUnit = (int)Get(worker, "CookUnitId");
+                if (cookUnit > 0 && !(bool)Get(worker, "IsMoving") && !(bool)Get(worker, "IsCooking"))
+                {
+                    foreach (object unit in (IEnumerable)Get(kitchen, "Units"))
+                        if ((int)Get(unit, "Id") == cookUnit) log.Append(" unit=").Append(Get(unit, "State")).Append('@').Append(Get(unit, "Location")).Append(" slot=").Append(Get(unit, "Slot")).Append(" p=").Append(Get(unit, "Progress"));
+                    MethodInfo handoffOf = mode.GetType().GetMethod("CookTableHandoffPosition", BindingFlags.Instance | BindingFlags.NonPublic);
+                    MethodInfo findStation = mode.GetType().GetMethod("FindPlacedStation", BindingFlags.Instance | BindingFlags.NonPublic);
+                    bool premium = Get(worker, "Role").ToString() == "ParrilleroPremium";
+                    object table = findStation.Invoke(mode, new[] { Enum.Parse(RuntimeType("TowerDefenseStationKind"), premium ? "PremiumTable" : "NormalTable") });
+                    Vector2 handoffAt = (Vector2)handoffOf.Invoke(mode, new[] { worker, table });
+                    log.Append(" handoffAt=").Append(handoffAt.ToString("F2"));
+                    MethodInfo path = mode.GetType().GetMethod("TryBuildWorkerPath", BindingFlags.Instance | BindingFlags.NonPublic);
+                    object[] pathArgs = { worker, Get(worker, "Position"), handoffAt, Rect.zero, null, Role(0) };
+                    if (!float.IsNaN(handoffAt.x)) log.Append(" path=").Append(path.Invoke(mode, pathArgs));
+                }
+                log.Append('\n');
+                }
+                foreach (object fan in (IEnumerable)Get(mode, "Fans"))
+                {
+                    if ((bool)Get(fan, "OrderComplete")) continue;
+                    log.Append("  F").Append(Get(fan, "Id")).Append(" res=").Append(Get(fan, "ReservedByWorker")).Append(" prog=")
+                        .Append(((float)Get(Get(fan, "RouteFollower"), "Progress")).ToString("0.00")).Append('/').Append(((float)Get(Get(fan, "RouteFollower"), "TotalDistance")).ToString("0.00")).Append(" order=");
+                    foreach (object line in (IEnumerable)Get(fan, "Order")) log.Append(Get(line, "Product")).Append('x').Append(Get(line, "Remaining")).Append(' ');
+                    log.Append('\n');
+                }
+                if (tick % 400 == 0) yield return null;
+            }
+            log.Append("END phase=").Append(Get(mode, "Phase")).Append(" served=").Append(Get(mode, "ServedFans")).Append(" t=").Append(t);
+            string directory = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/RedondosStall-20261126"));
+            Directory.CreateDirectory(directory);
+            File.WriteAllText(Path.Combine(directory, "trace.txt"), log.ToString());
+            Return(mode);
+        }
+
+        // 2026-11-26 (a pedido): Defense orders of four different products show four rows in a taller bubble.
+        [UnityTest, Timeout(120000)]
+        public IEnumerator LosRedondosFourProductOrderShowsFourRows()
+        {
+            yield return SetSize(575, 1280);
+            EnterFromSelector(10);
+            object mode = Get(view, "towerDefenseMode");
+            Assert.IsTrue((bool)Call(mode, "TrySpawnFan", new[] { 0, 2, 4, 6 }, new[] { 5, 4, 5, 4 }));
+            for (int i = 0; i < 6; i++) Call(mode, "Step", 1f);
+            MethodInfo bounds = view.GetType().GetMethod("TowerDefenseOrderBubbleBounds", BindingFlags.NonPublic | BindingFlags.Static);
+            Rect two = (Rect)bounds.Invoke(null, new object[] { new Vector2(200f, 400f), 2, 10 });
+            Rect four = (Rect)bounds.Invoke(null, new object[] { new Vector2(200f, 400f), 4, 10 });
+            Assert.AreEqual(two.yMax, four.yMax, .01f, "the tail stays in place");
+            Assert.Greater(four.height, two.height + 30f, "two more rows");
+            yield return Capture("redondos-pedido-4-productos");
+            Return(mode);
+        }
+
         // 2026-11-24 (a pedido): Los Redondos plays La Renga's C-shaped fence inverted, with La Renga's kitchen, crew and difficulty.
         [UnityTest, Timeout(120000)]
         public IEnumerator LosRedondosOpensOnTheInvertedCWithLaRengasKitchenCrewAndEconomy()

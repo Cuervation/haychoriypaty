@@ -71,16 +71,29 @@ namespace HayChoriYPaty
 
         // ---- Profile screen layout (canvas-logical, drawn with layoutVerticalScale = 1) ----
         private static Rect ProfilePanelBounds(float height) => new Rect(12, 16, W - 24, height - 16 - 92);
-        private static Rect ProfileCardBounds(float height) { Rect p = ProfilePanelBounds(height); return new Rect(p.x + 14, p.y + 70, p.width - 28, 170); }
-        private static Rect ProfileNameBounds(float height) { Rect c = ProfileCardBounds(height); return new Rect(c.x + 150, c.y + 30, c.width - 166, 54); }
-        private static Rect ProfileEditBounds(float height) { Rect c = ProfileCardBounds(height); return new Rect(c.xMax - 138, c.y + 100, 120, 40); }
-        private static Rect ProfileSaveBounds(float height) { Rect c = ProfileCardBounds(height); return new Rect(c.x + 150, c.y + 100, 150, 42); }
-        private static Rect ProfileCancelEditBounds(float height) { Rect c = ProfileCardBounds(height); return new Rect(c.x + 310, c.y + 100, 150, 42); }
+        // The card shrinks on short screens (an unfolded foldable's near-square canvas is ~670 px tall) and everything inside scales with it
+        // (k = card height / 170), so the six tiles and the Google account still fit (2026-11-26 resolution review).
+        private static float ProfileCardHeight(float height) => Mathf.Clamp(170f - (780f - height) * .5f, 124f, 170f);
+        private static Rect ProfileCardBounds(float height) { Rect p = ProfilePanelBounds(height); return new Rect(p.x + 14, p.y + 70, p.width - 28, ProfileCardHeight(height)); }
+        private static float ProfileCardScale(float height) => ProfileCardHeight(height) / 170f;
+        private static Rect ProfileNameBounds(float height) { Rect c = ProfileCardBounds(height); float k = ProfileCardScale(height); return new Rect(c.x + 150 * k, c.y + 30 * k, c.width - 166 * k, 54 * k); }
+        private static Rect ProfileEditBounds(float height) { Rect c = ProfileCardBounds(height); float k = ProfileCardScale(height); return new Rect(c.xMax - 138, c.y + 100 * k, 120, 40 * k); }
+        private static Rect ProfileSaveBounds(float height) { Rect c = ProfileCardBounds(height); float k = ProfileCardScale(height); return new Rect(c.x + 150 * k, c.y + 100 * k, 150, 42 * k); }
+        private static Rect ProfileCancelEditBounds(float height) { Rect c = ProfileCardBounds(height); float k = ProfileCardScale(height); return new Rect(c.x + 150 * k + 160, c.y + 100 * k, 150, 42 * k); }
+        // The tiles take the room left between the card and the Google account (2026-11-26 resolution review): shorter on 3:4 tablets, where
+        // they used to run under the mail row, and taller on long phones, where the screen looked empty. The next objective needs room for itself.
+        private static float ProfileTileHeight(float height)
+        {
+            Rect c = ProfileCardBounds(height), email = ProfileEmailBounds(height);
+            float room = (email.y - 34f) - (c.yMax + 34f);
+            float withObjective = (room - 12f - (64f + 24f)) * .5f;
+            return withObjective >= 80f ? Mathf.Min(124f, withObjective) : Mathf.Clamp((room - 12f) * .5f, 60f, 100f);
+        }
         private static Rect ProfileTileBounds(float height, int index)
         {
             Rect c = ProfileCardBounds(height);
-            float width = (c.width - 20f) / 3f;
-            return new Rect(c.x + (index % 3) * (width + 10f), c.yMax + 34f + (index / 3) * 112f, width, 100f);
+            float width = (c.width - 20f) / 3f, tile = ProfileTileHeight(height);
+            return new Rect(c.x + (index % 3) * (width + 10f), c.yMax + 34f + (index / 3) * (tile + 12f), width, tile);
         }
         // The Google account sits at the foot of the panel; the next objective fills the space between it and the stats.
         private static Rect ProfileSignOutBounds(float height) { Rect p = ProfilePanelBounds(height); return new Rect(W * .5f - 150f, p.yMax - 24f - 56f, 300f, 56f); }
@@ -132,7 +145,8 @@ namespace HayChoriYPaty
         {
             Rect card = ProfileCardBounds(height);
             DrawRankingPodiumCard(card);
-            DrawRankingMedallion(new Rect(card.x + 28, card.y + 34, 104, 104), RankingGold, ProfileEntry(), true);
+            float k = ProfileCardScale(height);
+            DrawRankingMedallion(new Rect(card.x + 28 * k, card.y + 34 * k, 104 * k, 104 * k), RankingGold, ProfileEntry(), true);
             Rect name = ProfileNameBounds(height);
             StreetPlayerStatistics stats = game?.PlayerStatistics;
             if (profileEditing)
@@ -168,10 +182,10 @@ namespace HayChoriYPaty
             else
             {
                 string nickname = ProfileNickname;
-                RankingOutlined(name, nickname ?? (ProfileSignedIn ? "SIN APODO" : "HINCHA"), 38, Color.white, MarketNavy, TextAnchor.MiddleLeft, 1.2f);
-                Rect chip = new Rect(name.x, card.y + 104, 196, 32);
+                RankingOutlined(name, nickname ?? (ProfileSignedIn ? "SIN APODO" : "HINCHA"), Mathf.RoundToInt(38 * k), Color.white, MarketNavy, TextAnchor.MiddleLeft, 1.2f);
+                Rect chip = new Rect(name.x, card.y + 104 * k, 196, 32 * k);
                 RankingPill(chip, new Color(0f, .03f, .12f, .55f));
-                DrawRankingStar(new Rect(chip.x + 8, chip.y + 6, 20, 20));
+                DrawRankingStar(new Rect(chip.x + 8, chip.y + (chip.height - 20f) * .5f, 20, 20));
                 MarketText(new Rect(chip.x + 32, chip.y, chip.width - 40, chip.height), ProfileNumber(StreetLeague.Points(stats)) + " PUNTOS DE LIGA", 14, Color.white, TextAnchor.MiddleLeft);
                 if (ProfileSignedIn)
                 {
@@ -203,8 +217,9 @@ namespace HayChoriYPaty
             {
                 Rect tile = ProfileTileBounds(height, i);
                 DrawRankingRowBase(tile, RankingRowKind.Normal, 0f);
-                RankingOutlined(new Rect(tile.x + 6, tile.y + 10, tile.width - 12, 46), values[i], 34, RankingGold, new Color(.24f, .10f, .02f));
-                MarketText(new Rect(tile.x + 6, tile.y + 60, tile.width - 12, 24), labels[i], 12, MarketInk);
+                float scale = Mathf.Clamp(tile.height / 100f, .7f, 1.2f);
+                RankingOutlined(new Rect(tile.x + 6, tile.y + tile.height * .1f, tile.width - 12, tile.height * .46f), values[i], Mathf.RoundToInt(34 * scale), RankingGold, new Color(.24f, .10f, .02f));
+                MarketText(new Rect(tile.x + 6, tile.y + tile.height * .6f, tile.width - 12, 24), labels[i], 12, MarketInk);
             }
         }
 

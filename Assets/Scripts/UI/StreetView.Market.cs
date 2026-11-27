@@ -773,7 +773,9 @@ namespace HayChoriYPaty
             if (marketLabelStyle == null) marketLabelStyle = new GUIStyle(menuTitle) { padding = new RectOffset(), margin = new RectOffset(), wordWrap = false };
             marketLabelStyle.alignment = alignment;
             marketLabelStyle.fontSize = FitMarketTextFontSize(marketLabelStyle, value, size, bounds.size);
-            marketLabelStyle.normal.textColor = color;
+            // Hover too (2026-11-26): under the pointer (the mouse in the Editor, a finger on the phone) IMGUI uses the hover colour,
+            // which the copied title style leaves white, so labels turned pale wherever the pointer rested.
+            marketLabelStyle.normal.textColor = marketLabelStyle.hover.textColor = color;
             GUI.Label(bounds, value, marketLabelStyle);
         }
         private string MarketEconomyFooterSummary()

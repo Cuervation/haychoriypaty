@@ -253,8 +253,9 @@ namespace HayChoriYPaty
             {
                 if (settingsActive)
                 {
-                    if (HubSettingsMusicButtonBounds.Contains(p)) return HubSettingsMusicAction;
-                    if (HubSettingsBackButtonBounds.Contains(p)) return HubSettingsBackAction;
+                    Vector2 canvas = new Vector2(p.x, p.y * layoutVerticalScale);
+                    if (HubSettingsMusicButtonCanvasBounds.Contains(canvas)) return HubSettingsMusicAction;
+                    if (HubSettingsBackButtonCanvasBounds.Contains(canvas)) return HubSettingsBackAction;
                     return 0;
                 }
                 if (HubSettingsButtonLayoutBounds(new Vector2(Screen.width, Screen.height), Screen.safeArea).Contains(p))
