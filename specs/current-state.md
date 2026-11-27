@@ -1,6 +1,6 @@
 # Current state — Hay Chori y Paty
 
-**Corte:** 2026-11-27, rama `docs/post-cleanup-state` (subida a `origin`). Última APK: commit `3857bdb` (ver android-prototype); instalada en el Motorola: `a4127c2`. Resumen corto para retomar; las reglas están en `AGENTS.md`, el detalle en cada contrato y la [tabla de balance](../docs/BALANCE_ACTUAL_NIVELES.md). Índice: [README](README.md). Snapshot anterior: [history/current-state-snapshot-through-20261113.md](history/current-state-snapshot-through-20261113.md).
+**Corte:** 2026-11-27, rama `docs/post-cleanup-state` (subida a `origin`). Última APK: commit `3857bdb`, instalada en el Motorola el 2026-11-27 (ver android-prototype). Resumen corto para retomar; las reglas están en `AGENTS.md`, el detalle en cada contrato y la [tabla de balance](../docs/BALANCE_ACTUAL_NIVELES.md). Índice: [README](README.md). Snapshot anterior: [history/current-state-snapshot-through-20261113.md](history/current-state-snapshot-through-20261113.md).
 
 ## Para retomar (Codex u otro agente)
 
