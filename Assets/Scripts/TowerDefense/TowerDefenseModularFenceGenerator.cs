@@ -37,6 +37,8 @@ namespace HayChoriYPaty
         private float visualLeftEdge, visualRightEdge;
         private Sprite visiblePanelSprite;
         private Sprite visiblePanelSource;
+        private Sprite visibleVerticalPanelSprite;
+        private Sprite visibleVerticalPanelSource;
 
         public TowerDefenseLevelConfig LevelConfig { get => levelConfig; set => levelConfig = value; }
         public Sprite FencePanelSprite { get => fencePanelSprite; set => fencePanelSprite = value; }
@@ -126,6 +128,7 @@ namespace HayChoriYPaty
             }
 
             PrepareVisiblePanelSprite();
+            PrepareVisibleVerticalPanelSprite();
             if (generatedRoot == null)
             {
                 var root = new GameObject("Tower Defense — modular double fence");
@@ -193,10 +196,36 @@ namespace HayChoriYPaty
             visiblePanelSprite.hideFlags = HideFlags.DontSave;
         }
 
+        private void PrepareVisibleVerticalPanelSprite()
+        {
+            Sprite source = levelConfig.VerticalFencePanelSprite;
+            if (source == visibleVerticalPanelSource) return;
+            DestroyGeneratedSprite(visibleVerticalPanelSprite);
+            visibleVerticalPanelSource = source;
+            visibleVerticalPanelSprite = null;
+            if (source == null || source.name != "fence-panel-overhead-60-v1") return;
+
+            // Match the visible rail endpoints, not the PNG's transparent side margins.
+            // Offset the pivot to keep the frame center at the same distance from the route as the original.
+            Rect rect = source.rect;
+            rect.x += rect.width * (417f / 2172f);
+            rect.width *= 1338f / 2172f;
+            visibleVerticalPanelSprite = Sprite.Create(source.texture, rect, new Vector2(.5f, 313f / 724f),
+                source.pixelsPerUnit, 0, SpriteMeshType.FullRect);
+            visibleVerticalPanelSprite.name = "Tower Defense visible 60-degree fence panel";
+            visibleVerticalPanelSprite.hideFlags = HideFlags.DontSave;
+        }
+
         private void OnDestroy()
         {
-            if (visiblePanelSprite == null) return;
-            if (Application.isPlaying) Destroy(visiblePanelSprite); else DestroyImmediate(visiblePanelSprite);
+            DestroyGeneratedSprite(visiblePanelSprite);
+            DestroyGeneratedSprite(visibleVerticalPanelSprite);
+        }
+
+        private static void DestroyGeneratedSprite(Sprite sprite)
+        {
+            if (sprite == null) return;
+            if (Application.isPlaying) Destroy(sprite); else DestroyImmediate(sprite);
         }
 
         /// <summary>A serpentine with a side work column (Los Redondos ID10).</summary>
@@ -354,21 +383,32 @@ namespace HayChoriYPaty
             pieceObject.transform.SetParent(generatedRoot, false);
             SetLayerRecursively(pieceObject, presentationLayer);
             pieceObject.transform.position = new Vector3(position.x, position.y, 0f);
-            pieceObject.transform.localScale = new Vector3(uniformScale, uniformScale, 1f);
+            Sprite panel = RenderPanelSprite;
+            float scale = uniformScale;
+            if (Mathf.Abs(tangent.y) > Mathf.Abs(tangent.x))
+            {
+                Sprite verticalPanel = visibleVerticalPanelSprite != null ? visibleVerticalPanelSprite : visibleVerticalPanelSource;
+                if (verticalPanel != null && verticalPanel.bounds.size.x > .0001f)
+                {
+                    scale *= panel.bounds.size.x / verticalPanel.bounds.size.x;
+                    panel = verticalPanel;
+                }
+            }
+            pieceObject.transform.localScale = new Vector3(scale, scale, 1f);
             // La Renga's C-shaped fence (2026-11-23, a pedido): its right side is turned the other way so the support feet face the pocket.
             bool mirrorVertical = levelConfig != null && levelConfig.RouteKind == TowerDefenseRouteKind.CShapedSingleFence;
             pieceObject.transform.rotation = GetFencePanelRotation(tangent, mirrorVertical);
 
             var renderer = pieceObject.GetComponent<SpriteRenderer>();
             if (renderer == null) renderer = pieceObject.AddComponent<SpriteRenderer>();
-            renderer.sprite = RenderPanelSprite;
+            renderer.sprite = panel;
             renderer.sortingLayerName = sortingLayerName;
             renderer.sortingOrder = sortingOrder + Mathf.RoundToInt(-position.y * 12f);
 
             var collider = pieceObject.GetComponent<BoxCollider2D>();
             if (collider == null) collider = pieceObject.AddComponent<BoxCollider2D>();
-            // Enlarge the artwork, not the collision thickness of the existing route.
-            collider.size = new Vector2(RenderPanelSprite.bounds.size.x, colliderThickness / uniformScale);
+            // Keep the same world-space length and thickness even when the vertical art has a different pixel span.
+            collider.size = new Vector2(panel.bounds.size.x, colliderThickness / scale);
 
             var metadata = pieceObject.GetComponent<TowerDefenseFencePiece>();
             if (metadata == null) metadata = pieceObject.AddComponent<TowerDefenseFencePiece>();

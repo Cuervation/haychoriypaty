@@ -3,9 +3,7 @@ using UnityEngine;
 namespace HayChoriYPaty
 {
     /// <summary>
-    /// Small 2D presentation responses to a delivery. Default levels: the soft pop plays on every delivered order item.
-    /// San Lorenzo (2026-11-23, a pedido, for testing): the soft pop plays when a worker hands something over (every delivered
-    /// item) and, when the whole order is completed and the customer leaves, a soft rising "bubble" pop (2026-11-24, a pedido; it replaced the coin ping and then a short ba-dum-tss).
+    /// Shared campaign audio: a soft pop per delivered item and a rising bubble when that item completes the order.
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(AudioSource))]
@@ -13,7 +11,6 @@ namespace HayChoriYPaty
     {
         private const string ClipResourcePath = "Audio/order-delivery-soft-pop";
         private const string CompleteClipResourcePath = "Audio/order-complete-bubble";
-        private const int SanLorenzoLevelIndex = 6;
         [SerializeField, Range(0f, 1f)] private float volume = 0.2f;
         [SerializeField, Range(0f, 1f)] private float completeVolume = 0.25f;
         [SerializeField, Range(0f, 0.1f)] private float pitchVariation = 0.03f;
@@ -21,6 +18,7 @@ namespace HayChoriYPaty
         private AudioSource audioSource;
         private AudioClip deliveryClip, completeClip;
         private StreetSimulation simulation;
+        private TowerDefenseGameMode towerDefense;
 
         private void Awake()
         {
@@ -39,19 +37,30 @@ namespace HayChoriYPaty
             if (isActiveAndEnabled) Subscribe();
         }
 
+        public void BindTowerDefense(TowerDefenseGameMode mode)
+        {
+            if (towerDefense == mode) return;
+            UnsubscribeTowerDefense();
+            towerDefense = mode;
+            if (isActiveAndEnabled) SubscribeTowerDefense();
+        }
+
         private void OnEnable()
         {
             Subscribe();
+            SubscribeTowerDefense();
         }
 
         private void OnDisable()
         {
             Unsubscribe();
+            UnsubscribeTowerDefense();
         }
 
         private void OnDestroy()
         {
             Unsubscribe();
+            UnsubscribeTowerDefense();
         }
 
         private void Subscribe()
@@ -68,7 +77,21 @@ namespace HayChoriYPaty
             simulation.OrderCompleted -= OnOrderCompleted;
         }
 
-        private bool CompletedOrderHasItsOwnSound => simulation != null && simulation.LevelIndex == SanLorenzoLevelIndex;
+        private void SubscribeTowerDefense()
+        {
+            if (towerDefense != null) towerDefense.DeliveryCompleted += OnTowerDefenseDelivery;
+        }
+
+        private void UnsubscribeTowerDefense()
+        {
+            if (towerDefense != null) towerDefense.DeliveryCompleted -= OnTowerDefenseDelivery;
+        }
+
+        private void OnTowerDefenseDelivery(TowerDefenseDelivery delivery)
+        {
+            OnUnitDelivered();
+            if (delivery.CompletesOrder) OnOrderCompleted();
+        }
 
         private void OnUnitDelivered()
         {
@@ -77,7 +100,6 @@ namespace HayChoriYPaty
 
         private void OnOrderCompleted()
         {
-            if (!CompletedOrderHasItsOwnSound) return;
             if (completeClip == null) completeClip = Resources.Load<AudioClip>(CompleteClipResourcePath);
             if (completeClip == null || audioSource == null) return;
             audioSource.pitch = Random.Range(1f - pitchVariation, 1f + pitchVariation);

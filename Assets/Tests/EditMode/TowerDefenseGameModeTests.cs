@@ -345,15 +345,7 @@ namespace HayChoriYPaty.Tests
             Invoke(mode, "Begin");
             Hire("Parrillero", 0);
             capturedDelivery = null;
-            EventInfo deliveryEvent = modeType.GetEvent("DeliveryCompleted", PublicInstance);
-            Type deliveryType = deliveryEvent.EventHandlerType.GetGenericArguments()[0];
-            ParameterExpression deliveryParameter = Expression.Parameter(deliveryType, "delivery");
-            MethodInfo captureMethod = typeof(TowerDefenseGameModeTests)
-                .GetMethod(nameof(CaptureDelivery), PrivateInstance);
-            Delegate deliveryHandler = Expression.Lambda(deliveryEvent.EventHandlerType,
-                Expression.Call(Expression.Constant(this), captureMethod,
-                    Expression.Convert(deliveryParameter, typeof(object))), deliveryParameter).Compile();
-            deliveryEvent.AddEventHandler(mode, deliveryHandler);
+            Type deliveryType = WatchDeliveries(CaptureDelivery);
 
             Assert.IsTrue((bool)Invoke(mode, "TrySpawnFan", new[] { new[] { 0 }, new[] { 1 } }));
             // Fill the finite budget with requests that this cook cannot service.
@@ -373,9 +365,58 @@ namespace HayChoriYPaty.Tests
                 Vector2.up * (float)modeType.GetField("StationRenderYOffsetLogical", PublicStatic).GetRawConstantValue() *
                 Get<float>(mode, "WorldUnitsPerLogicalPixel");
             Assert.IsNotNull(capturedDelivery, "The physical delivery event should expose its presentation source.");
+            Assert.IsTrue((bool)deliveryType.GetField("CompletesOrder").GetValue(capturedDelivery));
             Vector2 receivedSource = (Vector2)deliveryType.GetField("Source", PublicInstance).GetValue(capturedDelivery);
             Assert.AreEqual(expectedVisualSource, receivedSource,
                 "The physical handoff cue fallback originates at the moved visual table, not its unchanged base anchor.");
+        }
+
+        [Test]
+        public void TowerDefenseDeliveryAudioUsesCompletionCueOnlyOnLastUnitAndDetaches()
+        {
+            mode = CreateMode(.02f);
+            Invoke(mode, "Begin");
+            Hire("Cocacolero", 0);
+            Assert.IsTrue((bool)Invoke(mode, "TrySpawnFan", new[] { new[] { 4 }, new[] { 2 } }));
+            object fan = ((System.Collections.IList)Get<object>(mode, "Fans"))[0];
+            object follower = Get<object>(fan, "RouteFollower");
+            Invoke(follower, "Advance", new object[] { RowLength(0) * .5f / Get<float>(follower, "Speed") });
+
+            var host = new GameObject("Tower Defense delivery audio");
+            try
+            {
+                Type soundType = RuntimeType("OrderDeliverySound");
+                Component sound = host.AddComponent(soundType);
+                soundType.GetField("audioSource", PrivateInstance).SetValue(sound, null);
+                FieldInfo deliveryClip = soundType.GetField("deliveryClip", PrivateInstance);
+                FieldInfo completeClip = soundType.GetField("completeClip", PrivateInstance);
+                deliveryClip.SetValue(sound, null);
+                Invoke(sound, "BindTowerDefense", new[] { mode });
+                Invoke(sound, "BindTowerDefense", new[] { mode });
+                FieldInfo signal = modeType.GetField("DeliveryCompleted", PrivateInstance);
+                Assert.AreEqual(1, ((Delegate)signal.GetValue(mode)).GetInvocationList().Length,
+                    "Rebinding to the same round must not duplicate the cue.");
+
+                var completed = new System.Collections.Generic.List<bool>();
+                WatchDeliveries(receipt =>
+                {
+                    completed.Add((bool)receipt.GetType().GetField("CompletesOrder").GetValue(receipt));
+                    Assert.AreEqual("order-delivery-soft-pop", ((AudioClip)deliveryClip.GetValue(sound)).name);
+                    deliveryClip.SetValue(sound, null);
+                    if (completed.Count == 1) Assert.IsNull(completeClip.GetValue(sound));
+                });
+
+                CallPrivate("DeliverWithinServiceRanges");
+                ClearWorkerDeliveryCooldowns();
+                CallPrivate("DeliverWithinServiceRanges");
+                CollectionAssert.AreEqual(new[] { false, true }, completed);
+                Assert.AreEqual("order-complete-bubble", ((AudioClip)completeClip.GetValue(sound)).name);
+
+                Invoke(sound, "BindTowerDefense", new object[] { null });
+                Assert.AreEqual(1, ((Delegate)signal.GetValue(mode)).GetInvocationList().Length,
+                    "After detaching, only the test observer should remain.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(host); }
         }
 
         [Test]
@@ -1228,6 +1269,17 @@ namespace HayChoriYPaty.Tests
         }
 
         private static Type RuntimeType(string shortName) => Type.GetType("HayChoriYPaty." + shortName + ", Assembly-CSharp", true);
+
+        private Type WatchDeliveries(Action<object> handler)
+        {
+            EventInfo deliveryEvent = modeType.GetEvent("DeliveryCompleted", PublicInstance);
+            Type receiptType = deliveryEvent.EventHandlerType.GetGenericArguments()[0];
+            ParameterExpression receipt = Expression.Parameter(receiptType);
+            Delegate callback = Expression.Lambda(deliveryEvent.EventHandlerType,
+                Expression.Invoke(Expression.Constant(handler), Expression.Convert(receipt, typeof(object))), receipt).Compile();
+            deliveryEvent.AddEventHandler(mode, callback);
+            return receiptType;
+        }
 
         private void CaptureDelivery(object delivery) => capturedDelivery = delivery;
 

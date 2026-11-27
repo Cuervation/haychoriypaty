@@ -37,6 +37,8 @@ namespace HayChoriYPaty
             public SpriteRenderer Renderer;
             public Sprite[] Frames;
             public Sprite[] HandoffFrames;
+            public Sprite RearIdleFrame;
+            public SpriteRenderer MozoAngryCue;
             // La Renga's campaign crew body (see TowerDefenseWorldPresentation.CampaignCrew.cs).
             public SortingGroup Group;
             public SpriteRenderer Torso, LeftLeg, RightLeg;
@@ -697,9 +699,16 @@ namespace HayChoriYPaty
                     workerViews.Add(worker.Id, workerView);
                 }
                 staleIds.Remove(worker.Id);
+                StreetFacing? waitingFacing = null;
+                if (gameMode.TryGetMozoWaitingSandwichTable(worker, out Vector2 tableCenter))
+                {
+                    Vector2 look = tableCenter - worker.Position;
+                    waitingFacing = StreetWorkerAnimation.ResolveFacing(new Vector2(look.x, -look.y), StreetFacing.Up);
+                }
                 if (workerView.Group != null)
                 {
-                    SyncCampaignCrewBody(gameMode, worker, workerView);
+                    SyncCampaignCrewBody(gameMode, worker, workerView, waitingFacing);
+                    SyncMozoAngryCue(workerView, worker, waitingFacing.HasValue);
                     continue;
                 }
                 int frame = worker.IsMoving ? Mathf.FloorToInt(worker.TravelDistance / Mathf.Max(.01f, gameMode.WorldUnitsPerLogicalPixel * 16f)) % workerView.Frames.Length
@@ -708,7 +717,17 @@ namespace HayChoriYPaty
                 if (!worker.IsMoving) frame = 0;
                 float actionProgress = Mathf.Clamp01(1f - worker.ServeAnimationSeconds /
                     mode.DeliveryCueSeconds);
-                workerView.Renderer.sprite = workerView.Frames[frame];
+                bool facesFirstFence = worker.IsIdle && workerView.RearIdleFrame != null;
+                workerView.Renderer.sprite = facesFirstFence ? workerView.RearIdleFrame : workerView.Frames[frame];
+                if (facesFirstFence) workerView.Facing = StreetFacing.Up;
+                bool waitingFlip = false;
+                Sprite waitingSprite = waitingFacing.HasValue
+                    ? CampaignCrewProjection()?.MozoStandingSprite(waitingFacing.Value, out waitingFlip) : null;
+                if (waitingSprite != null)
+                {
+                    workerView.Facing = waitingFacing.Value;
+                    workerView.Renderer.sprite = waitingSprite;
+                }
                 if (gameMode.FreeConstruction && worker.IsCooking)
                 {
                     Sprite[] cooking = workerView.HandoffFrames != null && workerView.HandoffFrames.Length > 0
@@ -756,8 +775,10 @@ namespace HayChoriYPaty
                     : worker.ServeAnimationSeconds > 0f && worker.LastServiceTarget.x < worker.Position.x;
                 if (gameMode.FreeConstruction && worker.IsMoving && worker.TransferRoute != null && worker.TransferIndex < worker.TransferRoute.Length)
                     workerView.Renderer.flipX = worker.TransferRoute[worker.TransferIndex].x < worker.Position.x;
-                // La Renga's barrels are taken from the right: a Cocacolero waiting at its post stands beside the barrel and faces it.
-                if (gameMode.BarrelsFromTheSide && worker.Role == StreetWorkerRole.Cocacolero && !worker.IsMoving && worker.ServeAnimationSeconds <= 0f)
+                if (waitingSprite != null) workerView.Renderer.flipX = waitingFlip;
+                // Side-barrel work keeps its profile; a rear idle pose must not be flipped back to it.
+                if (!facesFirstFence && gameMode.BarrelsFromTheSide && worker.Role == StreetWorkerRole.Cocacolero &&
+                    !worker.IsMoving && worker.ServeAnimationSeconds <= 0f)
                     workerView.Renderer.flipX = true;
                 // The sprite pivot is at its feet. Use the same ground key as the grouped
                 // furniture; a tie belongs to the worker at the front edge.
@@ -768,6 +789,7 @@ namespace HayChoriYPaty
                 if (visualLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId &&
                     stationMinimumSortingOrderByRoleAndZone.TryGetValue(StationSortKey(worker.Role, worker.ServiceZone), out stationMinimumOrder))
                     workerView.Renderer.sortingOrder = Mathf.Min(workerView.Renderer.sortingOrder, stationMinimumOrder - 1);
+                SyncMozoAngryCue(workerView, worker, waitingFacing.HasValue);
             }
             for (int i = 0; i < staleIds.Count; i++)
             {
@@ -776,6 +798,31 @@ namespace HayChoriYPaty
                 DestroyPresentationObject(stale.GameObject);
                 workerViews.Remove(staleIds[i]);
             }
+        }
+
+        private void SyncMozoAngryCue(WorkerView workerView, TowerDefenseWorkerState worker, bool show)
+        {
+            if (!show)
+            {
+                if (workerView.MozoAngryCue != null) workerView.MozoAngryCue.enabled = false;
+                return;
+            }
+
+            if (workerView.MozoAngryCue == null)
+            {
+                Sprite sprite = CampaignCrewProjection()?.EnsureMozoAngryCueSprite();
+                if (sprite == null) return;
+                workerView.MozoAngryCue = CreateCampaignCrewPart(workerView.GameObject.transform, "MozoEmptySandwichAngryCue", 14);
+                workerView.MozoAngryCue.gameObject.layer = presentationLayer;
+                workerView.MozoAngryCue.sprite = sprite;
+            }
+            SpriteRenderer cue = workerView.MozoAngryCue;
+            float pixel = mode.WorldUnitsPerLogicalPixel;
+            cue.transform.position = worker.Position + Vector2.up * (TowerDefenseGameMode.WorkerVisualHeightLogical + 14f) * pixel;
+            cue.transform.localScale = Vector3.one * (34f * pixel /
+                (cue.sprite.bounds.size.x * workerView.GameObject.transform.lossyScale.x));
+            if (workerView.Group == null) cue.sortingOrder = workerView.Renderer.sortingOrder + 14;
+            cue.enabled = true;
         }
 
         private FanView CreateFanView(int id)
@@ -800,6 +847,8 @@ namespace HayChoriYPaty
             Sprite[] frames = view != null ? view.CreateTowerDefenseWorkerFrames(worker.Role) : null;
             if (frames == null || frames.Length == 0) return CreateFallbackWorker(worker);
             generatedWorkerSprites.AddRange(frames);
+            Sprite rearIdleFrame = mode.UsesCampaignIdleCrew ? view.CreateTowerDefenseWorkerRearIdleFrame(worker.Role) : null;
+            if (rearIdleFrame != null) generatedWorkerSprites.Add(rearIdleFrame);
             Sprite[] handoffFrames = view != null ? view.CreateTowerDefenseHandoffFrames(worker.Role) : null;
             if (handoffFrames != null) generatedWorkerSprites.AddRange(handoffFrames);
             var obj = new GameObject("TD worker " + worker.Role + " " + worker.Id);
@@ -812,7 +861,7 @@ namespace HayChoriYPaty
             float targetHeight = TowerDefenseGameMode.WorkerVisualHeightLogical * mode.WorldUnitsPerLogicalPixel;
             obj.transform.localScale = Vector3.one * (targetHeight / Mathf.Max(.001f, frames[0].bounds.size.y));
             SetLayerRecursively(obj, presentationLayer);
-            return new WorkerView { GameObject = obj, Renderer = renderer, Frames = frames, HandoffFrames = handoffFrames };
+            return new WorkerView { GameObject = obj, Renderer = renderer, Frames = frames, HandoffFrames = handoffFrames, RearIdleFrame = rearIdleFrame };
         }
 
         private WorkerView CreateFallbackWorker(TowerDefenseWorkerState worker)

@@ -254,6 +254,7 @@ namespace HayChoriYPaty
             || IsPassiveKitchenLevel || IsCShapedLevel;
         // La Renga: Huracán's kitchen inside the pocket of a "C"-shaped fence; the fans walk around the outside of it.
         internal bool IsCShapedLevel => config.FreeConstruction && config.RouteKind == TowerDefenseRouteKind.CShapedSingleFence;
+        internal bool UsesCampaignIdleCrew => config.FreeConstruction && StreetSimulation.IsTowerDefenseLevel(config.SourceCampaignLevelId);
         // Kitchen-derived horizontal levels that copy a traditional (passive) campaign kitchen: Camioneros (Nueva Chicago's)
         // and Los Redondos (Ferro's), plus La Renga on its C-shaped fence (Huracán's kitchen layout, the same two products as
         // Camioneros). Nobody cooks, the tables are always full and each worker only serves.
@@ -744,9 +745,8 @@ namespace HayChoriYPaty
             return true;
         }
 
-        // Where an idle worker waits: the passive campaign-kitchen levels (Camioneros, Los Redondos, La Renga) wait like the
-        // campaign (CampaignWaitSpot); every other level waits at the post.
-        private Vector2 WaitSpot(TowerDefenseWorkerState worker) =>
+        // Reused by the crew's speech bubbles so presentation follows the same per-role idle position as the kitchen.
+        internal Vector2 WaitSpot(TowerDefenseWorkerState worker) =>
             UsesWaitingBand(worker) ? CampaignWaitSpot(worker) : worker.PostPosition;
 
         // The passive crews wait in the open band between the fence and the tables. On the C-shaped fence the active kitchen's Mozos do too (2026-11-24):
@@ -1005,8 +1005,34 @@ namespace HayChoriYPaty
             return true;
         }
 
+        // Presentation snapshot from the same priority and reachability checks used for dispatch.
+        private int missingMozoSandwichProduct = -1;
+
+        internal bool TryGetMozoWaitingSandwichTable(TowerDefenseWorkerState worker, out Vector2 tableCenter)
+        {
+            tableCenter = default;
+            if (missingMozoSandwichProduct < 0 || Phase != TowerDefenseRunPhase.Playing ||
+                worker.Role != StreetWorkerRole.Mozo || !worker.IsIdle) return false;
+
+            Vector2 wait = worker.PostPosition;
+            if (UsesWaitingBand(worker))
+            {
+                // Read the spot chosen by the simulation; rendering must not reroll a position.
+                if (!waitSpotCache.TryGetValue(worker.Id, out WaitSpotEntry cached) || !cached.Jitter.Equals(worker.WaitJitter))
+                    return false;
+                wait = cached.Spot;
+            }
+            if (Vector2.Distance(worker.Position, wait) > 2f * worldUnitsPerLogicalPixel) return false;
+
+            TowerDefensePlacedStation table = FindPlacedStation(StationForProduct(missingMozoSandwichProduct));
+            if (table == null) return false;
+            tableCenter = table.Bounds.center;
+            return true;
+        }
+
         private void DeliverFreeConstructionOrders()
         {
+            missingMozoSandwichProduct = -1;
             UpdateFreeConstructionFanInterceptions();
             // Same-role hold-back: a role never serves a pilgrim while one further ahead still waits for that role
             // (even without stock yet), so a worker does not jump the queue. Other roles keep working in parallel,
@@ -1043,11 +1069,14 @@ namespace HayChoriYPaty
                     TowerDefenseOrderLine order = (TowerDefenseOrderLine)fan.Order[line];
                     if (order.Remaining <= 0) continue;
                     StreetWorkerRole role = GetDeliveryRole(order.Product);
-                    if (holdPerProduct)
-                    {
-                        if (!heldProducts.Contains(order.Product) && IsFanReachableForRole(fan, role, order.Product)) heldProducts.Add(order.Product);
-                    }
-                    else if (!heldRoles.Contains(role) && IsFanReachableForRole(fan, role, order.Product)) heldRoles.Add(role);
+                    if (holdPerProduct ? heldProducts.Contains(order.Product) : heldRoles.Contains(role)) continue;
+                    if (!IsFanReachableForRole(fan, role, order.Product)) continue;
+                    if (holdPerProduct) heldProducts.Add(order.Product);
+                    else heldRoles.Add(role);
+
+                    if (missingMozoSandwichProduct < 0 && role == StreetWorkerRole.Mozo &&
+                        Kitchen.ActiveCooks && Kitchen.AvailableTableCount(order.Product) <= 0)
+                        missingMozoSandwichProduct = order.Product;
                 }
             }
         }
@@ -1273,11 +1302,12 @@ namespace HayChoriYPaty
                 int sale = Mathf.RoundToInt(StreetSimulation.OfficialProductPrice(product));
                 coins = coins > int.MaxValue - sale ? int.MaxValue : coins + sale;
                 coinsEarned = coinsEarned > int.MaxValue - sale ? int.MaxValue : coinsEarned + sale;
-                if (fan.OrderComplete && !fan.CompletionCounted)
+                bool completesOrder = fan.OrderComplete && !fan.CompletionCounted;
+                if (completesOrder)
                 { fan.CompletionCounted = true; if (ordersCompleted < int.MaxValue) ordersCompleted++; fan.IsDeparting = true; fan.DepartureProgress = 0f; }
                 worker.DeliveryCooldownSeconds = IsPassiveKitchenLevel ? 0f : DeliveryIntervalSeconds; worker.ServeAnimationSeconds = DeliveryCueSeconds;
                 worker.LastServiceTarget = fan.RouteFollower.Position;
-                DeliveryCompleted?.Invoke(new TowerDefenseDelivery(unitId, product, worker.Id, fan.Id, 0, worker.Position, fan.RouteFollower.Position, elapsed));
+                DeliveryCompleted?.Invoke(new TowerDefenseDelivery(unitId, product, worker.Id, fan.Id, 0, worker.Position, fan.RouteFollower.Position, elapsed, completesOrder));
             }
             ReleaseFreeService(worker, fan);
         }

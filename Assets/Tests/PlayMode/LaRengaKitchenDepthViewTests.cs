@@ -765,6 +765,149 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest, Timeout(120000)]
+        public IEnumerator LosRedondosShowsSixtyDegreeArtOnTheVerticalFence()
+        {
+            yield return SetSize(575, 1280);
+            EnterFromSelector(10);
+            Assert.IsTrue((bool)Get(view, "towerDefenseActive"), Get(view, "towerDefenseError")?.ToString());
+            object mode = Get(view, "towerDefenseMode");
+            var generator = (Component)Get(Get(view, "towerDefensePresentation"), "fenceGenerator");
+            var panels = generator.GetComponentsInChildren<SpriteRenderer>()
+                .Where(renderer => renderer.name.StartsWith("Fence rail ", StringComparison.Ordinal)).ToArray();
+            Assert.IsTrue(panels.Any(renderer => Mathf.Abs(renderer.transform.right.y) > .9f));
+            Assert.IsTrue(panels.Any(renderer => Mathf.Abs(renderer.transform.right.x) > .9f));
+            foreach (SpriteRenderer panel in panels)
+                Assert.AreEqual(Mathf.Abs(panel.transform.right.y) > .9f ? "fence-panel-overhead-60-v1" : "fence-panel-v1",
+                    panel.sprite.texture.name, panel.name);
+            for (int i = 0; i < 16; i++) Call(mode, "Step", .25f);
+            yield return Capture("los-redondos-valla-vertical-60-575x1280");
+            Return(mode);
+        }
+
+        [UnityTest, Timeout(120000)]
+        public IEnumerator LosRedondosAndLujanShowCrewChantsAtTheirExistingPosts()
+        {
+            yield return SetSize(575, 1280);
+            foreach (int level in new[] { 10, 14 })
+            {
+                EnterFromSelector(level);
+                Assert.IsTrue((bool)Get(view, "towerDefenseActive"), Get(view, "towerDefenseError")?.ToString());
+                object mode = Get(view, "towerDefenseMode");
+                Assert.IsTrue((bool)Call(mode, "ContainsProduct", 3), "The dialogue should advertise Vacío in both levels.");
+
+                Set(mode, "coins", 100000);
+                var workers = (IEnumerable)Get(mode, "Workers");
+                foreach (string role in Enum.GetNames(RuntimeType("StreetWorkerRole")))
+                {
+                    if (!workers.Cast<object>().Any(w => Get(w, "Role").ToString() == role))
+                    {
+                        object workerRole = Enum.Parse(RuntimeType("StreetWorkerRole"), role);
+                        Assert.IsTrue((bool)Call(game, "TryHireTowerDefenseAtPost", mode, workerRole));
+                    }
+                }
+
+                var premium = workers.Cast<object>().First(w => Get(w, "Role").ToString() == "ParrilleroPremium");
+                var fernetero = workers.Cast<object>().First(w => Get(w, "Role").ToString() == "Fernetero");
+                // Freeze time in the fixture. Place each worker at the actual assigned idle point
+                // and drive the presentation with an explicit busy → idle transition.
+                foreach (object worker in workers)
+                {
+                    worker.GetType().GetProperty("Position", I).SetValue(worker, Call(mode, "WaitSpot", worker));
+                    worker.GetType().GetProperty("IsMoving", I).SetValue(worker, false);
+                }
+                yield return null;
+                yield return new WaitForEndOfFrame();
+                Assert.AreSame(mode, Get(view, "crewChantMode"), "The view must process crew chants in the active match.");
+                var starts = (IDictionary)Get(view, "crewChantStart");
+                Assert.IsEmpty(starts, "Newly hired or initially settled workers do not call out.");
+                var workerViews = (IDictionary)Get(Get(view, "towerDefensePresentation"), "workerViews");
+                foreach (object worker in workers)
+                {
+                    object workerView = workerViews[Get(worker, "Id")];
+                    Assert.AreEqual("Up", Get(workerView, "Facing").ToString(), $"Level {level}, {Get(worker, "Role")}");
+                    if (level == 14)
+                        Assert.AreSame(Get(workerView, "RearIdleFrame"), ((SpriteRenderer)Get(workerView, "Renderer")).sprite);
+                }
+
+                Set(premium, "CookUnitId", 1);
+                Set(fernetero, "ServiceStage", 1);
+                yield return null;
+                yield return new WaitForEndOfFrame();
+                Assert.IsEmpty(starts, "A cook with assigned food and a worker serving stay silent.");
+
+                Set(premium, "CookUnitId", 0);
+                yield return null;
+                yield return new WaitForEndOfFrame();
+                Assert.IsTrue(starts.Contains(Get(premium, "Id")));
+                Assert.IsFalse(starts.Contains(Get(fernetero, "Id")));
+                float premiumStart = (float)starts[Get(premium, "Id")];
+                yield return Capture($"crew-chant-level-{level}-premium");
+
+                Set(mode, "elapsed", premiumStart + 2f);
+                Set(fernetero, "ServiceStage", 0);
+                yield return null;
+                yield return new WaitForEndOfFrame();
+                Assert.AreEqual(premiumStart + 2f, starts[Get(fernetero, "Id")]);
+                Assert.AreEqual(premiumStart, starts[Get(premium, "Id")], "A worker still waiting must not restart its chant.");
+                yield return Capture($"crew-chant-level-{level}-fernet");
+                Return(mode);
+            }
+        }
+
+        [UnityTest, Timeout(120000)]
+        public IEnumerator LosRedondosAndLujanMozoLooksAtTheMissingSandwichTable()
+        {
+            yield return SetSize(575, 1280);
+            foreach (int level in new[] { 10, 14 })
+            {
+                EnterFromSelector(level);
+                Assert.IsTrue((bool)Get(view, "towerDefenseActive"), Get(view, "towerDefenseError")?.ToString());
+                object mode = Get(view, "towerDefenseMode");
+                Set(mode, "coins", 100000);
+                var workers = ((IEnumerable)Get(mode, "Workers")).Cast<object>();
+                if (!workers.Any(w => Get(w, "Role").ToString() == "Mozo"))
+                    Assert.IsTrue((bool)Call(game, "TryHireTowerDefenseAtPost", mode, Role(4)));
+                object mozo = workers.Single(w => Get(w, "Role").ToString() == "Mozo");
+                Vector2 wait = (Vector2)Call(mode, "WaitSpot", mozo);
+                mozo.GetType().GetProperty("Position", I).SetValue(mozo, wait);
+                mozo.GetType().GetProperty("IsMoving", I).SetValue(mozo, false);
+                object presentation = Get(view, "towerDefensePresentation");
+                var workerViews = (IDictionary)Get(presentation, "workerViews");
+
+                Assert.IsTrue((bool)Call(mode, "TrySpawnFan", new[] { 3 }, new[] { 1 }));
+                object fan = ((IEnumerable)Get(mode, "Fans")).Cast<object>().Single();
+                object follower = Get(fan, "RouteFollower");
+                Call(follower, "Advance", (float)Get(follower, "TotalDistance") * .18f / (float)Get(follower, "Speed"));
+                Call(mode, "DeliverWithinServiceRanges");
+                Call(presentation, "Sync", mode);
+                var args = new[] { mozo, (object)Vector2.zero };
+                Assert.IsTrue((bool)Call(mode, "TryGetMozoWaitingSandwichTable", args));
+                object table = ((IEnumerable)Get(mode, "PlacedStations")).Cast<object>()
+                    .Single(station => Get(station, "Kind").ToString() == "PremiumTable");
+                Vector2 target = ((Rect)Get(table, "Bounds")).center;
+                Assert.AreEqual(target, args[1], $"Level {level}: missing Vacío targets the Premium table.");
+                Assert.AreEqual(wait, Get(mozo, "Position"), "The cue only turns the Mozo; it must not move him.");
+                Vector2 delta = target - wait;
+                Type facing = RuntimeType("StreetFacing");
+                object expectedFacing = RuntimeType("StreetWorkerAnimation").GetMethod("ResolveFacing", S)
+                    .Invoke(null, new[] { (object)new Vector2(delta.x, -delta.y), Enum.Parse(facing, "Up") });
+                object workerView = workerViews[Get(mozo, "Id")];
+                Assert.AreEqual(expectedFacing, Get(workerView, "Facing"));
+                var cue = (SpriteRenderer)Get(workerView, "MozoAngryCue");
+                Assert.IsTrue(cue != null && cue.enabled);
+                Assert.Greater(cue.transform.position.y, wait.y);
+                yield return Capture($"mozo-missing-vacio-{level}");
+
+                Set(fan, "ReservedByWorker", int.MaxValue);
+                Call(mode, "DeliverWithinServiceRanges");
+                Call(presentation, "Sync", mode);
+                Assert.IsFalse(cue.enabled, "An already assigned order must not leave an idle Mozo angry.");
+                Assert.AreEqual("Up", Get(workerView, "Facing").ToString(), "Without the cue, look toward the first fence again.");
+                Return(mode);
+            }
+        }
+
+        [UnityTest, Timeout(120000)]
         public IEnumerator CamionerosWorkersCostWhatNuevaChicagoChargesAndGrowTheSameWay()
         {
             yield return SetSize(610, 1356);

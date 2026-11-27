@@ -792,10 +792,8 @@ namespace HayChoriYPaty
             finally { GUI.EndGroup(); }
         }
 
-        // La Renga's C (2026-11-23, a pedido): when a crew member has finished settling into its waiting spot (nothing to deliver, standing still on
-        // the spot and looking ahead) it calls out its line in a speech bubble: Parrillero "Hay chori y Paty", Parrillero Premium "Hay Bondio!",
-        // Cocacolero "Hay coca y birra!". The bubble lasts one second and fades away; it does not come back until the next time the worker has been
-        // away working and settles again. Hires and the run's first frame do not call out (their first observation is taken as already settled).
+        // A worker calls out once after coming back to its own waiting spot or work post, never just for being hired.
+        // The bubble lasts one second and uses the match clock, so its fade also pauses.
         private const float CrewChantSeconds = 1f, CrewChantFadeSeconds = .4f;
         // The speech art's tail sits at the bottom right; its tip is this far in from the right edge (mirrored: from the left edge).
         private const float CrewChantTailTipInsetLogical = 22f, CrewChantSidePaddingLogical = 12f, CrewChantLineHeightLogical = 15f, CrewChantBaseHeightLogical = 22f;
@@ -807,24 +805,24 @@ namespace HayChoriYPaty
         private TowerDefenseGameMode crewChantMode;
         private GUIStyle crewChantStyle;
 
-        private static string CrewChantTextFor(StreetWorkerRole role)
+        private static string CrewChantTextFor(StreetWorkerRole role, bool sellsVacio)
         {
             switch (role)
             {
                 case StreetWorkerRole.Parrillero: return "¡Hay\nchori y Paty!";
-                case StreetWorkerRole.ParrilleroPremium: return "¡Hay Bondio!";
+                case StreetWorkerRole.ParrilleroPremium: return sellsVacio ? "¡Hay Bondio\ny Vacío!" : "¡Hay Bondio!";
                 case StreetWorkerRole.Cocacolero: return "¡Hay coca\ny birra!";
+                case StreetWorkerRole.Fernetero: return "¡Hay Fernet!";
                 default: return null;
             }
         }
 
-        private static bool CrewHasNothingToDeliver(TowerDefenseWorkerState worker) =>
-            worker.PendingProduct < 0 && worker.ServiceStage == 0 && worker.ServiceUnitId <= 0 && !worker.ServiceDwelling && worker.ServeAnimationSeconds <= 0f;
+        private static bool CrewIsSettled(TowerDefenseGameMode mode, TowerDefenseWorkerState worker) =>
+            worker.IsIdle && Vector2.Distance(worker.Position, mode.WaitSpot(worker)) <= 2f * mode.WorldUnitsPerLogicalPixel;
 
         private void DrawTowerDefenseCrewChants(Rect viewport)
         {
-            // The calls are for the passive waiting crew; Los Redondos' active kitchen (cooks at their grills, Mozos delivering) does not wait in the band.
-            if (towerDefenseMode == null || !towerDefenseMode.IsCShapedLevel || !towerDefenseMode.IsPassiveKitchenLevel || items == null || viewport.width <= 0f || text == null) return;
+            if (towerDefenseMode == null || !towerDefenseMode.UsesCampaignIdleCrew || items == null || viewport.width <= 0f || text == null) return;
             Camera camera = Camera.main;
             if (camera == null) return;
             if (!ReferenceEquals(crewChantMode, towerDefenseMode)) { crewChantMode = towerDefenseMode; crewWasSettled.Clear(); crewChantStart.Clear(); }
@@ -838,13 +836,13 @@ namespace HayChoriYPaty
             try
             {
                 IReadOnlyList<TowerDefenseWorkerState> crew = towerDefenseMode.Workers;
+                bool sellsVacio = towerDefenseMode.ContainsProduct(3);
                 for (int i = 0; i < crew.Count; i++)
                 {
                     TowerDefenseWorkerState worker = crew[i];
-                    string chant = CrewChantTextFor(worker.Role);
+                    string chant = CrewChantTextFor(worker.Role, sellsVacio);
                     if (chant == null) continue;
-                    bool settled = !worker.IsMoving && CrewHasNothingToDeliver(worker) &&
-                        Vector2.Distance(worker.Position, towerDefenseMode.CampaignWaitSpot(worker)) <= 2f * pixel, wasSettled;
+                    bool settled = CrewIsSettled(towerDefenseMode, worker), wasSettled;
                     if (!crewWasSettled.TryGetValue(worker.Id, out wasSettled)) wasSettled = true;
                     if (settled && !wasSettled) crewChantStart[worker.Id] = now;
                     crewWasSettled[worker.Id] = settled;
@@ -1179,49 +1177,44 @@ namespace HayChoriYPaty
         /// <summary>Creates animation sprites from the same cropped role art used by the campaign.</summary>
         internal Sprite[] CreateTowerDefenseWorkerFrames(StreetWorkerRole role)
         {
-            Texture2D texture;
-            Rect[] poses;
-            if (role == StreetWorkerRole.Parrillero)
-            {
-                texture = parrillero;
-                poses = ParrilleroPoses;
-            }
-            else if (role == StreetWorkerRole.ParrilleroPremium)
-            {
-                texture = premiumWorker;
-                poses = ParrilleroPoses;
-            }
-            else if (role == StreetWorkerRole.Mozo)
-            {
-                texture = mozoWorker;
-                poses = ParrilleroPoses;
-            }
-            else if (role == StreetWorkerRole.Cocacolero)
-            {
-                texture = CocacoleroArtForLevel(TowerDefenseLevelConfig.CommonEconomicBalanceLevelId);
-                poses = null;
-            }
-            else
-            {
-                texture = UsesMatchedCocacoleroArt(9) && fernetWorkerLater != null ? fernetWorkerLater : fernetWorker;
-                poses = null;
-            }
-
+            Texture2D texture = TowerDefenseWorkerTexture(role);
             if (texture == null) return Array.Empty<Sprite>();
-            const int frameCount = 4;
-            var frames = new Sprite[frameCount];
-            for (int frame = 0; frame < frameCount; frame++)
-            {
-                Rect topOrigin;
-                if (role == StreetWorkerRole.Cocacolero) topOrigin = CocacoleroPoseForLevel(TowerDefenseLevelConfig.CommonEconomicBalanceLevelId, frame);
-                else if (role == StreetWorkerRole.Fernetero) topOrigin = MatchedCocacoleroPose(frame, new Vector2(texture.width, texture.height));
-                else topOrigin = poses[frame];
-                Rect spriteRect = new Rect(topOrigin.x, texture.height - topOrigin.yMax, topOrigin.width, topOrigin.height);
-                frames[frame] = Sprite.Create(texture, spriteRect, new Vector2(.5f, TowerDefenseGameMode.WorkerVisualPivotY), 100f, 0, SpriteMeshType.Tight);
-                frames[frame].name = "TD " + role + " campaign pose " + frame;
-                frames[frame].hideFlags = HideFlags.DontSave;
-            }
+            var frames = new Sprite[4];
+            for (int frame = 0; frame < frames.Length; frame++)
+                frames[frame] = CreateTowerDefenseWorkerFrame(role, texture, frame);
             return frames;
+        }
+
+        internal Sprite CreateTowerDefenseWorkerRearIdleFrame(StreetWorkerRole role)
+        {
+            Texture2D texture = TowerDefenseWorkerTexture(role);
+            // Same standing rear pose (index 4) as StreetWorkerProjection.
+            return texture != null ? CreateTowerDefenseWorkerFrame(role, texture, 4) : null;
+        }
+
+        private Texture2D TowerDefenseWorkerTexture(StreetWorkerRole role)
+        {
+            switch (role)
+            {
+                case StreetWorkerRole.Parrillero: return parrillero;
+                case StreetWorkerRole.ParrilleroPremium: return premiumWorker;
+                case StreetWorkerRole.Mozo: return mozoWorker;
+                case StreetWorkerRole.Cocacolero: return CocacoleroArtForLevel(TowerDefenseLevelConfig.CommonEconomicBalanceLevelId);
+                default: return UsesMatchedCocacoleroArt(9) && fernetWorkerLater != null ? fernetWorkerLater : fernetWorker;
+            }
+        }
+
+        private Sprite CreateTowerDefenseWorkerFrame(StreetWorkerRole role, Texture2D texture, int frame)
+        {
+            Rect topOrigin;
+            if (role == StreetWorkerRole.Cocacolero) topOrigin = CocacoleroPoseForLevel(TowerDefenseLevelConfig.CommonEconomicBalanceLevelId, frame);
+            else if (role == StreetWorkerRole.Fernetero) topOrigin = MatchedCocacoleroPose(frame, new Vector2(texture.width, texture.height));
+            else topOrigin = ParrilleroPoses[frame];
+            Rect spriteRect = new Rect(topOrigin.x, texture.height - topOrigin.yMax, topOrigin.width, topOrigin.height);
+            Sprite sprite = Sprite.Create(texture, spriteRect, new Vector2(.5f, TowerDefenseGameMode.WorkerVisualPivotY), 100f, 0, SpriteMeshType.Tight);
+            sprite.name = "TD " + role + " campaign pose " + frame;
+            sprite.hideFlags = HideFlags.DontSave;
+            return sprite;
         }
 
         /// <summary>Campaign kitchen crew bodies (eight directions, carry, pickup) for a Tower Defense presentation.</summary>

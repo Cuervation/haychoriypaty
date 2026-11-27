@@ -12,11 +12,12 @@ namespace HayChoriYPaty
         public readonly int UnitId, Product, WorkerId, FanId, Zone;
         public readonly Vector2 Source, Target;
         public readonly float Elapsed;
+        public readonly bool CompletesOrder;
         public TowerDefenseDelivery(int unitId, int product, int workerId, int fanId, int zone,
-            Vector2 source, Vector2 target, float elapsed)
+            Vector2 source, Vector2 target, float elapsed, bool completesOrder)
         {
             UnitId = unitId; Product = product; WorkerId = workerId; FanId = fanId; Zone = zone;
-            Source = source; Target = target; Elapsed = elapsed;
+            Source = source; Target = target; Elapsed = elapsed; CompletesOrder = completesOrder;
         }
     }
 
@@ -114,6 +115,8 @@ namespace HayChoriYPaty
         internal int TransferIndex;
         public bool IsCooking { get; internal set; }
         public int CurrentFoodId => ServiceUnitId > 0 ? ServiceUnitId : CookUnitId;
+        internal bool IsIdle => !IsMoving && !IsCooking && CurrentFoodId <= 0 && PendingProduct < 0 &&
+            ServiceStage == 0 && !ServiceDwelling && ServeAnimationSeconds <= 0f;
         internal int CookUnitId;
         /// <summary>Seconds left standing at the table before putting the cooked sandwich down; negative while it has not started.</summary>
         internal float CookHandoffSeconds = -1f;
@@ -987,7 +990,8 @@ namespace HayChoriYPaty
                             int sale = Mathf.RoundToInt(StreetSimulation.OfficialProductPrice(order.Product));
                             coins = coins > int.MaxValue - sale ? int.MaxValue : coins + sale;
                             coinsEarned = coinsEarned > int.MaxValue - sale ? int.MaxValue : coinsEarned + sale;
-                        if (fan.OrderComplete && !fan.CompletionCounted)
+                            bool completesOrder = fan.OrderComplete && !fan.CompletionCounted;
+                            if (completesOrder)
                             {
                                 fan.CompletionCounted = true;
                                 if (ordersCompleted < int.MaxValue) ordersCompleted++;
@@ -1003,7 +1007,7 @@ namespace HayChoriYPaty
                                     Vector2.up * StationRenderYOffsetLogical * worldUnitsPerLogicalPixel;
                             DeliveryCompleted?.Invoke(new TowerDefenseDelivery(unit.Id, order.Product, worker.Id, fan.Id,
                                 worker.ServiceZone, deliverySource,
-                                fan.RouteFollower.Position, elapsed));
+                                fan.RouteFollower.Position, elapsed, completesOrder));
                         }
                         servicedWorkers.Add(worker.Id); // Still one physical unit per worker per pass.
                         break;
@@ -1344,7 +1348,7 @@ namespace HayChoriYPaty
             return roleIndex == 1 ? -spacing : spacing;
         }
 
-        private bool ContainsProduct(int product)
+        internal bool ContainsProduct(int product)
         {
             for (int i = 0; i < availableProducts.Length; i++) if (availableProducts[i] == product) return true;
             return false;

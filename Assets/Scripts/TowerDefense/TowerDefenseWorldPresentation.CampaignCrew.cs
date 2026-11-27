@@ -66,7 +66,7 @@ namespace HayChoriYPaty
             return renderer;
         }
 
-        private void SyncCampaignCrewBody(TowerDefenseGameMode gameMode, TowerDefenseWorkerState worker, WorkerView workerView)
+        private void SyncCampaignCrewBody(TowerDefenseGameMode gameMode, TowerDefenseWorkerState worker, WorkerView workerView, StreetFacing? waitingFacing)
         {
             StreetWorkerProjection projection = CampaignCrewProjection();
             float pixel = gameMode.WorldUnitsPerLogicalPixel;
@@ -95,23 +95,12 @@ namespace HayChoriYPaty
                 if (fan != null) look = fan.RouteFollower.Position - worker.Position;
             }
             else if (pickingUp && source != null) look = source.Bounds.center - worker.Position;
-            else if (worker.ServiceStage == 0 && worker.Role == StreetWorkerRole.Cocacolero)
-            {
-                // A Cocacolero waiting at its post stands beside its barrel and faces it.
-                TowerDefensePlacedStation barrel = FindCampaignCrewStation(gameMode, TowerDefenseStationKind.CocaBarrel)
-                    ?? FindCampaignCrewStation(gameMode, TowerDefenseStationKind.BeerBarrel);
-                if (barrel != null && Vector2.Distance(worker.Position, worker.PostPosition) <= 2f * pixel)
-                    look = new Vector2(barrel.Bounds.center.x - worker.Position.x, 0f);
-                // La Renga's C (a pedido): settled at a waiting spot away from the barrel it looks ahead, at the first fence, like the cooks.
-                else if (gameMode.IsCShapedLevel) look = Vector2.up;
-            }
-            // La Renga's C (a pedido): a crew member with nothing to deliver waits looking at the first fence, where the fans queue.
-            else if (!worker.IsMoving && !serving && !carrying && !pickingUp && worker.ServiceStage == 0 && gameMode.IsCShapedLevel &&
-                     worker.Role != StreetWorkerRole.Cocacolero)
-                look = Vector2.up;
+            // All idle roles look at the first (upper) fence, including a Cocacolero by its barrel.
+            else if (gameMode.UsesCampaignIdleCrew && worker.IsIdle) look = Vector2.up;
             // World Y is up; the campaign facing uses canvas coordinates (Y down).
             if (look.sqrMagnitude > 1e-10f)
                 workerView.Facing = StreetWorkerAnimation.ResolveFacing(new Vector2(look.x, -look.y), workerView.Facing);
+            if (waitingFacing.HasValue) workerView.Facing = waitingFacing.Value;
             // Barrel drinks: the campaign reaches into the barrel from the front; La Renga's barrels are taken from their
             // side, so there the Cocacolero faces the barrel in profile while grabbing.
             if (pickingUp && source != null && worker.Role == StreetWorkerRole.Cocacolero &&

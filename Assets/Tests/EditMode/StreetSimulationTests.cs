@@ -594,6 +594,35 @@ object sim = Make(level: 2);
             orderCompleted.RemoveEventHandler(sim, completedOrderHandler);
         }
 
+        [TestCase(0)]  // All Boys
+        [TestCase(6)]  // San Lorenzo
+        [TestCase(11)] // Huracán
+        public void CampaignDeliveryAudioLoadsDistinctClipsForUnitAndOrder(int level)
+        {
+            object sim = Make(level: level);
+            var host = new GameObject("Campaign delivery audio");
+            try
+            {
+                Type soundType = Type.GetType("HayChoriYPaty.OrderDeliverySound, Assembly-CSharp", true);
+                Component sound = host.AddComponent(soundType);
+                const BindingFlags fields = BindingFlags.Instance | BindingFlags.NonPublic;
+                // Observe the exact clips selected by the event handlers without playing audio in EditMode.
+                soundType.GetField("audioSource", fields).SetValue(sound, null);
+                FieldInfo deliveryClip = soundType.GetField("deliveryClip", fields);
+                FieldInfo completeClip = soundType.GetField("completeClip", fields);
+                deliveryClip.SetValue(sound, null);
+                Call(sound, "Initialize", sim);
+
+                ((Action)simType.GetField("ProductUnitDelivered", fields).GetValue(sim))();
+                Assert.AreEqual("order-delivery-soft-pop", ((AudioClip)deliveryClip.GetValue(sound)).name);
+                Assert.IsNull(completeClip.GetValue(sound), "A partial handoff does not request the completion cue.");
+
+                ((Action)simType.GetField("OrderCompleted", fields).GetValue(sim))();
+                Assert.AreEqual("order-complete-bubble", ((AudioClip)completeClip.GetValue(sound)).name);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(host); }
+        }
+
         [Test]
         public void VelezThreeProductBubbleRevealsTheHiddenThirdLineWithoutZeroQuantities()
         {

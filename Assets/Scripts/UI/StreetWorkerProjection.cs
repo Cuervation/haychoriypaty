@@ -141,29 +141,23 @@ namespace HayChoriYPaty
             Vector2 anchor = simulation.KitchenLayout.GrillWorkPosition(product, worker.CookStationIndex, count);
             return Vector2.Distance(worker.Position, anchor) <= 1f;
         }
-        internal static bool NeedsMozoWaitingForSandwichAngryCue(StreetSimulation simulation, StreetWorker worker)
+        internal static bool TryGetMozoWaitingSandwichTable(StreetSimulation simulation, StreetWorker worker, out Vector2 tableCenter)
         {
-            if (simulation == null || worker == null || simulation.Kitchen == null ||
+            tableCenter = default;
+            if (simulation == null || worker == null || simulation.Kitchen == null || simulation.KitchenLayout == null ||
                 !simulation.UsesActiveCooks || simulation.Phase != RoundPhase.Playing ||
                 worker.Role != StreetWorkerRole.Mozo || worker.State != StreetWorkerState.Idle ||
                 worker.ReturningToWaitPosition || worker.CarriedItemId > 0 ||
                 Vector2.Distance(worker.Position, worker.WaitPosition) > 1f) return false;
 
-            return simulation.HasUnservedMozoSandwichDemandWithoutReadyPickup(worker);
+            int product = simulation.MissingMozoSandwichProduct(worker);
+            if (product < 0) return false;
+            Rect table = simulation.KitchenLayout.BoundsForProduct(product);
+            if (table.width <= 0f) return false;
+            tableCenter = table.center;
+            return true;
         }
 
-        internal static StreetFacing MozoWaitingGrillFacing(StreetSimulation simulation, StreetWorker worker,
-            StreetFacing fallback)
-        {
-            if (simulation == null || worker == null || simulation.KitchenLayout == null) return fallback;
-            Rect normalGrill = simulation.KitchenLayout.BoundsForProduct(0);
-            Rect premiumGrill = simulation.KitchenLayout.BoundsForProduct(2);
-            Vector2 target = normalGrill.center;
-            if (premiumGrill.width > 0f &&
-                (normalGrill.width <= 0f || (premiumGrill.center - worker.Position).sqrMagnitude <
-                    (normalGrill.center - worker.Position).sqrMagnitude)) target = premiumGrill.center;
-            return StreetWorkerAnimation.ResolveFacing(target - worker.Position, fallback);
-        }
         private static bool TryCookingPresentationTarget(StreetSimulation simulation, StreetWorker worker,
             out int product, out int slot, out Vector2 target)
         {
@@ -442,6 +436,15 @@ namespace HayChoriYPaty
             palm = new Vector2(handX, (1f - upper.Palm.y) * upper.Bounds.height * upperScale - bob + reach);
             return true;
         }
+        internal Sprite MozoStandingSprite(StreetFacing facing, out bool flip)
+        {
+            flip = false;
+            if (!Ready) return null;
+            Art pose = Walk(StreetWorkerRole.Mozo, facing, 0, false);
+            flip = pose.Flip;
+            return pose.Texture != null ? Slice(pose.Texture, pose.Bounds) : null;
+        }
+
         private Sprite Slice(Texture2D texture, Rect bounds)
         {
             // Value-type keys: no key/texture/pixel allocation in steady-state gait.
@@ -484,7 +487,7 @@ namespace HayChoriYPaty
             return (bounds.height - CookingPoseHairTopInsetPixels[index]) * spriteScale;
         }
         internal bool CookingPoseAvailable => cookingPoses != null;
-        private Sprite EnsureMozoAngryCueSprite()
+        internal Sprite EnsureMozoAngryCueSprite()
         {
             if (angryCueSprite != null) return angryCueSprite;
             const int size = 64;
@@ -579,9 +582,9 @@ namespace HayChoriYPaty
                 if (!v.Root.gameObject.activeSelf) v.Root.gameObject.SetActive(true);
                 Vector2 displayPosition = PresentationPosition(sim, w);
                 float presentationScale = PresentationScale(sim, w);
-                bool showAngryCue = NeedsMozoWaitingForSandwichAngryCue(sim, w);
+                bool showAngryCue = TryGetMozoWaitingSandwichTable(sim, w, out Vector2 missingTable);
                 StreetWorkerPose pose = StreetWorkerAnimation.Sample(w, IsIdleAtGrill(sim, w));
-                if (showAngryCue) pose.Facing = MozoWaitingGrillFacing(sim, w, pose.Facing);
+                if (showAngryCue) pose.Facing = StreetWorkerAnimation.ResolveFacing(missingTable - w.Position, pose.Facing);
                 if (IsFinalBarrelDrinkApproach(sim, w)) pose.Facing = StreetFacing.Down;
                 int contact = pose.Frame >= 2 ? 1 : 0;
                 bool hasCookingPose = pose.Cooking && cookingPoses != null &&

@@ -126,6 +126,7 @@ namespace HayChoriYPaty
         [SerializeField] private GameObject terminalFencePrefab;
         [SerializeField] private GameObject directionSignPrefab;
         [SerializeField] private Sprite directionArrowSprite;
+        [SerializeField] private Sprite verticalFencePanelSprite;
         [SerializeField] private int[] availableProducts = { 0, 4 };
         [SerializeField, Min(1)] private int totalFanCount = CamionerosFansToServe;
         [Tooltip("Multiplier applied to Tower Defense fan movement; other campaign levels are unaffected.")]
@@ -208,6 +209,7 @@ namespace HayChoriYPaty
         public GameObject TerminalFencePrefab => terminalFencePrefab;
         public GameObject DirectionSignPrefab => directionSignPrefab;
         public Sprite DirectionArrowSprite => directionArrowSprite;
+        public Sprite VerticalFencePanelSprite => verticalFencePanelSprite;
         public int[] AvailableProducts => availableProducts == null ? Array.Empty<int>() : (int[])availableProducts.Clone();
         public float FanSpeed => Mathf.Max(0f, fanSpeed);
         public int TotalFanCount => Mathf.Max(1, totalFanCount);

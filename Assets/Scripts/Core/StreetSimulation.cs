@@ -1606,12 +1606,12 @@ namespace HayChoriYPaty
             return StreetSpecialties.IsDeliveryResponsible(worker.Role, product, UsesActiveCooks);
         }
 
-        internal bool HasUnservedMozoSandwichDemandWithoutReadyPickup(StreetWorker worker)
+        internal int MissingMozoSandwichProduct(StreetWorker worker)
         {
             if (worker == null || worker.Role != StreetWorkerRole.Mozo || !UsesActiveCooks || Kitchen == null)
-                return false;
+                return -1;
 
-            bool hasDemandWithoutPickup = false;
+            int missingProduct = -1;
             for (int customerIndex = 0; customerIndex < customers.Count; customerIndex++)
             {
                 StreetCustomer customer = customers[customerIndex];
@@ -1637,14 +1637,14 @@ namespace HayChoriYPaty
                     if (!IsWorkerResponsibleFor(worker, line.Product) || line.Remaining <= line.Reserved ||
                         (line.OwnerWorkerId != 0 && line.OwnerWorkerId != worker.Id)) continue;
 
-                    hasDemandWithoutPickup = true;
+                    if (missingProduct < 0) missingProduct = line.Product;
                     // Only stock matching an outstanding sandwich order can give this Mozo work.
                     // An unrelated ready product must not hide the empty-pickup cue.
-                    if (Kitchen.AvailableTableCount(line.Product, worker.Id) > 0) return false;
+                    if (Kitchen.AvailableTableCount(line.Product, worker.Id) > 0) return -1;
                 }
             }
 
-            return hasDemandWithoutPickup;
+            return missingProduct;
         }
 
         private void ClaimAndDispatch(StreetWorker worker, StreetCustomer customer, StreetOrderLine line)

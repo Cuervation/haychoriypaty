@@ -180,7 +180,13 @@ Quota-aware demand retains random 1–4 quantities and mixed tickets (up to five
 **Historical late-level feasibility check (2026-10-12, before active cooks/Mozos):** The full `StreetSimulation` and adaptive-purchase policy were swept across seeds 1337, 407, and 2026. The attempt balances above plus 5:15 for Level 11 completed every level-6–11 run while leaving quotas, sales prices, production and upgrade prices intact. This does not certify current active-cook or restored-layout balance; levels9–11 remain open in the active-cook contract.
 
 
-### Per-delivery audio cue — updated 2026-10-27
+### Audio de entrega de campaña — actualizado 2026-11-27
+
+Los 15 niveles, incluidos los cuatro Tower Defense, reutilizan el audio antes exclusivo de San Lorenzo: un pop suave por **cada unidad entregada** (20 % de volumen) y una burbuja ascendente adicional **una vez por pedido**, cuando se entrega la última unidad (25 %). Ambos clips siguen siendo 2D con ±3 % de variación de tono; no hay disparos por cocinar, recoger, abandonar un pedido o fallar una entrega. Los niveles normales usan `ProductUnitDelivered` y `OrderCompleted`; Tower Defense usa el recibo `DeliveryCompleted` de la entrega física, que indica si esa unidad completó el pedido. No cambian la música ni los sonidos de interfaz, la economía o la progresión.
+
+Validación 2026-11-27: **PASS** compilación C# del runtime para Android y de los dos archivos EditMode afectados con el Roslyn de Unity 6000.6.3f1, fuera del Editor. **BLOCKED** ejecución de `CampaignDeliveryAudioLoadsDistinctClipsForUnitAndOrder` y `TowerDefenseDeliveryAudioUsesCompletionCueOnlyOnLastUnitAndDetaches`: el Editor existente no respondió al ping de Unity MCP. **NOT_RUN** escucha en partida y en Android.
+
+#### Antecedentes (solo historial; el alcance exclusivo de San Lorenzo ya no rige)
 
 A brief, low-volume 2D soft-pop is a presentation-only response to **each product unit successfully handed to a customer**. `StreetSimulation.ProductUnitDelivered` fires once after each real handoff consumes the reserved item and records its sale; cooking, pickup, failed handoffs and other gameplay transitions do not trigger it. `StreetSimulation.OrderCompleted` remains a separate once-per-ticket signal/statistic and fires only after all lines and quantities reach zero. The reusable `OrderDeliverySound` adapter listens to `ProductUnitDelivered` and plays `Assets/Resources/Audio/order-delivery-soft-pop.wav` at 20% one-shot volume with ±3% pitch variation. There is no playback throttle, so rapid valid deliveries are not silently skipped; the sound is rebound when `StreetGame` replaces its simulation. The WAV is a locally synthesized soft-pop equivalent rather than a third-party recording; the selected Pixabay file could not be incorporated into this Unity checkout.
 

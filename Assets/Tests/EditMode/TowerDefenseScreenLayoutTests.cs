@@ -32,6 +32,19 @@ namespace HayChoriYPaty.Tests
             Assert.That(visual.z, Is.EqualTo(opacity).Within(.001f));
         }
 
+        [TestCase("Parrillero", false, "¡Hay\nchori y Paty!")]
+        [TestCase("ParrilleroPremium", false, "¡Hay Bondio!")]
+        [TestCase("ParrilleroPremium", true, "¡Hay Bondio\ny Vacío!")]
+        [TestCase("Cocacolero", true, "¡Hay coca\ny birra!")]
+        [TestCase("Fernetero", true, "¡Hay Fernet!")]
+        [TestCase("Mozo", true, null)]
+        public void CrewChantMatchesTheRoleAndVacioCatalog(string roleName, bool sellsVacio, string expected)
+        {
+            MethodInfo chant = RuntimeType("StreetView").GetMethod("CrewChantTextFor", BindingFlags.NonPublic | BindingFlags.Static);
+            object role = Enum.Parse(RuntimeType("StreetWorkerRole"), roleName);
+            Assert.AreEqual(expected, chant.Invoke(null, new[] { role, (object)sellsVacio }));
+        }
+
         [Test]
         public void SerializedDefenseConfigOnlyRequestsChoriAndCocaAndStartsWithoutWorkers()
         {

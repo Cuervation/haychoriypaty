@@ -239,7 +239,7 @@ namespace HayChoriYPaty
                 }
             }
             activeAttemptId = save.activeAttemptId;
-            towerDefenseMode = null;
+            SetTowerDefenseRuntime(null);
             bool hasPersistedMarket = save.market != null;
             market = new StreetMarket(save.market, balance);
             save.market = market.Data;
@@ -782,13 +782,19 @@ namespace HayChoriYPaty
         public bool AttachTowerDefenseRuntime(TowerDefenseGameMode mode)
         {
             if (!playerActive || sim == null || !sim.IsExternalCampaignRuntime || mode == null) return false;
-            towerDefenseMode = mode;
+            SetTowerDefenseRuntime(mode);
             return PersistTowerDefenseProgress(mode);
         }
 
         public void DetachTowerDefenseRuntime(TowerDefenseGameMode mode)
         {
-            if (ReferenceEquals(towerDefenseMode, mode)) towerDefenseMode = null;
+            if (ReferenceEquals(towerDefenseMode, mode)) SetTowerDefenseRuntime(null);
+        }
+
+        private void SetTowerDefenseRuntime(TowerDefenseGameMode mode)
+        {
+            towerDefenseMode = mode;
+            if (deliverySound != null) deliverySound.BindTowerDefense(mode);
         }
 
         public bool PersistTowerDefenseProgress(TowerDefenseGameMode mode)
@@ -806,7 +812,7 @@ namespace HayChoriYPaty
                 mode.Phase != TowerDefenseRunPhase.Finished || (!mode.HasWon && !mode.HasLost)) return false;
             if (sim.Phase == RoundPhase.Playing && !ImportTowerDefenseState(mode, true, mode.HasWon)) return false;
             bool saved = ProcessRoundResult();
-            if (saved) towerDefenseMode = null;
+            if (saved) SetTowerDefenseRuntime(null);
             return saved;
         }
 
@@ -820,12 +826,12 @@ namespace HayChoriYPaty
             if (sim.Phase == RoundPhase.Won || sim.Phase == RoundPhase.Lost)
             {
                 bool resultSaved = ProcessRoundResult();
-                if (resultSaved) towerDefenseMode = null;
+                if (resultSaved) SetTowerDefenseRuntime(null);
                 return resultSaved;
             }
             if (sim.Phase != RoundPhase.Playing || !ImportTowerDefenseState(mode, false, false)) return false;
             bool saved = ReturnToLevels();
-            if (saved) towerDefenseMode = null;
+            if (saved) SetTowerDefenseRuntime(null);
             return saved;
         }
 
@@ -1150,7 +1156,7 @@ namespace HayChoriYPaty
             playerActive = false; suspensionRequested = true;
             if (!Save()) return false;
             if (deliverySound != null) deliverySound.Initialize(null);
-            sim = null; market = null; persist = null; activeAttemptId = null; towerDefenseMode = null;
+            sim = null; market = null; persist = null; activeAttemptId = null; SetTowerDefenseRuntime(null);
             suspensionRequested = false;
             return true;
         }

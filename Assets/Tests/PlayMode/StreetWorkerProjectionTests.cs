@@ -249,51 +249,50 @@ namespace HayChoriYPaty.Tests
                 Assert.IsNotNull(mozo);
                 Assert.That(Vector2.Distance((Vector2)Get(mozo, "Position"), (Vector2)Get(mozo, "WaitPosition")), Is.LessThan(.01f));
 
-                MethodInfo needsCue = T("StreetWorkerProjection").GetMethod("NeedsMozoWaitingForSandwichAngryCue",
+                MethodInfo waitingTable = T("StreetWorkerProjection").GetMethod("TryGetMozoWaitingSandwichTable",
                     BindingFlags.Static | BindingFlags.NonPublic);
-                MethodInfo grillFacing = T("StreetWorkerProjection").GetMethod("MozoWaitingGrillFacing",
-                    BindingFlags.Static | BindingFlags.NonPublic);
-                Assert.IsNotNull(needsCue);
-                Assert.IsNotNull(grillFacing);
+                Assert.IsNotNull(waitingTable);
+                Vector2? CueTarget(object worker)
+                {
+                    var args = new[] { sim, worker, (object)Vector2.zero };
+                    return (bool)waitingTable.Invoke(null, args) ? (Vector2)args[2] : (Vector2?)null;
+                }
                 object kitchen = Get(sim, "Kitchen");
-                Assert.IsFalse((bool)needsCue.Invoke(null, new[] { sim, mozo }),
+                Assert.IsFalse(CueTarget(mozo).HasValue,
                     "No angry cue is shown when no customer is waiting for a sandwich.");
-                Assert.IsFalse((bool)needsCue.Invoke(null, new[] { sim, normalCook }), "Cooks never get the Mozo's waiting cue.");
-                Assert.IsFalse((bool)needsCue.Invoke(null, new[] { sim, premiumCook }), "Premium cooks never get the Mozo's waiting cue.");
+                Assert.IsFalse(CueTarget(normalCook).HasValue, "Cooks never get the Mozo's waiting cue.");
+                Assert.IsFalse(CueTarget(premiumCook).HasValue, "Premium cooks never get the Mozo's waiting cue.");
 
                 Assert.IsTrue((bool)Call(sim, "SpawnCustomer", 0, 1));
                 object customer = ((IList)Get(sim, "Customers"))[0];
                 Set(customer, "Position", Get(customer, "Target"));
                 Set(customer, "State", Enum.Parse(T("StreetCustomerState"), "Waiting"));
-                Assert.IsTrue((bool)needsCue.Invoke(null, new[] { sim, mozo }));
+                Assert.IsTrue(CueTarget(mozo).HasValue);
 
                 Call(kitchen, "Add", 1, Enum.Parse(T("StreetFoodState"), "Cooked"),
                     Enum.Parse(T("StreetFoodLocation"), "Table"), 0);
-                Assert.IsTrue((bool)needsCue.Invoke(null, new[] { sim, mozo }),
+                Assert.IsTrue(CueTarget(mozo).HasValue,
                     "A ready Paty does not satisfy a waiting Chori order or clear this Mozo's cue.");
 
                 Set(mozo, "State", Enum.Parse(T("StreetWorkerState"), "ToStation"));
-                Assert.IsFalse((bool)needsCue.Invoke(null, new[] { sim, mozo }), "The cue is hidden while the Mozo is working/transiting.");
+                Assert.IsFalse(CueTarget(mozo).HasValue, "The cue is hidden while the Mozo is working/transiting.");
                 Set(mozo, "State", Enum.Parse(T("StreetWorkerState"), "Idle"));
                 SetField(mozo, "ReturningToWaitPosition", true);
-                Assert.IsFalse((bool)needsCue.Invoke(null, new[] { sim, mozo }), "The cue is hidden on the return trip to the wait post.");
+                Assert.IsFalse(CueTarget(mozo).HasValue, "The cue is hidden on the return trip to the wait post.");
                 SetField(mozo, "ReturningToWaitPosition", false);
                 Set(mozo, "State", Enum.Parse(T("StreetWorkerState"), "ToCounter"));
                 Set(mozo, "CarriedItemId", 999);
-                Assert.IsFalse((bool)needsCue.Invoke(null, new[] { sim, mozo }), "A Mozo carrying a unit never shows the empty-supply cue.");
+                Assert.IsFalse(CueTarget(mozo).HasValue, "A Mozo carrying a unit never shows the empty-supply cue.");
                 Set(mozo, "State", Enum.Parse(T("StreetWorkerState"), "Idle"));
                 Set(mozo, "CarriedItemId", 0);
 
                 object layout = Get(sim, "KitchenLayout");
-                Vector2 normalGrill = ((Rect)Call(layout, "BoundsForProduct", 0)).center;
-                Vector2 premiumGrill = ((Rect)Call(layout, "BoundsForProduct", 2)).center;
-                Vector2 targetGrill = Vector2.Distance((Vector2)Get(mozo, "Position"), normalGrill) <=
-                    Vector2.Distance((Vector2)Get(mozo, "Position"), premiumGrill) ? normalGrill : premiumGrill;
-                MethodInfo resolveFacing = T("StreetWorkerAnimation").GetMethod("ResolveFacing", BindingFlags.Static | BindingFlags.Public);
-                object expectedFacing = resolveFacing.Invoke(null, new object[] { targetGrill - (Vector2)Get(mozo, "Position"),
-                    Enum.Parse(T("StreetFacing"), "Down") });
-                Assert.AreEqual(expectedFacing, grillFacing.Invoke(null, new[] { sim, mozo, Enum.Parse(T("StreetFacing"), "Down") }),
-                    "While frustrated, the Mozo's rendered idle pose looks toward the nearest grill.");
+                Vector2 normalTable = ((Rect)Call(layout, "BoundsForProduct", 0)).center;
+                Vector2 premiumTable = ((Rect)Call(layout, "BoundsForProduct", 2)).center;
+                Assert.AreEqual(normalTable, CueTarget(mozo), "Chori belongs to the normal table.");
+                Call(customer, "SetOrder", new[] { 3 }, new[] { 1 });
+                Assert.AreEqual(premiumTable, CueTarget(mozo), "Vacío targets the premium table without moving the Mozo.");
+                Call(customer, "SetOrder", new[] { 0 }, new[] { 1 });
 
                 Component renderer = root.AddComponent(T("StreetKitchenRenderer"));
                 Texture2D normal = Resources.Load<Texture2D>("street-parrillero");
@@ -320,7 +319,7 @@ namespace HayChoriYPaty.Tests
 
                 Call(kitchen, "Add", 0, Enum.Parse(T("StreetFoodState"), "Cooked"),
                     Enum.Parse(T("StreetFoodLocation"), "Table"), 0);
-                Assert.IsFalse((bool)needsCue.Invoke(null, new[] { sim, mozo }),
+                Assert.IsFalse(CueTarget(mozo).HasValue,
                     "A ready sandwich matching the waiting order can be picked up.");
                 Call(sim, "Step", .05f);
                 Assert.AreEqual("ToStation", Get(mozo, "State").ToString(),
