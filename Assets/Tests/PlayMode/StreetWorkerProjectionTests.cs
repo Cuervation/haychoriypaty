@@ -51,6 +51,13 @@ namespace HayChoriYPaty.Tests
                 BindingFlags.Static | BindingFlags.NonPublic);
             return (Vector2)method.Invoke(null, new[] { simulation, worker });
         }
+        private static string PresentedFacing(object simulation, object worker)
+        {
+            MethodInfo method = T("StreetWorkerProjection").GetMethod("SamplePresentationPose",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.IsNotNull(method);
+            return Field(method.Invoke(null, new[] { simulation, worker, (object)false }), "Facing").ToString();
+        }
         [UnityTest]
         public IEnumerator RealCooksApproachTheirReservedFoodWithoutMovingItOrOverlappingPosts()
         {
@@ -172,7 +179,15 @@ namespace HayChoriYPaty.Tests
                         Set(worker, "Position", point); Set(worker, "Target", point); Set(worker, "WaitPosition", point);
                         Set(worker, "VisualCooking", !queued); Set(worker, "VisualCookingProduct", queued ? -1 : product);
                         Set(worker, "CookingProgress", .5f); Set(worker, "CookingCycleProgress", .5f);
-                        if (queued) waiting.Add(worker);
+                        Set(worker, "FacingVector", Vector2.right);
+                        if (queued)
+                        {
+                            // Hiring records a static WaitPosition; an existing queue shifts as its members change.
+                            Set(worker, "WaitPosition", point + Vector2.right * 20f);
+                            waiting.Add(worker);
+                        }
+                        Assert.AreEqual(queued ? "Up" : "Down", PresentedFacing(sim, worker),
+                            queued ? "Face the counter from the current queue point." : "Keep facing the grill while cooking.");
                         index++;
                     }
                 }
@@ -260,6 +275,7 @@ namespace HayChoriYPaty.Tests
                 object kitchen = Get(sim, "Kitchen");
                 Assert.IsFalse(CueTarget(mozo).HasValue,
                     "No angry cue is shown when no customer is waiting for a sandwich.");
+                Assert.AreEqual("Up", PresentedFacing(sim, mozo));
                 Assert.IsFalse(CueTarget(normalCook).HasValue, "Cooks never get the Mozo's waiting cue.");
                 Assert.IsFalse(CueTarget(premiumCook).HasValue, "Premium cooks never get the Mozo's waiting cue.");
 
@@ -292,7 +308,12 @@ namespace HayChoriYPaty.Tests
                 Assert.AreEqual(normalTable, CueTarget(mozo), "Chori belongs to the normal table.");
                 Call(customer, "SetOrder", new[] { 3 }, new[] { 1 });
                 Assert.AreEqual(premiumTable, CueTarget(mozo), "Vacío targets the premium table without moving the Mozo.");
+                MethodInfo resolve = T("StreetWorkerAnimation").GetMethod("ResolveFacing");
+                object rear = Enum.Parse(T("StreetFacing"), "Up");
+                string Toward(Vector2 table) => resolve.Invoke(null, new[] { (object)(table - (Vector2)Get(mozo, "Position")), rear }).ToString();
+                Assert.AreEqual(Toward(premiumTable), PresentedFacing(sim, mozo));
                 Call(customer, "SetOrder", new[] { 0 }, new[] { 1 });
+                Assert.AreEqual(Toward(normalTable), PresentedFacing(sim, mozo));
 
                 Component renderer = root.AddComponent(T("StreetKitchenRenderer"));
                 Texture2D normal = Resources.Load<Texture2D>("street-parrillero");
@@ -321,6 +342,7 @@ namespace HayChoriYPaty.Tests
                     Enum.Parse(T("StreetFoodLocation"), "Table"), 0);
                 Assert.IsFalse(CueTarget(mozo).HasValue,
                     "A ready sandwich matching the waiting order can be picked up.");
+                Assert.AreEqual("Up", PresentedFacing(sim, mozo), "Once the cue clears, an idle Mozo looks back to the counter.");
                 Call(sim, "Step", .05f);
                 Assert.AreEqual("ToStation", Get(mozo, "State").ToString(),
                     "The available order unit dispatches this Mozo toward its table slot.");

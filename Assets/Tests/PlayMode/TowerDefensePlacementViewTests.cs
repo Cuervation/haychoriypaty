@@ -2340,7 +2340,7 @@ namespace HayChoriYPaty.Tests
         [UnityTest]
         public IEnumerator LaRengaEscapeResultKeepsElapsedAndExplainsTheLoss()
         {
-            Assert.AreEqual("PEDIDOS 0/240", CallStatic(vt, "TowerDefenseWaveCaption", mode));
+            Assert.AreEqual("PEDIDOS 0/440", CallStatic(vt, "TowerDefenseWaveCaption", mode));
             // 2026-11-24: La Renga starts with one Parrillero and 40 coins; hire the Cocacolero so drinks can be served.
             Assert.IsTrue((bool)Call(game, "TryHireTowerDefenseAtPost", mode, Enum.ToObject(T("StreetWorkerRole"), 1)));
             bool observedLiveProgress = false;
@@ -2350,7 +2350,7 @@ namespace HayChoriYPaty.Tests
                 int current = (int)Get(mode, "OrdersCompleted");
                 if (!observedLiveProgress && current >= 10 && Get(mode, "Phase").ToString() == "Playing")
                 {
-                    Assert.AreEqual("PEDIDOS " + current + "/240", CallStatic(vt, "TowerDefenseWaveCaption", mode));
+                    Assert.AreEqual("PEDIDOS " + current + "/440", CallStatic(vt, "TowerDefenseWaveCaption", mode));
                     observedLiveProgress = true;
                     if (!Application.isBatchMode) yield return Capture("qa06-la-renga-wave-progress");
                 }
@@ -2367,9 +2367,9 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(elapsed, Get(sim, "Elapsed"));
             int completed = (int)Get(mode, "OrdersCompleted");
             Assert.Greater(completed, 0);
-            StringAssert.Contains("Un hincha llegó a la salida\nPedidos completos: " + completed + "/240",
+            StringAssert.Contains("Un hincha llegó a la salida\nPedidos completos: " + completed + "/440",
                 (string)CallStatic(vt, "RiotResultMessage", sim));
-            TestContext.WriteLine("La Renga lost at " + elapsed + " seconds; completed=" + completed + "/240.");
+            TestContext.WriteLine("La Renga lost at " + elapsed + " seconds; completed=" + completed + "/440.");
             yield return new WaitForSecondsRealtime(1.6f);
             if (!Application.isBatchMode) yield return Capture("qa04-la-renga-defense-loss");
         }

@@ -2,6 +2,14 @@
 
 > Original four-role gait contract below; [Racing+ Mozo](#racing-mozo--2026-10-15) extends it to the fifth role. Keep open visual acceptance items open until actual evidence closes them; no new worker/animation QA in the documentation audit.
 
+## Mirada al mostrador durante la espera — 2026-11-28
+
+En los once niveles normales, cada trabajador libre que llegó a su puesto de espera mira al mostrador de clientes (espalda a cámara) desde la misma posición. Los cocineros sin estación también lo hacen al quedar quietos en el punto vigente de su cola de parrilla. La orientación se mantiene durante el pregón y después de que desaparece. Antes de llegar sigue mirando en la dirección del trayecto; cocinar en la parrilla, recoger, transportar y entregar conservan sus poses. Si el Mozo está enojado por un sándwich faltante, prevalece [la mirada a su mesa](active-cooks-mozos.md#señal-de-espera-del-mozo--actualizada-2026-11-27).
+
+Es un cambio de presentación: no modifica posiciones, rutas, reservas, frases ni el ritmo de los pregones. No aplica a Tower Defense. Reemplaza la conservación de la última dirección de marcha únicamente en ese reposo.
+
+**Validación:** EditMode **PASS 22/22** (orientación y pregones de los once niveles normales); PlayMode **PASS 4/4** (cola de parrilleros, prioridad visual del Mozo, pregones en Floresta/Boca y regresión TD en Los Redondos/Luján). Capturas Game View revisadas de Floresta y Boca a 610×1356 en `Logs/Acceptance/QA-LaRenga-Depth/frames/campaign-pregon-{floresta,boca}.jpg`. APK y dispositivo **NOT_RUN**.
+
 ## Approved scope
 Improve all four existing roles across catalog levels and arbitrary hired workers. Keep 90×98 worker frame, cartoon identity, route/timing/economy and physical-item lifecycle unchanged. Existing 16 Parrillero poses +8 diagonal poses and16 poses in each Coca atlas are retained. Palette variants remain cached Premium blue/Fernet black.
 

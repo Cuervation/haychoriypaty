@@ -808,7 +808,7 @@ namespace HayChoriYPaty.Tests
             Assert.IsTrue((bool)Get(config, "ActiveKitchen"), "Racing's active kitchen (2026-11-24).");
             Assert.IsFalse((bool)Get(mode, "IsPassiveKitchenLevel"), "Parrilleros cook and Mozos deliver.");
             Assert.AreEqual(40, (int)Get(mode, "Coins"));
-            Assert.AreEqual(240, (int)Get(mode, "TotalFanCount"));
+            Assert.AreEqual(440, (int)Get(mode, "TotalFanCount"));
             CollectionAssert.AreEqual(new[] { 0, 1, 2, 3, 4, 5, 6 }, (int[])Get(config, "AvailableProducts"), "Racing's seven products.");
             CollectionAssert.AreEqual(new[] { 1, 0, 1, 0, 1 }, (int[])Get(mode, "WorkerCountsByRole"), "Racing's crew: a Parrillero, a Premium and a Mozo.");
             Assert.AreEqual(7, ((ICollection)Get(mode, "PlacedStations")).Count, "Racing's seven stations.");
@@ -1053,17 +1053,10 @@ namespace HayChoriYPaty.Tests
         [UnityTest, Timeout(220000)]
         public IEnumerator LaRengaRealWaveKeepsTheAuditedOutcomeAndDeliveryCount()
         {
-            foreach (var (width, height, expectedWins, expectedFans, expectedUnits) in new[]
-                     // Fans at half speed (fanSpeed 0.1875) sandwiches taken from behind the table and campaign waiting spots (2026-11-21); the previous audit at 0.375 gave 145 and a 66/77 loss.
-                     // 2026-11-23: with the difficulty ramp (speed x1.00..x1.40, bigger and double orders) the same scripted crew still wins 120/120 but delivers 220 units.
-                     // 2026-11-23 (a pedido): 200 fans and the ramp up to x1.72. The old eight-hire crew now loses at 150/200 (334 units); the crew below hires up to 24
-                     // staff as coins allow (the per-role cap is gone), wins 200/200 and delivers 514 units.
-                     // 2026-11-23 (a pedido): La Renga starts with 0 coins, one Parrillero and one Cocacolero and prices workers like Ferro (30/30/35, x2.5, x5, ...).
-                     // The same scripted crew now loses at 178/200 (444 units) in 540x960 but still wins 200/200 (514 units) in the taller 610x1356; no scripted strategy of the 540x960 sweep won (best 180/200).
-                     // 2026-11-24 (a pedido): ramp 'E' (orders of 3 units and second products from early on) plus two extra tiers of 20 -> 240 fans, x1.80 and x1.88. With 40 coins and no starting Cocacolero the same scripted crew
-                     // now LOSES: 212/240 (900 units) in 540x960 and 120/240 (366 units) in 610x1356 (the Parrillero strip jams; one scripted strategy only, not a balance certificate).
-                     // 2026-11-23 (a pedido): La Renga pays Ferro's prices for the speed upgrade (20, 35, 50, ...). 2026-11-24 (a pedido): it starts with 0 coins again; the same crew still wins 200/200 (514 units) in both sizes.
-                     { (540, 960, false, 211, 897), (610, 1356, false, 120, 366) })
+            // 2026-11-28: baseline for the 440-fan ramp, measured with this one scripted hiring strategy.
+            var expected = new[] { ("540x960", false, 223, 873), ("610x1356", false, 220, 867) };
+            var observed = new System.Collections.Generic.List<(string, bool, int, int)>();
+            foreach (var (width, height) in new[] { (540, 960), (610, 1356) })
             {
                 yield return SetSize(width, height);
                 object mode = OpenLaRenga();
@@ -1091,19 +1084,18 @@ namespace HayChoriYPaty.Tests
                 }
                 Assert.Greater(checks, 0);
                 Assert.AreEqual("Finished", Get(mode, "Phase").ToString());
-                Debug.Log("Renga real wave observed: " + width + "x" + height + "; won=" + Get(mode, "HasWon") + "; served=" +
-                    Get(mode, "ServedFans") + "; deliveries=" + Get(mode, "TotalDelivered"));
-                Assert.AreEqual(expectedWins, Get(mode, "HasWon"), width + "x" + height);
-                Assert.AreEqual(expectedFans, Get(mode, "ServedFans"), width + "x" + height);
-                Assert.AreEqual(expectedUnits, Get(mode, "TotalDelivered"), width + "x" + height);
-                Debug.Log("Renga real wave: " + width + "x" + height + "; won=" + expectedWins + "; served=" + expectedFans +
-                    "; deliveries=" + expectedUnits + "; collision checks=" + checks);
+                bool won = (bool)Get(mode, "HasWon");
+                int served = (int)Get(mode, "ServedFans"), deliveries = (int)Get(mode, "TotalDelivered");
+                observed.Add((width + "x" + height, won, served, deliveries));
+                Debug.Log("Renga real wave: " + width + "x" + height + "; won=" + won + "; served=" + served +
+                    "; deliveries=" + deliveries + "; collision checks=" + checks);
                 yield return null;
                 if ((bool)Get(game, "HasPendingChulengo"))
                     Assert.IsTrue((bool)Call(game, "TryCollectVictoryReward"));
                 Assert.IsTrue((bool)Call(game, "ReturnToLevels"));
                 Call(view, "EndTowerDefenseRun");
             }
+            CollectionAssert.AreEqual(expected, observed);
         }
     }
 }

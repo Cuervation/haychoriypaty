@@ -65,6 +65,62 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(Sells(5), Line("Fernetero")?.Contains("Fernet") == true);
         }
 
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        [TestCase(4)]
+        [TestCase(5)]
+        [TestCase(6)]
+        [TestCase(7)]
+        [TestCase(8)]
+        [TestCase(11)]
+        [TestCase(12)]
+        public void OrdinaryWorkersTurnTowardTheCounterOnlyAtTheirWaitingPost(int level)
+        {
+            object sim = Make(level: level);
+            Start(sim);
+            Set(sim, "Coins", 10000);
+            Type roleType = Type.GetType("HayChoriYPaty.StreetWorkerRole, Assembly-CSharp", true);
+            foreach (string role in new[] { "ParrilleroPremium", "Cocacolero", "Fernetero" })
+                Call(sim, "TryHire", Enum.Parse(roleType, role));
+
+            Type projection = Type.GetType("HayChoriYPaty.StreetWorkerProjection, Assembly-CSharp", true);
+            MethodInfo sample = projection.GetMethod("SamplePresentationPose", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.IsNotNull(sample);
+            object Pose(object w) => sample.Invoke(null, new[] { sim, w, (object)false });
+            bool active = (bool)Get(sim, "UsesActiveCooks");
+            int checkedPosts = 0;
+            foreach (object worker in (IEnumerable)Get(sim, "Workers"))
+            {
+                Vector2 post = (Vector2)Get(worker, "WaitPosition");
+                string role = Get(worker, "Role").ToString();
+                Set(worker, "FacingVector", Vector2.right);
+                if (active && role.StartsWith("Parrillero", StringComparison.Ordinal))
+                {
+                    // Hiring can re-space grill posts before workers reach them. Model an actual cooking pose,
+                    // not an assumption that every fresh hire is already on its latest station anchor.
+                    Set(worker, "VisualCooking", true);
+                    Assert.AreEqual("Down", Get(Pose(worker), "Facing").ToString(), role);
+                    continue;
+                }
+                checkedPosts++;
+                Vector2 offPost = post + new Vector2(0f, 24f);
+                Set(worker, "Position", offPost);
+                FieldInfo returning = worker.GetType().GetField("ReturningToWaitPosition", BindingFlags.Instance | BindingFlags.NonPublic);
+                returning.SetValue(worker, true);
+                Assert.AreEqual("Right", Get(Pose(worker), "Facing").ToString(), role + " on the way back");
+                returning.SetValue(worker, false);
+                Assert.AreEqual("Right", Get(Pose(worker), "Facing").ToString(), role + " away from its post");
+                Set(worker, "Position", post);
+                Assert.AreEqual("Up", Get(Pose(worker), "Facing").ToString(), role + " at its post");
+                Assert.AreEqual(post, Get(worker, "Position"));
+                Assert.AreEqual(post, Get(worker, "WaitPosition"));
+                Assert.AreEqual(Vector2.right, Get(worker, "FacingVector"), "The renderer does not alter the simulation's route direction.");
+            }
+            Assert.Greater(checkedPosts, 0);
+        }
+
         private static int StartingCoinsForLevel(object balance, int level)
         {
             MethodInfo getter = balance.GetType().GetMethod("GetStartingCoins", new[] { typeof(int) });
@@ -629,7 +685,7 @@ object sim = Make(level: 2);
         [TestCase(0)]  // All Boys
         [TestCase(6)]  // San Lorenzo
         [TestCase(11)] // Huracán
-        public void CampaignDeliveryAudioLoadsDistinctClipsForUnitAndOrder(int level)
+        public void CampaignDeliveryAudioLoadsDistinctClipsForUnitOrderAndProductGoal(int level)
         {
             object sim = Make(level: level);
             var host = new GameObject("Campaign delivery audio");
@@ -642,6 +698,7 @@ object sim = Make(level: 2);
                 soundType.GetField("audioSource", fields).SetValue(sound, null);
                 FieldInfo deliveryClip = soundType.GetField("deliveryClip", fields);
                 FieldInfo completeClip = soundType.GetField("completeClip", fields);
+                FieldInfo productGoalClip = soundType.GetField("productGoalClip", fields);
                 deliveryClip.SetValue(sound, null);
                 Call(sound, "Initialize", sim);
 
@@ -651,8 +708,73 @@ object sim = Make(level: 2);
 
                 ((Action)simType.GetField("OrderCompleted", fields).GetValue(sim))();
                 Assert.AreEqual("order-complete-bubble", ((AudioClip)completeClip.GetValue(sound)).name);
+                Assert.IsNull(productGoalClip.GetValue(sound), "An ordinary delivery or completed ticket does not request the coin.");
+
+                FieldInfo goalSignal = simType.GetField("ProductGoalCompleted", fields);
+                ((Action<int>)goalSignal.GetValue(sim))(0);
+                Assert.AreEqual("coin-appear-classic", ((AudioClip)productGoalClip.GetValue(sound)).name);
+                Call(sound, "Initialize", Make(level: level));
+                Assert.IsNull(goalSignal.GetValue(sim), "The previous round no longer owns an audio listener.");
             }
             finally { UnityEngine.Object.DestroyImmediate(host); }
+        }
+
+        [Test]
+        public void AProductQuotaSignalsOnceEvenIfTheOrderIsStillOpenAndMoreUnitsSell()
+        {
+            object balance = NewBalance();
+            Tune(balance, "maxCustomers", 1);
+            Tune(balance, "workerSpeed", 100000f); Tune(balance, "customerSpeed", 100000f); Tune(balance, "pickupSeconds", .01f);
+            TuneProductGoal(balance, 2, 0, 2); // 3 choris in the order: only the second one completes the quota.
+            TuneProductGoal(balance, 2, 4, 1); // 2 Cocas in the same order: only the first one completes the quota.
+            TuneProductGoal(balance, 2, 1, 3); // The only Paty delivered does not reach its quota.
+            object sim = Make(staff: 2, level: 2, balance: balance);
+            var goals = new List<int>();
+            bool quotaHeardWhileTicketWasOpen = false;
+            simType.GetEvent("ProductGoalCompleted").AddEventHandler(sim, (Action<int>)(product =>
+            {
+                Assert.AreEqual(Call(sim, "GetProductGoal", product), Call(sim, "GetProductDelivered", product));
+                Assert.IsTrue((bool)Call(sim, "IsProductGoalComplete", product));
+                quotaHeardWhileTicketWasOpen |= (int)Get(sim, "OrdersCompleted") == 0;
+                goals.Add(product);
+            }));
+            Start(sim);
+            Assert.IsTrue((bool)Call(sim, "SpawnCustomerWithProducts", new[] { 0, 1, 4 }, new[] { 3, 1, 2 }));
+            SetWaiting(Customers(sim)[0]);
+            Assert.IsEmpty(goals, "Starting and taking the order are not deliveries.");
+            for (int i = 0; i < 800 && (int)Get(sim, "Delivered") < 6; i++) Step(sim, .02f);
+            Assert.AreEqual(6, Get(sim, "Delivered"));
+            Assert.AreEqual(1, Get(sim, "OrdersCompleted"));
+            Assert.IsTrue(quotaHeardWhileTicketWasOpen);
+            CollectionAssert.AreEquivalent(new[] { 0, 4 }, goals, "Play one coin for each reached quota; no extras for overselling.");
+            Assert.IsFalse((bool)Get(sim, "GoalReached"), "An individual product target does not win the level.");
+        }
+
+        [Test]
+        public void FinalProductQuotaSignalsBeforeVictoryAndAgainOnANewAttempt()
+        {
+            object balance = NewBalance();
+            Tune(balance, "maxCustomers", 1);
+            Tune(balance, "workerSpeed", 100000f); Tune(balance, "customerSpeed", 100000f); Tune(balance, "pickupSeconds", .01f);
+            TuneProductGoal(balance, 0, 0, 1);
+            object sim = Make(level: 0, balance: balance);
+            var goals = new List<int>();
+            simType.GetEvent("ProductGoalCompleted").AddEventHandler(sim, (Action<int>)(product =>
+            {
+                Assert.AreEqual("Playing", Get(sim, "Phase").ToString());
+                goals.Add(product);
+            }));
+            for (int attempt = 1; attempt <= 2; attempt++)
+            {
+                if (attempt == 1) Start(sim); else Restart(sim);
+                Assert.AreEqual(attempt - 1, goals.Count, "No coin at match start.");
+                Assert.IsTrue(Spawn(sim, 0, 1));
+                SetWaiting(Customers(sim)[0]);
+                for (int i = 0; i < 800 && Get(sim, "Phase").ToString() == "Playing"; i++) Step(sim, .02f);
+                Assert.AreEqual("Won", Get(sim, "Phase").ToString());
+                Assert.AreEqual(attempt, goals.Count);
+            }
+            CollectionAssert.AreEqual(new[] { 0, 0 }, goals);
         }
 
         [Test]

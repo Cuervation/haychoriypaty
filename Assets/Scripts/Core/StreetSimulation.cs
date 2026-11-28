@@ -351,6 +351,8 @@ namespace HayChoriYPaty
 
         /// <summary>Fires once for each item unit successfully handed to a customer.</summary>
         public event Action ProductUnitDelivered;
+        /// <summary>Fires on the first delivery that completes a product's quota in the current round.</summary>
+        public event Action<int> ProductGoalCompleted;
         /// <summary>Fires once after every line and quantity in a customer's ticket is delivered.</summary>
         public event Action OrderCompleted;
 
@@ -1282,6 +1284,12 @@ namespace HayChoriYPaty
             worker.CookQueueTicket = nextCookQueueTicket++;
         }
 
+        internal Vector2 CookQueueWaitPosition(StreetWorker worker)
+        {
+            int queueIndex = CookQueueIndex(worker, out int queueCount);
+            return KitchenLayout.CookQueuePosition(worker.Role == StreetWorkerRole.Parrillero ? 0 : 2, queueIndex, queueCount);
+        }
+
         private void ReleaseCookStation(StreetWorker worker)
         {
             worker.CookStationIndex = -1;
@@ -1359,9 +1367,7 @@ namespace HayChoriYPaty
             {
                 if (worker.CookStationIndex < 0)
                 {
-                    int queueIndex = CookQueueIndex(worker, out int queueCount);
-                    Vector2 waitingPoint = KitchenLayout.CookQueuePosition(worker.Role == StreetWorkerRole.Parrillero ? 0 : 2,
-                        queueIndex, queueCount);
+                    Vector2 waitingPoint = CookQueueWaitPosition(worker);
                     if (worker.Position != waitingPoint && SetWorkerRoute(worker, waitingPoint))
                         worker.State = StreetWorkerState.ToCookQueue;
                     return;
@@ -1774,7 +1780,8 @@ namespace HayChoriYPaty
                 line.Remaining--;
                 customer.State = StreetCustomerState.Receiving; customer.ReceiveRemaining = .3f;
                 Delivered++;
-                deliveredByProduct[worker.Product]++;
+                int deliveredProduct = worker.Product;
+                int productTotal = ++deliveredByProduct[deliveredProduct];
                 if (!customer.WasServed) { customer.WasServed = true; customersAttended++; }
                 if (IsBonusTrack && bonusTrack != null) bonusTrack.RecordDeliveredUnit();
                 else
@@ -1784,6 +1791,8 @@ namespace HayChoriYPaty
                     if (sales.Count > 40) sales.RemoveAt(0);
                 }
                 ProductUnitDelivered?.Invoke();
+                int productGoal = GetProductGoal(deliveredProduct);
+                if (productGoal > 0 && productTotal == productGoal) ProductGoalCompleted?.Invoke(deliveredProduct);
 
                 if (line.Remaining > 0 && Kitchen.HasSupply(worker.Product))
                 {

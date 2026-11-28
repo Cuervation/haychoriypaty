@@ -274,7 +274,7 @@ namespace HayChoriYPaty.Tests
             Assert.IsNotNull(camioneros);
             Assert.IsNotNull(redondos);
             Assert.AreEqual(120, Get<int>(camioneros, "TotalFanCount"));
-            Assert.AreEqual(240, Get<int>(redondos, "TotalFanCount")); // 2026-11-24: La Renga's 240 fans
+            Assert.AreEqual(440, Get<int>(redondos, "TotalFanCount"));
             Assert.That(Get<float>(camioneros, "FanSpeed"), Is.EqualTo(.096875f).Within(.00001f)); // .0775 x 1.25 (2026-11-26, a pedido); before .1575f * 1.3f
             Assert.That(Get<float>(redondos, "FanSpeed"), Is.EqualTo(.1535625f).Within(.00001f)); // Luján's speed x1.5 (03cdd74, 2026-11-25, a pedido)
 
@@ -390,6 +390,7 @@ namespace HayChoriYPaty.Tests
                 soundType.GetField("audioSource", PrivateInstance).SetValue(sound, null);
                 FieldInfo deliveryClip = soundType.GetField("deliveryClip", PrivateInstance);
                 FieldInfo completeClip = soundType.GetField("completeClip", PrivateInstance);
+                FieldInfo productGoalClip = soundType.GetField("productGoalClip", PrivateInstance);
                 deliveryClip.SetValue(sound, null);
                 Invoke(sound, "BindTowerDefense", new[] { mode });
                 Invoke(sound, "BindTowerDefense", new[] { mode });
@@ -411,6 +412,7 @@ namespace HayChoriYPaty.Tests
                 CallPrivate("DeliverWithinServiceRanges");
                 CollectionAssert.AreEqual(new[] { false, true }, completed);
                 Assert.AreEqual("order-complete-bubble", ((AudioClip)completeClip.GetValue(sound)).name);
+                Assert.IsNull(productGoalClip.GetValue(sound), "Tower Defense has no traditional product quotas.");
 
                 Invoke(sound, "BindTowerDefense", new object[] { null });
                 Assert.AreEqual(1, ((Delegate)signal.GetValue(mode)).GetInvocationList().Length,

@@ -1,3 +1,17 @@
+# Android — 2026-11-28: APK del commit `2d63a2d` (ajustes de campaña, objetivos de producto y presentación de trabajadores) (**BUILD/ARTEFACTO PASS; INSTALACIÓN NOT_REQUESTED; SMOKE NOT_RUN**)
+
+Unity 6000.6.3f1 BuildPipeline desde el Editor activo (`manage_build`, Android no-Development, IL2CPP/ARM64, `build-53503812e4`): **Build Succeeded en 443,9 s, 0 errores, 11 advertencias** del commit local `2d63a2d`. APK local ignorada por Git: `Builds/Android/Archive/HayChoriYPaty-0.2.83-code85-2d63a2d-campaign-tuning-20261128.apk`, **217.989.861 bytes**, SHA-256 `a30a9fe6e71edb9418ada200dd8080c27d38a3f61c52a1fb2834827c6e756af7`.
+
+**Artefacto PASS:** ZIP íntegro, `zipalign -c -P 16 4`, firma v2 Android Debug (SHA-1 `bf9858166f755aac91a33da7409032b1daf1fc61`), `aapt`: `com.haychoriypaty.game`, 0.2.83/código 85, API 26/36, `arm64-v8a`, no `debuggable`; contiene `libil2cpp.so`. EditMode/PlayMode e instalación **no ejecutados** en esta tarea; la APK no se instaló ni se abrió en el teléfono.
+
+# Android — 2026-11-28: APK del commit `4da798a` (pregones de campaña y regreso a la parrilla de Los Redondos) (**BUILD/ARTEFACTO PASS; INSTALACIÓN PASS; SMOKE NOT_RUN**)
+
+Unity 6000.6.3f1 BuildPipeline desde el Editor activo (`manage_build`, Android no-Development, IL2CPP/ARM64, compilación incremental, `build-38b91c7738`): **Build Succeeded en 434,1 s, 0 errores, 7 advertencias**, del commit local `4da798a`, sin cambios rastreados durante la compilación. APK local ignorada por Git: `Builds/Android/Archive/HayChoriYPaty-0.2.83-code85-4da798a-pregones-campana-redondos-20261128.apk`, **218.013.114 bytes**, SHA-256 `ce9c041ece292ecf95aad075ece95d373a48cdd76b874cef7e831c29ca76ac58`.
+
+**Artefacto PASS:** ZIP íntegro, `zipalign -c -P 16 4`, firma v2 con el mismo certificado Android Debug que la APK anterior, `aapt`: `com.haychoriypaty.game`, 0.2.83/código 85, API 26/36, `arm64-v8a`, sin `debuggable`; contiene `libil2cpp.so`. Unity EditMode **20/20** (pregones tradicional y TD) y PlayMode **2/2** (Floresta/Boca y Los Redondos/Luján) con captura Game View de Boca. La prueba PlayMode anterior del retorno de los dos parrilleros es **PASS 1/1**.
+
+**Instalación PASS:** `adb install -r` en el Motorola Edge 60 Fusion: `Success`. Reemplazó `60b8789` sin desinstalar ni borrar datos. Package Manager confirma 0.2.83/código 85, `firstInstallTime=2026-10-03 18:49:24` conservado y `lastUpdateTime=2026-11-28 11:13:15`. El SHA-256 del `base.apk` instalado coincide con la APK local. No se abrió el juego en el teléfono.
+
 # Android — 2026-11-27: APK del commit `60b8789` (audio de entrega compartido, diálogos y miradas de trabajadores TD, señal del Mozo y valla de Los Redondos) (**BUILD/ARTEFACTO PASS; INSTALACIÓN PASS; SMOKE NOT_RUN**)
 
 Unity 6000.6.3f1 BuildPipeline desde el Editor activo (`manage_build`, Android no-Development, IL2CPP/ARM64, `clean_build`, `build-5d283bd00c`): **Build Succeeded en 804,6 s, 0 errores, 9 advertencias** desde `60b8789` (sin cambios rastreados; publicado en `origin/docs/post-cleanup-state`). APK local ignorada por Git: `Builds/Android/Archive/HayChoriYPaty-0.2.83-code85-60b8789-audio-mozos-valla-20261127.apk`, **218.010.438 bytes**, SHA-256 `b8dcc225107f6e79486607111b86e1b3edf8fdabf59be8befe7ba556bdb25864`.

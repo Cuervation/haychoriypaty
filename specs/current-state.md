@@ -1,6 +1,6 @@
 # Current state — Hay Chori y Paty
 
-**Corte:** 2026-11-27, rama `docs/post-cleanup-state` (subida a `origin`). Última APK: commit `60b8789`, instalada en el Motorola el 2026-11-27 (ver android-prototype). Resumen corto para retomar; las reglas están en `AGENTS.md`, el detalle en cada contrato y la [tabla de balance](../docs/BALANCE_ACTUAL_NIVELES.md). Índice: [README](README.md). Snapshot anterior: [history/current-state-snapshot-through-20261113.md](history/current-state-snapshot-through-20261113.md).
+**Corte:** 2026-11-28, rama `docs/post-cleanup-state`. Última APK generada y verificada: `2d63a2d` (no instalada); última instalada en el Motorola: `4da798a`, 2026-11-28; no se abrió el juego en el dispositivo (ver [android-prototype](features/android-prototype.md)). Resumen corto para retomar; las reglas están en `AGENTS.md`, el detalle en cada contrato y la [tabla de balance](../docs/BALANCE_ACTUAL_NIVELES.md). Índice: [README](README.md). Snapshot anterior: [history/current-state-snapshot-through-20261113.md](history/current-state-snapshot-through-20261113.md).
 
 ## Para retomar (Codex u otro agente)
 
@@ -15,7 +15,7 @@
 
 - **Huracán ID11 es un nivel normal desde el 2026-11-27** (antes Bonus Track): dificultad entre Ferro e Independiente, menú de Ferro + vacío, cocina pasiva; el código del bonus quedó inactivo (`IsBonusTrack == false`). No suma Puntos de Liga (tope de 14 canchas de las reglas de Firestore). [Contrato](features/huracan-bonus-track.md).
 - Reglas "desde Racing" (cocina activa, Mozos, trabajadores por tickets) en `StreetSimulation.IsRacingOrLaterLevel` (ID ≥ 5 salvo Huracán).
-- Tower Defense ([contrato](features/tower-defense.md)): Camioneros con rampa ×1,20 + 0,10 por tramo y pedidos de hasta 5 unidades (el equipo máximo no gana; decisión del usuario dejarlo así); Los Redondos con rampa ×1,10 + 0,10 cada 10 hinchas, pedidos de hasta 5 unidades y 4 productos, Fernetero a 120; La Renga y Peregrinación sin cambios recientes. Ningún TD está equilibrado/medido.
+- Tower Defense ([contrato](features/tower-defense.md)): Camioneros mantiene la rampa ×1,20 + 0,10 por tramo y hasta 5 unidades; La Renga y Los Redondos comparten la [rampa de 440 hinchas](features/la-renga.md#rampa-de-hinchas-vigente--2026-11-28) de ×1,00 a ×2,68 y hasta 3 productos, 3 unidades por producto (aún no está en la APK); Peregrinación no cambia. Balance sin certificar.
 
 ## Funciones recientes (2026-11-25 a 27)
 

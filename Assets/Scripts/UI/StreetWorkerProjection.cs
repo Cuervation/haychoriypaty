@@ -125,6 +125,35 @@ namespace HayChoriYPaty
             return false;
         }
         private static bool IsCook(StreetWorkerRole role) => role == StreetWorkerRole.Parrillero || role == StreetWorkerRole.ParrilleroPremium;
+
+        private static bool IsUnoccupiedIdle(StreetWorker worker) =>
+            worker != null && worker.State == StreetWorkerState.Idle && !worker.ReturningToWaitPosition &&
+            !worker.VisualCooking && worker.CarriedItemId <= 0 && worker.CookingItemId <= 0;
+
+        internal static bool IsWaitingAtPost(StreetWorker worker) =>
+            IsUnoccupiedIdle(worker) && (worker.Position - worker.WaitPosition).sqrMagnitude <= 1f;
+
+        internal static bool ShouldFaceCounterAtRest(StreetSimulation simulation, StreetWorker worker)
+        {
+            if (simulation == null || StreetSimulation.IsTowerDefenseLevel(simulation.LevelIndex) || !IsUnoccupiedIdle(worker))
+                return false;
+            if (simulation.UsesActiveCooks && IsCook(worker.Role))
+                return worker.CookStationIndex < 0 && worker.Position == worker.Target &&
+                    (worker.Position - simulation.CookQueueWaitPosition(worker)).sqrMagnitude <= 1f;
+            return IsWaitingAtPost(worker) && !IsIdleAtGrill(simulation, worker);
+        }
+
+        internal static StreetWorkerPose SamplePresentationPose(StreetSimulation simulation, StreetWorker worker, out bool showAngryCue)
+        {
+            StreetWorkerPose pose = StreetWorkerAnimation.Sample(worker, IsIdleAtGrill(simulation, worker));
+            showAngryCue = TryGetMozoWaitingSandwichTable(simulation, worker, out Vector2 missingTable);
+            if (showAngryCue) pose.Facing = StreetWorkerAnimation.ResolveFacing(missingTable - worker.Position, pose.Facing);
+            // The customer counter spans the scene: look straight across it from the existing post.
+            else if (ShouldFaceCounterAtRest(simulation, worker)) pose.Facing = StreetFacing.Up;
+            if (IsFinalBarrelDrinkApproach(simulation, worker)) pose.Facing = StreetFacing.Down;
+            return pose;
+        }
+
         private static bool IsIdleAtGrill(StreetSimulation simulation, StreetWorker worker)
         {
             if (simulation == null || worker == null || worker.State != StreetWorkerState.Idle || !IsCook(worker.Role)) return false;
@@ -582,10 +611,7 @@ namespace HayChoriYPaty
                 if (!v.Root.gameObject.activeSelf) v.Root.gameObject.SetActive(true);
                 Vector2 displayPosition = PresentationPosition(sim, w);
                 float presentationScale = PresentationScale(sim, w);
-                bool showAngryCue = TryGetMozoWaitingSandwichTable(sim, w, out Vector2 missingTable);
-                StreetWorkerPose pose = StreetWorkerAnimation.Sample(w, IsIdleAtGrill(sim, w));
-                if (showAngryCue) pose.Facing = StreetWorkerAnimation.ResolveFacing(missingTable - w.Position, pose.Facing);
-                if (IsFinalBarrelDrinkApproach(sim, w)) pose.Facing = StreetFacing.Down;
+                StreetWorkerPose pose = SamplePresentationPose(sim, w, out bool showAngryCue);
                 int contact = pose.Frame >= 2 ? 1 : 0;
                 bool hasCookingPose = pose.Cooking && cookingPoses != null &&
                     TryCookingPresentationTarget(sim, w, out _, out _, out _);

@@ -3,7 +3,7 @@ using UnityEngine;
 namespace HayChoriYPaty
 {
     /// <summary>
-    /// Shared campaign audio: a soft pop per delivered item and a rising bubble when that item completes the order.
+    /// Shared delivery/order cues, plus a coin when a normal level reaches a product quota.
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(AudioSource))]
@@ -11,12 +11,14 @@ namespace HayChoriYPaty
     {
         private const string ClipResourcePath = "Audio/order-delivery-soft-pop";
         private const string CompleteClipResourcePath = "Audio/order-complete-bubble";
+        private const string ProductGoalClipResourcePath = "Audio/coin-appear-classic";
         [SerializeField, Range(0f, 1f)] private float volume = 0.2f;
         [SerializeField, Range(0f, 1f)] private float completeVolume = 0.25f;
+        [SerializeField, Range(0f, 1f)] private float productGoalVolume = 0.22f;
         [SerializeField, Range(0f, 0.1f)] private float pitchVariation = 0.03f;
 
         private AudioSource audioSource;
-        private AudioClip deliveryClip, completeClip;
+        private AudioClip deliveryClip, completeClip, productGoalClip;
         private StreetSimulation simulation;
         private TowerDefenseGameMode towerDefense;
 
@@ -68,6 +70,7 @@ namespace HayChoriYPaty
             if (simulation == null) return;
             simulation.ProductUnitDelivered += OnUnitDelivered;
             simulation.OrderCompleted += OnOrderCompleted;
+            simulation.ProductGoalCompleted += OnProductGoalCompleted;
         }
 
         private void Unsubscribe()
@@ -75,6 +78,7 @@ namespace HayChoriYPaty
             if (simulation == null) return;
             simulation.ProductUnitDelivered -= OnUnitDelivered;
             simulation.OrderCompleted -= OnOrderCompleted;
+            simulation.ProductGoalCompleted -= OnProductGoalCompleted;
         }
 
         private void SubscribeTowerDefense()
@@ -95,24 +99,27 @@ namespace HayChoriYPaty
 
         private void OnUnitDelivered()
         {
-            Play(); // the soft pop, on every item a worker hands over
+            if (deliveryClip == null) deliveryClip = Resources.Load<AudioClip>(ClipResourcePath);
+            PlayCue(deliveryClip, volume);
         }
 
         private void OnOrderCompleted()
         {
             if (completeClip == null) completeClip = Resources.Load<AudioClip>(CompleteClipResourcePath);
-            if (completeClip == null || audioSource == null) return;
-            audioSource.pitch = Random.Range(1f - pitchVariation, 1f + pitchVariation);
-            audioSource.PlayOneShot(completeClip, Mathf.Clamp01(completeVolume));
+            PlayCue(completeClip, completeVolume);
         }
 
-        private void Play()
+        private void OnProductGoalCompleted(int product)
         {
-            if (deliveryClip == null) deliveryClip = Resources.Load<AudioClip>(ClipResourcePath);
-            if (deliveryClip == null || audioSource == null) return;
+            if (productGoalClip == null) productGoalClip = Resources.Load<AudioClip>(ProductGoalClipResourcePath);
+            PlayCue(productGoalClip, productGoalVolume);
+        }
 
+        private void PlayCue(AudioClip clip, float cueVolume)
+        {
+            if (clip == null || audioSource == null) return;
             audioSource.pitch = Random.Range(1f - pitchVariation, 1f + pitchVariation);
-            audioSource.PlayOneShot(deliveryClip, Mathf.Clamp01(volume));
+            audioSource.PlayOneShot(clip, Mathf.Clamp01(cueVolume));
         }
     }
 }

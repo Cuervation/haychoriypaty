@@ -334,37 +334,46 @@ namespace HayChoriYPaty.Tests
             Assert.IsEmpty((string[])Invoke(mode, "AuditLosRedondosLayout"), "The ID10 audit does not apply to ID9.");
         }
 
-        // 2026-11-26 (a pedido): speed x1.10 rising 0.10 every 10 fans (24 tiers up to x3.40), orders of up to 5 units and up to 4 different products.
-        [Test]
-        public void LosRedondosRampStartsAtOnePointOneAndEndsWithFourProductOrdersOfFourOrFiveUnits()
+        // The third-product percentage is measured over all orders, not only double orders.
+        [TestCase(199, 0, 2)]
+        [TestCase(200, 4, 3)]
+        [TestCase(200, 5, 2)]
+        [TestCase(200, 74, 2)]
+        [TestCase(200, 75, 1)]
+        [TestCase(439, 99, 3)]
+        public void LosRedondosRollsTheCumulativeProductChances(int spawnIndex, int roll, int expectedProducts)
         {
-            object config = Resources.Load("TowerDefense/LosRedondos-Tandil");
-            MethodInfo tierFor = config.GetType().GetMethod("DifficultyTierForFan");
-            for (int tierIndex = 0; tierIndex < 24; tierIndex++)
-            {
-                object tier = tierFor.Invoke(config, new object[] { tierIndex * 10 + 9 });
-                Assert.AreEqual(tierIndex * 10, tier.GetType().GetField("FromFan").GetValue(tier), "tier " + tierIndex);
-                Assert.AreEqual(1.1f + .1f * tierIndex, (float)tier.GetType().GetField("SpeedMultiplier").GetValue(tier), .0001f, "speed of tier " + tierIndex);
-                int quantities = 0;
-                foreach (string field in new[] { "Quantity2Percent", "Quantity3Percent", "Quantity4Percent", "Quantity5Percent" })
-                    quantities += (int)tier.GetType().GetField(field).GetValue(tier);
-                Assert.LessOrEqual(quantities, 100);
-            }
-            object mode = CreateLosRedondosMode(1200f, out object route, out float px);
-            SetPrivate(mode, "spawnedFans", 230);
+            object mode = CreateLosRedondosMode(1200f, out _, out _);
+            SetPrivate(mode, "spawnedFans", spawnIndex);
+            SetPrivate(mode, "random", new OrderRollRandom(roll));
             Invoke(mode, "SpawnNextFan");
             IList fans = (IList)mode.GetType().GetProperty("Fans").GetValue(mode);
             Assert.AreEqual(1, fans.Count);
-            IList order = (IList)fans[0].GetType().GetProperty("Order").GetValue(fans[0]);
-            Assert.AreEqual(4, order.Count, "the last tier always asks for four different products");
+            object fan = fans[0];
+            IList order = (IList)fan.GetType().GetProperty("Order").GetValue(fan);
+            Assert.AreEqual(expectedProducts, order.Count);
+            Assert.AreEqual(1f + .08f * (spawnIndex / 20), (float)fan.GetType().GetProperty("SpeedMultiplier").GetValue(fan), .0001f);
             var seen = new HashSet<int>();
             foreach (object line in order)
             {
                 int product = (int)line.GetType().GetProperty("Product").GetValue(line);
                 int remaining = (int)line.GetType().GetProperty("Remaining").GetValue(line);
                 Assert.IsTrue(seen.Add(product), "products are different");
-                Assert.That(remaining, Is.InRange(4, 5), "the last tier asks for 4 or 5 units of each");
+                Assert.AreEqual(3, remaining);
             }
+            if (spawnIndex == 439)
+            {
+                Invoke(mode, "SpawnNextFan");
+                Assert.AreEqual(1, fans.Count, "no fan can spawn after number 440");
+            }
+        }
+
+        private sealed class OrderRollRandom : System.Random
+        {
+            private readonly int roll;
+            private int product;
+            public OrderRollRandom(int roll) => this.roll = roll;
+            public override int Next(int maxValue) => maxValue == 100 ? roll : product++ % maxValue;
         }
 
         private object CreateLosRedondosMode(float logicalHeight, out object route, out float px)

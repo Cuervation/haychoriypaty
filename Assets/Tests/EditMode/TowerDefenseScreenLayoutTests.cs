@@ -79,7 +79,7 @@ namespace HayChoriYPaty.Tests
 
             Assert.AreEqual(120, Read(camioneros, "TotalFanCount"));
             // 2026-11-24 (a pedido): Los Redondos copies La Renga (240 fans, same speed, ramp, economy and kitchen) on the inverted C.
-            Assert.AreEqual(240, Read(redondos, "TotalFanCount"));
+            Assert.AreEqual(440, Read(redondos, "TotalFanCount"));
             // Camioneros' horizontal kitchen version slows its fans to keep the old on-screen time over a single fence.
             Assert.That((float)Read(camioneros, "FanSpeed"), Is.EqualTo(.096875f).Within(0.00001f));
             Assert.That((float)Read(redondos, "FanSpeed"), Is.EqualTo(.1535625f).Within(0.00001f), "Los Redondos: Luján's fan speed x1.5 (03cdd74, a pedido).");

@@ -186,11 +186,15 @@ Los once niveles tradicionales también muestran los globos visuales de los cuat
 
 En la campaña tradicional el pregón nombra solo productos del menú. Chori y Paty los anuncia **el Mozo** si hay cocina activa y **el Parrillero** si atiende directamente (p. ej. solo «¡Hay chori!» en Floresta). El Premium, Cocacolero y Fernetero conservan sus familias de frases: Bondio/Vacío, coca/birra y Fernet. No cambian las frases ya existentes en TD, sus puestos, la orientación, el audio de venta ni reglas de simulación.
 
-**Validación:** runtime y fixtures compilados con Roslyn de Unity; **PASS 11/11** fuera del Editor para catálogo, emisor, ausencia de globo al aparecer/volver en marcha y vencimiento de 1 s. PlayMode y Game View de Floresta/Boca quedan pendientes de ejecutar en el Editor.
+**Validación:** runtime y fixtures compilados con Roslyn de Unity; **PASS 11/11** fuera del Editor para catálogo, emisor, ausencia de globo al aparecer/volver en marcha y vencimiento de 1 s. Revalidación: **PASS 11/11** en EditMode y **PASS 1/1** en PlayMode (`CampaignCrewChantsFollowFlorestaParrilleroAndBocaMozo`); capturas Game View de 610×1356 en `Logs/Acceptance/QA-LaRenga-Depth/frames/campaign-pregon-{floresta,boca}.jpg`.
 
 ### Audio de entrega de campaña — actualizado 2026-11-27
 
 Los 15 niveles, incluidos los cuatro Tower Defense, reutilizan el audio antes exclusivo de San Lorenzo: un pop suave por **cada unidad entregada** (20 % de volumen) y una burbuja ascendente adicional **una vez por pedido**, cuando se entrega la última unidad (25 %). Ambos clips siguen siendo 2D con ±3 % de variación de tono; no hay disparos por cocinar, recoger, abandonar un pedido o fallar una entrega. Los niveles normales usan `ProductUnitDelivered` y `OrderCompleted`; Tower Defense usa el recibo `DeliveryCompleted` de la entrega física, que indica si esa unidad completó el pedido. No cambian la música ni los sonidos de interfaz, la economía o la progresión.
+
+**Moneda al alcanzar una meta de producto — 2026-11-28:** en los 11 niveles normales se suma el WAV original de la moneda de San Lorenzo (`Audio/coin-appear-classic`, 22 %, 2D). `ProductGoalCompleted` se emite solo en la entrega real que lleva por primera vez un producto a su cuota, aunque el pedido siga abierto o esa entrega dé la victoria. No se repite al pasar la cuota y vuelve a estar disponible en un nuevo intento. El pop y la burbuja siguen cumpliendo sus funciones; Tower Defense no recibe el sonido de meta.
+
+Validación de la moneda: **PASS 7/7 EditMode** en Unity (clips y enlace de eventos, metas parciales y final, nuevas partidas, excedentes y regresión TD). WAV y GUID originales conservados. Escucha en partida y Android **NOT_RUN**.
 
 Validación 2026-11-27: **PASS** compilación C# del runtime para Android y de los dos archivos EditMode afectados con el Roslyn de Unity 6000.6.3f1, fuera del Editor. **BLOCKED** ejecución de `CampaignDeliveryAudioLoadsDistinctClipsForUnitAndOrder` y `TowerDefenseDeliveryAudioUsesCompletionCueOnlyOnLastUnitAndDetaches`: el Editor existente no respondió al ping de Unity MCP. **NOT_RUN** escucha en partida y en Android.
 

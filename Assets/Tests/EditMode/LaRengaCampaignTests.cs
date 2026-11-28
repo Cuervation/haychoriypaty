@@ -332,23 +332,46 @@ namespace HayChoriYPaty.Tests
             var config = Resources.Load(path, configType);
             Assert.NotNull(config);
             Assert.AreEqual(13, configType.GetProperty("SourceCampaignLevelId").GetValue(config, null));
-            // C-shaped, Ferro-kitchen version (2026-11-19; Ferro's five products): 120 fans, faster and denser than the former serpentine 60 / 0.1575 / 96.
-            // 2026-11-23 (a pedido): 200 fans (was 120); the difficulty ramp is extended to ten tiers (x1.00..x1.72).
-            // 2026-11-24 (a pedido): 240 fans, two more tiers of 20 (x1.80, x1.88) and orders of 3 units / second products from fan 140 on.
-            Assert.AreEqual(240, configType.GetProperty("TotalFanCount").GetValue(config, null));
-            Assert.AreEqual(0.1875f, (float)configType.GetProperty("FanSpeed").GetValue(config, null), 0.00001f);
-            // 2026-11-23: 70 px (was 66) so the order bubbles of fans entering side by side keep the same height.
-            Assert.AreEqual(70f, configType.GetProperty("MinimumEntrySpacingLogical").GetValue(config, null));
-            // 2026-11-23: no per-role worker limit and a ten-tier difficulty ramp (speed x1.00..x1.72 in steps of 0.08 every 20 fans, bigger orders) by spawn index.
-            Assert.AreEqual(int.MaxValue, configType.GetProperty("MaximumWorkersPerRole").GetValue(config, null));
-            Assert.AreEqual(true, configType.GetProperty("HasDifficultyRamp").GetValue(config, null));
-            var tierFor = configType.GetMethod("DifficultyTierForFan");
-            foreach (var (fan, speed) in new[] { (0, 1f), (19, 1f), (20, 1.08f), (100, 1.4f), (119, 1.4f), (120, 1.48f), (160, 1.64f), (180, 1.72f), (199, 1.72f), (200, 1.8f), (219, 1.8f), (220, 1.88f), (239, 1.88f) })
-            {
-                object tier = tierFor.Invoke(config, new object[] { fan });
-                Assert.AreEqual(speed, (float)tier.GetType().GetField("SpeedMultiplier").GetValue(tier), 0.0001f, "tier of fan " + fan);
-            }
+            Assert.AreEqual(440, ReadProperty(config, "TotalFanCount"));
+            Assert.AreEqual(0.1875f, (float)ReadProperty(config, "FanSpeed"), 0.00001f);
+            Assert.AreEqual(70f, ReadProperty(config, "MinimumEntrySpacingLogical"));
+            Assert.AreEqual(int.MaxValue, ReadProperty(config, "MaximumWorkersPerRole"));
+            Assert.AreEqual(2, Convert.ToInt32(ReadProperty(config, "RouteKind")));
             CollectionAssert.AreEqual(new[] { 0, 1, 2, 4, 6 }, (int[])configType.GetProperty("AvailableProducts").GetValue(config, null));
+        }
+
+        [TestCase(13, .1875f)]
+        [TestCase(10, .1535625f)]
+        public void RengaAndRedondosUseTheSameTwentyTwoTierRamp(int level, float baseSpeed)
+        {
+            Type configType = RuntimeType("TowerDefenseLevelConfig");
+            string path = (string)configType.GetMethod("ResourcesPathForCampaignLevel", PublicStatic)
+                .Invoke(null, new object[] { level });
+            var config = Resources.Load(path, configType);
+            Assert.NotNull(config);
+            Assert.AreEqual(440, ReadProperty(config, "TotalFanCount"));
+            Assert.AreEqual(70f, ReadProperty(config, "MinimumEntrySpacingLogical"));
+            Assert.AreEqual(baseSpeed, (float)ReadProperty(config, "FanSpeed"), .00001f);
+            Assert.AreEqual(true, ReadProperty(config, "ThirdProductChanceOfAllOrders"));
+            var tierFor = configType.GetMethod("DifficultyTierForFan");
+            int[] two = { 0, 30, 40, 30, 20, 10, 10 };
+            int[] three = { 0, 0, 20, 40, 60, 80, 90 };
+            int[] second = { 20, 25, 30, 35, 40, 45, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 100, 100, 100, 100, 100, 100 };
+            int[] third = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100 };
+            for (int fan = 0; fan < 440; fan++)
+            {
+                int i = fan / 20;
+                object tier = tierFor.Invoke(config, new object[] { fan });
+                Assert.AreEqual(i * 20, Get(tier, "FromFan"), "fan " + (fan + 1));
+                Assert.AreEqual(1f + .08f * i, (float)Get(tier, "SpeedMultiplier"), .0001f);
+                Assert.AreEqual(i < two.Length ? two[i] : 0, Get(tier, "Quantity2Percent"));
+                Assert.AreEqual(i < three.Length ? three[i] : 100, Get(tier, "Quantity3Percent"));
+                Assert.AreEqual(0, Get(tier, "Quantity4Percent"));
+                Assert.AreEqual(0, Get(tier, "Quantity5Percent"));
+                Assert.AreEqual(second[i], Get(tier, "SecondProductPercent"));
+                Assert.AreEqual(third[i], Get(tier, "ThirdProductPercent"));
+                Assert.AreEqual(0, Get(tier, "FourthProductPercent"));
+            }
         }
     }
 }

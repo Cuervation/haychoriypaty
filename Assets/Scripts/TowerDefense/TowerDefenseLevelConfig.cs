@@ -49,7 +49,7 @@ namespace HayChoriYPaty
         [Range(0, 100)] public int Quantity5Percent;
         [Tooltip("Percent chance that the order has a second product.")]
         [Range(0, 100)] public int SecondProductPercent;
-        [Tooltip("Percent chance, once it has two, that the order adds a third different product (2026-11-26; 0 keeps orders at two).")]
+        [Tooltip("Percent chance of a third different product. Conditional on two products unless the level counts it across all orders.")]
         [Range(0, 100)] public int ThirdProductPercent;
         [Tooltip("Percent chance, once it has three, that the order adds a fourth different product.")]
         [Range(0, 100)] public int FourthProductPercent;
@@ -141,6 +141,8 @@ namespace HayChoriYPaty
         [SerializeField, Min(0)] private int stationCost = 80;
         [Tooltip("Most workers of each role the player may hire in a free-construction level. 0 = no limit (only coins limit it).")]
         [SerializeField, Min(0)] private int maximumWorkersPerRole = 3;
+        [Tooltip("Use the same chance roll for the second and third product, so both percentages are shares of all orders.")]
+        [SerializeField] private bool thirdProductChanceOfAllOrders;
         [Tooltip("Optional difficulty ramp by spawn index (ascending FromFan). Empty = the level's fixed difficulty.")]
         [SerializeField] private TowerDefenseDifficultyTier[] difficultyTiers = Array.Empty<TowerDefenseDifficultyTier>();
         [SerializeField] private int[] freeStationCounts = { 1, 1, 1, 1, 1, 1, 1 };
@@ -177,6 +179,7 @@ namespace HayChoriYPaty
         public float FanSpawnIntervalSeconds => Mathf.Max(0.1f, fanSpawnIntervalSeconds);
         public int StationCost => Mathf.Max(0, stationCost);
         public int MaximumWorkersPerRole => maximumWorkersPerRole <= 0 ? int.MaxValue : maximumWorkersPerRole;
+        public bool ThirdProductChanceOfAllOrders => thirdProductChanceOfAllOrders;
         public bool HasDifficultyRamp => difficultyTiers != null && difficultyTiers.Length > 0;
         /// <summary>The tier that governs the fan with this 0-based spawn index (the last one whose FromFan is not above it).</summary>
         public TowerDefenseDifficultyTier DifficultyTierForFan(int spawnIndex)

@@ -6,7 +6,42 @@
 
 > Delta posterior del mismo día: [Peregrinación ID14](peregrinacion-lujan.md) se inserta entre13 y4; campaña vigente15 y sucesión13→14→4. El resto de este registro conserva el alcance original de la incorporación de La Renga. No cambia su balance ni sus assets.
 
-## Identidad y campaña
+## Rampa de hinchas vigente — 2026-11-28
+
+**La Renga (ID13) y Los Redondos (ID10):** 440 hinchas en 22 tramos de 20. La velocidad se fija al entrar, de ×1,00 a ×2,68, con incrementos de 0,08. Cada nivel conserva su velocidad base (`fanSpeed` 0,1875 / 0,1535625, respectivamente), el mínimo de 70 px lógicos entre entradas, su recorrido, cocina, menú, plantel y precios. No cambia la regla terminal: sin plazo, hay que servir a todos y se pierde al primer hincha que llega a la salida con pedido pendiente.
+
+Las dos últimas columnas son porcentajes sobre **todos** los pedidos: «al menos 2» incluye a los que piden 3. Por ejemplo, en 201–220 salen 25% de un producto, 70% de exactamente dos y 5% de tres. Una misma tirada decide el tamaño del pedido; los productos son distintos. Las unidades se sortean por separado para cada producto (el resto pide una); no salen 4 ni 5 unidades de un producto ni pedidos de cuatro productos. El tramo escrito como «240–261» se normaliza a 241–260, sin pisar los tramos vecinos.
+
+| Hinchas | Velocidad | 2 unidades por producto | 3 unidades por producto | Al menos 2 productos | 3 productos |
+|---|---:|---:|---:|---:|---:|
+| 1–20 | ×1,00 | 0% | 0% | 20% | 0% |
+| 21–40 | ×1,08 | 30% | 0% | 25% | 0% |
+| 41–60 | ×1,16 | 40% | 20% | 30% | 0% |
+| 61–80 | ×1,24 | 30% | 40% | 35% | 0% |
+| 81–100 | ×1,32 | 20% | 60% | 40% | 0% |
+| 101–120 | ×1,40 | 10% | 80% | 45% | 0% |
+| 121–140 | ×1,48 | 10% | 90% | 55% | 0% |
+| 141–160 | ×1,56 | 0% | 100% | 60% | 0% |
+| 161–180 | ×1,64 | 0% | 100% | 65% | 0% |
+| 181–200 | ×1,72 | 0% | 100% | 70% | 0% |
+| 201–220 | ×1,80 | 0% | 100% | 75% | 5% |
+| 221–240 | ×1,88 | 0% | 100% | 80% | 5% |
+| 241–260 | ×1,96 | 0% | 100% | 85% | 10% |
+| 261–280 | ×2,04 | 0% | 100% | 90% | 20% |
+| 281–300 | ×2,12 | 0% | 100% | 95% | 30% |
+| 301–320 | ×2,20 | 0% | 100% | 100% | 40% |
+| 321–340 | ×2,28 | 0% | 100% | 100% | 50% |
+| 341–360 | ×2,36 | 0% | 100% | 100% | 60% |
+| 361–380 | ×2,44 | 0% | 100% | 100% | 70% |
+| 381–400 | ×2,52 | 0% | 100% | 100% | 80% |
+| 401–420 | ×2,60 | 0% | 100% | 100% | 90% |
+| 421–440 | ×2,68 | 0% | 100% | 100% | 100% |
+
+Los valores se serializan en los dos assets de nivel. Este delta reemplaza las rampas anteriores de 240 hinchas de La Renga y Los Redondos; Camioneros y Peregrinación no cambian. No certifica balance ni una estrategia ganadora.
+
+**Validación:** EditMode **PASS 18/18** (tabla de ambos niveles, umbrales reales de pedido y tope de 440, regresión de Camioneros). PlayMode **PASS 3/3** entre la primera ejecución y la repetición de la auditoría de La Renga con su resultado actualizado: apertura de Los Redondos, derrota de La Renga y partida automática de La Renga. Esa estrategia perdió con 223/440 atendidos en 540×960 y 220/440 en 610×1356. Partida completa de Los Redondos y APK **NOT_RUN**.
+
+## Identidad y campaña (registro original)
 
 - ID estable **13**, posición visible **9**, nombre `La Renga – Autódromo Bs. As.`. Ambientación: recital multitudinario en el Autódromo Oscar y Juan Gálvez, inspirado en el 17/11/2007, sin atribuir precisión documental al arte.
 - Orden exacto de catorce posiciones: `0,1,9,2,12,3,11,10,13,4,5,6,7,8`. Todos los IDs anteriores mantienen su significado. Ganar Los Redondos ID10 desbloquea ID13; ganar ID13 desbloquea Independiente ID4 mediante el cierre común idempotente.

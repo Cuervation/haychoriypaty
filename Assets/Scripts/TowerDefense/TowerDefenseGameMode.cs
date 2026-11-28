@@ -789,13 +789,16 @@ namespace HayChoriYPaty
                 int[] pool = availableProducts;
                 int product = index < 6 ? pool[index % 2 == 0 ? 0 : pool.Length - 1]
                     : index < 18 ? pool[(index - 6) % pool.Length] : pool[random.Next(pool.Length)];
-                if (tier.SecondProductPercent > 0 && pool.Length > 1 && random.Next(100) < tier.SecondProductPercent)
+                int secondProductRoll = tier.SecondProductPercent > 0 && pool.Length > 1 ? random.Next(100) : 100;
+                if (secondProductRoll < tier.SecondProductPercent)
                 {
                     int second = product;
                     while (second == product) second = pool[random.Next(pool.Length)];
                     var products = new List<int> { product, second };
-                    // Up to four different products (Los Redondos, 2026-11-26): each extra one is rolled only once the previous one was added.
-                    if (tier.ThirdProductPercent > 0 && pool.Length > 2 && random.Next(100) < tier.ThirdProductPercent)
+                    // La Renga authors the third product as a share of all orders, nested inside the second threshold.
+                    // Other levels retain their conditional roll; the fourth product is conditional in both modes.
+                    if (tier.ThirdProductPercent > 0 && pool.Length > 2 &&
+                        (config.ThirdProductChanceOfAllOrders ? secondProductRoll : random.Next(100)) < tier.ThirdProductPercent)
                     {
                         products.Add(RollDistinctProduct(pool, products));
                         if (tier.FourthProductPercent > 0 && pool.Length > 3 && random.Next(100) < tier.FourthProductPercent)

@@ -1,5 +1,9 @@
 # Tower Defense — Camioneros, Los Redondos, La Renga y Peregrinación
 
+## Rampa compartida de La Renga y Los Redondos — 2026-11-28
+
+**Vigente:** ambos niveles usan la [misma rampa de 440 hinchas](la-renga.md#rampa-de-hinchas-vigente--2026-11-28), con 22 tramos y multiplicadores de ×1,00 a ×2,68. Sustituye los valores de 240 hinchas y hasta cuatro productos/cinco unidades de los registros anteriores de Los Redondos. Cada nivel mantiene su velocidad base, cocina, menú y economía propios; Camioneros y Peregrinación no cambian.
+
 ## Prueba visual: panel de 60° en el tramo vertical de Los Redondos — 2026-11-27
 
 Solo la vertical de la C invertida de **Los Redondos (ID10)** usa el PNG transparente `fence-panel-overhead-60-v1`. La configuración del nivel asigna la alternativa; las horizontales y los demás TD conservan `fence-panel-v1`. Se recortan en ejecución los márgenes laterales del sprite alternativo y se alinea el centro del marco; su ancho visible calza en la longitud del módulo existente. No cambian el número de piezas, las rotaciones (apoyos hacia la cocina), las posiciones, los colliders mundiales ni el recorrido.
@@ -25,7 +29,7 @@ Validación de la excepción del Mozo: **PASS** compilación C# del runtime Andr
 
 Validación 2026-11-27: **PASS** compilación C# del runtime Android y de los archivos EditMode/PlayMode afectados con Roslyn de Unity 6000.6.3f1; prueba fuera del Editor del selector de frases (6 casos) y del predicado de reposo (reposo más 8 estados ocupados). **BLOCKED** ejecución Unity de `CrewChantMatchesTheRoleAndVacioCatalog` y `LosRedondosAndLujanShowCrewChantsAtTheirExistingPosts`: el Editor no respondió a Unity MCP ni a la apertura del Test Runner por interfaz. **NOT_RUN** capturas Game View y dispositivo.
 
-**Validación del cambio de voz del pregón:** compilación del runtime y los dos fixtures con Roslyn de Unity y prueba directa del selector **PASS 10/10** fuera del Editor. **BLOCKED** ejecución en Unity y captura de los globos: la sesión MCP no respondió y macOS no expuso la ventana.
+**Validación del cambio de voz del pregón:** compilación del runtime y los dos fixtures con Roslyn de Unity y prueba directa del selector **PASS 10/10** fuera del Editor. El primer intento de Editor fue **BLOCKED**; revalidación 2026-11-28: **PASS 9/9** EditMode (`CrewChantMatchesTheRoleAndKitchen`) y **PASS 1/1** PlayMode (`LosRedondosAndLujanShowCrewChantsAtTheirExistingPosts`).
 
 ## Ciclo de piernas visible en todos los niveles TD — 2026-11-26, a pedido (vigente; supersede "ID10 sigue en su pose única")
 

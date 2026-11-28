@@ -49,9 +49,7 @@ namespace HayChoriYPaty
             if (worker.CarriedItemId > 0 && (worker.State == StreetWorkerState.ToCounter || worker.State == StreetWorkerState.Handoff ||
                 worker.State == StreetWorkerState.ToTable || worker.State == StreetWorkerState.Deposit))
                 campaignCrewChantWorked.Add(worker.Id);
-            bool atPost = worker.State == StreetWorkerState.Idle && !worker.ReturningToWaitPosition && !worker.VisualCooking &&
-                worker.CarriedItemId <= 0 && worker.CookingItemId <= 0 && (worker.Position - worker.WaitPosition).sqrMagnitude <= 1f;
-            if (!atPost)
+            if (!StreetWorkerProjection.IsWaitingAtPost(worker))
             {
                 campaignCrewChantStart.Remove(worker.Id);
                 return false;
@@ -167,6 +165,8 @@ namespace HayChoriYPaty
                 movement = new Vector2(0f, 1f);
             moving = workerPose.Moving;
             int frame=moving?SelectParrilleroWalkFrame(movement,workerPose.Frame):0;
+            if (StreetWorkerProjection.ShouldFaceCounterAtRest(game.Sim, w) &&
+                !StreetWorkerProjection.TryGetMozoWaitingSandwichTable(game.Sim, w, out _)) frame = 4; // Static rear view.
             if(w.State==StreetWorkerState.Pickup||w.State==StreetWorkerState.Deposit)frame=beverageRole?0:11;
             if(w.State==StreetWorkerState.Handoff)frame=beverageRole?0:3;
             float bob=workerPose.Bob*1.875f;
