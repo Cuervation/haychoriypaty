@@ -105,6 +105,7 @@ namespace HayChoriYPaty.Tests
         {
             Set(view, "levelSelectActive", true);
             Call(view, "EnterSelectedLevel", FirstAction + Array.IndexOf(CampaignOrder, level), level);
+            Call(view, "AdvanceRoundPriceBoard", 3f);
         }
 
         [UnityTest, Timeout(150000)]

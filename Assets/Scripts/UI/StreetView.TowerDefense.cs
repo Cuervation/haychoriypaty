@@ -925,18 +925,23 @@ namespace HayChoriYPaty
 
         private void DrawTowerDefenseSceneLayers(float canvasHeight)
         {
-            if (backdrop == null || towerDefenseBackdrop == null || canvasHeight <= 0f) return;
-            // Draw within the active safe-area logical canvas, like the route and footer.
-            // Use the selected club's existing mural art all the way to the route so no
-            // unrelated campaign mural can show through behind the HUD.
-            int visualLevelId = towerDefenseSourceConfig != null ? towerDefenseSourceConfig.SourceCampaignLevelId : 9;
-            Rect themeSource = ClubVisualTheme.ForLevel(visualLevelId).MuralSource;
-            Rect muralSource = new Rect(themeSource.x * towerDefenseBackdrop.width,
-                themeSource.y * towerDefenseBackdrop.height, themeSource.width * towerDefenseBackdrop.width,
-                themeSource.height * towerDefenseBackdrop.height);
+            float footerTop = IsPilgrimConstruction
+                ? TowerDefenseResponsiveLayout.PilgrimFooterTop(canvasHeight, PilgrimFooterSourceLevelId)
+                : canvasHeight - TowerDefenseResponsiveLayout.FooterReserve;
+            DrawTowerDefenseSceneLayers(canvasHeight, towerDefenseBackdrop,
+                towerDefenseSourceConfig != null ? towerDefenseSourceConfig.SourceCampaignLevelId : 9, footerTop);
+        }
+
+        private void DrawTowerDefenseSceneLayers(float canvasHeight, Texture2D levelBackdrop, int level, float footerTop)
+        {
+            if (backdrop == null || levelBackdrop == null || canvasHeight <= 0f) return;
+            // The same level mural and street are also used before the run, without instantiating it.
+            Rect themeSource = ClubVisualTheme.ForLevel(level).MuralSource;
+            Rect muralSource = new Rect(themeSource.x * levelBackdrop.width, themeSource.y * levelBackdrop.height,
+                themeSource.width * levelBackdrop.width, themeSource.height * levelBackdrop.height);
             Rect mural = new Rect(0f, 0f, W, TowerDefenseResponsiveLayout.RouteTopReserve - 24f
                 - TowerDefenseResponsiveLayout.VisualStageLift);
-            DrawRawCover(mural, towerDefenseBackdrop, muralSource);
+            DrawRawCover(mural, levelBackdrop, muralSource);
 
             float sx = backdrop.width / StreetSceneLayout.ReferenceBackdropSize.x;
             float sy = backdrop.height / StreetSceneLayout.ReferenceBackdropSize.y;
@@ -945,9 +950,6 @@ namespace HayChoriYPaty
             Rect sourceNearSidewalk = new Rect(100f * sx, 495f * sy, 740f * sx, 50f * sy);
             float sidewalkTop = mural.yMax;
             const float farSidewalkHeight = 24f, nearSidewalkHeight = 30f, stallSpaceHeight = 90f;
-            float footerTop = IsPilgrimConstruction
-                ? TowerDefenseResponsiveLayout.PilgrimFooterTop(canvasHeight, PilgrimFooterSourceLevelId)
-                : canvasHeight - TowerDefenseResponsiveLayout.FooterReserve;
             float roadBottom = footerTop - nearSidewalkHeight - stallSpaceHeight;
             Rect cleanRoad = new Rect(0f, sidewalkTop + farSidewalkHeight, W,
                 Mathf.Max(1f, roadBottom - sidewalkTop - farSidewalkHeight));

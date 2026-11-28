@@ -139,6 +139,7 @@ namespace HayChoriYPaty.Tests
             float end = Time.realtimeSinceStartup + 8f;
             while ((bool)Get(view, "RewardShutterActive") && Time.realtimeSinceStartup < end) yield return null;
             Assert.IsFalse((bool)Get(view, "RewardShutterActive"));
+            Call(view, "AdvanceRoundPriceBoard", 3f);
         }
 
         IEnumerator Capture(string name)

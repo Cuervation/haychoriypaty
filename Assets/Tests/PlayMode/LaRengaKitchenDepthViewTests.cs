@@ -98,6 +98,7 @@ namespace HayChoriYPaty.Tests
         {
             Set(view, "levelSelectActive", true);
             Call(view, "EnterSelectedLevel", FirstAction + Array.IndexOf(CampaignOrder, level), level);
+            Call(view, "AdvanceRoundPriceBoard", 3f); // These cases start behind the presentation.
         }
 
         object Role(int id) => Enum.ToObject(RuntimeType("StreetWorkerRole"), id);

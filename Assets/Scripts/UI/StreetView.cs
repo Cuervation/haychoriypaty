@@ -1031,6 +1031,9 @@ namespace HayChoriYPaty
         }
         private void OnDisable()
         {
+            ClearRoundPriceBoard();
+            roundPriceBoardChalk?.Dispose();
+            roundPriceBoardChalk = null;
             rewardShutterStarted = -1f; // Uncommitted choices remain pending in the existing save.
             rewardShutterWhenCovered = null;
             DisposeTowerDefenseUi();
@@ -1181,6 +1184,12 @@ namespace HayChoriYPaty
         {
             UpdatePostProcessingPolicy();
             UpdateRewardShutter();
+            if (RoundPriceBoardActive)
+            {
+                // Unscaled time keeps the countdown independent of game speed. A long frame must not skip a number.
+                AdvanceRoundPriceBoard(Mathf.Min(Time.unscaledDeltaTime, .15f));
+                return;
+            }
             if (badgesActive && viewResourcesReady) EnsureBadgeShapes(); // trophy art is sampled outside OnGUI
             UpdateProfileKeyboard();
             UpdateHubMusic();
@@ -1270,9 +1279,13 @@ namespace HayChoriYPaty
         private void OnGUI()
         {
             bool enabled = GUI.enabled;
-            if (RewardShutterActive) GUI.enabled = false;
-            DrawGameGui();
-            GUI.enabled = enabled;
+            if (RoundPriceBoardActive) DrawRoundPriceBoard();
+            else
+            {
+                if (RewardShutterActive) GUI.enabled = false;
+                DrawGameGui();
+                GUI.enabled = enabled;
+            }
             DrawRewardShutter();
         }
 
@@ -1423,7 +1436,8 @@ namespace HayChoriYPaty
                 Rect bounds = SaleFeedbackBounds(sale.Position, sale.Age, saleFeedbackTop, layoutVerticalScale);
                 GUI.color = new Color(1f, 1f, 1f, alpha);
                 Item(new Rect(bounds.x, bounds.y / layoutVerticalScale, 23f, 23f), 10);
-                GUI.Label(new Rect(bounds.x + 24f, bounds.y, 48f, bounds.height), "+" + sale.Amount, text);
+                OutlineLabelAtGuiBounds(new Rect(bounds.x + 24f, bounds.y, 48f, bounds.height),
+                    "+" + sale.Amount, text, Color.black, Color.white, new Vector2(1.25f, 1.25f));
                 GUI.color = Color.white;
             }
             if (sim.IsBonusTrack) DrawBonusTrackHud(sim);
@@ -1592,16 +1606,20 @@ namespace HayChoriYPaty
             GUI.DrawTexture(LayoutRect(bounds), Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
             GUI.color = previous;
         }
-        private void OutlineLabel(Rect bounds, string value, GUIStyle style, Color fill, float offset)
+        private void OutlineLabel(Rect bounds, string value, GUIStyle style, Color fill, float offset) =>
+            OutlineLabelAtGuiBounds(LayoutRect(bounds), value, style, fill, new Color(.08f, .035f, .018f, .98f),
+                new Vector2(offset, offset * layoutVerticalScale));
+
+        private static void OutlineLabelAtGuiBounds(Rect bounds, string value, GUIStyle style, Color fill, Color outline, Vector2 offset)
         {
             Color previous = style.normal.textColor;
-            style.normal.textColor = new Color(.08f, .035f, .018f, .98f);
+            style.normal.textColor = outline;
             for (int y = -1; y <= 1; y++)
             for (int x = -1; x <= 1; x++)
                 if (x != 0 || y != 0)
-                    Label(new Rect(bounds.x + x * offset, bounds.y + y * offset, bounds.width, bounds.height), value, style);
+                    GUI.Label(new Rect(bounds.x + x * offset.x, bounds.y + y * offset.y, bounds.width, bounds.height), value, style);
             style.normal.textColor = fill;
-            Label(bounds, value, style);
+            GUI.Label(bounds, value, style);
             style.normal.textColor = previous;
         }
         // The cover is the sole visual source for ordinary runtime buttons.

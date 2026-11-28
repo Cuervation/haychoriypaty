@@ -1,6 +1,6 @@
 # Current state — Hay Chori y Paty
 
-**Corte:** 2026-11-28, rama `docs/post-cleanup-state`. Última APK generada y verificada: `2d63a2d` (no instalada); última instalada en el Motorola: `4da798a`, 2026-11-28; no se abrió el juego en el dispositivo (ver [android-prototype](features/android-prototype.md)). Resumen corto para retomar; las reglas están en `AGENTS.md`, el detalle en cada contrato y la [tabla de balance](../docs/BALANCE_ACTUAL_NIVELES.md). Índice: [README](README.md). Snapshot anterior: [history/current-state-snapshot-through-20261113.md](history/current-state-snapshot-through-20261113.md).
+**Corte:** 2026-11-28, rama `docs/post-cleanup-state`. Última APK generada, verificada e instalada en el Motorola: `2d63a2d`, 2026-11-28; no se abrió el juego en el dispositivo (ver [android-prototype](features/android-prototype.md)). Resumen corto para retomar; las reglas están en `AGENTS.md`, el detalle en cada contrato y la [tabla de balance](../docs/BALANCE_ACTUAL_NIVELES.md). Índice: [README](README.md). Snapshot anterior: [history/current-state-snapshot-through-20261113.md](history/current-state-snapshot-through-20261113.md).
 
 ## Para retomar (Codex u otro agente)
 

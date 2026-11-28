@@ -116,7 +116,85 @@ namespace HayChoriYPaty.Tests
             float end = Time.realtimeSinceStartup + 8f;
             while ((bool)Get(view, "RewardShutterActive") && Time.realtimeSinceStartup < end) yield return null;
             Assert.IsFalse((bool)Get(view, "RewardShutterActive"));
+            Call(view, "AdvanceRoundPriceBoard", 3f);
             yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator AllCampaignPriceBoardMenusMatchTheLevelAndSortByPrice()
+        {
+            const string tdConfigPrefix = "TowerDefense/";
+            var configType = Runtime("TowerDefenseLevelConfig");
+            foreach (int level in Order)
+            {
+                Assert.IsTrue((bool)Call(game, "SelectLevel", level), "Campaign ID " + level);
+                var sim = Sim;
+                int[] actual = (int[])ViewStatic("RoundPriceBoardProductIds", sim);
+                string configPath = (string)configType.GetMethod("ResourcesPathForCampaignLevel", S).Invoke(null, new object[] { level });
+                int[] catalog = configPath != null && configPath.StartsWith(tdConfigPrefix, StringComparison.Ordinal)
+                    ? (int[])Get(Resources.Load(configPath, configType), "AvailableProducts")
+                    : Enumerable.Range(0, (int)Get(sim, "ProductCount")).Select(i => (int)Call(sim, "GetAvailableProduct", i)).ToArray();
+                CollectionAssert.AreEquivalent(catalog, actual, "Menu at campaign ID " + level);
+                CollectionAssert.IsOrdered(actual.Select(i => (float)Call(sim, "GetProductPrice", i)).ToArray(),
+                    "Price display at campaign ID " + level);
+            }
+            yield break;
+        }
+
+        static readonly int[] PriceBoardLevels = { 8, 5, 13 };
+
+        [UnityTest, Timeout(120000)]
+        public IEnumerator RoundPriceBoardShowsTheLiveMenuAndDoesNotOpenAnAttemptUntilOneEnds([ValueSource(nameof(PriceBoardLevels))] int level)
+        {
+            yield return Size(610, 1356);
+            long before = Attempts;
+            bool defense = level == 13;
+            if (defense)
+            {
+                Set(view, "levelSelectActive", true);
+                int first = (int)ViewType.GetField("LevelSelectFirstAction", S).GetRawConstantValue();
+                Call(view, "EnterSelectedLevel", first + Array.IndexOf(Order, level), level);
+            }
+            else
+            {
+                Assert.IsTrue((bool)Call(game, "SelectLevel", level));
+                Set(view, "marketActive", true);
+                Set(MarketData, "balanceCents", 10000000L);
+                if (!(bool)Get(game, "CanStartRound")) Assert.IsTrue((bool)Call(game, "TryBuyMissingIngredients"));
+                if (level == 8) Call(view, "HandleMarketPlay");
+                else Call(view, "StartAfterRoundPriceBoard", (Action)(() => Call(view, "StartTraditionalMarketRound")));
+            }
+            Assert.IsTrue((bool)Get(view, "RoundPriceBoardActive"));
+            CollectionAssert.AreEqual(defense ? new[] { 0, 1, 4, 6, 2 } : new[] { 0, 1, 4, 6, 2, 3, 5 },
+                (int[])Get(view, "roundPriceBoardProducts"), "The actual menu is sorted by price, then ID.");
+            CollectionAssert.AreEqual(defense ? new[] { "$5", "$5", "$5", "$7", "$10" }
+                : new[] { "$5", "$5", "$5", "$7", "$10", "$12", "$12" }, (string[])Get(view, "roundPriceBoardPrices"));
+            Assert.AreEqual("street-price-board-iron-v1", ((Texture2D)Get(view, "roundPriceBoardArt")).name);
+            if (defense)
+                Assert.AreEqual("street-background-larenga-autodromo-v1", ((Texture2D)Get(view, "roundPriceBoardDefenseBackdrop")).name);
+            else
+                Assert.AreEqual(level == 8 ? "street-background-boca-v1" : "street-background-racing-v1",
+                    ((Texture2D)Call(view, "CurrentGameplayBackdrop")).name);
+            Set(view, "roundPriceBoardPaused", true);
+            string name = level == 8 ? "boca" : level == 5 ? "racing" : "la-renga";
+            yield return Capture("610x1356-pizarra-hierro-" + name);
+            Set(view, "roundPriceBoardPaused", false);
+
+            for (int digit = 3; digit >= 1; digit--)
+            {
+                Assert.AreEqual(digit, Get(view, "RoundPriceBoardNumber"));
+                Assert.AreEqual("Ready", Get(Sim, "Phase").ToString());
+                Assert.AreEqual(0f, Get(Sim, "Elapsed"));
+                Assert.AreEqual(before, Attempts);
+                Assert.IsFalse((bool)Get(MarketData, "attemptActive"));
+                Call(view, "DispatchAction", 160); // A second tap cannot restart the countdown.
+                Call(view, "AdvanceRoundPriceBoard", 1f);
+            }
+            Assert.AreEqual("Playing", Get(Sim, "Phase").ToString());
+            Assert.IsFalse((bool)Get(view, "RoundPriceBoardActive"));
+            Assert.AreEqual(before + 1, Attempts);
+            Call(view, "AdvanceRoundPriceBoard", 3f);
+            Assert.AreEqual(before + 1, Attempts);
         }
 
         static IEnumerator Capture(string name)

@@ -1,8 +1,10 @@
-# Android — 2026-11-28: APK del commit `2d63a2d` (ajustes de campaña, objetivos de producto y presentación de trabajadores) (**BUILD/ARTEFACTO PASS; INSTALACIÓN NOT_REQUESTED; SMOKE NOT_RUN**)
+# Android — 2026-11-28: APK del commit `2d63a2d` (ajustes de campaña, objetivos de producto y presentación de trabajadores) (**BUILD/ARTEFACTO PASS; INSTALACIÓN PASS; SMOKE NOT_RUN**)
 
 Unity 6000.6.3f1 BuildPipeline desde el Editor activo (`manage_build`, Android no-Development, IL2CPP/ARM64, `build-53503812e4`): **Build Succeeded en 443,9 s, 0 errores, 11 advertencias** del commit local `2d63a2d`. APK local ignorada por Git: `Builds/Android/Archive/HayChoriYPaty-0.2.83-code85-2d63a2d-campaign-tuning-20261128.apk`, **217.989.861 bytes**, SHA-256 `a30a9fe6e71edb9418ada200dd8080c27d38a3f61c52a1fb2834827c6e756af7`.
 
-**Artefacto PASS:** ZIP íntegro, `zipalign -c -P 16 4`, firma v2 Android Debug (SHA-1 `bf9858166f755aac91a33da7409032b1daf1fc61`), `aapt`: `com.haychoriypaty.game`, 0.2.83/código 85, API 26/36, `arm64-v8a`, no `debuggable`; contiene `libil2cpp.so`. EditMode/PlayMode e instalación **no ejecutados** en esta tarea; la APK no se instaló ni se abrió en el teléfono.
+**Artefacto PASS:** ZIP íntegro, `zipalign -c -P 16 4`, firma v2 Android Debug (SHA-1 `bf9858166f755aac91a33da7409032b1daf1fc61`), `aapt`: `com.haychoriypaty.game`, 0.2.83/código 85, API 26/36, `arm64-v8a`, no `debuggable`; contiene `libil2cpp.so`. EditMode/PlayMode no ejecutados en esta tarea.
+
+**Instalación PASS:** `adb install -r` en Motorola Edge 60 Fusion: `Success`, sin desinstalar ni borrar datos. Package Manager confirma 0.2.83/código 85, `firstInstallTime=2026-10-03 18:49:24` conservado y `lastUpdateTime=2026-11-28 15:45:28`. El SHA-256 del `base.apk` instalado coincide con la APK local. No se abrió el juego en el teléfono.
 
 # Android — 2026-11-28: APK del commit `4da798a` (pregones de campaña y regreso a la parrilla de Los Redondos) (**BUILD/ARTEFACTO PASS; INSTALACIÓN PASS; SMOKE NOT_RUN**)
 

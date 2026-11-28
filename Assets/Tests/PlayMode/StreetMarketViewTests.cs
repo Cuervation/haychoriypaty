@@ -78,6 +78,7 @@ namespace HayChoriYPaty.Tests
                 started.SetValue(view, Time.unscaledTime - 5f);
                 update.Invoke(view, null);
             }
+            viewType.GetMethod("AdvanceRoundPriceBoard", Priv).Invoke(view, new object[] { 3f });
         }
         private Vector2 Pixel(float x, float y)
         {
@@ -247,7 +248,7 @@ namespace HayChoriYPaty.Tests
             }
             Assert.IsFalse(ShutterActive, "The shutter opens again afterwards.");
 
-            // 2. JUGAR PARTIDO in the Market also closes it first and starts the round only once it is shut.
+            // 2. JUGAR PARTIDO closes the shutter first; the menu board is next, then the attempt starts.
             object data = Market.GetType().GetProperty("Data", Pub).GetValue(Market, null);
             data.GetType().GetField("balanceCents", Pub).SetValue(data, 150000L);
             for (int id = 0; id < 10; id++)
@@ -258,7 +259,14 @@ namespace HayChoriYPaty.Tests
             Assert.IsTrue(ShutterActive, "Playing from the Market closes the shutter.");
             Assert.AreEqual("Ready", Sim.GetType().GetProperty("Phase", Pub).GetValue(Sim, null).ToString(), "The round has not started yet.");
             CoverShutter();
-            Assert.AreEqual("Playing", Sim.GetType().GetProperty("Phase", Pub).GetValue(Sim, null).ToString(), "The round starts behind the shutter.");
+            Assert.AreEqual("Ready", Sim.GetType().GetProperty("Phase", Pub).GetValue(Sim, null).ToString());
+            var advance = viewType.GetMethod("AdvanceRoundPriceBoard", Priv);
+            advance.Invoke(view, new object[] { 3f });
+            Assert.AreEqual("Ready", Sim.GetType().GetProperty("Phase", Pub).GetValue(Sim, null).ToString(), "The countdown does not run under a closed shutter.");
+            viewType.GetField("rewardShutterStarted", Priv).SetValue(view, Time.unscaledTime - 5f);
+            viewType.GetMethod("UpdateRewardShutter", Priv).Invoke(view, null);
+            advance.Invoke(view, new object[] { 3f });
+            Assert.AreEqual("Playing", Sim.GetType().GetProperty("Phase", Pub).GetValue(Sim, null).ToString());
             Assert.IsFalse((bool)viewType.GetField("marketActive", Priv).GetValue(view));
             yield return null;
         }

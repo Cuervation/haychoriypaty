@@ -1095,7 +1095,9 @@ namespace HayChoriYPaty.Tests
             Assert.IsTrue((bool)viewType.GetField("levelOneTutorialActive", PrivateInstance).GetValue(view));
             Rect skipBounds = (Rect)viewType.GetMethod("LevelOneTutorialSkipBounds", PrivateInstance).Invoke(view, null);
             yield return Click(skipBounds.center.x, skipBounds.center.y);
-            Assert.AreEqual("Playing", Phase, "Skip continues directly to the match.");
+            Assert.AreEqual("Ready", Phase, "Skip shows the price board before the match.");
+            viewType.GetMethod("AdvanceRoundPriceBoard", PrivateInstance).Invoke(view, new object[] { 3f });
+            Assert.AreEqual("Playing", Phase);
             Assert.AreEqual(0, PlayerPrefs.GetInt(tutorialCompletedKey, 0),
                 "Temporary QA repetition must not persist the completion marker.");
             yield return null;
@@ -1116,6 +1118,7 @@ namespace HayChoriYPaty.Tests
 
             int skipAction = (int)viewType.GetField("LevelOneTutorialSkipAction", StaticPrivate).GetRawConstantValue();
             viewType.GetMethod("DispatchAction", PrivateInstance).Invoke(view, new object[] { skipAction });
+            viewType.GetMethod("AdvanceRoundPriceBoard", PrivateInstance).Invoke(view, new object[] { 3f });
             Assert.AreEqual("Playing", Phase, "Skipping still starts the round.");
             Assert.AreEqual(1, PlayerPrefs.GetInt(tutorialCompletedKey, 0),
                 "The testing override must leave the prior marker unchanged.");
@@ -1917,6 +1920,7 @@ namespace HayChoriYPaty.Tests
             try
             {
                 yield return Tap(screen, 270, 585, 1);
+                view.GetType().GetMethod("AdvanceRoundPriceBoard", PrivateInstance).Invoke(view, new object[] { 3f });
                 Assert.AreEqual("Playing", Phase);
                 ((Behaviour)game).enabled = false;
                 Assert.AreEqual(0, Sim.GetType().GetProperty("Coins").GetValue(Sim, null));
