@@ -30,6 +30,7 @@ namespace HayChoriYPaty
             DrawHubHotspot(HubPlayAction);
             DrawHubSettingsButton();
             DrawHubTopMusicButton();
+            DrawHubProfileCard();
         }
 
         private void DrawHubSettingsButton()
@@ -107,10 +108,25 @@ namespace HayChoriYPaty
             finally { GUI.color = previousColor; }
         }
 
+        // 2026-11-26 resolution review: the panel used to stretch its position but not its size on non-16:9 screens, so its fill, frame and
+        // buttons drifted apart (an extra blue band under the frame on tablets). It is now drawn at its authored size, centred vertically.
+        private float HubSettingsOffsetY => (logicalCanvasHeight - H) * .5f;
+        private static Rect ShiftY(Rect r, float dy) { r.y += dy; return r; }
+        private Rect HubSettingsMusicButtonCanvasBounds => ShiftY(HubSettingsMusicButtonBounds, HubSettingsOffsetY);
+        private Rect HubSettingsBackButtonCanvasBounds => ShiftY(HubSettingsBackButtonBounds, HubSettingsOffsetY);
+
         private void DrawHubSettingsOverlay()
         {
             DrawIntroScreen(Texture2D.whiteTexture, new Color(0f, 0f, 0f, .62f), ScaleMode.StretchToFill);
-            Rect panel = HubSettingsPanelBounds;
+            float previousScale = layoutVerticalScale;
+            layoutVerticalScale = 1f;
+            try { DrawHubSettingsPanel(); }
+            finally { layoutVerticalScale = previousScale; }
+        }
+
+        private void DrawHubSettingsPanel()
+        {
+            Rect panel = ShiftY(HubSettingsPanelBounds, HubSettingsOffsetY);
             FillRect(panel, new Color(.018f, .075f, .145f, .98f));
             Color accent = new Color(.20f, .79f, 1f, 1f);
             FillRect(new Rect(panel.x, panel.y, panel.width, 4f), accent);
@@ -135,9 +151,9 @@ namespace HayChoriYPaty
             caption.normal.textColor = new Color(.84f, .94f, 1f);
             Label(new Rect(panel.x + 18f, panel.y + 20f, panel.width - 36f, 52f), "AJUSTES", heading);
             Label(new Rect(panel.x + 18f, panel.y + 77f, panel.width - 36f, 30f), "MÚSICA DEL BARRIO", caption);
-            DrawStandardButton(HubSettingsMusicButtonBounds, HubSettingsMusicAction,
+            DrawStandardButton(HubSettingsMusicButtonCanvasBounds, HubSettingsMusicAction,
                 HubMusicEnabled() ? "MÚSICA: ACTIVADA" : "MÚSICA: DESACTIVADA");
-            DrawStandardButton(HubSettingsBackButtonBounds, HubSettingsBackAction, "VOLVER AL BARRIO");
+            DrawStandardButton(HubSettingsBackButtonCanvasBounds, HubSettingsBackAction, "VOLVER AL BARRIO");
         }
         private void DrawHubHotspot(int action)
         {

@@ -278,28 +278,6 @@ namespace HayChoriYPaty
             return new Rect(column * cellWidth, atlas.height - (rowFromTop + 1) * cellHeight,
                 cellWidth, cellHeight);
         }
-        private static Rect FerroFanSourceRect(Texture2D atlas, int variant)
-        {
-            if (atlas == null) return Rect.zero;
-            float cellWidth = atlas.width / (float)TeamFanAtlasColumns;
-            float cellHeight = atlas.height / 4f;
-            int column = variant % TeamFanAtlasColumns;
-            int rowFromTop = variant / TeamFanAtlasColumns;
-            return new Rect(column * cellWidth, atlas.height - (rowFromTop + 1) * cellHeight,
-                cellWidth, cellHeight);
-        }
-        private static Rect LosRedondosFanSourceRect(Texture2D atlas, int customerId)
-        {
-            if (atlas == null) return Rect.zero;
-            int variant = customerId % LosRedondosFanVariantCount;
-            if (variant < 0) variant += LosRedondosFanVariantCount;
-            float cellWidth = atlas.width / (float)LosRedondosFanAtlasColumns;
-            float cellHeight = atlas.height / 4f;
-            int column = variant % LosRedondosFanAtlasColumns;
-            int rowFromTop = variant / LosRedondosFanAtlasColumns;
-            return new Rect(column * cellWidth, atlas.height - (rowFromTop + 1) * cellHeight,
-                cellWidth, cellHeight);
-        }
         private static Rect TeamFanSourceRect(Texture2D atlas, int customerId)
         {
             if (atlas == null) return Rect.zero;

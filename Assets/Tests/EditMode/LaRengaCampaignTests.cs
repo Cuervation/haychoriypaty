@@ -69,7 +69,7 @@ namespace HayChoriYPaty.Tests
         public void CampaignOrderAppendsLaRengaBeforeUnchangedTraditionalIds()
         {
             Type simulation = RuntimeType("StreetSimulation");
-            Assert.AreEqual(new[] { 0, 1, 9, 2, 12, 3, 11, 10, 13, 14, 4, 5, 6, 7, 8 },
+            Assert.AreEqual(new[] { 0, 1, 9, 2, 12, 3, 13, 11, 4, 5, 10, 6, 7, 8, 14 },
                 simulation.GetField("CampaignOrder", PublicStatic).GetValue(null));
             Assert.AreEqual(15, ((string[])simulation.GetField("LevelNames", PublicStatic).GetValue(null)).Length);
             Assert.AreEqual(13, simulation.GetField("LaRengaTowerDefenseCampaignLevelId", PublicStatic).GetRawConstantValue());
@@ -155,10 +155,15 @@ namespace HayChoriYPaty.Tests
             Assert.IsTrue((bool)Invoke(game, "SelectLevel", levelId));
             Assert.IsTrue((bool)Invoke(game, "TryStartTowerDefenseRound"));
             object sim = ReadProperty(game, "Sim");
-            int[] deliveries = new int[7]; deliveries[0] = 1;
+            int[] deliveries = levelId == 10 ? new[] { 18, 15, 13, 0, 11, 0, 17 } : new[] { 1, 0, 0, 0, 0, 0, 0 };
             int[] workers = (int[])ReadProperty(sim, "WorkerCountsByRole");
+            if (levelId == 10)
+            {
+                Assert.IsFalse((bool)Invoke(game, "IsLevelUnlocked", 11));
+                // 2026-11-24: Los Redondos sells Racing's seven products (Fernet included), so no product is outside its menu any more.
+            }
             Assert.IsTrue((bool)InvokeAny(sim, "ImportTowerDefenseState", 240f, 600, 250, 1, workers,
-                deliveries, 8, 7, true, true));
+                deliveries, levelId == 10 ? 60 : 8, levelId == 10 ? 60 : 7, true, true));
             Assert.IsTrue((bool)Invoke(game, "ProcessRoundResult"));
             Assert.IsTrue((bool)Invoke(game, "TryCollectVictoryReward"));
         }
@@ -169,15 +174,17 @@ namespace HayChoriYPaty.Tests
             object game = NewGame(NewCampaignSave(10));
             Assert.AreEqual(0L, ReadProperty(game, "TicketBalance"));
             WinDefenseRound(game, 10);
-            Assert.IsTrue((bool)Invoke(game, "IsLevelUnlocked", 13), "A settled ID10 victory must unlock ID13.");
+            // Current chain: Ferro -> La Renga -> Huracán -> (a star there) -> Independiente -> Racing -> Los Redondos -> San Lorenzo ... Boca -> Peregrinación.
+            Assert.IsTrue((bool)Invoke(game, "IsLevelUnlocked", 6), "A settled ID10 victory must unlock San Lorenzo ID6.");
             Assert.IsFalse((bool)Invoke(game, "TryCollectVictoryReward"));
             Assert.IsFalse((bool)Invoke(game, "ProcessRoundResult"));
             Assert.AreEqual(1L, ReadProperty(game, "TicketBalance"));
             Assert.AreEqual(1, persistedMatchCount);
             Assert.AreEqual(1L, ((long[])Field(Field(Field(game, "save"), "statistics"), "winsByLevel"))[10]);
 
+            ((bool[])Field(Field(game, "save"), "unlockedLevelIds"))[13] = true; // the real route reaches it from Ferro, covered elsewhere
             WinDefenseRound(game, 13);
-            Assert.IsTrue((bool)Invoke(game, "IsLevelUnlocked", 14), "A settled ID13 victory must unlock Peregrinación ID14.");
+            Assert.IsTrue((bool)Invoke(game, "IsLevelUnlocked", 11), "A settled ID13 victory must unlock Huracán ID11.");
             Assert.IsFalse((bool)Invoke(game, "TryCollectVictoryReward"));
             Assert.IsFalse((bool)Invoke(game, "ProcessRoundResult"));
             Assert.AreEqual(2L, ReadProperty(game, "TicketBalance"));
@@ -276,7 +283,47 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
-        public void LaRengaConfigUsesSharedTwoProductTowerDefenseDefaults()
+        public void CamionerosGetsHarderEveryTenFansUpToTimesOnePointEightyEight()
+        {
+            Type configType = RuntimeType("TowerDefenseLevelConfig");
+            string path = configType.GetMethod("ResourcesPathForCampaignLevel", PublicStatic).Invoke(null, new object[] { 9 }) as string;
+            var config = Resources.Load(path, configType);
+            Assert.NotNull(config);
+            // 2026-11-24 (a pedido): La Renga's "E" table over Camioneros' 120 fans: twelve tiers, one every 10 fans (x1.00 .. x1.88, +0.08), orders of 3 units from fan 70 and
+            // 20 starting coins (it was x1.00 .. x1.66 and 500 coins; 50 coins on 2026-11-24 before this change).
+            Assert.AreEqual(120, configType.GetProperty("TotalFanCount").GetValue(config, null));
+            Assert.AreEqual(true, configType.GetProperty("HasDifficultyRamp").GetValue(config, null));
+            var tierFor = configType.GetMethod("DifficultyTierForFan");
+            // 2026-11-26 (a pedido): from tier 2 more 2- and 3-unit lines and more two-product orders, plus 4 and 5 units by difficulty.
+            float previousSpeed = 0f, previousUnits = 0f; int previousSecond = -1;
+            for (int tierIndex = 0; tierIndex < 12; tierIndex++)
+            {
+                object tier = tierFor.Invoke(config, new object[] { tierIndex * 10 });
+                Assert.AreEqual(tier.GetType().GetField("FromFan").GetValue(tier), tierIndex * 10, "tier " + tierIndex + " starts at fan " + tierIndex * 10);
+                float speed = (float)tier.GetType().GetField("SpeedMultiplier").GetValue(tier);
+                int Percent(object t, string field) => (int)t.GetType().GetField(field).GetValue(t);
+                int two = Percent(tier, "Quantity2Percent"), three = Percent(tier, "Quantity3Percent"), four = Percent(tier, "Quantity4Percent"),
+                    five = Percent(tier, "Quantity5Percent"), second = Percent(tier, "SecondProductPercent");
+                Assert.LessOrEqual(two + three + four + five, 100, "quantity chances of tier " + tierIndex);
+                float units = (100 - two - three - four - five + 2 * two + 3 * three + 4 * four + 5 * five) / 100f;
+                Assert.AreEqual(1.20f + .10f * tierIndex, speed, 0.0001f, "speed of tier " + tierIndex); // x1.20 +0.10 per tier (2026-11-26, a pedido; was x1.16 +0.08)
+                Assert.Greater(speed, previousSpeed); Assert.GreaterOrEqual(second, previousSecond);
+                if (tierIndex > 0) Assert.Greater(units, previousUnits, "average units per line grow from tier " + tierIndex);
+                previousSpeed = speed; previousUnits = units; previousSecond = second;
+            }
+            object first = tierFor.Invoke(config, new object[] { 0 });
+            Assert.AreEqual(0, (int)first.GetType().GetField("Quantity2Percent").GetValue(first), "the first ten fans still ask for one unit");
+            Assert.AreEqual(20, (int)first.GetType().GetField("SecondProductPercent").GetValue(first));
+            object last = tierFor.Invoke(config, new object[] { 119 });
+            Assert.AreEqual(2.30f, (float)last.GetType().GetField("SpeedMultiplier").GetValue(last), 0.0001f);
+            Assert.AreEqual(50, (int)last.GetType().GetField("Quantity4Percent").GetValue(last));
+            Assert.AreEqual(50, (int)last.GetType().GetField("Quantity5Percent").GetValue(last));
+            Assert.AreEqual(100, (int)last.GetType().GetField("SecondProductPercent").GetValue(last));
+            Assert.AreEqual(20, configType.GetProperty("StartingCoins").GetValue(config, null), "Camioneros starts with 20 coins.");
+        }
+
+        [Test]
+        public void LaRengaConfigUsesFerroMenuOnTheCShapedFence()
         {
             string path = RuntimeType("TowerDefenseLevelConfig").GetMethod("ResourcesPathForCampaignLevel", PublicStatic)
                 .Invoke(null, new object[] { 13 }) as string;
@@ -285,10 +332,46 @@ namespace HayChoriYPaty.Tests
             var config = Resources.Load(path, configType);
             Assert.NotNull(config);
             Assert.AreEqual(13, configType.GetProperty("SourceCampaignLevelId").GetValue(config, null));
-            Assert.AreEqual(60, configType.GetProperty("TotalFanCount").GetValue(config, null));
-            Assert.AreEqual(0.1575f, configType.GetProperty("FanSpeed").GetValue(config, null));
-            Assert.AreEqual(96f, configType.GetProperty("MinimumEntrySpacingLogical").GetValue(config, null));
-            CollectionAssert.AreEqual(new[] { 0, 4 }, (int[])configType.GetProperty("AvailableProducts").GetValue(config, null));
+            Assert.AreEqual(440, ReadProperty(config, "TotalFanCount"));
+            Assert.AreEqual(0.1875f, (float)ReadProperty(config, "FanSpeed"), 0.00001f);
+            Assert.AreEqual(70f, ReadProperty(config, "MinimumEntrySpacingLogical"));
+            Assert.AreEqual(int.MaxValue, ReadProperty(config, "MaximumWorkersPerRole"));
+            Assert.AreEqual(2, Convert.ToInt32(ReadProperty(config, "RouteKind")));
+            CollectionAssert.AreEqual(new[] { 0, 1, 2, 4, 6 }, (int[])configType.GetProperty("AvailableProducts").GetValue(config, null));
+        }
+
+        [TestCase(13, .1875f)]
+        [TestCase(10, .1535625f)]
+        public void RengaAndRedondosUseTheSameTwentyTwoTierRamp(int level, float baseSpeed)
+        {
+            Type configType = RuntimeType("TowerDefenseLevelConfig");
+            string path = (string)configType.GetMethod("ResourcesPathForCampaignLevel", PublicStatic)
+                .Invoke(null, new object[] { level });
+            var config = Resources.Load(path, configType);
+            Assert.NotNull(config);
+            Assert.AreEqual(440, ReadProperty(config, "TotalFanCount"));
+            Assert.AreEqual(70f, ReadProperty(config, "MinimumEntrySpacingLogical"));
+            Assert.AreEqual(baseSpeed, (float)ReadProperty(config, "FanSpeed"), .00001f);
+            Assert.AreEqual(true, ReadProperty(config, "ThirdProductChanceOfAllOrders"));
+            var tierFor = configType.GetMethod("DifficultyTierForFan");
+            int[] two = { 0, 30, 40, 30, 20, 10, 10 };
+            int[] three = { 0, 0, 20, 40, 60, 80, 90 };
+            int[] second = { 20, 25, 30, 35, 40, 45, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 100, 100, 100, 100, 100, 100 };
+            int[] third = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100 };
+            for (int fan = 0; fan < 440; fan++)
+            {
+                int i = fan / 20;
+                object tier = tierFor.Invoke(config, new object[] { fan });
+                Assert.AreEqual(i * 20, Get(tier, "FromFan"), "fan " + (fan + 1));
+                Assert.AreEqual(1f + .08f * i, (float)Get(tier, "SpeedMultiplier"), .0001f);
+                Assert.AreEqual(i < two.Length ? two[i] : 0, Get(tier, "Quantity2Percent"));
+                Assert.AreEqual(i < three.Length ? three[i] : 100, Get(tier, "Quantity3Percent"));
+                Assert.AreEqual(0, Get(tier, "Quantity4Percent"));
+                Assert.AreEqual(0, Get(tier, "Quantity5Percent"));
+                Assert.AreEqual(second[i], Get(tier, "SecondProductPercent"));
+                Assert.AreEqual(third[i], Get(tier, "ThirdProductPercent"));
+                Assert.AreEqual(0, Get(tier, "FourthProductPercent"));
+            }
         }
     }
 }

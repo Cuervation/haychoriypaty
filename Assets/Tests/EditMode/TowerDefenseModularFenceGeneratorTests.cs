@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
@@ -9,6 +10,72 @@ namespace HayChoriYPaty.Tests
     {
         private const BindingFlags PublicInstance = BindingFlags.Public | BindingFlags.Instance;
         private const BindingFlags PrivateInstance = BindingFlags.NonPublic | BindingFlags.Instance;
+
+        [Test]
+        public void LosRedondosUsesSixtyDegreeArtOnlyOnVerticalPanelsWithoutMovingColliders()
+        {
+            Type configType = Type.GetType("HayChoriYPaty.TowerDefenseLevelConfig, Assembly-CSharp", true);
+            Type generatorType = Type.GetType("HayChoriYPaty.TowerDefenseModularFenceGenerator, Assembly-CSharp", true);
+            var config = Resources.Load("TowerDefense/LosRedondos-Tandil", configType) as ScriptableObject;
+            Assert.IsNotNull(config);
+            var alternative = (Sprite)configType.GetProperty("VerticalFencePanelSprite", PublicInstance).GetValue(config);
+            Assert.IsNotNull(alternative, "Los Redondos must reference the imported 60-degree PNG.");
+            Assert.AreEqual("fence-panel-overhead-60-v1", alternative.texture.name);
+            foreach (string level in new[] { "Camioneros-PlazaDeMayo", "LaRenga-AutodromoBuenosAires", "Peregrinacion-LujanMoreno" })
+            {
+                var other = Resources.Load("TowerDefense/" + level, configType);
+                Assert.IsNotNull(other);
+                Assert.IsNull(configType.GetProperty("VerticalFencePanelSprite", PublicInstance).GetValue(other), level);
+            }
+
+            var baseline = UnityEngine.Object.Instantiate(config);
+            configType.GetField("verticalFencePanelSprite", PrivateInstance).SetValue(baseline, null);
+            var before = new GameObject("Original fence");
+            var after = new GameObject("Vertical alternative");
+            try
+            {
+                var source = Resources.Load<Sprite>("fence-panel-v1");
+                Assert.IsNotNull(source);
+                void Generate(GameObject owner, ScriptableObject level)
+                {
+                    Component generator = owner.AddComponent(generatorType);
+                    Set(generator, "levelConfig", level);
+                    Set(generator, "fencePanelSprite", source);
+                    generatorType.GetMethod("SetLogicalPanelSize", PublicInstance).Invoke(generator, new object[] { .02f });
+                    Assert.IsTrue((bool)generatorType.GetMethod("Generate", PublicInstance).Invoke(generator, null),
+                        Get<string>(generator, "LatestError"));
+                }
+                Generate(before, baseline); Generate(after, config);
+
+                var expected = before.GetComponentsInChildren<BoxCollider2D>().ToDictionary(x => x.name);
+                BoxCollider2D[] panels = after.GetComponentsInChildren<BoxCollider2D>();
+                Assert.AreEqual(expected.Count, panels.Length);
+                int verticalCount = 0, horizontalCount = 0;
+                foreach (BoxCollider2D panel in panels)
+                {
+                    BoxCollider2D old = expected[panel.name];
+                    Assert.AreEqual(old.transform.position, panel.transform.position, panel.name);
+                    Assert.AreEqual(old.transform.rotation, panel.transform.rotation, panel.name);
+                    Assert.That((panel.transform.TransformVector(panel.size) - old.transform.TransformVector(old.size)).magnitude,
+                        Is.LessThan(.0001f), panel.name);
+                    bool vertical = Mathf.Abs(panel.transform.right.y) > .9f;
+                    if (vertical) verticalCount++; else horizontalCount++;
+                    Sprite actual = panel.GetComponent<SpriteRenderer>().sprite;
+                    Assert.AreSame(vertical ? alternative.texture : source.texture, actual.texture, panel.name);
+                    if (vertical) Assert.Less(actual.rect.width, alternative.rect.width, "Trim the alternative's transparent side margins.");
+                }
+                Assert.Greater(verticalCount, 0);
+                Assert.Greater(horizontalCount, 0);
+                CollectionAssert.AreEqual(before.GetComponentInChildren<EdgeCollider2D>().points,
+                    after.GetComponentInChildren<EdgeCollider2D>().points);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(before);
+                UnityEngine.Object.DestroyImmediate(after);
+                UnityEngine.Object.DestroyImmediate(baseline);
+            }
+        }
 
         [TestCase(.01f)]
         [TestCase(.02f)]
@@ -265,6 +332,7 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
+        [Ignore("Los Redondos (ID10) now plays La Renga's inverted C-shaped single fence (2026-11-24); this test covered its former five-run fence.")]
         public void LosRedondosDrawsBothRailsAlongTheWholeFiveRunRoute()
         {
             Type generatorType = Type.GetType("HayChoriYPaty.TowerDefenseModularFenceGenerator, Assembly-CSharp", true);

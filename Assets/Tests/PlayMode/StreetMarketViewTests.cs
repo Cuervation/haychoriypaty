@@ -21,6 +21,14 @@ namespace HayChoriYPaty.Tests
         private Type gameType, viewType;
         private bool hadSave;
         private string previousSave;
+        private int batchSaveCalls;
+        private bool failBatchWrite;
+
+        private bool PersistBatchProbe<TMatch>(string json, TMatch match)
+        {
+            batchSaveCalls++;
+            return !failBatchWrite;
+        }
 
         [UnitySetUp]
         public IEnumerator SetUp()
@@ -59,7 +67,19 @@ namespace HayChoriYPaty.Tests
         private object GetGame(string name) => gameType.GetProperty(name, Pub).GetValue(game, null);
         private object Sim => GetGame("Sim");
         private object Market => GetGame("Market");
-        private void Dispatch(int action) => viewType.GetMethod("DispatchAction", Priv).Invoke(view, new object[] { action });
+        private void Dispatch(int action)
+        {
+            viewType.GetMethod("DispatchAction", Priv).Invoke(view, new object[] { action });
+            // The level tap and JUGAR PARTIDO run behind the reward shutter: let it close, run its action and open.
+            FieldInfo started = viewType.GetField("rewardShutterStarted", Priv);
+            MethodInfo update = viewType.GetMethod("UpdateRewardShutter", Priv);
+            for (int i = 0; i < 3 && (float)started.GetValue(view) >= 0f; i++)
+            {
+                started.SetValue(view, Time.unscaledTime - 5f);
+                update.Invoke(view, null);
+            }
+            viewType.GetMethod("AdvanceRoundPriceBoard", Priv).Invoke(view, new object[] { 3f });
+        }
         private Vector2 Pixel(float x, float y)
         {
             Rect viewport = (Rect)viewType.GetMethod("CanvasViewport", PrivStatic)
@@ -74,6 +94,64 @@ namespace HayChoriYPaty.Tests
             MethodInfo pointer = viewType.GetMethod("HandlePointer", Priv);
             pointer.Invoke(view, new object[] { p, true, false });
             pointer.Invoke(view, new object[] { p, false, true });
+        }
+
+        [UnityTest]
+        public IEnumerator BuyingAllMissingIngredientsIsOneAtomicSaveAndDoesNotChargeAgain()
+        {
+            Assert.IsTrue((bool)gameType.GetMethod("SelectLevel", Pub).Invoke(game, new object[] { 1 }));
+            viewType.GetField("marketActive", Priv).SetValue(view, true);
+            viewType.GetField("hubActive", Priv).SetValue(view, false);
+            viewType.GetField("levelSelectActive", Priv).SetValue(view, false);
+            object data = Market.GetType().GetProperty("Data").GetValue(Market);
+            var stock = (int[])data.GetType().GetField("stockUnits").GetValue(data);
+            Array.Clear(stock, 0, stock.Length);
+            FieldInfo balance = data.GetType().GetField("balanceCents");
+            long cost = (long)Market.GetType().GetMethod("MinimumPurchaseCostCents").Invoke(Market, new[] { Sim });
+            Assert.Greater(cost, 0);
+            long nextId = (long)Market.GetType().GetProperty("NextPurchaseId").GetValue(Market);
+            object save = gameType.GetField("save", Priv).GetValue(game);
+            object stats = save.GetType().GetField("statistics").GetValue(save);
+            string originalStats = JsonUtility.ToJson(stats);
+            FieldInfo persist = gameType.GetField("persist", Priv);
+            Type match = persist.FieldType.GetGenericArguments()[1];
+            persist.SetValue(game, GetType().GetMethod("PersistBatchProbe", Priv).MakeGenericMethod(match)
+                .CreateDelegate(persist.FieldType, this));
+            batchSaveCalls = 0;
+            var buy = gameType.GetMethod("TryBuyMissingIngredients", Pub);
+            var dataProperty = Market.GetType().GetProperty("Data");
+
+            balance.SetValue(data, cost - 1);
+            string lowBalanceSnapshot = JsonUtility.ToJson(data);
+            Assert.IsFalse((bool)buy.Invoke(game, null));
+            Assert.AreEqual(0, batchSaveCalls);
+            Assert.AreEqual(lowBalanceSnapshot, JsonUtility.ToJson(dataProperty.GetValue(Market)));
+
+            balance.SetValue(data, cost);
+            string prior = JsonUtility.ToJson(data);
+            failBatchWrite = true;
+            Dispatch(150);
+            Assert.AreEqual(1, batchSaveCalls, "The entire basket attempts one durable write.");
+            Assert.AreEqual(prior, JsonUtility.ToJson(dataProperty.GetValue(Market)), "Balance, stock and purchase IDs roll back together.");
+            Assert.AreEqual(originalStats, JsonUtility.ToJson(stats));
+            Assert.IsFalse((bool)GetGame("CanStartRound"));
+            StringAssert.Contains("no cambiaron", (string)viewType.GetField("marketMessage", Priv).GetValue(view));
+
+            yield return new WaitForSecondsRealtime(.3f);
+            failBatchWrite = false;
+            Dispatch(150);
+            Assert.AreEqual(2, batchSaveCalls);
+            Assert.IsTrue((bool)GetGame("CanStartRound"));
+            Assert.AreEqual(0L, Market.GetType().GetProperty("BalanceCents").GetValue(Market));
+            Assert.AreEqual(nextId + 3, Market.GetType().GetProperty("NextPurchaseId").GetValue(Market));
+            Assert.AreEqual(cost, stats.GetType().GetField("ingredientSpendTotalCents").GetValue(stats));
+            foreach (int id in new[] { 0, 1, 6 })
+                Assert.Greater(((long[])stats.GetType().GetField("purchasedUnitsByIngredient").GetValue(stats))[id], 0L);
+            StringAssert.Contains("Stock completo", (string)viewType.GetField("marketMessage", Priv).GetValue(view));
+            string committed = JsonUtility.ToJson(dataProperty.GetValue(Market));
+            Assert.IsFalse((bool)buy.Invoke(game, null), "An immediate repeat with no shortages cannot charge twice.");
+            Assert.AreEqual(2, batchSaveCalls);
+            Assert.AreEqual(committed, JsonUtility.ToJson(dataProperty.GetValue(Market)));
         }
 
         [UnityTest]
@@ -138,6 +216,58 @@ namespace HayChoriYPaty.Tests
             viewType.GetField("marketLastPurchaseTime", Priv).SetValue(view, -100f);
             Dispatch(120); Dispatch(140);
             Assert.AreEqual(goal+10, stock[0], "Extra stock never bypasses the cash-only guard.");
+            yield return null;
+        }
+
+        private bool ShutterActive => (float)viewType.GetField("rewardShutterStarted", Priv).GetValue(view) >= 0f;
+        private void CoverShutter()
+        {
+            // Jump to the instant the panels fully cover the screen: the hidden action runs now.
+            viewType.GetField("rewardShutterStarted", Priv).SetValue(view, Time.unscaledTime - .6f);
+            viewType.GetMethod("UpdateRewardShutter", Priv).Invoke(view, null);
+        }
+
+        [UnityTest]
+        public IEnumerator TappingALevelAndPlayingFromTheMarketBothCloseTheShutterFirst()
+        {
+            MethodInfo dispatchRaw = viewType.GetMethod("DispatchAction", Priv);
+            // 1. A level tap does nothing until the shutter covers the screen, then it opens that level's Market.
+            viewType.GetField("levelSelectActive", Priv).SetValue(view, true);
+            dispatchRaw.Invoke(view, new object[] { 31 });
+            Assert.IsTrue(ShutterActive, "Tapping a level closes the shutter.");
+            Assert.IsTrue((bool)viewType.GetField("levelSelectActive", Priv).GetValue(view), "The selector stays under the closing shutter.");
+            Assert.IsFalse((bool)viewType.GetField("marketActive", Priv).GetValue(view));
+            dispatchRaw.Invoke(view, new object[] { 31 }); // input is ignored while the shutter moves
+            CoverShutter();
+            Assert.IsTrue((bool)viewType.GetField("marketActive", Priv).GetValue(view), "Behind the shutter the level's Market opens.");
+            Assert.IsFalse((bool)viewType.GetField("levelSelectActive", Priv).GetValue(view));
+            for (int i = 0; i < 3 && ShutterActive; i++)
+            {
+                viewType.GetField("rewardShutterStarted", Priv).SetValue(view, Time.unscaledTime - 5f);
+                viewType.GetMethod("UpdateRewardShutter", Priv).Invoke(view, null);
+            }
+            Assert.IsFalse(ShutterActive, "The shutter opens again afterwards.");
+
+            // 2. JUGAR PARTIDO closes the shutter first; the menu board is next, then the attempt starts.
+            object data = Market.GetType().GetProperty("Data", Pub).GetValue(Market, null);
+            data.GetType().GetField("balanceCents", Pub).SetValue(data, 150000L);
+            for (int id = 0; id < 10; id++)
+                if ((int)Market.GetType().GetMethod("MissingPacks", Pub).Invoke(Market, new[] { Sim, (object)id }) > 0)
+                    Assert.IsTrue((bool)gameType.GetMethod("BuyMissingIngredient", Pub).Invoke(game, new object[] { id }));
+            Assert.IsTrue((bool)GetGame("CanStartRound"));
+            dispatchRaw.Invoke(view, new object[] { 160 });
+            Assert.IsTrue(ShutterActive, "Playing from the Market closes the shutter.");
+            Assert.AreEqual("Ready", Sim.GetType().GetProperty("Phase", Pub).GetValue(Sim, null).ToString(), "The round has not started yet.");
+            CoverShutter();
+            Assert.AreEqual("Ready", Sim.GetType().GetProperty("Phase", Pub).GetValue(Sim, null).ToString());
+            var advance = viewType.GetMethod("AdvanceRoundPriceBoard", Priv);
+            advance.Invoke(view, new object[] { 3f });
+            Assert.AreEqual("Ready", Sim.GetType().GetProperty("Phase", Pub).GetValue(Sim, null).ToString(), "The countdown does not run under a closed shutter.");
+            viewType.GetField("rewardShutterStarted", Priv).SetValue(view, Time.unscaledTime - 5f);
+            viewType.GetMethod("UpdateRewardShutter", Priv).Invoke(view, null);
+            advance.Invoke(view, new object[] { 3f });
+            Assert.AreEqual("Playing", Sim.GetType().GetProperty("Phase", Pub).GetValue(Sim, null).ToString());
+            Assert.IsFalse((bool)viewType.GetField("marketActive", Priv).GetValue(view));
             yield return null;
         }
 
@@ -441,6 +571,38 @@ namespace HayChoriYPaty.Tests
         }
 
         [UnityTest]
+        public IEnumerator ExtrasShowsRacingCampaignPositionWithoutChangingRedemptionGate()
+        {
+            yield return WaitForStreetViewResources();
+            viewType.GetField("marketActive", Priv).SetValue(view, true);
+            viewType.GetField("levelSelectActive", Priv).SetValue(view, false);
+            Assert.IsTrue((bool)gameType.GetMethod("SelectLevel", Pub).Invoke(game, new object[] { 0 }));
+            object save = gameType.GetField("save", Priv).GetValue(game);
+            ((bool[])save.GetType().GetField("unlockedLevelIds").GetValue(save))[5] = false;
+            object tickets = save.GetType().GetField("tickets").GetValue(save);
+            tickets.GetType().GetField("balance").SetValue(tickets, 10L);
+            tickets.GetType().GetField("totalEarned").SetValue(tickets, 10L);
+            Assert.IsFalse((bool)GetGame("TicketExtrasUnlocked"));
+            Dispatch(192);
+            StringAssert.Contains("Racing (nivel 12)", (string)viewType.GetMethod("MarketExtrasUnlockMessage", PrivStatic).Invoke(null, null));
+#if UNITY_EDITOR
+            var portrait = new PortraitGameView(540, 960);
+            portrait.Begin();
+            try
+            {
+                yield return portrait.WaitUntilApplied();
+                yield return new WaitForEndOfFrame();
+                SaveCurrentGameViewCapture("qa07-extras-racing-position-540x960");
+            }
+            finally { portrait.End(); }
+#endif
+            Dispatch(220);
+            Assert.AreEqual("Desbloqueá Racing y elegí una cancha compatible.",
+                viewType.GetField("marketMessage", Priv).GetValue(view));
+            Assert.AreEqual(10L, GetGame("TicketBalance"));
+        }
+
+        [UnityTest]
         public IEnumerator MarketTabsAndExtrasCardsRemainInTheScrollableSafeViewportAtPortraitHeights()
         {
             Assert.IsTrue((bool)gameType.GetMethod("SelectLevel", Pub).Invoke(game, new object[] { 5 }));
@@ -515,6 +677,42 @@ namespace HayChoriYPaty.Tests
             var capture = ScreenCapture.CaptureScreenshotAsTexture();
             try { File.WriteAllBytes("/private/tmp/hcyp-market-rounded.png", capture.EncodeToPNG()); }
             finally { UnityEngine.Object.Destroy(capture); }
+        }
+
+        [UnityTest]
+        public IEnumerator FerroShortageIsVisibleWithoutScrollingAndClearsWhenStockIsReady()
+        {
+            yield return WaitForStreetViewResources();
+            Assert.IsTrue((bool)gameType.GetMethod("SelectLevel", Pub).Invoke(game, new object[] { 3 }));
+            viewType.GetField("marketActive", Priv).SetValue(view, true);
+            viewType.GetField("levelSelectActive", Priv).SetValue(view, false);
+            object data = Market.GetType().GetProperty("Data", Pub).GetValue(Market, null);
+            int[] stock = (int[])data.GetType().GetField("stockUnits").GetValue(data);
+            int[] needed = (int[])Market.GetType().GetMethod("RequiredUnits", Pub).Invoke(Market, new[] { Sim });
+            Array.Copy(needed, stock, needed.Length);
+            const int coca = 6;
+            Assert.Greater(needed[coca], 0);
+            stock[coca] = 0;
+            MethodInfo message = viewType.GetMethod("MarketShortageMessage", Priv);
+            MethodInfo caption = viewType.GetMethod("MarketPlayCaption", PrivStatic);
+            Assert.AreEqual("FALTA: COCA", message.Invoke(view, null));
+            Assert.AreEqual("JUGAR · FALTA STOCK", caption.Invoke(null, new[] { message.Invoke(view, null) }));
+            Assert.IsFalse((bool)GetGame("CanStartRound"));
+#if UNITY_EDITOR
+            var portrait = new PortraitGameView(540, 960);
+            portrait.Begin();
+            try
+            {
+                yield return portrait.WaitUntilApplied();
+                yield return new WaitForEndOfFrame();
+                SaveCurrentGameViewCapture("qa05-ferro-stock-missing-540x960");
+            }
+            finally { portrait.End(); }
+#endif
+            stock[coca] = needed[coca];
+            Assert.AreEqual("", message.Invoke(view, null));
+            Assert.AreEqual("JUGAR PARTIDO", caption.Invoke(null, new[] { message.Invoke(view, null) }));
+            Assert.IsTrue((bool)GetGame("CanStartRound"));
         }
 
         [UnityTest]

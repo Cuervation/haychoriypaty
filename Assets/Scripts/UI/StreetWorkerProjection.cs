@@ -63,7 +63,7 @@ namespace HayChoriYPaty
         // Alpha-tight top inset of the hair inside each reviewed source crop, in source pixels.
         // Measured from street-parrillero-cooking-arms-v1.png (alpha > 0); palette variants keep alpha.
         private static readonly float[] CookingPoseHairTopInsetPixels = { 0f, 0f, 6f, 5f };
-        private static readonly Vector2 CookingPoseAtlasSize = new Vector2(1175f,1338f);
+        internal static readonly Vector2 CookingPoseAtlasSize = new Vector2(1175f,1338f);
         private static readonly Rect[] ExtensionBounds = { new Rect(28,11,206,279),new Rect(298,11,195,278),new Rect(562,11,213,277),new Rect(848,11,209,277),new Rect(34,299,226,280),new Rect(296,299,208,280),new Rect(557,299,217,280),new Rect(831,299,223,280),new Rect(41,588,218,281),new Rect(290,588,222,281),new Rect(564,588,217,281),new Rect(835,588,212,281),new Rect(38,876,173,272),new Rect(306,881,195,265),new Rect(598,883,176,268),new Rect(887,878,173,272),new Rect(37,1158,180,272),new Rect(326,1158,187,269),new Rect(567,1158,191,269),new Rect(866,1158,186,267) };
         public bool Ready => normal != null && diagonal != null && drink != null && extension != null;
         internal StreetWorkerProjection(Transform parent, Material material)
@@ -108,7 +108,8 @@ namespace HayChoriYPaty
             if (mozoExtension != null) UnityEngine.Object.Destroy(mozoExtension);
             mozo = mozoDiagonal = mozoExtension = null;
         }
-        private static bool Beverage(StreetWorker w) => w.Role == StreetWorkerRole.Cocacolero || w.Role == StreetWorkerRole.Fernetero;
+        private static bool Beverage(StreetWorker w) => Beverage(w.Role);
+        private static bool Beverage(StreetWorkerRole role) => role == StreetWorkerRole.Cocacolero || role == StreetWorkerRole.Fernetero;
         internal static bool IsObscuredIdleWorker(IReadOnlyList<StreetWorker> allWorkers, StreetWorker candidate, float verticalScale, bool activeCooks = false)
         {
             if (candidate == null || candidate.State != StreetWorkerState.Idle || candidate.Role == StreetWorkerRole.Mozo) return false;
@@ -124,6 +125,35 @@ namespace HayChoriYPaty
             return false;
         }
         private static bool IsCook(StreetWorkerRole role) => role == StreetWorkerRole.Parrillero || role == StreetWorkerRole.ParrilleroPremium;
+
+        private static bool IsUnoccupiedIdle(StreetWorker worker) =>
+            worker != null && worker.State == StreetWorkerState.Idle && !worker.ReturningToWaitPosition &&
+            !worker.VisualCooking && worker.CarriedItemId <= 0 && worker.CookingItemId <= 0;
+
+        internal static bool IsWaitingAtPost(StreetWorker worker) =>
+            IsUnoccupiedIdle(worker) && (worker.Position - worker.WaitPosition).sqrMagnitude <= 1f;
+
+        internal static bool ShouldFaceCounterAtRest(StreetSimulation simulation, StreetWorker worker)
+        {
+            if (simulation == null || StreetSimulation.IsTowerDefenseLevel(simulation.LevelIndex) || !IsUnoccupiedIdle(worker))
+                return false;
+            if (simulation.UsesActiveCooks && IsCook(worker.Role))
+                return worker.CookStationIndex < 0 && worker.Position == worker.Target &&
+                    (worker.Position - simulation.CookQueueWaitPosition(worker)).sqrMagnitude <= 1f;
+            return IsWaitingAtPost(worker) && !IsIdleAtGrill(simulation, worker);
+        }
+
+        internal static StreetWorkerPose SamplePresentationPose(StreetSimulation simulation, StreetWorker worker, out bool showAngryCue)
+        {
+            StreetWorkerPose pose = StreetWorkerAnimation.Sample(worker, IsIdleAtGrill(simulation, worker));
+            showAngryCue = TryGetMozoWaitingSandwichTable(simulation, worker, out Vector2 missingTable);
+            if (showAngryCue) pose.Facing = StreetWorkerAnimation.ResolveFacing(missingTable - worker.Position, pose.Facing);
+            // The customer counter spans the scene: look straight across it from the existing post.
+            else if (ShouldFaceCounterAtRest(simulation, worker)) pose.Facing = StreetFacing.Up;
+            if (IsFinalBarrelDrinkApproach(simulation, worker)) pose.Facing = StreetFacing.Down;
+            return pose;
+        }
+
         private static bool IsIdleAtGrill(StreetSimulation simulation, StreetWorker worker)
         {
             if (simulation == null || worker == null || worker.State != StreetWorkerState.Idle || !IsCook(worker.Role)) return false;
@@ -140,29 +170,23 @@ namespace HayChoriYPaty
             Vector2 anchor = simulation.KitchenLayout.GrillWorkPosition(product, worker.CookStationIndex, count);
             return Vector2.Distance(worker.Position, anchor) <= 1f;
         }
-        internal static bool NeedsMozoWaitingForSandwichAngryCue(StreetSimulation simulation, StreetWorker worker)
+        internal static bool TryGetMozoWaitingSandwichTable(StreetSimulation simulation, StreetWorker worker, out Vector2 tableCenter)
         {
-            if (simulation == null || worker == null || simulation.Kitchen == null ||
+            tableCenter = default;
+            if (simulation == null || worker == null || simulation.Kitchen == null || simulation.KitchenLayout == null ||
                 !simulation.UsesActiveCooks || simulation.Phase != RoundPhase.Playing ||
                 worker.Role != StreetWorkerRole.Mozo || worker.State != StreetWorkerState.Idle ||
                 worker.ReturningToWaitPosition || worker.CarriedItemId > 0 ||
                 Vector2.Distance(worker.Position, worker.WaitPosition) > 1f) return false;
 
-            return simulation.HasUnservedMozoSandwichDemandWithoutReadyPickup(worker);
+            int product = simulation.MissingMozoSandwichProduct(worker);
+            if (product < 0) return false;
+            Rect table = simulation.KitchenLayout.BoundsForProduct(product);
+            if (table.width <= 0f) return false;
+            tableCenter = table.center;
+            return true;
         }
 
-        internal static StreetFacing MozoWaitingGrillFacing(StreetSimulation simulation, StreetWorker worker,
-            StreetFacing fallback)
-        {
-            if (simulation == null || worker == null || simulation.KitchenLayout == null) return fallback;
-            Rect normalGrill = simulation.KitchenLayout.BoundsForProduct(0);
-            Rect premiumGrill = simulation.KitchenLayout.BoundsForProduct(2);
-            Vector2 target = normalGrill.center;
-            if (premiumGrill.width > 0f &&
-                (normalGrill.width <= 0f || (premiumGrill.center - worker.Position).sqrMagnitude <
-                    (normalGrill.center - worker.Position).sqrMagnitude)) target = premiumGrill.center;
-            return StreetWorkerAnimation.ResolveFacing(target - worker.Position, fallback);
-        }
         private static bool TryCookingPresentationTarget(StreetSimulation simulation, StreetWorker worker,
             out int product, out int slot, out Vector2 target)
         {
@@ -314,13 +338,14 @@ namespace HayChoriYPaty
             }
             return count <= 1 ? 0 : Mathf.RoundToInt(Mathf.Lerp(-4f, 4f, index / (float)(count - 1)));
         }
-        private Texture2D BaseTexture(StreetWorker w) => w.Role == StreetWorkerRole.Mozo && mozo != null ? mozo : Beverage(w) ? (w.Role == StreetWorkerRole.Fernetero ? fernet : drink)
-            : w.Role == StreetWorkerRole.ParrilleroPremium ? premium : normal;
-        private Texture2D Extension(StreetWorker w) => w.Role == StreetWorkerRole.Mozo && mozoExtension != null ? mozoExtension : w.Role == StreetWorkerRole.ParrilleroPremium ? premiumExtension
-            : w.Role == StreetWorkerRole.Fernetero ? fernetExtension : extension;
+        private Texture2D BaseTexture(StreetWorkerRole role) => role == StreetWorkerRole.Mozo && mozo != null ? mozo : Beverage(role) ? (role == StreetWorkerRole.Fernetero ? fernet : drink)
+            : role == StreetWorkerRole.ParrilleroPremium ? premium : normal;
+        private Texture2D Extension(StreetWorkerRole role) => role == StreetWorkerRole.Mozo && mozoExtension != null ? mozoExtension : role == StreetWorkerRole.ParrilleroPremium ? premiumExtension
+            : role == StreetWorkerRole.Fernetero ? fernetExtension : extension;
         private static bool Diagonal(StreetFacing f) => ((int)f & 1) == 1;
         private static int Quarter(StreetFacing f) => f == StreetFacing.DownLeft ? 0 : f == StreetFacing.DownRight ? 1 : f == StreetFacing.UpLeft ? 2 : 3;
-        private Art Original(StreetWorker w, int frame, bool flip)
+        private Art Original(StreetWorker w, int frame, bool flip) => Original(w.Role, frame, flip);
+        private Art Original(StreetWorkerRole w, int frame, bool flip)
         {
             Texture2D texture = BaseTexture(w);
             Rect source = Beverage(w) ? StreetView.WorkerDrinkPoseBounds(matched)[frame] : StreetView.WorkerFoodPoseBounds[frame];
@@ -329,7 +354,7 @@ namespace HayChoriYPaty
                 source.width * texture.width / authored.x, source.height * texture.height / authored.y);
             return new Art { Texture = texture, Bounds = source, Flip = flip, Palm = new Vector2(.5f,.58f) };
         }
-        private Art Supplemental(StreetWorker w, int index, bool flip, Vector2 palm)
+        private Art Supplemental(StreetWorkerRole w, int index, bool flip, Vector2 palm)
             => new Art { Texture = Extension(w), Bounds = ExtensionBounds[index], Flip = flip, Palm = palm };
         private Art CookPoseArt(StreetWorker worker, int frame)
         {
@@ -340,20 +365,22 @@ namespace HayChoriYPaty
             Rect bounds = new Rect(source.x * scale.x, source.y * scale.y, source.width * scale.x, source.height * scale.y);
             return new Art { Texture = texture, Bounds = bounds, Palm = new Vector2(.5f, 1f) };
         }
-        private Art Walk(StreetWorker w, StreetFacing facing, int contact, bool moving)
+        private Art Walk(StreetWorker w, StreetFacing facing, int contact, bool moving) => Walk(w.Role, facing, contact, moving);
+        private Art Walk(StreetWorkerRole w, StreetFacing facing, int contact, bool moving)
         {
             if (Diagonal(facing))
             {
                 int quarter = Quarter(facing);
                 if (Beverage(w)) return Supplemental(w, 4 + quarter * 2 + contact, false, Vector2.zero);
-                Texture2D texture = w.Role == StreetWorkerRole.Mozo && mozoDiagonal != null ? mozoDiagonal : w.Role == StreetWorkerRole.ParrilleroPremium ? premiumDiagonal : diagonal;
+                Texture2D texture = w == StreetWorkerRole.Mozo && mozoDiagonal != null ? mozoDiagonal : w == StreetWorkerRole.ParrilleroPremium ? premiumDiagonal : diagonal;
                 return new Art { Texture = texture, Bounds = StreetView.WorkerDiagonalPoseBounds[quarter * 2 + contact] };
             }
             int first = facing == StreetFacing.Down ? 0 : facing == StreetFacing.Up ? 4 : 8;
             bool flip = first == 8 && (Beverage(w) ? facing == StreetFacing.Left : facing == StreetFacing.Right);
             return Original(w, first + (moving ? 1 + contact : 0), flip);
         }
-        private Art Carry(StreetWorker w, StreetFacing facing)
+        private Art Carry(StreetWorker w, StreetFacing facing) => Carry(w.Role, facing, w.State == StreetWorkerState.ToTable);
+        private Art Carry(StreetWorkerRole w, StreetFacing facing, bool toTable)
         {
             if (!Beverage(w))
             {
@@ -362,7 +389,7 @@ namespace HayChoriYPaty
                     Art a = Original(w, facing == StreetFacing.Down ? 12 : facing == StreetFacing.Up ? 13 : 7, facing == StreetFacing.Right);
                     a.Palm = facing == StreetFacing.Down ? new Vector2(.5f,.68f) : facing == StreetFacing.Up ? new Vector2(.68f,.65f) : new Vector2(.23f,.67f);
                     // Keep the real unit beside the hand/forearm at waist height, not near the face.
-                    if (facing == StreetFacing.Up && (w.Role == StreetWorkerRole.Mozo || w.State == StreetWorkerState.ToTable))
+                    if (facing == StreetFacing.Up && (w == StreetWorkerRole.Mozo || toTable))
                         a.Palm = new Vector2(.98f, .65f);
                     return a;
                 }
@@ -379,6 +406,74 @@ namespace HayChoriYPaty
             return Supplemental(w, cell, facing == StreetFacing.Left,
                 new Vector2(facing == StreetFacing.Down ? .25f : facing == StreetFacing.Up ? .83f : .80f, facing == StreetFacing.Up ? .65f : .68f));
         }
+        /// <summary>One cutout of the campaign's split crew body, in logical pixels with Y up from the feet.</summary>
+        internal struct BodyPart
+        {
+            public Sprite Sprite;
+            public bool Flip;
+            public Vector2 Offset;
+            public float Scale;
+        }
+
+        /// <summary>
+        /// Samples the same torso-over-legs cutouts that <see cref="Sync"/> draws for the campaign crew
+        /// (eight gait directions, carry, pickup reach) for presentations that are not driven by
+        /// <see cref="StreetSimulation"/>. Offsets/scales are in campaign logical pixels; the palm is
+        /// relative to the feet. Presentation only.
+        /// </summary>
+        internal bool TrySampleBody(StreetWorkerRole role, StreetFacing facing, bool moving, int frame, bool carrying,
+            bool pickingUp, bool pickupFlip, bool barrelPickup, float pickupProgress, float bob,
+            out BodyPart torso, out BodyPart leftLeg, out BodyPart rightLeg, out Vector2 palm, out bool rear)
+        {
+            torso = leftLeg = rightLeg = default(BodyPart);
+            palm = Vector2.zero;
+            rear = facing == StreetFacing.Up || facing == StreetFacing.UpLeft || facing == StreetFacing.UpRight;
+            if (!Ready) return false;
+            int contact = frame >= 2 ? 1 : 0;
+            Art upper = carrying ? Carry(role, facing, false) : Walk(role, facing, contact, moving);
+            if (pickingUp)
+                // A barrel reached from its side (La Renga) uses the side carry pose; otherwise the campaign's front reach.
+                upper = barrelPickup ? Carry(role, facing == StreetFacing.Left || facing == StreetFacing.Right ? facing : StreetFacing.Down, false)
+                    : Beverage(role) ? Carry(role, facing, false) : Original(role, 11, pickupFlip);
+            if (upper.Texture == null) return false;
+            bool passing = !moving || (frame & 1) == 1;
+            StreetFacing legFacing = Diagonal(facing) ? (rear ? StreetFacing.Up : StreetFacing.Down) : facing;
+            Art legs = passing ? Walk(role, legFacing, 0, false) : Walk(role, facing, contact, true);
+            if (legs.Texture == null) return false;
+            float upperScale = Scale(upper), legScale = Scale(legs);
+            float splitRatio = Waist + WaistOverlap;
+            float split = upper.Bounds.height * splitRatio;
+            float reach = pickingUp ? Mathf.Sin(Mathf.Clamp01(pickupProgress) * Mathf.PI) * Height * (barrelPickup ? -.08f : .20f) : 0f;
+            float upperBottom = upper.Bounds.height * (1f - splitRatio) * upperScale - bob - reach;
+            float legHeight = legs.Bounds.height * (1f - Waist + WaistOverlap), half = legs.Bounds.width * .5f;
+            // 2026-11-25: a barrel taken from its side shows the side carry pose over the walking legs. Its art is not exactly as tall as the legs' (and the
+            // old -8 % "reach" lifted the torso on purpose), so the two cutouts parted at the waist and a clear line crossed the apron. The torso now never
+            // rides higher than the legs' top minus the designed waist overlap. Other poses are untouched (they already sit exactly there).
+            if (barrelPickup) upperBottom = Mathf.Min(upperBottom, legHeight * legScale - WaistOverlap * upper.Bounds.height * upperScale);
+            torso = new BodyPart { Sprite = Slice(upper.Texture, new Rect(upper.Bounds.x, upper.Bounds.y, upper.Bounds.width, split)),
+                Flip = upper.Flip, Offset = new Vector2(0f, upperBottom), Scale = upperScale };
+            float leftLift = moving && frame == 1 ? 2f : 0f;
+            float rightLift = moving && frame == 3 ? 2f : 0f;
+            float quarterWidth = legs.Bounds.width * legScale * .25f;
+            if (legs.Flip) { float t = leftLift; leftLift = rightLift; rightLift = t; }
+            leftLeg = new BodyPart { Sprite = Slice(legs.Texture, new Rect(legs.Bounds.x, legs.Bounds.yMax - legHeight, half, legHeight)),
+                Flip = legs.Flip, Offset = new Vector2(legs.Flip ? quarterWidth : -quarterWidth, leftLift), Scale = legScale };
+            rightLeg = new BodyPart { Sprite = Slice(legs.Texture, new Rect(legs.Bounds.x + half, legs.Bounds.yMax - legHeight, half, legHeight)),
+                Flip = legs.Flip, Offset = new Vector2(legs.Flip ? -quarterWidth : quarterWidth, rightLift), Scale = legScale };
+            float handX = (upper.Palm.x - .5f) * upper.Bounds.width * upperScale;
+            if (upper.Flip) handX = -handX;
+            palm = new Vector2(handX, (1f - upper.Palm.y) * upper.Bounds.height * upperScale - bob + reach);
+            return true;
+        }
+        internal Sprite MozoStandingSprite(StreetFacing facing, out bool flip)
+        {
+            flip = false;
+            if (!Ready) return null;
+            Art pose = Walk(StreetWorkerRole.Mozo, facing, 0, false);
+            flip = pose.Flip;
+            return pose.Texture != null ? Slice(pose.Texture, pose.Bounds) : null;
+        }
+
         private Sprite Slice(Texture2D texture, Rect bounds)
         {
             // Value-type keys: no key/texture/pixel allocation in steady-state gait.
@@ -421,7 +516,7 @@ namespace HayChoriYPaty
             return (bounds.height - CookingPoseHairTopInsetPixels[index]) * spriteScale;
         }
         internal bool CookingPoseAvailable => cookingPoses != null;
-        private Sprite EnsureMozoAngryCueSprite()
+        internal Sprite EnsureMozoAngryCueSprite()
         {
             if (angryCueSprite != null) return angryCueSprite;
             const int size = 64;
@@ -516,10 +611,7 @@ namespace HayChoriYPaty
                 if (!v.Root.gameObject.activeSelf) v.Root.gameObject.SetActive(true);
                 Vector2 displayPosition = PresentationPosition(sim, w);
                 float presentationScale = PresentationScale(sim, w);
-                bool showAngryCue = NeedsMozoWaitingForSandwichAngryCue(sim, w);
-                StreetWorkerPose pose = StreetWorkerAnimation.Sample(w, IsIdleAtGrill(sim, w));
-                if (showAngryCue) pose.Facing = MozoWaitingGrillFacing(sim, w, pose.Facing);
-                if (IsFinalBarrelDrinkApproach(sim, w)) pose.Facing = StreetFacing.Down;
+                StreetWorkerPose pose = SamplePresentationPose(sim, w, out bool showAngryCue);
                 int contact = pose.Frame >= 2 ? 1 : 0;
                 bool hasCookingPose = pose.Cooking && cookingPoses != null &&
                     TryCookingPresentationTarget(sim, w, out _, out _, out _);

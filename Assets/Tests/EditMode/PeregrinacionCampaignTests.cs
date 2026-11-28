@@ -23,11 +23,11 @@ namespace HayChoriYPaty.Tests
             return s;
         }
         [Test]
-        public void CampaignHasFifteenStableIdsAndThirteenFourteenFourSuccessors()
+        public void CampaignHasFifteenStableIdsAndPeregrinacionClosesTheCampaignAfterBoca()
         {
-            CollectionAssert.AreEqual(new[] {0,1,9,2,12,3,11,10,13,14,4,5,6,7,8},
+            CollectionAssert.AreEqual(new[] {0,1,9,2,12,3,13,11,4,5,10,6,7,8,14},
                 (int[])T("StreetSimulation").GetField("CampaignOrder", S).GetValue(null));
-            foreach (var pair in new[] {new[] {13,14}, new[] {14,4}})
+            foreach (var pair in new[] {new[] {3,13}, new[] {13,11}, new[] {11,4}, new[] {5,10}, new[] {10,6}, new[] {8,14}})
                 Assert.AreEqual(pair[1], T("StreetSimulation").GetMethod("NextCampaignLevelId", S).Invoke(null, new object[] {pair[0]}));
             string[] names = (string[])T("StreetSimulation").GetField("LevelNames", S).GetValue(null);
             Assert.AreEqual(15, names.Length); Assert.AreEqual("Peregrinación a Luján — Moreno", names[14]);
@@ -71,10 +71,14 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(14,property("SourceCampaignLevelId")); Assert.AreEqual(true,property("FreeConstruction"));
             Assert.AreEqual(8,property("EconomicBalanceCampaignLevelId")); Assert.AreEqual(true,property("UseCampaignEconomyPricing"));
             Assert.AreEqual(1200,property("StartingCoins"),"The level keeps its own opening cash.");
-            Assert.That((float)property("FanSpeed"), Is.EqualTo(.0525f).Within(.000001f),
-                "Lujan's configured route speed is 50% above the previous .035 value.");
+            Assert.That((float)property("FanSpeed"), Is.EqualTo(.0525f * 1.3f * 1.5f).Within(.000001f),
+                "Lujan's pilgrims walk 30% faster than .0525, then another 50% faster.");
+            Assert.That((float)property("MinimumEntrySpacingLogical"), Is.EqualTo(58f).Within(.001f),
+                "Pilgrims enter one right behind the other, at Los Redondos' compact spacing.");
+            Assert.That((float)property("FanSpawnIntervalSeconds"), Is.LessThanOrEqualTo(.1001f),
+                "There is no waiting time between entries: only the physical spacing gates the next pilgrim.");
             Assert.AreEqual(false,property("EquipmentPlacementAllowed"),"Every Luján station is preinstalled and equipment cannot be placed or purchased.");
-            CollectionAssert.AreEqual(new[]{1,0,0,0,0},(int[])property("StartingWorkersByRole"));
+            CollectionAssert.AreEqual(new[]{1,0,0,0,1},(int[])property("StartingWorkersByRole"),"Luján opens like Boca: one Parrillero and one Mozo.");
             Array startingStations=(Array)property("StartingStations");
             Assert.AreEqual(7,startingStations.Length,"Luján starts with one real instance of every station type.");
             CollectionAssert.AreEqual(new[]{0,1,2,3,4,5,6},startingStations.Cast<object>()

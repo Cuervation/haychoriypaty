@@ -127,7 +127,7 @@ namespace HayChoriYPaty
         }
         private void HandlePointer(Vector2 pixel, bool down, bool up)
         {
-            if (RewardShutterActive) return;
+            if (RewardShutterActive || RoundPriceBoardActive) return;
             if (game == null || (!IsTowerDefenseNavigationActive && (!game.IsPlayerActive || game.Sim == null)) ||
                 (Cloud.FirebasePlayerSession.Instance != null && Cloud.FirebasePlayerSession.Instance.BlocksGameInput)) return;
             if (ConsumeVictoryTransitionPointer(down, up)) return;
@@ -167,6 +167,12 @@ namespace HayChoriYPaty
                 }
                 return;
             }
+            if (badgesActive && !game.ShowChulengoResult)
+            {
+                p.y *= layoutVerticalScale;
+                HandleBadgesPointer(p, down, up);
+                return;
+            }
             if (marketActive && !game.ShowChulengoResult)
             {
                 p.y *= layoutVerticalScale; // Market geometry uses the full logical safe-area height.
@@ -190,13 +196,16 @@ namespace HayChoriYPaty
             if (pressedAction != 0 && pressedAction == HitAction(p)) DispatchAction(pressedAction);
             pressedAction = 0;
         }
+        // Returning from the bonus keeps Huracán selected in Ready, but the visible selector/hub owns input then.
+        private bool BonusTrackInputActive => game != null && game.IsBonusTrack && game.Sim.Phase != RoundPhase.Ready;
+
         private int HitAction(Vector2 p)
         {
             if (VictoryTransitionActive || victorySkipHeld) return 0;
             if (IsTowerDefenseNavigationActive) return HitTowerDefenseAction(p);
             // Huracán has its own result panel and actions. A previous club's Chulengo receipt
             // may still be present in Mercado.LastResult; it must never capture Bonus Track taps.
-            if (game.IsBonusTrack) return HitBonusTrackAction(p);
+            if (BonusTrackInputActive) return HitBonusTrackAction(p);
             if (game.ShowChulengoResult)
             {
                 Vector2 resultPoint = new Vector2(p.x, p.y * layoutVerticalScale);
@@ -237,18 +246,21 @@ namespace HayChoriYPaty
                 if (LevelSixRacingTutorialSkipBounds().Contains(p)) return LevelOneTutorialSkipAction;
                 return LevelSixRacingTutorialPrimaryBounds().Contains(p) ? LevelOneTutorialPrimaryAction : 0;
             }
+            if (profileActive) { p.y *= layoutVerticalScale; return HitProfileAction(p); }
             if (badgesActive) { p.y *= layoutVerticalScale; return BadgeBackBounds(logicalCanvasHeight).Contains(p) ? BadgeBackAction : 0; }
-            if (rankingActive) { p.y *= layoutVerticalScale; return RankingBackBounds(logicalCanvasHeight).Contains(p) ? RankingBackAction : 0; }
+            if (rankingActive) { p.y *= layoutVerticalScale; return HitRankingAction(p); }
             if (hubActive && !marketActive)
             {
                 if (settingsActive)
                 {
-                    if (HubSettingsMusicButtonBounds.Contains(p)) return HubSettingsMusicAction;
-                    if (HubSettingsBackButtonBounds.Contains(p)) return HubSettingsBackAction;
+                    Vector2 canvas = new Vector2(p.x, p.y * layoutVerticalScale);
+                    if (HubSettingsMusicButtonCanvasBounds.Contains(canvas)) return HubSettingsMusicAction;
+                    if (HubSettingsBackButtonCanvasBounds.Contains(canvas)) return HubSettingsBackAction;
                     return 0;
                 }
                 if (HubSettingsButtonLayoutBounds(new Vector2(Screen.width, Screen.height), Screen.safeArea).Contains(p))
                     return HubSettingsAction;
+                if (HubProfileCardBounds().Contains(new Vector2(p.x, p.y * layoutVerticalScale))) return HubProfileAction;
                 if (HubTopMusicButtonLayoutBounds(new Vector2(Screen.width, Screen.height), Screen.safeArea).Contains(p))
                     return HubTopMusicAction;
                 foreach (int action in HubArtworkActions)
@@ -281,9 +293,147 @@ namespace HayChoriYPaty
                     : ResultLevelsBounds().Contains(new Vector2(p.x, p.y * layoutVerticalScale)) ? ResultLevelsAction : 0)
                 : 0;
         }
+        // What tapping an unlocked level does: select it and go to its Market, tutorial or round (runs once the shutter has closed).
+        private void EnterSelectedLevel(int a, int level)
+        {
+            if (game == null) return;
+            levelSelectorStartError = null;
+            bool selectionSucceeded = game.SelectLevel(level);
+            if (selectionSucceeded)
+            {
+                levelSelectActive = false;
+                if (StreetSimulation.IsTowerDefenseLevel(level))
+                {
+                    marketFromSelector = true;
+                    if (game.CanStartRound)
+                    {
+                        StartAfterRoundPriceBoard(() =>
+                        {
+                            if (StartTowerDefenseRun()) marketFromSelector = false;
+                            else
+                            {
+                                levelSelectorStartError = string.IsNullOrEmpty(towerDefenseError)
+                                    ? "No se pudo iniciar el partido." : towerDefenseError;
+                                levelSelectActive = true;
+                            }
+                        });
+                    }
+                    else
+                    {
+                        marketActive = true; marketTab = 0; marketMessage = "Prepará Mercado para iniciar Tower Defense.";
+                        marketScroll = 0; marketOtherExpanded = false; marketExpandedIngredient = -1;
+                    }
+                }
+                else if (level == 0)
+                {
+                    if (game.CanStartRound)
+                    {
+                        marketMessage = "";
+                        if (RepeatLevelOneTutorialForTesting ||
+                            PlayerPrefs.GetInt(LevelOneTutorialCompletedKey, 0) == 0)
+                        {
+                            levelOneTutorialActive = true;
+                            levelOneTutorialStep = 0;
+                        }
+                        else StartTraditionalWithPriceBoard();
+                    }
+                    else { marketMessage="Falta stock para iniciar. Revisá Mercado."; levelSelectActive=true; }
+                }
+                else { marketFromSelector = true; marketActive = true; marketTab = 0; marketMessage = ""; marketScroll = 0; marketOtherExpanded = false; marketExpandedIngredient = -1; }
+            }
+            lastAction = a; feedbackUntil = Time.unscaledTime + 0.22f; feedbackScale = selectionSucceeded ? 1.04f : 0.97f;
+        }
+
+        // The Market's JUGAR PARTIDO: Tower Defense run, a level's first-time tutorial or the round itself.
+        private void HandleMarketPlay()
+        {
+            if (game?.Sim == null) return;
+            if (StreetSimulation.IsTowerDefenseLevel(game.Sim.LevelIndex))
+            {
+                StartAfterRoundPriceBoard(() =>
+                {
+                    if (StartTowerDefenseRun())
+                    {
+                        marketActive = false; marketFromSelector = false; hubActive = false; levelSelectActive = false;
+                    }
+                    else marketMessage = string.IsNullOrEmpty(towerDefenseError) ? "Falta stock para iniciar." : towerDefenseError;
+                });
+                return;
+            }
+            if (game.CanStartRound && game.Sim.LevelIndex == 2 &&
+                PlayerPrefs.GetInt(LevelThreePatyTutorialCompletedKey, 0) == 0)
+            {
+                marketMessage = "";
+                marketActive = false;
+                hubActive = false;
+                levelSelectActive = false;
+                levelThreePatyTutorialActive = true;
+                return;
+            }
+            if (game.CanStartRound && game.Sim.LevelIndex == 3 &&
+                PlayerPrefs.GetInt(LevelFourSpecialistsTutorialCompletedKey, 0) == 0)
+            {
+                marketMessage = "";
+                marketActive = false;
+                hubActive = false;
+                levelSelectActive = false;
+                levelFourSpecialistsTutorialActive = true;
+                levelFourSpecialistsTutorialStep = 0;
+                return;
+            }
+            if (game.CanStartRound && game.Sim.LevelIndex == 4 &&
+                PlayerPrefs.GetInt(LevelFiveSpecialistsTutorialCompletedKey, 0) == 0)
+            {
+                marketMessage = "";
+                marketActive = false;
+                hubActive = false;
+                levelSelectActive = false;
+                levelFiveSpecialistsTutorialActive = true;
+                levelFiveSpecialistsTutorialStep = 0;
+                return;
+            }
+            if (game.CanStartRound && game.Sim.LevelIndex == 5 &&
+                PlayerPrefs.GetInt(LevelSixRacingTutorialCompletedKey, 0) == 0)
+            {
+                marketMessage = "";
+                marketActive = false;
+                hubActive = false;
+                levelSelectActive = false;
+                levelSixRacingTutorialActive = true;
+                levelSixRacingTutorialStep = 0;
+                return;
+            }
+            if (game.CanStartRound && game.Sim.LevelIndex == 1 &&
+                PlayerPrefs.GetInt(LevelTwoCocacoleroTutorialCompletedKey, 0) == 0)
+            {
+                marketMessage = "";
+                marketActive = false;
+                hubActive = false;
+                levelSelectActive = false;
+                levelTwoCocacoleroTutorialActive = true;
+                levelTwoCocacoleroTutorialStep = 0;
+                return;
+            }
+            StartAfterRoundPriceBoard(StartTraditionalMarketRound);
+        }
+
+        private void StartTraditionalMarketRound()
+        {
+            if (game.TryStartRoundWithSaveFeedback(out bool initialSaveRejected))
+                marketMessage = "";
+            else if (initialSaveRejected)
+                marketMessage = "No se pudo guardar el inicio. Volvé a intentar.";
+            else if (!game.Sim.IsBonusTrack && game.Market != null &&
+                !game.Market.CanMeetRequiredStockWithLevelOneFloor(game.Sim))
+                marketMessage = "Falta stock para iniciar";
+            else
+                marketMessage = "No se pudo iniciar el partido.";
+            if (game.Sim.Phase == RoundPhase.Playing) { marketActive = false; hubActive = false; levelSelectActive = false; }
+        }
+
         private void DispatchAction(int a)
         {
-            if (RewardShutterActive || VictoryTransitionActive || victorySkipHeld || game == null) return;
+            if (RewardShutterActive || RoundPriceBoardActive || VictoryTransitionActive || victorySkipHeld || game == null) return;
             var firebaseSession = Cloud.FirebasePlayerSession.Instance;
             bool isHubSettingsAction = hubActive &&
                 (a == HubSettingsAction || a == HubSettingsMusicAction || a == HubSettingsBackAction || a == HubTopMusicAction);
@@ -297,7 +447,7 @@ namespace HayChoriYPaty
             }
             if (HandleTowerDefenseAction(a)) return;
             // Route by the currently rendered mode before inspecting any stale normal-level receipt.
-            if (game.IsBonusTrack)
+            if (BonusTrackInputActive)
             {
                 bool bonusActionSucceeded = false;
                 if (a >= BonusCardFirstAction && a < BonusCardFirstAction + 3) game.ChooseBonusCard(a - BonusCardFirstAction);
@@ -346,7 +496,7 @@ namespace HayChoriYPaty
                 if (a == LevelOneTutorialSkipAction ||
                     (a == LevelOneTutorialPrimaryAction && levelOneTutorialStep == 3))
                 {
-                    if (game.TryStartRound())
+                    StartTraditionalWithPriceBoard(() =>
                     {
                         levelOneTutorialActive = false;
                         levelOneTutorialStep = 0;
@@ -355,7 +505,7 @@ namespace HayChoriYPaty
                             PlayerPrefs.SetInt(LevelOneTutorialCompletedKey, 1);
                             PlayerPrefs.Save();
                         }
-                    }
+                    });
                 }
                 else if (a == LevelOneTutorialPrimaryAction && levelOneTutorialStep < 3)
                     levelOneTutorialStep++;
@@ -366,7 +516,7 @@ namespace HayChoriYPaty
                 if (a == LevelOneTutorialSkipAction ||
                     (a == LevelOneTutorialPrimaryAction && levelTwoCocacoleroTutorialStep == 1))
                 {
-                    if (game.TryStartRound())
+                    StartTraditionalWithPriceBoard(() =>
                     {
                         levelTwoCocacoleroTutorialActive = false;
                         levelTwoCocacoleroTutorialStep = 0;
@@ -375,7 +525,7 @@ namespace HayChoriYPaty
                         marketActive = false;
                         hubActive = false;
                         levelSelectActive = false;
-                    }
+                    });
                 }
                 else if (a == LevelOneTutorialPrimaryAction && levelTwoCocacoleroTutorialStep == 0)
                     levelTwoCocacoleroTutorialStep++;
@@ -385,7 +535,7 @@ namespace HayChoriYPaty
             {
                 if (a == LevelOneTutorialSkipAction || a == LevelOneTutorialPrimaryAction)
                 {
-                    if (game.TryStartRound())
+                    StartTraditionalWithPriceBoard(() =>
                     {
                         levelThreePatyTutorialActive = false;
                         PlayerPrefs.SetInt(LevelThreePatyTutorialCompletedKey, 1);
@@ -393,7 +543,7 @@ namespace HayChoriYPaty
                         marketActive = false;
                         hubActive = false;
                         levelSelectActive = false;
-                    }
+                    });
                 }
                 return;
             }
@@ -402,7 +552,7 @@ namespace HayChoriYPaty
                 if (a == LevelOneTutorialSkipAction ||
                     (a == LevelOneTutorialPrimaryAction && levelFourSpecialistsTutorialStep == 1))
                 {
-                    if (game.TryStartRound())
+                    StartTraditionalWithPriceBoard(() =>
                     {
                         levelFourSpecialistsTutorialActive = false;
                         levelFourSpecialistsTutorialStep = 0;
@@ -411,7 +561,7 @@ namespace HayChoriYPaty
                         marketActive = false;
                         hubActive = false;
                         levelSelectActive = false;
-                    }
+                    });
                 }
                 else if (a == LevelOneTutorialPrimaryAction && levelFourSpecialistsTutorialStep == 0)
                     levelFourSpecialistsTutorialStep++;
@@ -422,7 +572,7 @@ namespace HayChoriYPaty
                 if (a == LevelOneTutorialSkipAction ||
                     (a == LevelOneTutorialPrimaryAction && levelFiveSpecialistsTutorialStep == 1))
                 {
-                    if (game.TryStartRound())
+                    StartTraditionalWithPriceBoard(() =>
                     {
                         levelFiveSpecialistsTutorialActive = false;
                         levelFiveSpecialistsTutorialStep = 0;
@@ -431,7 +581,7 @@ namespace HayChoriYPaty
                         marketActive = false;
                         hubActive = false;
                         levelSelectActive = false;
-                    }
+                    });
                 }
                 else if (a == LevelOneTutorialPrimaryAction && levelFiveSpecialistsTutorialStep == 0)
                     levelFiveSpecialistsTutorialStep++;
@@ -442,7 +592,7 @@ namespace HayChoriYPaty
                 if (a == LevelOneTutorialSkipAction ||
                     (a == LevelOneTutorialPrimaryAction && levelSixRacingTutorialStep == 1))
                 {
-                    if (game.TryStartRound())
+                    StartTraditionalWithPriceBoard(() =>
                     {
                         levelSixRacingTutorialActive = false;
                         levelSixRacingTutorialStep = 0;
@@ -451,7 +601,7 @@ namespace HayChoriYPaty
                         marketActive = false;
                         hubActive = false;
                         levelSelectActive = false;
-                    }
+                    });
                 }
                 else if (a == LevelOneTutorialPrimaryAction && levelSixRacingTutorialStep == 0)
                     levelSixRacingTutorialStep++;
@@ -481,9 +631,15 @@ namespace HayChoriYPaty
                     marketActive = true; marketFromSelector = false; marketTab = 0; marketMessage = "";
                     marketScroll = 0; marketOtherExpanded = false; marketExpandedIngredient = -1;
                 }
-                else if (a == HubBadgesAction) { hubActive = false; badgesActive = true; }
-                else if (a == HubRankingAction) { hubActive = false; rankingActive = true; }
+                else if (a == HubBadgesAction) OpenBadges();
+                else if (a == HubProfileAction) OpenProfile();
+                else if (a == HubRankingAction) OpenRanking();
                 else if (a == HubAccountAction) Cloud.FirebasePlayerSession.Instance?.OpenAccountMenu();
+                return;
+            }
+            if (profileActive)
+            {
+                DispatchProfileAction(a);
                 return;
             }
             if (badgesActive)
@@ -493,13 +649,14 @@ namespace HayChoriYPaty
             }
             if (rankingActive)
             {
-                if (a == RankingBackAction) { rankingActive = false; hubActive = true; }
+                DispatchRankingAction(a);
                 return;
             }
             if (levelSelectActive)
             {
                 if (a == LevelSelectorBackAction)
                 {
+                    levelSelectorStartError = null;
                     levelSelectActive = false;
                     hubActive = true;
                     marketFromSelector = false;
@@ -509,51 +666,14 @@ namespace HayChoriYPaty
                 {
                     int campaignPosition = a - LevelSelectFirstAction;
                     int level = StreetSimulation.CampaignLevelAt(campaignPosition);
-                    bool selectionSucceeded = game.IsLevelUnlocked(level) && game.SelectLevel(level);
-                    if (selectionSucceeded)
+                    if (game.IsLevelUnlocked(level))
                     {
-                        levelSelectActive = false;
-                        if (StreetSimulation.IsTowerDefenseLevel(level))
-                        {
-                            marketFromSelector = true;
-                            if (game.CanStartRound)
-                            {
-                                if (StartTowerDefenseRun()) marketFromSelector = false;
-                                else
-                                {
-                                    marketMessage = string.IsNullOrEmpty(towerDefenseError)
-                                        ? "No se pudo iniciar Tower Defense." : towerDefenseError;
-                                    levelSelectActive = true;
-                                }
-                            }
-                            else
-                            {
-                                marketActive = true; marketTab = 0; marketMessage = "Prepará Mercado para iniciar Tower Defense.";
-                                marketScroll = 0; marketOtherExpanded = false; marketExpandedIngredient = -1;
-                            }
-                        }
-                        else if (level == 0)
-                        {
-                            if (game.CanStartRound)
-                            {
-                                marketMessage = "";
-                                if (RepeatLevelOneTutorialForTesting ||
-                                    PlayerPrefs.GetInt(LevelOneTutorialCompletedKey, 0) == 0)
-                                {
-                                    levelOneTutorialActive = true;
-                                    levelOneTutorialStep = 0;
-                                }
-                                else game.TryStartRound();
-                            }
-                            else { marketMessage="Falta stock para iniciar. Revisá Mercado."; levelSelectActive=true; }
-                        }
-                        else if (level == StreetSimulation.HuracanBonusLevelId)
-                        {
-                            if (!game.TryStartRound()) levelSelectActive = true;
-                        }
-                        else { marketFromSelector = true; marketActive = true; marketTab = 0; marketMessage = ""; marketScroll = 0; marketOtherExpanded = false; marketExpandedIngredient = -1; }
+                        // The shutter closes over the selector, the level is entered behind it and the shutter opens on the result.
+                        int tappedAction = a;
+                        StartRewardShutter(() => EnterSelectedLevel(tappedAction, level));
+                        return;
                     }
-                    lastAction = a; feedbackUntil = Time.unscaledTime + 0.22f; feedbackScale = selectionSucceeded ? 1.04f : 0.97f;
+                    lastAction = a; feedbackUntil = Time.unscaledTime + 0.22f; feedbackScale = 0.97f;
                     return;
                 }
                 return;
@@ -585,7 +705,7 @@ namespace HayChoriYPaty
                     bool success = game.TryRedeemTicketWorker(role, game.TicketRedemptionOperationId(role));
                     marketMessage = success ? "¡CANJE REALIZADO! Tu trabajador está reservado para el próximo partido."
                         : game.TicketBalance < 3 ? "Te faltan " + System.Math.Max(0L, 3L - game.TicketBalance) + " tickets para canjear."
-                        : game.Sim.LevelIndex < 5 || !game.TicketExtrasUnlocked ? "Desbloqueá Racing y elegí un nivel 6 o superior."
+                        : !StreetSimulation.IsRacingOrLaterLevel(game.Sim.LevelIndex) || !game.TicketExtrasUnlocked ? "Desbloqueá Racing y elegí una cancha compatible."
                         : "No se pudo guardar el canje; el saldo no cambió.";
                     return;
                 }
@@ -623,79 +743,17 @@ namespace HayChoriYPaty
                 {
                     if(Time.unscaledTime-marketLastPurchaseTime<.25f)return;
                     marketLastPurchaseTime=Time.unscaledTime;
+                    if(!MarketHasMissing()){marketMessage="No hay faltantes pendientes.";return;}
                     long cost=game.Market.MinimumPurchaseCostCents(game.Sim);
                     if(cost>game.Market.BalanceCents){marketMessage=MarketInsufficientFundsMessage(cost);return;}
-                    bool bought=false;
-                    for(int id=0;id<StreetIngredientCatalog.Names.Length;id++)if(game.Market.MissingPacks(game.Sim,id)>0)bought|=game.BuyMissingIngredient(id);
-                    marketMessage=bought?"Compras mínimas realizadas":"No hay faltantes pendientes";return;
+                    marketMessage=game.TryBuyMissingIngredients() ? "Compra realizada. Stock completo."
+                        : "No se completó la compra. Tu saldo y stock no cambiaron.";
+                    return;
                 }
                 if (a == MarketPlayAction)
                 {
-                    if (StreetSimulation.IsTowerDefenseLevel(game.Sim.LevelIndex))
-                    {
-                        if (StartTowerDefenseRun())
-                        {
-                            marketActive = false; marketFromSelector = false; hubActive = false; levelSelectActive = false;
-                        }
-                        else marketMessage = string.IsNullOrEmpty(towerDefenseError) ? "Falta stock para iniciar." : towerDefenseError;
-                        return;
-                    }
-                    if (game.CanStartRound && game.Sim.LevelIndex == 2 &&
-                        PlayerPrefs.GetInt(LevelThreePatyTutorialCompletedKey, 0) == 0)
-                    {
-                        marketMessage = "";
-                        marketActive = false;
-                        hubActive = false;
-                        levelSelectActive = false;
-                        levelThreePatyTutorialActive = true;
-                        return;
-                    }
-                    if (game.CanStartRound && game.Sim.LevelIndex == 3 &&
-                        PlayerPrefs.GetInt(LevelFourSpecialistsTutorialCompletedKey, 0) == 0)
-                    {
-                        marketMessage = "";
-                        marketActive = false;
-                        hubActive = false;
-                        levelSelectActive = false;
-                        levelFourSpecialistsTutorialActive = true;
-                        levelFourSpecialistsTutorialStep = 0;
-                        return;
-                    }
-                    if (game.CanStartRound && game.Sim.LevelIndex == 4 &&
-                        PlayerPrefs.GetInt(LevelFiveSpecialistsTutorialCompletedKey, 0) == 0)
-                    {
-                        marketMessage = "";
-                        marketActive = false;
-                        hubActive = false;
-                        levelSelectActive = false;
-                        levelFiveSpecialistsTutorialActive = true;
-                        levelFiveSpecialistsTutorialStep = 0;
-                        return;
-                    }
-                    if (game.CanStartRound && game.Sim.LevelIndex == 5 &&
-                        PlayerPrefs.GetInt(LevelSixRacingTutorialCompletedKey, 0) == 0)
-                    {
-                        marketMessage = "";
-                        marketActive = false;
-                        hubActive = false;
-                        levelSelectActive = false;
-                        levelSixRacingTutorialActive = true;
-                        levelSixRacingTutorialStep = 0;
-                        return;
-                    }
-                    if (game.CanStartRound && game.Sim.LevelIndex == 1 &&
-                        PlayerPrefs.GetInt(LevelTwoCocacoleroTutorialCompletedKey, 0) == 0)
-                    {
-                        marketMessage = "";
-                        marketActive = false;
-                        hubActive = false;
-                        levelSelectActive = false;
-                        levelTwoCocacoleroTutorialActive = true;
-                        levelTwoCocacoleroTutorialStep = 0;
-                        return;
-                    }
-                    marketMessage = game.TryStartRound() ? "" : "Falta stock para iniciar";
-                    if (game.Sim.Phase == RoundPhase.Playing) { marketActive = false; hubActive = false; levelSelectActive = false; }
+                    // Going from the Market to play closes the shutter too, unless there is nothing to start (the message shows at once).
+                    if (game.CanStartRound) StartRewardShutter(HandleMarketPlay); else HandleMarketPlay();
                     return;
                 }
             }
@@ -752,7 +810,7 @@ namespace HayChoriYPaty
                     hubActive = false;
                     levelSelectActive = false;
                 }
-                else game.TryStartRound();
+                else StartTraditionalWithPriceBoard();
             }
             else if(a==2) ok=game.TryHireParrillero(); else if(a==3) ok=game.TryUpgradeSpeed(); else if (a==HireCocacoleroAction || a==HirePremiumAction || a==HireFerneteroAction) ok=game.TryHire(RoleForAction(a)); else if (a==HireMozoAction) ok=game.TryHireMozo();
             else if (a == RiotReturnAction && game.Sim.Phase == RoundPhase.Lost)

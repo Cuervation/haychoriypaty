@@ -24,14 +24,6 @@ namespace HayChoriYPaty
             hubAmbientOverlay = null;
         }
 
-        // These image-space anchors are intentionally local overlays; they never alter the artwork or hitboxes.
-        // IDs are stable for the focused EditMode mapping test below.
-        internal static Rect HubAmbientLayoutBounds(int element, Vector2 screenSize, Rect safeArea)
-        {
-            Rect source = HubAmbientSourceBounds(element);
-            return source.width <= 0f ? Rect.zero : HubArtworkRectToLayout(source, HubArtworkSize, screenSize, safeArea);
-        }
-
         private static Rect HubAmbientSourceBounds(int element)
         {
             switch (element)
@@ -468,39 +460,6 @@ namespace HayChoriYPaty
                     finally { GUI.matrix = previous; }
                     sparks[i] = spark;
                 }
-            }
-
-            private void DrawRankingShine()
-            {
-                if (rankingShineStartedAt < 0f && animationTime >= nextRankingShineAt)
-                {
-                    rankingShineStartedAt = animationTime;
-                    rankingShineDuration = Range(.55f, .80f);
-                    nextRankingShineAt = animationTime + HubAmbientInterval(Range(6f, 11f));
-                }
-                if (rankingShineStartedAt < 0f) return;
-                float progress = (animationTime - rankingShineStartedAt) / rankingShineDuration;
-                if (progress >= 1f) { rankingShineStartedAt = -1f; return; }
-                float alpha = Mathf.Sin(progress * Mathf.PI) * HubAmbientOpacity(.28f);
-                DrawSourceTexture(softDisc, new Rect(519f, 467f, 46f, 44f), new Color(1f, .79f, .25f, alpha));
-                float glint = Mathf.Sin(progress * Mathf.PI) * HubAmbientOpacity(.42f);
-                DrawSourceTexture(Texture2D.whiteTexture, new Rect(537f, 471f, 1.5f, 29f), new Color(1f, .91f, .57f, glint));
-            }
-
-            private void DrawPlaySweep()
-            {
-                if (playSweepStartedAt < 0f && animationTime >= nextPlaySweepAt)
-                {
-                    playSweepStartedAt = animationTime;
-                    playSweepDuration = Range(1.0f, 1.3f);
-                    nextPlaySweepAt = animationTime + HubAmbientInterval(Range(7f, 12f));
-                }
-                if (playSweepStartedAt < 0f) return;
-                float progress = (animationTime - playSweepStartedAt) / playSweepDuration;
-                if (progress >= 1f) { playSweepStartedAt = -1f; return; }
-                float alpha = Mathf.Sin(progress * Mathf.PI) * .52f;
-                float centerX = Mathf.Lerp(153f, 375f, progress);
-                DrawSourceTexture(buttonSweep, new Rect(centerX - 17f, 872f, 34f, 72f), new Color(1f, 1f, 1f, alpha));
             }
 
             public void Dispose()

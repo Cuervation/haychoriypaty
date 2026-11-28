@@ -6,7 +6,7 @@ namespace HayChoriYPaty
     // Fondos, murales y banderines de partida. Extraído de StreetView.cs sin cambios de lógica.
     public sealed partial class StreetView
     {
-        private void DrawGameplayScreenFill()
+        private void DrawGameplayScreenFill(bool sceneryOnly = false)
         {
             // SafeArea is for controls, not a clipping boundary for scenery.
             // Paint behind the camera/cutout and navigation insets before the safe canvas.
@@ -17,13 +17,13 @@ namespace HayChoriYPaty
             Rect viewport = CanvasViewport(new Vector2(Screen.width, Screen.height), Screen.safeArea);
             float canvasHeight = CanvasLogicalHeight(viewport);
             float bottomBleed = SafeAreaBottomInsetLogical(viewport, Screen.height);
-            ResponsiveFooterLayout footer = CurrentResponsiveFooter(game.Sim, canvasHeight, bottomBleed);
-            Rect pennantArtBounds = FooterPennantRenderBounds(footer.Pennants, canvasHeight, bottomBleed);
+            Rect pennantArtBounds = sceneryOnly ? Rect.zero : FooterPennantRenderBounds(
+                CurrentResponsiveFooter(game.Sim, canvasHeight, bottomBleed).Pennants, canvasHeight, bottomBleed);
             try
             {
                 GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1));
                 GUI.color = Color.white;
-                DrawBackdropLayers(fullHeight, fullHeight / H, viewport, pennantArtBounds);
+                DrawBackdropLayers(fullHeight, fullHeight / H, viewport, pennantArtBounds, sceneryOnly);
             }
             finally { GUI.matrix = previous; GUI.color = color; }
         }
@@ -48,7 +48,7 @@ namespace HayChoriYPaty
             if (game.Sim.LevelIndex == 10 && losRedondosBackground != null) return losRedondosBackground;
             return backdrop;
         }
-        private void DrawBackdropLayers(float canvasHeight, float verticalScale, Rect safeViewport, Rect safePennants)
+        private void DrawBackdropLayers(float canvasHeight, float verticalScale, Rect safeViewport, Rect safePennants, bool sceneryOnly)
         {
             ClubVisualTheme theme = ClubVisualTheme.ForLevel(VisualLevelIndex);
             // The root public ground/counter/operator floor is invariant; only scenery is themed.
@@ -67,7 +67,21 @@ namespace HayChoriYPaty
             Rect muralBounds = DrawGameplayMural(canvasHeight, verticalScale);
             DrawFerroMuralSidewalk(muralBounds);
             DrawLosRedondosMuralSidewalk(muralBounds);
-            DrawClubPennants(canvasHeight, verticalScale, safeViewport, safePennants);
+            if (sceneryOnly)
+            {
+                if (backdrop == null) return;
+                // Continue the original pavement in one uninterrupted projection, without the baked footer.
+                // Start below the counter and table in the original artwork; keep horizontal grout aligned.
+                const float floorStart = 825f, floorEnd = 1154f;
+                Rect floor = StreetSceneLayout.BackgroundBounds(canvasHeight);
+                float top = StreetSceneLayout.SourceY(floorStart, canvasHeight);
+                float sy = backdrop.height / StreetSceneLayout.ReferenceBackdropSize.y;
+                GUI.color = theme.SceneryTint;
+                DrawRaw(new Rect(floor.x, top, floor.width, canvasHeight - top), backdrop,
+                    new Rect(0, floorStart * sy, backdrop.width, (floorEnd - floorStart) * sy), true, false);
+                GUI.color = previous;
+            }
+            else DrawClubPennants(canvasHeight, verticalScale, safeViewport, safePennants);
         }
 
         private void DrawFerroMuralSidewalk(Rect muralBounds)

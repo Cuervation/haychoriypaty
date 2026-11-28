@@ -74,3 +74,6 @@ tools/firebase/node_modules/
 *.jks
 .env
 .env.*
+
+# IL2CPP debug-symbol folders Unity writes next to every player build (2026-11-27).
+*_BackUpThisFolder_ButDontShipItWithYourGame/

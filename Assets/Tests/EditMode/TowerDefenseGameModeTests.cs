@@ -262,8 +262,8 @@ namespace HayChoriYPaty.Tests
             Assert.IsNotNull(losRedondos);
             Assert.AreEqual(96f, Get<float>(camioneros, "MinimumEntrySpacingLogical"),
                 "Camioneros needs a visible gap larger than the 78 px fan frame.");
-            Assert.AreEqual(58f, Get<float>(losRedondos, "MinimumEntrySpacingLogical"),
-                "This request changes only campaign position 3; Los Redondos keeps its existing cadence.");
+            Assert.AreEqual(70f, Get<float>(losRedondos, "MinimumEntrySpacingLogical"),
+                "Los Redondos copies La Renga's cadence on its inverted C (2026-11-24).");
         }
 
         [Test]
@@ -274,36 +274,13 @@ namespace HayChoriYPaty.Tests
             Assert.IsNotNull(camioneros);
             Assert.IsNotNull(redondos);
             Assert.AreEqual(120, Get<int>(camioneros, "TotalFanCount"));
-            Assert.AreEqual(60, Get<int>(redondos, "TotalFanCount"));
-            Assert.That(Get<float>(camioneros, "FanSpeed"), Is.EqualTo(.1575f * 1.3f).Within(.00001f));
-            Assert.That(Get<float>(redondos, "FanSpeed"), Is.EqualTo(.1575f).Within(.00001f));
+            Assert.AreEqual(440, Get<int>(redondos, "TotalFanCount"));
+            Assert.That(Get<float>(camioneros, "FanSpeed"), Is.EqualTo(.096875f).Within(.00001f)); // .0775 x 1.25 (2026-11-26, a pedido); before .1575f * 1.3f
+            Assert.That(Get<float>(redondos, "FanSpeed"), Is.EqualTo(.1535625f).Within(.00001f)); // Luján's speed x1.5 (03cdd74, 2026-11-25, a pedido)
 
-            mode = CreateMode(camioneros, .02f);
-            Invoke(mode, "Begin");
-            Assert.AreEqual(120, Get<int>(mode, "TotalFanCount"));
-            float campaignSpeed = (float)balanceType.GetField("customerSpeed", PublicInstance).GetValue(balance);
-            Assert.IsTrue((bool)Invoke(mode, "TrySpawnFan", new[] {new[] {0}, new[] {1}}));
-            object camionerosFollower = Get<object>(((System.Collections.IList)Get<object>(mode, "Fans"))[0], "RouteFollower");
-            Assert.That(Get<float>(camionerosFollower, "Speed"),
-                Is.EqualTo(campaignSpeed * .1575f * 1.3f * .02f).Within(.0001f));
-            for (int i = 1; i < 120; i++)
-                Assert.IsTrue((bool)Invoke(mode, "TrySpawnFan", new[] {new[] {0}, new[] {1}}));
-            Assert.AreEqual(120, Get<int>(mode, "SpawnedFans"));
-            Assert.IsFalse((bool)Invoke(mode, "TrySpawnFan", new[] {new[] {0}, new[] {1}}),
-                "Camioneros must reject fan number 121.");
-
-            Invoke(mode, "Stop");
-            mode = CreateMode(redondos, .02f);
-            Invoke(mode, "Begin");
-            Assert.AreEqual(60, Get<int>(mode, "TotalFanCount"));
-            Assert.IsTrue((bool)Invoke(mode, "TrySpawnFan", new[] {new[] {4}, new[] {1}}));
-            object redondosFollower = Get<object>(((System.Collections.IList)Get<object>(mode, "Fans"))[0], "RouteFollower");
-            Assert.That(Get<float>(redondosFollower, "Speed"), Is.EqualTo(campaignSpeed * .1575f * .02f).Within(.0001f));
-            for (int i = 1; i < 60; i++)
-                Assert.IsTrue((bool)Invoke(mode, "TrySpawnFan", new[] {new[] {4}, new[] {1}}));
-            Assert.AreEqual(60, Get<int>(mode, "SpawnedFans"));
-            Assert.IsFalse((bool)Invoke(mode, "TrySpawnFan", new[] {new[] {4}, new[] {1}}),
-                "Los Redondos must remain capped at 60.");
+            // Camioneros (Nueva Chicago's kitchen) and Los Redondos (Ferro's) are horizontal kitchen levels now: their live
+            // modes need a real phone layout, so their runtime is covered by the PlayMode tests of each level; this
+            // fixture only builds serpentine modes.
         }
 
         [Test]
@@ -368,15 +345,7 @@ namespace HayChoriYPaty.Tests
             Invoke(mode, "Begin");
             Hire("Parrillero", 0);
             capturedDelivery = null;
-            EventInfo deliveryEvent = modeType.GetEvent("DeliveryCompleted", PublicInstance);
-            Type deliveryType = deliveryEvent.EventHandlerType.GetGenericArguments()[0];
-            ParameterExpression deliveryParameter = Expression.Parameter(deliveryType, "delivery");
-            MethodInfo captureMethod = typeof(TowerDefenseGameModeTests)
-                .GetMethod(nameof(CaptureDelivery), PrivateInstance);
-            Delegate deliveryHandler = Expression.Lambda(deliveryEvent.EventHandlerType,
-                Expression.Call(Expression.Constant(this), captureMethod,
-                    Expression.Convert(deliveryParameter, typeof(object))), deliveryParameter).Compile();
-            deliveryEvent.AddEventHandler(mode, deliveryHandler);
+            Type deliveryType = WatchDeliveries(CaptureDelivery);
 
             Assert.IsTrue((bool)Invoke(mode, "TrySpawnFan", new[] { new[] { 0 }, new[] { 1 } }));
             // Fill the finite budget with requests that this cook cannot service.
@@ -396,9 +365,60 @@ namespace HayChoriYPaty.Tests
                 Vector2.up * (float)modeType.GetField("StationRenderYOffsetLogical", PublicStatic).GetRawConstantValue() *
                 Get<float>(mode, "WorldUnitsPerLogicalPixel");
             Assert.IsNotNull(capturedDelivery, "The physical delivery event should expose its presentation source.");
+            Assert.IsTrue((bool)deliveryType.GetField("CompletesOrder").GetValue(capturedDelivery));
             Vector2 receivedSource = (Vector2)deliveryType.GetField("Source", PublicInstance).GetValue(capturedDelivery);
             Assert.AreEqual(expectedVisualSource, receivedSource,
                 "The physical handoff cue fallback originates at the moved visual table, not its unchanged base anchor.");
+        }
+
+        [Test]
+        public void TowerDefenseDeliveryAudioUsesCompletionCueOnlyOnLastUnitAndDetaches()
+        {
+            mode = CreateMode(.02f);
+            Invoke(mode, "Begin");
+            Hire("Cocacolero", 0);
+            Assert.IsTrue((bool)Invoke(mode, "TrySpawnFan", new[] { new[] { 4 }, new[] { 2 } }));
+            object fan = ((System.Collections.IList)Get<object>(mode, "Fans"))[0];
+            object follower = Get<object>(fan, "RouteFollower");
+            Invoke(follower, "Advance", new object[] { RowLength(0) * .5f / Get<float>(follower, "Speed") });
+
+            var host = new GameObject("Tower Defense delivery audio");
+            try
+            {
+                Type soundType = RuntimeType("OrderDeliverySound");
+                Component sound = host.AddComponent(soundType);
+                soundType.GetField("audioSource", PrivateInstance).SetValue(sound, null);
+                FieldInfo deliveryClip = soundType.GetField("deliveryClip", PrivateInstance);
+                FieldInfo completeClip = soundType.GetField("completeClip", PrivateInstance);
+                FieldInfo productGoalClip = soundType.GetField("productGoalClip", PrivateInstance);
+                deliveryClip.SetValue(sound, null);
+                Invoke(sound, "BindTowerDefense", new[] { mode });
+                Invoke(sound, "BindTowerDefense", new[] { mode });
+                FieldInfo signal = modeType.GetField("DeliveryCompleted", PrivateInstance);
+                Assert.AreEqual(1, ((Delegate)signal.GetValue(mode)).GetInvocationList().Length,
+                    "Rebinding to the same round must not duplicate the cue.");
+
+                var completed = new System.Collections.Generic.List<bool>();
+                WatchDeliveries(receipt =>
+                {
+                    completed.Add((bool)receipt.GetType().GetField("CompletesOrder").GetValue(receipt));
+                    Assert.AreEqual("order-delivery-soft-pop", ((AudioClip)deliveryClip.GetValue(sound)).name);
+                    deliveryClip.SetValue(sound, null);
+                    if (completed.Count == 1) Assert.IsNull(completeClip.GetValue(sound));
+                });
+
+                CallPrivate("DeliverWithinServiceRanges");
+                ClearWorkerDeliveryCooldowns();
+                CallPrivate("DeliverWithinServiceRanges");
+                CollectionAssert.AreEqual(new[] { false, true }, completed);
+                Assert.AreEqual("order-complete-bubble", ((AudioClip)completeClip.GetValue(sound)).name);
+                Assert.IsNull(productGoalClip.GetValue(sound), "Tower Defense has no traditional product quotas.");
+
+                Invoke(sound, "BindTowerDefense", new object[] { null });
+                Assert.AreEqual(1, ((Delegate)signal.GetValue(mode)).GetInvocationList().Length,
+                    "After detaching, only the test observer should remain.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(host); }
         }
 
         [Test]
@@ -1251,6 +1271,17 @@ namespace HayChoriYPaty.Tests
         }
 
         private static Type RuntimeType(string shortName) => Type.GetType("HayChoriYPaty." + shortName + ", Assembly-CSharp", true);
+
+        private Type WatchDeliveries(Action<object> handler)
+        {
+            EventInfo deliveryEvent = modeType.GetEvent("DeliveryCompleted", PublicInstance);
+            Type receiptType = deliveryEvent.EventHandlerType.GetGenericArguments()[0];
+            ParameterExpression receipt = Expression.Parameter(receiptType);
+            Delegate callback = Expression.Lambda(deliveryEvent.EventHandlerType,
+                Expression.Invoke(Expression.Constant(handler), Expression.Convert(receipt, typeof(object))), receipt).Compile();
+            deliveryEvent.AddEventHandler(mode, callback);
+            return receiptType;
+        }
 
         private void CaptureDelivery(object delivery) => capturedDelivery = delivery;
 

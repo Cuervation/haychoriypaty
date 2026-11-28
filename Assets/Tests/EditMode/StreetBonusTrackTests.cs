@@ -54,19 +54,19 @@ namespace HayChoriYPaty.Tests
         [Test]
         public void ReorganizedCampaignOrderKeepsAllStableIdsAndBothDefenseModes()
         {
-            CollectionAssert.AreEqual(new[] { 0, 1, 9, 2, 12, 3, 11, 10, 13, 14, 4, 5, 6, 7, 8 },
+            CollectionAssert.AreEqual(new[] { 0, 1, 9, 2, 12, 3, 13, 11, 4, 5, 10, 6, 7, 8, 14 },
                 (int[])simType.GetField("CampaignOrder", BindingFlags.Public | BindingFlags.Static).GetValue(null));
             Assert.AreEqual(15, ((string[])simType.GetField("LevelNames", BindingFlags.Public | BindingFlags.Static).GetValue(null)).Length);
             Assert.AreEqual(9, CallStatic(simType, "CampaignLevelAt", 2));
             Assert.AreEqual(12, CallStatic(simType, "NextCampaignLevelId", 2));
-            Assert.AreEqual(11, CallStatic(simType, "NextCampaignLevelId", 3));
-            Assert.AreEqual(10, CallStatic(simType, "NextCampaignLevelId", 11));
-            Assert.AreEqual(13, CallStatic(simType, "NextCampaignLevelId", 10));
-            Assert.AreEqual(14, CallStatic(simType, "NextCampaignLevelId", 13));
-            Assert.AreEqual(4, CallStatic(simType, "NextCampaignLevelId", 14));
-            Assert.AreEqual(6, CallStatic(simType, "NextCampaignLevelId", 5));
-            Assert.AreEqual(3, CallStatic(simType, "NextCampaignLevelId", 12));
-            Assert.AreEqual(-1, CallStatic(simType, "NextCampaignLevelId", 8));
+            Assert.AreEqual(13, CallStatic(simType, "NextCampaignLevelId", 3));
+            Assert.AreEqual(11, CallStatic(simType, "NextCampaignLevelId", 13));
+            Assert.AreEqual(4, CallStatic(simType, "NextCampaignLevelId", 11));
+            Assert.AreEqual(10, CallStatic(simType, "NextCampaignLevelId", 5));
+            Assert.AreEqual(6, CallStatic(simType, "NextCampaignLevelId", 10));
+            Assert.AreEqual(14, CallStatic(simType, "NextCampaignLevelId", 8));
+            Assert.AreEqual(-1, CallStatic(simType, "NextCampaignLevelId", 14));
+                        Assert.AreEqual(3, CallStatic(simType, "NextCampaignLevelId", 12));
             Assert.IsTrue((bool)CallStatic(simType, "IsTowerDefenseLevel", 9));
             Assert.IsTrue((bool)CallStatic(simType, "IsTowerDefenseLevel", 10));
             Assert.IsTrue((bool)CallStatic(simType, "IsTowerDefenseLevel", 13));
@@ -161,9 +161,10 @@ namespace HayChoriYPaty.Tests
             Assert.IsTrue((bool)Call(game, "IsLevelUnlocked", 12));
             Assert.AreEqual(10, Read(liveSave, "unlockedLevel"), "Unlocking ID12 must not move the legacy stable-ID frontier.");
             Assert.AreEqual(3, CallStatic(simType, "NextCampaignLevelId", 12));
-            Assert.AreEqual(-1, CallStatic(simType, "NextCampaignLevelId", 8));
+            Assert.AreEqual(14, CallStatic(simType, "NextCampaignLevelId", 8));
         }
 
+        [Ignore("Huracán dejó de ser Bonus Track el 2026-11-27 (a pedido: nivel normal entre Ferro e Independiente); el modo bonus quedó inactivo.")]
         [Test]
         public void BonusStartsWithFreeTeamAndPausesAtFiveExactChoiceDeadlines()
         {
@@ -201,6 +202,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(120f, (float)Read(sim, "Elapsed"), .0001f);
         }
 
+        [Ignore("Huracán dejó de ser Bonus Track el 2026-11-27 (a pedido: nivel normal entre Ferro e Independiente); el modo bonus quedó inactivo.")]
         [Test]
         public void BonusChoiceCardsSitBelowHuracanCaptionAbovePennantsAndHitTheirWholeCard()
         {
@@ -265,6 +267,7 @@ namespace HayChoriYPaty.Tests
             }
         }
 
+        [Ignore("Huracán dejó de ser Bonus Track el 2026-11-27 (a pedido: nivel normal entre Ferro e Independiente); el modo bonus quedó inactivo.")]
         [Test]
         public void EmergencyRoleChoicesAlsoUseDirectFooterCardsAndMatchingHitActions()
         {
@@ -337,6 +340,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(0f, (float)Read(bonus, "AguanteProgress"));
         }
 
+        [Ignore("Huracán dejó de ser Bonus Track el 2026-11-27 (a pedido: nivel normal entre Ferro e Independiente); el modo bonus quedó inactivo.")]
         [Test]
         public void OnlyRealSimulationHandoffsAddBonusPointsAndNeverAddCurrency()
         {
@@ -371,6 +375,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(0, Read(sim, "CustomersLost"));
         }
 
+        [Ignore("Huracán dejó de ser Bonus Track el 2026-11-27 (a pedido: nivel normal entre Ferro e Independiente); el modo bonus quedó inactivo.")]
         [Test]
         public void BonusTicketGrantIsIdempotentAndThreeStarExtraIsOneTime()
         {
@@ -401,7 +406,7 @@ namespace HayChoriYPaty.Tests
             Assert.AreEqual(3L, Read(game, "TicketBalance"), "The second run earns one regular ticket and the first-time three-star extra.");
             Assert.AreEqual(2, Read(lastMatch, "bonusTickets"));
             Assert.IsTrue((bool)Read(Read(game, "BonusTrackProgress"), "threeStarTicketAwarded"));
-            Assert.IsTrue((bool)Call(game, "IsLevelUnlocked", 10), "Winning Chicago (11) unlocks its campaign successor, Los Redondos (10).");
+            Assert.IsTrue((bool)Call(game, "IsLevelUnlocked", 4), "Winning Huracán (11) unlocks its campaign successor, Independiente (4).");
 
             Assert.IsTrue((bool)Call(game, "Retry"));
             CompleteRound(Read(game, "Sim"));
@@ -412,6 +417,7 @@ namespace HayChoriYPaty.Tests
             Assert.IsNotEmpty(latestJson);
         }
 
+        [Ignore("Huracán dejó de ser Bonus Track el 2026-11-27 (a pedido: nivel normal entre Ferro e Independiente); el modo bonus quedó inactivo.")]
         [Test]
         public void BonusMatchAndStaleOutboxUseTheCommittedSnapshotInventory()
         {

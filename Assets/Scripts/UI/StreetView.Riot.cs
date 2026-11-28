@@ -195,7 +195,6 @@ namespace HayChoriYPaty
                 cellWidth, cellHeight);
         }
 
-
         private static Rect RiotFanFrameSource(Texture2D atlas, int customerId, int pose)
         {
             if (atlas == null) return Rect.zero;
@@ -267,12 +266,6 @@ namespace HayChoriYPaty
             return new Rect(150, Mathf.Min(lastSafeTop, preferredTop), 240f * responsiveScale, height);
         }
 
-        private static Rect RiotGameOverBounds(float canvasHeight)
-        {
-            float height = Mathf.Min(380f, Mathf.Max(200f, canvasHeight * .5f));
-            return new Rect(18f, (canvasHeight - height) * .5f, W - 36f, height);
-        }
-
         private void DrawRiotResult()
         {
             float previousVertical = layoutVerticalScale;
@@ -286,9 +279,17 @@ namespace HayChoriYPaty
             finally { layoutVerticalScale = previousVertical; }
         }
 
+        private static string RiotResultMessage(StreetSimulation sim)
+        {
+            if (sim != null && StreetSimulation.IsTowerDefenseLevel(sim.LevelIndex))
+                return "Un hincha llegó a la salida\nPedidos completos: " + sim.OrdersCompleted + "/" +
+                    TowerDefenseLevelConfig.TotalFanCountForCampaignLevel(sim.LevelIndex) + "\nIntentalo nuevamente";
+            return "Los hinchas se cansaron\nde esperar,\nintentalo nuevamente";
+        }
+
         private void DrawRiotWaitMessage(Rect bounds)
         {
-            const string message = "Los hinchas se cansaron\nde esperar,\nintentalo nuevamente";
+            string message = RiotResultMessage(game?.Sim);
             const int fontSize = 30;
             GUIStyle caption = CachedStandardButtonLabelStyle(menuTitle, fontSize, Color.white);
             GUIStyle outline = CachedStandardButtonLabelStyle(menuTitle, fontSize, new Color(.035f, .075f, .16f));
@@ -302,6 +303,5 @@ namespace HayChoriYPaty
                         letters.width, letters.height), message, outline);
             Label(letters, message, caption);
         }
-
     }
 }

@@ -151,6 +151,7 @@ namespace HayChoriYPaty.Cloud
             State = PlayerSessionState.Recovering; message = "Recuperando tu progreso…";
             string uid = auth.CurrentUser.UserId;
             local = new PlayerLocalRepository(root, uid); remote = new FirestorePlayerRepository(firestore, uid);
+            leaderboardNickname = null; publishedPoints = -1; publishedWonLevels = -1;
             RemotePlayerState cloud;
             try { cloud = await Within(remote.ReadAsync()); }
             catch (Exception error)
@@ -250,6 +251,8 @@ namespace HayChoriYPaty.Cloud
             if ((State == PlayerSessionState.Ready || (initialSyncWaiting && State == PlayerSessionState.Recovering)) &&
                 local != null && local.State.pending.Count > 0 && Time.unscaledTime >= retryAt)
                 SyncPending();
+            // Ranking prefetch (2026-11-26): read once per sign-in as soon as the session is ready (usually behind the splash).
+            if (prefetchedLeaderboardGeneration != generation && LeaderboardReady) PrefetchLeaderboard();
         }
         private async void SyncPending()
         {
@@ -269,6 +272,7 @@ namespace HayChoriYPaty.Cloud
                     { initialSyncWaiting = false; State = PlayerSessionState.Ready; message = ""; }
                 }
                 retryAt = Time.unscaledTime + 1;
+                PublishLeaderboardInBackground();
             }
             catch (Exception error)
             {
@@ -342,6 +346,121 @@ namespace HayChoriYPaty.Cloud
         }
         private static bool IsTransient(FirestoreError code) => code == FirestoreError.Unavailable ||
             code == FirestoreError.DeadlineExceeded || code == FirestoreError.Cancelled || code == FirestoreError.Aborted;
+        // ---- Ranking de la hinchada (2026-11-25): public apodo + Liga points, one row per player (rules: leaderboard/{uid}). ----
+        private string leaderboardNickname;
+        private long publishedPoints = -1, publishedWonLevels = -1;
+        private bool publishingLeaderboard;
+        private LeaderboardSnapshot cachedLeaderboard;
+        private Task<LeaderboardSnapshot> leaderboardLoad;
+        private int cachedLeaderboardGeneration = -1, leaderboardLoadGeneration = -1, prefetchedLeaderboardGeneration = -1;
+        private const string LeaderboardNicknameKey = "HayChoriYPaty.Leaderboard.Nickname.";
+
+        /// <summary>The ranking needs a live Google session and a connection; it never blocks or changes the game.</summary>
+        public bool LeaderboardReady => State == PlayerSessionState.Ready && !offline && firestore != null && IsGoogleUser(auth?.CurrentUser);
+        // ---- Perfil del barrio (2026-11-26, a pedido): datos de la cuenta que el propio jugador ve en su perfil. ----
+        /// <summary>True while a Google player is signed in and their progress is loaded.</summary>
+        public bool ProfileSignedIn => State == PlayerSessionState.Ready && IsGoogleUser(auth?.CurrentUser);
+        /// <summary>The signed-in Google account's mail, shown only to its owner in the profile (never published or logged).</summary>
+        public string AccountEmail => ProfileSignedIn ? auth.CurrentUser.Email : null;
+        /// <summary>Stable id used only to colour the player's own avatar the same way the ranking does.</summary>
+        public string AccountUid => ProfileSignedIn ? auth.CurrentUser.UserId : null;
+
+        public string LeaderboardNickname
+        {
+            get
+            {
+                if (leaderboardNickname == null && auth?.CurrentUser != null)
+                    leaderboardNickname = PlayerPrefs.GetString(LeaderboardNicknameKey + auth.CurrentUser.UserId, null);
+                return string.IsNullOrEmpty(leaderboardNickname) ? null : leaderboardNickname;
+            }
+        }
+
+        private void RememberNickname(string nickname)
+        {
+            leaderboardNickname = nickname;
+            if (auth?.CurrentUser != null) PlayerPrefs.SetString(LeaderboardNicknameKey + auth.CurrentUser.UserId, nickname ?? "");
+        }
+
+        /// <summary>Last ranking read in this sign-in (startup prefetch or the last open), or null; the screen shows it at once and refreshes.</summary>
+        public LeaderboardSnapshot CachedLeaderboard => cachedLeaderboardGeneration == generation ? cachedLeaderboard : null;
+
+        /// <summary>Reads the top and the player's own position; a read already in flight for this sign-in is shared instead of repeated.</summary>
+        public Task<LeaderboardSnapshot> LoadLeaderboardAsync()
+        {
+            if (leaderboardLoad != null && !leaderboardLoad.IsCompleted && leaderboardLoadGeneration == generation) return leaderboardLoad;
+            leaderboardLoadGeneration = generation;
+            return leaderboardLoad = ReadLeaderboardAsync();
+        }
+
+        private async void PrefetchLeaderboard()
+        {
+            prefetchedLeaderboardGeneration = generation; // one silent attempt per sign-in; opening the ranking still loads on its own
+            try { await LoadLeaderboardAsync(); }
+            catch (OperationCanceledException) { }
+            catch (Exception error) { Debug.LogWarning("[FirebasePlayerSession] " + FormatFailureDiagnostic("leaderboard-prefetch", error)); }
+        }
+
+        // First brings the player's published points up to date, then reads the top.
+        private async Task<LeaderboardSnapshot> ReadLeaderboardAsync()
+        {
+            if (!LeaderboardReady) throw new InvalidOperationException("Ranking unavailable");
+            int ticket = generation;
+            var repository = new FirestoreLeaderboardRepository(firestore, auth.CurrentUser.UserId);
+            LeaderboardEntry own = await Within(repository.ReadOwnAsync());
+            if (ticket != generation) throw new OperationCanceledException();
+            RememberNickname(own?.nickname); publishedPoints = own == null ? -1 : own.points; publishedWonLevels = own == null ? -1 : own.wonLevels;
+            if (own != null) await PublishLeaderboardAsync(repository, ticket);
+            LeaderboardSnapshot snapshot = await Within(repository.ReadAsync());
+            if (ticket != generation) throw new OperationCanceledException();
+            cachedLeaderboard = snapshot; cachedLeaderboardGeneration = ticket;
+            return snapshot;
+        }
+
+        /// <summary>Creates the row (or renames it) with the current Liga points. False when the apodo is invalid or the write fails.</summary>
+        public async Task<bool> SaveLeaderboardNicknameAsync(string raw)
+        {
+            if (!StreetLeague.TryNormalizeNickname(raw, out string nickname) || !LeaderboardReady) return false;
+            int ticket = generation;
+            try
+            {
+                var repository = new FirestoreLeaderboardRepository(firestore, auth.CurrentUser.UserId);
+                StreetPlayerStatistics stats = game?.PlayerStatistics;
+                // Points never go down on the server: a rename keeps whatever is higher.
+                long points = Math.Max(StreetLeague.Points(stats), Math.Max(0L, publishedPoints));
+                long won = Math.Max(StreetLeague.WonLevels(stats), Math.Max(0L, publishedWonLevels));
+                await Within(repository.PublishAsync(nickname, points, won));
+                if (ticket != generation) return false;
+                RememberNickname(nickname); publishedPoints = points; publishedWonLevels = won;
+                return true;
+            }
+            catch (Exception error) { LogFailure("leaderboard-nickname", error); return false; }
+        }
+
+        private async Task PublishLeaderboardAsync(FirestoreLeaderboardRepository repository, int ticket)
+        {
+            string nickname = LeaderboardNickname; StreetPlayerStatistics stats = game?.PlayerStatistics;
+            if (nickname == null || stats == null) return;
+            long points = StreetLeague.Points(stats), won = StreetLeague.WonLevels(stats);
+            if (points <= publishedPoints && won <= publishedWonLevels) return;
+            await Within(repository.PublishAsync(nickname, Math.Max(points, publishedPoints), Math.Max(won, publishedWonLevels)));
+            if (ticket != generation) return;
+            publishedPoints = Math.Max(points, publishedPoints); publishedWonLevels = Math.Max(won, publishedWonLevels);
+        }
+
+        /// <summary>After a confirmed cloud commit: best effort, silent, never blocks the progress sync.</summary>
+        private async void PublishLeaderboardInBackground()
+        {
+            if (publishingLeaderboard || !LeaderboardReady || LeaderboardNickname == null) return;
+            publishingLeaderboard = true; int ticket = generation;
+            try { await PublishLeaderboardAsync(new FirestoreLeaderboardRepository(firestore, auth.CurrentUser.UserId), ticket); }
+            catch (Exception error)
+            {
+                // A row already ahead on the server (played elsewhere) is refused by the rules: stop retrying until the ranking is opened again.
+                LogFailure("leaderboard-publish", error); publishedPoints = long.MaxValue; publishedWonLevels = long.MaxValue;
+            }
+            finally { publishingLeaderboard = false; }
+        }
+
         public void OpenAccountMenu()
         {
             // Login, recovery and conflict resolution all live inside the main hub account panel.
@@ -351,6 +470,7 @@ namespace HayChoriYPaty.Cloud
         {
             if (game != null && !game.SuspendPlayer()) { Fail("No pudimos guardar. No cerramos tu sesión para proteger la partida."); return; }
             generation++; google.Cancel(); auth?.SignOut(); google.SignOut(); local = null; remote = null; conflictRemote = null;
+            leaderboardNickname = null; publishedPoints = -1; publishedWonLevels = -1; // never carry one account's ranking row to the next
             accountOpen = true; initialSyncWaiting = false; State = PlayerSessionState.LoginRequired; message = "Iniciá sesión con Google para continuar.";
             FindAnyObjectByType<StreetView>()?.ReturnToHubAfterAuthenticationRequired();
         }
@@ -373,13 +493,9 @@ namespace HayChoriYPaty.Cloud
             if (StreetGame.AllowEditorTestInitialization) return;
 #endif
             var view = FindAnyObjectByType<StreetView>();
-            if (State == PlayerSessionState.Ready && !accountOpen)
-            {
-                if (view != null && view.AccountMenuVisible && !view.HubAccountActionRendered)
-                    AccountButton(HayChoriYPaty.StreetView.HubAccountButtonScreenBounds(
-                        new Vector2(Screen.width, Screen.height)), "CUENTA", OpenAccountMenu);
-                return;
-            }
+            // 2026-11-24 (a pedido): the top-right "CUENTA" button is no longer drawn on the hub, badges, ranking or market.
+            // The account panel still opens when a game destination is pressed without a session (StreetView.Input).
+            if (State == PlayerSessionState.Ready && !accountOpen) return;
 
             // Never put a second full-screen Firebase cover in front of the three-phrase
             // startup presentation or the hub. The account panel is opened from the hub hotspot.

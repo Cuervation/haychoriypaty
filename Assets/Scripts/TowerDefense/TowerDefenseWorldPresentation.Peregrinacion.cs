@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace HayChoriYPaty
 {
@@ -12,6 +13,23 @@ namespace HayChoriYPaty
         private readonly HashSet<int> activePilgrimAmbientGrillSlots = new HashSet<int>();
         private readonly Dictionary<int, Sprite[]> pilgrimGrillMeatSprites = new Dictionary<int, Sprite[]>();
         private Sprite pilgrimFernetCupSprite, pilgrimFernetBottleSprite, pilgrimCocaTableBottleSprite, pilgrimFernetContactShadowSprite;
+        private bool UsesHorizontalKitchenDepth => mode.FreeConstruction &&
+            mode.RouteConfig.RouteKind != TowerDefenseRouteKind.CShapedSingleFence &&
+            (visualLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId ||
+             visualLevelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId);
+        // La Renga's depth model also drives Camioneros since it plays on the same C-shaped fence (2026-11-23, a pedido).
+        private bool UsesLaRengaKitchenDepth => mode.FreeConstruction &&
+            (visualLevelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId || visualLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId ||
+             visualLevelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId) &&
+            mode.RouteConfig.RouteKind == TowerDefenseRouteKind.CShapedSingleFence;
+        private bool UsesKitchenGroundDepth => UsesHorizontalKitchenDepth || UsesLaRengaKitchenDepth;
+
+        private static int KitchenGroundSortingOrder(float floorY) => 32 + Mathf.RoundToInt(-floorY * 12f);
+        private static bool GroupsCounterAndStock(TowerDefenseStationKind kind) =>
+            kind == TowerDefenseStationKind.NormalTable || kind == TowerDefenseStationKind.PremiumTable ||
+            kind == TowerDefenseStationKind.CocaBarrel || kind == TowerDefenseStationKind.BeerBarrel;
+        private bool GroupsStationAndStock(TowerDefenseStationKind kind) =>
+            UsesLaRengaKitchenDepth || (UsesHorizontalKitchenDepth && GroupsCounterAndStock(kind));
         private static readonly string[] ProductPrefabs = { "Sandwich_Chori", "Sandwich_Paty", "Sandwich_Bondiola", "Sandwich_Vacio", "Drink_Coca", "Drink_Fernet", "Drink_Beer" };
         private static readonly string[] GrillFoodPrefabs = { "Food_Chori", "Food_Paty", "Food_Bondiola", "Food_Vacio" };
         private static readonly string[] AmbientMeatStates = { "Raw", "Cooking", "Cooked" };
@@ -55,7 +73,9 @@ namespace HayChoriYPaty
                 root.layer = presentationLayer;
                 pilgrimStations.Add(station.Id, root);
                 Rect b = station.Bounds;
-                int depth = 32 + Mathf.RoundToInt(-b.yMin * 12f);
+                int depth = KitchenGroundSortingOrder(b.yMin);
+                if (!UsesLaRengaKitchenDepth && visualLevelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId &&
+                    (station.Kind == TowerDefenseStationKind.CocaBarrel || station.Kind == TowerDefenseStationKind.BeerBarrel)) depth -= 6;
                 string resource = station.Kind == TowerDefenseStationKind.NormalGrill ? "Station_NormalGrill"
                     : station.Kind == TowerDefenseStationKind.PremiumGrill ? "Station_PremiumGrill"
                     : station.Kind == TowerDefenseStationKind.NormalTable ? "Station_NormalTable"
@@ -63,6 +83,24 @@ namespace HayChoriYPaty
                     : station.Kind == TowerDefenseStationKind.FernetTable ? "Station_FernetTable"
                     : station.Kind == TowerDefenseStationKind.BeerBarrel ? "Station_BeerBarrel" : "Station_CocaBarrel";
                 CreatePilgrimFurniture(root.transform, resource, station.Kind, b.center, depth);
+                if (GroupsStationAndStock(station.Kind))
+                {
+                    // Group the counter with the products resting on it. Draw the whole unit against
+                    // the worker's feet, rather than interleaving heads with individual stock sprites.
+                    // La Renga's solid footprint is the ground line in the narrow work strip.
+                    // Leave the horizontal venues' existing visual-footprint rule unchanged.
+                    float floorY = b.yMin;
+                    if (!UsesLaRengaKitchenDepth)
+                    {
+                        SpriteRenderer[] parts = root.GetComponentsInChildren<SpriteRenderer>(true);
+                        if (parts.Length > 0)
+                        {
+                            floorY = parts[0].bounds.min.y;
+                            for (int i = 1; i < parts.Length; i++) floorY = Mathf.Min(floorY, parts[i].bounds.min.y);
+                        }
+                    }
+                    root.AddComponent<SortingGroup>().sortingOrder = KitchenGroundSortingOrder(floorY);
+                }
             }
             SyncPilgrimFood();
         }
@@ -104,7 +142,9 @@ namespace HayChoriYPaty
 
             if (kind == TowerDefenseStationKind.NormalTable || kind == TowerDefenseStationKind.PremiumTable)
             {
-                FitPilgrimSandwichTable(obj, depth);
+                // La Renga's tables are half as wide: draw the table at the width its layout gives it.
+                float layoutWidth = mode.BocaKitchenSourceBounds(kind).width;
+                FitPilgrimSandwichTable(obj, depth, layoutWidth > 0f ? layoutWidth : StreetKitchenLayout.TableWidth);
             }
             else
             {
@@ -130,7 +170,8 @@ namespace HayChoriYPaty
                     || kind == TowerDefenseStationKind.PremiumGrill
                     || kind == TowerDefenseStationKind.FernetTable;
                 if (preserveAspect) scaleX = scaleY = Mathf.Min(scaleX, scaleY);
-                obj.transform.localScale = new Vector3(scaleX, scaleY, 1f);
+                // Boca stretches its kitchen art vertically with the screen height (FitStation: scale.y *= verticalScale).
+                obj.transform.localScale = new Vector3(scaleX, scaleY * mode.KitchenVerticalScale, 1f);
             }
 
             SetLayerRecursively(obj, presentationLayer);
@@ -148,7 +189,7 @@ namespace HayChoriYPaty
             }
         }
 
-        private void FitPilgrimSandwichTable(GameObject station, int depth)
+        private void FitPilgrimSandwichTable(GameObject station, int depth, float tableWidth)
         {
             Transform tabletop = station.transform.Find("Tabletop");
             Transform leftTrestle = station.transform.Find("Trestle_Left");
@@ -161,21 +202,23 @@ namespace HayChoriYPaty
 
             // Match StreetKitchenRenderer's exact Boca table composition. The source layout is
             // scaled as a whole; only its transparent authored overlap may extend past collision bounds.
-            Rect bounds = new Rect(-StreetKitchenLayout.TableWidth * .5f, -40f,
-                StreetKitchenLayout.TableWidth, StreetKitchenLayout.SandwichTableHeight);
+            Rect bounds = new Rect(-tableWidth * .5f, -40f,
+                tableWidth, StreetKitchenLayout.SandwichTableHeight);
             Rect visual = StreetKitchenLayout.FoodTableVisualBounds(bounds);
             float topDepth = visual.height * StreetKitchenLayout.SandwichTableTopDepthRatio;
             float supportHeight = visual.height - topDepth + StreetKitchenLayout.SandwichTableSupportOverlap;
             float scale = mode.BocaKitchenFitScale() * mode.WorldUnitsPerLogicalPixel;
-            FitTablePart(station, "Tabletop", visual.center.x, visual.yMin + topDepth * .5f,
-                bounds.width, topDepth, scale, depth + 2);
+            // Boca's FitFoodTable multiplies every vertical position and height by the screen's vertical scale.
+            float stretch = mode.KitchenVerticalScale;
+            FitTablePart(station, "Tabletop", visual.center.x, (visual.yMin + topDepth * .5f) * stretch,
+                bounds.width, topDepth * stretch, scale, depth + 2);
             float supportWidth = bounds.width * StreetKitchenLayout.SandwichTableSupportWidthFraction;
             float leftCenterX = visual.xMin + visual.width * StreetKitchenLayout.SandwichTableSupportCenterFraction;
             float rightCenterX = visual.xMax - visual.width * StreetKitchenLayout.SandwichTableSupportCenterFraction;
             float supportCenterY = visual.yMax - supportHeight * .5f;
-            FitTablePart(station, "Trestle_Left", leftCenterX, supportCenterY, supportWidth, supportHeight,
+            FitTablePart(station, "Trestle_Left", leftCenterX, supportCenterY * stretch, supportWidth, supportHeight * stretch,
                 scale, depth);
-            FitTablePart(station, "Trestle_Right", rightCenterX, supportCenterY, supportWidth, supportHeight,
+            FitTablePart(station, "Trestle_Right", rightCenterX, supportCenterY * stretch, supportWidth, supportHeight * stretch,
                 scale, depth);
         }
         private void SyncPilgrimFood()
@@ -183,7 +226,7 @@ namespace HayChoriYPaty
             staleIds.Clear(); foreach (int id in pilgrimFood.Keys) staleIds.Add(id);
             if (mode.Kitchen == null) return;
             occupiedPilgrimGrillSlots.Clear();
-            StreetKitchenLayout layout = TowerDefenseGameMode.LujanBocaKitchenVisualLayout;
+            StreetKitchenLayout layout = mode.SourceKitchenLayout;
             float kitchenScale = mode.BocaKitchenFitScale();
             foreach (StreetFoodUnit unit in mode.Kitchen.Units)
             {
@@ -209,6 +252,7 @@ namespace HayChoriYPaty
                 Vector2 iconSize;
                 float rotation = 0f;
                 int displayLayer = Mathf.Max(0, unit.Slot);
+                int carrierDepth = int.MinValue;
                 if (carried)
                 {
                     TowerDefenseWorkerState carrier = null;
@@ -239,7 +283,7 @@ namespace HayChoriYPaty
                     logicalPosition = layout.TableSlotPosition(unit.Product, unit.Slot, companionAvailable,
                         mode.Kitchen.TableCapacity(unit.Product));
                     iconSize = StreetKitchenLayout.TableServingSize(unit.Product);
-                    rotation = StreetKitchenLayout.TableSlotRotation(unit.Product, unit.Slot, companionAvailable);
+                    rotation = StreetKitchenLayout.TableSlotRotation(unit.Product, unit.Slot, companionAvailable, layout.NarrowTables);
                 }
                 if (unit.Location == StreetFoodLocation.Carried)
                 {
@@ -248,6 +292,14 @@ namespace HayChoriYPaty
                     if (carrier == null) continue;
                     // Carried objects follow their worker in world units rather than table-space.
                     logicalPosition = carrier.Position + new Vector2(18f, 40f) * pixel;
+                    if (UsesKitchenGroundDepth) carrierDepth = KitchenGroundSortingOrder(carrier.Position.y) + 2;
+                    // The campaign crew body holds the unit in its palm, behind the body when walking away.
+                    WorkerView carrierView;
+                    if (workerViews.TryGetValue(carrier.Id, out carrierView) && carrierView.Group != null)
+                    {
+                        logicalPosition = carrierView.PalmWorld;
+                        if (carrierView.Rear) carrierDepth = KitchenGroundSortingOrder(carrier.Position.y);
+                    }
                     sourceBounds = Rect.zero;
                 }
                 else logicalPosition = MapBocaKitchenPointToStation(logicalPosition, sourceBounds, station, kitchenScale, pixel);
@@ -260,6 +312,11 @@ namespace HayChoriYPaty
                 }
                 if (obj != null)
                 {
+                    GameObject furniture = null;
+                    bool onGroupedStation = !carried && GroupsStationAndStock(station.Kind)
+                        && pilgrimStations.TryGetValue(station.Id, out furniture);
+                    Transform parent = onGroupedStation ? furniture.transform : presentationRoot.transform;
+                    if (obj.transform.parent != parent) obj.transform.SetParent(parent, true);
                     obj.transform.position = logicalPosition;
                     var renderer = obj.GetComponent<SpriteRenderer>();
                     if (unit.Product == 5 && !carried && unit.Location == StreetFoodLocation.Table)
@@ -270,7 +327,15 @@ namespace HayChoriYPaty
                         int stationDepth = 32 + Mathf.RoundToInt(-station.Bounds.yMin * 12f);
                         renderer.sortingOrder = stationDepth + 10 + unit.Slot;
                     }
-                    else renderer.sortingOrder = 40 + Mathf.RoundToInt(-logicalPosition.y * 12f) + displayLayer;
+                    else
+                    {
+                        int productDepth = Mathf.Max(carrierDepth, 40 + Mathf.RoundToInt(-logicalPosition.y * 12f) + displayLayer);
+                        if (!UsesLaRengaKitchenDepth && visualLevelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId &&
+                            !carried && (unit.Product == 4 || unit.Product == 6)) productDepth -= 14;
+                        renderer.sortingOrder = onGroupedStation
+                            ? Mathf.Max(KitchenGroundSortingOrder(station.Bounds.yMin) + 3, productDepth)
+                            : UsesLaRengaKitchenDepth && carried ? carrierDepth : productDepth;
+                    }
                     string prefab = inGrill ? GrillFoodPrefabs[unit.Product] : ProductPrefabs[unit.Product];
                     var source = Resources.Load<GameObject>("ModularKitchen/Prefabs/" + prefab);
                     if (source != null) renderer.sprite = source.GetComponent<SpriteRenderer>().sprite;
@@ -300,11 +365,13 @@ namespace HayChoriYPaty
             return null;
         }
 
-        private static Vector2 MapBocaKitchenPointToStation(Vector2 point, Rect sourceBounds,
+        private Vector2 MapBocaKitchenPointToStation(Vector2 point, Rect sourceBounds,
             TowerDefensePlacedStation station, float fitScale, float pixelScale)
         {
+            // Boca's item positions are stretched vertically with the screen height, like its stations.
             Vector2 offset = point - sourceBounds.center;
-            return station.Bounds.center + new Vector2(offset.x, -offset.y) * (fitScale * pixelScale);
+            // The kitchen is reflected in world space (Los Redondos): a piece's contents mirror about its own centre too.
+            return station.Bounds.center + new Vector2(mode.ReflectKitchen ? -offset.x : offset.x, -offset.y * mode.KitchenVerticalScale) * (fitScale * pixelScale);
         }
 
         private void SyncPilgrimAmbientGrillMeat(StreetKitchenLayout layout, float kitchenScale)
@@ -347,7 +414,7 @@ namespace HayChoriYPaty
                     Vector2 worldPosition = MapBocaKitchenPointToStation(sourcePoint, sourceBounds, station,
                         kitchenScale, mode.WorldUnitsPerLogicalPixel);
                     visual.Object.transform.position = worldPosition;
-                    visual.Renderer.sortingOrder = 42 + Mathf.RoundToInt(-worldPosition.y * 12f) + slot;
+                    visual.Renderer.sortingOrder = PilgrimAmbientGrillSortingOrder(worldPosition.y, station, slot);
                 }
             }
             foreach (KeyValuePair<int, PilgrimAmbientGrillMeat> pair in pilgrimAmbientGrillMeat)
@@ -355,14 +422,22 @@ namespace HayChoriYPaty
                     pair.Value.Object.SetActive(false);
         }
 
+        private int PilgrimAmbientGrillSortingOrder(float y, TowerDefensePlacedStation station, int slot)
+        {
+            int depth = 42 + Mathf.RoundToInt(-y * 12f) + slot;
+            return UsesLaRengaKitchenDepth ? Mathf.Max(KitchenGroundSortingOrder(station.Bounds.yMin) + 3, depth) : depth;
+        }
+
         private PilgrimAmbientGrillMeat CreatePilgrimAmbientGrillMeat(int product, int slot,
             TowerDefensePlacedStation station, Rect sourceBounds, float kitchenScale, Vector2 meatSize)
         {
-            Vector2 sourcePoint = TowerDefenseGameMode.LujanBocaKitchenVisualLayout.GrillSlotPosition(product, slot,
+            Vector2 sourcePoint = mode.SourceKitchenLayout.GrillSlotPosition(product, slot,
                 mode.Kitchen.GrillCapacity(product ^ 1) > 0, mode.Kitchen.GrillCapacity(product));
             Vector2 position = MapBocaKitchenPointToStation(sourcePoint, sourceBounds, station, kitchenScale,
                 mode.WorldUnitsPerLogicalPixel);
-            GameObject visualObject = CreateProductDisplay(presentationRoot.transform, GrillFoodPrefabs[product],
+            Transform parent = UsesLaRengaKitchenDepth && pilgrimStations.TryGetValue(station.Id, out GameObject grill)
+                ? grill.transform : presentationRoot.transform;
+            GameObject visualObject = CreateProductDisplay(parent, GrillFoodPrefabs[product],
                 "Peregrinación Boca ambient grill P" + product + " S" + slot, position, meatSize, 42);
             if (visualObject == null) return null;
             SpriteRenderer renderer = visualObject.GetComponent<SpriteRenderer>();
@@ -370,7 +445,7 @@ namespace HayChoriYPaty
             int stateIndex = (product * 2 + slot) % AmbientMeatStates.Length;
             renderer.sprite = PilgrimAmbientMeatSprite(product, stateIndex);
             FitPilgrimDisplayToLogicalSize(visualObject.transform, renderer, meatSize);
-            renderer.sortingOrder = 42 + Mathf.RoundToInt(-position.y * 12f) + slot;
+            renderer.sortingOrder = PilgrimAmbientGrillSortingOrder(position.y, station, slot);
             return new PilgrimAmbientGrillMeat
             {
                 Product = product,

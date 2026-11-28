@@ -325,8 +325,12 @@ namespace HayChoriYPaty.Tests
             object save = Field(latest, "save");
             Type simulationType = Runtime("StreetSimulation");
             int[] campaignOrder = (int[])simulationType.GetField("CampaignOrder", StaticPublic).GetValue(null);
-            int latestCampaignLevel = (int)simulationType.GetMethod("CampaignLevelAt", StaticPublic)
-                .Invoke(null, new object[] { campaignOrder.Length - 1 });
+            // The campaign now closes with Peregrinación (a Tower Defense run that is not market-backed), so the
+            // latest market-backed level is the last traditional one; its successor stays locked in this fixture.
+            int latestCampaignLevel = -1;
+            for (int position = campaignOrder.Length - 1; position >= 0 && latestCampaignLevel < 0; position--)
+                if (!(bool)simulationType.GetMethod("IsTowerDefenseLevel", StaticPublic).Invoke(null, new object[] { campaignOrder[position] }))
+                    latestCampaignLevel = campaignOrder[position];
             ((bool[])Field(save, "unlockedLevelIds"))[latestCampaignLevel] = true;
             Assert.IsTrue((bool)Invoke(latest, "SelectLevel", latestCampaignLevel));
             object latestData = Read(Read(latest, "Market"), "Data");

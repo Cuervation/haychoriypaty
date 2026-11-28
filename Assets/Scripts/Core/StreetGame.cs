@@ -127,6 +127,8 @@ namespace HayChoriYPaty
         }
         public bool IsIngredientUnlocked(int ingredientId) => playerActive && market != null && save != null &&
             market.IsIngredientUnlocked(ingredientId, save.unlockedLevelIds, save.unlockedLevel);
+        /// <summary>Statistics of the active profile (read-only use: Liga points for the ranking); null without a player.</summary>
+        public StreetPlayerStatistics PlayerStatistics => playerActive ? save?.statistics : null;
         public bool HasWonLevel(int levelIndex)
         {
             if (save == null || save.statistics == null || levelIndex < 0 || levelIndex >= StreetSimulation.LevelNames.Length ||
@@ -237,7 +239,7 @@ namespace HayChoriYPaty
                 }
             }
             activeAttemptId = save.activeAttemptId;
-            towerDefenseMode = null;
+            SetTowerDefenseRuntime(null);
             bool hasPersistedMarket = save.market != null;
             market = new StreetMarket(save.market, balance);
             save.market = market.Data;
@@ -322,14 +324,52 @@ namespace HayChoriYPaty
             temporaryStartupTicketGrantAppliedThisProcess = false;
         }
 
+        // ---- Time away in the background (2026-11-26, a pedido: "que cuando la app esté en segundo plano continúe andando") ----
+        // Android freezes the player while the app is in the background, so nothing can run there. Instead, the round that was being
+        // played when the app left catches up on return: the clock, fans and workers advance by the time it was away, a few seconds
+        // of simulation per frame (normal levels in StreetGame, Defense levels in StreetView). A player pause or the hub drops it.
+        public const float MaxBackgroundCatchUpSeconds = 3600f;
+        private DateTime? backgroundSinceUtc;
+        private float backgroundCatchUpSeconds;
+        public float PendingBackgroundCatchUpSeconds => backgroundCatchUpSeconds;
+
+        /// <summary>Takes up to maxSeconds of the time still owed to the round after coming back from the background.</summary>
+        public float TakeBackgroundCatchUp(float maxSeconds)
+        {
+            float taken = Mathf.Clamp(backgroundCatchUpSeconds, 0f, Mathf.Max(0f, maxSeconds));
+            backgroundCatchUpSeconds -= taken;
+            return taken;
+        }
+
+        private bool RoundIsRunning => playerActive && sim != null && (sim.IsExternalCampaignRuntime
+            ? towerDefenseMode != null && towerDefenseMode.Phase == TowerDefenseRunPhase.Playing
+            : sim.Phase == RoundPhase.Playing);
+
+        private void RecordBackgroundTime(bool paused)
+        {
+            if (paused) { backgroundSinceUtc = DateTime.UtcNow; return; }
+            if (!backgroundSinceUtc.HasValue) return;
+            double away = (DateTime.UtcNow - backgroundSinceUtc.Value).TotalSeconds;
+            backgroundSinceUtc = null;
+            // A clock moved backwards gives nothing; a very long absence is capped.
+            if (away > 0d && RoundIsRunning)
+                backgroundCatchUpSeconds = Mathf.Min(MaxBackgroundCatchUpSeconds, backgroundCatchUpSeconds + (float)Math.Min(away, MaxBackgroundCatchUpSeconds));
+        }
+
         private void Update()
         {
+            // Owed time only belongs to the round that was running; paused, finished or left rounds drop it.
+            if (backgroundCatchUpSeconds > 0f && !RoundIsRunning) backgroundCatchUpSeconds = 0f;
             if (!playerActive || sim == null || TowerDefenseGameMode.CampaignStepSuspended) return;
             sim.Step(Time.deltaTime);
+            // Normal levels: up to 30 s of the time away per frame, in the simulation's own 10 s calls.
+            for (int i = 0; i < 3 && backgroundCatchUpSeconds > 0f && !sim.IsExternalCampaignRuntime && sim.Phase == RoundPhase.Playing; i++)
+                sim.Step(TakeBackgroundCatchUp(10f));
             ProcessRoundResult();
         }
         private void OnApplicationPause(bool paused)
         {
+            RecordBackgroundTime(paused);
             if (!paused || (!playerActive && !suspensionRequested)) return;
             if (playerActive && sim != null && sim.IsExternalCampaignRuntime)
             {
@@ -403,7 +443,7 @@ namespace HayChoriYPaty
                 bool firstTimeUnlock = nextLevel >= 0 && !IsLevelUnlocked(nextLevel);
                 if (nextLevel >= 0) SetCampaignLevelUnlocked(nextLevel);
                 save.unlockedLevel = Mathf.Max(save.unlockedLevel, Mathf.Min(10, sim.LevelIndex + 1));
-                if (market != null && nextLevel >= 0 && nextLevel != StreetSimulation.HuracanBonusLevelId)
+                if (market != null && nextLevel >= 0)
                 {
                     var nextLevelSimulation = new StreetSimulation(balance, nextLevel, sim.Price);
                     market.GrantFirstUnlockStockBonus(nextLevelSimulation, firstTimeUnlock);
@@ -662,25 +702,33 @@ namespace HayChoriYPaty
         }
         public void SetProductPrice(int product,float value) { if(playerActive && sim!=null && sim.Phase==RoundPhase.Ready)sim.SetProductPrice(product,value); }
         public void StartRound() { TryStartRound(); }
-        public bool TryStartRound()
+        public bool TryStartRound() => TryStartRoundWithSaveFeedback(out _);
+
+        // This reports only a rejected initial write, whose existing rollback makes a retry safe.
+        internal bool TryStartRoundWithSaveFeedback(out bool initialSaveRejected)
         {
+            initialSaveRejected = false;
             // Both stable TD IDs are owned by the external mode, never the traditional simulation.
             if (sim == null || StreetSimulation.IsTowerDefenseLevel(sim.LevelIndex)) return false;
-            return TryStartRoundCore(false);
+            return TryStartRoundCore(false, out initialSaveRejected);
         }
 
-        public bool TryStartTowerDefenseRound()
+        public bool TryStartTowerDefenseRound() => TryStartTowerDefenseRoundWithSaveFeedback(out _);
+
+        internal bool TryStartTowerDefenseRoundWithSaveFeedback(out bool initialSaveRejected)
         {
+            initialSaveRejected = false;
             return sim != null && StreetSimulation.IsTowerDefenseLevel(sim.LevelIndex) &&
-                IsLevelUnlocked(sim.LevelIndex) && TryStartRoundCore(true);
+                IsLevelUnlocked(sim.LevelIndex) && TryStartRoundCore(true, out initialSaveRejected);
         }
 
-        private bool TryStartRoundCore(bool externalTowerDefense)
+        private bool TryStartRoundCore(bool externalTowerDefense, out bool initialSaveRejected)
         {
+            initialSaveRejected = false;
             if (!playerActive || !CanStartRound) return false;
             if (sim.IsBonusTrack) return TryStartBonusRound();
             long[] ticketGrants = new long[5];
-            bool eligibleLevel = sim.LevelIndex >= 5 && !externalTowerDefense;
+            bool eligibleLevel = StreetSimulation.IsRacingOrLaterLevel(sim.LevelIndex) && !externalTowerDefense;
             if (eligibleLevel) Array.Copy(save.tickets.pendingWorkersByRole, ticketGrants, ticketGrants.Length);
             if (!sim.CanStartRoundWithTicketWorkers(ticketGrants)) return false;
 
@@ -702,6 +750,7 @@ namespace HayChoriYPaty
             // The same durable snapshot confirms the attempt and consumes eligible reservations.
             if (!Save())
             {
+                initialSaveRejected = true;
                 save.statistics.attemptsStarted--;
                 save.activeAttemptId = null; activeAttemptId = null;
                 save.tickets = JsonUtility.FromJson<StreetTicketData>(previousTickets);
@@ -733,13 +782,19 @@ namespace HayChoriYPaty
         public bool AttachTowerDefenseRuntime(TowerDefenseGameMode mode)
         {
             if (!playerActive || sim == null || !sim.IsExternalCampaignRuntime || mode == null) return false;
-            towerDefenseMode = mode;
+            SetTowerDefenseRuntime(mode);
             return PersistTowerDefenseProgress(mode);
         }
 
         public void DetachTowerDefenseRuntime(TowerDefenseGameMode mode)
         {
-            if (ReferenceEquals(towerDefenseMode, mode)) towerDefenseMode = null;
+            if (ReferenceEquals(towerDefenseMode, mode)) SetTowerDefenseRuntime(null);
+        }
+
+        private void SetTowerDefenseRuntime(TowerDefenseGameMode mode)
+        {
+            towerDefenseMode = mode;
+            if (deliverySound != null) deliverySound.BindTowerDefense(mode);
         }
 
         public bool PersistTowerDefenseProgress(TowerDefenseGameMode mode)
@@ -757,7 +812,7 @@ namespace HayChoriYPaty
                 mode.Phase != TowerDefenseRunPhase.Finished || (!mode.HasWon && !mode.HasLost)) return false;
             if (sim.Phase == RoundPhase.Playing && !ImportTowerDefenseState(mode, true, mode.HasWon)) return false;
             bool saved = ProcessRoundResult();
-            if (saved) towerDefenseMode = null;
+            if (saved) SetTowerDefenseRuntime(null);
             return saved;
         }
 
@@ -771,12 +826,12 @@ namespace HayChoriYPaty
             if (sim.Phase == RoundPhase.Won || sim.Phase == RoundPhase.Lost)
             {
                 bool resultSaved = ProcessRoundResult();
-                if (resultSaved) towerDefenseMode = null;
+                if (resultSaved) SetTowerDefenseRuntime(null);
                 return resultSaved;
             }
             if (sim.Phase != RoundPhase.Playing || !ImportTowerDefenseState(mode, false, false)) return false;
             bool saved = ReturnToLevels();
-            if (saved) towerDefenseMode = null;
+            if (saved) SetTowerDefenseRuntime(null);
             return saved;
         }
 
@@ -810,28 +865,17 @@ namespace HayChoriYPaty
             return true;
         }
 
-        public bool TryHireTowerDefenseAt(TowerDefenseGameMode mode, StreetWorkerRole role, Vector2 position)
+        public bool TryHireTowerDefenseAtPost(TowerDefenseGameMode mode, StreetWorkerRole role)
         {
             int index = (int)role;
             if (!playerActive || sim == null || mode == null || !sim.IsExternalCampaignRuntime ||
-                mode != towerDefenseMode || index < 0 || index >= 5 || !mode.CanHireAt(role, position)) return false;
+                mode != towerDefenseMode || index < 0 || index >= 5 || !mode.CanHireAtPost(role)) return false;
             int cost = mode.HireCost(role);
-            if (cost <= 0 || !mode.TryHireAt(role, position)) return false;
+            if (cost <= 0 || !mode.TryHireAtPost(role)) return false;
             long cents = (long)cost * 100L;
             save.statistics.paidHiresByRole[index]++;
             save.statistics.hireSpendCentsByRole[index] += cents;
             save.statistics.hireSpendTotalCents += cents;
-            return PersistTowerDefenseProgress(mode);
-        }
-
-        public bool TryPlaceTowerDefenseStation(TowerDefenseGameMode mode, TowerDefenseStationKind kind, Vector2 position)
-        {
-            if (!playerActive || sim == null || mode == null || mode != towerDefenseMode || !sim.IsExternalCampaignRuntime ||
-                !mode.EquipmentPlacementAllowed) return false;
-            TowerDefensePlacedStation placed;
-            int cost = mode.StationCost(kind);
-            if (!mode.TryPlaceStation(kind, position, out placed)) return false;
-            save.statistics.equipmentSpendTotalCents += (long)cost * 100L;
             return PersistTowerDefenseProgress(mode);
         }
 
@@ -891,7 +935,7 @@ namespace HayChoriYPaty
         {
             int index = (int)role;
             return playerActive && save?.tickets != null && market != null && sim != null &&
-                IsLevelUnlocked(sim.LevelIndex) && sim.LevelIndex >= 5 && !sim.IsBonusTrack && sim.Phase == RoundPhase.Ready &&
+                IsLevelUnlocked(sim.LevelIndex) && StreetSimulation.IsRacingOrLaterLevel(sim.LevelIndex) && !sim.IsBonusTrack && sim.Phase == RoundPhase.Ready &&
                 !HasPendingChulengo && !resumedChulengoResult && !market.Data.attemptActive &&
                 !StreetSimulation.IsTowerDefenseLevel(sim.LevelIndex) &&
                 index >= 0 && index < 5 && sim.HasRole(role) && save.tickets.balance >= 3 &&
@@ -937,22 +981,57 @@ namespace HayChoriYPaty
             market = new StreetMarket(JsonUtility.FromJson<StreetMarketData>(serializedMarket), balance);
             save.market = market.Data;
         }
-        public bool TryBuyIngredient(int ingredient, int packs, long operationId = 0)
+        private bool CanPurchaseIngredients() => playerActive && !HasPendingChulengo && !resumedChulengoResult &&
+            market != null && sim != null && sim.Phase == RoundPhase.Ready && UnlockedLevel > 0;
+
+        private void TrackIngredientPurchase(int ingredient, int packs)
         {
-            if (!playerActive || HasPendingChulengo || resumedChulengoResult || market == null || sim == null || sim.Phase != RoundPhase.Ready || UnlockedLevel == 0) return false;
-            string before = JsonUtility.ToJson(market.Data);
-            if (!market.TryBuy(sim, ingredient, packs, UnlockedLevel,
-                operationId == 0 ? market.NextPurchaseId : operationId)) return false;
             save.statistics.purchasedUnitsByIngredient[ingredient] += (long)packs * StreetIngredientCatalog.PackUnits[ingredient];
             long purchaseCost = (long)packs * market.PackPriceCents(ingredient);
             save.statistics.purchaseSpendCentsByIngredient[ingredient] += purchaseCost;
             save.statistics.ingredientSpendTotalCents += purchaseCost;
+        }
+
+        public bool TryBuyIngredient(int ingredient, int packs, long operationId = 0)
+        {
+            if (!CanPurchaseIngredients()) return false;
+            string before = JsonUtility.ToJson(market.Data);
+            if (!market.TryBuy(sim, ingredient, packs, UnlockedLevel,
+                operationId == 0 ? market.NextPurchaseId : operationId)) return false;
+            TrackIngredientPurchase(ingredient, packs);
             if (Save()) return true;
-            save.statistics.purchasedUnitsByIngredient[ingredient] -= (long)packs * StreetIngredientCatalog.PackUnits[ingredient];
-            save.statistics.purchaseSpendCentsByIngredient[ingredient] -= purchaseCost;
-            save.statistics.ingredientSpendTotalCents -= purchaseCost;
-            market = new StreetMarket(JsonUtility.FromJson<StreetMarketData>(before), balance);
-            save.market = market.Data;
+            TrackIngredientPurchase(ingredient, -packs);
+            RestoreMarketAfterFailedStart(before);
+            return false;
+        }
+
+        public bool TryBuyMissingIngredients()
+        {
+            if (!CanPurchaseIngredients() || market.Data.attemptActive ||
+                market.MinimumPurchaseCostCents(sim) > market.BalanceCents) return false;
+            var nextMarket = new StreetMarket(JsonUtility.FromJson<StreetMarketData>(JsonUtility.ToJson(market.Data)), balance);
+            var boughtPacks = new int[StreetIngredientCatalog.Names.Length];
+            bool hasPurchase = false;
+            for (int ingredient = 0; ingredient < boughtPacks.Length; ingredient++)
+            {
+                int packs = nextMarket.MissingPacks(sim, ingredient);
+                if (packs <= 0) continue;
+                if (!nextMarket.TryBuy(sim, ingredient, packs, UnlockedLevel, nextMarket.NextPurchaseId)) return false;
+                boughtPacks[ingredient] = packs;
+                hasPurchase = true;
+            }
+            if (!hasPurchase) return false;
+
+            // Preserve per-ingredient counters, but never persist a prefix of the batch.
+            StreetMarket previousMarket = market;
+            market = nextMarket;
+            for (int ingredient = 0; ingredient < boughtPacks.Length; ingredient++)
+                if (boughtPacks[ingredient] > 0) TrackIngredientPurchase(ingredient, boughtPacks[ingredient]);
+            if (Save()) return true;
+            for (int ingredient = 0; ingredient < boughtPacks.Length; ingredient++)
+                if (boughtPacks[ingredient] > 0) TrackIngredientPurchase(ingredient, -boughtPacks[ingredient]);
+            market = previousMarket;
+            save.market = previousMarket.Data;
             return false;
         }
         public bool IsPreparationPermitPurchased(int itemId) => playerActive && market != null && sim != null &&
@@ -1077,7 +1156,7 @@ namespace HayChoriYPaty
             playerActive = false; suspensionRequested = true;
             if (!Save()) return false;
             if (deliverySound != null) deliverySound.Initialize(null);
-            sim = null; market = null; persist = null; activeAttemptId = null; towerDefenseMode = null;
+            sim = null; market = null; persist = null; activeAttemptId = null; SetTowerDefenseRuntime(null);
             suspensionRequested = false;
             return true;
         }
@@ -1236,7 +1315,6 @@ namespace HayChoriYPaty
             }
             return data;
         }
-
 
         private bool InitializeTicketData(SaveData data)
         {

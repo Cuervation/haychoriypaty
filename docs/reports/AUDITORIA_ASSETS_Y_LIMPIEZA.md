@@ -142,3 +142,14 @@ Las capturas posteriores se realizaron durante la retirada provisional de cinco 
 ### Revisión independiente de cierre
 
 El validador contrastó el reporte con CSV/JSON, ambos grafos, callbacks y capturas: cantidades y categorías coinciden; el único nodo retirado es cover-loading y las 466 filas restantes no cambiaron; las cuatro restauraciones coinciden con sus SHA iniciales. Se verificaron **172 huellas previas sin desviaciones**, con los dos documentos intencionalmente ampliados solo por append y prefijo original intacto. Aprobado el alcance cuantitativo y la distinción entre evidencia y pendientes, **no una aprobación global del producto**.
+
+## Limpieza 2026-11-27 (a pedido: "si hay archivos que no se usan, deben ser eliminados")
+
+Análisis repetido sobre el árbol actual (GUIDs en escenas/prefabs/assets/settings, nombres de `Resources` en scripts incluyendo rutas armadas, y referencias de métodos en todo el código y las pruebas). Con autorización explícita del usuario se eliminaron, con sus `.meta`:
+
+- `Assets/Art/Placeholder/` completo: las cinco imágenes de Floresta del prototipo (8,2 MB, en `Resources`, así que entraban en la APK) más su README y prompts. `PrototypeView`/`GameController`, que las usaban, ya no existen; sustituye la retención "D" de la tabla de arriba.
+- `Assets/Art/Street/Resources/StreetHubSignage/` (recortes de los carteles Mercado/Insignias) y `StreetHubCharacters/hub-seller-wave-arm-v1.png` / `hub-seller-wave-clean-plate-v1.png`: sin carga en código; sustituye la retención "D" de la tabla.
+- `Assets/Resources/Audio/coin-appear-classic.wav`: sin uso desde el sonido "burbuja" de San Lorenzo.
+- Código sin llamadas (ni juego ni pruebas, ~180 líneas): `StreetSimulation.GetUpgradeCostProfile/GetHireCostProfile/GetProfile/StationApproachPointForLevel/IsWorkerTravelling`, `StreetGame.TryHireTowerDefenseAt/TryPlaceTowerDefenseStation`, `StreetWorkstationLayout.WorkerVisualBounds`, `TowerDefenseGameMode.FindWorkerInZone/CanWorkerOccupyPosition`, `StreetView.FerroFanSourceRect/LosRedondosFanSourceRect/DrawRankingShine/DrawPlaySweep/HubAmbientLayoutBounds/LevelSelectAccent/DrawPilgrimCardLabel/RiotGameOverBounds/DrawGrillArtwork`. Los campos serializados de perfiles de costo siguen en la escena.
+
+Se conservan a propósito: archivos de Android/Firebase y licencias (sin referencia textual pero necesarios), carnes enteras (rutas armadas), `LegacyKitchen` (pruebas y constructor; no va a la APK), referencias y prompts de arte, el menú `BuildApprovedFoodTables` y el código "en pausa" de personajes y capas del barrio (contrato `home-hub.md`). Verificación: EditMode completo 1299 PASS / 1 FAIL previo (`RacingBalanceAuditGameplayTests`); PlayMode barrio, Tower Defense y entrada 96/97 (falla previa `RiotReturn…`). También se corrigió `StreetSpecialtyDomainTests` (buscaba `ComputeHireCost` como privado; es público desde el 2026-11-26).

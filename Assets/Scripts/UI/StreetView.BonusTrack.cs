@@ -46,6 +46,15 @@ namespace HayChoriYPaty
             return 0;
         }
 
+        // A flat fill in the HUD's own canvas coordinates (FillRect would also scale y by layoutVerticalScale).
+        private static void HudFill(Rect bounds, Color color)
+        {
+            Color previous = GUI.color;
+            GUI.color = color;
+            GUI.DrawTexture(bounds, Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
+            GUI.color = previous;
+        }
+
         private void DrawBonusTrackHud(StreetSimulation sim)
         {
             StreetBonusTrackState state = sim != null ? sim.BonusTrack : null;
@@ -61,9 +70,11 @@ namespace HayChoriYPaty
                 ? StreetBonusTrackState.DurationSeconds
                 : Mathf.Min(StreetBonusTrackState.DurationSeconds, (state.ChoiceCount + 1) * 20f);
             float progress = state.SelectionPending ? 1f : Mathf.Clamp01((sim.Elapsed - state.ChoiceCount * 20f) / Mathf.Max(.01f, nextAt - state.ChoiceCount * 20f));
+            // Same canvas coordinates as the HUD texts and panels (2026-11-26 resolution review): FillRect scales y by layoutVerticalScale, so on
+            // short screens (an unfolded foldable) the bar crossed out "PUNTOS" and on tall ones it fell inside the ¡AGUANTE! panel.
             Rect bar = new Rect(12f, 62f, 516f, 4f);
-            FillRect(bar, new Color(.02f, .025f, .06f, .75f));
-            FillRect(new Rect(bar.x, bar.y, bar.width * progress, bar.height), new Color(1f, .74f, .12f));
+            HudFill(bar, new Color(.02f, .025f, .06f, .75f));
+            HudFill(new Rect(bar.x, bar.y, bar.width * progress, bar.height), new Color(1f, .74f, .12f));
             DrawMarketBluePanel(new Rect(10f, 73f, 520f, 27f), new Color(.02f, .055f, .16f, .83f));
             string status = state.AguanteActive ? "¡AGUANTE! ACTIVO " + state.AguanteBoostRemaining.ToString("0.0") + " s"
                 : state.AguanteReady && state.SelectionPending ? "¡AGUANTE! LISTO · ELEGÍ UNA MEJORA"
@@ -80,13 +91,15 @@ namespace HayChoriYPaty
                 : state.Stars == 1 ? StreetBonusTrackState.GoodStarScore : StreetBonusTrackState.ExcellentStarScore;
             string starProgress = nextStar < 0 ? "TRES ESTRELLAS · " + state.Score.ToString("N0") + " PUNTOS"
                 : "PRÓXIMA ESTRELLA " + state.Score.ToString("N0") + " / " + nextStar.ToString("N0");
+            // A dark strip behind the line keeps it readable where the crowd's order bubbles reach it (short screens such as unfolded foldables).
+            HudFill(new Rect(10f, 101f, 520f, 17f), new Color(.02f, .055f, .16f, .72f));
             MarketText(new Rect(14f, 102f, 270f, 15f), starProgress, 10, new Color(.92f, .96f, 1f), TextAnchor.MiddleLeft);
             Rect starBar = new Rect(286f, 108f, 244f, 4f);
-            FillRect(starBar, new Color(.02f, .025f, .06f, .75f));
+            HudFill(starBar, new Color(.02f, .025f, .06f, .75f)); // HUD coordinates, like its label (2026-11-26 resolution review)
             int lowerStar = state.Stars == 1 ? StreetBonusTrackState.BasicStarScore :
                 state.Stars == 2 ? StreetBonusTrackState.GoodStarScore : 0;
             float starFill = nextStar < 0 ? 1f : Mathf.Clamp01((state.Score - lowerStar) / (float)Mathf.Max(1, nextStar - lowerStar));
-            FillRect(new Rect(starBar.x, starBar.y, starBar.width * starFill, starBar.height), new Color(1f, .78f, .16f));
+            HudFill(new Rect(starBar.x, starBar.y, starBar.width * starFill, starBar.height), new Color(1f, .78f, .16f));
             long attempt = game.BonusTrackProgress != null ? game.BonusTrackProgress.attemptsStarted : -1;
             if (attempt != bonusIntroAttempt)
             {

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace HayChoriYPaty
 {
@@ -18,6 +19,10 @@ namespace HayChoriYPaty
         private const string CamionerosDownReverseWalkingFansResource = "street-ferro-fans-walk-down-reverse-v1";
         private const string CamionerosDownPassingWalkingFansResource = "street-ferro-fans-walk-down-passing-v1";
         private const int CamionerosWalkingPoseCount = 3;
+        // Los Redondos ID10 (2026-11-26): pose 0 = authored stride atlas, pose 1 = passing pose derived from it
+        // (tools/art/make_walk_poses_from_stride.swift), so the legs visibly alternate while the fans advance.
+        private const string LosRedondosPassingWalkingFansResource = "street-losredondos-fans-walk-passing-v1";
+        private const int LosRedondosWalkingPoseCount = 2;
         private const float FanWalkHalfStrideLogicalPixels = 18f;
 
         private sealed class FanView
@@ -32,6 +37,14 @@ namespace HayChoriYPaty
             public SpriteRenderer Renderer;
             public Sprite[] Frames;
             public Sprite[] HandoffFrames;
+            public Sprite RearIdleFrame;
+            public SpriteRenderer MozoAngryCue;
+            // La Renga's campaign crew body (see TowerDefenseWorldPresentation.CampaignCrew.cs).
+            public SortingGroup Group;
+            public SpriteRenderer Torso, LeftLeg, RightLeg;
+            public StreetFacing Facing;
+            public Vector2 LastPosition, PalmWorld;
+            public bool Rear, WasMoving;
         }
 
         private sealed class DeliveryCue
@@ -68,6 +81,7 @@ namespace HayChoriYPaty
         private Texture2D camionerosDownWalkingFans;
         private Texture2D camionerosDownReverseWalkingFans;
         private Texture2D camionerosDownPassingWalkingFans;
+        private Texture2D losRedondosPassingWalkingFans;
         private RenderTexture overlayTexture;
         private int originalSourceCameraMask;
         private int presentationLayer = 5;
@@ -96,6 +110,8 @@ namespace HayChoriYPaty
                 ? Resources.Load<Texture2D>(CamionerosDownReverseWalkingFansResource) : null;
             camionerosDownPassingWalkingFans = visualLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId
                 ? Resources.Load<Texture2D>(CamionerosDownPassingWalkingFansResource) : null;
+            losRedondosPassingWalkingFans = visualLevelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId
+                ? Resources.Load<Texture2D>(LosRedondosPassingWalkingFansResource) : null;
             sourceCamera = camera;
             presentationLayer = LayerMask.NameToLayer("UI");
             if (presentationLayer < 0) presentationLayer = 5;
@@ -164,7 +180,7 @@ namespace HayChoriYPaty
                 new Vector3(cameraPixels.xMax, cameraPixels.center.y, depth));
             // ID10's exit ends inside the screen, next to the worker strip: stop the exit rails
             // so that even the centered exit terminal panel ends at the fenced route's edge.
-            if (visualLevelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId)
+            if (visualLevelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId && !mode.FreeConstruction)
                 rightEdge.x = Mathf.Min(rightEdge.x,
                     mode.RouteConfig.PlayableBounds.xMax - fenceGenerator.TerminalPanelHalfLength);
             if (!fenceGenerator.SetVisualHorizontalBounds(
@@ -181,6 +197,7 @@ namespace HayChoriYPaty
             SyncFans(gameMode);
             SyncWorkers(gameMode);
             SyncDeliveryCues(gameMode.Elapsed);
+            SyncSecurityGuard(gameMode);
         }
 
         public void ResizeTarget(Vector2 screenSize)
@@ -232,6 +249,8 @@ namespace HayChoriYPaty
             fanSpriteCache.Clear();
             for (int i = 0; i < generatedWorkerSprites.Count; i++) DestroyPresentationObject(generatedWorkerSprites[i]);
             generatedWorkerSprites.Clear();
+            DisposeCampaignCrewProjection();
+            DisposeSecurityGuard();
             if (overlayTexture != null)
             {
                 overlayTexture.Release();
@@ -439,6 +458,10 @@ namespace HayChoriYPaty
         private void OnDeliveryCompleted(TowerDefenseDelivery receipt)
         {
             if (!configured || receipt.Product < 0 || receipt.Product > 6 || (!mode.FreeConstruction && receipt.Product != 0 && receipt.Product != 4)) return;
+            // La Renga (2026-11-23, a pedido): the delivery looks exactly like the regular levels, where the carried product stays in the
+            // worker's hand and disappears when it is consumed; no extra sprite crosses over to the fan. Camioneros plays on the same
+            // C-shaped fence and delivers the same way.
+            if (mode.RouteConfig.RouteKind == TowerDefenseRouteKind.CShapedSingleFence) return;
             DeliveryCue cue = pooledDeliveryCues.Count > 0 ? pooledDeliveryCues.Pop() : new DeliveryCue();
             if (cue.GameObject == null)
             {
@@ -496,7 +519,7 @@ namespace HayChoriYPaty
             for (int i = deliveryCues.Count - 1; i >= 0; i--)
             {
                 DeliveryCue cue = deliveryCues[i];
-                float t = Mathf.Clamp01((elapsed - cue.Receipt.Elapsed) / TowerDefenseGameMode.DeliveryCueDurationSeconds);
+                float t = Mathf.Clamp01((elapsed - cue.Receipt.Elapsed) / mode.DeliveryCueSeconds);
                 if (t >= 1f)
                 {
                     cue.GameObject.SetActive(false);
@@ -505,9 +528,12 @@ namespace HayChoriYPaty
                     continue;
                 }
                 float pixel = mode.WorldUnitsPerLogicalPixel;
-                Vector2 from = cue.HasSourcePosition ? cue.SourcePosition : cue.Receipt.Source + Vector2.up * 14f * pixel;
-                Vector2 to = cue.Receipt.Target + Vector2.up * 28f * pixel;
                 Vector2 hand = WorkerHandPosition(cue, pixel);
+                // Free-construction levels hand the order over, like Boca and River: the product is already in the
+                // worker's hand and crosses straight into the pilgrim's hand instead of being thrown.
+                bool handOver = mode.FreeConstruction;
+                Vector2 from = handOver ? hand : cue.HasSourcePosition ? cue.SourcePosition : cue.Receipt.Source + Vector2.up * 14f * pixel;
+                Vector2 to = handOver ? PilgrimHandPosition(cue, pixel) : cue.Receipt.Target + Vector2.up * 28f * pixel;
                 Vector2 throwOrigin = hand;
                 WorkerView worker;
                 if (workerViews.TryGetValue(cue.Receipt.WorkerId, out worker) && worker.GameObject != null)
@@ -517,7 +543,7 @@ namespace HayChoriYPaty
                 }
 
                 Vector2 point;
-                float throwT = 0f;
+                float throwT = 0f, handOverT = 0f;
                 if (t < HandoffPickupEnd)
                 {
                     point = Vector2.Lerp(from, hand, Mathf.SmoothStep(0f, 1f, t / HandoffPickupEnd));
@@ -527,6 +553,11 @@ namespace HayChoriYPaty
                     float windup = Mathf.SmoothStep(0f, 1f,
                         (t - HandoffPickupEnd) / Mathf.Max(.001f, HandoffThrowStart - HandoffPickupEnd));
                     point = Vector2.Lerp(hand, throwOrigin, windup);
+                }
+                else if (handOver)
+                {
+                    handOverT = Mathf.Clamp01((t - HandoffThrowStart) / Mathf.Max(.001f, 1f - HandoffThrowStart));
+                    point = HandOverPoint(throwOrigin, to, Mathf.SmoothStep(0f, 1f, handOverT));
                 }
                 else
                 {
@@ -544,9 +575,23 @@ namespace HayChoriYPaty
                 cue.GameObject.transform.localRotation = Quaternion.Euler(0f, 0f, throwT * 360f);
                 bool cocaStillInHandPose = cue.Receipt.Product == 4 && t < HandoffThrowStart;
                 cue.Renderer.enabled = !cocaStillInHandPose;
-                float throwFade = throwT <= .88f ? 1f : 1f - Mathf.SmoothStep(.88f, 1f, throwT);
+                float arrival = handOver ? handOverT : throwT;
+                float throwFade = arrival <= .88f ? 1f : 1f - Mathf.SmoothStep(.88f, 1f, arrival);
                 cue.Renderer.color = new Color(1f, 1f, 1f, throwFade);
             }
+        }
+
+        internal static Vector2 HandOverPoint(Vector2 from, Vector2 to, float progress) =>
+            Vector2.Lerp(from, to, Mathf.Clamp01(progress));
+
+        // The pilgrim keeps walking while the product crosses over, so aim at where it is now.
+        private Vector2 PilgrimHandPosition(DeliveryCue cue, float pixel)
+        {
+            Vector2 pilgrim = cue.Receipt.Target;
+            IReadOnlyList<TowerDefenseFanState> fans = mode.Fans;
+            for (int i = 0; i < fans.Count; i++)
+                if (fans[i].Id == cue.Receipt.FanId) { pilgrim = fans[i].RouteFollower.Position; break; }
+            return pilgrim + Vector2.up * 28f * pixel;
         }
 
         private Vector2 WorkerHandPosition(DeliveryCue cue, float pixel)
@@ -554,7 +599,10 @@ namespace HayChoriYPaty
             Vector2 workerPosition = cue.Receipt.Source;
             WorkerView worker;
             if (workerViews.TryGetValue(cue.Receipt.WorkerId, out worker) && worker.GameObject != null)
+            {
+                if (worker.Group != null) return worker.PalmWorld;
                 workerPosition = worker.GameObject.transform.position;
+            }
             float facing = cue.Receipt.Target.x < workerPosition.x ? -1f : 1f;
             // Coca's approved reach pose extends the bottle beyond the worker's elbow;
             // the Parrillero's tongs stay closer to the apron.
@@ -651,13 +699,35 @@ namespace HayChoriYPaty
                     workerViews.Add(worker.Id, workerView);
                 }
                 staleIds.Remove(worker.Id);
+                StreetFacing? waitingFacing = null;
+                if (gameMode.TryGetMozoWaitingSandwichTable(worker, out Vector2 tableCenter))
+                {
+                    Vector2 look = tableCenter - worker.Position;
+                    waitingFacing = StreetWorkerAnimation.ResolveFacing(new Vector2(look.x, -look.y), StreetFacing.Up);
+                }
+                if (workerView.Group != null)
+                {
+                    SyncCampaignCrewBody(gameMode, worker, workerView, waitingFacing);
+                    SyncMozoAngryCue(workerView, worker, waitingFacing.HasValue);
+                    continue;
+                }
                 int frame = worker.IsMoving ? Mathf.FloorToInt(worker.TravelDistance / Mathf.Max(.01f, gameMode.WorldUnitsPerLogicalPixel * 16f)) % workerView.Frames.Length
                     : Mathf.FloorToInt(worker.AnimationTime * 2f) % workerView.Frames.Length;
                 // Station staff breathe/serve, never cycle cooking poses at an invisible grill.
                 if (!worker.IsMoving) frame = 0;
                 float actionProgress = Mathf.Clamp01(1f - worker.ServeAnimationSeconds /
-                    TowerDefenseGameMode.DeliveryCueDurationSeconds);
-                workerView.Renderer.sprite = workerView.Frames[frame];
+                    mode.DeliveryCueSeconds);
+                bool facesFirstFence = worker.IsIdle && workerView.RearIdleFrame != null;
+                workerView.Renderer.sprite = facesFirstFence ? workerView.RearIdleFrame : workerView.Frames[frame];
+                if (facesFirstFence) workerView.Facing = StreetFacing.Up;
+                bool waitingFlip = false;
+                Sprite waitingSprite = waitingFacing.HasValue
+                    ? CampaignCrewProjection()?.MozoStandingSprite(waitingFacing.Value, out waitingFlip) : null;
+                if (waitingSprite != null)
+                {
+                    workerView.Facing = waitingFacing.Value;
+                    workerView.Renderer.sprite = waitingSprite;
+                }
                 if (gameMode.FreeConstruction && worker.IsCooking)
                 {
                     Sprite[] cooking = workerView.HandoffFrames != null && workerView.HandoffFrames.Length > 0
@@ -686,7 +756,10 @@ namespace HayChoriYPaty
                     ? Mathf.Sin(Mathf.InverseLerp(HandoffPickupEnd, HandoffThrowStart, actionProgress) * Mathf.PI) : 0f;
                 float followThrough = actionProgress >= HandoffThrowStart
                     ? Mathf.Sin(Mathf.InverseLerp(HandoffThrowStart, 1f, actionProgress) * Mathf.PI) : 0f;
-                float gesture = -facing * windup * 8f + facing * followThrough * 11f;
+                // Free-construction levels hand the order over: no wind-up or throwing lunge, only a small lean.
+                float gesture = gameMode.FreeConstruction
+                    ? facing * followThrough * 2f
+                    : -facing * windup * 8f + facing * followThrough * 11f;
                 workerView.GameObject.transform.localRotation = Quaternion.Euler(0f, 0f, gesture - facing * serve * 2f);
                 Sprite activeSprite = workerView.Renderer.sprite;
                 if (activeSprite != null)
@@ -702,11 +775,21 @@ namespace HayChoriYPaty
                     : worker.ServeAnimationSeconds > 0f && worker.LastServiceTarget.x < worker.Position.x;
                 if (gameMode.FreeConstruction && worker.IsMoving && worker.TransferRoute != null && worker.TransferIndex < worker.TransferRoute.Length)
                     workerView.Renderer.flipX = worker.TransferRoute[worker.TransferIndex].x < worker.Position.x;
-                workerView.Renderer.sortingOrder = 28 + Mathf.RoundToInt(-worker.Position.y * 12f);
+                if (waitingSprite != null) workerView.Renderer.flipX = waitingFlip;
+                // Side-barrel work keeps its profile; a rear idle pose must not be flipped back to it.
+                if (!facesFirstFence && gameMode.BarrelsFromTheSide && worker.Role == StreetWorkerRole.Cocacolero &&
+                    !worker.IsMoving && worker.ServeAnimationSeconds <= 0f)
+                    workerView.Renderer.flipX = true;
+                // The sprite pivot is at its feet. Use the same ground key as the grouped
+                // furniture; a tie belongs to the worker at the front edge.
+                workerView.Renderer.sortingOrder = UsesKitchenGroundDepth
+                    ? KitchenGroundSortingOrder(worker.Position.y) + 1
+                    : 28 + Mathf.RoundToInt(-worker.Position.y * 12f);
                 int stationMinimumOrder;
                 if (visualLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId &&
                     stationMinimumSortingOrderByRoleAndZone.TryGetValue(StationSortKey(worker.Role, worker.ServiceZone), out stationMinimumOrder))
                     workerView.Renderer.sortingOrder = Mathf.Min(workerView.Renderer.sortingOrder, stationMinimumOrder - 1);
+                SyncMozoAngryCue(workerView, worker, waitingFacing.HasValue);
             }
             for (int i = 0; i < staleIds.Count; i++)
             {
@@ -715,6 +798,31 @@ namespace HayChoriYPaty
                 DestroyPresentationObject(stale.GameObject);
                 workerViews.Remove(staleIds[i]);
             }
+        }
+
+        private void SyncMozoAngryCue(WorkerView workerView, TowerDefenseWorkerState worker, bool show)
+        {
+            if (!show)
+            {
+                if (workerView.MozoAngryCue != null) workerView.MozoAngryCue.enabled = false;
+                return;
+            }
+
+            if (workerView.MozoAngryCue == null)
+            {
+                Sprite sprite = CampaignCrewProjection()?.EnsureMozoAngryCueSprite();
+                if (sprite == null) return;
+                workerView.MozoAngryCue = CreateCampaignCrewPart(workerView.GameObject.transform, "MozoEmptySandwichAngryCue", 14);
+                workerView.MozoAngryCue.gameObject.layer = presentationLayer;
+                workerView.MozoAngryCue.sprite = sprite;
+            }
+            SpriteRenderer cue = workerView.MozoAngryCue;
+            float pixel = mode.WorldUnitsPerLogicalPixel;
+            cue.transform.position = worker.Position + Vector2.up * (TowerDefenseGameMode.WorkerVisualHeightLogical + 14f) * pixel;
+            cue.transform.localScale = Vector3.one * (34f * pixel /
+                (cue.sprite.bounds.size.x * workerView.GameObject.transform.lossyScale.x));
+            if (workerView.Group == null) cue.sortingOrder = workerView.Renderer.sortingOrder + 14;
+            cue.enabled = true;
         }
 
         private FanView CreateFanView(int id)
@@ -731,9 +839,16 @@ namespace HayChoriYPaty
 
         private WorkerView CreateWorkerView(TowerDefenseWorkerState worker)
         {
+            if (UsesCampaignCrewBodies)
+            {
+                WorkerView campaignCrew = CreateCampaignCrewView(worker);
+                if (campaignCrew != null) return campaignCrew;
+            }
             Sprite[] frames = view != null ? view.CreateTowerDefenseWorkerFrames(worker.Role) : null;
             if (frames == null || frames.Length == 0) return CreateFallbackWorker(worker);
             generatedWorkerSprites.AddRange(frames);
+            Sprite rearIdleFrame = mode.UsesCampaignIdleCrew ? view.CreateTowerDefenseWorkerRearIdleFrame(worker.Role) : null;
+            if (rearIdleFrame != null) generatedWorkerSprites.Add(rearIdleFrame);
             Sprite[] handoffFrames = view != null ? view.CreateTowerDefenseHandoffFrames(worker.Role) : null;
             if (handoffFrames != null) generatedWorkerSprites.AddRange(handoffFrames);
             var obj = new GameObject("TD worker " + worker.Role + " " + worker.Id);
@@ -746,7 +861,7 @@ namespace HayChoriYPaty
             float targetHeight = TowerDefenseGameMode.WorkerVisualHeightLogical * mode.WorldUnitsPerLogicalPixel;
             obj.transform.localScale = Vector3.one * (targetHeight / Mathf.Max(.001f, frames[0].bounds.size.y));
             SetLayerRecursively(obj, presentationLayer);
-            return new WorkerView { GameObject = obj, Renderer = renderer, Frames = frames, HandoffFrames = handoffFrames };
+            return new WorkerView { GameObject = obj, Renderer = renderer, Frames = frames, HandoffFrames = handoffFrames, RearIdleFrame = rearIdleFrame };
         }
 
         private WorkerView CreateFallbackWorker(TowerDefenseWorkerState worker)
@@ -777,9 +892,14 @@ namespace HayChoriYPaty
             ClubFanDefinition fans = ClubVisualTheme.ForLevel(visualLevelId).Fans;
             if (fans == null) return null;
             Texture2D texture = receiving ? fans.LoadFrontFans() : fans.LoadWalkingFans();
-            bool directionalPairedWalk = !receiving && fans.WalkingPoseCount > 1 &&
-                !string.IsNullOrEmpty(fans.DownwardWalkingFans);
-            if (directionalPairedWalk && walkingDownwards) texture = fans.LoadDownwardWalkingFans();
+            // Paired walk atlases (La Renga, Peregrinación) alternate their two authored poses; the downward atlas
+            // is optional (Peregrinación walks only sideways and has none).
+            bool directionalPairedWalk = !receiving && fans.WalkingPoseCount > 1;
+            if (directionalPairedWalk && walkingDownwards && !string.IsNullOrEmpty(fans.DownwardWalkingFans))
+                texture = fans.LoadDownwardWalkingFans();
+            if (!receiving && visualLevelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId &&
+                walkingPose % LosRedondosWalkingPoseCount == 1 && losRedondosPassingWalkingFans != null)
+                texture = losRedondosPassingWalkingFans;
             if (!receiving && visualLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId)
             {
                 int pose = walkingPose % CamionerosWalkingPoseCount;
@@ -838,8 +958,9 @@ namespace HayChoriYPaty
 
         private static int FanWalkingFrameIndex(int levelId, int fanId, float routeProgress, float worldUnitsPerLogicalPixel)
         {
-            int poseCount = levelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId
-                ? CamionerosWalkingPoseCount : ClubVisualTheme.ForLevel(levelId).Fans?.WalkingPoseCount ?? 1;
+            int poseCount = levelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId ? CamionerosWalkingPoseCount
+                : levelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId ? LosRedondosWalkingPoseCount
+                : ClubVisualTheme.ForLevel(levelId).Fans?.WalkingPoseCount ?? 1;
             if (poseCount <= 1 ||
                 float.IsNaN(routeProgress) || float.IsInfinity(routeProgress) || routeProgress < 0f ||
                 float.IsNaN(worldUnitsPerLogicalPixel) || float.IsInfinity(worldUnitsPerLogicalPixel) ||

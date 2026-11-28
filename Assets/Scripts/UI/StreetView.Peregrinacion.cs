@@ -4,33 +4,75 @@ namespace HayChoriYPaty
 {
     public sealed partial class StreetView
     {
-        private const int PilgrimSelectFirst = 7910, PilgrimPlace = 7920;
+        private const int PilgrimSelectFirst = 7910;
         private const int PilgrimCardsPerPage = 6;
-        private static readonly StreetWorkerRole[] PilgrimWorkerCardRoles =
+        // The hire cards are the ones of the copied campaign footer: its catalog actions after "Velocidad" (3). Boca: five
+        // roles; Nueva Chicago: Parrillero and Cocacolero; Ferro: Parrillero, Parrillero Premium and Cocacolero.
+        private StreetWorkerRole[] PilgrimWorkerCardRoles
         {
-            StreetWorkerRole.Parrillero, StreetWorkerRole.ParrilleroPremium,
-            StreetWorkerRole.Cocacolero, StreetWorkerRole.Fernetero, StreetWorkerRole.Mozo
-        };
+            get
+            {
+                int level = PilgrimFooterReferenceLevel(PilgrimFooterSourceLevelId);
+                if (pilgrimCardRolesLevel != level || pilgrimCardRoles == null)
+                {
+                    var sim = new StreetSimulation(new StreetBalance(), level, 5f, 0, 1, 0);
+                    var roles = new System.Collections.Generic.List<StreetWorkerRole>();
+                    foreach (int action in CatalogUpgradeActions(sim)) if (action != 3) roles.Add(RoleForAction(action));
+                    pilgrimCardRoles = roles.ToArray();
+                    pilgrimCardRolesLevel = level;
+                }
+                return pilgrimCardRoles;
+            }
+        }
+        private static StreetWorkerRole[] pilgrimCardRoles;
+        private static int pilgrimCardRolesLevel = -1;
+        // The campaign level whose kitchen, footer and caption this level copies (Boca for Luján, Nueva Chicago for Camioneros).
+        private int PilgrimSourceLevelId => towerDefenseSourceConfig != null
+            ? towerDefenseSourceConfig.SourceCampaignLevelId : TowerDefenseLevelConfig.PeregrinacionLujanCampaignLevelId;
+        // The level whose footer (cards, height) is copied: Racing's active kitchen uses Boca's, the same as Luján (2026-11-24, Los Redondos).
+        private int PilgrimFooterSourceLevelId => towerDefenseSourceConfig != null && towerDefenseSourceConfig.ActiveKitchen
+            ? TowerDefenseLevelConfig.PeregrinacionLujanCampaignLevelId : PilgrimSourceLevelId;
         // Index zero is the immediate speed upgrade; the remaining cards hire real staff.
         // Like Boca's footer, Luján has no category switcher or equipment catalogue.
-        private int pilgrimSelection = -1;
-        private Vector2 pilgrimPlacementPoint;
         private bool IsPilgrimConstruction => towerDefenseMode != null && towerDefenseMode.FreeConstruction;
 
-        private void ResetPilgrimPlacement()
-        { pilgrimSelection = -1; pilgrimPlacementPoint = Vector2.zero; }
-
         private int PilgrimItemCount => PilgrimWorkerCardRoles.Length + 1;
-        private Rect PilgrimCardBounds(int visibleIndex) => new Rect(16f + visibleIndex % 3 * 170f,
-            logicalCanvasHeight - TowerDefenseResponsiveLayout.FooterReserve + 80f + visibleIndex / 3 * 74f, 158f, 70f);
-
-        private Vector2 PilgrimLogicalToWorld(Vector2 logical)
+        // Luján's footer is Boca's: the same height, caption and 3x2 card block, laid out by Boca's own footer code
+        // for a reference Boca simulation (six active-cook cards, no pennants, no ready selector).
+        private static StreetSimulation pilgrimFooterReference;
+        private static int pilgrimFooterReferenceLevel = -1;
+        private static ResponsiveFooterLayout pilgrimFooterCache;
+        private static float pilgrimFooterCacheHeight = -1f;
+        private static int pilgrimFooterCacheLevel = -1;
+        // Campaign level index whose own footer the level copies: Nueva Chicago (1) for Camioneros and La Renga, Ferro (3) for Los Redondos, Boca (8) for Luján.
+        private static int PilgrimFooterReferenceLevel(int sourceLevelId) =>
+            sourceLevelId == TowerDefenseLevelConfig.CamionerosCampaignLevelId ? 1
+            : sourceLevelId == TowerDefenseLevelConfig.LosRedondosCampaignLevelId || sourceLevelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId ? 3 : 8;
+        private ResponsiveFooterLayout PilgrimFooter(float canvasHeight)
         {
-            Camera camera = Camera.main;
-            Rect viewport = CanvasViewport(TowerDefenseRenderSize(camera), Screen.safeArea);
-            // The overlay is displayed lifted by this amount; invert that visual transform for input.
-            logical.y += TowerDefenseResponsiveLayout.VisualStageLift;
-            return TowerDefenseResponsiveLayout.LogicalToWorld(camera, viewport, W, viewport.width / W, logical);
+            int level = PilgrimFooterReferenceLevel(PilgrimFooterSourceLevelId);
+            if (Mathf.Abs(canvasHeight - pilgrimFooterCacheHeight) > .001f || pilgrimFooterCache.UpgradeBounds == null ||
+                pilgrimFooterCacheLevel != level)
+            {
+                if (pilgrimFooterReference == null || pilgrimFooterReferenceLevel != level)
+                {
+                    pilgrimFooterReference = new StreetSimulation(new StreetBalance(), level, 5f, 0, 1, 0);
+                    pilgrimFooterReferenceLevel = level;
+                }
+                pilgrimFooterCache = BuildResponsiveFooterLayout(pilgrimFooterReference, canvasHeight, true, false);
+                pilgrimFooterCacheHeight = canvasHeight;
+                pilgrimFooterCacheLevel = level;
+            }
+            return pilgrimFooterCache;
+        }
+
+        // Boca's footer rects are authored in 960-high layout units: y moves with the screen height, sizes do not.
+        private Rect PilgrimCardBounds(int visibleIndex)
+        {
+            Rect[] cards = PilgrimFooter(logicalCanvasHeight).UpgradeBounds;
+            if (visibleIndex < 0 || visibleIndex >= cards.Length) return Rect.zero;
+            Rect card = cards[visibleIndex];
+            return new Rect(card.x, card.y * (logicalCanvasHeight / H), card.width, card.height);
         }
 
         private Rect PilgrimWorldToLogical(Rect world)
@@ -59,16 +101,12 @@ namespace HayChoriYPaty
         private int HitPilgrimAction(Vector2 logical)
         {
             if (!TowerDefensePlacementInputAllowed) return 0;
-            for (int cardIndex = 0; cardIndex < PilgrimCardsPerPage; cardIndex++)
+            for (int cardIndex = 0; cardIndex < PilgrimItemCount; cardIndex++)
             {
                 if (!PilgrimCardBounds(cardIndex).Contains(logical)) continue;
                 if (cardIndex == 0) return CanUpgradePilgrimSpeed ? TowerDefenseSpeedAction : 0;
-                if (pilgrimSelection == cardIndex || CanSelectPilgrimWorker(cardIndex))
-                    return PilgrimSelectFirst + cardIndex;
-                return 0;
+                return CanSelectPilgrimWorker(cardIndex) ? PilgrimSelectFirst + cardIndex : 0;
             }
-            if (pilgrimSelection > 0 && PilgrimWorldToLogical(towerDefenseMode.WorkBounds).Contains(logical))
-            { pilgrimPlacementPoint = PilgrimLogicalToWorld(logical); return PilgrimPlace; }
             return 0;
         }
 
@@ -81,30 +119,19 @@ namespace HayChoriYPaty
                     ? null : "No se pudo guardar la mejora de velocidad.";
                 return true;
             }
-            if (action >= PilgrimSelectFirst && action < PilgrimSelectFirst + PilgrimCardsPerPage)
+            if (action < PilgrimSelectFirst || action >= PilgrimSelectFirst + PilgrimItemCount) return false;
+            if (!TowerDefensePlacementInputAllowed) return true;
+            int selectedCard = action - PilgrimSelectFirst;
+            if (selectedCard <= 0 || !CanSelectPilgrimWorker(selectedCard)) return true;
+
+            // One tap hires: the worker appears at its role's post and starts working, as in Boca.
+            StreetWorkerRole role = PilgrimWorkerCardRoles[selectedCard - 1];
+            if (!towerDefenseMode.CanHireAtPost(role))
             {
-                if (!TowerDefensePlacementInputAllowed) return true;
-                int selectedCard = action - PilgrimSelectFirst;
-                if (selectedCard <= 0) return true;
-                if (selectedCard != pilgrimSelection && !CanSelectPilgrimWorker(selectedCard)) return true;
-                pilgrimSelection = selectedCard == pilgrimSelection ? -1 : selectedCard;
-                pilgrimPlacementPoint = towerDefenseMode.WorkBounds.center;
-                towerDefenseError = null;
+                towerDefenseError = "Falta una estación o el cupo de este rol está completo.";
                 return true;
             }
-            if (action != PilgrimPlace) return false;
-            if (!TowerDefensePlacementInputAllowed || pilgrimSelection <= 0 || pilgrimSelection >= PilgrimItemCount) return true;
-
-            StreetWorkerRole role = PilgrimWorkerCardRoles[pilgrimSelection - 1];
-            TowerDefensePlacementResult preview = towerDefenseMode.PreviewWorkerPlacement(role, pilgrimPlacementPoint);
-            if (!preview.IsValid || !CanSelectPilgrimWorker(pilgrimSelection))
-            {
-                towerDefenseError = preview.IsValid ? "No alcanza el saldo para sumar este puesto." : preview.Reason;
-                return true;
-            }
-
-            pilgrimSelection = -1; // Consume selection before durable command; repeated release cannot hire twice.
-            bool saved = game.TryHireTowerDefenseAt(towerDefenseMode, role, pilgrimPlacementPoint);
+            bool saved = game.TryHireTowerDefenseAtPost(towerDefenseMode, role);
             towerDefenseError = saved ? null : "No se pudo guardar. La partida quedó en pausa.";
             if (!saved) towerDefenseMode.Pause();
             return true;
@@ -113,28 +140,26 @@ namespace HayChoriYPaty
         private void DrawPilgrimHud(float height)
         {
             DrawTowerDefenseCampaignHud();
-            float top = height - TowerDefenseResponsiveLayout.FooterReserve;
+            float top = TowerDefenseResponsiveLayout.PilgrimFooterTop(height, PilgrimFooterSourceLevelId);
             DrawFooterBluePanel(LayoutRect(new Rect(0, top, W, height - top)), layoutVerticalScale);
-            if (towerDefenseCrest != null) DrawLevelCrest(new Rect(8, top + 3, 29, 33), towerDefenseCrest);
-            const string levelTitle = "PEREGRINACIÓN LUJÁN";
-            int previousTitleSize = towerDefenseTitle.fontSize;
-            towerDefenseTitle.fontSize = FitUpgradeStatusFontSize(towerDefenseTitle, levelTitle, W - 84f);
-            DrawTowerDefenseLabel(new Rect(42, top + 1, W - 84, 26), levelTitle, towerDefenseTitle);
-            towerDefenseTitle.fontSize = previousTitleSize;
-            DrawTowerDefenseLabel(new Rect(42, top + 26, W - 84, 18), "MORENO", towerDefenseSmallLabel);
+            // Same caption as the source level's footer: club first, neighborhood second, with the level's crest.
+            ResponsiveFooterLayout pilgrimFooterLayout = PilgrimFooter(height);
+            DrawPilgrimFooterPennants(pilgrimFooterLayout.Pennants);
+            Rect badge = pilgrimFooterLayout.LevelBadge;
+            DrawLevelBadge(PilgrimSourceLevelId,
+                new Rect(badge.x, badge.y * (height / H), badge.width, badge.height));
 
-            string hint = !string.IsNullOrEmpty(towerDefenseError) ? towerDefenseError
-                : pilgrimSelection > 0 ? "TOCÁ EL ÁREA PARA SUMARLO" : string.Empty;
+            string hint = !string.IsNullOrEmpty(towerDefenseError) ? towerDefenseError : string.Empty;
             if (!string.IsNullOrEmpty(hint))
             {
                 int hintSize = towerDefenseSmallLabel.fontSize;
                 towerDefenseSmallLabel.fontSize = FitUpgradeStatusFontSize(towerDefenseSmallLabel, hint, W - 162f);
-                DrawTowerDefenseLabel(new Rect(42, top + 49, W - 150, 18), hint, towerDefenseSmallLabel);
+                DrawTowerDefenseLabel(new Rect(42, top - 18, W - 150, 18), hint, towerDefenseSmallLabel);
                 towerDefenseSmallLabel.fontSize = hintSize;
             }
 
             bool active = TowerDefensePlacementInputAllowed;
-            for (int cardIndex = 0; cardIndex < PilgrimCardsPerPage; cardIndex++)
+            for (int cardIndex = 0; cardIndex < PilgrimItemCount; cardIndex++)
             {
                 Rect card = PilgrimCardBounds(cardIndex);
                 if (cardIndex == 0)
@@ -148,8 +173,7 @@ namespace HayChoriYPaty
                 StreetWorkerRole role = PilgrimWorkerCardRoles[cardIndex - 1];
                 int cost = towerDefenseMode.HireCost(role);
                 DrawPilgrimWorkerCard(card, PilgrimSelectFirst + cardIndex, role, cost,
-                    towerDefenseMode.WorkersCount(role), active && (pilgrimSelection == cardIndex || cost > 0 && cost <= towerDefenseMode.Coins),
-                    pilgrimSelection == cardIndex);
+                    towerDefenseMode.WorkersCount(role), active && cost > 0 && cost <= towerDefenseMode.Coins);
             }
 
             if (towerDefenseMode.Phase == TowerDefenseRunPhase.Paused)
@@ -159,27 +183,28 @@ namespace HayChoriYPaty
             }
         }
 
-        private void DrawPilgrimPlacementOverlay()
+        // Nueva Chicago's footer keeps its club pennants in the band under the cards (Boca's has none).
+        private void DrawPilgrimFooterPennants(Rect pennants)
         {
-            if (!TowerDefensePlacementInputAllowed || pilgrimSelection <= 0) return;
-            Rect area = PilgrimWorldToLogical(towerDefenseMode.WorkBounds);
-            FillRect(area, new Color(.10f, .55f, .80f, .08f));
-            if (Event.current != null && area.Contains(Event.current.mousePosition))
-                pilgrimPlacementPoint = PilgrimLogicalToWorld(Event.current.mousePosition);
-            StreetWorkerRole role = PilgrimWorkerCardRoles[pilgrimSelection - 1];
-            TowerDefensePlacementResult result = towerDefenseMode.PreviewWorkerPlacement(role, pilgrimPlacementPoint);
-            Rect preview = PilgrimWorldToLogical(result.Bounds);
-            Color color = result.IsValid && CanSelectPilgrimWorker(pilgrimSelection)
-                ? new Color(.12f, .9f, .30f, .28f) : new Color(.95f, .12f, .12f, .28f);
-            FillRect(preview, color);
-            color.a = 1;
-            DrawTowerDefensePlacementBorder(preview, color);
+            if (pennants.height <= 1f) return;
+            ClubVisualTheme theme = ClubVisualTheme.ForLevel(PilgrimSourceLevelId);
+            if (clubPennantTexture == null || clubPennantThemeName != theme.ClubName ||
+                Mathf.Abs(clubPennantLogicalHeight - pennants.height) > .25f)
+            {
+                if (clubPennantTexture != null) Destroy(clubPennantTexture);
+                clubPennantTexture = CreateFooterPennants(theme, pennants.height);
+                clubPennantThemeName = theme.ClubName;
+                clubPennantLogicalHeight = pennants.height;
+            }
+            Color previous = GUI.color;
+            GUI.color = Color.white;
+            GUI.DrawTexture(new Rect(0f, pennants.y, W, pennants.height), clubPennantTexture, ScaleMode.ScaleToFit, true);
+            GUI.color = previous;
         }
 
         private void DrawPilgrimWorkerCard(Rect bounds, int action, StreetWorkerRole role, int cost,
-            int count, bool available, bool selected)
+            int count, bool available)
         {
-            DrawPilgrimCardBackground(bounds, available, selected);
             Texture2D art = null;
             Rect source = default;
             switch (role)
@@ -195,33 +220,46 @@ namespace HayChoriYPaty
                     break;
                 case StreetWorkerRole.Mozo: art = mozoWorker; source = ParrilleroPoses[0]; break;
             }
-            if (art != null) DrawUpgradeOvalContent(bounds, art, source);
-            Rect content = new Rect(bounds.x + 57, bounds.y + 3, bounds.width - 64, bounds.height - 6);
-            string title = RoleCaption(role).Replace('\n', ' ');
-            DrawPilgrimCardLabel(new Rect(content.x, content.y, content.width, 17), title, upgradeTitle, new Color(.98f, .99f, 1f), 11);
-            string status = selected ? "COLOCAR" : "EQUIPO " + count;
-            DrawPilgrimCardLabel(new Rect(content.x, content.y + 17, content.width, 16), status, upgradePercent, new Color(.55f, .90f, 1f), 11);
-            Item(new Rect(content.x, bounds.y + 48, 18, 18), 10);
-            string price = cost > 0 ? cost.ToString() : "MAX";
-            DrawPilgrimCardLabel(new Rect(content.x + 20, bounds.y + 43, content.width - 20, 23), price, upgradePrice,
-                new Color(.98f, .99f, 1f), 20);
-            DrawTowerDefenseClickTarget(bounds, action, available);
+            DrawPilgrimUpgradeCard(bounds, action, false, role == StreetWorkerRole.ParrilleroPremium, RoleCaption(role),
+                "EQUIPO " + count, cost, available, art, source);
         }
 
         private void DrawPilgrimSpeedCard(Rect bounds, int cost, int speedLevel, bool available)
         {
-            DrawPilgrimCardBackground(bounds, available, false);
-            if (speedArrows != null) DrawUpgradeOvalContent(bounds, speedArrows, SpeedArrowBounds);
-            Rect content = new Rect(bounds.x + 57, bounds.y + 3, bounds.width - 64, bounds.height - 6);
-            DrawPilgrimCardLabel(new Rect(content.x, content.y, content.width, 17), "VELOCIDAD", upgradeTitle,
-                new Color(.98f, .99f, 1f), 11);
             string multiplier = (1f + speedLevel * .1f).ToString("0.00").Replace('.', ',');
-            DrawPilgrimCardLabel(new Rect(content.x, content.y + 17, content.width, 16), "×" + multiplier + "  +10%",
-                upgradePercent, new Color(.55f, .90f, 1f), 11);
-            if (cost > 0) Item(new Rect(content.x, bounds.y + 48, 18, 18), 10);
-            DrawPilgrimCardLabel(new Rect(content.x + 20, bounds.y + 43, content.width - 20, 23), cost > 0 ? cost.ToString() : "MAX",
-                upgradePrice, new Color(.98f, .99f, 1f), 20);
-            DrawTowerDefenseClickTarget(bounds, TowerDefenseSpeedAction, available);
+            // Same text as Boca's Upgrade(): one line on the wide cards, two on the compact ones.
+            string status = bounds.width < 200f ? "×" + multiplier + "\n+10%" : "×" + multiplier + "  ·  +10%";
+            DrawPilgrimUpgradeCard(bounds, TowerDefenseSpeedAction, true, false, "VELOCIDAD", status,
+                cost, available, speedArrows, SpeedArrowBounds);
+        }
+
+        // Same card as Boca's Upgrade(): the compact 156x100 card, with its own title/status/coin/price placement.
+        private void DrawPilgrimUpgradeCard(Rect r, int action, bool speed, bool premium, string name, string status,
+            int cost, bool available, Texture2D portrait, Rect portraitSource)
+        {
+            DrawPilgrimCardBackground(r, available, false);
+            bool compact = r.width < 200;
+            int titleSize = upgradeTitle.fontSize;
+            upgradeTitle.fontSize = r.height < 120 ? (premium ? 13 : compact ? 15 : 17) : compact ? 16 : 18;
+            Rect titleBounds = UpgradeTitleBounds(r);
+            upgradeTitle.fontSize = FitUpgradeStatusFontSize(upgradeTitle, name, titleBounds.width);
+            UpgradeOutline(titleBounds, name, upgradeTitle, new Color(.98f, .99f, 1f));
+            upgradeTitle.fontSize = titleSize;
+            Rect statusBounds = speed ? UpgradeSpeedStatusBounds(r) : UpgradeStatusBounds(r);
+            int statusSize = upgradePercent.fontSize;
+            if (compact) upgradePercent.fontSize = speed ? 12 : 13;
+            upgradePercent.fontSize = FitUpgradeStatusFontSize(upgradePercent, status, statusBounds.width);
+            UpgradeOutline(statusBounds, status, upgradePercent, new Color(.55f, .90f, 1f));
+            upgradePercent.fontSize = statusSize;
+            if (portrait != null) DrawUpgradeOvalContent(r, portrait, portraitSource);
+            string priceText = cost > 0 ? cost.ToString() : "MAX";
+            if (cost > 0) Item(UpgradeCoinBounds(r), 10);
+            int priceSize = upgradePrice.fontSize;
+            if (compact || r.height < 120) upgradePrice.fontSize = 24;
+            upgradePrice.fontSize = FitUpgradePriceFontSize(upgradePrice, priceText, UpgradePriceTextBounds(r).width);
+            UpgradeOutline(UpgradePriceTextBounds(r), priceText, upgradePrice, new Color(.98f, .99f, 1f));
+            upgradePrice.fontSize = priceSize;
+            DrawTowerDefenseClickTarget(r, action, available);
         }
 
         private void DrawPilgrimCardBackground(Rect bounds, bool available, bool selected)
@@ -234,15 +272,6 @@ namespace HayChoriYPaty
             GUI.color = previous;
             if (selected) DrawTowerDefensePlacementBorder(bounds, new Color(1f, .86f, .18f, 1f));
             else if (available) DrawAffordableUpgradeBorder(bounds);
-        }
-
-        private void DrawPilgrimCardLabel(Rect bounds, string value, GUIStyle style, Color color, int maximumFontSize)
-        {
-            int previous = style.fontSize;
-            style.fontSize = Mathf.Min(previous, maximumFontSize);
-            style.fontSize = FitUpgradeStatusFontSize(style, value, bounds.width);
-            UpgradeOutline(bounds, value, style, color);
-            style.fontSize = previous;
         }
     }
 }

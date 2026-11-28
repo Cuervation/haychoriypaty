@@ -158,8 +158,7 @@ namespace HayChoriYPaty
             SelectorLabel(caption, "NIVEL " + (index + 1), Mathf.RoundToInt(22f * scale), SelectorInk);
             string name = ClubVisualTheme.ForLevel(levelId).ClubName.ToUpperInvariant();
             if (levelId == 9) name = name.Split('/')[0].Trim();
-            if (levelId == StreetSimulation.HuracanBonusLevelId) name = "HURACÁN · BONUS TRACK";
-            if (levelId == StreetSimulation.PeregrinacionTowerDefenseCampaignLevelId) name = "PEREGRINACIÓN A LUJÁN";
+            if (levelId == StreetSimulation.PeregrinacionTowerDefenseCampaignLevelId) name = "PEREGRINACIÓN - LUJÁN";
             SelectorLabel(new Rect(caption.x, bounds.y + 155f * scale, caption.width, 20f * scale),
                 name, Mathf.RoundToInt(15f * scale), SelectorInk);
 

@@ -1,6 +1,17 @@
-# Huracán / Parque Patricios — Bonus Track
+# Huracán / Parque Patricios
 
-**Estado:** lógica y presentación fuente integradas; aceptación total pendiente. Este contrato describe lo que hoy hace la fuente, no certifica ejecución de escena, balance final ni Game View.
+## Nivel normal desde el 2026-11-27 (vigente; reemplaza el Bonus Track)
+
+Pedido del usuario: "el nivel de Huracán debe ser un nivel normal, con la dificultad entre el nivel anterior y el que le sigue". Huracán (ID 11, posición 8 del selector, entre La Renga y Independiente) se juega como cualquier nivel tradicional: cuotas por producto, reloj, monedas, stock de Mercado, contrataciones, mejoras de velocidad, victoria con Chulengo y derrota con disturbio. Ganarlo desbloquea Independiente.
+
+- **Valores (a mitad de camino entre Ferro, el nivel normal anterior, e Independiente, el siguiente):** 225 s (210 / 240); menú de Ferro más vacío, elegido por el usuario: chori, paty, bondiola, vacío, coca y cerveza (el vacío lo hace el Parrillero Premium, así que no agrega rol; el Fernetero sigue apareciendo en Independiente); cuotas 188/128/65/60/158/78 = 677, unas 180,5 por minuto (Ferro 171,4; Independiente 190,0); 10 monedas al empezar (0 / 20); 1 Parrillero inicial; contrataciones 30/30/40 (Parrillero, Cocacolero, Premium); costo de velocidad ×3,875 (×3,25 / ×4,50); demanda ×1,425 (×1,35 / ×1,50). Cocina pasiva como Ferro e Independiente: `StreetSimulation.IsRacingOrLaterLevel` reúne las reglas "desde Racing" (cocina activa, Mozos, trabajadores por tickets, banderín) y deja afuera a Huracán.
+- `StreetSimulation.IsBonusTrack` devuelve siempre `false`: las cartas, ¡Aguante!, estrellas, puntos y tickets del bonus quedan inactivos (código y estado de guardado conservados, sin uso). Huracán entra al Mercado desde el selector y compra stock como cualquier nivel; el Mercado ya no lo saltea.
+- **Liga:** sigue sin sumar Puntos de Liga ni canchas ganadas, para respetar el tope de 14 canchas de las reglas de Firestore; cambiarlo exige publicar reglas nuevas.
+- Pruebas del bonus: seis de `StreetBonusTrackTests` (cartas, estrellas, tickets, puntos) y dos PlayMode de navegación con estrellas quedan ignoradas con motivo; las de migración y orden de campaña de esa clase siguen activas. Evidencia (2026-11-27): EditMode completo PASS salvo la falla previa de Racing; PlayMode `HuracanPlaysAsANormalQuotaLevel` PASS (Mercado → partida con 6 cuotas = 677, 225 s, cocina pasiva; captura `Logs/Acceptance/QA-LaRenga-Depth/frames/huracan-nivel-normal.jpg`) y `StreetPointerTests`/`StreetHubViewTests` 78/79 (falla previa `RiotReturn…`). **Balance NO medido**; en el celular: NOT_RUN.
+
+## Historial: Bonus Track (hasta el 2026-11-26)
+
+Lo que sigue describe el modo anterior y ya no está activo.
 
 ## Identidad y progresión
 
@@ -16,6 +27,8 @@
 - Cartas normales: Parrilla a Fondo (+30% producción alimento, hasta 3 stacks); Otro Parrillero (límite de la geometría de cook stations); Coca Express (+35%, hasta 3); Otro Cocacolero (hasta 3 del rol); Mozo Relámpago (+40% movimiento, hasta 3); Otro Mozo (hasta 3). El Super Bonus filtra entre Todos a Fondo (+25% global/15 s), Entrega Dorada (10 unidades entregadas a 200 puntos), Manos Rápidas (−30% recogida por stack, hasta 2) y Refuerzo de Emergencia (elige un rol válido). Se excluyen cartas sin efecto aplicable.
 - ¡Aguante! carga con diez entregas válidas; activación manual, +25% temporal a producción/movimiento durante 8 s y una carga como máximo.
 - En la pantalla final de Huracán se ofrecen los mismos dos destinos/resultados estándar: `NIVELES` y `SIGUIENTE PARTIDO` (o `ÚLTIMO NIVEL` deshabilitado si no puede avanzar). No existe acción `REINTENTAR`; el acceso a niveles permite repetir Huracán. Un resultado Chulengo guardado por un club previo no debe reemplazar ni interceptar el panel/las acciones Bonus.
+- **Regresión QA-01 (2026-11-19):** tras `NIVELES`, ganado o perdido, el selector vuelve a aceptar sus controles aunque Huracán siga siendo el nivel seleccionado en estado Ready. Debe permitir abrir otra cancha disponible, volver al barrio y repetir Huracán. La ronda y su resultado conservan las acciones propias del bonus.
+  Unity 6000.6.3f1: PlayMode PASS 2/2 (resultado con estrella → Chicago; cero estrellas → barrio → repetir Huracán). XML en `Logs/Acceptance/QA-Fixes-20261119/QA-01-playmode.xml`. Dispositivo no probado.
 - Multiplicadores se aplican en cada ciclo/ruta/recogida; no mutan velocidades persistentes. Límites: tres stacks de velocidades individuales, dos stacks de Manos Rápidas, máximo de cook stations para Parrilleros y máximo de tres Cocacoleros/Mozos.
 - Una entrega física válida suma 100 puntos (200 con Entrega Dorada); cerrar un pedido suma 150 una sola vez. Sin ingresos ni monedas persistentes. A 120 s el modo termina; las estrellas se determinan por puntos. Los valores 3000/6500/10000 son **provisionales y no están aprobados**.
 - Con ≥1 estrella: un ticket normal por intento; el primer 3★ añade un ticket una sola vez por perfil. Deduplicación por `attemptId`; abandono no acredita premios. Récord/perfil y ficha de intento se serializan junto con estadísticas.

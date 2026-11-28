@@ -2298,7 +2298,7 @@ Rect bar = (Rect)View.GetField("HudBar", BindingFlags.Static | BindingFlags.NonP
                 "San Lorenzo / Boedo", "River Plate / Núñez", "Boca Juniors / La Boca",
                 "Sindicato de Camioneros / Plaza de Mayo", "Los Redondos / Tandil",
                 "Huracán / Parque Patricios", "Argentinos Juniors / La Paternal",
-                "La Renga – Autódromo Bs. As.", "Peregrinación a Luján — Moreno"
+                "La Renga – Autódromo Bs. As.", "Peregrinación - Luján"
             }, names);
             Type themes = Type.GetType("HayChoriYPaty.ClubVisualTheme, Assembly-CSharp", true);
             MethodInfo forLevel = themes.GetMethod("ForLevel", BindingFlags.Static | BindingFlags.Public);

@@ -33,7 +33,7 @@ namespace HayChoriYPaty.Tests
         bool Persist<TMatch>(string json, TMatch match) => true; // Never PlayerPrefs/cloud.
         void Hub()
         {
-            foreach (string flag in new[] {"introActive", "settingsActive", "marketActive", "badgesActive", "rankingActive", "levelSelectActive"}) Set(view, flag, false);
+            foreach (string flag in new[] {"introActive", "settingsActive", "marketActive", "badgesActive", "rankingActive", "levelSelectActive", "profileActive"}) Set(view, flag, false);
             Set(view, "hubActive", true); Set(view, "pressedAction", 0);
         }
         void Portrait(int width, int height)
@@ -126,6 +126,128 @@ namespace HayChoriYPaty.Tests
                     Assert.IsTrue((bool)Get(view, screen), "Action " + action + " opens " + screen);
                 }
             }
+        }
+        // 2026-11-25: the ranking screen with a made-up server answer (podium, list, own row outside the Top 10, apodo form, no connection).
+        [UnityTest, Explicit("Captures the ranking screen states to Logs/Acceptance/Ranking-20261125")]
+        public IEnumerator RankingScreenStatesCapture()
+        {
+            if (Application.isBatchMode) Assert.Ignore("Requires interactive Game View.");
+            Portrait(575, 1280); yield return null; yield return null;
+            Type snapshotType = Type.GetType("HayChoriYPaty.Cloud.LeaderboardSnapshot, Assembly-CSharp", true);
+            Type entryType = Type.GetType("HayChoriYPaty.Cloud.LeaderboardEntry, Assembly-CSharp", true);
+            Type stateType = vt.GetNestedType("RankingState", BindingFlags.NonPublic);
+            Func<string, string, long, long, object> entry = (uid, nick, points, won) =>
+            {
+                object e = Activator.CreateInstance(entryType);
+                Set(e, "uid", uid); Set(e, "nickname", nick); Set(e, "points", points); Set(e, "wonLevels", won); return e;
+            };
+            string[] nicks = { "Xiangxiu", "Chori_Rey", "La Bondiola", "Ñandú FC", "Paty Doble", "El Negro", "Hincha 10", "Fernet&Co", "Doña Coca", "Vacío Total" };
+            object snapshot = Activator.CreateInstance(snapshotType);
+            IList top = (IList)Get(snapshot, "top");
+            for (int i = 0; i < nicks.Length; i++) top.Add(entry("u" + i, nicks[i], 2030 - i * 140, 14 - i / 2));
+            Set(snapshot, "me", entry("me", "Cuervation", 393, 4)); Set(snapshot, "myRank", 1779L);
+            Set(view, "rankingSnapshot", snapshot);
+            string folder = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/Ranking-20261125"));
+            Directory.CreateDirectory(folder);
+            foreach (var shot in new[] { ("ready", 2), ("nickname", 3), ("offline", 4) })
+            {
+                foreach (string flag in new[] { "introActive", "settingsActive", "marketActive", "badgesActive", "levelSelectActive", "hubActive" }) Set(view, flag, false);
+                Set(view, "rankingActive", true); Set(view, "rankingState", Enum.ToObject(stateType, shot.Item2));
+                yield return null; yield return new WaitForEndOfFrame();
+                Texture2D capture = ScreenCapture.CaptureScreenshotAsTexture();
+                File.WriteAllBytes(Path.Combine(folder, "ranking-" + shot.Item1 + ".png"), capture.EncodeToPNG());
+                UnityEngine.Object.Destroy(capture);
+            }
+            // Few players (the real server today): the player alone at Nº 1, empty podium places and free list rows.
+            object sparse = Activator.CreateInstance(snapshotType);
+            object alone = entry("me", "cuervo", 1655, 12);
+            ((IList)Get(sparse, "top")).Add(alone); Set(sparse, "me", alone); Set(sparse, "myRank", 1L);
+            Set(view, "rankingSnapshot", sparse); Set(view, "rankingState", Enum.ToObject(stateType, 2));
+            yield return null; yield return new WaitForEndOfFrame();
+            Texture2D sparseCapture = ScreenCapture.CaptureScreenshotAsTexture();
+            File.WriteAllBytes(Path.Combine(folder, "ranking-ready-sparse.png"), sparseCapture.EncodeToPNG());
+            UnityEngine.Object.Destroy(sparseCapture);
+            // Shortest supported portrait (16:9): the board must still fit without overlaps.
+            Portrait(1080, 1920); yield return null; yield return null;
+            Set(view, "rankingSnapshot", snapshot); Set(view, "rankingState", Enum.ToObject(stateType, 2));
+            yield return null; yield return new WaitForEndOfFrame();
+            Texture2D shortCapture = ScreenCapture.CaptureScreenshotAsTexture();
+            File.WriteAllBytes(Path.Combine(folder, "ranking-ready-1080x1920.png"), shortCapture.EncodeToPNG());
+            UnityEngine.Object.Destroy(shortCapture);
+        }
+        // 2026-11-26: the badges trophy vitrina with mixed progress, at the top, half-way and the end of the scroll.
+        [UnityTest, Explicit("Captures the badges vitrina to Logs/Acceptance/Badges-20261126")]
+        public IEnumerator BadgesVitrinaCapture()
+        {
+            if (Application.isBatchMode) Assert.Ignore("Requires interactive Game View.");
+            Portrait(575, 1280); yield return null; yield return null;
+            object save = gt.GetField("save", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(game);
+            object statistics = save.GetType().GetField("statistics").GetValue(save);
+            statistics.GetType().GetField("deliveredByProduct").SetValue(statistics, new long[] { 5400, 2600, 820, 120, 3100, 0, 510 });
+            statistics.GetType().GetMethod("Normalize").Invoke(statistics, null);
+            string folder = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/Badges-20261126"));
+            Directory.CreateDirectory(folder);
+            foreach (string flag in new[] { "introActive", "settingsActive", "marketActive", "rankingActive", "levelSelectActive", "hubActive" }) Set(view, flag, false);
+            Set(view, "badgesActive", true);
+            for (int frame = 0; frame < 4; frame++) yield return null; // the trophy art is sampled in Update
+            float max = (float)vt.GetMethod("BadgesMaxScroll", BindingFlags.NonPublic | BindingFlags.Static).Invoke(null, new object[] { (float)Get(view, "logicalCanvasHeight") });
+            foreach (var shot in new[] { ("top", 0f), ("middle", .5f), ("end", 1f) })
+            {
+                Set(view, "badgesScroll", max * shot.Item2);
+                yield return null; yield return new WaitForEndOfFrame();
+                Texture2D capture = ScreenCapture.CaptureScreenshotAsTexture();
+                File.WriteAllBytes(Path.Combine(folder, "badges-" + shot.Item1 + ".png"), capture.EncodeToPNG());
+                UnityEngine.Object.Destroy(capture);
+            }
+            Portrait(1080, 1920); yield return null; yield return null;
+            Set(view, "badgesScroll", 0f);
+            yield return null; yield return new WaitForEndOfFrame();
+            Texture2D shortCapture = ScreenCapture.CaptureScreenshotAsTexture();
+            File.WriteAllBytes(Path.Combine(folder, "badges-top-1080x1920.png"), shortCapture.EncodeToPNG());
+            UnityEngine.Object.Destroy(shortCapture);
+        }
+        // 2026-11-26: the hub profile card and the profile screen (preview data: there is no Firebase session in the editor).
+        [UnityTest, Explicit("Captures the hub profile card and profile screen to Logs/Acceptance/Profile-20261126")]
+        public IEnumerator ProfileScreensCapture()
+        {
+            if (Application.isBatchMode) Assert.Ignore("Requires interactive Game View.");
+            object save = gt.GetField("save", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(game);
+            object statistics = save.GetType().GetField("statistics").GetValue(save);
+            statistics.GetType().GetField("deliveredByProduct").SetValue(statistics, new long[] { 5400, 2600, 820, 120, 3100, 0, 510 });
+            Set(statistics, "attemptsFinished", 184L); Set(statistics, "wins", 97L); Set(statistics, "customersAttended", 9321L);
+            statistics.GetType().GetMethod("Normalize").Invoke(statistics, null);
+            Set(view, "profilePreviewNickname", "Cuervation"); Set(view, "profilePreviewEmail", "hincha.ejemplo@gmail.com"); Set(view, "profilePreviewSignedIn", true);
+            string folder = Path.GetFullPath(Path.Combine(Application.dataPath, "../Logs/Acceptance/Profile-20261126"));
+            Directory.CreateDirectory(folder);
+            IEnumerator Shot(string name)
+            {
+                yield return null; yield return new WaitForEndOfFrame();
+                Texture2D capture = ScreenCapture.CaptureScreenshotAsTexture();
+                File.WriteAllBytes(Path.Combine(folder, name + ".png"), capture.EncodeToPNG());
+                UnityEngine.Object.Destroy(capture);
+            }
+            foreach (var size in new[] { new Vector2Int(575, 1280), new Vector2Int(1080, 1920) })
+            {
+                Portrait(size.x, size.y); yield return null; yield return null;
+                Hub(); yield return Shot("hub-card-" + size.x + "x" + size.y);
+                Call(view, "DispatchAction", 240);
+                Assert.IsTrue((bool)Get(view, "profileActive"), "tapping the card opens the profile");
+                yield return Shot("profile-" + size.x + "x" + size.y);
+                Call(view, "DispatchAction", 242);
+                Assert.IsTrue((bool)Get(view, "profileEditing"));
+                Set(view, "profileNicknameInput", "Cuervation 10");
+                yield return Shot("profile-editing-" + size.x + "x" + size.y);
+                Call(view, "DispatchAction", 244);
+                Call(view, "DispatchAction", 245);
+                Assert.IsTrue((bool)Get(view, "profileConfirmSignOut"));
+                yield return Shot("profile-signout-confirm-" + size.x + "x" + size.y);
+                Call(view, "DispatchAction", 247);
+                Call(view, "DispatchAction", 241);
+                Assert.IsTrue((bool)Get(view, "hubActive"));
+            }
+            Set(view, "profilePreviewSignedIn", false); Set(view, "profilePreviewNickname", null); Set(view, "profilePreviewEmail", null);
+            Call(view, "DispatchAction", 240);
+            yield return Shot("profile-signed-out-1080x1920");
         }
         [UnityTearDown] public IEnumerator TearDown()
         {

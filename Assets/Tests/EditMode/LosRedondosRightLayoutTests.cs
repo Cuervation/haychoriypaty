@@ -43,6 +43,7 @@ namespace HayChoriYPaty.Tests
         [TestCase(960f)]
         [TestCase(1170f)]
         [TestCase(1200f)]
+        [Ignore("Los Redondos (ID10) is now a horizontal Ferro kitchen level; this test covered its former five-run serpentine route and right-hand bays.")]
         public void FiveRunRouteAndFourRightSectorsPassTheSharedValidatorWithFullCrews(float logicalHeight)
         {
             object mode = CreateLosRedondosMode(logicalHeight, out object route, out float px);
@@ -91,6 +92,7 @@ namespace HayChoriYPaty.Tests
 
         [TestCase(960f)]
         [TestCase(1200f)]
+        [Ignore("Los Redondos (ID10) is now a horizontal Ferro kitchen level; this test covered its former five-run serpentine route and right-hand bays.")]
         public void EachRowSeparationIsDrawnAsOneFenceWhileCollidersKeepBothRails(float logicalHeight)
         {
             CreateLosRedondosMode(logicalHeight, out object _, out float px);
@@ -187,6 +189,7 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
+        [Ignore("Los Redondos (ID10) is now a horizontal Ferro kitchen level; this test covered its former five-run serpentine route and right-hand bays.")]
         public void SectorsServeTheirAdjacentRunsInTopToBottomOrder()
         {
             object mode = CreateLosRedondosMode(960f, out object route, out float px);
@@ -222,6 +225,7 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
+        [Ignore("Los Redondos (ID10) is now a horizontal Ferro kitchen level; this test covered its former five-run serpentine route and right-hand bays.")]
         public void ValidatorReportsTheSegmentAndCoordinatesOfConcreteDefects()
         {
             object mode = CreateLosRedondosMode(960f, out object route, out float px);
@@ -256,6 +260,7 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
+        [Ignore("Los Redondos (ID10) is now a horizontal Ferro kitchen level; this test covered its former five-run serpentine route and right-hand bays.")]
         public void SeveralFansWalkTheWholeRouteThroughAllFourTurnsInsideTheRails()
         {
             object mode = CreateLosRedondosMode(960f, out object route, out float px);
@@ -301,6 +306,7 @@ namespace HayChoriYPaty.Tests
         }
 
         [Test]
+        [Ignore("Camioneros (ID9) is now a horizontal Nueva Chicago kitchen level: it no longer has two shared-role zones.")]
         public void IdNineKeepsTheExistingTwoZoneSharedRoleAnchors()
         {
             object config = Resources.Load("TowerDefense/Camioneros-PlazaDeMayo");
@@ -326,6 +332,48 @@ namespace HayChoriYPaty.Tests
             Assert.AreNotEqual(p0, p1, "ID9 keeps its two existing service zones, not ID10's four sectors.");
             Assert.AreEqual(Rect.zero, (Rect)Invoke(mode, "RightBayBounds", parrillero, 0), "ID9 has no right-side sectors.");
             Assert.IsEmpty((string[])Invoke(mode, "AuditLosRedondosLayout"), "The ID10 audit does not apply to ID9.");
+        }
+
+        // The third-product percentage is measured over all orders, not only double orders.
+        [TestCase(199, 0, 2)]
+        [TestCase(200, 4, 3)]
+        [TestCase(200, 5, 2)]
+        [TestCase(200, 74, 2)]
+        [TestCase(200, 75, 1)]
+        [TestCase(439, 99, 3)]
+        public void LosRedondosRollsTheCumulativeProductChances(int spawnIndex, int roll, int expectedProducts)
+        {
+            object mode = CreateLosRedondosMode(1200f, out _, out _);
+            SetPrivate(mode, "spawnedFans", spawnIndex);
+            SetPrivate(mode, "random", new OrderRollRandom(roll));
+            Invoke(mode, "SpawnNextFan");
+            IList fans = (IList)mode.GetType().GetProperty("Fans").GetValue(mode);
+            Assert.AreEqual(1, fans.Count);
+            object fan = fans[0];
+            IList order = (IList)fan.GetType().GetProperty("Order").GetValue(fan);
+            Assert.AreEqual(expectedProducts, order.Count);
+            Assert.AreEqual(1f + .08f * (spawnIndex / 20), (float)fan.GetType().GetProperty("SpeedMultiplier").GetValue(fan), .0001f);
+            var seen = new HashSet<int>();
+            foreach (object line in order)
+            {
+                int product = (int)line.GetType().GetProperty("Product").GetValue(line);
+                int remaining = (int)line.GetType().GetProperty("Remaining").GetValue(line);
+                Assert.IsTrue(seen.Add(product), "products are different");
+                Assert.AreEqual(3, remaining);
+            }
+            if (spawnIndex == 439)
+            {
+                Invoke(mode, "SpawnNextFan");
+                Assert.AreEqual(1, fans.Count, "no fan can spawn after number 440");
+            }
+        }
+
+        private sealed class OrderRollRandom : System.Random
+        {
+            private readonly int roll;
+            private int product;
+            public OrderRollRandom(int roll) => this.roll = roll;
+            public override int Next(int maxValue) => maxValue == 100 ? roll : product++ % maxValue;
         }
 
         private object CreateLosRedondosMode(float logicalHeight, out object route, out float px)

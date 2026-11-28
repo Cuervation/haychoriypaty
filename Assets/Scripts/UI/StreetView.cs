@@ -209,7 +209,6 @@ namespace HayChoriYPaty
                 canvasHeight + Mathf.Max(0f, bottomBleed));
         }
 
-
         private static ResponsiveFooterLayout BuildResponsiveFooterLayoutCore(
             StreetSimulation sim, float canvasHeight, bool showUpgrades, bool showReadySelector, float decorationBottom)
         {
@@ -239,7 +238,7 @@ namespace HayChoriYPaty
                 - panelHeight - pennantClearance);
             // Levels 1–5 keep their pennants. Huracán is the explicit bonus-track exception;
             // regular Racing and later campaign levels keep the match scenery unobstructed.
-            float pennantHeight = sim.LevelIndex < 5 || sim.IsBonusTrack
+            float pennantHeight = !StreetSimulation.IsRacingOrLaterLevel(sim.LevelIndex)
                 ? Mathf.Min(desiredPennantHeight, availablePennantHeight)
                 : 0f;
             float pennantTop = decorationBottom - pennantHeight;
@@ -763,11 +762,16 @@ namespace HayChoriYPaty
         private void DrawLevelCrest(Rect slot, Texture2D crest)
         {
             if (crest == null) return;
-            Rect uv, body;
+            Rect drawn = LevelCrestVisibleBounds(slot, crest, out Rect uv);
+            GUI.DrawTextureWithTexCoords(drawn, crest, uv, true);
+        }
+
+        private Rect LevelCrestVisibleBounds(Rect slot, Texture2D crest, out Rect uv)
+        {
             if (!crestVisibleUvs.TryGetValue(crest, out uv)) uv = new Rect(0, 0, 1, 1);
-            if (!crestBodyUvs.TryGetValue(crest, out body)) body = uv;
+            if (!crestBodyUvs.TryGetValue(crest, out Rect body)) body = uv;
             slot = LevelCrestSizedSlot(slot, crest);
-            GUI.DrawTextureWithTexCoords(FitLevelCrest(slot, new Vector2(crest.width, crest.height), uv, body), crest, uv, true);
+            return FitLevelCrest(slot, new Vector2(crest.width, crest.height), uv, body);
         }
 
         private static Texture2D CreateLevelCrestCutout(Texture2D source)
@@ -1027,7 +1031,11 @@ namespace HayChoriYPaty
         }
         private void OnDisable()
         {
+            ClearRoundPriceBoard();
+            roundPriceBoardChalk?.Dispose();
+            roundPriceBoardChalk = null;
             rewardShutterStarted = -1f; // Uncommitted choices remain pending in the existing save.
+            rewardShutterWhenCovered = null;
             DisposeTowerDefenseUi();
             if (hubMusicAudioSource != null) hubMusicAudioSource.Stop();
             ReleaseHubSignageResources();
@@ -1098,6 +1106,7 @@ namespace HayChoriYPaty
                     if (texture != null) Destroy(texture);
             marketPanelTextures.Clear();
             if (clubPennantTexture != null) Destroy(clubPennantTexture);
+            if (towerDefensePremiumCookingPoses != null) Destroy(towerDefensePremiumCookingPoses);
             clubPennantTexture = null;
             clubPennantThemeName = null;
             foreach (Texture2D variant in new[] { premiumWorker, premiumDiagonal, fernetWorker, fernetWorkerLater, mozoWorker })
@@ -1175,6 +1184,14 @@ namespace HayChoriYPaty
         {
             UpdatePostProcessingPolicy();
             UpdateRewardShutter();
+            if (RoundPriceBoardActive)
+            {
+                // Unscaled time keeps the countdown independent of game speed. A long frame must not skip a number.
+                AdvanceRoundPriceBoard(Mathf.Min(Time.unscaledDeltaTime, .15f));
+                return;
+            }
+            if (badgesActive && viewResourcesReady) EnsureBadgeShapes(); // trophy art is sampled outside OnGUI
+            UpdateProfileKeyboard();
             UpdateHubMusic();
             // The branded presentation belongs to startup, not to the authenticated game session.
             // Let it complete while Firebase resolves; game actions remain gated separately.
@@ -1223,6 +1240,17 @@ namespace HayChoriYPaty
                             press.wasPressedThisFrame, press.isPressed, press.wasReleasedThisFrame);
                 }
             }
+            if (badgesActive && !game.ShowChulengoResult)
+            {
+                Touchscreen badgesTouch = Touchscreen.current;
+                if (badgesTouch != null)
+                {
+                    var press = badgesTouch.primaryTouch.press;
+                    if (press.isPressed || press.wasReleasedThisFrame)
+                        HandleBadgesTouchScroll(badgesTouch.primaryTouch.position.ReadValue(),
+                            press.wasPressedThisFrame, press.isPressed, press.wasReleasedThisFrame);
+                }
+            }
             if (marketActive && !game.ShowChulengoResult)
             {
                 Touchscreen marketTouch = Touchscreen.current;
@@ -1245,15 +1273,19 @@ namespace HayChoriYPaty
 #endif
         }
 
-        public bool AccountMenuVisible => !introActive && (hubActive || badgesActive || rankingActive || marketActive);
+        public bool AccountMenuVisible => !introActive && (hubActive || badgesActive || rankingActive || marketActive || profileActive);
         public bool HubAccountActionRendered => false;
 
         private void OnGUI()
         {
             bool enabled = GUI.enabled;
-            if (RewardShutterActive) GUI.enabled = false;
-            DrawGameGui();
-            GUI.enabled = enabled;
+            if (RoundPriceBoardActive) DrawRoundPriceBoard();
+            else
+            {
+                if (RewardShutterActive) GUI.enabled = false;
+                DrawGameGui();
+                GUI.enabled = enabled;
+            }
             DrawRewardShutter();
         }
 
@@ -1316,6 +1348,13 @@ namespace HayChoriYPaty
             if (hubActive && !marketActive && !chulengoResult)
             {
                 DrawHubScreen();
+                GUI.color=old; GUI.matrix=m;
+                return;
+            }
+            if (profileActive && !chulengoResult)
+            {
+                float pageScale = layoutVerticalScale; layoutVerticalScale = 1f;
+                DrawProfileScreen(); layoutVerticalScale = pageScale;
                 GUI.color=old; GUI.matrix=m;
                 return;
             }
@@ -1387,11 +1426,19 @@ namespace HayChoriYPaty
             if (kitchenRenderer.CarriedTexture != null)
                 GUI.DrawTexture(kitchenCanvas, kitchenRenderer.CarriedTexture, ScaleMode.StretchToFill, true);
             if (sim.UsesActiveCooks) DrawCookingProgress(sim);
-            for(int i=0;i<sim.Sales.Count;i++)
+            DrawCampaignCrewChants(sim);
+            float saleFeedbackTop = sim.Sales.Count > 0 ? SaleFeedbackTop(v) : 0f;
+            for (int i = 0; i < sim.Sales.Count; i++)
             {
-                var s=sim.Sales[i];float a=Mathf.Clamp01(2.2f-s.Age);GUI.color=new Color(1,1,1,a);
-                Item(new Rect(s.Position.x-27,s.Position.y-86-s.Age*33,23,23),10);
-                Label(new Rect(s.Position.x-3,s.Position.y-86-s.Age*33,48,25),"+"+s.Amount,text);GUI.color=Color.white;
+                var sale = sim.Sales[i];
+                float alpha = Mathf.Clamp01(SaleFeedbackDuration - sale.Age);
+                if (alpha <= 0f) continue;
+                Rect bounds = SaleFeedbackBounds(sale.Position, sale.Age, saleFeedbackTop, layoutVerticalScale);
+                GUI.color = new Color(1f, 1f, 1f, alpha);
+                Item(new Rect(bounds.x, bounds.y / layoutVerticalScale, 23f, 23f), 10);
+                OutlineLabelAtGuiBounds(new Rect(bounds.x + 24f, bounds.y, 48f, bounds.height),
+                    "+" + sale.Amount, text, Color.black, Color.white, new Vector2(1.25f, 1.25f));
+                GUI.color = Color.white;
             }
             if (sim.IsBonusTrack) DrawBonusTrackHud(sim);
             else DrawCounters(sim);
@@ -1427,7 +1474,6 @@ namespace HayChoriYPaty
             else if (levelSixRacingTutorialActive) DrawLevelSixRacingTutorial();
             GUI.color=old;GUI.matrix=m;
         }
-
 
         private const float CookingRingRadius = 10f;
         private const float CookingRingDotSize = 3f;
@@ -1509,7 +1555,7 @@ namespace HayChoriYPaty
             if (measured + 8f > available)
                 levelTitle.fontSize = Mathf.Max(12, Mathf.FloorToInt(originalSize * (available - 8f) / measured));
             Rect[] layout = LevelBadgeLayoutForWidth(bounds, levelTitle.CalcSize(new GUIContent(caption)).x + 8f, crestWidth);
-            if (showCrest) DrawLevelCrest(LayoutRect(layout[0]), crest);
+            if (showCrest) DrawLevelCrest(LevelBadgeCrestDisplaySlot(levelIndex, LayoutRect(layout[0]), crest), crest);
             levelTitle.normal.textColor = new Color(.005f, .035f, .16f);
             for (int y = -1; y <= 1; y++)
             for (int x = -1; x <= 1; x++)
@@ -1518,6 +1564,25 @@ namespace HayChoriYPaty
             levelTitle.normal.textColor = Color.white;
             Label(layout[1], caption, levelTitle);
             levelTitle.fontSize = originalSize;
+        }
+
+        private Rect LevelBadgeCrestDisplaySlot(int levelIndex, Rect slot, Texture2D crest)
+        {
+            if (logicalCanvasHeight >= 958f) return slot;
+            StreetSimulation sim = game?.Sim;
+            if (sim == null || sim.LevelIndex != levelIndex || sim.IsBonusTrack || StreetSimulation.IsTowerDefenseLevel(levelIndex)) return slot;
+            Rect drawn = LevelCrestVisibleBounds(slot, crest, out _);
+            // Keep the badge's width, artwork and the card hitboxes. Shift only the shield
+            // by its visible overlap with the real compact cards (rather than its texture padding).
+            foreach (Rect bounds in CurrentResponsiveFooter(sim, logicalCanvasHeight).UpgradeBounds)
+            {
+                Rect card = LayoutRect(ScaleCardBounds(bounds, layoutVerticalScale));
+                if (drawn.xMin >= card.xMax || drawn.xMax <= card.xMin || drawn.yMin >= card.yMax) continue;
+                float overlap = Mathf.Max(0f, drawn.yMax - card.yMin + 2f);
+                drawn.y -= overlap;
+                slot.y -= overlap;
+            }
+            return slot;
         }
         private static Rect[] LevelBadgeLayout(Rect bounds, float preferredTextWidth, bool includeCrest)
         {
@@ -1541,16 +1606,20 @@ namespace HayChoriYPaty
             GUI.DrawTexture(LayoutRect(bounds), Texture2D.whiteTexture, ScaleMode.StretchToFill, true);
             GUI.color = previous;
         }
-        private void OutlineLabel(Rect bounds, string value, GUIStyle style, Color fill, float offset)
+        private void OutlineLabel(Rect bounds, string value, GUIStyle style, Color fill, float offset) =>
+            OutlineLabelAtGuiBounds(LayoutRect(bounds), value, style, fill, new Color(.08f, .035f, .018f, .98f),
+                new Vector2(offset, offset * layoutVerticalScale));
+
+        private static void OutlineLabelAtGuiBounds(Rect bounds, string value, GUIStyle style, Color fill, Color outline, Vector2 offset)
         {
             Color previous = style.normal.textColor;
-            style.normal.textColor = new Color(.08f, .035f, .018f, .98f);
+            style.normal.textColor = outline;
             for (int y = -1; y <= 1; y++)
             for (int x = -1; x <= 1; x++)
                 if (x != 0 || y != 0)
-                    Label(new Rect(bounds.x + x * offset, bounds.y + y * offset, bounds.width, bounds.height), value, style);
+                    GUI.Label(new Rect(bounds.x + x * offset.x, bounds.y + y * offset.y, bounds.width, bounds.height), value, style);
             style.normal.textColor = fill;
-            Label(bounds, value, style);
+            GUI.Label(bounds, value, style);
             style.normal.textColor = previous;
         }
         // The cover is the sole visual source for ordinary runtime buttons.
@@ -1637,6 +1706,7 @@ namespace HayChoriYPaty
             levelFourSpecialistsTutorialActive = false; levelFourSpecialistsTutorialStep = 0;
             levelFiveSpecialistsTutorialActive = false; levelFiveSpecialistsTutorialStep = 0;
             marketActive = false; badgesActive = false; rankingActive = false; hubActive = true;
+            CloseProfile();
             marketFromSelector = false; pressedAction = 0;
         }
 
@@ -1656,7 +1726,7 @@ namespace HayChoriYPaty
             ClearLevelOneTutorialMarkerForTesting();
 #endif
             introActive = false; levelSelectActive = false; marketActive = false;
-            badgesActive = false; rankingActive = false; settingsActive = false;
+            badgesActive = false; rankingActive = false; settingsActive = false; CloseProfile();
             hubActive = true; marketFromSelector = false;
             pressedAction = 0;
         }
@@ -1669,13 +1739,6 @@ namespace HayChoriYPaty
 
         private static Rect GrillRect(int productCount) => StreetWorkstationLayout.GrillBounds;
         private static Rect GrillRectForLevel(int productCount, int levelIndex) => StreetWorkstationLayout.GrillBounds;
-        private Rect DrawGrillArtwork(Rect bounds, Texture2D art)
-        {
-            if (art == null) { Item(bounds,7); return LayoutRect(bounds); }
-            Rect drawn = StreetWorkstationLayout.FitArtwork(LayoutRect(bounds), new Vector2(art.width,art.height));
-            GUI.DrawTexture(drawn,art,ScaleMode.StretchToFill,true);
-            return drawn;
-        }
         private static string StationLabelForProduct(int product)
         {
             return product == 4 ? "COCA 600 ml" : product == 6 ? "CERVEZA" : product == 5 ? "FERNET 1 L" : string.Empty;
@@ -1730,6 +1793,29 @@ namespace HayChoriYPaty
             levelOneTutorialSkipStyle.normal.textColor = new Color(.045f, .14f, .29f);
         }
         private static GUIStyle Style(int size){var s=new GUIStyle(GUI.skin.label){fontSize=size,fontStyle=FontStyle.Bold,alignment=TextAnchor.MiddleCenter,wordWrap=true};s.normal.textColor=new Color(.16f,.10f,.08f);return s;}
+        private const float SaleFeedbackDuration = 2.2f;
+        private float SaleFeedbackTop(Rect viewport)
+        {
+            float top = CustomerCounterTopY();
+            // Short screens may place the compact quota/status band on the counter face.
+            if (logicalCanvasHeight < H - 2f)
+            {
+                float fullCanvasHeight = Screen.height * W / Screen.width;
+                top += StreetSceneLayout.CounterBounds(fullCanvasHeight).height * Screen.width / viewport.width;
+            }
+            return top;
+        }
+
+        private static Rect SaleFeedbackBounds(Vector2 handoff, float age, float clearTop, float verticalScale)
+        {
+            const float width = 72f, risePerSecond = 33f, gap = 6f;
+            float rise = risePerSecond * verticalScale;
+            // Orders are clipped at this same projected counter edge. Keep the whole
+            // ascending coin and amount on the other side, including their last visible frame.
+            float startY = Mathf.Max((handoff.y - 86f) * verticalScale, clearTop + gap + SaleFeedbackDuration * rise);
+            float y = startY - Mathf.Clamp(age, 0f, SaleFeedbackDuration) * rise;
+            return new Rect(Mathf.Clamp(handoff.x - 27f, gap, W - width - gap), y, width, 25f);
+        }
         private void Label(Rect r,string value,GUIStyle style){GUI.Label(LayoutRect(r),value,style);}
         private void Item(Rect r,int id,bool stretch=false)
         {

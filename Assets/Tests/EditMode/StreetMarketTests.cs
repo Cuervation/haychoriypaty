@@ -193,8 +193,10 @@ namespace HayChoriYPaty.Tests
                 Assert.AreEqual(0, Call(defense, "GetProductGoal", 0));
                 Assert.AreEqual(0, Call(defense, "GetProductGoal", 4));
                 Assert.AreEqual(0f, Get(defense, "TimeRemaining"));
-                Assert.AreEqual(2, Get(defense, "ProductCount"));
-                Assert.AreEqual(500, CallStatic(simType, "GetStartingCoinsForLevel", Activator.CreateInstance(balanceType), level));
+                // Los Redondos serves its authored five-product Defense menu; Camioneros keeps the Chori/Coca pair.
+                Assert.AreEqual(level == 10 ? 7 : 2, Get(defense, "ProductCount")); // Los Redondos sells Racing's seven products (2026-11-24)
+                // 2026-11-24 (a pedido): Camioneros opens with 20 coins (50 until 2026-11-24) and Los Redondos (La Renga's C) with 40.
+                Assert.AreEqual(level == 10 ? 40 : 20, CallStatic(simType, "GetStartingCoinsForLevel", Activator.CreateInstance(balanceType), level));
             }
             object ordinaryMarket = Market(), ordinary = Sim(8);
             Assert.IsFalse((bool)Call(ordinaryMarket, "HasRequiredStock", ordinary));

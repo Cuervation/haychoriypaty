@@ -7,6 +7,17 @@ namespace HayChoriYPaty
     {
         public const float RouteTopReserve = 240f;
         public const float FooterReserve = 240f;
+
+        /// <summary>
+        /// Top of a kitchen-derived level's footer: the same place as its source campaign level's (Boca's for Luján,
+        /// Nueva Chicago's for Camioneros): the kitchen field bottom, stretched with the screen height.
+        /// </summary>
+        public static float PilgrimFooterTop(float logicalHeight, int sourceCampaignLevelId) =>
+            TowerDefenseGameMode.KitchenLayoutForLevel(FooterSourceLevelId(sourceCampaignLevelId)).PlayfieldBottom * logicalHeight / StreetSceneLayout.Height;
+
+        /// <summary>The campaign level whose footer a Tower Defense level copies. La Renga keeps Camioneros' (Nueva Chicago's) footer.</summary>
+        public static int FooterSourceLevelId(int sourceCampaignLevelId) =>
+            sourceCampaignLevelId == TowerDefenseLevelConfig.LaRengaCampaignLevelId ? TowerDefenseLevelConfig.LosRedondosCampaignLevelId : sourceCampaignLevelId;
         // Shared visual frame width used to anchor follower entry to the viewport edge.
         public const float FanFrameWidthLogical = 78f;
         // The 96px corridor leaves a visible margin around the fan frame.
@@ -15,6 +26,19 @@ namespace HayChoriYPaty
         public const float VisualStageLift = 24f;
         // Full fan body height shared by Camioneros and Los Redondos.
         public const float LosRedondosFanBodyLogical = 76f;
+
+        /// <summary>Only offer a narrower view below the shortest validated phone (320×568).</summary>
+        public static bool TryCompactViewport(Rect safeViewport, out Rect viewport)
+        {
+            viewport = safeViewport;
+            const float shortestProtectedHeight = 958f; // 320×568 is 958.5 logical pixels high.
+            if (safeViewport.width <= 0f || safeViewport.height <= 0f ||
+                safeViewport.height * StreetSceneLayout.Width >= safeViewport.width * shortestProtectedHeight)
+                return false;
+            float width = safeViewport.height * StreetSceneLayout.Width / StreetSceneLayout.Height;
+            viewport = new Rect(safeViewport.center.x - width * .5f, safeViewport.y, width, safeViewport.height);
+            return true;
+        }
 
         public static bool TryCreate(TowerDefenseLevelConfig source, Camera camera, Rect viewport,
             float logicalWidth, float logicalHeight, out TowerDefenseLevelConfig runtimeConfig,
@@ -33,7 +57,7 @@ namespace HayChoriYPaty
             }
 
             TowerDefenseRouteGeometryConfig authored = source.Route;
-            if (authored == null || (authored.RouteKind == TowerDefenseRouteKind.HorizontalSingleFence
+            if (authored == null || (authored.RouteKind != TowerDefenseRouteKind.Serpentine
                 ? authored.RowCount != 1 : authored.RowCount < 3 || authored.RowCount > 9 || authored.RowCount % 2 == 0))
             {
                 error = "The editable route has an invalid row count for its route kind.";
@@ -50,6 +74,9 @@ namespace HayChoriYPaty
                 return false;
             }
 
+            if (authored.RouteKind == TowerDefenseRouteKind.CShapedSingleFence)
+                return TryCreateCShaped(source, camera, viewport, logicalWidth, logicalHeight, canvasScale,
+                    worldUnitsPerLogicalPixel, out runtimeConfig, out route, out firstServiceZone, out secondServiceZone, out error);
             if (authored.RouteKind == TowerDefenseRouteKind.HorizontalSingleFence)
                 return TryCreateHorizontal(source, camera, viewport, logicalWidth, logicalHeight, canvasScale,
                     worldUnitsPerLogicalPixel, out runtimeConfig, out route, out firstServiceZone, out secondServiceZone, out error);
@@ -237,12 +264,20 @@ namespace HayChoriYPaty
             firstServiceZone = secondServiceZone = Vector2.zero;
             error = null;
             const float margin = 16f;
-            const float corridorLogical = 88f;
+            // The fence stays where the 88 px corridor put it; the narrower corridor walks the pilgrims right
+            // behind it so workers hand the order over instead of reaching across a wide yard.
+            const float fenceOffsetLogical = 88f;
+            const float corridorLogical = 24f;
             const float fenceClearanceLogical = 8f;
-            float footer = FooterReserve;
-            float routeY = RouteTopReserve + corridorLogical * .5f;
-            float workTop = routeY + corridorLogical * .5f + fenceClearanceLogical;
-            float workBottom = logicalHeight - footer - margin;
+            float routeY = RouteTopReserve + fenceOffsetLogical - corridorLogical * .5f;
+            float workTop = RouteTopReserve + fenceOffsetLogical + fenceClearanceLogical;
+            // The kitchen is Boca's own: its footer starts where Boca's does and the furniture sits at Boca's
+            // (vertically stretched) positions, so the work area ends at the bottom of Boca's lowest piece, the grills.
+            float kitchenVerticalScale = logicalHeight / StreetSceneLayout.Height;
+            // The stage is drawn VisualStageLift logical px above the coordinates it is computed from (the route and
+            // mural already account for it), so add it back to make the grills end exactly where Boca's end.
+            float workBottom = TowerDefenseGameMode.BocaStationsBottomLogical(
+                TowerDefenseGameMode.KitchenLayoutForLevel(source.SourceCampaignLevelId), kitchenVerticalScale) + VisualStageLift;
             if (logicalWidth <= margin * 2f + corridorLogical || workBottom - workTop < 160f)
             {
                 error = "Horizontal single-fence layout needs a usable lower work area above the footer.";
@@ -257,9 +292,13 @@ namespace HayChoriYPaty
                 new Vector2(exitX + corridorLogical * .5f, routeY + corridorLogical * .5f));
             Rect worldRouteBounds = Rect.MinMaxRect(Mathf.Min(routeTopLeft.x, routeBottomRight.x), Mathf.Min(routeTopLeft.y, routeBottomRight.y),
                 Mathf.Max(routeTopLeft.x, routeBottomRight.x), Mathf.Max(routeTopLeft.y, routeBottomRight.y));
-            Vector2 workTopLeft = LogicalToWorld(camera, viewport, logicalWidth, canvasScale, new Vector2(margin, workTop));
+            // Boca's kitchen row spans the whole 540 px canvas, so the work area has no side margin: only that keeps
+            // the furniture at Boca's size. The bottom margin above the footer stays.
+            // Boca's row overhangs the 540 px canvas by 1.2 px on each side, so the work area does too.
+            const float workSideMarginLogical = -1.2f;
+            Vector2 workTopLeft = LogicalToWorld(camera, viewport, logicalWidth, canvasScale, new Vector2(workSideMarginLogical, workTop));
             Vector2 workBottomRight = LogicalToWorld(camera, viewport, logicalWidth, canvasScale,
-                new Vector2(logicalWidth - margin, workBottom));
+                new Vector2(logicalWidth - workSideMarginLogical, workBottom));
             Rect workBounds = Rect.MinMaxRect(Mathf.Min(workTopLeft.x, workBottomRight.x), Mathf.Min(workTopLeft.y, workBottomRight.y),
                 Mathf.Max(workTopLeft.x, workBottomRight.x), Mathf.Max(workTopLeft.y, workBottomRight.y));
 
@@ -275,6 +314,7 @@ namespace HayChoriYPaty
                 TurnRadius = source.Route.TurnRadius,
                 PlayableBounds = worldRouteBounds,
                 WorkBounds = workBounds,
+                KitchenVerticalScale = kitchenVerticalScale,
                 TurnSegments = Mathf.Clamp(source.Route.TurnSegments, 4, 128)
             };
             runtimeConfig = UnityEngine.Object.Instantiate(source);
@@ -288,6 +328,81 @@ namespace HayChoriYPaty
                 return false;
             }
             Vector2 entry = LogicalToWorld(camera, viewport, logicalWidth, canvasScale, new Vector2(entryX, routeY));
+            route.FanEntryExtensionWorldUnits = Mathf.Max(0f, geometry.Centerline[0].x - entry.x);
+            runtimeConfig.ConfigureRoute(route);
+            firstServiceZone = secondServiceZone = workBounds.center;
+            return true;
+        }
+
+        // The "C" fence (La Renga): the top run sits 42.5 px under the sidewalk curb, the right run stays 65.7 px (74 screen px)
+        // inside the screen edge and the bottom run sits 46.8 logical px above the footer (stage lift included); the work pocket is the rectangle the fence encloses, and the fans
+        // walk around the outside. Everything is in the same logical coordinates as the horizontal route (stage lift included).
+        private const float CShapedTopFenceOffset = 42.5f, CShapedRightFenceInset = 65.7f, CShapedBottomFenceAboveFooter = 38.83f,
+            CShapedCorridor = 24f, CShapedPocketClearance = 8f,
+            // The downward run of the line walks this much further right than the corridor's own centre (the fence stays put),
+            // so the fans no longer stand on the right rail.
+            CShapedRightLaneShift = 31f,
+            // The bottom run walks this much further below the bottom fence (the fence stays put): the fans pass under it, not on it.
+            CShapedBottomLaneExtra = 38f;
+
+        private static bool TryCreateCShaped(TowerDefenseLevelConfig source, Camera camera, Rect viewport,
+            float logicalWidth, float logicalHeight, float canvasScale, float pixel,
+            out TowerDefenseLevelConfig runtimeConfig, out TowerDefenseRouteGeometryConfig route,
+            out Vector2 firstServiceZone, out Vector2 secondServiceZone, out string error)
+        {
+            runtimeConfig = null;
+            route = null;
+            firstServiceZone = secondServiceZone = Vector2.zero;
+            error = null;
+            float topFence = RouteTopReserve + CShapedTopFenceOffset;
+            // Los Redondos' active kitchen (2026-11-24) copies Racing's/Boca's footer, which is taller than Ferro's.
+            float bottomFence = PilgrimFooterTop(logicalHeight, source.ActiveKitchen ? TowerDefenseLevelConfig.PeregrinacionLujanCampaignLevelId : source.SourceCampaignLevelId) - CShapedBottomFenceAboveFooter;
+            float rightFence = logicalWidth - CShapedRightFenceInset;
+            if (bottomFence - topFence < 300f || rightFence < logicalWidth * .5f)
+            {
+                error = "The C-shaped fence needs a usable pocket between the mural and the footer.";
+                return false;
+            }
+            float half = CShapedCorridor * .5f;
+            float verticalCorridor = CShapedCorridor + 2f * CShapedRightLaneShift, verticalHalf = verticalCorridor * .5f;
+            float topCenter = topFence - half, bottomCenter = bottomFence + half + CShapedBottomLaneExtra, rightCenter = rightFence + verticalHalf;
+            float entryX = -FanFrameWidthLogical * .5f;
+            Vector2 a = LogicalToWorld(camera, viewport, logicalWidth, canvasScale, new Vector2(entryX - verticalHalf, topCenter - half)); // symmetric about the run (same half width as the right end), so its left end lands exactly on entryX
+            Vector2 b = LogicalToWorld(camera, viewport, logicalWidth, canvasScale, new Vector2(rightCenter + verticalHalf, bottomCenter + half));
+            Rect playable = Rect.MinMaxRect(Mathf.Min(a.x, b.x), Mathf.Min(a.y, b.y), Mathf.Max(a.x, b.x), Mathf.Max(a.y, b.y));
+            // The work pocket: from the screen's left edge to just inside the right rail, between the top and bottom rails.
+            Vector2 workA = LogicalToWorld(camera, viewport, logicalWidth, canvasScale,
+                new Vector2(0f, topFence + CShapedPocketClearance));
+            Vector2 workB = LogicalToWorld(camera, viewport, logicalWidth, canvasScale,
+                new Vector2(rightFence - CShapedPocketClearance, bottomFence - CShapedPocketClearance));
+            Rect workBounds = Rect.MinMaxRect(Mathf.Min(workA.x, workB.x), Mathf.Min(workA.y, workB.y),
+                Mathf.Max(workA.x, workB.x), Mathf.Max(workA.y, workB.y));
+            route = new TowerDefenseRouteGeometryConfig
+            {
+                RouteKind = TowerDefenseRouteKind.CShapedSingleFence,
+                RowCount = 1,
+                SegmentLengths = new[] { (rightCenter - entryX) * pixel },
+                CorridorWidth = verticalCorridor * pixel,
+                HorizontalCorridorWidth = CShapedCorridor * pixel,
+                BottomLaneExtra = CShapedBottomLaneExtra * pixel,
+                RowSpacing = (bottomCenter - topCenter) * pixel,
+                TurnRadius = source.Route.TurnRadius,
+                PlayableBounds = playable,
+                WorkBounds = workBounds,
+                KitchenVerticalScale = logicalHeight / StreetSceneLayout.Height,
+                TurnSegments = Mathf.Clamp(source.Route.TurnSegments, 4, 128)
+            };
+            runtimeConfig = UnityEngine.Object.Instantiate(source);
+            runtimeConfig.name = source.name + " (runtime C-shaped viewport)";
+            TowerDefenseRouteGeometryResult geometry = TowerDefenseRouteGeometry.Generate(route);
+            if (geometry == null || !geometry.IsValid)
+            {
+                error = geometry == null ? "Route generator returned no layout." : string.Join("; ", geometry.Validation.Errors);
+                UnityEngine.Object.Destroy(runtimeConfig);
+                runtimeConfig = null;
+                return false;
+            }
+            Vector2 entry = LogicalToWorld(camera, viewport, logicalWidth, canvasScale, new Vector2(entryX, topCenter));
             route.FanEntryExtensionWorldUnits = Mathf.Max(0f, geometry.Centerline[0].x - entry.x);
             runtimeConfig.ConfigureRoute(route);
             firstServiceZone = secondServiceZone = workBounds.center;

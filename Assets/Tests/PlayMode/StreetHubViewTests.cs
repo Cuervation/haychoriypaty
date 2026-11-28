@@ -125,6 +125,34 @@ namespace HayChoriYPaty.Tests
                 "Startup should not draw the separate generic PREPARANDO EL BARRIO screen.");
         }
 
+        [UnityTest]
+        public IEnumerator RankingNeedsAnActualBocaWinBeforeShowingTheCampaignComplete()
+        {
+            for (int frame = 0; frame < 1200 && !(bool)Field("viewResourcesReady"); frame++) yield return null;
+            Assert.IsTrue((bool)Field("viewResourcesReady"));
+            vt.GetField("introActive", P).SetValue(view, false);
+            vt.GetField("hubActive", P).SetValue(view, true);
+            object save = gt.GetField("save", P).GetValue(game);
+            var unlocks = (bool[])save.GetType().GetField("unlockedLevelIds").GetValue(save);
+            var stats = save.GetType().GetField("statistics").GetValue(save);
+            var wins = (long[])stats.GetType().GetField("winsByLevel").GetValue(stats);
+            for (int id = 0; id < unlocks.Length; id++) { unlocks[id] = true; wins[id] = id == 8 ? 0L : 1L; }
+
+            ClickAction(203); // Ranking sign in the real hub.
+            Assert.IsTrue((bool)Field("rankingActive"));
+            var objective = vt.GetMethod("RankingObjectiveText", P);
+            var unlockedCounter = new object[] { 0 };
+            StringAssert.Contains("PRÓXIMO OBJETIVO: BOCA JUNIORS", (string)objective.Invoke(view, unlockedCounter));
+            Assert.AreEqual(15, unlockedCounter[0]);
+            if (!Application.isBatchMode) yield return Capture("qa03-ranking-boca-pending-1080x1920");
+
+            wins[8] = 1L;
+            Assert.AreEqual("TODAS LAS CANCHAS SUPERADAS", objective.Invoke(view, unlockedCounter));
+            if (!Application.isBatchMode) yield return Capture("qa03-ranking-campaign-completed-1080x1920");
+            wins[6] = 0L; // A legacy profile can know only part of its victory history.
+            StringAssert.Contains("SAN LORENZO", (string)objective.Invoke(view, unlockedCounter));
+        }
+
         [UnityTest] public IEnumerator PermanentFirebaseSyncFailureReturnsToHubAndOpensAccountPanel()
         {
             float deadline = Time.realtimeSinceStartup + 20f;
@@ -414,13 +442,21 @@ namespace HayChoriYPaty.Tests
             object statistics = save.GetType().GetField("statistics").GetValue(save);
             statistics.GetType().GetField("deliveredByProduct").SetValue(statistics, new long[] { 499, 500, 2499, 2500, 4999, 5000, 0 });
             statistics.GetType().GetMethod("Normalize").Invoke(statistics, null);
-            MethodInfo rows = vt.GetMethod("SalesBadgeRowBounds", BindingFlags.NonPublic | BindingFlags.Static);
+            // 2026-11-26: the badges are a scrollable trophy vitrina, one case per product with its three trophies.
+            MethodInfo viewportOf = vt.GetMethod("BadgesViewportBounds", BindingFlags.NonPublic | BindingFlags.Static);
+            MethodInfo caseOf = vt.GetMethod("BadgeCaseBounds", BindingFlags.NonPublic | BindingFlags.Static);
+            MethodInfo maxScroll = vt.GetMethod("BadgesMaxScroll", BindingFlags.NonPublic | BindingFlags.Static);
             foreach (float height in new[] { 900f, 960f, 1200f })
-            for (int product = 0; product < 7; product++)
             {
-                Rect row = (Rect)rows.Invoke(null, new object[] { product, height });
-                Assert.GreaterOrEqual(row.yMin, 160); Assert.Less(row.yMax, height - 109f);
-                Assert.AreEqual(500f, row.width);
+                Rect viewport = (Rect)viewportOf.Invoke(null, new object[] { height });
+                Assert.GreaterOrEqual(viewport.yMin, 160f); Assert.LessOrEqual(viewport.yMax, height - 100f, "the vitrina ends above the back button");
+                Rect last = (Rect)caseOf.Invoke(null, new object[] { 6, viewport.width });
+                Assert.AreEqual(last.yMax - viewport.height, (float)maxScroll.Invoke(null, new object[] { height }), .5f, "scrolling reaches the last case");
+                for (int product = 0; product < 7; product++)
+                {
+                    Rect shelf = (Rect)caseOf.Invoke(null, new object[] { product, viewport.width });
+                    Assert.LessOrEqual(shelf.xMax, viewport.width - 5f, "room for the scroll bar");
+                }
             }
             yield return Capture("badges-playmode-1080x1920");
             Dispatch(205); Assert.IsTrue((bool)Field("hubActive"));

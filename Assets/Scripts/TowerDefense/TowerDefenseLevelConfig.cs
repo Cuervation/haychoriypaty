@@ -3,7 +3,12 @@ using UnityEngine;
 
 namespace HayChoriYPaty
 {
-    public enum TowerDefenseRouteKind { Serpentine = 0, HorizontalSingleFence = 1 }
+    /// <summary>
+    /// Serpentine = the original two-rail serpentine; HorizontalSingleFence = one straight fence with the work area below;
+    /// CShapedSingleFence = one fence shaped like a "C" open to the left (top run to the right, a right connector down and a
+    /// bottom run back to the left) with the work area in the pocket the fence encloses and the fans walking outside it.
+    /// </summary>
+    public enum TowerDefenseRouteKind { Serpentine = 0, HorizontalSingleFence = 1, CShapedSingleFence = 2 }
 
     public enum TowerDefenseStationKind
     {
@@ -21,6 +26,33 @@ namespace HayChoriYPaty
         public bool HasAccessPosition;
         [Tooltip("Worker access point in logical pixels relative to the lower-left corner of WorkBounds.")]
         public Vector2 AccessPositionFromWorkBoundsMin;
+    }
+
+    /// <summary>
+    /// One step of a level's difficulty ramp. It applies to every fan whose spawn index is at least <see cref="FromFan"/> and
+    /// below the next tier's FromFan. Orders roll their quantity per product line and their chance of a second product here.
+    /// </summary>
+    [Serializable]
+    public struct TowerDefenseDifficultyTier
+    {
+        [Tooltip("Index (0-based) of the first fan of the wave that uses this tier.")]
+        [Min(0)] public int FromFan;
+        [Tooltip("Multiplier on the level's fan speed for fans born in this tier (already-born fans keep theirs).")]
+        [Min(0.1f)] public float SpeedMultiplier;
+        [Tooltip("Percent chance that a product line asks for 2 units.")]
+        [Range(0, 100)] public int Quantity2Percent;
+        [Tooltip("Percent chance that a product line asks for 3 units (rolled after 5 and 4, before 2; the rest ask for 1).")]
+        [Range(0, 100)] public int Quantity3Percent;
+        [Tooltip("Percent chance that a product line asks for 4 units (2026-11-26; 0 in levels that never ask for more than 3).")]
+        [Range(0, 100)] public int Quantity4Percent;
+        [Tooltip("Percent chance that a product line asks for 5 units (rolled first; the five quantity chances add up to at most 100).")]
+        [Range(0, 100)] public int Quantity5Percent;
+        [Tooltip("Percent chance that the order has a second product.")]
+        [Range(0, 100)] public int SecondProductPercent;
+        [Tooltip("Percent chance of a third different product. Conditional on two products unless the level counts it across all orders.")]
+        [Range(0, 100)] public int ThirdProductPercent;
+        [Tooltip("Percent chance, once it has three, that the order adds a fourth different product.")]
+        [Range(0, 100)] public int FourthProductPercent;
     }
 
     /// <summary>Serializable configuration for the Tower Defense runtime attached to a campaign level.</summary>
@@ -71,6 +103,10 @@ namespace HayChoriYPaty
         [Tooltip("Optional campaign balance row used only for Tower Defense prices. Campaign identity/progression still uses SourceCampaignLevelId.")]
         [SerializeField, Min(0)] private int economicBalanceCampaignLevelId = CommonEconomicBalanceLevelId;
         [SerializeField] private bool useCampaignEconomyPricing;
+        [Tooltip("Optional: price the workers hired in this level with the hire prices and growth of a regular campaign level (e.g. 3 = Ferro). -1 = off. Speed upgrades keep their own price.")]
+        [SerializeField] private int hirePricingCampaignLevelId = -1;
+        [Tooltip("Per-role first price that replaces the campaign one (0 = keep it); it grows with each purchase like the campaign prices.")]
+        [SerializeField] private int[] hireBaseCostOverridesByRole = new int[0];
         [SerializeField] private string backgroundResource = "street-background-camioneros-v1";
         [SerializeField] private TowerDefenseRouteKind routeKind = TowerDefenseRouteKind.Serpentine;
         [SerializeField] private bool freeConstruction;
@@ -90,6 +126,7 @@ namespace HayChoriYPaty
         [SerializeField] private GameObject terminalFencePrefab;
         [SerializeField] private GameObject directionSignPrefab;
         [SerializeField] private Sprite directionArrowSprite;
+        [SerializeField] private Sprite verticalFencePanelSprite;
         [SerializeField] private int[] availableProducts = { 0, 4 };
         [SerializeField, Min(1)] private int totalFanCount = CamionerosFansToServe;
         [Tooltip("Multiplier applied to Tower Defense fan movement; other campaign levels are unaffected.")]
@@ -102,13 +139,22 @@ namespace HayChoriYPaty
         [SerializeField, Min(0)] private int startingCoins = 500;
         [SerializeField, Min(0.1f)] private float fanSpawnIntervalSeconds = 1f;
         [SerializeField, Min(0)] private int stationCost = 80;
-        [SerializeField, Min(1)] private int maximumWorkersPerRole = 3;
+        [Tooltip("Most workers of each role the player may hire in a free-construction level. 0 = no limit (only coins limit it).")]
+        [SerializeField, Min(0)] private int maximumWorkersPerRole = 3;
+        [Tooltip("Use the same chance roll for the second and third product, so both percentages are shares of all orders.")]
+        [SerializeField] private bool thirdProductChanceOfAllOrders;
+        [Tooltip("Optional difficulty ramp by spawn index (ascending FromFan). Empty = the level's fixed difficulty.")]
+        [SerializeField] private TowerDefenseDifficultyTier[] difficultyTiers = Array.Empty<TowerDefenseDifficultyTier>();
         [SerializeField] private int[] freeStationCounts = { 1, 1, 1, 1, 1, 1, 1 };
         [Tooltip("Optional physical stations placed at level start. Positions are logical pixels from the lower-left of WorkBounds.")]
         [SerializeField] private TowerDefenseStartingStation[] startingStations = Array.Empty<TowerDefenseStartingStation>();
         [SerializeField] private int[] hireCostsByRole = { 60, 60, 60, 60, 60 };
         [Tooltip("Explicit role-local starting crew for free-construction levels. This is level config, never imported from a saved campaign roster.")]
         [SerializeField] private int[] startingWorkersByRole = new int[5];
+        [Tooltip("Draws the Defense world mirrored left-right on screen (a C that opens to the right). The game logic and geometry are unchanged.")]
+        [SerializeField] private bool mirrorHorizontally;
+        [Tooltip("Racing's active kitchen (2026-11-24): the Parrilleros cook on the grill and the Mozos hand the sandwiches over, with all seven products, like the previous campaign level.")]
+        [SerializeField] private bool activeKitchen;
 
         public string ModeId => string.IsNullOrWhiteSpace(modeId) ? "tower-defense" : modeId;
         public string LevelId => string.IsNullOrWhiteSpace(levelId) ? CamionerosLevelId : levelId;
@@ -117,6 +163,14 @@ namespace HayChoriYPaty
         public int SourceCampaignLevelId => sourceCampaignLevelId;
         public int EconomicBalanceCampaignLevelId => Mathf.Clamp(economicBalanceCampaignLevelId, 0, StreetSimulation.LevelNames.Length - 1);
         public bool UseCampaignEconomyPricing => useCampaignEconomyPricing;
+        /// <summary>Regular campaign level whose worker prices this level copies, or -1.</summary>
+        /// <summary>Own first price for this role (Los Redondos' Fernetero: 120, 2026-11-26), or 0 to keep the campaign price.</summary>
+        public int HireBaseCostOverride(StreetWorkerRole role)
+        {
+            int index = (int)role;
+            return hireBaseCostOverridesByRole != null && index >= 0 && index < hireBaseCostOverridesByRole.Length ? Mathf.Max(0, hireBaseCostOverridesByRole[index]) : 0;
+        }
+        public int HirePricingCampaignLevelId => hirePricingCampaignLevelId < 0 ? -1 : Mathf.Min(hirePricingCampaignLevelId, StreetSimulation.LevelNames.Length - 1);
         public string BackgroundResource => backgroundResource;
         public TowerDefenseRouteKind RouteKind => routeKind;
         public bool FreeConstruction => freeConstruction;
@@ -124,7 +178,22 @@ namespace HayChoriYPaty
         public int StartingCoins => Mathf.Max(0, startingCoins);
         public float FanSpawnIntervalSeconds => Mathf.Max(0.1f, fanSpawnIntervalSeconds);
         public int StationCost => Mathf.Max(0, stationCost);
-        public int MaximumWorkersPerRole => Mathf.Max(1, maximumWorkersPerRole);
+        public int MaximumWorkersPerRole => maximumWorkersPerRole <= 0 ? int.MaxValue : maximumWorkersPerRole;
+        public bool ThirdProductChanceOfAllOrders => thirdProductChanceOfAllOrders;
+        public bool HasDifficultyRamp => difficultyTiers != null && difficultyTiers.Length > 0;
+        /// <summary>The tier that governs the fan with this 0-based spawn index (the last one whose FromFan is not above it).</summary>
+        public TowerDefenseDifficultyTier DifficultyTierForFan(int spawnIndex)
+        {
+            if (!HasDifficultyRamp) return new TowerDefenseDifficultyTier { SpeedMultiplier = 1f };
+            TowerDefenseDifficultyTier tier = difficultyTiers[0];
+            for (int i = 1; i < difficultyTiers.Length; i++)
+            {
+                if (difficultyTiers[i].FromFan > spawnIndex) break;
+                tier = difficultyTiers[i];
+            }
+            if (tier.SpeedMultiplier <= 0f) tier.SpeedMultiplier = 1f;
+            return tier;
+        }
         public int HireCostForRole(StreetWorkerRole role)
         {
             int index = (int)role;
@@ -143,6 +212,7 @@ namespace HayChoriYPaty
         public GameObject TerminalFencePrefab => terminalFencePrefab;
         public GameObject DirectionSignPrefab => directionSignPrefab;
         public Sprite DirectionArrowSprite => directionArrowSprite;
+        public Sprite VerticalFencePanelSprite => verticalFencePanelSprite;
         public int[] AvailableProducts => availableProducts == null ? Array.Empty<int>() : (int[])availableProducts.Clone();
         public float FanSpeed => Mathf.Max(0f, fanSpeed);
         public int TotalFanCount => Mathf.Max(1, totalFanCount);
@@ -150,6 +220,16 @@ namespace HayChoriYPaty
         public float ServiceRange => Mathf.Max(0.01f, serviceRange);
         public Vector2 FirstWorkZoneOffset => firstWorkZoneOffset;
         public Vector2 SecondWorkZoneOffset => secondWorkZoneOffset;
+        /// <summary>The world is drawn mirrored left-right on screen (2026-11-24: Los Redondos plays La Renga's C inverted).</summary>
+        public bool MirrorHorizontally => mirrorHorizontally;
+        /// <summary>Racing's active kitchen: cooks cook on the grill and Mozos deliver (Boca's seven-station layout); not a passive Defense kitchen.</summary>
+        public bool ActiveKitchen => activeKitchen;
+        /// <summary>
+        /// La Renga's dynamics: its C-shaped fence, kitchen (Ferro's with narrow grills), crew behavior and difficulty ramp.
+        /// Los Redondos copies them on the C-shaped fence (2026-11-24, a pedido).
+        /// </summary>
+        public bool UsesLaRengaDynamics => sourceCampaignLevelId == LaRengaCampaignLevelId ||
+            (sourceCampaignLevelId == LosRedondosCampaignLevelId && routeKind == TowerDefenseRouteKind.CShapedSingleFence);
         public int[] StartingWorkersByRole => startingWorkersByRole == null
             ? new int[5] : (int[])startingWorkersByRole.Clone();
 
@@ -169,7 +249,8 @@ namespace HayChoriYPaty
                 PlayableBounds = runtimeRoute.PlayableBounds,
                 WorkBounds = runtimeRoute.WorkBounds,
                 TurnSegments = runtimeRoute.TurnSegments,
-                FanEntryExtensionWorldUnits = runtimeRoute.FanEntryExtensionWorldUnits
+                FanEntryExtensionWorldUnits = runtimeRoute.FanEntryExtensionWorldUnits,
+                BottomLaneExtra = runtimeRoute.BottomLaneExtra
             };
         }
 

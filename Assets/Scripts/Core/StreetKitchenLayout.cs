@@ -84,6 +84,19 @@ namespace HayChoriYPaty
         public bool HasFernetTable { get { return hasFernet; } }
         public bool HasCocaBarrel { get { return hasCoca; } }
         public bool HasBeerBarrel { get { return hasBeer; } }
+        public bool NarrowGrills { get; private set; }
+        /// <summary>Sandwich tables three quarters as wide (one column of sandwiches per product): they come with the narrow grills (La Renga, and Los Redondos' active kitchen).</summary>
+        public bool NarrowTables { get; private set; }
+        /// <summary>
+        /// Tower Defense on La Renga's C-shaped fence (2026-11-23): drinks are taken from the barrel's right side, with the workers
+        /// spread upward along it, exactly as in the narrow (La Renga) layout, without changing any size or the food capacity.
+        /// </summary>
+        public bool SideBarrelPickup { get; set; }
+        public bool BarrelsFromTheSide { get { return NarrowGrills || NarrowTables || SideBarrelPickup; } }
+        /// <summary>The barrel stack is left of the tables and its side pickup is on the barrel's left (Los Redondos).</summary>
+        public bool BarrelsBeforeTables { get; private set; }
+        /// <summary>Top edge of the span the kitchen is fitted with (narrow layout only; 0 = use the pieces).</summary>
+        public float KitchenSpanTop { get; private set; }
         public Rect NormalGrillBounds { get { return normalGrill; } }
         public Rect PremiumGrillBounds { get { return premiumGrill; } }
         public Rect NormalTableBounds { get { return normalTable; } }
@@ -94,9 +107,21 @@ namespace HayChoriYPaty
 
         public StreetKitchenLayout(int[] availableProducts) : this(availableProducts, false) { }
 
-        public StreetKitchenLayout(int[] availableProducts, bool activeCooks)
+        public StreetKitchenLayout(int[] availableProducts, bool activeCooks) : this(availableProducts, activeCooks, false) { }
+
+        /// <summary>When <paramref name="narrowGrills"/> is true the grills hold two columns less of food: 2 instead of 3 per product on a shared grill, 4 instead of 6 for a solo Bondiola row.</summary>
+        public StreetKitchenLayout(int[] availableProducts, bool activeCooks, bool narrowGrills) : this(availableProducts, activeCooks, narrowGrills, false) { }
+
+        /// <summary>
+        /// <paramref name="barrelsBeforeTables"/> (Los Redondos, 2026-11-25): the barrel stack stands to the LEFT of the tables instead of the right and is
+        /// served from its left side, so the table row can sit against the right margin of the pocket and the free lane stays on the other side.
+        /// </summary>
+        public StreetKitchenLayout(int[] availableProducts, bool activeCooks, bool narrowGrills, bool barrelsBeforeTables)
         {
             this.activeCooks = activeCooks;
+            BarrelsBeforeTables = barrelsBeforeTables;
+            NarrowGrills = narrowGrills;
+            NarrowTables = narrowGrills;
             bool[] available = new bool[7];
             if (availableProducts != null)
                 for (int i = 0; i < availableProducts.Length; i++)
@@ -109,11 +134,87 @@ namespace HayChoriYPaty
             hasBeer = available[6];
             Rect normal, premium, fernet, coca, beer;
             PackUpperRow(out normal, out premium, out fernet, out coca, out beer);
+            // La Renga: the sandwich tables are three quarters as wide (one column of sandwiches per product instead of two). They keep
+            // Ferro's separation (26.4), the barrels sit NarrowTableBarrelGap from the right table and next to each other
+            // with Ferro's own separation, as in the original row.
+            if (NarrowTables && hasNormal && hasPremium)
+            {
+                float tableGap = premium.xMin - normal.xMax;
+                float barrelGap = hasCoca && hasBeer ? beer.xMin - coca.xMax : tableGap;
+                normal.width *= NarrowTableWidthFraction;
+                premium.width *= NarrowTableWidthFraction;
+                premium.x = normal.xMax + tableGap;
+                // The Fernet table is narrowed like the sandwich tables: with it the row (and the barrels' side pickup lane) would not fit the pocket.
+                if (hasFernet) { fernet.width *= NarrowTableWidthFraction; fernet.x = premium.xMax + tableGap; }
+                if (BarrelsBeforeTables && hasCoca)
+                {
+                    // The barrels take the left end of the row (where the normal table started) and the tables slide right by the barrels' width.
+                    float rowStart = normal.xMin, shift = coca.width * NarrowBarrelScale + FernetBarrelGap;
+                    normal.x += shift; premium.x += shift; if (hasFernet) fernet.x += shift;
+                    coca.x = rowStart;
+                }
+                else if (hasCoca) coca.x = hasFernet ? fernet.xMax + FernetBarrelGap : premium.xMax + NarrowTableBarrelGap;
+                // The barrels are 15% smaller, standing on the same base line as before.
+                float spanTop = Mathf.Min(hasCoca ? coca.yMin : float.MaxValue, hasBeer ? beer.yMin : float.MaxValue);
+                if (hasCoca) coca = ShrinkBarrel(coca);
+                if (hasBeer) beer = ShrinkBarrel(beer);
+                if (hasCoca && hasBeer)
+                {
+                    // The beer barrel stands on top of the Coca barrel and both are served from the right. The kitchen keeps the
+                    // vertical span it had with a single row of barrels, so nothing else moves.
+                    KitchenSpanTop = spanTop;
+                    beer.x = coca.x;
+                    beer.y = coca.yMin - beer.height - NarrowBarrelStackGap;
+                }
+            }
             normalTable = normal; premiumTable = premium; fernetTable = fernet; cocaBarrel = coca; beerBarrel = beer;
             Rect normalG, premiumG;
             PackGrills(out normalG, out premiumG);
+            if (narrowGrills)
+            {
+                normalG = ShrinkToFitFood(normalG); premiumG = ShrinkToFitFood(premiumG);
+                // The grills are aligned to the left edge of the sandwich tables and sit 3 layout px apart.
+                if (hasNormal) normalG.x = normalTable.xMin;
+                if (hasNormal && hasPremium)
+                    premiumG.x = normalG.xMax + NarrowGrillGap;
+            }
             normalGrill = normalG; premiumGrill = premiumG;
+            if (BarrelsBeforeTables && hasNormal && hasPremium)
+            {
+                // The row of tables (with the barrels in front of it) ends where the grills end, so both stand against the same right margin.
+                float tablesRight = Mathf.Max(normalTable.xMax, Mathf.Max(premiumTable.xMax, hasFernet ? fernetTable.xMax : float.NegativeInfinity));
+                float slide = Mathf.Max(0f, premiumGrill.xMax - tablesRight);
+                if (slide > 0f)
+                {
+                    normalTable = SlideRight(normalTable, slide); premiumTable = SlideRight(premiumTable, slide);
+                    if (hasFernet) fernetTable = SlideRight(fernetTable, slide);
+                    if (hasCoca) cocaBarrel = SlideRight(cocaBarrel, slide);
+                    if (hasBeer) beerBarrel = SlideRight(beerBarrel, slide);
+                }
+            }
             BuildRouteGeometry(available);
+        }
+
+        /// <summary>
+        /// Narrow grills (two columns less of food) shrink the grill itself so its food fills it: the surface half then holds two
+        /// 36.4 px sausage columns edge to edge. Same centre and same top edge, so the cook strip under the tables is unchanged.
+        /// </summary>
+        public const float NarrowGrillScale = .73f, NarrowBarrelScale = .85f;
+        private static Rect SlideRight(Rect rect, float distance) { rect.x += distance; return rect; }
+        private static Rect ShrinkBarrel(Rect barrel)
+        {
+            float width = barrel.width * NarrowBarrelScale, height = barrel.height * NarrowBarrelScale;
+            return new Rect(barrel.x, barrel.yMax - height, width, height);
+        }
+        public const float NarrowGrillGap = 3f;
+        /// <summary>Los Redondos (with a Fernet table): the barrels stand almost against it (3 px), 2026-11-25.</summary>
+        public const float FernetBarrelGap = 3f;
+        public const float NarrowTableBarrelGap = 23.4f, NarrowTableWidthFraction = .75f, NarrowBarrelStackGap = 1f, NarrowBarrelSideStandoff = 24f;
+        private static Rect ShrinkToFitFood(Rect grill)
+        {
+            if (grill.width <= 0f) return grill;
+            float width = grill.width * NarrowGrillScale, height = grill.height * NarrowGrillScale;
+            return new Rect(grill.center.x - width * .5f, grill.y, width, height);
         }
 
         private void PackUpperRow(out Rect normal, out Rect premium, out Rect fernet, out Rect coca, out Rect beer)
@@ -218,9 +319,21 @@ namespace HayChoriYPaty
         {
             Rect barrel = product == 4 ? cocaBarrel : product == 6 ? beerBarrel : Rect.zero;
             if (barrel.width <= 0f) return Vector2.zero;
+            if (BarrelsFromTheSide) return NarrowBarrelSidePickup(barrel, 0, 1);
             float safeX = Mathf.Clamp(barrel.center.x, StreetWorkstationLayout.WorkerHalfWidth,
                 StreetSceneLayout.Width - StreetWorkstationLayout.WorkerHalfWidth);
             return new Vector2(safeX, barrel.yMin - (BarrelY - BarrelPickupY));
+        }
+
+        /// <summary>
+        /// La Renga's barrels are taken from the right: the worker stands beside the barrel with the feet near its base;
+        /// several workers spread upward along the barrel's right edge.
+        /// </summary>
+        private Vector2 NarrowBarrelSidePickup(Rect barrel, int index, int count)
+        {
+            float step = count > 1 ? Mathf.Min(24f, Mathf.Max(0f, barrel.height - 30f) / (count - 1)) : 0f;
+            float x = BarrelsBeforeTables ? barrel.xMin - NarrowBarrelSideStandoff : barrel.xMax + NarrowBarrelSideStandoff;
+            return new Vector2(x, barrel.yMax - 4f - index * step);
         }
 
         /// <summary>One of a few front-side access points for concurrent workers at the same station.</summary>
@@ -230,6 +343,7 @@ namespace HayChoriYPaty
             if (barrel.width <= 0f) return Vector2.zero;
             int count = Mathf.Clamp(accessCount, 1, 3);
             int index = Mathf.Clamp(accessIndex, 0, count - 1);
+            if (BarrelsFromTheSide) return NarrowBarrelSidePickup(barrel, index, count);
             float inset = Mathf.Min(15f, barrel.width * .2f);
             float left = Mathf.Clamp(barrel.xMin + inset, StreetWorkstationLayout.WorkerHalfWidth,
                 StreetSceneLayout.Width - StreetWorkstationLayout.WorkerHalfWidth);
@@ -254,6 +368,13 @@ namespace HayChoriYPaty
         {
             if (product == 4 || product == 6) return BarrelPickupPosition(product);
             Rect r = BoundsForProduct(product);
+            if (NarrowGrills && product >= 0 && product < 4 && r.width > 0f)
+            {
+                // Narrow tables are solid: the pickup point is on the strip between the table and its grill.
+                Rect grill = GrillBoundsForProduct(product);
+                float stripX = Mathf.Clamp(r.center.x, StreetWorkstationLayout.WorkerHalfWidth, StreetSceneLayout.Width - StreetWorkstationLayout.WorkerHalfWidth);
+                if (grill.width > 0f) return new Vector2(stripX, GrillWorkY(grill));
+            }
             float y = product < 4 || product == 5 ? LayoutTableY + 36f : LayoutBarrelY - BarrelPickupClearance;
             float safeX = Mathf.Clamp(r.center.x, StreetWorkstationLayout.WorkerHalfWidth, StreetSceneLayout.Width - StreetWorkstationLayout.WorkerHalfWidth);
             return new Vector2(safeX, y);
@@ -277,6 +398,10 @@ namespace HayChoriYPaty
             return new Vector2(x, standard.y);
         }
 
+        // Narrow tables hold one column of sandwiches per product instead of two (half the base slots per product).
+        private int TableBaseCount(bool companionAvailable) => NarrowTables ? (companionAvailable ? 3 : 6) : (companionAvailable ? 6 : 12);
+        private int TableColumnCount(bool companionAvailable) => NarrowTables ? (companionAvailable ? 1 : 2) : (companionAvailable ? 2 : 4);
+
         /// <summary>Front-side pickup point aligned to the exact reserved sandwich slot.</summary>
         public Vector2 TableSlotPickupPosition(int product, int slot, bool companionAvailable, int capacity)
         {
@@ -285,7 +410,7 @@ namespace HayChoriYPaty
             if (product < 0 || product > 3 || table.width <= 0f) return standard;
             Vector2 firstItem = TableSlotPosition(product, 0, companionAvailable, capacity);
             Vector2 item = TableSlotPosition(product, slot, companionAvailable, capacity);
-            int basePositionCount = companionAvailable ? 6 : 12;
+            int basePositionCount = TableBaseCount(companionAvailable);
             int baseSlot = Mathf.Clamp(slot, 0, Mathf.Max(0, capacity - 1)) % basePositionCount;
             Vector2 baseItem = TableSlotPosition(product, baseSlot, companionAvailable, capacity);
             int lastBaseSlot = Mathf.Min(basePositionCount - 1, Mathf.Max(0, capacity - 1));
@@ -313,6 +438,9 @@ namespace HayChoriYPaty
             float left = Mathf.Clamp(grill.xMin + visibleHalfWidth, 54f, StreetSceneLayout.Width - 54f);
             float right = Mathf.Clamp(grill.xMax - visibleHalfWidth, 54f, StreetSceneLayout.Width - 54f);
             float x = count == 1 ? grill.center.x : Mathf.Lerp(left, right, safeIndex / (float)(count - 1));
+            // La Renga: the Premium grill lies under the barrels, which its cooks must not stand beneath: their post is at the grill's left end.
+            // Los Redondos (barrels before the tables, 2026-11-26): nothing stands over its premium grill, so its cook works at the middle of it.
+            if (NarrowGrills && product >= 2 && !BarrelsBeforeTables) x = grill.xMin + 14f + safeIndex * 6f;
             float y = GrillWorkY(grill);
             return new Vector2(x, y);
         }
@@ -584,8 +712,8 @@ namespace HayChoriYPaty
 
             Rect visual = FoodTableVisualBounds(r);
             Vector2 footprint = TableServingFootprint(product);
-            int baseCount = companionAvailable ? 6 : 12;
-            int columns = companionAvailable ? 2 : 4;
+            int baseCount = TableBaseCount(companionAvailable);
+            int columns = TableColumnCount(companionAvailable);
             int baseSlot = index % baseCount;
             int rowIndex = baseSlot / columns;
             int localColumn = baseSlot % columns;
@@ -597,16 +725,16 @@ namespace HayChoriYPaty
                 int firstProduct = product & ~1;
                 float firstWidth = TableServingFootprint(firstProduct).x;
                 float secondWidth = TableServingFootprint(firstProduct + 1).x;
-                float clusterWidth = 2f * (firstWidth + secondWidth) + 3f * CompactSandwichGap;
+                float clusterWidth = columns * (firstWidth + secondWidth) + (2f * columns - 1f) * CompactSandwichGap;
                 float start = visual.center.x - clusterWidth * .5f;
                 itemX = product == firstProduct
                     ? start + firstWidth * .5f + column * (firstWidth + CompactSandwichGap)
-                    : start + 2f * firstWidth + 2f * CompactSandwichGap + secondWidth * .5f
+                    : start + columns * firstWidth + columns * CompactSandwichGap + secondWidth * .5f
                         + column * (secondWidth + CompactSandwichGap);
             }
             else
             {
-                float clusterWidth = 4f * footprint.x + 3f * CompactSandwichGap;
+                float clusterWidth = columns * footprint.x + (columns - 1f) * CompactSandwichGap;
                 itemX = visual.center.x - clusterWidth * .5f + footprint.x * .5f
                     + column * (footprint.x + CompactSandwichGap);
             }
@@ -630,10 +758,13 @@ namespace HayChoriYPaty
         }
 
         /// <summary>Small repeatable in-plane rotation for the loose upper sandwiches on a table.</summary>
-        public static float TableSlotRotation(int product, int slot, bool companionAvailable)
+        public static float TableSlotRotation(int product, int slot, bool companionAvailable) =>
+            TableSlotRotation(product, slot, companionAvailable, false);
+
+        public static float TableSlotRotation(int product, int slot, bool companionAvailable, bool narrowTables)
         {
             if (product < 0 || product > 3) return 0f;
-            int baseCount = companionAvailable ? 6 : 12;
+            int baseCount = narrowTables ? (companionAvailable ? 3 : 6) : (companionAvailable ? 6 : 12);
             int baseSlot = Mathf.Max(0, slot) % baseCount;
             int stackLayer = Mathf.Max(0, slot) / baseCount;
             float amount = stackLayer == 0 ? 5f : 16f;
@@ -704,13 +835,80 @@ namespace HayChoriYPaty
         public Vector2 GrillSlotPosition(int product, int slot) => GrillSlotPosition(product, slot, true, product < 2 ? 12 : 4);
 
         /// <summary>Visual meat footprint adapted to the actual surface of the scaled grill.</summary>
+
+        // 2026-11-25 (a pedido): on the narrow grills (La Renga, Los Redondos) the cuts form one filled, symmetric grid: every column the same width,
+        // every row evenly spread over the grate, and nothing past the grate's REAR edges (the narrowest ones), so no cut hangs over a side at any depth.
+        // Chori 2x4 and Paty 3x2 share the grill (left and right half); a lone Bondiola grill is 4x2. Rows overlap (perspective) so each cut is as big as its column allows.
+        // NarrowMeatGap is the seam between cuts; the grate bars run a little further front than GrillSurfaceBottom, so the filled grid uses all of them.
+        private const float NarrowMeatGap = 1f, NarrowGridSurfaceBottom = .50f;
+
+        // Chori|Paty and Bondiola|Vacío each split the grill in half; a lone Bondiola takes all of it. (A lone Chori/Vacío keeps the old layout.)
+        private bool UsesFilledNarrowGrid(int product, bool companionAvailable) =>
+            NarrowGrills && (product == 2 || (companionAvailable && product < 4));
+
+        // pitch = how much of a cut's height the next row advances (the rest overlaps it).
+        private static void NarrowGridShape(int product, bool companionAvailable, out int columns, out int rows, out float aspect, out float pitch)
+        {
+            pitch = .5f;
+            switch (product)
+            {
+                case 0: columns = 2; rows = 4; aspect = 36.4f / 14f; pitch = .28f; break;
+                case 1: columns = 3; rows = 2; aspect = 1.2f; break; // the patty art is round: its box is nearly square
+                case 2: columns = companionAvailable ? 2 : 4; rows = 2; aspect = 2.1f; break;
+                default: columns = 2; rows = 2; aspect = 2001f / 786f; break; // Vacío art box (the old 3.4 left it two thirds of its cell)
+            }
+        }
+
+        private void NarrowGridZone(int product, bool companionAvailable, out float left, out float right, out float top, out float bottom)
+        {
+            Rect r = GrillBoundsForProduct(product);
+            left = r.x + r.width * Mathf.Max(LeftEdgeAt(0f), LeftEdgeAt(1f));
+            right = r.x + r.width * Mathf.Min(RightEdgeAt(0f), RightEdgeAt(1f));
+            float middle = (left + right) * .5f;
+            if (companionAvailable && (product == 0 || product == 2)) right = middle - NarrowMeatGap * .5f;
+            else if (companionAvailable && (product == 1 || product == 3)) left = middle + NarrowMeatGap * .5f;
+            top = r.y + r.height * GrillSurfaceTop;
+            bottom = r.y + r.height * NarrowGridSurfaceBottom;
+        }
+
+        private Vector2 NarrowGridMeatSize(int product, bool companionAvailable)
+        {
+            NarrowGridShape(product, companionAvailable, out int columns, out int rows, out float aspect, out float pitch);
+            NarrowGridZone(product, companionAvailable, out float left, out float right, out float top, out float bottom);
+            float cellWidth = (right - left) / columns;
+            float tallest = (bottom - top) / (1f + (rows - 1) * pitch);
+            float height = Mathf.Max(1f, Mathf.Min(tallest, (cellWidth - NarrowMeatGap) / aspect));
+            return new Vector2(height * aspect, height);
+        }
+
+        private Vector2 NarrowGridSlotPosition(int product, int slot, bool companionAvailable)
+        {
+            NarrowGridShape(product, companionAvailable, out int columns, out int rows, out _, out _);
+            NarrowGridZone(product, companionAvailable, out float left, out float right, out float top, out float bottom);
+            Vector2 size = NarrowGridMeatSize(product, companionAvailable);
+            int index = Mathf.Max(0, slot);
+            int column = index % columns, row = (index / columns) % rows;
+            float x = left + (right - left) / columns * (column + .5f);
+            float y = rows <= 1 ? (top + bottom) * .5f : Mathf.Lerp(top + size.y * .5f, bottom - size.y * .5f, row / (float)(rows - 1));
+            return new Vector2(x, y);
+        }
+
         public Vector2 GrillMeatSize(int product, bool companionAvailable)
         {
+            if (UsesFilledNarrowGrid(product, companionAvailable)) return NarrowGridMeatSize(product, companionAvailable);
             Rect grill = GrillBoundsForProduct(product);
             if (product == 0 && !companionAvailable)
             {
                 float width = Mathf.Min(62f, Mathf.Max(36.4f, grill.width * .12f));
                 return new Vector2(width, width * 14f / 36.4f);
+            }
+            if (product == 2 && NarrowGrills && !companionAvailable)
+            {
+                // One row of four Bondiolas that fills the shrunken grate edge to edge (the surface is ~73% of the grill width).
+                float surfaceHeight = grill.height * (GrillSurfaceBottom - GrillSurfaceTop);
+                float width = grill.width * .73f / 4f - 1f;
+                float height = Mathf.Min(width / 2.1f, surfaceHeight - 1.2f);
+                return new Vector2(height * 2.1f, height);
             }
             if (product == 2)
             {
@@ -735,19 +933,20 @@ namespace HayChoriYPaty
 
         public Vector2 GrillSlotPosition(int product, int slot, bool companionAvailable, int capacity)
         {
+            if (UsesFilledNarrowGrid(product, companionAvailable)) return NarrowGridSlotPosition(product, slot, companionAvailable);
             Rect r = GrillBoundsForProduct(product);
             int index = Mathf.Max(0, slot);
             Vector2 meatSize = GrillMeatSize(product, companionAvailable);
             int columns, rows, col, row;
             if (product == 2)
             {
-                columns = companionAvailable ? 3 : 6;
+                columns = companionAvailable ? (NarrowGrills ? 2 : 3) : (NarrowGrills ? 4 : 6);
                 rows = companionAvailable ? 2 : 1;
                 col = index % columns; row = index / columns;
             }
             else if (companionAvailable && product < 2)
             {
-                columns = 3;
+                columns = NarrowGrills ? 2 : 3;
                 rows = product == 0 ? 4 : 2;
                 col = index % columns; row = (index / columns) % rows;
             }

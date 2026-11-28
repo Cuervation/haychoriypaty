@@ -2,6 +2,14 @@
 
 > Original four-role gait contract below; [Racing+ Mozo](#racing-mozo--2026-10-15) extends it to the fifth role. Keep open visual acceptance items open until actual evidence closes them; no new worker/animation QA in the documentation audit.
 
+## Mirada al mostrador durante la espera — 2026-11-28
+
+En los once niveles normales, cada trabajador libre que llegó a su puesto de espera mira al mostrador de clientes (espalda a cámara) desde la misma posición. Los cocineros sin estación también lo hacen al quedar quietos en el punto vigente de su cola de parrilla. La orientación se mantiene durante el pregón y después de que desaparece. Antes de llegar sigue mirando en la dirección del trayecto; cocinar en la parrilla, recoger, transportar y entregar conservan sus poses. Si el Mozo está enojado por un sándwich faltante, prevalece [la mirada a su mesa](active-cooks-mozos.md#señal-de-espera-del-mozo--actualizada-2026-11-27).
+
+Es un cambio de presentación: no modifica posiciones, rutas, reservas, frases ni el ritmo de los pregones. No aplica a Tower Defense. Reemplaza la conservación de la última dirección de marcha únicamente en ese reposo.
+
+**Validación:** EditMode **PASS 22/22** (orientación y pregones de los once niveles normales); PlayMode **PASS 4/4** (cola de parrilleros, prioridad visual del Mozo, pregones en Floresta/Boca y regresión TD en Los Redondos/Luján). Capturas Game View revisadas de Floresta y Boca a 610×1356 en `Logs/Acceptance/QA-LaRenga-Depth/frames/campaign-pregon-{floresta,boca}.jpg`. APK y dispositivo **NOT_RUN**.
+
 ## Approved scope
 Improve all four existing roles across catalog levels and arbitrary hired workers. Keep 90×98 worker frame, cartoon identity, route/timing/economy and physical-item lifecycle unchanged. Existing 16 Parrillero poses +8 diagonal poses and16 poses in each Coca atlas are retained. Palette variants remain cached Premium blue/Fernet black.
 
@@ -107,3 +115,11 @@ The user still saw the Cocacolero accelerate near Coca/beer after the prior ease
 ### 2026-10-28 — Center a lone Cocacolero on its barrel
 
 A single Cocacolero no longer takes lane 0 of a fixed three-point spread. Coca/beer access lanes are counted only among active Cocacoleros assigned to that same product (up to the existing three-lane maximum), so a lone worker at either barrel selects its centered safe anchor; the access-count-one layout overload clamps that center to the worker-safe canvas range, keeping beer's reach inside the right edge. Concurrent workers assigned to one barrel retain distinct left/right access points. Focused PlayMode regressions passed in an isolated Unity 6000.6.3f1 copy: CocacoleroPickupIsFrontalAndGroundedAtBothBarrels (Racing LevelIndex 5; captures for IDs 4/6) and CocacoleroBarrelAccessLanesMatchTheActualHiredWorkerCount (different-product center anchors and concurrent same-barrel lane spacing). Fresh 1080×1920 kitchen projections were visually reviewed. These are station-only projections, not full Game View/device or live-route proof; user acceptance remains open.
+
+## Cocacolero partido por la cintura en el retiro de costado (2026-11-25, a pedido) — **CORREGIDO**
+
+**Qué se veía:** en La Renga, mientras el Cocacolero toma una bebida del barril de costado (`barrelPickup`), el torso quedaba separado de las piernas por una línea clara horizontal a la altura de la cintura (se cortaba el delantal rojo y se veía el fondo). Estaba en casi todos los cuadros del retiro, fina al empezar y al terminar y con el máximo a mitad.
+
+**Causa:** `StreetWorkerProjection.TrySampleBody` corta el cuerpo en torso y piernas por la cintura. El retiro de costado usa la pose lateral de carga sobre las piernas de caminar, cuyo arte no tiene exactamente la misma altura, y además el "alcance" de ese retiro (`-0,08 · Height`) subía el torso a propósito: los dos recortes se separaban.
+
+**Corrección:** solo con `barrelPickup`, el torso nunca queda más alto que el borde superior de las piernas menos el solape de cintura diseñado (`Mathf.Min(upperBottom, legHeight·legScale − WaistOverlap·altura·escala)`). El resto de las poses (caminar, carga, retiro frontal de la campaña) no cambia. Verificado con los 24 cuadros del retiro de La Renga (`Logs/Acceptance/CocacoleroCrouch-20261125/LaRengaCocacoleroCrouchFrames`, antes/después): la línea desaparece también a mitad del retiro. EditMode 417/417 (`StreetArt`, `StreetKitchenPresentation`, `StreetActiveCooks`, La Renga) y PlayMode `StreetWorkerProjectionTests` 7 PASS (4 ignoradas de antes). **Pendiente:** la pose no se ve en Los Redondos ni en Luján (no hay pausa de retiro) y Camioneros comparte la rama pero no se capturó; no se vio en el celu. Queda un pequeño escalón de silueta (el torso es más ancho que las piernas) que es del arte, no una separación.
