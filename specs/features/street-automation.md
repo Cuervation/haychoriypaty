@@ -180,6 +180,14 @@ Quota-aware demand retains random 1–4 quantities and mixed tickets (up to five
 **Historical late-level feasibility check (2026-10-12, before active cooks/Mozos):** The full `StreetSimulation` and adaptive-purchase policy were swept across seeds 1337, 407, and 2026. The attempt balances above plus 5:15 for Level 11 completed every level-6–11 run while leaving quotas, sales prices, production and upgrade prices intact. This does not certify current active-cook or restored-layout balance; levels9–11 remain open in the active-cook contract.
 
 
+### Pregones de los trabajadores en toda la campaña — 2026-11-28
+
+Los once niveles tradicionales también muestran los globos visuales de los cuatro [Tower Defense](tower-defense.md#diálogos-y-mirada-de-espera-del-equipo-en-los-cuatro-tower-defense--2026-11-27), sin voz, con el mismo arte y una duración de **1 s** de reloj de la partida. El trabajador anuncia al quedarse quieto en su puesto de espera después de llevar un producto; no al aparecer, al ser contratado ni mientras trabaja o sigue volviendo. No se repite en la misma espera. La señal de enojo del Mozo tiene prioridad visual.
+
+En la campaña tradicional el pregón nombra solo productos del menú. Chori y Paty los anuncia **el Mozo** si hay cocina activa y **el Parrillero** si atiende directamente (p. ej. solo «¡Hay chori!» en Floresta). El Premium, Cocacolero y Fernetero conservan sus familias de frases: Bondio/Vacío, coca/birra y Fernet. No cambian las frases ya existentes en TD, sus puestos, la orientación, el audio de venta ni reglas de simulación.
+
+**Validación:** runtime y fixtures compilados con Roslyn de Unity; **PASS 11/11** fuera del Editor para catálogo, emisor, ausencia de globo al aparecer/volver en marcha y vencimiento de 1 s. PlayMode y Game View de Floresta/Boca quedan pendientes de ejecutar en el Editor.
+
 ### Audio de entrega de campaña — actualizado 2026-11-27
 
 Los 15 niveles, incluidos los cuatro Tower Defense, reutilizan el audio antes exclusivo de San Lorenzo: un pop suave por **cada unidad entregada** (20 % de volumen) y una burbuja ascendente adicional **una vez por pedido**, cuando se entrega la última unidad (25 %). Ambos clips siguen siendo 2D con ±3 % de variación de tono; no hay disparos por cocinar, recoger, abandonar un pedido o fallar una entrega. Los niveles normales usan `ProductUnitDelivered` y `OrderCompleted`; Tower Defense usa el recibo `DeliveryCompleted` de la entrega física, que indica si esa unidad completó el pedido. No cambian la música ni los sonidos de interfaz, la economía o la progresión.

@@ -544,6 +544,111 @@ namespace HayChoriYPaty.Tests
             }
         }
 
+        [UnityTest, Timeout(120000)]
+        public IEnumerator CampaignCrewChantsFollowFlorestaParrilleroAndBocaMozo()
+        {
+            yield return SetSize(610, 1356);
+            foreach (int level in new[] { 0, 8 })
+            {
+                Assert.IsTrue((bool)Call(game, "SelectLevel", level));
+                Set(view, "levelSelectActive", false);
+                object sim = Sim;
+                Call(sim, "StartRound");
+                var workers = ((IEnumerable)Get(sim, "Workers")).Cast<object>().ToArray();
+                string expectedRole = level == 8 ? "Mozo" : "Parrillero";
+                object speaker = workers.First(w => Get(w, "Role").ToString() == expectedRole);
+                object cook = workers.First(w => Get(w, "Role").ToString() == "Parrillero");
+                var starts = (IDictionary)Get(view, "campaignCrewChantStart");
+                var armed = (IEnumerable)Get(view, "campaignCrewChantWorked");
+                Type state = RuntimeType("StreetWorkerState");
+                void SetWorker(object worker, string property, object value) => worker.GetType().GetProperty(property, I).SetValue(worker, value);
+                void SetState(object worker, string value) => SetWorker(worker, "State", Enum.Parse(state, value));
+                void StartCarry(object worker, string pose)
+                {
+                    SetState(worker, pose);
+                    SetWorker(worker, "CarriedItemId", 1);
+                }
+
+                yield return new WaitForEndOfFrame();
+                Assert.AreSame(sim, Get(view, "campaignCrewChantSimulation"));
+                Assert.IsEmpty(starts, "Opening staff does not call out just for appearing.");
+
+                if (level == 8) StartCarry(cook, "ToTable");
+                StartCarry(speaker, "ToCounter");
+                yield return new WaitForEndOfFrame();
+                Assert.IsEmpty(starts, "Do not announce while carrying.");
+                CollectionAssert.Contains(armed, Get(speaker, "Id"));
+                if (level == 8) CollectionAssert.DoesNotContain(armed, Get(cook, "Id"));
+
+                Vector2 post = (Vector2)Get(speaker, "WaitPosition");
+                SetState(speaker, "Idle");
+                SetWorker(speaker, "CarriedItemId", 0);
+                SetWorker(speaker, "Position", post + Vector2.up * 24f);
+                Set(speaker, "ReturningToWaitPosition", true);
+                yield return new WaitForEndOfFrame();
+                Assert.IsEmpty(starts, "The bubble must wait until the worker actually gets home.");
+
+                SetWorker(speaker, "Position", post);
+                Set(speaker, "ReturningToWaitPosition", false);
+                Set(sim, "<Elapsed>k__BackingField", 12f);
+                yield return new WaitForEndOfFrame();
+                CollectionAssert.AreEquivalent(new[] { Get(speaker, "Id") }, starts.Keys);
+                Assert.AreEqual(12f, starts[Get(speaker, "Id")]);
+                yield return Capture($"campaign-pregon-{(level == 8 ? "boca" : "floresta")}");
+
+                Set(sim, "<Elapsed>k__BackingField", 13.1f);
+                yield return new WaitForEndOfFrame();
+                Assert.IsEmpty(starts, "One second later the worker stays quiet until another trip.");
+                Assert.IsTrue((bool)Call(game, "ReturnToLevels"));
+            }
+        }
+
+        [UnityTest, Timeout(120000)]
+        public IEnumerator LosRedondosBothRegularCooksReturnToGrillAfterSecondHire()
+        {
+            yield return SetSize(610, 1356);
+            EnterFromSelector(10);
+            object mode = Get(view, "towerDefenseMode");
+            Assert.IsNotNull(mode, Get(view, "towerDefenseError")?.ToString());
+            Set(mode, "coins", 100000);
+            Assert.IsTrue((bool)Call(game, "TryHireTowerDefenseAtPost", mode, Role(1)));
+
+            var workers = (IEnumerable)Get(mode, "Workers");
+            object first = workers.Cast<object>().Single(w => Get(w, "Role").ToString() == "Parrillero");
+            // Hire while the first cook is at the table, not while already on the narrow grill strip.
+            for (int tick = 0; tick < 240 && (float)Get(first, "CookHandoffSeconds") <= 0f; tick++)
+                Call(mode, "Step", .05f);
+            Assert.Greater((float)Get(first, "CookHandoffSeconds"), 0f, "The first cook reached the table.");
+            Vector2 oldPost = (Vector2)Get(first, "PostPosition");
+            Assert.IsTrue((bool)Call(game, "TryHireTowerDefenseAtPost", mode, Role(0)));
+            object second = workers.Cast<object>().Single(w => w != first && Get(w, "Role").ToString() == "Parrillero");
+            Assert.AreNotEqual(oldPost, (Vector2)Get(first, "PostPosition"), "Hiring moves the first cook's assigned grill slot.");
+
+            var cooks = new[] { first, second };
+            var previousIds = new int[2];
+            var deposits = new int[2];
+            var cookedAtPost = new bool[2];
+            for (int tick = 0; tick < 320 && (Math.Min(deposits[0], deposits[1]) < 2 || !cookedAtPost.All(v => v)); tick++)
+            {
+                Call(mode, "Step", .05f);
+                for (int i = 0; i < cooks.Length; i++)
+                {
+                    object worker = cooks[i];
+                    int unitId = (int)Get(worker, "CookUnitId");
+                    if (previousIds[i] > 0 && unitId == 0) deposits[i]++;
+                    previousIds[i] = unitId;
+                    cookedAtPost[i] |= (bool)Get(worker, "IsCooking") &&
+                        Vector2.Distance((Vector2)Get(worker, "Position"), (Vector2)Get(worker, "PostPosition")) < .001f;
+                }
+                if (tick % 80 == 0) yield return null;
+            }
+            Assert.IsTrue(cookedAtPost[0], $"The first cook must return to the new grill slot. Position {Get(first, "Position")}, slot {Get(first, "PostPosition")}.");
+            Assert.IsTrue(cookedAtPost[1], "The second cook must use its own grill slot.");
+            Assert.GreaterOrEqual(Math.Min(deposits[0], deposits[1]), 2, $"Each cook must deliver at least twice ({deposits[0]} and {deposits[1]}).");
+            yield return Capture("redondos-dos-parrilleros-610x1356");
+            Return(mode);
+        }
+
         // 2026-11-26 (user report on Los Redondos): with the user's crew a Parrillero stood forever by the barrels holding a cooked sandwich
         // (its handoff point had no walkable way) and the Mozos stood idle while fans asking for choris on the table walked past (one fan
         // ahead waiting for an uncooked sandwich held the whole role). Neither may last more than a moment now.
@@ -793,6 +898,7 @@ namespace HayChoriYPaty.Tests
                 EnterFromSelector(level);
                 Assert.IsTrue((bool)Get(view, "towerDefenseActive"), Get(view, "towerDefenseError")?.ToString());
                 object mode = Get(view, "towerDefenseMode");
+                Assert.IsTrue((bool)Get(Get(mode, "Kitchen"), "ActiveCooks"), $"Level {level} has active cooks.");
                 Assert.IsTrue((bool)Call(mode, "ContainsProduct", 3), "The dialogue should advertise Vacío in both levels.");
 
                 Set(mode, "coins", 100000);
@@ -806,6 +912,8 @@ namespace HayChoriYPaty.Tests
                     }
                 }
 
+                var parrillero = workers.Cast<object>().First(w => Get(w, "Role").ToString() == "Parrillero");
+                var mozo = workers.Cast<object>().First(w => Get(w, "Role").ToString() == "Mozo");
                 var premium = workers.Cast<object>().First(w => Get(w, "Role").ToString() == "ParrilleroPremium");
                 var fernetero = workers.Cast<object>().First(w => Get(w, "Role").ToString() == "Fernetero");
                 // Freeze time in the fixture. Place each worker at the actual assigned idle point
@@ -829,11 +937,21 @@ namespace HayChoriYPaty.Tests
                         Assert.AreSame(Get(workerView, "RearIdleFrame"), ((SpriteRenderer)Get(workerView, "Renderer")).sprite);
                 }
 
+                Set(parrillero, "CookUnitId", 1);
+                Set(mozo, "ServiceStage", 1);
                 Set(premium, "CookUnitId", 1);
                 Set(fernetero, "ServiceStage", 1);
                 yield return null;
                 yield return new WaitForEndOfFrame();
                 Assert.IsEmpty(starts, "A cook with assigned food and a worker serving stay silent.");
+
+                Set(parrillero, "CookUnitId", 0);
+                Set(mozo, "ServiceStage", 0);
+                yield return null;
+                yield return new WaitForEndOfFrame();
+                Assert.IsFalse(starts.Contains(Get(parrillero, "Id")), "The active cook does not call out Chori y Paty.");
+                Assert.IsTrue(starts.Contains(Get(mozo, "Id")), "The Mozo calls out Chori y Paty on returning to idle.");
+                yield return Capture($"crew-chant-level-{level}-mozo-chori-paty");
 
                 Set(premium, "CookUnitId", 0);
                 yield return null;

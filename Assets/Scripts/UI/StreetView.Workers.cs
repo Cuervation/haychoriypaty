@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace HayChoriYPaty
@@ -6,6 +7,118 @@ namespace HayChoriYPaty
     // Arte y poses de trabajadores. Extraído de StreetView.cs sin cambios de lógica.
     public sealed partial class StreetView
     {
+        // The bubble lasts one second and uses the match clock, so its fade also pauses.
+        private const float CrewChantSeconds = 1f, CrewChantFadeSeconds = .4f;
+        // The speech art's tail sits at the bottom right; its tip is this far in from the right edge (mirrored: from the left edge).
+        private const float CrewChantTailTipInsetLogical = 22f, CrewChantSidePaddingLogical = 12f, CrewChantLineHeightLogical = 15f, CrewChantBaseHeightLogical = 22f;
+        // Body of the speech art (Items[11], 225 px tall, drawn with 15 px top/bottom slices of 65 px): opaque from source y≈10 to y≈196,
+        // the tail below. In logical pixels the body starts 10/65×15 below the top and ends (225−196)/65×15 above the bottom.
+        private const float CrewChantBodyTopInsetLogical = 2.3f, CrewChantBodyBottomInsetLogical = 6.7f;
+        // Presentation only: ordinary attempts have their own clock and worker IDs, separate from Tower Defense.
+        private StreetSimulation campaignCrewChantSimulation;
+        private float campaignCrewChantLastTime;
+        private readonly HashSet<int> campaignCrewChantWorked = new HashSet<int>();
+        private readonly Dictionary<int, float> campaignCrewChantStart = new Dictionary<int, float>();
+        private GUIStyle crewChantStyle;
+
+        private static string CampaignCrewChantTextFor(StreetSimulation sim, StreetWorkerRole role)
+        {
+            switch (role)
+            {
+                case StreetWorkerRole.Parrillero when !sim.UsesActiveCooks:
+                case StreetWorkerRole.Mozo when sim.UsesActiveCooks:
+                    if (!sim.IsProductAvailable(0)) return sim.IsProductAvailable(1) ? "¡Hay Paty!" : null;
+                    return sim.IsProductAvailable(1) ? "¡Hay\nchori y Paty!" : "¡Hay chori!";
+                case StreetWorkerRole.ParrilleroPremium:
+                    if (!sim.IsProductAvailable(2)) return sim.IsProductAvailable(3) ? "¡Hay Vacío!" : null;
+                    return sim.IsProductAvailable(3) ? "¡Hay Bondio\ny Vacío!" : "¡Hay Bondio!";
+                case StreetWorkerRole.Cocacolero:
+                    if (!sim.IsProductAvailable(4)) return sim.IsProductAvailable(6) ? "¡Hay birra!" : null;
+                    return sim.IsProductAvailable(6) ? "¡Hay coca\ny birra!" : "¡Hay coca!";
+                case StreetWorkerRole.Fernetero:
+                    return sim.IsProductAvailable(5) ? "¡Hay Fernet!" : null;
+                default:
+                    return null;
+            }
+        }
+
+        private bool TryGetCampaignCrewChantAge(StreetWorker worker, float now, out float age)
+        {
+            age = 0f;
+            // A new hire, a cook walking to a grill, or a worker whose home position changes is not a completed trip.
+            if (worker.CarriedItemId > 0 && (worker.State == StreetWorkerState.ToCounter || worker.State == StreetWorkerState.Handoff ||
+                worker.State == StreetWorkerState.ToTable || worker.State == StreetWorkerState.Deposit))
+                campaignCrewChantWorked.Add(worker.Id);
+            bool atPost = worker.State == StreetWorkerState.Idle && !worker.ReturningToWaitPosition && !worker.VisualCooking &&
+                worker.CarriedItemId <= 0 && worker.CookingItemId <= 0 && (worker.Position - worker.WaitPosition).sqrMagnitude <= 1f;
+            if (!atPost)
+            {
+                campaignCrewChantStart.Remove(worker.Id);
+                return false;
+            }
+            if (campaignCrewChantWorked.Remove(worker.Id)) campaignCrewChantStart[worker.Id] = now;
+            if (!campaignCrewChantStart.TryGetValue(worker.Id, out float start)) return false;
+            age = now - start;
+            if (age >= 0f && age < CrewChantSeconds) return true;
+            campaignCrewChantStart.Remove(worker.Id);
+            return false;
+        }
+
+        private void DrawCampaignCrewChants(StreetSimulation sim)
+        {
+            float now = sim.Elapsed;
+            if (!ReferenceEquals(sim, campaignCrewChantSimulation) || now < campaignCrewChantLastTime || sim.Phase != RoundPhase.Playing)
+            {
+                campaignCrewChantSimulation = sim;
+                campaignCrewChantWorked.Clear();
+                campaignCrewChantStart.Clear();
+            }
+            campaignCrewChantLastTime = now;
+            if (sim.Phase != RoundPhase.Playing || items == null || text == null) return;
+
+            foreach (StreetWorker worker in sim.Workers)
+            {
+                string chant = CampaignCrewChantTextFor(sim, worker.Role);
+                if (chant == null || !TryGetCampaignCrewChantAge(worker, now, out float age) ||
+                    StreetWorkerProjection.IsObscuredIdleWorker(sim.Workers, worker, layoutVerticalScale, sim.UsesActiveCooks) ||
+                    StreetWorkerProjection.TryGetMozoWaitingSandwichTable(sim, worker, out _)) continue;
+                Vector2 foot = StreetWorkerProjection.PresentationPosition(sim, worker);
+                float height = StreetWorkerProjection.Height * StreetWorkerProjection.PresentationScale(sim, worker);
+                DrawCrewChantBubble(chant, foot.x, foot.y * layoutVerticalScale - height, age);
+            }
+        }
+
+        private void DrawCrewChantBubble(string chant, float headX, float headY, float age)
+        {
+            if (crewChantStyle == null) crewChantStyle = new GUIStyle(text) { alignment = TextAnchor.MiddleCenter, wordWrap = false };
+            crewChantStyle.fontSize = 11;
+            float alpha = age < CrewChantSeconds - CrewChantFadeSeconds ? 1f : (CrewChantSeconds - age) / CrewChantFadeSeconds;
+            Color previousColor = GUI.color;
+            // As narrow as its longest line allows (same font size): the bubble hugs the text on both sides.
+            string[] lines = chant.Split('\n');
+            float chantWidth = 0f;
+            foreach (string line in lines) chantWidth = Mathf.Max(chantWidth, crewChantStyle.CalcSize(new GUIContent(line)).x);
+            chantWidth = Mathf.Max(56f, Mathf.Ceil(chantWidth) + 2f * CrewChantSidePaddingLogical);
+            float chantHeight = CrewChantBaseHeightLogical + lines.Length * CrewChantLineHeightLogical;
+            float rise = (1f - alpha) * 6f; // it drifts up a little while it dissolves
+            // The tail must point at its worker: bubbles of workers in the left half mirror the art (tail on the left, bubble to the right).
+            bool tailLeft = headX < W * .5f;
+            float bubbleX = tailLeft ? headX - CrewChantTailTipInsetLogical : headX - (chantWidth - CrewChantTailTipInsetLogical);
+            var bubble = new Rect(Mathf.Clamp(bubbleX, 4f, W - chantWidth - 4f), headY - chantHeight - 3f - rise, chantWidth, chantHeight);
+            GUI.color = new Color(1f, 1f, 1f, alpha);
+            Matrix4x4 previousMatrix = GUI.matrix;
+            if (tailLeft)
+                GUI.matrix = previousMatrix * Matrix4x4.TRS(new Vector3(bubble.center.x, 0f, 0f), Quaternion.identity, new Vector3(-1f, 1f, 1f))
+                    * Matrix4x4.TRS(new Vector3(-bubble.center.x, 0f, 0f), Quaternion.identity, Vector3.one);
+            DrawOrderBubble(bubble, 1f);
+            GUI.matrix = previousMatrix;
+            // Centre the text on the bubble's body, not on the body plus tail (2026-11-26, a pedido: "¡Hay Bondio!" sat too high).
+            var label = new Rect(bubble.x, bubble.y + CrewChantBodyTopInsetLogical, bubble.width,
+                bubble.height - CrewChantBodyTopInsetLogical - CrewChantBodyBottomInsetLogical);
+            GUI.Label(label, chant, crewChantStyle);
+            GUI.color = previousColor;
+        }
+
         private static int SpecialistUpgradePortraitSourceLevel(int levelIndex)
         {
             // Keep Cocacolero/Fernetero upgrade-card portraits visually consistent across levels.

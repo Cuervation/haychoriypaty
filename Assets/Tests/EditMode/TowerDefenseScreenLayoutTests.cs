@@ -32,17 +32,20 @@ namespace HayChoriYPaty.Tests
             Assert.That(visual.z, Is.EqualTo(opacity).Within(.001f));
         }
 
-        [TestCase("Parrillero", false, "¡Hay\nchori y Paty!")]
-        [TestCase("ParrilleroPremium", false, "¡Hay Bondio!")]
-        [TestCase("ParrilleroPremium", true, "¡Hay Bondio\ny Vacío!")]
-        [TestCase("Cocacolero", true, "¡Hay coca\ny birra!")]
-        [TestCase("Fernetero", true, "¡Hay Fernet!")]
-        [TestCase("Mozo", true, null)]
-        public void CrewChantMatchesTheRoleAndVacioCatalog(string roleName, bool sellsVacio, string expected)
+        [TestCase("Parrillero", false, false, "¡Hay\nchori y Paty!")]
+        [TestCase("Parrillero", true, true, null)]
+        [TestCase("Mozo", true, true, "¡Hay\nchori y Paty!")]
+        [TestCase("Mozo", true, false, "¡Hay\nchori y Paty!")]
+        [TestCase("Mozo", false, true, null)]
+        [TestCase("ParrilleroPremium", false, false, "¡Hay Bondio!")]
+        [TestCase("ParrilleroPremium", true, true, "¡Hay Bondio\ny Vacío!")]
+        [TestCase("Cocacolero", true, true, "¡Hay coca\ny birra!")]
+        [TestCase("Fernetero", true, true, "¡Hay Fernet!")]
+        public void CrewChantMatchesTheRoleAndKitchen(string roleName, bool activeCooks, bool sellsVacio, string expected)
         {
             MethodInfo chant = RuntimeType("StreetView").GetMethod("CrewChantTextFor", BindingFlags.NonPublic | BindingFlags.Static);
             object role = Enum.Parse(RuntimeType("StreetWorkerRole"), roleName);
-            Assert.AreEqual(expected, chant.Invoke(null, new[] { role, (object)sellsVacio }));
+            Assert.AreEqual(expected, chant.Invoke(null, new[] { role, (object)activeCooks, sellsVacio }));
         }
 
         [Test]

@@ -33,6 +33,38 @@ namespace HayChoriYPaty.Tests
             if (coins > 0) Set(sim, "Coins", coins); // Synthetic fixture balance, not resumed save data.
             return sim;
         }
+        [TestCase(0, false)]
+        [TestCase(1, false)]
+        [TestCase(2, false)]
+        [TestCase(3, false)]
+        [TestCase(4, false)]
+        [TestCase(5, true)]
+        [TestCase(6, true)]
+        [TestCase(7, true)]
+        [TestCase(8, true)]
+        [TestCase(11, false)]
+        [TestCase(12, true)]
+        public void TraditionalLevelAdvertisesOnlyItsMenuThroughTheRightWorker(int level, bool activeCooks)
+        {
+            object sim = Make(level: level);
+            Type role = Type.GetType("HayChoriYPaty.StreetWorkerRole, Assembly-CSharp", true);
+            Type view = Type.GetType("HayChoriYPaty.StreetView, Assembly-CSharp", true);
+            MethodInfo select = view.GetMethod("CampaignCrewChantTextFor", BindingFlags.Static | BindingFlags.NonPublic);
+            string Line(string namedRole) => (string)select.Invoke(null, new[] { sim, Enum.Parse(role, namedRole) });
+            bool Sells(int product) => (bool)Call(sim, "IsProductAvailable", product);
+
+            Assert.AreEqual(activeCooks, Get(sim, "UsesActiveCooks"));
+            string sandwich = Line(activeCooks ? "Mozo" : "Parrillero");
+            StringAssert.Contains("chori", sandwich);
+            Assert.AreEqual(Sells(1), sandwich.Contains("Paty"));
+            Assert.IsNull(Line(activeCooks ? "Parrillero" : "Mozo"));
+            Assert.AreEqual(Sells(2), Line("ParrilleroPremium")?.Contains("Bondio") == true);
+            Assert.AreEqual(Sells(3), Line("ParrilleroPremium")?.Contains("Vacío") == true);
+            Assert.AreEqual(Sells(4), Line("Cocacolero")?.Contains("coca") == true);
+            Assert.AreEqual(Sells(6), Line("Cocacolero")?.Contains("birra") == true);
+            Assert.AreEqual(Sells(5), Line("Fernetero")?.Contains("Fernet") == true);
+        }
+
         private static int StartingCoinsForLevel(object balance, int level)
         {
             MethodInfo getter = balance.GetType().GetMethod("GetStartingCoins", new[] { typeof(int) });

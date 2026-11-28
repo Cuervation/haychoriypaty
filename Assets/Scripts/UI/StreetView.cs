@@ -1413,6 +1413,7 @@ namespace HayChoriYPaty
             if (kitchenRenderer.CarriedTexture != null)
                 GUI.DrawTexture(kitchenCanvas, kitchenRenderer.CarriedTexture, ScaleMode.StretchToFill, true);
             if (sim.UsesActiveCooks) DrawCookingProgress(sim);
+            DrawCampaignCrewChants(sim);
             float saleFeedbackTop = sim.Sales.Count > 0 ? SaleFeedbackTop(v) : 0f;
             for (int i = 0; i < sim.Sales.Count; i++)
             {

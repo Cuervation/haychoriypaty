@@ -793,23 +793,17 @@ namespace HayChoriYPaty
         }
 
         // A worker calls out once after coming back to its own waiting spot or work post, never just for being hired.
-        // The bubble lasts one second and uses the match clock, so its fade also pauses.
-        private const float CrewChantSeconds = 1f, CrewChantFadeSeconds = .4f;
-        // The speech art's tail sits at the bottom right; its tip is this far in from the right edge (mirrored: from the left edge).
-        private const float CrewChantTailTipInsetLogical = 22f, CrewChantSidePaddingLogical = 12f, CrewChantLineHeightLogical = 15f, CrewChantBaseHeightLogical = 22f;
-        // Body of the speech art (Items[11], 225 px tall, drawn with 15 px top/bottom slices of 65 px): opaque from source y≈10 to y≈196,
-        // the tail below. In logical pixels the body starts 10/65×15 below the top and ends (225−196)/65×15 above the bottom.
-        private const float CrewChantBodyTopInsetLogical = 2.3f, CrewChantBodyBottomInsetLogical = 6.7f;
         private readonly Dictionary<int, bool> crewWasSettled = new Dictionary<int, bool>();
         private readonly Dictionary<int, float> crewChantStart = new Dictionary<int, float>();
         private TowerDefenseGameMode crewChantMode;
-        private GUIStyle crewChantStyle;
 
-        private static string CrewChantTextFor(StreetWorkerRole role, bool sellsVacio)
+        private static string CrewChantTextFor(StreetWorkerRole role, bool activeCooks, bool sellsVacio)
         {
             switch (role)
             {
-                case StreetWorkerRole.Parrillero: return "¡Hay\nchori y Paty!";
+                case StreetWorkerRole.Parrillero when !activeCooks:
+                case StreetWorkerRole.Mozo when activeCooks:
+                    return "¡Hay\nchori y Paty!";
                 case StreetWorkerRole.ParrilleroPremium: return sellsVacio ? "¡Hay Bondio\ny Vacío!" : "¡Hay Bondio!";
                 case StreetWorkerRole.Cocacolero: return "¡Hay coca\ny birra!";
                 case StreetWorkerRole.Fernetero: return "¡Hay Fernet!";
@@ -829,18 +823,17 @@ namespace HayChoriYPaty
             float now = towerDefenseMode.Elapsed, canvasScale = viewport.width / W;
             float pixel = towerDefenseMode.WorldUnitsPerLogicalPixel;
             float headWorld = pixel * TowerDefenseGameMode.WorkerVisualHeightLogical;
-            if (crewChantStyle == null) crewChantStyle = new GUIStyle(text) { alignment = TextAnchor.MiddleCenter, wordWrap = false };
-            crewChantStyle.fontSize = 11;
             Color previousColor = GUI.color;
             GUI.BeginGroup(new Rect(0f, 0f, W, logicalCanvasHeight));
             try
             {
                 IReadOnlyList<TowerDefenseWorkerState> crew = towerDefenseMode.Workers;
+                bool activeCooks = towerDefenseMode.Kitchen.ActiveCooks;
                 bool sellsVacio = towerDefenseMode.ContainsProduct(3);
                 for (int i = 0; i < crew.Count; i++)
                 {
                     TowerDefenseWorkerState worker = crew[i];
-                    string chant = CrewChantTextFor(worker.Role, sellsVacio);
+                    string chant = CrewChantTextFor(worker.Role, activeCooks, sellsVacio);
                     if (chant == null) continue;
                     bool settled = CrewIsSettled(towerDefenseMode, worker), wasSettled;
                     if (!crewWasSettled.TryGetValue(worker.Id, out wasSettled)) wasSettled = true;
@@ -850,34 +843,12 @@ namespace HayChoriYPaty
                     if (!crewChantStart.TryGetValue(worker.Id, out started)) continue;
                     float age = now - started;
                     if (age < 0f || age >= CrewChantSeconds) continue;
-                    float alpha = age < CrewChantSeconds - CrewChantFadeSeconds ? 1f : (CrewChantSeconds - age) / CrewChantFadeSeconds;
                     Vector3 head = camera.WorldToScreenPoint(new Vector3(worker.Position.x, worker.Position.y + headWorld, 0f));
                     if (head.z <= 0f) continue;
                     if (TowerDefenseMirrored) head.x = 2f * (viewport.x + viewport.width * .5f) - head.x;
-                    // As narrow as its longest line allows (same font size): the bubble hugs the text on both sides.
-                    string[] lines = chant.Split('\n');
-                    float chantWidth = 0f;
-                    foreach (string line in lines) chantWidth = Mathf.Max(chantWidth, crewChantStyle.CalcSize(new GUIContent(line)).x);
-                    chantWidth = Mathf.Max(56f, Mathf.Ceil(chantWidth) + 2f * CrewChantSidePaddingLogical);
-                    float chantHeight = CrewChantBaseHeightLogical + lines.Length * CrewChantLineHeightLogical;
                     float headX = (head.x - viewport.x) / canvasScale;
                     float headY = (Screen.height - head.y - viewport.y) / canvasScale - TowerDefenseResponsiveLayout.VisualStageLift;
-                    float rise = (1f - alpha) * 6f; // it drifts up a little while it dissolves
-                    // The tail must point at its worker: bubbles of workers in the left half mirror the art (tail on the left, bubble to the right).
-                    bool tailLeft = headX < W * .5f;
-                    float bubbleX = tailLeft ? headX - CrewChantTailTipInsetLogical : headX - (chantWidth - CrewChantTailTipInsetLogical);
-                    var bubble = new Rect(Mathf.Clamp(bubbleX, 4f, W - chantWidth - 4f), headY - chantHeight - 3f - rise, chantWidth, chantHeight);
-                    GUI.color = new Color(1f, 1f, 1f, alpha);
-                    Matrix4x4 previousMatrix = GUI.matrix;
-                    if (tailLeft)
-                        GUI.matrix = previousMatrix * Matrix4x4.TRS(new Vector3(bubble.center.x, 0f, 0f), Quaternion.identity, new Vector3(-1f, 1f, 1f))
-                            * Matrix4x4.TRS(new Vector3(-bubble.center.x, 0f, 0f), Quaternion.identity, Vector3.one);
-                    DrawOrderBubble(bubble, 1f);
-                    GUI.matrix = previousMatrix;
-                    // Centre the text on the bubble's body, not on the body plus tail (2026-11-26, a pedido: "¡Hay Bondio!" sat too high).
-                    var label = new Rect(bubble.x, bubble.y + CrewChantBodyTopInsetLogical, bubble.width,
-                        bubble.height - CrewChantBodyTopInsetLogical - CrewChantBodyBottomInsetLogical);
-                    GUI.Label(label, chant, crewChantStyle);
+                    DrawCrewChantBubble(chant, headX, headY, age);
                 }
             }
             finally { GUI.EndGroup(); GUI.color = previousColor; }

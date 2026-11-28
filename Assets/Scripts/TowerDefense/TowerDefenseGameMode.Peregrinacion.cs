@@ -1724,13 +1724,16 @@ namespace HayChoriYPaty
             long signature = PathLatticeSignature();
             if (pathLattices.TryGetValue(role, out PathLattice cached) && cached.Signature == signature) return cached;
             float step = (config.FreeConstruction ? ConstructionGridLogical * .5f : ConstructionGridLogical) * worldUnitsPerLogicalPixel;
-            // La Renga's cooks work from a strip a few pixels tall between two solid rows. One row of waypoints is laid exactly on
-            // it, otherwise no node falls inside the strip and a cook standing there could never reach anything.
+            // Anchor one row inside the narrow walkable strip behind the grills. In active C kitchens the cooks' posts move
+            // down to the visible grill edge; the regular station access can be above the strip, inside the barrel keep-out.
             float originY = WorkBounds.yMin;
             if (IsCShapedLevel)
             {
                 TowerDefensePlacedStation grill = FindPlacedStation(TowerDefenseStationKind.NormalGrill);
-                if (grill != null && IsFinite(grill.WorkPosition.y)) originY = WorkBounds.yMin + Mathf.Repeat(grill.WorkPosition.y - WorkBounds.yMin, step);
+                float stripY = CooksAtVisibleGrillBack && IsCookRole(role)
+                    ? RolePost(role, 0, 1).y
+                    : (grill != null ? grill.WorkPosition.y : float.NaN);
+                if (IsFinite(stripY)) originY = WorkBounds.yMin + Mathf.Repeat(stripY - WorkBounds.yMin, step);
             }
             // Same for the corridor between the premium table and the barrels: a column of waypoints runs along its centre line.
             float originX = WorkBounds.xMin;
